@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CTurret id="MothershipRotate">
+        <YawIdleRate value="0.3515"/>
+        <Fidget TurningRate="0.1757"/>
+    </CTurret>
+    <CTurret id="WarpPrismPhasingRotate">
+        <YawIdleRate value="-0.879"/>
+        <Fidget TurningRate="4.9218"/>
+    </CTurret>
+</Catalog>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CModel id="Armory">
+        <ScaleMax value="2.000000,2.000000,2.000000"/>
+        <ScaleMin value="2.000000,2.000000,2.000000"/>
+    </CModel>
+    <CModel id="Battlecruiser">
+        <AnimSpeed value="0.200000"/>
+    </CModel>
+    <CModel id="ConfirmationLocalGround">
+        <ScaleMax value="0.000500,0.000500,0.000500"/>
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="ConfirmationSyncGround">
+        <ScaleMax value="0.000500,0.000500,0.000500"/>
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="Confirmation_Ground_TeamColor">
+        <ScaleMax value="0.000500,0.000500,0.000500"/>
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="DukesRevenge">
+        <ScaleMax value="8.000000,8.000000,8.000000"/>
+        <ScaleMin value="8.000000,8.000000,8.000000"/>
+    </CModel>
+    <CModel id="FogMist">
+        <ScaleMax value="2.000000,2.000000,2.000000"/>
+        <ScaleMin value="2.000000,2.000000,2.000000"/>
+    </CModel>
+    <CModel id="GehennaCruiser">
+        <Flags index="DynamicZChanger" value="1"/>
+        <ScaleMax value="6.000000,6.000000,6.000000"/>
+        <ScaleMin value="6.000000,6.000000,6.000000"/>
+        <SelectionOffset value="0.000000,0.000000,62.000000"/>
+    </CModel>
+    <CModel id="GhostNukeLaunch">
+        <ScaleMax value="0.000500,0.000500,0.000500"/>
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="Goliath">
+        <ScaleMax value="1.400000,1.400000,1.400000"/>
+        <ScaleMin value="1.400000,1.400000,1.400000"/>
+    </CModel>
+    <CModel id="GoliathDeath">
+        <ScaleMax value="1.400000,1.400000,1.400000"/>
+        <ScaleMin value="1.400000,1.400000,1.400000"/>
+    </CModel>
+    <CModel id="HeroNukeExplode">
+        <ScaleMax value="3.000000,3.000000,3.000000"/>
+        <ScaleMin value="3.000000,3.000000,3.000000"/>
+        <AnimSpeed value="0.500000"/>
+    </CModel>
+    <CModel id="Hive">
+        <ScaleMax value="3.000000,3.000000,3.000000"/>
+        <ScaleMin value="3.000000,3.000000,3.000000"/>
+    </CModel>
+    <CModel id="HybridUltraliskShackled">
+        <ScaleMax value="1.200000,1.200000,1.200000"/>
+        <ScaleMin value="1.200000,1.200000,1.200000"/>
+    </CModel>
+    <CModel id="InfestedSiegeBreaker">
+        <ScaleMax value="2.000000,2.000000,2.000000"/>
+        <ScaleMin value="2.000000,2.000000,2.000000"/>
+    </CModel>
+    <CModel id="InfestedSiegeBreakerDeath">
+        <ScaleMax value="2.000000,2.000000,2.000000"/>
+        <ScaleMin value="2.000000,2.000000,2.000000"/>
+    </CModel>
+    <CModel id="KorhalBuilding">
+        <Occlusion value="None"/>
+    </CModel>
+    <CModel id="MengskBC">
+        <AnimSpeed value="0.100000"/>
+    </CModel>
+    <CModel id="Mothership">
+        <AnimSpeed value="0.250000"/>
+        <Occlusion value="None"/>
+        <OccludingOpacity value="1.000000"/>
+    </CModel>
+    <CModel id="PsiDecimator">
+        <ScaleMax value="3.500000,3.500000,3.500000"/>
+        <ScaleMin value="3.500000,3.500000,3.500000"/>
+    </CModel>
+    <CModel id="ShapeArrowPointer">
+        <ScaleMax value="0.000500,0.000500,0.000500"/>
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="SporeCrawlerAttackImpact">
+        <ScaleMax value="4.000000,4.000000,4.000000"/>
+        <ScaleMin value="4.000000,4.000000,4.000000"/>
+        <Model value="Assets\Effects\Zerg\BioPlasmidMissileImpactEx1\BioPlasmidMissileImpactEx1.m3"/>
+    </CModel>
+    <CModel id="WarfieldFortress">
+        <ScaleMax value="3.000000,3.000000,3.000000"/>
+        <ScaleMin value="2.000000,2.000000,2.000000"/>
+    </CModel>
+    <CModel id="WarpPrism">
+        <AnimSpeed value="0.100000"/>
+    </CModel>
+    <CModel id="WarpPrismPhasing">
+        <AnimSpeed value="0.100000"/>
+    </CModel>
+    <CModel id="WayPointAttack_TeamColor">
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="WayPointConfirmation_TeamColor">
+        <ScaleMax value="0.000500,0.000500,0.000500"/>
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="WayPointMove_TeamColor">
+        <ScaleMax value="0.000500,0.000500,0.000500"/>
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="WayPointRally_TeamColor">
+        <ScaleMax value="0.000500,0.000500,0.000500"/>
+        <ScaleMin value="0.000500,0.000500,0.000500"/>
+    </CModel>
+    <CModel id="WeatherHelper">
+        <ScaleMax value="2.000000,2.000000,2.000000"/>
+        <ScaleMin value="2.000000,2.000000,2.000000"/>
+    </CModel>
+    <CModel id="ZerusTree">
+        <VariationCount value="12"/>
+    </CModel>
+</Catalog>

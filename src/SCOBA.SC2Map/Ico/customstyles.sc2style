@@ -1,0 +1,10 @@
+<StyleFile>
+  <Style name="StandardText" template="StandardExtendedTemplate" height="16" textcolor="#ColorWhite"/>
+  <Style name="HeaderText" template="HeaderExtendedTemplate" height="24" textcolor="#ColorWhite"/> 
+
+  <Style name="StandardParagraphText" template="StandardText" hjustify="Left" vjustify="Top"/>
+  <Style name="HeaderCenterText" template="HeaderText" hjustify="Center" vjustify="Middle"/>
+
+  <Style name="DialogItemText" template="HeaderText" height="20" hjustify="Left" vjustify="Middle"/>
+  <Style name="DialogButtonText" template="HeaderText" hjustify="Center" vjustify="Middle"/>
+</StyleFile>

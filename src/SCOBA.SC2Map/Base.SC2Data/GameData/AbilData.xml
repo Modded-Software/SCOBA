@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <!--CAbilEffectInstant id="DehakaHeal">-->
+    <!--        <EditorCategories value="Race:Zerg,AbilityorEffectType:Units"/>-->
+    <!--        <Flags index="Transient" value="1"/>-->
+    <!--        <Cost>-->
+    <!--            <Cooldown Link="DehakaHeal" Location="Unit" TimeUse="10"/>-->
+    <!--        </Cost>-->
+    <!--        <CmdButtonArray index="Execute" DefaultButtonFace="DehakaHeal"/>-->
+    <!--    </CAbilEffectInstant-->
+    <CAbilEffectTarget id="DehakaLeap">
+        <Range index="0" value="4"/>
+        <ArcSlop value="3.999"/>
+        <UseMarkerArray index="Approach" value="0"/>
+        <UseMarkerArray index="Prep" value="0"/>
+        <UseMarkerArray index="Channel" value="0"/>
+    </CAbilEffectTarget>
+    <CAbilEffectTarget id="HeroNuclearStrike">
+        <Effect index="0" value="HeroNukePersistent"/>
+        <Cost>
+            <Charge Link=""/>
+            <Cooldown Link="Abil/HeroNuclearStrike" TimeUse="180"/>
+        </Cost>
+        <Range index="0" value="20"/>
+        <CalldownEffect value="HeroNukePersistent"/>
+        <CmdButtonArray index="Execute" Requirements=""/>
+    </CAbilEffectTarget>
+    <CAbilSpecialize id="MakeVultureSpiderMines">
+        <InfoArray index="Specialize1">
+            <Resource index="Minerals" value="10"/>
+        </InfoArray>
+    </CAbilSpecialize>
+    <CAbilEffectInstant id="SummonCompanion">
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <CmdButtonArray index="Execute" DefaultButtonFace="Salvage2"/>
+    </CAbilEffectInstant>
+</Catalog>

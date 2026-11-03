@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CWeaponLegacy id="AcidSpew">
+        <Range value="128"/>
+        <Period value="4"/>
+    </CWeaponLegacy>
+    <CWeaponLegacy id="AutoTurret">
+        <Period value="1"/>
+    </CWeaponLegacy>
+    <CWeaponLegacy id="BrakkClaws">
+        <Range value="0.3"/>
+    </CWeaponLegacy>
+    <CWeaponLegacy id="ImpalerTentacle">
+        <Period value="1.2"/>
+    </CWeaponLegacy>
+    <CWeaponLegacy id="KraithSpineVolley">
+        <TargetFilters value="-;Missile,Stasis,Dead,Invulnerable"/>
+    </CWeaponLegacy>
+    <CWeaponLegacy id="QueenOfBladesPsiBlast">
+        <Period value="1"/>
+    </CWeaponLegacy>
+</Catalog>

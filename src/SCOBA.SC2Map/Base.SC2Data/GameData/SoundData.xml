@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CSound id="SporeCannon_AttackLaunch">
+        <Volume value="-96.000000,-96.000000"/>
+    </CSound>
+</Catalog>

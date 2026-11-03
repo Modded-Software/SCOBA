@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Regions>
+    <region id="1">
+        <name value="Tosh Spawn"/>
+        <shape type="circle">
+            <center value="88.3662,87.1394"/>
+            <radius value="6"/>
+        </shape>
+    </region>
+    <region id="2">
+        <name value="Kerrigan Spawn"/>
+        <shape type="circle">
+            <center value="34.9277,34.704"/>
+            <radius value="6"/>
+        </shape>
+    </region>
+    <region id="3">
+        <name value="Nova Spawn"/>
+        <shape type="circle">
+            <center value="110.4843,79.4216"/>
+            <radius value="7.194"/>
+        </shape>
+    </region>
+    <region id="4">
+        <name value="Raynor Spawn"/>
+        <shape type="circle">
+            <center value="79.3266,109.3198"/>
+            <radius value="7.194"/>
+        </shape>
+    </region>
+    <region id="5">
+        <name value="Stukov Spawn"/>
+        <shape type="circle">
+            <center value="53.7246,15.0056"/>
+            <radius value="7.194"/>
+        </shape>
+    </region>
+    <region id="6">
+        <name value="Dehaka Spawn"/>
+        <shape type="circle">
+            <center value="14.605,54.6523"/>
+            <radius value="7.194"/>
+        </shape>
+    </region>
+    <region id="7">
+        <name value="X Bottom"/>
+        <shape type="circle">
+            <center value="92.728,29.0314"/>
+            <radius value="8"/>
+        </shape>
+    </region>
+    <region id="8">
+        <name value="X Center"/>
+        <shape type="circle">
+            <center value="62.6437,59.4165"/>
+            <radius value="8"/>
+        </shape>
+    </region>
+    <region id="9">
+        <name value="X Top"/>
+        <shape type="circle">
+            <center value="31.0554,95.5341"/>
+            <radius value="8"/>
+        </shape>
+    </region>
+    <region id="10">
+        <name value="Zerg"/>
+        <shape type="circle">
+            <center value="18.3815,16.791"/>
+            <radius value="14.1384"/>
+        </shape>
+    </region>
+    <region id="11">
+        <name value="Terran"/>
+        <shape type="circle">
+            <center value="109.086,107.7062"/>
+            <radius value="14.1384"/>
+        </shape>
+    </region>
+    <region id="12">
+        <name value="Terran Jungle Left"/>
+        <shape type="circle">
+            <center value="92.0297,60.8205"/>
+            <radius value="12"/>
+        </shape>
+    </region>
+    <region id="13">
+        <name value="Terran Jungle Right"/>
+        <shape type="circle">
+            <center value="62.1777,89.397"/>
+            <radius value="12"/>
+        </shape>
+    </region>
+</Regions>

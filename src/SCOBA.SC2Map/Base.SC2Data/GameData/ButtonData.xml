@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CButton id="Move2">
+        <Icon value="Assets\Textures\btn-command-move.dds"/>
+        <AlertIcon value="Assets\Textures\btn-command-move.dds"/>
+        <EditorCategories value="Race:Neutral"/>
+        <TintRacially value="1"/>
+        <Universal value="1"/>
+        <SimpleDisplayText value="SimpleDisplay/Move2"/>
+    </CButton>
+    <CButton id="ResearchNeosteelFrame"/>
+    <CButton id="Salvage2">
+        <Icon value="Assets\Textures\btn-research-zerg-predator.dds"/>
+        <AlertIcon value="Assets\Textures\btn-research-zerg-predator.dds"/>
+        <EditorCategories value="Race:Terran"/>
+        <TintRacially value="1"/>
+    </CButton>
+</Catalog>

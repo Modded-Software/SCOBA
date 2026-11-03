@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CBehaviorBuff id="ARMOR">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/ARMOURI"/>
+            <Cooldown Link="Behavior/ARMOURI"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_ARMOUR.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification LifeArmorBonus="4" ShieldArmorBonus="3">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/ARMOURI"/>
+                    <Cooldown Link="Behavior/ARMOURI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/ARMOURI"/>
+                <Cooldown Link="Behavior/ARMOURI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="ARMORMeele">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/ARMOURI"/>
+            <Cooldown Link="Behavior/ARMOURI"/>
+        </Cost>
+        <InfoFlags index="Hidden" value="1"/>
+        <InfoIcon value="Ico\SkillTree_ARMOUR.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification LifeArmorBonus="2" ShieldArmorBonus="2">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/ARMOURI"/>
+                    <Cooldown Link="Behavior/ARMOURI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/ARMOURI"/>
+                <Cooldown Link="Behavior/ARMOURI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="ATTACKRANGE">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/ATTACKRANGEI"/>
+            <Cooldown Link="Behavior/ATTACKRANGEI"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_ATTACK_RANGE.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification WeaponRange="3">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/ATTACKRANGEI"/>
+                    <Cooldown Link="Behavior/ATTACKRANGEI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/ATTACKRANGEI"/>
+                <Cooldown Link="Behavior/ATTACKRANGEI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="ATTACKSPEED">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/UnitATTACKSPEEDL1"/>
+            <Cooldown Link="Behavior/UnitATTACKSPEEDL1"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_ATTACK_SPEED.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification AttackSpeedMultiplier="1.5">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/UnitATTACKSPEEDL1"/>
+                    <Cooldown Link="Behavior/UnitATTACKSPEEDL1"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/UnitATTACKSPEEDL1"/>
+                <Cooldown Link="Behavior/UnitATTACKSPEEDL1"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="ATTACKSPEEDMeele">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/UnitATTACKSPEEDL1"/>
+            <Cooldown Link="Behavior/UnitATTACKSPEEDL1"/>
+        </Cost>
+        <InfoFlags index="Hidden" value="1"/>
+        <InfoIcon value="Ico\SkillTree_ATTACK_SPEED.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification AttackSpeedMultiplier="1.5">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/UnitATTACKSPEEDL1"/>
+                    <Cooldown Link="Behavior/UnitATTACKSPEEDL1"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/UnitATTACKSPEEDL1"/>
+                <Cooldown Link="Behavior/UnitATTACKSPEEDL1"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="DAMAGE2">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/UnitDAMAGEL2"/>
+            <Cooldown Link="Behavior/UnitDAMAGEL2"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_DAMAGE.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <DamageDealtFraction index="Spell" value="0.5"/>
+            <DamageDealtFraction index="Melee" value="0.5"/>
+            <DamageDealtFraction index="Ranged" value="0.5"/>
+            <DamageDealtFraction index="Splash" value="0.5"/>
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/UnitDAMAGEL2"/>
+                    <Cooldown Link="Behavior/UnitDAMAGEL2"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/UnitDAMAGEL2"/>
+                <Cooldown Link="Behavior/UnitDAMAGEL2"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="DAMAGEMeele">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/UnitDAMAGEL2"/>
+            <Cooldown Link="Behavior/UnitDAMAGEL2"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_DAMAGE.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <DamageDealtFraction index="Spell" value="1.5"/>
+            <DamageDealtFraction index="Melee" value="1.5"/>
+            <DamageDealtFraction index="Ranged" value="1.5"/>
+            <DamageDealtFraction index="Splash" value="1.5"/>
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/UnitDAMAGEL2"/>
+                    <Cooldown Link="Behavior/UnitDAMAGEL2"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/UnitDAMAGEL2"/>
+                <Cooldown Link="Behavior/UnitDAMAGEL2"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="ENERGYREGEN">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/ENERGYI"/>
+            <Cooldown Link="Behavior/ENERGYI"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_ENERGY_REGEN.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <VitalRegenArray index="Energy" value="4"/>
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/ENERGYI"/>
+                    <Cooldown Link="Behavior/ENERGYI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/ENERGYI"/>
+                <Cooldown Link="Behavior/ENERGYI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="HEALTHBONUS">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/SIGHTRANGEI"/>
+            <Cooldown Link="Behavior/SIGHTRANGEI"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_HEALTH.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification SightBonus="4">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/SIGHTRANGEI"/>
+                    <Cooldown Link="Behavior/SIGHTRANGEI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/SIGHTRANGEI"/>
+                <Cooldown Link="Behavior/SIGHTRANGEI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="HEALTHREGEN">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/HEALTHREGENI"/>
+            <Cooldown Link="Behavior/HEALTHREGENI"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_HEALTH_SHIELD_REGEN.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <VitalRegenArray index="Life" value="3"/>
+            <VitalRegenArray index="Shields" value="3"/>
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/HEALTHREGENI"/>
+                    <Cooldown Link="Behavior/HEALTHREGENI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/HEALTHREGENI"/>
+                <Cooldown Link="Behavior/HEALTHREGENI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="HEALTHREGENMeele">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/HEALTHREGENI"/>
+            <Cooldown Link="Behavior/HEALTHREGENI"/>
+        </Cost>
+        <InfoFlags index="Hidden" value="1"/>
+        <InfoIcon value="Ico\SkillTree_HEALTH_SHIELD_REGEN.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <VitalRegenArray index="Life" value="2"/>
+            <VitalRegenArray index="Shields" value="2"/>
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/HEALTHREGENI"/>
+                    <Cooldown Link="Behavior/HEALTHREGENI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/HEALTHREGENI"/>
+                <Cooldown Link="Behavior/HEALTHREGENI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="HideUnit">
+        <InfoFlags index="Hidden" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <StateFlags index="NoDraw" value="1"/>
+        </Modification>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="MOVESPEED">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/MOVESPEEDI"/>
+            <Cooldown Link="Behavior/MOVESPEEDI"/>
+        </Cost>
+        <InfoIcon value="Ico\SkillTree_MOVEMENT_SPEED.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification MoveSpeedMultiplier="1.3">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/MOVESPEEDI"/>
+                    <Cooldown Link="Behavior/MOVESPEEDI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/MOVESPEEDI"/>
+                <Cooldown Link="Behavior/MOVESPEEDI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="MOVESPEEDMeele">
+        <Alignment value="Negative"/>
+        <Cost>
+            <Charge Link="Behavior/MOVESPEEDI"/>
+            <Cooldown Link="Behavior/MOVESPEEDI"/>
+        </Cost>
+        <InfoFlags index="Hidden" value="1"/>
+        <InfoIcon value="Ico\SkillTree_MOVEMENT_SPEED.dds"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification MoveSpeedMultiplier="1.4">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/MOVESPEEDI"/>
+                    <Cooldown Link="Behavior/MOVESPEEDI"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/MOVESPEEDI"/>
+                <Cooldown Link="Behavior/MOVESPEEDI"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorVeterancy id="RPGExperienceNORMAL">
+        <Cost>
+            <Charge Link="Behavior/RPGExperienceWEAK"/>
+            <Cooldown Link="Behavior/RPGExperienceWEAK"/>
+        </Cost>
+        <InfoFlags index="Hidden" value="1"/>
+        <BehaviorCategories index="Permanent" value="1"/>
+        <BehaviorCategories index="Restorable" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <XPFraction index="DamageDealt" value="0.05"/>
+        <XPFraction index="DamageTaken" value="0.025"/>
+        <VeterancyLevelArray MinVeterancyXP="2000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="2000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="4000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="8000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+    </CBehaviorVeterancy>
+    <CBehaviorVeterancy id="RPGExperienceSTRONG">
+        <Cost>
+            <Charge Link="Behavior/RPGExperienceWEAK"/>
+            <Cooldown Link="Behavior/RPGExperienceWEAK"/>
+        </Cost>
+        <InfoFlags index="Hidden" value="1"/>
+        <BehaviorCategories index="Permanent" value="1"/>
+        <BehaviorCategories index="Restorable" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <XPFraction index="DamageDealt" value="0.05"/>
+        <XPFraction index="DamageTaken" value="0.025"/>
+        <VeterancyLevelArray MinVeterancyXP="4000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="4000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="8000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+    </CBehaviorVeterancy>
+    <CBehaviorVeterancy id="RPGExperienceWEAK">
+        <InfoFlags index="Hidden" value="1"/>
+        <BehaviorCategories index="Permanent" value="1"/>
+        <BehaviorCategories index="Restorable" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <XPFraction index="DamageDealt" value="0.05"/>
+        <XPFraction index="DamageTaken" value="0.025"/>
+        <VeterancyLevelArray MinVeterancyXP="1000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="1000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="2000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="4000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+        <VeterancyLevelArray MinVeterancyXP="8000">
+            <Modification>
+                <DeathResponse>
+                    <Type index="Remove" value="1"/>
+                </DeathResponse>
+            </Modification>
+        </VeterancyLevelArray>
+    </CBehaviorVeterancy>
+    <CBehaviorBuff id="SKILLTREEisActive">
+        <InfoFlags index="Hidden" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="UnitDirectControl">
+        <Alignment value="Positive"/>
+        <Cost>
+            <Charge Link="Behavior/StimPack"/>
+            <Cooldown Link="Behavior/StimPack"/>
+        </Cost>
+        <InfoIcon value="Ico\UnitControl_Ico.dds"/>
+        <BehaviorCategories index="Permanent" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <SightBonus value="10"/>
+            <AccelerationMultiplier value="10"/>
+            <DecelerationMultiplier value="10"/>
+            <AttackSpeedMultiplier value="1.5"/>
+            <WeaponRange value="2"/>
+            <WeaponScanBonus value="1"/>
+            <Radar value="25"/>
+            <VitalRegenArray index="Life" value="2"/>
+            <VitalRegenArray index="Shields" value="2"/>
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/StimPack"/>
+                    <Cooldown Link="Behavior/StimPack"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/StimPack"/>
+                <Cooldown Link="Behavior/StimPack"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="UnitDirectControlMeele">
+        <Alignment value="Positive"/>
+        <Cost>
+            <Charge Link="Behavior/StimPack"/>
+            <Cooldown Link="Behavior/StimPack"/>
+        </Cost>
+        <InfoIcon value="Ico\UnitControl_Ico.dds"/>
+        <BehaviorCategories index="Permanent" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <SightBonus value="10"/>
+            <MoveSpeedMultiplier value="1.2"/>
+            <AccelerationMultiplier value="10"/>
+            <DecelerationMultiplier value="10"/>
+            <AttackSpeedMultiplier value="1.5"/>
+            <LifeArmorBonus value="2"/>
+            <Radar value="25"/>
+            <VitalRegenArray index="Life" value="3"/>
+            <VitalRegenArray index="Shields" value="3"/>
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/StimPack"/>
+                    <Cooldown Link="Behavior/StimPack"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/StimPack"/>
+                <Cooldown Link="Behavior/StimPack"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="UnitRun">
+        <Alignment value="Positive"/>
+        <Cost>
+            <Charge Link="Behavior/StimPack"/>
+            <Cooldown Link="Behavior/StimPack"/>
+        </Cost>
+        <InfoIcon value="Ico\Run_Ico.dds"/>
+        <BehaviorCategories index="Temporary" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Duration value="10"/>
+        <Modification MoveSpeedMultiplier="1.3" AccelerationMultiplier="10" DecelerationMultiplier="10">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/StimPack"/>
+                    <Cooldown Link="Behavior/StimPack"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/StimPack"/>
+                <Cooldown Link="Behavior/StimPack"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="UnitRunMeele">
+        <Alignment value="Positive"/>
+        <Cost>
+            <Charge Link="Behavior/StimPack"/>
+            <Cooldown Link="Behavior/StimPack"/>
+        </Cost>
+        <InfoIcon value="Ico\Run_Ico.dds"/>
+        <BehaviorCategories index="Temporary" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Duration value="10"/>
+        <Modification MoveSpeedMultiplier="1.7" AccelerationMultiplier="10" DecelerationMultiplier="10">
+            <DeathResponse>
+                <Cost>
+                    <Charge Link="Behavior/StimPack"/>
+                    <Cooldown Link="Behavior/StimPack"/>
+                </Cost>
+            </DeathResponse>
+        </Modification>
+        <DamageResponse>
+            <Cost>
+                <Charge Link="Behavior/StimPack"/>
+                <Cooldown Link="Behavior/StimPack"/>
+            </Cost>
+        </DamageResponse>
+    </CBehaviorBuff>
+</Catalog>

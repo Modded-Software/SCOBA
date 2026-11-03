@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CAlert default="1" id="Attack">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackTown">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackTownAlly">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackTownAlly_Prot">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackTownAlly_Terr">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackTownAlly_Zerg">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackTown_Prot">
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackTown_Terr">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackTown_Zerg">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackUnit">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackUnitAlly">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackUnitAlly_Prot">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackUnitAlly_Terr">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackUnitAlly_Zerg">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackUnit_Prot">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackUnit_Terr">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+    <CAlert id="AttackUnit_Zerg">
+        <Display index="Self" value="0"/>
+        <Display index="Other" value="0"/>
+        <Flags index="Combine" value="0"/>
+        <Flags index="Ping" value="0"/>
+    </CAlert>
+</Catalog>

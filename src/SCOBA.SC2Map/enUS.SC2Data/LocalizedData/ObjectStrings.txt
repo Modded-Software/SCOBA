@@ -1,0 +1,2 @@
+﻿Actor/Name/WalkBackwards=Walk Backwards
+Effect/EditorPrefix/SalvageDeath=

@@ -1,0 +1,267 @@
+trigger gt_DamageTrack;
+trigger gt_HealAward;
+trigger gt_DeathAward;
+trigger gt_DamageCleanup;
+
+bool gf_IsHeroPlayer (int lp_player) {
+    return (lp_player >= 1 && lp_player <= 6);
+}
+
+string gf_DamageKey (int lp_tag, int lp_player) {
+    return "dmg:" + IntToString(lp_tag) + ":" + IntToString(lp_player);
+}
+
+void gf_ClearDamageRecord (int lp_tag) {
+    int lv_player;
+    string lv_key;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        lv_key = gf_DamageKey(lp_tag, lv_player);
+        if (DataTableValueExists(true, lv_key)) {
+            DataTableValueRemove(true, lv_key);
+        }
+    }
+}
+
+void gf_AwardExperience (int lp_player, int lp_amount) {
+    int lv_threshold;
+    int lv_xpBar;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    if (lp_amount <= 0) {
+        return;
+    }
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+
+    gv_xP[lp_player] += lp_amount;
+    lv_xpBar = ((lp_player * 10) + 3);
+    libNtve_gf_SetBossBarCurrentValue(lv_xpBar, gv_xP[lp_player], true);
+
+    lv_threshold = ((gv_lEVEL[lp_player] * 298) + PowI(2.0, gv_lEVEL[lp_player]));
+    while (gv_xP[lp_player] >= lv_threshold) {
+        gv_xP[lp_player] -= lv_threshold;
+        gv_lEVEL[lp_player] += 1;
+        gv_availableStatPoints[lp_player] += 3;
+        libNtve_gf_CreateExplosionAtPoint(libNtve_ge_ExplosionSize_Small, libNtve_ge_ExplosionType_Protoss, UnitGetPosition(gv_tPSUNIT[lp_player]));
+        TextTagCreate((StringToText("LEVEL ") + IntToText(gv_lEVEL[lp_player])), 18, UnitGetPosition(gv_tPSUNIT[lp_player]), 2.0, true, false, PlayerGroupSingle(lp_player));
+        TextTagSetColor(TextTagLastCreated(), c_textTagColorText, Color(100.00, 85.00, 20.00));
+        TextTagSetVelocity(TextTagLastCreated(), 0.0, 90.0);
+        TextTagSetTime(TextTagLastCreated(), c_textTagTimeDuration, 2.0);
+        if ((DialogIsVisible(gv_abilitiesSelectionDialog, lp_player) == true)) {
+            if ((gf_CanLevelAbility(gv_lEVEL[lp_player]) == true) && (gv_lEVEL[lp_player] <= 15)) {
+                gv_availableAbilityPoints[lp_player] += 1;
+            }
+            else {
+                if ((gv_lEVEL[lp_player] > 15) && (gv_lEVEL[lp_player] == 20)) {
+                    gv_availableAbilityPoints[lp_player] += 1;
+                }
+            }
+        }
+        else {
+            if ((gf_CanLevelAbility(gv_lEVEL[lp_player]) == true) && (gv_lEVEL[lp_player] <= 15)) {
+                gv_availableAbilityPoints[lp_player] += 1;
+            }
+            else {
+                if ((gv_lEVEL[lp_player] > 15) && (gv_lEVEL[lp_player] == 20)) {
+                    gv_availableAbilityPoints[lp_player] += 1;
+                }
+            }
+        }
+        lv_threshold = ((gv_lEVEL[lp_player] * 298) + PowI(2.0, gv_lEVEL[lp_player]));
+    }
+
+    libNtve_gf_DisplayBossBar(lv_xpBar, "Assets\\Textures\\btn-ability-kerrigan_revive.dds", (StringExternal("Param/Value/5E8CE3E3") + IntToText(gv_lEVEL[lp_player])), lv_threshold, PlayerGroupSingle(lp_player));
+    libNtve_gf_SetBossBarCurrentValue(lv_xpBar, gv_xP[lp_player], true);
+    libNtve_gf_SetBossBarMaximumValue(lv_xpBar, lv_threshold, true);
+    gf_ShowStasLevelingInterface(lp_player);
+    gf_ShowAbilityLevelingInterface(lp_player);
+}
+
+bool gt_DamageTrack_Func (bool testConds, bool runActions) {
+    unit lv_victim;
+    unit lv_source;
+    int lv_player;
+    int lv_victimOwner;
+    int lv_tag;
+    fixed lv_damage;
+    string lv_key;
+
+    lv_victim = EventUnit();
+    lv_source = EventUnitDamageSourceUnit();
+    lv_player = EventUnitDamageSourcePlayer();
+    lv_victimOwner = -1;
+    lv_damage = EventUnitDamageAmount();
+    if (UnitIsValid(lv_victim)) {
+        lv_victimOwner = UnitGetOwner(lv_victim);
+    }
+
+    if (!runActions) {
+        return true;
+    }
+
+    if (!UnitIsValid(lv_victim) || !UnitIsValid(lv_source)) {
+        return true;
+    }
+    if (!gf_IsHeroPlayer(lv_player)) {
+        return true;
+    }
+    if (!UnitIsValid(gv_tPSUNIT[lv_player])) {
+        return true;
+    }
+    if (lv_victimOwner < 0 || lv_victimOwner > 15) {
+        return true;
+    }
+    if (lv_victimOwner == lv_player) {
+        return true;
+    }
+    if (libNtve_gf_PlayerIsEnemy(lv_player, lv_victimOwner, libNtve_ge_PlayerRelation_Ally) == true) {
+        return true;
+    }
+    if (lv_damage <= 0.0) {
+        return true;
+    }
+
+    lv_tag = UnitGetTag(lv_victim);
+    lv_key = gf_DamageKey(lv_tag, lv_player);
+    DataTableSetFixed(true, lv_key, (DataTableGetFixed(true, lv_key) + lv_damage));
+    return true;
+}
+
+void gt_DamageTrack_Init () {
+    gt_DamageTrack = TriggerCreate("gt_DamageTrack_Func");
+    TriggerAddEventUnitDamaged(gt_DamageTrack, null, c_unitDamageTypeAny, c_unitDamageEither, null);
+}
+
+bool gt_HealAward_Func (bool testConds, bool runActions) {
+    unit lv_healedUnit;
+    unit lv_healUnit;
+    int lv_healer;
+    int lv_targetOwner;
+    fixed lv_healAmount;
+
+    lv_healedUnit = EventUnit();
+    lv_healUnit = EventUnitHealLaunchUnit();
+    lv_healer = EventUnitHealLaunchPlayer();
+    lv_healAmount = EventUnitHealAmount();
+    lv_targetOwner = -1;
+    if (UnitIsValid(lv_healedUnit)) {
+        lv_targetOwner = UnitGetOwner(lv_healedUnit);
+    }
+
+    if (!runActions) {
+        return true;
+    }
+
+    if (!UnitIsValid(lv_healedUnit) || !UnitIsValid(lv_healUnit)) {
+        return true;
+    }
+    if (!gf_IsHeroPlayer(lv_healer)) {
+        return true;
+    }
+    if (!UnitIsValid(gv_tPSUNIT[lv_healer])) {
+        return true;
+    }
+    if (lv_targetOwner < 0 || lv_targetOwner > 15) {
+        return true;
+    }
+    if (lv_targetOwner == lv_healer) {
+        return true;
+    }
+    if (libNtve_gf_PlayerIsEnemy(lv_healer, lv_targetOwner, libNtve_ge_PlayerRelation_Ally) == false) {
+        return true;
+    }
+    if (lv_healAmount <= 0.0) {
+        return true;
+    }
+
+    gf_AwardExperience(lv_healer, FixedToInt(lv_healAmount));
+    return true;
+}
+
+void gt_HealAward_Init () {
+    gt_HealAward = TriggerCreate("gt_HealAward_Func");
+    TriggerAddEventUnitHealed(gt_HealAward, null, c_unitVitalLife, null);
+}
+
+bool gt_DeathAward_Func (bool testConds, bool runActions) {
+    unit lv_victim;
+    int lv_tag;
+    int lv_victimOwner;
+    int lv_player;
+    int lv_xp;
+    fixed lv_damage;
+    string lv_key;
+
+    lv_victim = EventUnit();
+    lv_tag = 0;
+    lv_victimOwner = -1;
+    if (UnitIsValid(lv_victim)) {
+        lv_tag = UnitGetTag(lv_victim);
+        lv_victimOwner = UnitGetOwner(lv_victim);
+    }
+
+    if (!runActions) {
+        return true;
+    }
+
+    if (!UnitIsValid(lv_victim)) {
+        return true;
+    }
+    if (lv_tag <= 0) {
+        return true;
+    }
+    if (lv_victimOwner < 0 || lv_victimOwner > 15) {
+        return true;
+    }
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        lv_key = gf_DamageKey(lv_tag, lv_player);
+        lv_damage = DataTableGetFixed(true, lv_key);
+        if (lv_damage > 0.0) {
+            if (lv_victimOwner != lv_player && libNtve_gf_PlayerIsEnemy(lv_player, lv_victimOwner, libNtve_ge_PlayerRelation_Ally) == false) {
+                lv_xp = FixedToInt(lv_damage * 6.0);
+                gf_AwardExperience(lv_player, lv_xp);
+            }
+        }
+    }
+
+    gf_ClearDamageRecord(lv_tag);
+    return true;
+}
+
+void gt_DeathAward_Init () {
+    gt_DeathAward = TriggerCreate("gt_DeathAward_Func");
+    TriggerAddEventUnitDied(gt_DeathAward, null);
+}
+
+bool gt_DamageCleanup_Func (bool testConds, bool runActions) {
+    unit lv_victim;
+    int lv_tag;
+
+    lv_victim = EventUnit();
+    lv_tag = 0;
+    if (UnitIsValid(lv_victim)) {
+        lv_tag = UnitGetTag(lv_victim);
+    }
+
+    if (!runActions) {
+        return true;
+    }
+
+    if (lv_tag <= 0) {
+        return true;
+    }
+
+    Wait(2.0, c_timeGame);
+    gf_ClearDamageRecord(lv_tag);
+    return true;
+}
+
+void gt_DamageCleanup_Init () {
+    gt_DamageCleanup = TriggerCreate("gt_DamageCleanup_Func");
+    TriggerAddEventUnitRemoved(gt_DamageCleanup, null);
+}

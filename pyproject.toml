@@ -1,0 +1,12 @@
+[project]
+name = "sc2-research"
+version = "0.1.0"
+description = "SC2Map format research and archive inspection tools"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mpyq>=0.2.5",
+]
+
+[dependency-groups]
+dev = []

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CGame id="Dflt">
+        <DifficultyLevels index="6" ActionsPerMinute="100"/>
+        <DifficultyLevels index="7" ActionsPerMinute="100"/>
+        <DifficultyLevels index="8" ActionsPerMinute="100"/>
+        <DifficultyLevels index="9" ActionsPerMinute="100"/>
+        <DifficultyLevels index="10" ActionsPerMinute="100"/>
+        <DifficultyLevels index="11" ActionsPerMinute="100"/>
+        <DifficultyLevels index="12" ActionsPerMinute="100"/>
+        <DifficultyLevels index="13" ActionsPerMinute="100"/>
+        <DifficultyLevels index="14" ActionsPerMinute="100"/>
+        <DifficultyLevels index="15" ActionsPerMinute="100"/>
+        <DifficultyLevels index="16" ActionsPerMinute="100"/>
+        <DifficultyLevels index="17" ActionsPerMinute="100"/>
+        <DifficultyLevels index="18" ActionsPerMinute="100"/>
+        <DifficultyLevels index="19" ActionsPerMinute="100"/>
+        <DifficultyLevels index="20" ActionsPerMinute="100"/>
+        <DifficultyLevels index="21" ActionsPerMinute="100"/>
+        <DifficultyLevels index="22" ActionsPerMinute="100"/>
+        <DifficultyLevels index="23" ActionsPerMinute="100"/>
+        <DifficultyLevels index="24" ActionsPerMinute="100"/>
+        <DifficultyLevels index="25" ActionsPerMinute="100"/>
+        <DifficultyLevels index="26" ActionsPerMinute="100"/>
+        <DifficultyLevels index="27" ActionsPerMinute="100"/>
+        <DifficultyLevels index="28" ActionsPerMinute="100"/>
+        <DifficultyLevels index="29" ActionsPerMinute="100"/>
+        <DifficultyLevels index="30" ActionsPerMinute="100"/>
+        <DifficultyLevels index="31" ActionsPerMinute="100"/>
+        <CameraMarginAspectAdjust index="1" Margin="3,0,3,0"/>
+        <CameraMarginAspectAdjust index="2" Margin="3,0,3,0"/>
+        <DifficultyDefault value="4"/>
+    </CGame>
+</Catalog>

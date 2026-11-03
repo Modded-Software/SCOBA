@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <!--                                                                                         -->
+    <!-- Armory ................................................................................ -->
+    <!--                                                                                         -->
+    <CActorUnit id="Armory">
+        <Scale value="1.500000,1.500000,2.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Auto Turret ........................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="AutoTurret">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorUnit id="Banshee">
+        <Scale value="3.500000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Battlecruiser                                                                           -->
+    <!--                                                                                         -->
+    <CActorUnit id="Battlecruiser">
+        <Scale value="16.000000"/>
+        <WalkAnimMoveSpeed value="1"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Primal King                                                                          -->
+    <!--                                                                                         -->
+    <CActorUnit id="Brakk">
+        <Scale value="2.200000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Colossus .............................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="Colossus">
+        <Scale value="3.000000"/>
+    </CActorUnit>
+    <!-- Decals and Clan flags -->
+    <!-- Terran -->
+    <CActorUnit id="CommandCenter">
+        <Scale value="3.000000,3.000000,3.500000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Engineering Bay ....................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="EngineeringBay">
+        <Scale value="1.500000,1.500000,2.000000"/>
+    </CActorUnit>
+    <CActorDoodad id="FogMist">
+        <Scale value="1.500000"/>
+    </CActorDoodad>
+    <!--                                                                                         -->
+    <!-- Greater Nydus Worm ........................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="GreaterNydusWorm">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorDoodad id="HavenTree">
+        <RandomScaleRange value="2.000000,5.000000"/>
+    </CActorDoodad>
+    <!--                                                                                         -->
+    <!-- Hellion ............................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="Hellion">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorSquib id="HeroNukeExplode">
+        <Map index="None" Scale="2.000000"/>
+    </CActorSquib>
+    <CActorUnit id="Hive">
+        <Scale value="3.000000"/>
+    </CActorUnit>
+    <CActorUnit id="Immortal">
+        <Scale value="3.000000"/>
+    </CActorUnit>
+    <CActorUnit id="InfestedColonistShip">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorUnit id="InfestedSiegeBreakerSieged">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorAction id="InfestedSiegeBreakerSiegedAttackDirected">
+        <ShieldRippleScaleFactor value="2.000000"/>
+    </CActorAction>
+    <CActorDoodad id="KorhalBuilding">
+        <ModelFlags index="UpdateVisibility" value="0"/>
+    </CActorDoodad>
+    <!--                                                                                         -->
+    <!-- Korhal Palace Turret ........................................................................ -->
+    <!--                                                                                         -->
+    <CActorUnit id="KorhalPalaceTurret">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Kraith -->
+    <CActorUnit id="Kraith">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorModel id="KraithSpineVolleyAttackImpact">
+        <Scale value="2.000000"/>
+    </CActorModel>
+    <!--                                                                                         -->
+    <!-- Drakken Laser Drill.................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="LaserDrillTripod">
+        <Scale value="3.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Lurker ................................................................................ -->
+    <!--                                                                                         -->
+    <CActorUnit id="LurkerMP">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorModel id="LurkerMPAttackSpikes6">
+        <Scale value="2.000000"/>
+    </CActorModel>
+    <!--                                                                                         -->
+    <!-- Marauder                                                                                -->
+    <!--                                                                                         -->
+    <CActorUnit id="Marauder">
+        <Scale value="1.250000"/>
+    </CActorUnit>
+    <CActorUnit id="Marine">
+        <Scale value="1.250000"/>
+    </CActorUnit>
+    <CActorUnit id="MengskBC">
+        <Scale value="52.000000"/>
+    </CActorUnit>
+    <CActorUnit id="Mitosaurus">
+        <Scale value="2.500000"/>
+    </CActorUnit>
+    <CActorUnit id="MitosaurusB">
+        <Scale value="2.500000"/>
+    </CActorUnit>
+    <CActorUnit id="MitosaurusC">
+        <Scale value="2.500000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Mothership ............................................................................ -->
+    <!--                                                                                         -->
+    <CActorUnit id="Mothership">
+        <Scale value="68.000000"/>
+        <Baselines index="Walk" AnimProps="Default"/>
+    </CActorUnit>
+    <CActorUnit id="NydusCanal">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Overlord .............................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="Overlord">
+        <Scale value="20.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Perdition Turret ...................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="PerditionTurret">
+        <Scale value="1.500000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Predator .............................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="Predator">
+        <Scale value="0.800000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Queen ................................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="Queen">
+        <Scale value="2.500000"/>
+    </CActorUnit>
+    <CActorDoodad id="RainEmitterLarge">
+        <Scale value="2.000000"/>
+        <RandomScaleRange value="2.000000,2.000000"/>
+    </CActorDoodad>
+    <!--                                                                                         -->
+    <!-- Roach                                                                                -->
+    <!--                                                                                         -->
+    <CActorUnit id="Roach">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <!-- Roach->Corpser ................................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="RoachCorpser">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Sensor Tower .......................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="SensorTower">
+        <Scale value="4.000000,4.000000,6.000000"/>
+    </CActorUnit>
+    <CActorAction id="SiegeBreakerSiegedAttack">
+        <ShieldRippleScaleFactor value="2.000000"/>
+    </CActorAction>
+    <!--                                                                                         -->
+    <!-- Siege Tank ............................................................................ -->
+    <!--                                                                                         -->
+    <CActorUnit id="SiegeTank">
+        <Scale value="2.500000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Super Spore Colony .................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="SporeCannon">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorAction id="SporeCannonFire">
+        <LaunchSound value=""/>
+        <LaunchTerrainSquibSound value=""/>
+        <ContainerSound value=""/>
+        <ContainerTerrainSquibSound value=""/>
+        <ImpactSound value=""/>
+        <ImpactTerrainSquibSound value=""/>
+        <DamageSound value=""/>
+        <DamageTerrainSquibSound value=""/>
+    </CActorAction>
+    <!-- Super Spore Colony Fire                                                                 -->
+    <CActorMissile id="SporeCannonFireMissile">
+        <Scale value="2.000000,1.000000,1.000000"/>
+    </CActorMissile>
+    <CActorUnit id="SporeCrawler">
+        <Scale value="1.500000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <CActorMissile id="SporeCrawlerAttackMissile">
+        <Scale value="4.000000"/>
+    </CActorMissile>
+    <CActorUnit id="Stalker">
+        <Scale value="1.500000"/>
+    </CActorUnit>
+    <CActorUnit id="SupplyDepot">
+        <Scale value="2.500000,2.500000,3.500000"/>
+        <!--DeathArray index="Normal" SoundLink=""/-->
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Terran Drop Pod (Art) ................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="TerranDropPod">
+        <Scale value="3.000000"/>
+    </CActorUnit>
+    <CActorUnit id="Thor">
+        <Scale value="3.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Tosh .................................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="Tosh">
+        <VarianceWindowWalk value="0.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Ultralisk ............................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="Ultralisk">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorUnit id="VikingAssault">
+        <Scale value="3.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Viking ................................................................................ -->
+    <!--                                                                                         -->
+    <CActorUnit id="VikingFighter">
+        <Scale value="3.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Vulture ............................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="Vulture">
+        <Scale value="1.500000"/>
+    </CActorUnit>
+    <CActorSimple id="WalkBackwards">
+        <EditorCategories value=""/>
+    </CActorSimple>
+    <CActorUnit id="WarpPrismPhasing">
+        <Scale value="12.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Zerg Drop Pod (Art) ................................................................... -->
+    <!--                                                                                         -->
+    <CActorUnit id="ZergDropPod">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <!--                                                                                         -->
+    <!-- Zergling .............................................................................. -->
+    <!--                                                                                         -->
+    <CActorUnit id="Zergling">
+        <Scale value="1.250000"/>
+    </CActorUnit>
+    <CActorDoodad id="ZerusTree">
+        <RandomScaleRange value="4.000000,6.000000"/>
+        <Scale value="1.000000,1.000000,1.400000"/>
+    </CActorDoodad>
+</Catalog>

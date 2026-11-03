@@ -1,0 +1,1405 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PlacedObjects Version="27">
+    <ObjectUnit Id="245" Position="91,81,0" Rotation="5.3527" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="247" Position="82,88,0" Rotation="5.7331" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="248" Position="68,71,0" Rotation="5.3525" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="249" Position="74,64,0" Rotation="5.3525" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="252" Position="76,104,0" Rotation="4.417" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="253" Position="75,115,0" Rotation="5.3527" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="254" Position="38,103,0" Rotation="5.3525" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="255" Position="42,97,0" Rotation="5.3525" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="258" Position="107,74,0" Rotation="0.3581" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="259" Position="117,73,0" Rotation="5.7058" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="260" Position="96,38,0" Rotation="0.358" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="261" Position="101,34,0" Rotation="0.358" Scale="1,1,1" UnitType="AutoTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="2091851783" Position="14.9558,113.3615,0" Rotation="0.7656" Scale="1,1,1" UnitType="Brakk" Player="15"/>
+    <ObjectUnit Id="797310284" Position="29.5,29.5,0" Rotation="2.4692" Scale="1,1,1" UnitType="GreaterNydusWorm" Player="8"/>
+    <ObjectUnit Id="283" Position="10.5,4.5,0" Scale="1,1,1" UnitType="Hive" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1613478781" Position="97.1896,96.5441,0" Rotation="5.5058" Scale="1,1,1" UnitType="HybridUltraliskShackled" Player="7"/>
+    <ObjectUnit Id="66570817" Position="107.7475,19.1455,0" Rotation="0.2917" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="279297956" Position="101.0153,18.2155,0" Rotation="1.5595" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="582134192" Position="104.4284,22.0236,0" Rotation="5.5883" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="590579151" Position="103.586,15.5114,0" Rotation="2.261" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="603160826" Position="110.9143,20.9733,0" Rotation="0.6481" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="829069503" Position="107.7722,10.5053,0" Rotation="5.721" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="836435394" Position="111.3964,15.4545,0" Rotation="5.3564" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="885190778" Position="101.5312,22.2617,0" Rotation="0.0864" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="1585102779" Position="105.0268,9.887,0" Rotation="5.7478" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="1855362190" Position="102.0541,10.6513,0" Rotation="5.919" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="2136710547" Position="113.1271,18.9978,0" Rotation="4.437" Scale="1,1,1" UnitType="InfestedMedic" Player="15"/>
+    <ObjectUnit Id="117075307" Position="106.9321,15.776,0" Rotation="4.0222" Scale="1,1,1" UnitType="InfestedSiegeBreakerSieged" Player="15"/>
+    <ObjectUnit Id="848504476" Position="102.853,21.1584,0" Rotation="2.0173" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="892833773" Position="104.2272,26.7602,0" Rotation="5.8562" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="968970465" Position="102.8496,23.5996,0" Rotation="5.573" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="1012090584" Position="102.9433,9.2314,0" Rotation="3.3251" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="1199589195" Position="98.1706,12.8767,0" Rotation="3.8645" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="1202690511" Position="103.498,12.6674,0" Rotation="2.1477" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="1331060344" Position="109.9191,22.2055,0" Rotation="5.1323" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="1361866736" Position="105.174,25.2204,0" Rotation="0.7465" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="1415136142" Position="101.0454,21.0976,0" Rotation="4.1428" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="1770599771" Position="111.0983,17.5527,0" Rotation="1.307" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="1909530753" Position="105.3005,11.0354,0" Rotation="2.4792" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="2084612417" Position="110.294,13.2983,0" Rotation="2.3796" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="2084903227" Position="99.651,19.7248,0" Rotation="1.189" Scale="1,1,1" UnitType="InfestedTerran" Player="15"/>
+    <ObjectUnit Id="5469387" Position="112.3854,14.0051,0" Rotation="0.014" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="135554509" Position="99.7202,17.5915,0" Rotation="3.8723" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="218582979" Position="111.726,12.9665,0" Rotation="1.6437" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="243127445" Position="111.147,19,0" Rotation="5.4626" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="247798771" Position="112.5122,18.145,0" Rotation="1.6647" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="249407442" Position="101.0434,14.4704,0" Rotation="5.498" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="252602192" Position="101.9663,13.66,0" Rotation="0.697" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="357381981" Position="106.0771,20.9816,0" Rotation="6.234" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="369095438" Position="103.8874,10.8322,0" Rotation="2.1857" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="411114154" Position="106.4165,9.291,0" Rotation="1.4682" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="427098622" Position="104.378,23.1943,0" Rotation="5.4592" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="461827667" Position="108.0893,21.5227,0" Rotation="2.6992" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="507488798" Position="102.3991,18.4223,0" Rotation="5.0292" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="520162967" Position="109.02,20.6215,0" Rotation="1.8918" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="522823107" Position="112.7951,16.9306,0" Rotation="4.0205" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="584759754" Position="110.6027,20.1877,0" Rotation="0.5488" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="626074378" Position="110.701,11.7326,0" Rotation="5.74" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="684401130" Position="101.7263,16.5688,0" Rotation="4.9562" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1151715180" Position="102.394,11.5603,0" Rotation="6.0454" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1156839106" Position="109.427,11.358,0" Rotation="2.0566" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1353398914" Position="97.453,17.2316,0" Rotation="0.9934" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1487722596" Position="99.5031,24.63,0" Rotation="3.2226" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1602279958" Position="104.2753,18.6784,0" Rotation="1.8833" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1651995787" Position="99.467,14.9506,0" Rotation="2.1647" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1679000227" Position="104.8884,8.965,0" Rotation="0.6638" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1990722972" Position="103.9252,20.0786,0" Rotation="0.8647" Scale="1,1,1" UnitType="InfestedTerranCampaign" Player="15"/>
+    <ObjectUnit Id="1410839172" Position="114.6291,18.0302,0" Rotation="5.5034" Scale="1,1,1" UnitType="InfestedTerranCampaignBurrowed" Player="15"/>
+    <ObjectUnit Id="649131550" Position="32.88,32.74,0" Rotation="2.481" Scale="1,1,1" UnitType="Kerrigan" Player="4"/>
+    <ObjectUnit Id="241" Position="88,112,0" Rotation="4.973" Scale="1,1,1" UnitType="KorhalPalaceTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="243" Position="112,88,0" Rotation="6.2094" Scale="1,1,1" UnitType="KorhalPalaceTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="51985889" Position="53.7602,30.6337,0" Rotation="3.228" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="116033436" Position="57.7734,38.897,0" Rotation="6.2053" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="280754982" Position="63.409,30.447,0" Rotation="3.7604" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="560295555" Position="38.7001,59.696,0" Rotation="4.0036" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="647838828" Position="69.0307,33.4912,0" Rotation="2.252" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="933081763" Position="36.007,72.9526,0" Rotation="4.0473" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="952534117" Position="31.6352,60.2138,0" Rotation="3.0607" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="1166244566" Position="42.2182,66.1044,0" Rotation="0.939" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="1308770660" Position="64.8398,43.2331,0" Rotation="2.255" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="1658616913" Position="32.0983,68.4743,0" Rotation="2.775" Scale="1,1,1" UnitType="LurkerMPBurrowed" Player="8"/>
+    <ObjectUnit Id="1431705028" Position="51.8967,76.6206,0" Rotation="5.547" Scale="1,1,1" UnitType="MengskBC" Player="7"/>
+    <ObjectUnit Id="812228188" Position="54.992,1.276,0" Rotation="3.4965" Scale="1,1,1" UnitType="Overlord" Player="8"/>
+    <ObjectUnit Id="879273328" Position="15.4997,54.3493,0" Rotation="0.8657" Scale="1,1,1" UnitType="Overlord" Player="8"/>
+    <ObjectUnit Id="244" Position="88,80,0" Rotation="5.4538" Scale="1,1,1" UnitType="PerditionTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="246" Position="82,85,0" Rotation="5.5498" Scale="1,1,1" UnitType="PerditionTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="250" Position="74,106,0" Rotation="4.515" Scale="1,1,1" UnitType="PerditionTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="251" Position="73,113,0" Rotation="5.0078" Scale="1,1,1" UnitType="PerditionTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="256" Position="109,72,0" Rotation="0.153" Scale="1,1,1" UnitType="PerditionTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="257" Position="115,71,0" Rotation="5.9084" Scale="1,1,1" UnitType="PerditionTurret" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="36855602" Position="91.6677,50.945,0" Rotation="6.1308" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="71233868" Position="60.5053,93.1433,0" Rotation="0.302" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="85529774" Position="96.0661,59.8498,0" Rotation="0.5737" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="107296994" Position="68.385,92.4133,0" Rotation="1.0632" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="450517341" Position="82.4477,55.9443,0" Rotation="0.302" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="458390022" Position="81.8085,60.1315,0" Rotation="1.9213" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="635591775" Position="54,92.5,0" Rotation="2.9645" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="796818963" Position="69.686,80.8598,0" Rotation="0.3022" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="938968946" Position="58.8625,78.537,0" Rotation="0.302" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="1260960016" Position="96.9304,66.062,0" Rotation="0.302" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="1369091298" Position="88.922,67.5751,0" Rotation="5.5478" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="1724260609" Position="58.0402,83.2717,0" Rotation="4.1486" Scale="1,1,1" UnitType="Predator" Player="7"/>
+    <ObjectUnit Id="1899846884" Position="120,124,0" Scale="1,1,1" UnitType="PsiDecimator" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="308" Position="118,112,0" Rotation="0.0075" Scale="1,1,1" UnitType="RaynorCommando" Player="1">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="309" Position="121.5,110.5,0" Rotation="0.191" Scale="1,1,1" UnitType="RaynorCommando" Player="1">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="310" Position="123.5,109.5,0" Rotation="3.8786" Scale="1,1,1" UnitType="RaynorCommando" Player="1">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="130328411" Position="63,89,0" Rotation="5.4975" Scale="1,1,1" UnitType="SensorTower" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="320974776" Position="89,60,0" Rotation="5.4975" Scale="1,1,1" UnitType="SensorTower" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="426241393" Position="122,69,0" Rotation="5.4975" Scale="1,1,1" UnitType="SensorTower" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="625964553" Position="71,121,0" Rotation="5.4975" Scale="1,1,1" UnitType="SensorTower" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="730277199" Position="89,122,0" Rotation="5.4975" Scale="1,1,1" UnitType="SensorTower" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="832458050" Position="122,87,0" Rotation="5.4975" Scale="1,1,1" UnitType="SensorTower" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="268" Position="51,56,0" Rotation="6.0852" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="269" Position="56,50,0" Rotation="2.519" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="270" Position="35,41,0" Rotation="2.3122" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="271" Position="41,35,0" Rotation="2.4567" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="284" Position="79,28,0" Rotation="3.1755" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="285" Position="85,22,0" Rotation="3.2753" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="290" Position="24,93,0" Rotation="1.3242" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="291" Position="28,87,0" Rotation="2.1337" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="296" Position="13,47,0" Rotation="2.0402" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="297" Position="19,47,0" Rotation="2.081" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="302" Position="47,18,0" Rotation="2.685" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="303" Position="47,10,0" Rotation="2.7316" Scale="1,1,1" UnitType="SpineCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="272" Position="43.5,28.5,0" Rotation="0.7851" Scale="1,1,1" UnitType="SporeCannon" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="273" Position="29.5,44.5,0" Rotation="0.7851" Scale="1,1,1" UnitType="SporeCannon" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="299" Position="5.5,52.5,0" Rotation="0.7851" Scale="1,1,1" UnitType="SporeCannon" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="304" Position="54.5,4.5,0" Rotation="0.7851" Scale="1,1,1" UnitType="SporeCannon" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="762332777" Position="5.5,67.5,0" Rotation="0.7851" Scale="1,1,1" UnitType="SporeCannon" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1215050075" Position="36.5,64.5,0" Rotation="0.7851" Scale="1,1,1" UnitType="SporeCannon" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1524557314" Position="61.5,35.5,0" Rotation="0.7851" Scale="1,1,1" UnitType="SporeCannon" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1734156241" Position="76.5,4.5,0" Rotation="0.7851" Scale="1,1,1" UnitType="SporeCannon" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="274" Position="41,33,0" Rotation="2.4868" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="275" Position="33,41,0" Rotation="2.2846" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="278" Position="57,48,0" Rotation="2.5717" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="279" Position="49,57,0" Rotation="5.4155" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="288" Position="86,20,0" Rotation="3.2873" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="289" Position="77,29,0" Rotation="3.1367" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="292" Position="29,85,0" Rotation="6.0773" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="293" Position="22,94,0" Rotation="1.3156" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="300" Position="20,49,0" Rotation="2.0544" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="301" Position="12,49,0" Rotation="2.0092" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="306" Position="50,9,0" Rotation="2.7731" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="307" Position="49,20,0" Rotation="2.699" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="821928244" Position="51,42,0" Rotation="2.5715" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="2103306027" Position="42,51,0" Rotation="2.5715" Scale="1,1,1" UnitType="SporeCrawler" Player="8">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="352867994" Position="120,81,0" Rotation="5.4975" Scale="1,1,1" UnitType="SupplyDepot" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1424795256" Position="94,118,0" Rotation="5.4975" Scale="1,1,1" UnitType="SupplyDepot" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1455266132" Position="81,118,0" Rotation="5.4975" Scale="1,1,1" UnitType="SupplyDepot" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1559950947" Position="119,93,0" Rotation="5.4975" Scale="1,1,1" UnitType="SupplyDepot" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1689533396" Position="90,103,0" Rotation="5.4975" Scale="1,1,1" UnitType="SupplyDepot" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="1971666357" Position="103,89,0" Rotation="5.4975" Scale="1,1,1" UnitType="SupplyDepot" Player="7">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectUnit Id="622754155" Position="94.036,93.4841,0" Rotation="5.5917" Scale="1,1,1" UnitType="Tosh" Player="1">
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectUnit>
+    <ObjectDoodad Id="164510472" Position="89.2163,114.8662,50.3762" Rotation="3.245" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="383000050" Position="92.7404,66.7883,52.5153" Rotation="5.896" Scale="1.067,1.067,1.067" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="423057708" Position="29.5678,62.7482,54.0424" Rotation="3.245" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="481388391" Position="113.8356,90.032,51.7243" Rotation="5.896" Scale="1.067,1.067,1.067" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="522115064" Position="54.1872,37.914,49.7067" Rotation="5.896" Scale="1.067,1.067,1.067" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="526839081" Position="27.0334,5.6206,50.6628" Rotation="5.896" Scale="1.067,1.067,1.067" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="599733902" Position="36.6181,100.2487,27.7502" Rotation="3.2448" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="736521944" Position="42.3361,42.3176,26.1975" Rotation="3.2448" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="796505715" Position="67.1323,56.0524,6.8032" Rotation="4.5283" Scale="0.9372,0.9372,0.9372" Type="FogMist">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="900858806" Position="81.6586,38.6564,6.3435" Rotation="3.4355" Scale="1.05,1.05,1.05" Type="FogMist">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="946385203" Position="2.414,30.4548,58.9797" Rotation="3.245" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1023573077" Position="37.8564,87.679,6.752" Rotation="1.268" Scale="0.9702,0.9702,0.9702" Type="FogMist">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1104983294" Position="46.9353,73.622,47.1018" Rotation="5.896" Scale="1.067,1.067,1.067" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1203752563" Position="90.5498,89.93,28.854" Rotation="3.2448" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1552819461" Position="92.4411,24.1328,47.0261" Rotation="5.896" Scale="1.067,1.067,1.067" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1567202250" Position="46.7587,77.9584,6.647" Rotation="4.7097" Scale="0.93,0.93,0.93" Type="FogMist">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1681545830" Position="75.5124,46.64,6.8303" Rotation="5.226" Scale="1.15,1.15,1.15" Type="FogMist">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1706522058" Position="20.3374,74.8757,30.4157" Rotation="3.2448" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1708729244" Position="15.5236,115.235,6.6652" Rotation="4.9731" Scale="1.0612,1.0612,1.0612" Type="FogMist">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1758779462" Position="69.8437,18.3374,24.2482" Rotation="3.2448" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1937068642" Position="22.316,98.4562,47.722" Rotation="3.245" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1963151645" Position="100.565,41.5952,27.252" Rotation="3.2448" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1993964583" Position="67.8217,48.967,47.8264" Rotation="3.245" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="2114130508" Position="68.121,91.6225,51.6181" Rotation="3.245" Scale="1.0678,1.0678,1.0678" Type="FogMist">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="2115326981" Position="56.1171,66.4443,7.0058" Rotation="1.7727" Scale="1.0544,1.0544,1.0544" Type="FogMist">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="2145862509" Position="107.8801,16.059,7.7214" Rotation="1.2685" Scale="1.1462,1.1462,1.1462" Type="FogMist">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="173242156" Position="107.9921,14.168,4.6293" Rotation="2.9145" Scale="1.0432,1.0432,1.0432" Type="FogStormDeep">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1144039599" Position="15.4453,113.31,3.665" Rotation="4.922" Scale="1.1635,1.1635,1.1635" Type="FogStormDeep">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="149034949" Position="37.046,39.0307,5.9084" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="190018970" Position="47.809,48.989,6.8505" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="270118217" Position="112.8742,65.8752,9.562" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="404765695" Position="93.3198,86.1445,8.966" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="490378574" Position="116.2136,90.894,12.4287" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="514348591" Position="28.9472,28.1486,8.9956" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="523111003" Position="77.8684,74.669,7.406" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="845425640" Position="98.3791,99.5312,12.2604" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1084812466" Position="108.1323,45.4916,7.3996" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1224684927" Position="34.3581,118.2321,9.122" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1229628656" Position="23.66,76.8405,10.6896" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1240258556" Position="8.1894,41.05,12.61" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1247634870" Position="90.2902,58.511,11.747" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1285680005" Position="61.6545,60.531,6.8603" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1311764702" Position="90.9765,31.1843,6.634" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1336253221" Position="63.8615,88.1416,11.5385" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1349729016" Position="13.5307,70.2333,8.7495" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1421454340" Position="76.8193,46.191,6.909" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1528666976" Position="40.1513,7.0578,11.8793" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1562990318" Position="17.9616,112.2001,6.951" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1581201411" Position="63.3608,10.4038,3.9311" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1596769516" Position="47.493,106.0031,7.247" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1610546894" Position="108.855,17.01,7.581" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1625390503" Position="37.7644,65.886,13.1474" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1641648621" Position="44.9252,80.4145,6.4804" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1769110748" Position="93.1203,118.5512,11.2058" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1831108247" Position="70.3496,111.3295,7.4873" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1859095064" Position="31.4116,96.7304,6.9914" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1863980694" Position="77.3093,18.7685,6.4536" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="2105539086" Position="66.551,37.3605,10.1816" Scale="1,1,1" Type="RainEmitterLarge">
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="47536337" Position="7.1247,115.0793,7.546" Rotation="1.249" Scale="3,3,3" Type="Waterfall">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1086286831" Position="9.2941,119.3381,5.451" Rotation="1.8212" Scale="3,3,3" Type="Waterfall">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="1510090075" Position="10.5075,117.2124,3.6196" Rotation="1.898" Scale="3,3,3" Type="Waterfall">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="2033555485" Position="8.3933,116.856,5.9543" Rotation="1.497" Scale="3,3,3" Type="Waterfall">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="2" Variation="5" Position="50.5,33.5,7.1926" Rotation="1.3906" Scale="2.3134,2.3134,2.3134" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="4" Position="52.5,35.5,7.299" Rotation="1.1357" Scale="2.1672,2.1672,2.1672" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="5" Variation="8" Position="60.5,41.5,7.158" Rotation="0.772" Scale="2.0947,2.0947,2.0947" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="6" Variation="13" Position="94.5,53.5,8.0478" Rotation="0.0727" Scale="3.522,3.522,3.522" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="7" Variation="4" Position="80.5,59.5,6.495" Rotation="1.9245" Scale="3.5183,3.5183,3.5183" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="8" Variation="3" Position="74.5,57.5,4.9816" Rotation="2.91" Scale="2.3234,2.3234,2.3234" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="9" Variation="7" Position="83.5,51.5,8.14" Rotation="2.7" Scale="2.7961,2.7961,2.7961" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="10" Variation="5" Position="89.5,48.5,8.152" Rotation="0.4497" Scale="2.3027,2.3027,2.3027" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="11" Variation="6" Position="83.5,44.5,5.9355" Rotation="3.318" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="12" Variation="6" Position="68.5,39.5,7.328" Rotation="3.2851" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="13" Variation="14" Position="66.5,51.5,4.2941" Rotation="4.7434" Scale="3.205,3.205,3.205" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="14" Position="73.5,29.5,5.0751" Rotation="3.6997" Scale="3.5788,3.5788,3.5788" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="15" Variation="9" Position="58.5,29.5,5.4782" Rotation="4.9372" Scale="2.5144,2.5144,2.5144" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="16" Variation="14" Position="64.5,25.5,3.8427" Rotation="1.7741" Scale="2.3552,2.3552,2.3552" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="17" Position="49.5,26.5,4.4045" Rotation="3.4406" Scale="3.8137,3.8137,3.8137" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="18" Variation="2" Position="80.5,34.5,3.8596" Rotation="4.8061" Scale="2.2727,2.2727,2.2727" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="19" Variation="1" Position="89.5,39.5,4.984" Rotation="1.187" Scale="2.0104,2.0104,2.0104" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="20" Variation="8" Position="60.5,47.5,5.8962" Rotation="5.8747" Scale="3.5942,3.5942,3.5942" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="21" Variation="2" Position="79.5,54.5,6.8352" Rotation="4.085" Scale="2.82,2.82,2.82" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="22" Variation="11" Position="74.5,52.5,4.0024" Rotation="5.9414" Scale="2.181,2.181,2.181" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="23" Variation="5" Position="42.5,32.5,3.6223" Rotation="4.3117" Scale="2.7875,2.7875,2.7875" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="24" Variation="9" Position="55.5,40.5,6.1757" Rotation="6.119" Scale="3.0563,3.0563,3.0563" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="25" Variation="6" Position="56.5,24.5,3.0781" Rotation="4.2827" Scale="3.083,3.083,3.083" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="26" Variation="9" Position="53.5,20.5,1.4638" Rotation="1.3164" Scale="3.165,3.165,3.165" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="27" Position="61.5,20.5,1.4272" Rotation="4.8356" Scale="2.3623,2.3623,2.3623" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="28" Variation="7" Position="55.5,3.5,5.4577" Rotation="2.9785" Scale="2.6401,2.6401,2.6401" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="29" Variation="2" Position="59.5,4.5,5.126" Rotation="5.2646" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="30" Variation="3" Position="63.5,2.5,7.818" Rotation="3.942" Scale="2.5146,2.5146,2.5146" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="31" Variation="1" Position="65.5,4.5,6.1623" Rotation="3.3483" Scale="2.6723,2.6723,2.6723" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="32" Variation="3" Position="71.5,4.5,7.2277" Rotation="4.4262" Scale="2.729,2.729,2.729" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="33" Variation="7" Position="71.5,1.5,11.533" Rotation="5.0705" Scale="3.5952,3.5952,3.5952" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="34" Position="78.5,2.5,3.1457" Rotation="0.4787" Scale="2.2805,2.2805,2.2805" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="35" Variation="10" Position="83.5,5.5,4.8237" Rotation="4.66" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="36" Variation="1" Position="85.5,4.5,6.1875" Rotation="0.9714" Scale="3.0563,3.0563,3.0563" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="37" Variation="9" Position="89.5,3.5,8.4311" Rotation="3.2045" Scale="2.9907,2.9907,2.9907" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="38" Variation="1" Position="88.5,2.5,9.7058" Rotation="4.186" Scale="3.184,3.184,3.184" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="39" Variation="3" Position="91.5,1.5,10.3405" Rotation="0.2634" Scale="2.133,2.133,2.133" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="40" Variation="12" Position="95.5,2.5,7.8271" Rotation="2.2736" Scale="2.5583,2.5583,2.5583" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="41" Position="99.5,4.5,6.5102" Rotation="3.0573" Scale="2.9953,2.9953,2.9953" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="42" Variation="1" Position="103.5,2.5,11.374" Rotation="4.6345" Scale="3.992,3.992,3.992" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="43" Variation="4" Position="109.5,2.5,12.103" Rotation="1.9045" Scale="2.3876,2.3876,2.3876" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="44" Variation="12" Position="121.5,1.5,19.9323" Rotation="0.9265" Scale="2.6328,2.6328,2.6328" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="45" Variation="11" Position="123.5,3.5,14.9184" Rotation="4.2546" Scale="3.131,3.131,3.131" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="46" Variation="3" Position="115.5,3.5,10.7634" Rotation="0.7812" Scale="3.3937,3.3937,3.3937" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="47" Variation="7" Position="120.5,4.5,9.2214" Rotation="1.8483" Scale="3.9353,3.9353,3.9353" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="48" Variation="1" Position="125.5,11.5,13.9982" Rotation="3.2912" Scale="2.295,2.295,2.295" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="49" Variation="1" Position="123.5,8.5,9.4675" Rotation="0.535" Scale="2.9118,2.9118,2.9118" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="50" Variation="10" Position="106.5,6.5,3.63" Rotation="0.6997" Scale="3.8183,3.8183,3.8183" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="51" Variation="6" Position="100.5,12.5,3.7482" Rotation="2.835" Scale="2.6914,2.6914,2.6914" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="52" Variation="7" Position="125.5,17.5,13.165" Rotation="5.0507" Scale="2.6164,2.6164,2.6164" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="53" Variation="2" Position="126.5,21.5,13.666" Rotation="1.0532" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="54" Variation="11" Position="126.5,22.5,12.7597" Rotation="1.3803" Scale="3.9326,3.9326,3.9326" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="55" Variation="2" Position="125.5,30.5,13.5632" Rotation="2.583" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="56" Variation="11" Position="124.5,25.5,8.5751" Rotation="1.6796" Scale="3.6943,3.6943,3.6943" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="57" Variation="9" Position="123.5,17.5,8.1281" Rotation="2.81" Scale="2.7468,2.7468,2.7468" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="58" Variation="6" Position="80.5,11.5,2.6875" Rotation="5.5173" Scale="2.7946,2.7946,2.7946" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="59" Variation="8" Position="84.5,11.5,4.5952" Rotation="3.6936" Scale="2.0117,2.0117,2.0117" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="60" Variation="4" Position="89.5,12.5,5.2705" Rotation="6.1984" Scale="3.3835,3.3835,3.3835" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="61" Variation="4" Position="93.5,9.5,4.8024" Rotation="1.1135" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="62" Variation="10" Position="114.5,20.5,4.2343" Rotation="5.1706" Scale="3.514,3.514,3.514" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="63" Variation="3" Position="119.5,27.5,5.001" Rotation="2.0776" Scale="2.522,2.522,2.522" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="64" Variation="10" Position="112.5,29.5,4.6516" Rotation="0.749" Scale="3.054,3.054,3.054" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="65" Variation="2" Position="107.5,25.5,3.9868" Rotation="2.4746" Scale="3.7324,3.7324,3.7324" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="66" Variation="7" Position="116.5,34.5,4.7812" Rotation="5.7397" Scale="2.0832,2.0832,2.0832" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="67" Variation="5" Position="120.5,41.5,6.0327" Rotation="0.944" Scale="3.66,3.66,3.66" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="68" Variation="2" Position="50.5,5.5,5.6401" Rotation="4.091" Scale="3.4042,3.4042,3.4042" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="70" Variation="2" Position="118.5,52.5,6.2336" Rotation="3.5031" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="71" Variation="12" Position="24.5,46.5,5.5075" Rotation="0.6938" Scale="3.516,3.516,3.516" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="72" Variation="12" Position="38.5,1.5,14.0788" Rotation="2.2314" Scale="3.2165,3.2165,3.2165" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="75" Variation="7" Position="22.5,1.5,12.444" Rotation="3.3845" Scale="3.0058,3.0058,3.0058" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="83" Variation="9" Position="4.5,28.5,11.3002" Rotation="6.2175" Scale="2.0925,2.0925,2.0925" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="84" Variation="5" Position="3.5,28.5,12.6142" Rotation="0.243" Scale="3.2922,3.2922,3.2922" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="85" Variation="11" Position="1.5,24.5,16.2932" Rotation="4.134" Scale="3.8925,3.8925,3.8925" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="86" Variation="4" Position="0.5,33.5,21.3864" Rotation="2.048" Scale="3.0961,3.0961,3.0961" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="87" Variation="11" Position="0.5,34.5,23.3598" Rotation="4.9877" Scale="2.2358,2.2358,2.2358" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="88" Variation="10" Position="1.5,40.5,16.1428" Rotation="0.259" Scale="2.3586,2.3586,2.3586" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="89" Variation="11" Position="1.5,45.5,14.522" Rotation="1.4262" Scale="2.1223,2.1223,2.1223" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="90" Variation="9" Position="1.5,46.5,14.837" Rotation="4.4934" Scale="3.047,3.047,3.047" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="91" Variation="13" Position="1.5,50.5,13.6862" Rotation="4.0383" Scale="3.6574,3.6574,3.6574" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="92" Variation="2" Position="6.5,44.5,9.5473" Rotation="2.489" Scale="3.0651,3.0651,3.0651" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="93" Variation="2" Position="0.5,56.5,16.787" Rotation="0.7087" Scale="2.742,2.742,2.742" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="94" Variation="3" Position="22.5,54.5,7.8605" Rotation="4.3728" Scale="2.823,2.823,2.823" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="95" Variation="14" Position="3.5,63.5,11.4174" Rotation="1.972" Scale="2.2731,2.2731,2.2731" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="96" Variation="2" Position="0.5,67.5,14.7172" Rotation="3.4238" Scale="2.0656,2.0656,2.0656" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="97" Variation="9" Position="0.5,62.5,14.407" Rotation="6.1105" Scale="3.882,3.882,3.882" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="98" Variation="4" Position="4.5,71.5,10.2023" Rotation="2.1782" Scale="3.2956,3.2956,3.2956" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="99" Variation="8" Position="1.5,75.5,14.2705" Rotation="1.9348" Scale="2.3505,2.3505,2.3505" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="100" Variation="8" Position="6.5,78.5,8.1035" Rotation="4.0002" Scale="2.8041,2.8041,2.8041" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="101" Variation="7" Position="3.5,83.5,12.422" Rotation="1.4887" Scale="2.2353,2.2353,2.2353" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="102" Variation="14" Position="1.5,80.5,12.836" Rotation="3.696" Scale="3.072,3.072,3.072" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="103" Variation="1" Position="1.5,87.5,17.9365" Rotation="3.664" Scale="3.24,3.24,3.24" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="104" Variation="8" Position="31.5,53.5,8.954" Rotation="2.7731" Scale="2.1103,2.1103,2.1103" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="105" Variation="11" Position="21.5,60.5,8.1113" Rotation="4.3823" Scale="2.057,2.057,2.057" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="106" Variation="3" Position="26.5,60.5,10.5102" Rotation="0.2177" Scale="2.0803,2.0803,2.0803" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="107" Variation="12" Position="25.5,63.5,10.1342" Rotation="1.036" Scale="2.939,2.939,2.939" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="108" Variation="11" Position="20.5,67.5,7.4841" Rotation="0.3334" Scale="3.547,3.547,3.547" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="109" Variation="7" Position="23.5,72.5,8.7424" Rotation="3.8198" Scale="2.3476,2.3476,2.3476" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="110" Variation="7" Position="2.5,92.5,13.3352" Rotation="1.9807" Scale="2.2817,2.2817,2.2817" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="111" Variation="3" Position="4.5,95.5,9.2658" Rotation="2.5898" Scale="3.8994,3.8994,3.8994" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="112" Position="3.5,97.5,12.18" Rotation="5.4265" Scale="2.4233,2.4233,2.4233" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="113" Variation="9" Position="1.5,99.5,16.083" Rotation="4.6762" Scale="2.1857,2.1857,2.1857" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="114" Variation="5" Position="4.5,102.5,9.9533" Rotation="4.5625" Scale="3.9106,3.9106,3.9106" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="115" Position="4.5,109.5,9.1633" Rotation="3.389" Scale="3.1496,3.1496,3.1496" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="116" Variation="4" Position="2.5,113.5,16.3312" Rotation="0.3215" Scale="2.5854,2.5854,2.5854" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="117" Position="2.5,114.5,17.282" Rotation="3.7446" Scale="2.9143,2.9143,2.9143" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="118" Variation="13" Position="6.5,113.5,7.9" Rotation="5.908" Scale="3.61,3.61,3.61" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="119" Variation="13" Position="4.5,118.5,13.803" Rotation="6.2651" Scale="2.8388,2.8388,2.8388" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="120" Variation="4" Position="3.5,121.5,14.986" Rotation="2.9377" Scale="3.02,3.02,3.02" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="121" Position="4.5,125.5,18.9631" Rotation="2.0861" Scale="2.5676,2.5676,2.5676" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="122" Position="12.5,127.5,14.6176" Rotation="1.45" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="123" Variation="4" Position="16.5,127.5,12.5441" Rotation="3.0556" Scale="3.292,3.292,3.292" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="124" Variation="13" Position="20.5,125.5,12.7145" Rotation="1.5783" Scale="3.4907,3.4907,3.4907" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="125" Variation="12" Position="24.5,124.5,10.8325" Rotation="1.2563" Scale="2.636,2.636,2.636" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="126" Position="30.5,123.5,8.2941" Rotation="1.8066" Scale="2.19,2.19,2.19" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="127" Variation="11" Position="32.5,123.5,7.6293" Rotation="2.138" Scale="3.8156,3.8156,3.8156" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="128" Variation="9" Position="24.5,120.5,7.1394" Rotation="5.1821" Scale="2.4455,2.4455,2.4455" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="129" Position="19.5,119.5,6.0185" Rotation="2.9458" Scale="2.0327,2.0327,2.0327" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="130" Variation="9" Position="24.5,68.5,9.4702" Rotation="3.7917" Scale="3.382,3.382,3.382" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="131" Variation="13" Position="16.5,88.5,6.4291" Rotation="2.004" Scale="2.7473,2.7473,2.7473" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="132" Variation="1" Position="35.5,79.5,8.015" Rotation="5.1423" Scale="3.2495,3.2495,3.2495" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="133" Variation="1" Position="27.5,81.5,7.2087" Rotation="3.6235" Scale="2.2084,2.2084,2.2084" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="134" Variation="4" Position="28.5,75.5,9.9011" Rotation="3.8293" Scale="3.7216,3.7216,3.7216" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="135" Variation="5" Position="29.5,57.5,10.5805" Rotation="1.3488" Scale="2.885,2.885,2.885" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="136" Variation="10" Position="38.5,71.5,9.4882" Rotation="4.7893" Scale="2.269,2.269,2.269" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="137" Variation="1" Position="28.5,68.5,10.6455" Rotation="3.0275" Scale="2.0432,2.0432,2.0432" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="138" Variation="4" Position="32.5,71.5,10.692" Rotation="0.3095" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="139" Variation="12" Position="46.5,60.5,7.03" Rotation="3.1975" Scale="3.7534,3.7534,3.7534" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="140" Variation="2" Position="32.5,83.5,6.5974" Rotation="6.1965" Scale="2.1455,2.1455,2.1455" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="141" Variation="2" Position="44.5,66.5,7.9943" Rotation="3.6042" Scale="2.0273,2.0273,2.0273" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="142" Variation="6" Position="50.5,65.5,5.0986" Rotation="2.0761" Scale="3.6264,3.6264,3.6264" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="143" Variation="10" Position="56.5,77.5,8.089" Rotation="0.4721" Scale="3.456,3.456,3.456" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="144" Variation="12" Position="60.5,72.5,6.5432" Rotation="0.0354" Scale="3.0214,3.0214,3.0214" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="145" Variation="1" Position="62.5,80.5,7.7893" Rotation="1.1445" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="146" Variation="14" Position="89.5,17.5,4.9912" Rotation="6.2145" Scale="3.1733,3.1733,3.1733" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="147" Variation="10" Position="69.5,84.5,7.4013" Rotation="3.71" Scale="2.3586,2.3586,2.3586" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="148" Variation="11" Position="71.5,88.5,7.9211" Rotation="4.0957" Scale="2.6933,2.6933,2.6933" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="149" Variation="11" Position="70.5,94.5,8.8627" Rotation="4.9" Scale="2.7263,2.7263,2.7263" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="150" Variation="9" Position="69.5,96.5,8.9614" Rotation="2.877" Scale="3.816,3.816,3.816" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="151" Position="66.5,100.5,7.0314" Rotation="0.6975" Scale="2.846,2.846,2.846" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="152" Variation="2" Position="58.5,99.5,6.253" Rotation="5.4726" Scale="3.2138,3.2138,3.2138" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="154" Variation="4" Position="60.5,95.5,8.2163" Rotation="3.1562" Scale="2.63,2.63,2.63" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="155" Variation="4" Position="56.5,84.5,8.5126" Rotation="1.8955" Scale="2.6567,2.6567,2.6567" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="156" Variation="2" Position="43.5,74.5,5.4785" Rotation="5.682" Scale="2.128,2.128,2.128" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="157" Variation="7" Position="50.5,83.5,7.4487" Rotation="5.04" Scale="2.8498,2.8498,2.8498" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="158" Variation="7" Position="48.5,90.5,8.1071" Rotation="5.9807" Scale="3.0866,3.0866,3.0866" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="159" Variation="5" Position="37.5,107.5,5.4362" Rotation="5.1894" Scale="2.4082,2.4082,2.4082" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="160" Variation="4" Position="52.5,98.5,5.226" Rotation="3.0722" Scale="2.1501,2.1501,2.1501" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="161" Variation="14" Position="45.5,95.5,6.518" Rotation="0.1406" Scale="3.4807,3.4807,3.4807" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="162" Variation="3" Position="59.5,100.5,5.907" Rotation="2.626" Scale="2.147,2.147,2.147" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="163" Variation="7" Position="75.5,100.5,7.4797" Rotation="3.3647" Scale="2.5998,2.5998,2.5998" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="164" Position="78.5,92.5,6.9992" Rotation="2.3513" Scale="3.316,3.316,3.316" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="165" Variation="7" Position="100.5,76.5,9.0864" Rotation="1.1843" Scale="3.2277,3.2277,3.2277" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="166" Variation="10" Position="95.5,77.5,8.0915" Rotation="5.067" Scale="3.2175,3.2175,3.2175" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="167" Variation="14" Position="87.5,70.5,7.281" Rotation="0.8337" Scale="2.4887,2.4887,2.4887" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="168" Variation="5" Position="95.5,69.5,9.532" Rotation="1.0344" Scale="3.357,3.357,3.357" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="169" Variation="1" Position="98.5,62.5,7.9516" Rotation="6.1962" Scale="3.1674,3.1674,3.1674" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="170" Variation="2" Position="8.5,81.5,7.3085" Rotation="0.6618" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="171" Variation="2" Position="42.5,126.5,16.5673" Rotation="5.1752" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="172" Variation="7" Position="49.5,124.5,10.1206" Rotation="2.698" Scale="2.145,2.145,2.145" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="173" Variation="9" Position="53.5,126.5,13.635" Rotation="5.9848" Scale="2.9213,2.9213,2.9213" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="174" Variation="12" Position="57.5,124.5,9.2587" Rotation="3.7211" Scale="2.8183,2.8183,2.8183" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="175" Variation="1" Position="62.4155,127.5,10.6254" Rotation="5.2341" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="176" Variation="8" Position="65.5,125.5,10.8791" Rotation="1.4772" Scale="3.7536,3.7536,3.7536" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="177" Variation="10" Position="71.5,124.5,8.5217" Rotation="5.3786" Scale="2.5554,2.5554,2.5554" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="178" Variation="14" Position="75.5,126.5,10.8132" Rotation="0.013" Scale="2.7983,2.7983,2.7983" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="179" Variation="1" Position="82.5,123.5,8.717" Rotation="0.48" Scale="2.383,2.383,2.383" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="180" Variation="3" Position="85.5,125.5,10.8935" Rotation="6.1594" Scale="3.2324,3.2324,3.2324" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="181" Variation="11" Position="87.5,126.5,12.3332" Rotation="2.565" Scale="2.7585,2.7585,2.7585" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="182" Variation="5" Position="90.5,125.5,9.8466" Rotation="1.212" Scale="2.9226,2.9226,2.9226" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="183" Variation="5" Position="93.5,124.5,10.618" Rotation="5.9223" Scale="3.8315,3.8315,3.8315" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="184" Variation="4" Position="94.5,124.5,10.942" Rotation="1.382" Scale="3.628,3.628,3.628" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="185" Variation="14" Position="101.5,126.5,10.9614" Rotation="2.5673" Scale="3.1528,3.1528,3.1528" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="187" Variation="11" Position="117.5,124.5,8.6894" Rotation="1.4978" Scale="2.3356,2.3356,2.3356" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="189" Variation="2" Position="123.5,126.5,12.9313" Rotation="5.9753" Scale="2.7653,2.7653,2.7653" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="190" Variation="8" Position="124.5,119.5,11.8732" Rotation="1.472" Scale="3.6784,3.6784,3.6784" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="193" Variation="3" Position="126.5,110.5,13.6003" Rotation="2.4033" Scale="2.242,2.242,2.242" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="194" Variation="4" Position="125.5,106.5,12.8666" Rotation="1.5644" Scale="2.4812,2.4812,2.4812" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="195" Variation="14" Position="124.5,99.5,13.3752" Rotation="2.7741" Scale="2.8684,2.8684,2.8684" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="196" Variation="8" Position="125.5,95.5,15.6386" Rotation="3.228" Scale="3.2912,3.2912,3.2912" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="197" Position="125.5,87.5,12.2856" Rotation="5.7607" Scale="2.7976,2.7976,2.7976" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="198" Variation="3" Position="124.5,90.5,12.712" Rotation="2.6896" Scale="2.423,2.423,2.423" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="199" Variation="3" Position="124.5,82.5,12.353" Rotation="6.0866" Scale="3.8112,3.8112,3.8112" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="200" Variation="13" Position="125.5,79.5,13.2343" Rotation="5.0043" Scale="2.5183,2.5183,2.5183" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="201" Variation="9" Position="125.5,74.5,13.3305" Rotation="4.9565" Scale="2.7863,2.7863,2.7863" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="202" Variation="10" Position="124.5,69.5,9.5324" Rotation="2.0517" Scale="3.7126,3.7126,3.7126" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="203" Variation="9" Position="125.5,63.5,13.8625" Rotation="4.738" Scale="3.4672,3.4672,3.4672" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="204" Variation="6" Position="125.5,57.5,13.3518" Rotation="6.2724" Scale="2.5874,2.5874,2.5874" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="205" Variation="3" Position="125.5,66.5,13.9511" Rotation="4.0493" Scale="2.2226,2.2226,2.2226" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="206" Variation="11" Position="124.5,52.5,10.8454" Rotation="1.1193" Scale="2.0996,2.0996,2.0996" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="207" Variation="5" Position="123.5,57.5,10.6804" Rotation="4.437" Scale="3.195,3.195,3.195" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="208" Variation="4" Position="125.5,46.5,12.8078" Rotation="5.4462" Scale="3.7031,3.7031,3.7031" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="209" Variation="14" Position="124.5,49.5,10.8293" Rotation="2.9455" Scale="2.1828,2.1828,2.1828" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="210" Variation="8" Position="124.5,37.5,12.2783" Rotation="3.7607" Scale="3.013,3.013,3.013" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="211" Variation="10" Position="122.5,36.5,8.211" Rotation="5.5263" Scale="2.1787,2.1787,2.1787" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="212" Variation="11" Position="24.5,113.5,5.434" Rotation="5.7346" Scale="3.8715,3.8715,3.8715" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="213" Variation="1" Position="33.5,117.5,6.1745" Rotation="0.154" Scale="3.8962,3.8962,3.8962" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="214" Variation="7" Position="43.5,118.5,6.1052" Rotation="5.8488" Scale="3.79,3.79,3.79" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="215" Variation="8" Position="42.5,118.5,6.1381" Rotation="0.6735" Scale="3.9956,3.9956,3.9956" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="216" Variation="5" Position="53.5,119.5,5.7065" Rotation="0.596" Scale="2.8615,2.8615,2.8615" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="217" Variation="7" Position="66.5,119.5,6.6623" Rotation="5.1564" Scale="3.4348,3.4348,3.4348" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="218" Variation="5" Position="59.5842,120.478,5.8276" Rotation="0.8193" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+        <Flag Index="ForcePlacement" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="219" Variation="2" Position="57.5,114.5,5.3698" Rotation="3.5034" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="220" Variation="4" Position="77.5,120.5,7.8232" Rotation="6.0827" Scale="2.0866,2.0866,2.0866" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="221" Variation="13" Position="39.5,112.5,6.1184" Rotation="1.0246" Scale="2.265,2.265,2.265" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="222" Variation="8" Position="32.5,109.5,6.0732" Rotation="4.7031" Scale="3.2182,3.2182,3.2182" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="223" Position="14.5,100.5,6.3525" Rotation="5.1857" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="224" Variation="4" Position="8.5,104.5,8.0617" Rotation="5.1303" Scale="3.439,3.439,3.439" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="225" Variation="5" Position="19.5,96.5,6.001" Rotation="5.7521" Scale="3.1333,3.1333,3.1333" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="226" Variation="2" Position="10.5,93.5,6.7924" Rotation="4.7326" Scale="3.4516,3.4516,3.4516" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="227" Variation="11" Position="8.5,88.5,7.4216" Rotation="5.56" Scale="3.5688,3.5688,3.5688" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="228" Variation="6" Position="100.5,52.5,5.988" Rotation="1.6596" Scale="3.4826,3.4826,3.4826" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="229" Variation="3" Position="73.5,9.5,2.1462" Rotation="3.836" Scale="2.426,2.426,2.426" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="230" Variation="14" Position="64.5,8.5,1.6633" Rotation="4.707" Scale="3.5,3.5,3.5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="231" Variation="14" Position="62.5,7.5,2.0227" Rotation="4.8112" Scale="2.4416,2.4416,2.4416" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="232" Variation="13" Position="42.5,7.5,7.6977" Rotation="0.7431" Scale="3.4155,3.4155,3.4155" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="233" Variation="5" Position="95.5,16.5,4.21" Rotation="3.0178" Scale="2.1035,2.1035,2.1035" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="234" Variation="14" Position="112.5,35.5,4.743" Rotation="2.6643" Scale="3.8625,3.8625,3.8625" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="235" Variation="7" Position="115.5,45.5,5.3332" Rotation="5.0266" Scale="2.5515,2.5515,2.5515" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="236" Variation="1" Position="48.5,113.5,5.4814" Rotation="4.6782" Scale="2.294,2.294,2.294" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="237" Variation="4" Position="72.5,116.5,6.6125" Rotation="4.935" Scale="2.3864,2.3864,2.3864" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="238" Variation="2" Position="37.5,55.5,7.7712" Rotation="5.7075" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="239" Variation="2" Position="83.5,66.5,6.4494" Rotation="3.5031" Scale="5,5,5" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+    <ObjectDoodad Id="775344764" Variation="10" Position="87.5,51.5,8.511" Rotation="3.7097" Scale="2.3586,2.3586,2.3586" Type="ZerusTree">
+        <Flag Index="HeightOffset" Value="1"/>
+        <Flag Index="HeightAbsolute" Value="1"/>
+    </ObjectDoodad>
+</PlacedObjects>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <CEffectDamage id="AutoTurret">
+        <Amount value="25"/>
+    </CEffectDamage>
+    <CEffectCreatePersistent id="HeroNukePersistent">
+        <FinalEffect value="HeroNukeDetonate"/>
+    </CEffectCreatePersistent>
+    <CEffectDamage id="ImpalerTentacleU">
+        <Amount value="50"/>
+    </CEffectDamage>
+    <CEffectDamage id="MengskBCADamage">
+        <Amount value="0.1"/>
+    </CEffectDamage>
+    <CEffectDamage id="MengskBCCannonsA">
+        <Amount value="0.1"/>
+    </CEffectDamage>
+    <CEffectDamage id="MengskBCCannonsG">
+        <Amount value="0.1"/>
+    </CEffectDamage>
+    <CEffectDamage id="MengskBCGDamage">
+        <Amount value="0.1"/>
+    </CEffectDamage>
+    <CEffectDamage id="MitosaurusBDamage">
+        <Amount value="30"/>
+    </CEffectDamage>
+    <CEffectDamage id="MitosaurusCDamage">
+        <Amount value="15"/>
+    </CEffectDamage>
+    <CEffectDamage id="MitosaurusDamage">
+        <Amount value="50"/>
+    </CEffectDamage>
+    <CEffectDamage id="PsiBlastDamage">
+        <Amount value="25"/>
+    </CEffectDamage>
+    <CEffectDamage id="SalvageDeath">
+        <Flags index="Kill" value="0"/>
+        <Death value="Normal"/>
+    </CEffectDamage>
+</Catalog>
