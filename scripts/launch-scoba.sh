@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -n "${SC2_PROJECT_ROOT:-}" ]; then
-    ROOT_DIR="$SC2_PROJECT_ROOT"
-else
-    SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
-    SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-    ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-fi
+resolve_root() {
+    local cand
+    for cand in \
+        "${SC2_PROJECT_ROOT:-}" \
+        "$(cd -- "$(dirname -- "${0:-.}")/.." && pwd)" \
+        "$PWD" \
+        "$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-.}")/.." && pwd)"; do
+        if [ -n "$cand" ] && [ -f "$cand/scripts/stage-map.py" ]; then
+            printf '%s\n' "$cand"
+            return 0
+        fi
+    done
+    return 1
+}
+ROOT_DIR="$(resolve_root)" || { printf 'ERROR: cannot locate project root\n' >&2; exit 1; }
 
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/scoba"
 mkdir -p "$LOG_DIR"

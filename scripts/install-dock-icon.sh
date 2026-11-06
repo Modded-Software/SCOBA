@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-ROOT_DIR="${SC2_PROJECT_ROOT:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
+resolve_root() {
+    local cand
+    for cand in \
+        "${SC2_PROJECT_ROOT:-}" \
+        "$(cd -- "$(dirname -- "${0:-.}")/.." && pwd)" \
+        "$PWD" \
+        "$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-.}")/.." && pwd)"; do
+        if [ -n "$cand" ] && [ -f "$cand/assets/scoba.png" ]; then
+            printf '%s\n' "$cand"
+            return 0
+        fi
+    done
+    return 1
+}
+ROOT_DIR="$(resolve_root)" || { printf 'ERROR: cannot locate project root\n' >&2; exit 1; }
 
 APP_ID="scoba.desktop"
 APP_NAME="SCOBA"
