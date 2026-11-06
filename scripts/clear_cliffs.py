@@ -1,0 +1,11 @@
+from pathlib import Path
+import re
+
+MAP = Path(__file__).resolve().parent.parent / "out" / "SCOBA256.SC2Map"
+p = MAP / "t3Terrain.xml"
+text = p.read_text(encoding="utf-8")
+new = re.sub(r'<cliffCellList num="\d+" numOccupied="\d+">.*?</cliffCellList>',
+             '<cliffCellList num="16384" numOccupied="0">\n        </cliffCellList>',
+             text, flags=re.S)
+p.write_text(new, encoding="utf-8")
+print("cliffs cleared", len(text), "->", len(new))
