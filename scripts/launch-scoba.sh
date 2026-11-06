@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
 if [ -n "${SC2_PROJECT_ROOT:-}" ]; then
     ROOT_DIR="$SC2_PROJECT_ROOT"
-elif [ -f "$SCRIPT_DIR/../pyproject.toml" ]; then
-    ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 else
-    ROOT_DIR="$PWD"
+    SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+    SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
+    ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 fi
 
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/scoba"
