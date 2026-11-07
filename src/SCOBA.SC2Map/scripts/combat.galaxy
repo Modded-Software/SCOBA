@@ -6,7 +6,6 @@ trigger gt_TargetClick;
 trigger gt_OrderKey;
 trigger gt_OrderButton;
 trigger gt_OrderCancel;
-int gv_sCOBAOrderFlash;
 trigger gt_TargetRing;
 
 bool gf_IsHeroPlayer (int lp_player) {
@@ -282,17 +281,13 @@ void gt_DamageCleanup_Init () {
 }
 
 void gf_OrderCreate () {
-    DialogCreate(120, 56, c_anchorTop, -160, 154, false);
+    DialogCreate(120, 56, c_anchorTop, -160, 156, false);
     gv_sCOBAOrderDialog = DialogLastCreated();
     libNtve_gf_CreateDialogItemButton(gv_sCOBAOrderDialog, 120, 56, c_anchorCenter, 0, 0, StringToText("Order this unit"), StringToText("Order"), "");
     gv_sCOBAOrderButton = DialogControlLastCreated();
     libNtve_gf_SetDialogItemRenderPriority(gv_sCOBAOrderButton, 900, PlayerGroupAll());
     libNtve_gf_CreateDialogItemImage(gv_sCOBAOrderDialog, 9, 3, c_anchorTopLeft, 70, 41, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(255,255,255), c_triggerBlendModeNormal);
     libNtve_gf_SetDialogItemRenderPriority(DialogControlLastCreated(), 920, PlayerGroupAll());
-    libNtve_gf_CreateDialogItemImage(gv_sCOBAOrderDialog, 120, 56, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(0,0,0), c_triggerBlendModeNormal);
-    gv_sCOBAOrderFlash = DialogControlLastCreated();
-    libNtve_gf_SetDialogItemRenderPriority(gv_sCOBAOrderFlash, 950, PlayerGroupAll());
-    DialogControlSetVisible(gv_sCOBAOrderFlash, PlayerGroupAll(), false);
     DialogSetVisible(gv_sCOBAOrderDialog, PlayerGroupAll(), false);
 }
 
@@ -310,11 +305,13 @@ void gf_OrderEnter (int lp_player) {
     gv_sCOBAOrderUnit[lp_player] = lv_unit;
     UnitSetState(lv_unit, c_unitStateSelectable, true);
     UnitSelect(lv_unit, lp_player, true);
+    libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, true, PlayerGroupSingle(lp_player));
 }
 
 void gf_OrderExit (int lp_player) {
     gv_sCOBAOrderMode[lp_player] = false;
     gv_sCOBAOrderUnit[lp_player] = null;
+    libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, false, PlayerGroupSingle(lp_player));
     UnitClearSelection(lp_player);
     if (UnitIsValid(gv_tARGET[lp_player])) {
         UnitSetState(gv_tARGET[lp_player], c_unitStateSelectable, false);
@@ -511,13 +508,8 @@ bool gt_OrderKey_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
-    if (gv_sCOBAOrderFlash != c_invalidDialogControlId) {
-        DialogControlSetVisible(gv_sCOBAOrderFlash, PlayerGroupSingle(lv_player), true);
-        DialogControlSendAnimationEvent(gv_sCOBAOrderButton, PlayerGroupSingle(lv_player), "OnClick");
-        Wait(0.12, c_timeGame);
-        DialogControlSetVisible(gv_sCOBAOrderFlash, PlayerGroupSingle(lv_player), false);
-    }
     gf_OrderToggle(lv_player);
+    libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, gv_sCOBAOrderMode[lv_player], PlayerGroupSingle(lv_player));
     return true;
 }
 
