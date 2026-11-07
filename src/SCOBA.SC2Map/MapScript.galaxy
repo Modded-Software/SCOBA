@@ -102,6 +102,7 @@ unit[8] gv_tARGET;
 unit[8] gv_sCOBAHover;
 unit[8] gv_sCOBAOrderUnit;
 bool[8] gv_sCOBAOrderMode;
+unit[8] gv_sCOBAAutoTarget;
 int gv_sCOBAOrderDialog;
 int gv_sCOBAOrderButton;
 int gv_sCOBABB_Panel;
@@ -300,6 +301,8 @@ void gf_BossBarSetup ();
 void gf_OrderEnter (int lp_player);
 void gf_OrderExit (int lp_player);
 void gf_OrderExecute (int lp_player, fixed lp_x, fixed lp_y);
+void gt_ToggleCommands_Init ();
+void gt_AttackEvent_Init ();
 
 //--------------------------------------------------------------------------------------------------
 // Trigger Variables
@@ -315,6 +318,7 @@ trigger gt_AbilitiesSelectionDialogCallback;
 trigger gt_GUIEnvironmentSetup;
 trigger gt_UnitSelection;
 trigger gt_NewUnitSelection;
+trigger gt_KeepHeroSelected;
 trigger gt_ShowStatusBar;
 trigger gt_HideStatusBar;
 trigger gt_CameraFollowDistance;
@@ -1553,6 +1557,18 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             UnitXPGainEnable(gv_tPSUNIT[lv_localPlayer], null, true);
             UnitSetState(gv_tPSUNIT[lv_localPlayer], c_unitStateStatusBar, false);
             libNtve_gf_StoreUnitSelection(lv_localPlayer, libNtve_ge_UnitSelectionStoreOption_DoNotClearUnitSelection);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", true);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
+            UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickStandBehavior", gv_tPSUNIT[lv_localPlayer], 1);
+            UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], Order(AbilityCommand("SCOBARightClickToggle", 0)), c_orderQueueReplace);
+            if (lv_localPlayer <= 3) {
+                libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, (lv_localPlayer + 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 8.0, 45.0));
+                libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, (lv_localPlayer + 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 8.0, 225.0));
+            }
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", false);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "heal", false);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
@@ -1639,6 +1655,8 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
     for (lv_localPlayer = 1; lv_localPlayer <= 6; lv_localPlayer += 1) {
         UnitClearSelection(lv_localPlayer);
     }
+    gt_ToggleCommands_Init();
+    gt_AttackEvent_Init();
     return true;
 }
 
@@ -2097,6 +2115,44 @@ bool gt_NewUnitSelection_Func (bool testConds, bool runActions) {
 void gt_NewUnitSelection_Init () {
     gt_NewUnitSelection = TriggerCreate("gt_NewUnitSelection_Func");
     TriggerAddEventUnitCreated(gt_NewUnitSelection, null, null, null);
+}
+
+//--------------------------------------------------------------------------------------------------
+// Trigger: Keep Hero Selected
+//--------------------------------------------------------------------------------------------------
+bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
+    int lv_player;
+    unit lv_hero;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        if (gv_sCOBAOrderMode[lv_player] == true) {
+            continue;
+        }
+        if (lv_player == 1) {
+            lv_hero = UnitFromId(622754155);
+        }
+        else if (lv_player == 2) {
+            lv_hero = UnitFromId(649131550);
+        }
+        else {
+            lv_hero = gv_tPSUNIT[lv_player];
+        }
+        if (!UnitIsValid(lv_hero)) {
+            continue;
+        }
+        gv_tPSUNIT[lv_player] = lv_hero;
+        UnitSetState(lv_hero, c_unitStateSelectable, true);
+        UnitSelect(lv_hero, lv_player, true);
+    }
+    return true;
+}
+
+void gt_KeepHeroSelected_Init () {
+    gt_KeepHeroSelected = TriggerCreate("gt_KeepHeroSelected_Func");
+    TriggerAddEventTimePeriodic(gt_KeepHeroSelected, 0.1, c_timeGame);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -3231,6 +3287,7 @@ void InitTriggers () {
     gt_GUIEnvironmentSetup_Init();
     gt_UnitSelection_Init();
     gt_NewUnitSelection_Init();
+    gt_KeepHeroSelected_Init();
     gt_ShowStatusBar_Init();
     gt_HideStatusBar_Init();
     gf_OrderCreate();
@@ -3238,6 +3295,7 @@ void InitTriggers () {
     gt_OrderKey_Init();
     gt_OrderButton_Init();
     gt_OrderCancel_Init();
+    gt_CombatTick_Init();
     gt_MedicSpawn_Init();
     gt_TargetRing_Init();
     gt_TargetClick_Init();

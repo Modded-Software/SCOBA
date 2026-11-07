@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="us-ascii"?>
 <BankList>
+    <Bank Name="SCOBA" Player="1"/>
     <Bank Name="ZCampaignStats" Player="1"/>
     <Bank Name="ZStorySimulation" Player="1"/>
     <Bank Name="ZArchive" Player="1"/>

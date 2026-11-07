@@ -8,5 +8,6 @@ build/
 dist/
 out/
 *.log
+tools/stormex
 .DS_Store
 

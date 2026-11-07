@@ -15,4 +15,44 @@
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
     </CButton>
+    <CButton id="SCOBAAutoAttackOn">
+        <Icon value="Assets\Textures\btn-upgrade-terran-hisecautotracking.dds"/>
+        <AlertIcon value="Assets\Textures\btn-upgrade-terran-hisecautotracking.dds"/>
+        <EditorCategories value="Race:Terran"/>
+        <TintRacially value="1"/>
+        <Name value="Auto-attack: ON"/>
+        <Tooltip value="Attacks enemies in range automatically. Cancel: Ctrl+C, deselect target, or move with WASD. Click to turn off."/>
+    </CButton>
+    <CButton id="SCOBAAutoAttackOff">
+        <Icon value="Assets\Textures\btn-command-cancel.dds"/>
+        <AlertIcon value="Assets\Textures\btn-command-cancel.dds"/>
+        <EditorCategories value="Race:Terran"/>
+        <TintRacially value="1"/>
+        <Name value="Auto-attack: OFF"/>
+        <Tooltip value="Auto-attack disabled. Click to enable automatic attacks on nearby enemies."/>
+    </CButton>
+    <CButton id="SCOBARightClickStand">
+        <Icon value="Assets\Textures\btn-command-holdposition.dds"/>
+        <AlertIcon value="Assets\Textures\btn-command-holdposition.dds"/>
+        <EditorCategories value="Race:Terran"/>
+        <TintRacially value="1"/>
+        <Name value="Chase: Stand"/>
+        <Tooltip value="Hero holds position and attacks only enemies in range. Click to switch to Walk."/>
+    </CButton>
+    <CButton id="SCOBARightClickMove">
+        <Icon value="Assets\Textures\btn-command-move.dds"/>
+        <AlertIcon value="Assets\Textures\btn-command-move.dds"/>
+        <EditorCategories value="Race:Terran"/>
+        <TintRacially value="1"/>
+        <Name value="Chase: Walk"/>
+        <Tooltip value="Hero chases enemies to attack them. Click to switch to Stand."/>
+    </CButton>
+    <CButton id="SCOBAAutoAttackStatus">
+        <Icon value="Assets\Textures\btn-command-attack.dds"/>
+        <AlertIcon value="Assets\Textures\btn-command-attack.dds"/>
+        <EditorCategories value="Race:Terran"/>
+        <TintRacially value="1"/>
+        <Name value="Auto-attack cooldown"/>
+        <Tooltip value="Shows the live auto-attack cooldown. Attacks repeat automatically while enemies are in range. Cancel: Ctrl+C, deselect the target, or move with WASD. Use the chase button to switch Stand or Walk."/>
+    </CButton>
 </Catalog>

@@ -590,19 +590,45 @@ uv run scripts/sc2map_ls.py SCOBA.SC2Map --cat Build.txt
 uv run scripts/sc2map_ls.py SCOBA.SC2Map --extract src/SCOBA.SC2Map
 ```
 
+### Build the expanded map
+
+```bash
+scripts/build.sh
+```
+
+- Builds `out/SCOBA256.SC2Map` atomically.
+- Normalizes line endings.
+- Writes a deterministic build stamp.
+- Validates XML, dimensions, catalogs, script wiring, and stamp.
+- Writes `BuildManifest.txt`.
+
 ### Launch the map
 
 ```bash
 scripts/launch-scoba.sh
 ```
 
-- Uses `src/SCOBA.SC2Map` by default.
-- Falls back to the packed `SCOBA.SC2Map` if the source tree is absent.
+- Uses `out/SCOBA256.SC2Map` by default.
+- Falls back to `src/SCOBA.SC2Map` if the build is absent.
+- Stops old SC2 processes.
+- Clears the SC2 map cache.
 - Stages a clean copy into the SC2 `Maps` folder.
+- Verifies the staged copy matches the source.
 - Runs it through `SC2Switcher_x64.exe` under GE-Proton.
 - Falls back to `StarCraft II.exe -run` if the switcher is absent.
 - Set `SC2_MAP_SOURCE` to launch another packed map or component folder.
 - Set `DRY_RUN=1` to print the command without launching.
+- Set `SC2_KEEP_RUNNING=1` to skip stopping old SC2 processes.
+
+### Launch and check
+
+```bash
+scripts/launch-and-check.sh
+```
+
+- Launches the built map and waits for a runtime build stamp.
+- Fails on script errors, map-load errors, and stamp mismatch.
+- Set `SC2_AUTO_START=0` to skip automatic start input.
 
 ### Install the dock icon
 

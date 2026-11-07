@@ -14,6 +14,14 @@ x11.XWarpPointer.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong, ct
 x11.XDefaultRootWindow.restype = ctypes.c_ulong
 x11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
 x11.XFlush.argtypes = [ctypes.c_void_p]
+x11.XRaiseWindow.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+x11.XSetInputFocus.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+
+def focus(wid):
+    x11.XRaiseWindow(d, wid)
+    x11.XSetInputFocus(d, wid, 1, 0)
+    x11.XFlush(d)
+    time.sleep(0.3)
 
 def key(k, hold_ms):
     kc = x11.XKeysymToKeycode(d, x11.XStringToKeysym(k.encode()))
@@ -53,12 +61,19 @@ if len(sys.argv) > 1 and sys.argv[1] == "auto":
     import re
     out = subprocess.run(["xwininfo", "-root", "-tree"], capture_output=True, text=True, env={**os.environ, "DISPLAY": ":0"}).stdout
     geo = None
+    wid = None
     for line in out.splitlines():
         if "StarCraft II" in line:
+            try:
+                wid = int(line.split()[0], 16)
+            except ValueError:
+                wid = None
             m = re.search(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", line)
             if m:
                 geo = tuple(int(v) for v in m.groups())
             break
+    if wid:
+        focus(wid)
     if geo:
         w, h, x, y = geo
         click(x + w // 2, y + h // 2)

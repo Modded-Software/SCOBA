@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import shutil
@@ -400,33 +401,31 @@ def write_pathing_info(dst: Path) -> None:
 
 def patch_mapscript(src: Path, dst: Path) -> None:
     text = src.read_text(encoding="utf-8")
-    anchor = (
-        "    }\n"
-        "    return true;\n"
-        "}\n"
-        "\n"
-        "//--------------------------------------------------------------------------------------------------\n"
-        "void gt_MapInit_Init () {"
-    )
-    at = text.index(anchor) + len("    }\n")
     call = (
         "    RegionPlayableMapSet(RegionRect(0.0, 0.0, 254.0, 254.0));\n"
         "    CameraSetBounds(PlayerGroupAll(), RegionRect(0.0, 0.0, 254.0, 254.0), true);\n"
     )
+    if call in text:
+        dst.write_text(text, encoding="utf-8")
+        return
+    func = "bool gt_MapInit_Func (bool testConds, bool runActions) {"
+    guard = "    if (!runActions) {\n        return true;\n    }\n"
+    func_at = text.index(func)
+    at = text.index(guard, func_at) + len(guard)
     dst.write_text(text[:at] + call + text[at:], encoding="utf-8")
 
 
 def expand_terrain_xml(src: Path, dst: Path) -> None:
     text = src.read_text(encoding="utf-8")
-    text = text.replace('dim="129 129 "', 'dim="257 257 "')
+    text = re.sub(r'dim="\d+ \d+ "', 'dim="257 257 "', text, count=1)
     text = re.sub(
-        r"<blockTextureSetList num=\"256\">.*?</blockTextureSetList>",
+        r"<blockTextureSetList num=\"\d+\">.*?</blockTextureSetList>",
         lambda _: block_texture_sets(),
         text,
         flags=re.S,
     )
     text = re.sub(
-        r"<cliffCellList num=\"4096\" numOccupied=\"547\">.*?</cliffCellList>",
+        r"<cliffCellList num=\"\d+\" numOccupied=\"\d+\">.*?</cliffCellList>",
         lambda _: cliff_cells(src),
         text,
         flags=re.S,
@@ -490,13 +489,18 @@ def expand_minimap(src: Path, dst: Path) -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--out", type=Path, help="Build into this folder without swapping")
+    args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     src = root / "src" / "SCOBA.SC2Map"
-    dst = root / "out" / "SCOBA256.SC2Map"
+    final = root / "out" / "SCOBA256.SC2Map"
+    dst = args.out if args.out is not None else root / "out" / ".build-tmp"
     if not src.is_dir():
         raise SystemExit(f"source not found: {src}")
     if dst.exists():
         shutil.rmtree(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, dst)
     (dst / "t3SyncHeightMap").unlink(missing_ok=True)
     expand_mapinfo(src / "MapInfo", dst / "MapInfo")
@@ -519,7 +523,18 @@ def main() -> int:
     disable_doodad_occlusion(dst)
     if os.environ.get("SC2_NO_PROPS") != "1":
         expand_props(dst)
+    if os.environ.get("SC2_NO_SPORES") != "1":
         scale_spores(dst)
+    if args.out is None:
+        old = root / "out" / ".build-old"
+        if old.exists():
+            shutil.rmtree(old)
+        if final.exists():
+            final.rename(old)
+        dst.rename(final)
+        if old.exists():
+            shutil.rmtree(old)
+        dst = final
     print(dst)
     return 0
 

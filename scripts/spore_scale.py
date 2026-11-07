@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MAP = ROOT / "out" / "SCOBA256.SC2Map"
 SPORE_SCALE = 3.0
 SPORE_UNITS = {"SporeCannon", "SporeCrawler"}
-PROJECTILE_FACTOR = 2.0
+PROJECTILE_FACTOR = 1.5
 MOVER_ID = "MissileDefault"
 
 
@@ -68,7 +68,7 @@ def scale_spores(map_dir: Path) -> int:
 
 
 def revert() -> int:
-    env = {**os.environ, "SC2_NO_PROPS": "1"}
+    env = {**os.environ, "SC2_NO_SPORES": "1"}
     return subprocess.call([sys.executable, str(ROOT / "scripts" / "expand_map.py")], env=env)
 
 

@@ -34,4 +34,35 @@
         <EditorCategories value="AbilityorEffectType:Units"/>
         <CmdButtonArray index="Execute" DefaultButtonFace="Salvage2"/>
     </CAbilEffectInstant>
+    <CAbilBehavior id="SCOBAAutoAttackToggle">
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <CmdButtonArray index="On" DefaultButtonFace="SCOBAAutoAttackOff">
+            <Flags index="ToSelection" value="1"/>
+        </CmdButtonArray>
+        <CmdButtonArray index="Off" DefaultButtonFace="SCOBAAutoAttackOn">
+            <Flags index="ToSelection" value="1"/>
+        </CmdButtonArray>
+        <Flags index="Toggle" value="1"/>
+        <Flags index="Transient" value="1"/>
+        <BehaviorArray value="SCOBAAutoAttackBehavior"/>
+    </CAbilBehavior>
+    <CAbilBehavior id="SCOBARightClickToggle">
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <CmdButtonArray index="On" DefaultButtonFace="SCOBARightClickMove">
+            <Flags index="ToSelection" value="1"/>
+        </CmdButtonArray>
+        <CmdButtonArray index="Off" DefaultButtonFace="SCOBARightClickStand">
+            <Flags index="ToSelection" value="1"/>
+        </CmdButtonArray>
+        <Flags index="Toggle" value="1"/>
+        <Flags index="Transient" value="1"/>
+        <BehaviorArray value="SCOBARightClickStandBehavior"/>
+    </CAbilBehavior>
+    <CAbilEffectInstant id="SCOBAAutoAttackStatus">
+        <Cost>
+            <Cooldown Link="Abil/SCOBAAutoAttackStatus" TimeUse="1"/>
+        </Cost>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <CmdButtonArray index="Execute" DefaultButtonFace="SCOBAAutoAttackStatus"/>
+    </CAbilEffectInstant>
 </Catalog>

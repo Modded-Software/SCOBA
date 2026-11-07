@@ -22,7 +22,10 @@ mkdir -p "$LOG_DIR"
 exec >>"$LOG_DIR/launcher.log" 2>&1
 
 MAP_NAME="SCOBA.SC2Map"
-MAP_SOURCE="${SC2_MAP_SOURCE:-$ROOT_DIR/src/$MAP_NAME}"
+MAP_SOURCE="${SC2_MAP_SOURCE:-$ROOT_DIR/out/SCOBA256.SC2Map}"
+if [ ! -e "$MAP_SOURCE" ]; then
+    MAP_SOURCE="$ROOT_DIR/src/$MAP_NAME"
+fi
 if [ ! -e "$MAP_SOURCE" ]; then
     MAP_SOURCE="$ROOT_DIR/$MAP_NAME"
 fi
@@ -34,6 +37,7 @@ SC2_EXE="$SC2_DIR/StarCraft II.exe"
 SC2_SWITCHER="$SC2_DIR/Support64/SC2Switcher_x64.exe"
 MAP_DIR="$SC2_DIR/Maps"
 MAP_TARGET="$MAP_DIR/$MAP_NAME"
+CACHE_DIR="${SC2_CACHE_DIR:-$BNET_PREFIX/pfx/drive_c/ProgramData/Blizzard Entertainment/StarCraft II/Maps/Cache/$MAP_NAME}"
 SC2_LAUNCH_ARGS=(-run "$MAP_NAME" -displaymode "${SC2_DISPLAYMODE:-0}" -preload 1 -NoUserCheats -reloadcheck)
 
 log() {
@@ -58,8 +62,23 @@ done
 [ -n "$GE_PROTON_DIR" ] || fail "GE-Proton not found under $STEAM_ROOT/compatibilitytools.d"
 
 log "source: $MAP_SOURCE"
+if [ "${SC2_KEEP_RUNNING:-0}" != "1" ]; then
+    python3 "$ROOT_DIR/scripts/kill-sc2.py"
+fi
+if [ -e "$CACHE_DIR" ]; then
+    log "clearing cache: $CACHE_DIR"
+    rm -rf "$CACHE_DIR"
+fi
 mkdir -p "$MAP_DIR"
 python3 "$ROOT_DIR/scripts/stage-map.py" "$MAP_SOURCE" "$MAP_TARGET"
+if [ -d "$MAP_SOURCE" ]; then
+    diff -r "$MAP_SOURCE" "$MAP_TARGET" >"$LOG_DIR/stage-check.log" || fail "staged map does not match source"
+elif ! cmp -s "$MAP_SOURCE" "$MAP_TARGET"; then
+    fail "staged map does not match source"
+fi
+if [ -f "$MAP_TARGET/BuildStamp.txt" ]; then
+    log "stamp: $(cat "$MAP_TARGET/BuildStamp.txt")"
+fi
 
 export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT"
 export STEAM_COMPAT_DATA_PATH="$BNET_PREFIX"
