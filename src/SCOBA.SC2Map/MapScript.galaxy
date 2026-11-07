@@ -2277,6 +2277,10 @@ bool gt_ForwardStart_Func (bool testConds, bool runActions) {
         return true;
     }
 
+    if (gv_sCOBAOrderMode[lv_localPlayer] == true) {
+        return true;
+    }
+
     gv_fORWARD[lv_localPlayer] = true;
     while ((gv_fORWARD[lv_localPlayer] == true) && (gv_bACKWARD[lv_localPlayer] == false)) {
         if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
@@ -2344,6 +2348,10 @@ bool gt_BackwardStart_Func (bool testConds, bool runActions) {
 
     // Actions
     if (!runActions) {
+        return true;
+    }
+
+    if (gv_sCOBAOrderMode[lv_localPlayer] == true) {
         return true;
     }
 
@@ -2422,6 +2430,10 @@ bool gt_LeftStart_Func (bool testConds, bool runActions) {
         return true;
     }
 
+    if (gv_sCOBAOrderMode[lv_localPlayer] == true) {
+        return true;
+    }
+
     gv_lEFT[lv_localPlayer] = true;
     while ((gv_lEFT[lv_localPlayer] == true)) {
         if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
@@ -2489,6 +2501,10 @@ bool gt_RightStart_Func (bool testConds, bool runActions) {
 
     // Actions
     if (!runActions) {
+        return true;
+    }
+
+    if (gv_sCOBAOrderMode[lv_localPlayer] == true) {
         return true;
     }
 
@@ -3222,6 +3238,7 @@ void InitTriggers () {
     gt_OrderKey_Init();
     gt_OrderButton_Init();
     gt_OrderCancel_Init();
+    gt_MedicSpawn_Init();
     gt_TargetRing_Init();
     gt_TargetClick_Init();
     gt_CameraFollowDistance_Init();

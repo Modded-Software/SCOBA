@@ -53,7 +53,7 @@ void gf_AwardExperience (int lp_player, int lp_amount) {
         gv_xP[lp_player] -= lv_threshold;
         gv_lEVEL[lp_player] += 1;
         gv_availableStatPoints[lp_player] += 3;
-        libNtve_gf_CreateExplosionAtPoint(libNtve_ge_ExplosionSize_Small, libNtve_ge_ExplosionType_Protoss, UnitGetPosition(gv_tPSUNIT[lp_player]));
+        libNtve_gf_SendActorMessageToUnit(gv_tPSUNIT[lp_player], "AnimPlay WarpIn");
         TextTagCreate((StringToText("LEVEL ") + IntToText(gv_lEVEL[lp_player])), 18, UnitGetPosition(gv_tPSUNIT[lp_player]), 2.0, true, false, PlayerGroupSingle(lp_player));
         TextTagSetColor(TextTagLastCreated(), c_textTagColorText, Color(100.00, 85.00, 20.00));
         TextTagSetVelocity(TextTagLastCreated(), 0.0, 90.0);
@@ -281,7 +281,7 @@ void gt_DamageCleanup_Init () {
 }
 
 void gf_OrderCreate () {
-    DialogCreate(120, 56, c_anchorTop, -160, 156, false);
+    DialogCreate(120, 56, c_anchorTop, -160, 160, false);
     gv_sCOBAOrderDialog = DialogLastCreated();
     libNtve_gf_CreateDialogItemButton(gv_sCOBAOrderDialog, 120, 56, c_anchorCenter, 0, 0, StringToText("Order this unit"), StringToText("Order"), "");
     gv_sCOBAOrderButton = DialogControlLastCreated();
@@ -302,10 +302,15 @@ void gf_OrderEnter (int lp_player) {
         return;
     }
     gv_sCOBAOrderMode[lp_player] = true;
+    gv_fORWARD[lp_player] = false;
+    gv_bACKWARD[lp_player] = false;
+    gv_lEFT[lp_player] = false;
+    gv_rIGHT[lp_player] = false;
     gv_sCOBAOrderUnit[lp_player] = lv_unit;
     UnitSetState(lv_unit, c_unitStateSelectable, true);
     UnitSelect(lv_unit, lp_player, true);
     libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, true, PlayerGroupSingle(lp_player));
+    UIDisplayMessage(PlayerGroupSingle(lp_player), c_messageAreaSubtitle, StringToText("Ordering " + UnitGetType(lv_unit) + ". Press Ctrl+E or Ctrl+C to cancel."));
 }
 
 void gf_OrderExit (int lp_player) {
@@ -579,4 +584,37 @@ bool gt_TargetRing_Func (bool testConds, bool runActions) {
 void gt_TargetRing_Init () {
     gt_TargetRing = TriggerCreate("gt_TargetRing_Func");
     TriggerAddEventTimePeriodic(gt_TargetRing, 0.2, c_timeGame);
+}
+
+unit [16] gv_sCOBAMedic;
+trigger gt_MedicSpawn;
+
+void gf_MedicSpawn (int lp_player) {
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+    libNtve_gf_CreateUnitsWithDefaultFacing(1, "Medic", 0, lp_player, PointWithOffset(UnitGetPosition(gv_tPSUNIT[lp_player]), 2.0, 2.0));
+    gv_sCOBAMedic[lp_player] = UnitLastCreated();
+    UnitIssueOrder(gv_sCOBAMedic[lp_player], OrderTargetingUnit(AbilityCommand("move", 0), gv_tPSUNIT[lp_player]), c_orderQueueReplace);
+}
+
+bool gt_MedicSpawn_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    Wait(2.0, c_timeGame);
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        gf_MedicSpawn(lv_player);
+    }
+    return true;
+}
+
+void gt_MedicSpawn_Init () {
+    gt_MedicSpawn = TriggerCreate("gt_MedicSpawn_Func");
+    TriggerAddEventMapInit(gt_MedicSpawn);
 }

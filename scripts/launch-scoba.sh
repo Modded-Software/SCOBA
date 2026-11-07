@@ -65,6 +65,8 @@ export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT"
 export STEAM_COMPAT_DATA_PATH="$BNET_PREFIX"
 export WINE_SIMULATE_WRITECOPY=1
 export PROTON_USE_NTSYNC=1
+export SC2_WINDOW_WIDTH="${SC2_WINDOW_WIDTH:-1920}"
+export SC2_WINDOW_HEIGHT="${SC2_WINDOW_HEIGHT:-1080}"
 
 if [ "${DRY_RUN:-0}" = "1" ]; then
     log "map: $MAP_TARGET"
@@ -79,6 +81,10 @@ fi
 
 log "launching $MAP_NAME"
 cd "$SC2_DIR"
+
+if ! python3 "$ROOT_DIR/scripts/sc2-configure-window.py"; then
+    log "warning: could not configure window size"
+fi
 
 if [ -f "$SC2_SWITCHER" ]; then
     exec "$GE_PROTON_DIR/proton" run "$SC2_SWITCHER" "${SC2_LAUNCH_ARGS[@]}"

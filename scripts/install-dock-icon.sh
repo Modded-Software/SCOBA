@@ -40,7 +40,7 @@ fail() {
 mkdir -p "$ICON_DIR" "$APPS_DIR"
 cp -f "$ICON_SOURCE" "$ICON_DIR/$ICON_NAME.png"
 
-printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=env SC2_PROJECT_ROOT="%s" SC2_MAP_SOURCE="%s/out/SCOBA256.SC2Map" bash "%s/scripts/launch-scoba.sh"\nIcon=%s\nTerminal=false\nType=Application\nCategories=Game;StrategyGame;\nStartupNotify=true\nStartupWMClass=StarCraft II.exe\n' \
+printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=env SC2_PROJECT_ROOT="%s" SC2_MAP_SOURCE="%s/out/SCOBA256.SC2Map" SC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s/scripts/launch-scoba.sh"\nIcon=%s\nTerminal=false\nType=Application\nCategories=Game;StrategyGame;\nStartupNotify=true\nStartupWMClass=StarCraft II.exe\n' \
     "$APP_NAME" \
     "Launch the SCOBA StarCraft II custom map" \
     "$ROOT_DIR" \
