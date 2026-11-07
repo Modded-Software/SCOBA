@@ -19,7 +19,7 @@ void InitLibs () {
 //--------------------------------------------------------------------------------------------------
 // Constants
 //--------------------------------------------------------------------------------------------------
-const int gv_zOOM = c_keyControl;
+const int gv_zOOM = c_keyShift;
 const int gv_mOVERIGHT = c_keyD;
 const int gv_mOVELEFT = c_keyA;
 const int gv_mOVEBACKWARD = c_keyS;
@@ -28,8 +28,8 @@ const int gv_fIRE = c_mouseButtonRight;
 const int gv_mOUSECURSOR = c_mouseButtonLeft;
 const int gv_aBILITYCAMERA = c_mouseButtonMiddle;
 const int gv_jUMP = c_keySpace;
-const int gv_singleButtonConstantButtonSize = 96;
-const int gv_singleButtonConstantIconSize = 78;
+const int gv_singleButtonConstantButtonSize = 64;
+const int gv_singleButtonConstantIconSize = 48;
 const int gv_nCols = 3;
 const int gv_cRowGap = 4;
 const int gv_cHeaderHeight = 24;
@@ -38,8 +38,8 @@ const int gv_cButtonGap = 2;
 const int gv_cIconSize = 76;
 const int gv_cButtonSize = 84;
 const int gv_cDialogBorder = 30;
-const int gv_singleButtonConstantButtonSizeAbilities = 96;
-const int gv_singleButtonConstantIconSizeAbilities = 78;
+const int gv_singleButtonConstantButtonSizeAbilities = 64;
+const int gv_singleButtonConstantIconSizeAbilities = 48;
 const int gv_abilitiesSelectionTotalColumnButtons = 6;
 const int gv_abilitiesnCols = 4;
 const int gv_cRowGapAbilities = 42;
@@ -99,6 +99,32 @@ bool[8] gv_bACKWARD;
 bool[8] gv_lEFT;
 bool[8] gv_rIGHT;
 unit[8] gv_tARGET;
+unit[8] gv_sCOBAHover;
+unit[8] gv_sCOBAOrderUnit;
+bool[8] gv_sCOBAOrderMode;
+int gv_sCOBAOrderDialog;
+int gv_sCOBAOrderButton;
+int gv_sCOBABB_Panel;
+int gv_sCOBABB_Icon;
+int gv_sCOBABB_Name;
+int gv_sCOBABB_HpImage;
+int gv_sCOBABB_HpLabel;
+int gv_sCOBABB_BarBg;
+int gv_sCOBABB_Border;
+int gv_sCOBABB_HpMaxWidth;
+bool[8] gv_sCOBABB_Shown;
+int[8] gv_pbXpDlg;
+int[8] gv_pbXpBg;
+int[8] gv_pbXpFill;
+int[8] gv_pbXpText;
+int[8] gv_pbHpDlg;
+int[8] gv_pbHpBg;
+int[8] gv_pbHpFill;
+int[8] gv_pbHpText;
+int[8] gv_pbNrgDlg;
+int[8] gv_pbNrgBg;
+int[8] gv_pbNrgFill;
+int[8] gv_pbNrgText;
 int[8] gv_xP;
 int[8] gv_lEVEL;
 int[8][6] gv_sTATLEVEL;
@@ -124,6 +150,10 @@ int gv_singleButtonDialogAbilities;
 int gv_singleButtonButtonAbilities;
 int gv_singleButtonIconAbilities;
 int gv_singleButtonLabelAbilities;
+int gv_singleButtonDialogInventory;
+int gv_singleButtonButtonInventory;
+int gv_singleButtonIconInventory;
+int gv_singleButtonLabelInventory;
 int gv_abilitiesSelectionDialogCloseButton;
 int gv_abilitiesSelectionAdditionalColumnDialog;
 int[8] gv_abilitiesSelectionAdditionalColumnAllocatedPoints;
@@ -191,6 +221,10 @@ void InitGlobals () {
     gv_singleButtonButtonAbilities = c_invalidDialogControlId;
     gv_singleButtonIconAbilities = c_invalidDialogControlId;
     gv_singleButtonLabelAbilities = c_invalidDialogControlId;
+    gv_singleButtonDialogInventory = c_invalidDialogId;
+    gv_singleButtonButtonInventory = c_invalidDialogControlId;
+    gv_singleButtonIconInventory = c_invalidDialogControlId;
+    gv_singleButtonLabelInventory = c_invalidDialogControlId;
     gv_abilitiesSelectionDialogCloseButton = c_invalidDialogControlId;
     gv_abilitiesSelectionAdditionalColumnDialog = c_invalidDialogId;
     for (init_i = 0; init_i <= 7; init_i += 1) {
@@ -240,6 +274,9 @@ bool gf_CanLevelAbility (int lp_numberToCheck);
 void gf_ShowAbilityLevelingInterface (int lp_iPlayer);
 void gf_SBDialogShowAbilitiesButton (int lp_iPlayer);
 void gf_SBDialogCreateAbilitiesButton ();
+void gf_SBDialogCreateInventoryButton ();
+void gf_PlayerBarsCreate ();
+void gf_PlayerBarsUpdate ();
 void gf_UnlockSupportTalentTree (int lp_iPlayer);
 void gf_UnlockDefenseTalentTree (int lp_iPlayer);
 void gf_UnlockOffenseTalentTree (int lp_iPlayer);
@@ -257,6 +294,12 @@ void gf_AbilitiesSelectionDialogShow (int lp_iPlayer);
 void gf_AbilitiesSelectionDialogCreate ();
 void gf_InitializeAbilitiesButtons ();
 void gf_AddAbilitiesButton (string lp_ability, bool lp_enabled, bool lp_learned, string lp_icon, string lp_grayIcon, text lp_tooltip);
+void gf_ShowTarget (int lp_player, unit lp_unit);
+void gf_OrderCreate ();
+void gf_BossBarSetup ();
+void gf_OrderEnter (int lp_player);
+void gf_OrderExit (int lp_player);
+void gf_OrderExecute (int lp_player, fixed lp_x, fixed lp_y);
 
 //--------------------------------------------------------------------------------------------------
 // Trigger Variables
@@ -276,6 +319,7 @@ trigger gt_ShowStatusBar;
 trigger gt_HideStatusBar;
 trigger gt_CameraFollowDistance;
 trigger gt_RefreshEnergyBar;
+trigger gt_PlayerBars;
 trigger gt_Jump;
 trigger gt_DisableClickMove;
 trigger gt_ForwardStart;
@@ -314,6 +358,8 @@ void gf_InitializeLevelingInterface () {
     gf_InitializeUnitButtons();
     gf_UnitSelectionDialogCreate();
     gf_SBDialogCreateAbilitiesButton();
+    gf_SBDialogCreateInventoryButton();
+    gf_PlayerBarsCreate();
     gf_InitializeAbilitiesButtons();
     gf_AbilitiesSelectionDialogCreate();
 }
@@ -379,31 +425,120 @@ void gf_SBDialogShowStatsButton (int lp_iPlayer) {
     DialogSetVisible(gv_singleButtonDialog, PlayerGroupSingle(lp_iPlayer), true);
 }
 
+void gf_PlayerBarsCreate () {
+    int lv_player;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        DialogCreate(480, 60, c_anchorTopLeft, 10, 10, false);
+        gv_pbXpDlg[lv_player] = DialogLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 10, StringToText(""), "Assets\\Textures\\btn-ability-kerrigan_revive.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+        libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 410, 24, c_anchorTopLeft, 56, 18, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
+        gv_pbXpBg[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 410, 24, c_anchorTopLeft, 56, 18, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(30,100,30), c_triggerBlendModeNormal);
+        gv_pbXpFill[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemLabel(gv_pbXpDlg[lv_player], 410, 24, c_anchorTopLeft, 56, 18, StringToText(""), Color(100,100,100), false, 2.0);
+        gv_pbXpText[lv_player] = DialogControlLastCreated();
+        DialogSetVisible(gv_pbXpDlg[lv_player], PlayerGroupSingle(lv_player), true);
+
+        DialogCreate(480, 52, c_anchorBottomLeft, 10, 60, false);
+        gv_pbHpDlg[lv_player] = DialogLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbHpDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 6, StringToText(""), "Assets\\Textures\\btn-ability-terran-heal-color.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+        libNtve_gf_CreateDialogItemImage(gv_pbHpDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
+        gv_pbHpBg[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbHpDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(30,100,30), c_triggerBlendModeNormal);
+        gv_pbHpFill[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemLabel(gv_pbHpDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), Color(100,100,100), false, 2.0);
+        gv_pbHpText[lv_player] = DialogControlLastCreated();
+        DialogSetVisible(gv_pbHpDlg[lv_player], PlayerGroupSingle(lv_player), true);
+
+        DialogCreate(480, 52, c_anchorBottomLeft, 10, 10, false);
+        gv_pbNrgDlg[lv_player] = DialogLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbNrgDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 6, StringToText(""), "Assets\\Textures\\btn-ability-protoss-psistorm-color.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+        libNtve_gf_CreateDialogItemImage(gv_pbNrgDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
+        gv_pbNrgBg[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbNrgDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(20,60,100), c_triggerBlendModeNormal);
+        gv_pbNrgFill[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemLabel(gv_pbNrgDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), Color(100,100,100), false, 2.0);
+        gv_pbNrgText[lv_player] = DialogControlLastCreated();
+        DialogSetVisible(gv_pbNrgDlg[lv_player], PlayerGroupSingle(lv_player), true);
+    }
+}
+
+void gf_PlayerBarsUpdate () {
+    int lv_player;
+    int lv_cur;
+    int lv_max;
+    int lv_xpMax;
+    int lv_width;
+    unit lv_unit;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        lv_unit = gv_tPSUNIT[lv_player];
+        if (!UnitIsValid(lv_unit)) {
+            continue;
+        }
+        lv_cur = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent));
+        lv_max = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLifeMax, c_unitPropNormal));
+        if (lv_max < 1) {
+            lv_max = 1;
+        }
+        lv_width = ((410 * lv_cur) / lv_max);
+        DialogControlSetSize(gv_pbHpFill[lv_player], PlayerGroupSingle(lv_player), lv_width, 20);
+        libNtve_gf_SetDialogItemText(gv_pbHpText[lv_player], StringToText(IntToString(lv_cur) + "/" + IntToString(lv_max)), PlayerGroupSingle(lv_player));
+
+        lv_cur = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropEnergy, c_unitPropCurrent));
+        lv_max = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropEnergyMax, c_unitPropNormal));
+        if (lv_max < 1) {
+            lv_max = 1;
+        }
+        lv_width = ((410 * lv_cur) / lv_max);
+        DialogControlSetSize(gv_pbNrgFill[lv_player], PlayerGroupSingle(lv_player), lv_width, 20);
+        libNtve_gf_SetDialogItemText(gv_pbNrgText[lv_player], StringToText(IntToString(lv_cur) + "/" + IntToString(lv_max)), PlayerGroupSingle(lv_player));
+
+        lv_xpMax = ((gv_lEVEL[lv_player] * 298) + PowI(2.0, gv_lEVEL[lv_player]));
+        if (lv_xpMax < 1) {
+            lv_xpMax = 1;
+        }
+        lv_width = ((410 * gv_xP[lv_player]) / lv_xpMax);
+        if (lv_width > 410) {
+            lv_width = 410;
+        }
+        DialogControlSetSize(gv_pbXpFill[lv_player], PlayerGroupSingle(lv_player), lv_width, 24);
+        libNtve_gf_SetDialogItemText(gv_pbXpText[lv_player], StringToText("Lv " + IntToString(gv_lEVEL[lv_player]) + "   " + IntToString(gv_xP[lv_player]) + "/" + IntToString(lv_xpMax)), PlayerGroupSingle(lv_player));
+    }
+}
+
+bool gt_PlayerBars_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_PlayerBarsUpdate();
+    return true;
+}
+
+void gt_PlayerBars_Init () {
+    gt_PlayerBars = TriggerCreate("gt_PlayerBars_Func");
+    TriggerAddEventTimePeriodic(gt_PlayerBars, 0.2, c_timeGame);
+}
+
 void gf_SBDialogCreateStatsButton () {
-    // Variable Declarations
     int lv_localAnchor;
-    string lv_localButton;
     string lv_localIcon;
     text lv_localTooltip;
 
-    // Variable Initialization
-    lv_localAnchor = c_anchorBottomLeft;
-    lv_localIcon = "Assets\\Textures\\ui_arrowred.dds";
-    lv_localTooltip = StringToText("");
-
-    // Implementation
-    lv_localButton = "attack";
     lv_localIcon = "Assets\\Textures\\btn-ability-terran-liftoff.dds";
     lv_localTooltip = StringExternal("Param/Value/8B0DE8A0");
     lv_localAnchor = c_anchorBottomRight;
-    DialogCreate(128, 128, lv_localAnchor, 430, 10, true);
+    DialogCreate(64, 64, lv_localAnchor, 429, 35, true);
     gv_singleButtonDialog = DialogLastCreated();
     libNtve_gf_CreateDialogItemButton(DialogLastCreated(), gv_singleButtonConstantButtonSize, gv_singleButtonConstantButtonSize, c_anchorCenter, 0, 0, lv_localTooltip, StringToText(""), "");
     gv_singleButtonButton = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemBackgroundVisible(gv_singleButtonButton, false, PlayerGroupAll());
+    libNtve_gf_SetDialogItemBorderVisible(gv_singleButtonButton, false, PlayerGroupAll());
     libNtve_gf_CreateDialogItemImage(DialogLastCreated(), gv_singleButtonConstantIconSize, gv_singleButtonConstantIconSize, c_anchorCenter, 0, 0, StringToText(""), lv_localIcon, c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
     DialogControlFadeTransparency(DialogControlLastCreated(), PlayerGroupAll(), 1.0, 50.0);
     gv_singleButtonIcon = DialogControlLastCreated();
-    libNtve_gf_CreateDialogItemLabel(gv_singleButtonDialog, gv_singleButtonConstantButtonSize, gv_singleButtonConstantButtonSize, c_anchorTopLeft, 84, 88, StringToText(""), Color(100,100,100), false, 2.0);
+    libNtve_gf_CreateDialogItemLabel(gv_singleButtonDialog, 24, 20, c_anchorTopLeft, 40, 40, StringToText(""), Color(100,100,100), false, 1.5);
     gv_singleButtonLabel = DialogControlLastCreated();
 }
 
@@ -682,31 +817,41 @@ void gf_SBDialogShowAbilitiesButton (int lp_iPlayer) {
 }
 
 void gf_SBDialogCreateAbilitiesButton () {
-    // Variable Declarations
     int lv_localAnchor;
-    string lv_localButton;
     string lv_localIcon;
     text lv_localTooltip;
 
-    // Variable Initialization
-    lv_localAnchor = c_anchorBottomLeft;
-    lv_localIcon = "Assets\\Textures\\ui_arrowred.dds";
-    lv_localTooltip = StringToText("");
-
-    // Implementation
-    lv_localButton = "attack";
     lv_localIcon = "Assets\\Textures\\btn-ability-terran-emp-color.dds";
     lv_localTooltip = StringExternal("Param/Value/4BF409FB");
     lv_localAnchor = c_anchorBottomRight;
-    DialogCreate(128, 128, lv_localAnchor, 430, 140, true);
+    DialogCreate(64, 64, lv_localAnchor, 429, 112, true);
     gv_singleButtonDialogAbilities = DialogLastCreated();
     libNtve_gf_CreateDialogItemButton(DialogLastCreated(), gv_singleButtonConstantButtonSizeAbilities, gv_singleButtonConstantButtonSizeAbilities, c_anchorCenter, 0, 0, lv_localTooltip, StringToText(""), "");
     gv_singleButtonButtonAbilities = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemBackgroundVisible(gv_singleButtonButtonAbilities, false, PlayerGroupAll());
+    libNtve_gf_SetDialogItemBorderVisible(gv_singleButtonButtonAbilities, false, PlayerGroupAll());
     libNtve_gf_CreateDialogItemImage(DialogLastCreated(), gv_singleButtonConstantIconSizeAbilities, gv_singleButtonConstantIconSizeAbilities, c_anchorCenter, 0, 0, StringToText(""), lv_localIcon, c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
     DialogControlFadeTransparency(DialogControlLastCreated(), PlayerGroupAll(), 1.0, 50.0);
     gv_singleButtonIconAbilities = DialogControlLastCreated();
-    libNtve_gf_CreateDialogItemLabel(gv_singleButtonDialogAbilities, gv_singleButtonConstantButtonSizeAbilities, gv_singleButtonConstantButtonSizeAbilities, c_anchorTopLeft, 84, 88, StringToText(""), Color(100,100,100), false, 2.0);
+    libNtve_gf_CreateDialogItemLabel(gv_singleButtonDialogAbilities, 24, 20, c_anchorTopLeft, 40, 40, StringToText(""), Color(100,100,100), false, 1.5);
     gv_singleButtonLabelAbilities = DialogControlLastCreated();
+}
+
+void gf_SBDialogCreateInventoryButton () {
+    text lv_tooltip;
+
+    lv_tooltip = StringToText("Inventory");
+    DialogCreate(64, 64, c_anchorBottomRight, 429, 189, true);
+    gv_singleButtonDialogInventory = DialogLastCreated();
+    libNtve_gf_CreateDialogItemButton(DialogLastCreated(), gv_singleButtonConstantButtonSizeAbilities, gv_singleButtonConstantButtonSizeAbilities, c_anchorCenter, 0, 0, lv_tooltip, StringToText(""), "");
+    gv_singleButtonButtonInventory = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemBackgroundVisible(gv_singleButtonButtonInventory, false, PlayerGroupAll());
+    libNtve_gf_SetDialogItemBorderVisible(gv_singleButtonButtonInventory, false, PlayerGroupAll());
+    libNtve_gf_CreateDialogItemImage(DialogLastCreated(), gv_singleButtonConstantIconSizeAbilities, gv_singleButtonConstantIconSizeAbilities, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\btn-unit-terran-predator.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+    gv_singleButtonIconInventory = DialogControlLastCreated();
+    libNtve_gf_CreateDialogItemLabel(gv_singleButtonDialogInventory, 24, 20, c_anchorTopLeft, 40, 40, StringToText(""), Color(100,100,100), false, 1.5);
+    gv_singleButtonLabelInventory = DialogControlLastCreated();
+    DialogSetVisible(gv_singleButtonDialogInventory, PlayerGroupAll(), true);
 }
 
 void gf_UnlockSupportTalentTree (int lp_iPlayer) {
@@ -1485,8 +1630,14 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             libNtve_gf_DisplayBossBar(lv_localXPBar, "Assets\\Textures\\btn-ability-kerrigan_revive.dds", (StringExternal("Param/Value/8C6298BA") + IntToText(gv_lEVEL[lv_localPlayer])), ((gv_lEVEL[lv_localPlayer] * 298) + PowI(2.0, gv_lEVEL[lv_localPlayer])), PlayerGroupSingle(lv_localPlayer));
             libNtve_gf_SetBossBarCurrentValue(lv_localXPBar, gv_xP[lv_localPlayer], true);
             libNtve_gf_MoveBossBar(lv_localXPBar, c_anchorTopLeft, 0, 0);
+            libNtve_gf_ShowHideBossBar(false, lv_localHPBar);
+            libNtve_gf_ShowHideBossBar(false, lv_localNRGBar);
+            libNtve_gf_ShowHideBossBar(false, lv_localXPBar);
         }
 
+    }
+    for (lv_localPlayer = 1; lv_localPlayer <= 6; lv_localPlayer += 1) {
+        UnitClearSelection(lv_localPlayer);
     }
     return true;
 }
@@ -1588,6 +1739,9 @@ bool gt_SBDialogStatsCallback_Func (bool testConds, bool runActions) {
         else {
             gf_UnitSelectionDialogShow(EventPlayer());
         }
+    }
+    if ((EventDialogControl() == gv_singleButtonButtonInventory)) {
+        UIDisplayMessage(PlayerGroupSingle(EventPlayer()), c_messageAreaSubtitle, StringToText("Inventory coming soon"));
     }
 
     return true;
@@ -1955,6 +2109,7 @@ bool gt_ShowStatusBar_Func (bool testConds, bool runActions) {
     }
 
     UnitStatusBarOverride(EventUnit(), c_unitStatusGroupAll);
+    gv_sCOBAHover[EventPlayer()] = EventUnit();
     return true;
 }
 
@@ -1974,6 +2129,9 @@ bool gt_HideStatusBar_Func (bool testConds, bool runActions) {
     }
 
     UnitStatusBarOverride(EventUnit(), -1);
+    if (gv_sCOBAHover[EventPlayer()] == EventUnit()) {
+        gv_sCOBAHover[EventPlayer()] = null;
+    }
     return true;
 }
 
@@ -2453,6 +2611,10 @@ bool gt_CursorStart_Func (bool testConds, bool runActions) {
         return true;
     }
 
+    if ((EventMouseClickedButton() == gv_fIRE) && (gv_sCOBAOrderMode[lv_localPlayer] == true)) {
+        return true;
+    }
+
     if (((EventMouseClickedButton() == gv_fIRE) || (EventMouseClickedButton() == gv_aBILITYCAMERA))) {
         gv_rOTATEUNIT[lv_localPlayer] = true;
     }
@@ -2558,12 +2720,7 @@ bool gt_Target_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    gv_tARGET[lv_localPlayer] = lv_triggeringUnit;
-    libNtve_gf_DisplayBossBar(lv_localBar, "Assets\\Textures\\btn-command-attack.dds", UnitTypeGetName(UnitGetType(lv_triggeringUnit)), 100, PlayerGroupSingle(lv_localPlayer));
-    libNtve_gf_SetBossBarRace(lv_localBar, libNtve_ge_BossBarRace_Terran, true);
-    libNtve_gf_SetBossBarBoss(lv_localBar, lv_triggeringUnit, true);
-    libNtve_gf_MoveBossBar(lv_localBar, c_anchorTop, 0, 50);
-    UnitStatusBarOverride(lv_triggeringUnit, -1);
+    gf_ShowTarget(lv_localPlayer, lv_triggeringUnit);
     return true;
 }
 
@@ -2607,11 +2764,7 @@ bool gt_ClearTarget_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if (UnitIsValid(gv_tARGET[lv_localPlayer])) {
-        UnitStatusBarOverride(gv_tARGET[lv_localPlayer], -1);
-    }
-
-    gv_tARGET[lv_localPlayer] = null;
+    gf_ShowTarget(lv_localPlayer, null);
     return true;
 }
 
@@ -3064,8 +3217,16 @@ void InitTriggers () {
     gt_NewUnitSelection_Init();
     gt_ShowStatusBar_Init();
     gt_HideStatusBar_Init();
+    gf_OrderCreate();
+    gf_BossBarSetup();
+    gt_OrderKey_Init();
+    gt_OrderButton_Init();
+    gt_OrderCancel_Init();
+    gt_TargetRing_Init();
+    gt_TargetClick_Init();
     gt_CameraFollowDistance_Init();
     gt_RefreshEnergyBar_Init();
+    gt_PlayerBars_Init();
     gt_Jump_Init();
     gt_DisableClickMove_Init();
     gt_ForwardStart_Init();
@@ -3081,7 +3242,7 @@ void InitTriggers () {
     gt_CursorStart_Init();
     gt_CursorEnd_Init();
     gt_Target_Init();
-    gt_ClearTarget_Init();
+    // gt_ClearTarget_Init();  // disabled: selection is cleared by click-outside/death
     gt_ZerusSpawn_Init();
     gt_TerranSpawn_Init();
     gt_XCenterUnitOrders_Init();

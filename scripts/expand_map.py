@@ -3,10 +3,15 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import struct
 from pathlib import Path
+
+from doodad_occlusion import disable_doodad_occlusion
+from props_expand import expand_props
+from spore_scale import scale_spores
 
 SCALE = 2
 OLD_CELLS = 128
@@ -511,6 +516,10 @@ def main() -> int:
     scale_xml_regions(src / "Regions", dst / "Regions")
     patch_mapscript(src / "MapScript.galaxy", dst / "MapScript.galaxy")
     expand_minimap(src / "Minimap.tga", dst / "Minimap.tga")
+    disable_doodad_occlusion(dst)
+    if os.environ.get("SC2_NO_PROPS") != "1":
+        expand_props(dst)
+        scale_spores(dst)
     print(dst)
     return 0
 

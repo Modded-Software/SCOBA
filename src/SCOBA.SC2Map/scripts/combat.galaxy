@@ -2,6 +2,12 @@ trigger gt_DamageTrack;
 trigger gt_HealAward;
 trigger gt_DeathAward;
 trigger gt_DamageCleanup;
+trigger gt_TargetClick;
+trigger gt_OrderKey;
+trigger gt_OrderButton;
+trigger gt_OrderCancel;
+int gv_sCOBAOrderFlash;
+trigger gt_TargetRing;
 
 bool gf_IsHeroPlayer (int lp_player) {
     return (lp_player >= 1 && lp_player <= 6);
@@ -22,6 +28,8 @@ void gf_ClearDamageRecord (int lp_tag) {
         }
     }
 }
+
+
 
 void gf_AwardExperience (int lp_player, int lp_amount) {
     int lv_threshold;
@@ -77,6 +85,7 @@ void gf_AwardExperience (int lp_player, int lp_amount) {
     libNtve_gf_DisplayBossBar(lv_xpBar, "Assets\\Textures\\btn-ability-kerrigan_revive.dds", (StringExternal("Param/Value/5E8CE3E3") + IntToText(gv_lEVEL[lp_player])), lv_threshold, PlayerGroupSingle(lp_player));
     libNtve_gf_SetBossBarCurrentValue(lv_xpBar, gv_xP[lp_player], true);
     libNtve_gf_SetBossBarMaximumValue(lv_xpBar, lv_threshold, true);
+    libNtve_gf_ShowHideBossBar(false, lv_xpBar);
     gf_ShowStasLevelingInterface(lp_player);
     gf_ShowAbilityLevelingInterface(lp_player);
 }
@@ -230,6 +239,12 @@ bool gt_DeathAward_Func (bool testConds, bool runActions) {
     }
 
     gf_ClearDamageRecord(lv_tag);
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        if (UnitIsValid(gv_tARGET[lv_player]) && (gv_tARGET[lv_player] == lv_victim)) {
+            gf_ShowTarget(lv_player, null);
+        }
+    }
     return true;
 }
 
@@ -264,4 +279,312 @@ bool gt_DamageCleanup_Func (bool testConds, bool runActions) {
 void gt_DamageCleanup_Init () {
     gt_DamageCleanup = TriggerCreate("gt_DamageCleanup_Func");
     TriggerAddEventUnitRemoved(gt_DamageCleanup, null);
+}
+
+void gf_OrderCreate () {
+    DialogCreate(120, 56, c_anchorTop, -160, 154, false);
+    gv_sCOBAOrderDialog = DialogLastCreated();
+    libNtve_gf_CreateDialogItemButton(gv_sCOBAOrderDialog, 120, 56, c_anchorCenter, 0, 0, StringToText("Order this unit"), StringToText("Order"), "");
+    gv_sCOBAOrderButton = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemRenderPriority(gv_sCOBAOrderButton, 900, PlayerGroupAll());
+    libNtve_gf_CreateDialogItemImage(gv_sCOBAOrderDialog, 9, 3, c_anchorTopLeft, 70, 41, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(255,255,255), c_triggerBlendModeNormal);
+    libNtve_gf_SetDialogItemRenderPriority(DialogControlLastCreated(), 920, PlayerGroupAll());
+    libNtve_gf_CreateDialogItemImage(gv_sCOBAOrderDialog, 120, 56, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(0,0,0), c_triggerBlendModeNormal);
+    gv_sCOBAOrderFlash = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemRenderPriority(gv_sCOBAOrderFlash, 950, PlayerGroupAll());
+    DialogControlSetVisible(gv_sCOBAOrderFlash, PlayerGroupAll(), false);
+    DialogSetVisible(gv_sCOBAOrderDialog, PlayerGroupAll(), false);
+}
+
+void gf_OrderEnter (int lp_player) {
+    unit lv_unit;
+
+    lv_unit = gv_tARGET[lp_player];
+    if (!UnitIsValid(lv_unit)) {
+        return;
+    }
+    if (UnitGetOwner(lv_unit) != lp_player) {
+        return;
+    }
+    gv_sCOBAOrderMode[lp_player] = true;
+    gv_sCOBAOrderUnit[lp_player] = lv_unit;
+    UnitSetState(lv_unit, c_unitStateSelectable, true);
+    UnitSelect(lv_unit, lp_player, true);
+}
+
+void gf_OrderExit (int lp_player) {
+    gv_sCOBAOrderMode[lp_player] = false;
+    gv_sCOBAOrderUnit[lp_player] = null;
+    UnitClearSelection(lp_player);
+    if (UnitIsValid(gv_tARGET[lp_player])) {
+        UnitSetState(gv_tARGET[lp_player], c_unitStateSelectable, false);
+    }
+}
+
+void gf_OrderToggle (int lp_player) {
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    if (gv_sCOBAOrderMode[lp_player] == true) {
+        gf_OrderExit(lp_player);
+    }
+    else {
+        gf_OrderEnter(lp_player);
+    }
+}
+
+void gf_OrderExecute (int lp_player, fixed lp_x, fixed lp_y) {
+    unit lv_unit;
+    unit lv_hover;
+
+    lv_unit = gv_sCOBAOrderUnit[lp_player];
+    if (!UnitIsValid(lv_unit)) {
+        gf_OrderExit(lp_player);
+        return;
+    }
+    lv_hover = gv_sCOBAHover[lp_player];
+    if (UnitIsValid(lv_hover) && (UnitGetOwner(lv_hover) != lp_player)) {
+        UnitIssueOrder(lv_unit, OrderTargetingUnit(AbilityCommand("attack", 0), lv_hover), c_orderQueueReplace);
+    }
+    else {
+        UnitIssueOrder(lv_unit, OrderTargetingPoint(AbilityCommand("move", 0), Point(lp_x, lp_y)), c_orderQueueReplace);
+    }
+}
+
+void gf_BossBarSetup () {
+    gv_sCOBABB_Panel = c_invalidDialogControlId;
+    gv_sCOBABB_Icon = c_invalidDialogControlId;
+    gv_sCOBABB_Name = c_invalidDialogControlId;
+    gv_sCOBABB_HpImage = c_invalidDialogControlId;
+    gv_sCOBABB_HpLabel = c_invalidDialogControlId;
+    gv_sCOBABB_BarBg = c_invalidDialogControlId;
+    gv_sCOBABB_Border = c_invalidDialogControlId;
+    gv_sCOBABB_HpMaxWidth = 200;
+}
+
+void gf_BossBarEnsure () {
+    if (gv_sCOBABB_Panel != c_invalidDialogControlId) {
+        return;
+    }
+    DialogControlHookupStandard(c_triggerControlTypePanel, "UIContainer/ConsoleUIContainer/BossUnitFrame");
+    gv_sCOBABB_Panel = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeImage, "IconImage");
+    gv_sCOBABB_Icon = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeLabel, "NameLabel");
+    gv_sCOBABB_Name = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeImage, "HealthBarImage");
+    gv_sCOBABB_HpImage = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeLabel, "HealthLabel");
+    gv_sCOBABB_HpLabel = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeImage, "BarBackground");
+    gv_sCOBABB_BarBg = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeImage, "BorderImage");
+    gv_sCOBABB_Border = DialogControlLastCreated();
+    DialogControlSetPosition(gv_sCOBABB_Panel, PlayerGroupAll(), c_anchorTop, 0, 50);
+    if (gv_sCOBAOrderDialog != c_invalidDialogId && gv_sCOBABB_Panel != c_invalidDialogControlId) {
+DialogControlSetPosition(gv_sCOBAOrderDialog, PlayerGroupAll(), c_anchorTop, -157, 50 + DialogControlGetHeight(gv_sCOBABB_Panel, 1) + 8);
+    }
+    gv_sCOBABB_HpMaxWidth = DialogControlGetWidth(gv_sCOBABB_HpImage, 1);
+    if (gv_sCOBABB_HpMaxWidth < 10) {
+        gv_sCOBABB_HpMaxWidth = 200;
+    }
+}
+
+void gf_BossBarUpdate (int lp_player) {
+    unit lv_unit;
+    int lv_cur;
+    int lv_max;
+    int lv_width;
+
+    if (gv_sCOBABB_Panel == c_invalidDialogControlId) {
+        return;
+    }
+    lv_unit = gv_tARGET[lp_player];
+    if (!UnitIsValid(lv_unit)) {
+        return;
+    }
+    lv_cur = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent));
+    lv_max = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLifeMax, c_unitPropNormal));
+    if (lv_max < 1) {
+        lv_max = 1;
+    }
+    if (lv_cur < 0) {
+        lv_cur = 0;
+    }
+    if (lv_cur > lv_max) {
+        lv_cur = lv_max;
+    }
+    lv_width = ((gv_sCOBABB_HpMaxWidth * lv_cur) / lv_max);
+    DialogControlSetSize(gv_sCOBABB_HpImage, PlayerGroupSingle(lp_player), lv_width, DialogControlGetHeight(gv_sCOBABB_HpImage, 1));
+    libNtve_gf_SetDialogItemText(gv_sCOBABB_HpLabel, StringToText(IntToString(lv_cur) + "/" + IntToString(lv_max)), PlayerGroupSingle(lp_player));
+}
+
+void gf_ShowTarget (int lp_player, unit lp_unit) {
+    unit lv_old;
+    string lv_portrait;
+    bool lv_enemy;
+    int lv_bar;
+
+    if (UnitIsValid(lp_unit) && (lp_unit == gv_tPSUNIT[lp_player])) {
+        lp_unit = null;
+    }
+    lv_bar = ((lp_player * 10) + 4);
+    lv_old = gv_tARGET[lp_player];
+    if (lv_old != lp_unit) {
+        UnitClearSelection(lp_player);
+        if (UnitIsValid(lv_old)) {
+            UnitStatusBarOverride(lv_old, -1);
+            UnitSetState(lv_old, c_unitStateSelectable, false);
+        }
+    }
+    gv_tARGET[lp_player] = lp_unit;
+    DialogSetVisible(gv_sCOBAOrderDialog, PlayerGroupSingle(lp_player), (UnitIsValid(lp_unit) && (UnitGetOwner(lp_unit) == lp_player)));
+    if (!UnitIsValid(lp_unit)) {
+        libNtve_gf_ShowHideBossBar(false, lv_bar);
+        return;
+    }
+    UnitStatusBarOverride(lp_unit, -1);
+    lv_enemy = (libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Ally) == false);
+    lv_portrait = "";
+    if (CatalogEntryIsValid(c_gameCatalogActor, UnitGetType(lp_unit))) {
+        lv_portrait = CatalogFieldValueGet(c_gameCatalogActor, UnitGetType(lp_unit), "UnitIcon", lp_player);
+    }
+    if (lv_portrait == "") {
+        lv_portrait = "Assets\\Textures\\btn-command-attack.dds";
+    }
+    libNtve_gf_DisplayBossBar(lv_bar, lv_portrait, UnitTypeGetName(UnitGetType(lp_unit)), 100, PlayerGroupSingle(lp_player));
+    if (lv_enemy) {
+        libNtve_gf_SetBossBarRace(lv_bar, libNtve_ge_BossBarRace_Zerg, true);
+    }
+    libNtve_gf_SetBossBarBoss(lv_bar, lp_unit, true);
+    libNtve_gf_MoveBossBar(lv_bar, c_anchorTop, 0, 50);
+}
+
+bool gt_TargetClick_Func (bool testConds, bool runActions) {
+    int lv_player;
+    unit lv_picked;
+
+    lv_player = EventPlayer();
+    lv_picked = null;
+    if (gf_IsHeroPlayer(lv_player)) {
+        lv_picked = gv_sCOBAHover[lv_player];
+    }
+
+    if (!runActions) {
+        return true;
+    }
+
+    if (!gf_IsHeroPlayer(lv_player)) {
+        return true;
+    }
+
+    if (EventMouseClickedButton() == gv_fIRE) {
+        if (gv_sCOBAOrderMode[lv_player] == true) {
+            gf_OrderExecute(lv_player, EventMouseClickedPosXWorld(), EventMouseClickedPosYWorld());
+        }
+        else if (!UnitIsValid(lv_picked)) {
+            gf_ShowTarget(lv_player, null);
+        }
+        return true;
+    }
+
+    if (EventMouseClickedButton() == gv_mOUSECURSOR) {
+        if (gv_sCOBAOrderMode[lv_player] == true) {
+            gf_OrderExit(lv_player);
+        }
+        gf_ShowTarget(lv_player, lv_picked);
+    }
+    return true;
+}
+
+void gt_TargetClick_Init () {
+    gt_TargetClick = TriggerCreate("gt_TargetClick_Func");
+    TriggerAddEventMouseClicked(gt_TargetClick, c_playerAny, gv_mOUSECURSOR, true);
+    TriggerAddEventMouseClicked(gt_TargetClick, c_playerAny, gv_fIRE, true);
+}
+
+bool gt_OrderKey_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    lv_player = EventPlayer();
+
+    if (!runActions) {
+        return true;
+    }
+    if (gv_sCOBAOrderFlash != c_invalidDialogControlId) {
+        DialogControlSetVisible(gv_sCOBAOrderFlash, PlayerGroupSingle(lv_player), true);
+        DialogControlSendAnimationEvent(gv_sCOBAOrderButton, PlayerGroupSingle(lv_player), "OnClick");
+        Wait(0.12, c_timeGame);
+        DialogControlSetVisible(gv_sCOBAOrderFlash, PlayerGroupSingle(lv_player), false);
+    }
+    gf_OrderToggle(lv_player);
+    return true;
+}
+
+void gt_OrderKey_Init () {
+    gt_OrderKey = TriggerCreate("gt_OrderKey_Func");
+    TriggerAddEventKeyPressed(gt_OrderKey, c_playerAny, c_keyF, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    TriggerAddEventKeyPressed(gt_OrderKey, c_playerAny, c_keyE, true, c_keyModifierStateIgnore, c_keyModifierStateRequire, c_keyModifierStateIgnore);
+}
+
+bool gt_OrderCancel_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    lv_player = EventPlayer();
+
+    if (!runActions) {
+        return true;
+    }
+    if (gv_sCOBAOrderMode[lv_player] == true) {
+        gf_OrderExit(lv_player);
+    }
+    return true;
+}
+
+void gt_OrderCancel_Init () {
+    gt_OrderCancel = TriggerCreate("gt_OrderCancel_Func");
+    TriggerAddEventKeyPressed(gt_OrderCancel, c_playerAny, c_keyC, true, c_keyModifierStateIgnore, c_keyModifierStateRequire, c_keyModifierStateIgnore);
+}
+
+bool gt_OrderButton_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    lv_player = EventPlayer();
+
+    if (!runActions) {
+        return true;
+    }
+    if (EventDialogControl() == gv_sCOBAOrderButton) {
+        gf_OrderToggle(lv_player);
+    }
+    return true;
+}
+
+void gt_OrderButton_Init () {
+    gt_OrderButton = TriggerCreate("gt_OrderButton_Func");
+    TriggerAddEventDialogControl(gt_OrderButton, c_playerAny, c_invalidDialogControlId, c_triggerControlEventTypeClick);
+}
+
+bool gt_TargetRing_Func (bool testConds, bool runActions) {
+    int lv_player;
+    unit lv_unit;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        lv_unit = gv_tARGET[lv_player];
+        if (UnitIsValid(lv_unit)) {
+            if (gv_sCOBAOrderMode[lv_player] == false) {
+                UnitFlashSelection(lv_unit, 1.0);
+            }
+            gf_BossBarUpdate(lv_player);
+        }
+    }
+    return true;
+}
+
+void gt_TargetRing_Init () {
+    gt_TargetRing = TriggerCreate("gt_TargetRing_Func");
+    TriggerAddEventTimePeriodic(gt_TargetRing, 0.2, c_timeGame);
 }
