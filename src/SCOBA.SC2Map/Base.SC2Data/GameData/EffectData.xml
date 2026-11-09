@@ -37,4 +37,5 @@
         <Flags index="Kill" value="0"/>
         <Death value="Normal"/>
     </CEffectDamage>
+    <CEffectSet id="SCOBAWeaponAttackDummy"/>
 </Catalog>

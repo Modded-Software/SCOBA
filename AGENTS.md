@@ -30,6 +30,10 @@
 
 ## Project docs
 
+- `docs/requirements/REQ-COMBAT-CONTROLS.md` — binding combat control requirements.
+- `docs/specifications/SPEC-COMBAT-CONTROLS.md` — combat FSM implementation specification.
+- `docs/requirements/REQ-MOUSE-CONTROLS.md` — binding mouse control requirements.
+- `docs/specifications/SPEC-MOUSE-CONTROLS.md` — mouse control implementation specification.
 - `docs/AUDIT.md` — full audit of command-card and repository changes.
 - `docs/REMEDIATION.md` — phased remediation plan and test matrix.
 - `docs/PIPELINE_AUDIT.md` — build, staging, cache, and launch audit.

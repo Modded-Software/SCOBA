@@ -52,7 +52,7 @@
         <AlertIcon value="Assets\Textures\btn-command-attack.dds"/>
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
-        <Name value="Auto-attack cooldown"/>
-        <Tooltip value="Shows the live auto-attack cooldown. Attacks repeat automatically while enemies are in range. Cancel: Ctrl+C, deselect the target, or move with WASD. Use the chase button to switch Stand or Walk."/>
+        <Name value="Weapon Attack"/>
+        <Tooltip value="Attack a target. The ring shows the weapon cooldown. The button is disabled while the weapon recharges."/>
     </CButton>
 </Catalog>

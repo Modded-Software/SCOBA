@@ -11,6 +11,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
 
     // Variable Declarations
     int lv_localPlayer;
+    bank lv_bank;
     int lv_localHPBar;
     int lv_localNRGBar;
     int lv_localXPBar;
@@ -60,13 +61,11 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             UnitSetState(gv_tPSUNIT[lv_localPlayer], c_unitStateStatusBar, false);
             libNtve_gf_StoreUnitSelection(lv_localPlayer, libNtve_ge_UnitSelectionStoreOption_DoNotClearUnitSelection);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", true);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", true);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
-            UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickStandBehavior", gv_tPSUNIT[lv_localPlayer], 1);
-            
             if (lv_localPlayer <= 3) {
                 libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, (lv_localPlayer + 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 8.0, 45.0));
                 libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, (lv_localPlayer + 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 8.0, 225.0));
@@ -159,8 +158,17 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
     }
     gv_sCOBA_Clock = TimerCreate();
     TimerStart(gv_sCOBA_Clock, 3600.0, false, c_timeGame);
+    lv_bank = BankLoad("SCOBA", 1);
+    BankSectionCreate(lv_bank, "Debug");
+    BankValueSetFromString(lv_bank, "Debug", "Build", c_SCOBA_BUILD_STAMP);
+    BankSave(lv_bank);
     gt_ToggleCommands_Init();
     gt_AttackEvent_Init();
+    for (lv_localPlayer = 1; lv_localPlayer <= 6; lv_localPlayer += 1) {
+        if (UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {
+            UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], Order(AbilityCommand("SCOBARightClickToggle", 0)), c_orderQueueReplace);
+        }
+    }
     return true;
 }
 

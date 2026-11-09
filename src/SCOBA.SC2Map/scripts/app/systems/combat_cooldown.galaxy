@@ -1,107 +1,34 @@
 // Module: systems/combat_cooldown
 
-int gf_HeroWeaponIndex (unit lp_unit) {
-    int lv_count;
-    int lv_index;
-    fixed lv_period;
-
-    lv_count = UnitWeaponCount(lp_unit);
-    for (lv_index = 0; lv_index < lv_count; lv_index += 1) {
-        lv_period = UnitWeaponPeriod(lp_unit, lv_index);
-        if (lv_period > 0.0) {
-            return lv_index;
-        }
-    }
-    return 0;
-}
-
-bool gt_AttackCooldown_Func (bool testConds, bool runActions) {
+bool gt_CombatStartedAttack_Func (bool testConds, bool runActions) {
     int lv_player;
-    int lv_weapon;
     unit lv_hero;
     fixed lv_now;
     fixed lv_delta;
     fixed lv_period;
-    bank lv_bank;
 
     if (!runActions) {
         return true;
     }
     lv_player = gf_HeroPlayerFromUnit(EventUnit());
-    if (lv_player < 1) {
+    if (lv_player < c_SCOBA_HERO_FIRST || lv_player > c_SCOBA_HERO_LAST) {
         return true;
     }
     lv_hero = gv_tPSUNIT[lv_player];
-    if (!UnitIsValid(lv_hero)) {
+    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
         return true;
     }
-    if (UnitBehaviorCount(lv_hero, "SCOBAAutoAttackBehavior") <= 0) {
-        return true;
-    }
-    lv_weapon = gf_HeroWeaponIndex(lv_hero);
     lv_now = TimerGetElapsed(gv_sCOBA_Clock);
     lv_delta = lv_now - gv_sCOBA_LastAttackAt[lv_player];
-    if (gv_sCOBA_LastAttackAt[lv_player] > 0.0 && lv_delta > 0.05 && lv_delta < 10.0) {
+    if (gv_sCOBA_LastAttackAt[lv_player] > 0.0 && lv_delta >= c_SCOBA_MIN_ATTACK_PERIOD && lv_delta <= c_SCOBA_MAX_ATTACK_PERIOD) {
         gv_sCOBA_AttackPeriod[lv_player] = lv_delta;
     }
     gv_sCOBA_LastAttackAt[lv_player] = lv_now;
-    if (c_SCOBA_DEBUG_COOLDOWN) {
-        lv_bank = BankLoad("SCOBA", 1);
-        BankSectionCreate(lv_bank, "Debug");
-        BankValueSetFromFixed(lv_bank, "Debug", "AtkMeasured", gv_sCOBA_AttackPeriod[lv_player]);
-        BankValueSetFromFixed(lv_bank, "Debug", "AtkDelta", lv_delta);
-        BankValueSetFromFixed(lv_bank, "Debug", "AtkNow", lv_now);
-        BankSave(lv_bank);
-    }
     lv_period = gv_sCOBA_AttackPeriod[lv_player];
     if (lv_period <= 0.0) {
-        lv_period = UnitWeaponPeriodRemaining(lv_hero, lv_weapon);
+        lv_period = c_SCOBA_INITIAL_WEAPON_PERIOD;
     }
-    if (lv_period <= 0.0) {
-        lv_period = UnitWeaponPeriod(lv_hero, lv_weapon);
-    }
-    if (lv_period <= 0.0) {
-        lv_period = 1.0;
-    }
-    UnitAbilityShow(lv_hero, "SCOBAAutoAttackStatus", true);
+    UnitAbilityReset(lv_hero, AbilityCommand("SCOBAAutoAttackStatus", 0), c_spendLocationAbility);
     UnitAbilityAddCooldown(lv_hero, "SCOBAAutoAttackStatus", "Abil/SCOBAAutoAttackStatus", lv_period);
     return true;
-}
-
-bool gt_CooldownSync_Func (bool testConds, bool runActions) {
-    int lv_player;
-    int lv_weapon;
-    unit lv_hero;
-    fixed lv_now;
-    fixed lv_remaining;
-
-    if (!runActions) {
-        return true;
-    }
-    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
-        lv_hero = gv_tPSUNIT[lv_player];
-        if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
-            continue;
-        }
-        if (UnitBehaviorCount(lv_hero, "SCOBAAutoAttackBehavior") <= 0) {
-            UnitAbilityShow(lv_hero, "SCOBAAutoAttackStatus", false);
-            continue;
-        }
-        UnitAbilityShow(lv_hero, "SCOBAAutoAttackStatus", true);
-        lv_weapon = gf_HeroWeaponIndex(lv_hero);
-        lv_now = TimerGetElapsed(gv_sCOBA_Clock);
-        lv_remaining = UnitWeaponPeriodRemaining(lv_hero, lv_weapon);
-        if (lv_remaining <= 0.0) {
-            lv_remaining = gv_sCOBA_AttackPeriod[lv_player] - (lv_now - gv_sCOBA_LastAttackAt[lv_player]);
-        }
-        if (lv_remaining > 0.0) {
-            UnitAbilityAddCooldown(lv_hero, "SCOBAAutoAttackStatus", "Abil/SCOBAAutoAttackStatus", lv_remaining);
-        }
-    }
-    return true;
-}
-
-void gt_CooldownSync_Init () {
-    gt_CooldownSync = TriggerCreate("gt_CooldownSync_Func");
-    TriggerAddEventTimePeriodic(gt_CooldownSync, 0.2, c_timeGame);
 }

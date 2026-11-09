@@ -21,6 +21,7 @@ void gf_OrderEnter (int lp_player) {
     if (UnitGetOwner(lv_unit) != lp_player) {
         return;
     }
+    gf_CombatBeginMove(lp_player);
     gv_sCOBAOrderMode[lp_player] = true;
     gv_fORWARD[lp_player] = false;
     gv_bACKWARD[lp_player] = false;
@@ -37,6 +38,8 @@ void gf_OrderEnter (int lp_player) {
 void gf_OrderExit (int lp_player) {
     gv_sCOBAOrderMode[lp_player] = false;
     gv_sCOBAOrderUnit[lp_player] = null;
+    gv_sCOBAManualOrder[lp_player] = false;
+    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
     libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, false, PlayerGroupSingle(lp_player));
     UnitClearSelection(lp_player);
     if (UnitIsValid(gv_tARGET[lp_player])) {
@@ -65,8 +68,8 @@ void gf_OrderExecute (int lp_player, fixed lp_x, fixed lp_y) {
         gf_OrderExit(lp_player);
         return;
     }
-    lv_hover = gv_sCOBAHover[lp_player];
-    if (UnitIsValid(lv_hover) && (UnitGetOwner(lv_hover) != lp_player)) {
+    lv_hover = gf_ResolveClickEnemy(lp_player, Point(lp_x, lp_y));
+    if (UnitIsValid(lv_hover)) {
         UnitIssueOrder(lv_unit, OrderTargetingUnit(AbilityCommand("attack", 0), lv_hover), c_orderQueueReplace);
     }
     else {

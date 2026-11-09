@@ -11,6 +11,7 @@ include "scripts/app/app/alliances"
 include "scripts/app/systems/camera"
 include "scripts/app/systems/combat_attack"
 include "scripts/app/systems/combat_cooldown"
+include "scripts/app/systems/combat_fsm"
 include "scripts/app/systems/combat_tick"
 include "scripts/app/systems/companion"
 include "scripts/app/systems/energy_bar"
@@ -56,7 +57,6 @@ void main () {
     gt_OrderButton_Init();
     gt_OrderCancel_Init();
     gt_CombatTick_Init();
-    gt_CooldownSync_Init();
     gt_MedicSpawn_Init();
     gt_TargetRing_Init();
     gt_TargetClick_Init();

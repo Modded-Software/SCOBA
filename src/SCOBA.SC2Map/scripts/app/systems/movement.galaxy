@@ -1,19 +1,22 @@
 // Module: systems/movement
 
 bool gt_DisableClickMove_Func (bool testConds, bool runActions) {
-    // Conditions
-    if (testConds) {
-        if (!((((EventUnit() == gv_tPSUNIT[1]) && (gv_fORWARD[1] == false) && (gv_bACKWARD[1] == false) && (gv_lEFT[1] == false) && (gv_rIGHT[1] == false)) || ((EventUnit() == gv_tPSUNIT[2]) && (gv_fORWARD[2] == false) && (gv_bACKWARD[2] == false) && (gv_lEFT[2] == false) && (gv_rIGHT[2] == false))))) {
-            return false;
-        }
-    }
+    int lv_player;
 
-    // Actions
     if (!runActions) {
         return true;
     }
-
-    UnitIssueOrder(EventUnit(), Order(AbilityCommand("move", 2)), c_orderQueueReplace);
+    lv_player = gf_HeroPlayerFromUnit(EventUnit());
+    if (lv_player < c_SCOBA_HERO_FIRST || lv_player > c_SCOBA_HERO_LAST) {
+        return true;
+    }
+    if (gf_MovementKeyHeld(lv_player)) {
+        return true;
+    }
+    if (!gf_CombatStandOn(lv_player)) {
+        return true;
+    }
+    UnitIssueOrder(EventUnit(), Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
     return true;
 }
 
@@ -22,10 +25,64 @@ void gt_DisableClickMove_Init () {
     TriggerAddEventUnitOrder(gt_DisableClickMove, null, AbilityCommand("move", 0));
 }
 
+void gf_ForwardBegin (int lp_player) {
+    fixed lv_angle;
+
+    if (gv_sCOBAOrderMode[lp_player] == true) {
+        return;
+    }
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+    gv_fORWARD[lp_player] = true;
+    gf_CombatBeginMove(lp_player);
+    while ((gv_fORWARD[lp_player] == true) && (gv_bACKWARD[lp_player] == false)) {
+        if (((gv_rOTATEUNIT[lp_player] == true) || (gv_rOTATECAMERA[lp_player] == false))) {
+            lv_angle = CameraGetYaw(lp_player);
+        }
+        else {
+            lv_angle = UnitGetFacing(gv_tPSUNIT[lp_player]);
+        }
+        if ((gv_lEFT[lp_player] == true)) {
+            lv_angle = (lv_angle + 45.0);
+        }
+
+        if ((gv_rIGHT[lp_player] == true)) {
+            lv_angle = (lv_angle - 45.0);
+        }
+
+        UnitIssueOrder(gv_tPSUNIT[lp_player], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lp_player]), 0.5, lv_angle)), c_orderQueueReplace);
+        UnitSetFacing(gv_tPSUNIT[lp_player], lv_angle, 0.01);
+        Wait(0.01, c_timeGame);
+    }
+}
+
+void gf_MouseForwardStart (int lp_player) {
+    if (gv_sCOBAOrderMode[lp_player] == true) {
+        return;
+    }
+    gv_mOUSEFORWARD[lp_player] = true;
+    if (!gv_fORWARD[lp_player]) {
+        gf_ForwardBegin(lp_player);
+    }
+}
+
+void gf_MouseForwardStop (int lp_player) {
+    if (!gv_mOUSEFORWARD[lp_player]) {
+        return;
+    }
+    gv_mOUSEFORWARD[lp_player] = false;
+    if (!gv_kEYFORWARD[lp_player]) {
+        gv_fORWARD[lp_player] = false;
+    }
+    if (!gf_MovementKeyHeld(lp_player)) {
+        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
+    }
+}
+
 bool gt_ForwardStart_Func (bool testConds, bool runActions) {
     // Variable Declarations
     int lv_localPlayer;
-    fixed lv_angle;
 
     // Variable Initialization
     lv_localPlayer = EventPlayer();
@@ -39,25 +96,9 @@ bool gt_ForwardStart_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    gv_fORWARD[lv_localPlayer] = true;
-    while ((gv_fORWARD[lv_localPlayer] == true) && (gv_bACKWARD[lv_localPlayer] == false)) {
-        if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
-            lv_angle = CameraGetYaw(lv_localPlayer);
-        }
-        else {
-            lv_angle = UnitGetFacing(gv_tPSUNIT[lv_localPlayer]);
-        }
-        if ((gv_lEFT[lv_localPlayer] == true)) {
-            lv_angle = (lv_angle + 45.0);
-        }
-
-        if ((gv_rIGHT[lv_localPlayer] == true)) {
-            lv_angle = (lv_angle - 45.0);
-        }
-
-        UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 0.5, lv_angle)), c_orderQueueReplace);
-        UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
-        Wait(0.01, c_timeGame);
+    gv_kEYFORWARD[lv_localPlayer] = true;
+    if (!gv_fORWARD[lv_localPlayer]) {
+        gf_ForwardBegin(lv_localPlayer);
     }
     return true;
 }
@@ -79,7 +120,13 @@ bool gt_ForwardEnd_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    gv_fORWARD[lv_localPlayer] = false;
+    gv_kEYFORWARD[lv_localPlayer] = false;
+    if (!gv_mOUSEFORWARD[lv_localPlayer]) {
+        gv_fORWARD[lv_localPlayer] = false;
+    }
+    if (!gf_MovementKeyHeld(lv_localPlayer)) {
+        gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
+    }
     return true;
 }
 
@@ -110,6 +157,7 @@ bool gt_BackwardStart_Func (bool testConds, bool runActions) {
     }
 
     gv_bACKWARD[lv_localPlayer] = true;
+    gf_CombatBeginMove(lv_localPlayer);
     while ((gv_bACKWARD[lv_localPlayer] == true) && (gv_fORWARD[lv_localPlayer] == false)) {
         if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
             lv_angle = (CameraGetYaw(lv_localPlayer) + 180.0);
@@ -151,6 +199,9 @@ bool gt_BackwardEnd_Func (bool testConds, bool runActions) {
 
     gv_bACKWARD[lv_localPlayer] = false;
     UnitBehaviorRemove(gv_tPSUNIT[lv_localPlayer], "VileAcidSlowEffectsLevel2", 1);
+    if (!gf_MovementKeyHeld(lv_localPlayer)) {
+        gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
+    }
     return true;
 }
 
@@ -177,6 +228,7 @@ bool gt_LeftStart_Func (bool testConds, bool runActions) {
     }
 
     gv_lEFT[lv_localPlayer] = true;
+    gf_CombatBeginMove(lv_localPlayer);
     while ((gv_lEFT[lv_localPlayer] == true)) {
         if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
             lv_angle = (CameraGetYaw(lv_localPlayer) + 90.0);
@@ -217,6 +269,9 @@ bool gt_LeftEnd_Func (bool testConds, bool runActions) {
     }
 
     gv_lEFT[lv_localPlayer] = false;
+    if (!gf_MovementKeyHeld(lv_localPlayer)) {
+        gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
+    }
     return true;
 }
 
@@ -243,6 +298,7 @@ bool gt_RightStart_Func (bool testConds, bool runActions) {
     }
 
     gv_rIGHT[lv_localPlayer] = true;
+    gf_CombatBeginMove(lv_localPlayer);
     while ((gv_rIGHT[lv_localPlayer] == true)) {
         if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
             lv_angle = (CameraGetYaw(lv_localPlayer) - 90.0);
@@ -283,6 +339,9 @@ bool gt_RightEnd_Func (bool testConds, bool runActions) {
     }
 
     gv_rIGHT[lv_localPlayer] = false;
+    if (!gf_MovementKeyHeld(lv_localPlayer)) {
+        gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
+    }
     return true;
 }
 

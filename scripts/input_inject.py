@@ -35,6 +35,34 @@ def click(x, y):
     xt.XTestFakeButtonEvent(d, 1, 1, 0); x11.XFlush(d); time.sleep(0.08)
     xt.XTestFakeButtonEvent(d, 1, 0, 0); x11.XFlush(d)
 
+def move(x, y):
+    root = x11.XDefaultRootWindow(d)
+    x11.XWarpPointer(d, 0, root, 0, 0, 0, 0, x, y); x11.XFlush(d); time.sleep(0.1)
+
+def button(number, down):
+    xt.XTestFakeButtonEvent(d, number, 1 if down else 0, 0); x11.XFlush(d); time.sleep(0.08)
+
+def rclick(x, y):
+    move(x, y)
+    button(3, True)
+    button(3, False)
+
+def rdrag(x1, y1, x2, y2):
+    move(x1, y1)
+    button(3, True)
+    steps = 8
+    for i in range(1, steps + 1):
+        move(x1 + (x2 - x1) * i // steps, y1 + (y2 - y1) * i // steps)
+    button(3, False)
+
+def bothclick(x, y, hold_ms):
+    move(x, y)
+    button(1, True)
+    button(3, True)
+    time.sleep(hold_ms / 1000.0)
+    button(3, False)
+    button(1, False)
+
 def shot(path):
     wid = None
     proc = subprocess.run(['xwininfo', '-root', '-tree'], capture_output=True, text=True, env={**os.environ, 'DISPLAY': ':0'})
@@ -61,6 +89,12 @@ if __name__ == '__main__':
         click(int(sys.argv[2]), int(sys.argv[3]))
     elif cmd == 'shot':
         shot(sys.argv[2])
+    elif cmd == 'rclick':
+        rclick(int(sys.argv[2]), int(sys.argv[3]))
+    elif cmd == 'rdrag':
+        rdrag(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]))
+    elif cmd == 'both':
+        bothclick(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))
     print('ok', cmd)
 
 if len(sys.argv) > 1 and sys.argv[1] == "auto":

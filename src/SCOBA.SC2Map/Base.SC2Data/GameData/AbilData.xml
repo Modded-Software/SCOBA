@@ -58,11 +58,14 @@
         <Flags index="Transient" value="1"/>
         <BehaviorArray value="SCOBARightClickStandBehavior"/>
     </CAbilBehavior>
-    <CAbilEffectInstant id="SCOBAAutoAttackStatus">
-        <Cost>
-            <Cooldown Link="Abil/SCOBAAutoAttackStatus"/>
+    <CAbilEffectTarget id="SCOBAAutoAttackStatus">
+        <Effect index="0" value="SCOBAWeaponAttackDummy"/>
+        <TargetFilters value="Visible;Self,Ally,Neutral,Missile,Dead,Hidden,Invulnerable"/>
+        <Range value="500"/>
+        <Cost index="0">
+            <Cooldown Link="Abil/SCOBAAutoAttackStatus" Location="Ability" TimeUse="2.0"/>
         </Cost>
         <EditorCategories value="AbilityorEffectType:Units"/>
         <CmdButtonArray index="Execute" DefaultButtonFace="SCOBAAutoAttackStatus"/>
-    </CAbilEffectInstant>
+    </CAbilEffectTarget>
 </Catalog>

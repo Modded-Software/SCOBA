@@ -96,10 +96,6 @@ bool gt_CursorStart_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if ((EventMouseClickedButton() == gv_fIRE) && (gv_sCOBAOrderMode[lv_localPlayer] == true)) {
-        return true;
-    }
-
     if (((EventMouseClickedButton() == gv_fIRE) || (EventMouseClickedButton() == gv_aBILITYCAMERA))) {
         gv_rOTATEUNIT[lv_localPlayer] = true;
     }
@@ -113,7 +109,9 @@ bool gt_CursorStart_Func (bool testConds, bool runActions) {
         CameraForceMouseRelative(lv_localPlayer, true);
         CameraLockInput(lv_localPlayer, false);
     }
-
+    if (gv_mOUSELEFT[lv_localPlayer] && gv_mOUSERIGHT[lv_localPlayer] && !gv_mOUSEFORWARD[lv_localPlayer]) {
+        gf_MouseForwardStart(lv_localPlayer);
+    }
     return true;
 }
 

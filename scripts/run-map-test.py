@@ -116,7 +116,7 @@ def main() -> int:
     log_dir = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "scoba"
     log_dir.mkdir(parents=True, exist_ok=True)
     launch_log = open(log_dir / "integration-test.log", "ab")
-    subprocess.Popen(
+    launcher = subprocess.Popen(
         ["bash", str(ROOT / "scripts" / "launch-scoba.sh")],
         cwd=ROOT,
         env=env,
@@ -125,26 +125,52 @@ def main() -> int:
         start_new_session=True,
     )
 
-    time.sleep(15)
-    for _ in range(4):
-        subprocess.run([sys.executable, str(ROOT / "scripts" / "input_inject.py"), "auto"])
-        time.sleep(6)
+    timeout = float(os.environ.get("SC2_TEST_TIMEOUT", "90"))
+    deadline = time.time() + timeout
     bank_path: Path | None = None
     data: dict | None = None
-    deadline = time.time() + 150
+    sc2_seen = False
+    missing_since: float | None = None
     while time.time() < deadline:
-        time.sleep(2)
+        time.sleep(1)
+        now = time.time()
+        pids = sc2_pids()
+        if pids:
+            sc2_seen = True
+            missing_since = None
+        else:
+            if missing_since is None:
+                missing_since = now
+            if sc2_seen and now - missing_since >= 5:
+                print("FAIL: SC2 exited before the test bank completed", file=sys.stderr)
+                break
+            if not sc2_seen and now - started >= 30 and launcher.poll() is not None:
+                print("FAIL: SC2 did not start", file=sys.stderr)
+                break
         bank_path = find_bank(started)
         if bank_path is not None:
             data = read_bank(bank_path)
             if data and data.get("meta", {}).get("done") == 1:
                 break
-
-    if bank_path is None or data is None:
-        print("FAIL: no test bank produced", file=sys.stderr)
         err = latest_script_error(started)
         if err is not None:
+            print(f"FAIL: script compile or runtime error: {err}", file=sys.stderr)
             print(err.read_text(errors="replace"), file=sys.stderr)
+            kill_sc2()
+            return 1
+
+    if bank_path is None or data is None or data.get("meta", {}).get("done") != 1:
+        if time.time() >= deadline:
+            print(f"FAIL: test bank timed out after {timeout:.0f}s", file=sys.stderr)
+        elif bank_path is not None and data is not None:
+            print("FAIL: test bank incomplete", file=sys.stderr)
+        else:
+            print("FAIL: no test bank produced", file=sys.stderr)
+        log_path = log_dir / "launcher.log"
+        if log_path.is_file():
+            lines = log_path.read_text(errors="replace").splitlines()[-40:]
+            print("launcher log tail:", file=sys.stderr)
+            print("\n".join(lines), file=sys.stderr)
         kill_sc2()
         return 1
     err = latest_script_error(started)
@@ -153,10 +179,7 @@ def main() -> int:
 
     print(f"bank: {bank_path}")
     meta = data.get("meta", {})
-    if {"startX", "startY", "targetX", "targetY"} <= meta.keys():
-        PROBES["P1"]["start"] = (meta["startX"], meta["startY"])
-        PROBES["P1"]["target"] = (meta["targetX"], meta["targetY"])
-    print(f"ticks: {meta.get('tick')}  done: {meta.get('done')}")
+    print(f"done: {meta.get('done')}  anchor: ({meta.get('anchorX')},{meta.get('anchorY')})")
     engine = data.get("engine", {})
     print(f"engine entire bounds: ({engine.get('entire_min_x')},{engine.get('entire_min_y')})..({engine.get('entire_max_x')},{engine.get('entire_max_y')})")
     print(f"engine playable bounds: ({engine.get('play_min_x')},{engine.get('play_min_y')})..({engine.get('play_max_x')},{engine.get('play_max_y')})")
@@ -167,47 +190,165 @@ def main() -> int:
         for gy in range(33):
             print("  " + "".join("#" if grid.get(str(gy * 33 + gx)) == 1 else "." for gx in range(33)))
 
-
-
-    behaviors = data.get("behavior", {})
-    expected = {
-        "startStand": 1,
-        "startAuto": 0,
-        "autoOn": 1,
-        "autoOffEarly": 0,
-        "autoOff": 0,
-        "standAgain": 1,
-        "walkStand": 0,
-        "autoAttack": True,
-    }
     failures = 0
-    for key, want in expected.items():
-        got = behaviors.get(key)
+
+    def value(section: str, tag: str, key: str):
+        return data.get(section, {}).get(tag + key)
+
+    def check_equal(section: str, tag: str, key: str, want) -> None:
+        nonlocal failures
+        got = value(section, tag, key)
         status = "PASS" if got == want else "FAIL"
-        print(f"behavior {key}: got={got} want={want} {status}")
+        print(f"{section} {tag} {key}: got={got} want={want} {status}")
         if got != want:
             failures += 1
+
+    def check_true(section: str, tag: str, key: str) -> None:
+        check_equal(section, tag, key, True)
+
+    def check_false(section: str, tag: str, key: str) -> None:
+        check_equal(section, tag, key, False)
+
+    def displacement(section: str, tag_a: str, tag_b: str) -> int:
+        ax = value(section, tag_a, "HeroX") or 0
+        ay = value(section, tag_a, "HeroY") or 0
+        bx = value(section, tag_b, "HeroX") or 0
+        by = value(section, tag_b, "HeroY") or 0
+        return abs(bx - ax) + abs(by - ay)
+
+    def check_damage(section: str, tag_before: str, tag_after: str) -> None:
+        nonlocal failures
+        before = value(section, tag_before, "EnemyHp")
+        after = value(section, tag_after, "EnemyHp")
+        ok = before is not None and after is not None and after < before
+        print(f"{section} {tag_before}->{tag_after} EnemyHp: before={before} after={after} want damage {'PASS' if ok else 'FAIL'}")
+        if not ok:
+            failures += 1
+
     if meta.get("done") != 1:
         print(f"meta done: got={meta.get('done')} want=1 FAIL")
         failures += 1
-    if meta.get("moveOrders", 0) < 1:
-        print(f"meta moveOrders: got={meta.get('moveOrders')} want>=1 FAIL")
+
+    check_equal("startup", "t0000", "Auto", 0)
+    check_equal("startup", "t0000", "Stand", 1)
+    check_equal("startup", "t0000", "Root", 1)
+    check_true("startup", "t0000", "MoveSuppressed")
+    check_false("startup", "t0000", "AttackOrder")
+
+    check_equal("auto_off", "t0000", "Auto", 0)
+    check_false("auto_off", "t3000", "AttackOrder")
+    check_equal("auto_off", "t0000", "EnemyHp", value("auto_off", "t3000", "EnemyHp"))
+    if displacement("auto_off", "t0000", "t3000") > 1:
+        print("auto_off displacement: want<=1 FAIL")
         failures += 1
 
-    for p, info in PROBES.items():
-        vals = data.get(p, {})
-        fx, fy = vals.get("x"), vals.get("y")
-        sx, sy = info["start"]
-        tx, ty = info["target"]
-        print(f"\nprobe {p} ({info['axis']}): start=({sx},{sy}) target=({tx},{ty}) final=({fx},{fy})")
-        if fx is None or fy is None:
-            print("  FAIL: no final position")
-            failures += 1
-            continue
-        remaining = abs(tx - fx) + abs(ty - fy)
-        start_dist = abs(tx - sx) + abs(ty - sy)
-        progress = 1.0 - remaining / start_dist if start_dist else 0.0
-        print(f"  progress={progress:.0%} remaining={remaining}")
+    check_equal("stand_in", "t0000", "Stand", 1)
+    check_equal("stand_in", "t0000", "Root", 1)
+    check_true("stand_in", "t0000", "MoveSuppressed")
+    check_true("stand_in", "t0500", "AttackOrder")
+    check_damage("stand_in", "t0000", "t2500")
+    if displacement("stand_in", "t0000", "t2500") > 1:
+        print("stand_in displacement: want<=1 FAIL")
+        failures += 1
+
+    check_equal("stand_out", "t2500", "Root", 1)
+    check_true("stand_out", "t2500", "MoveSuppressed")
+    if displacement("stand_out", "t0000", "t2500") > 1:
+        print("stand_out displacement: want<=1 FAIL")
+        failures += 1
+
+    check_equal("stand_outside", "t2000", "Root", 1)
+    check_true("stand_outside", "t2000", "MoveSuppressed")
+    check_false("stand_outside", "t2000", "AttackOrder")
+    if displacement("stand_outside", "t0000", "t2000") > 1:
+        print("stand_outside displacement: want<=1 FAIL")
+        failures += 1
+
+    check_equal("stand_auto_off", "t0000", "Auto", 0)
+    check_equal("stand_auto_off", "t0000", "Root", 1)
+    check_true("stand_auto_off", "t0000", "MoveSuppressed")
+    check_equal("stand_auto_off", "t2000", "Root", 1)
+    if displacement("stand_auto_off", "t0000", "t2000") > 1:
+        print("stand_auto_off displacement: want<=1 FAIL")
+        failures += 1
+
+    check_equal("stand_wake_manual", "t0200", "Root", 0)
+    check_equal("stand_wake_manual", "t1000", "Root", 1)
+    check_equal("stand_wake_manual", "t2000", "Root", 1)
+    if displacement("stand_wake_manual", "t0000", "t2000") > 1:
+        print("stand_wake_manual displacement: want<=1 FAIL")
+        failures += 1
+
+    check_equal("right_click", "", "ran", True)
+    check_true("right_click", "t0200", "AttackOrder")
+    check_true("right_click", "t0200", "TargetEnemy")
+    check_equal("right_click", "t0200", "Root", 1)
+
+    check_equal("right_drag", "", "ran", False)
+    check_false("right_drag", "t0000", "AttackOrder")
+    check_false("right_drag", "t0500", "AttackOrder")
+    check_equal("right_drag", "t0000", "Root", 1)
+
+    check_equal("right_point", "", "pickValid", True)
+
+    check_equal("right_ground_walk", "", "ran", True)
+    if displacement("right_ground_walk", "t0000", "t1000") <= 1:
+        print("right_ground_walk displacement: want>1 FAIL")
+        failures += 1
+
+    check_equal("right_ground_stand", "", "ran", True)
+    check_equal("right_ground_stand", "t0500", "Root", 1)
+    if displacement("right_ground_stand", "t0000", "t0500") > 1:
+        print("right_ground_stand displacement: want<=1 FAIL")
+        failures += 1
+
+    check_true("right_target_kept", "t0200", "TargetEnemy")
+
+    check_true("both_forward", "tkey", "Forward")
+    check_false("both_forward", "tmouse", "Forward")
+
+    if displacement("walk_ground", "t0000", "t1000") <= 1:
+        print("walk_ground displacement: want>1 FAIL")
+        failures += 1
+
+    check_equal("stand_ground", "t1000", "Root", 1)
+    if displacement("stand_ground", "t0000", "t1000") > 1:
+        print("stand_ground displacement: want<=1 FAIL")
+        failures += 1
+
+    check_equal("move_wake", "t0000", "Root", 1)
+    check_true("move_wake", "t0000", "MoveSuppressed")
+    check_equal("move_wake", "t0200", "Root", 0)
+    check_false("move_wake", "t0200", "MoveSuppressed")
+    if displacement("move_wake", "t0000", "t1200") <= 1:
+        print("move_wake displacement: want>1 FAIL")
+        failures += 1
+    check_equal("move_wake", "t2200", "Root", 1)
+
+    check_equal("walk_chase", "t0000", "Root", 0)
+    check_false("walk_chase", "t0000", "MoveSuppressed")
+    start_distance = value("walk_chase", "t0000", "Distance")
+    end_distance = value("walk_chase", "t3000", "Distance")
+    if start_distance is None or end_distance is None or end_distance >= start_distance:
+        print(f"walk_chase Distance: start={start_distance} end={end_distance} want decrease FAIL")
+        failures += 1
+    check_true("walk_chase", "t3000", "AttackOrder")
+    check_damage("walk_chase", "t0000", "t3000")
+
+    check_equal("walk_idle", "t0000", "Root", 0)
+    check_false("walk_idle", "t2000", "AttackOrder")
+    if displacement("walk_idle", "t0000", "t2000") > 1:
+        print("walk_idle displacement: want<=1 FAIL")
+        failures += 1
+
+    check_equal("weapon", "t0000", "CooldownMs", 0)
+    check_false("weapon", "t0000", "CmdCooldown")
+    if value("weapon", "t0500", "CooldownMs") is None or value("weapon", "t0500", "CooldownMs") <= 0:
+        print(f"weapon t0500 CooldownMs: got={value('weapon', 't0500', 'CooldownMs')} want>0 FAIL")
+        failures += 1
+    check_true("weapon", "t0500", "CmdCooldown")
+    check_true("weapon", "t0500", "AttackOrder")
+    check_damage("weapon", "t0000", "t1000")
 
     import shutil
     shutil.rmtree(MAP_CACHE, ignore_errors=True)

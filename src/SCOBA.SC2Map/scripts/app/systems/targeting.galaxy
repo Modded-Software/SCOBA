@@ -137,53 +137,200 @@ void gf_ShowTarget (int lp_player, unit lp_unit) {
     libNtve_gf_MoveBossBar(lv_bar, c_anchorTop, 0, 50);
 }
 
+bool gf_IsClickEnemy (int lp_player, unit lp_unit) {
+    if (!UnitIsValid(lp_unit) || !UnitIsAlive(lp_unit)) {
+        return false;
+    }
+    return libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Ally) == false;
+}
+
+unit gf_ResolveClickEnemy (int lp_player, point lp_point) {
+    unit lv_unit;
+    unit lv_best;
+    unitgroup lv_group;
+    fixed lv_bestDistance;
+    fixed lv_distance;
+    fixed lv_radius;
+
+    lv_unit = gv_sCOBAPRESSUNIT[lp_player];
+    if (gf_IsClickEnemy(lp_player, lv_unit)) {
+        return lv_unit;
+    }
+    lv_unit = gv_tARGET[lp_player];
+    if (gf_IsClickEnemy(lp_player, lv_unit)) {
+        lv_radius = UnitGetPropertyFixed(lv_unit, c_unitPropRadius, c_unitPropNormal) + c_SCOBA_CLICK_MARGIN;
+        if (DistanceBetweenPoints(lp_point, UnitGetPosition(lv_unit)) <= lv_radius) {
+            return lv_unit;
+        }
+    }
+    lv_group = UnitGroupAlliance(lp_player, c_unitAllianceEnemy, RegionCircle(lp_point, c_SCOBA_CLICK_SCAN_RADIUS), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0);
+    lv_best = null;
+    lv_bestDistance = c_SCOBA_CLICK_SCAN_RADIUS + 1.0;
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_unit = UnitGroupLoopCurrent();
+        if (!gf_IsClickEnemy(lp_player, lv_unit)) {
+            continue;
+        }
+        lv_radius = UnitGetPropertyFixed(lv_unit, c_unitPropRadius, c_unitPropNormal) + c_SCOBA_CLICK_MARGIN;
+        lv_distance = DistanceBetweenPoints(lp_point, UnitGetPosition(lv_unit));
+        if (lv_distance <= lv_radius && lv_distance < lv_bestDistance) {
+            lv_best = lv_unit;
+            lv_bestDistance = lv_distance;
+        }
+    }
+    UnitGroupLoopEnd();
+    return lv_best;
+}
+
+void gf_ShowMoveMarker (int lp_player, point lp_point) {
+    string lv_model;
+    actor lv_actor;
+
+    lv_model = "CommandUIHarnessMoveZerg";
+    if (PlayerRace(lp_player) == "Terr") {
+        lv_model = "CommandUIHarnessMoveTerran";
+    }
+    else if (PlayerRace(lp_player) == "Prot") {
+        lv_model = "CommandUIHarnessMoveProtoss";
+    }
+    lv_actor = libNtve_gf_CreateModelAtPoint(lv_model, lp_point);
+    Wait(0.6, c_timeGame);
+    ActorSend(lv_actor, "Destroy");
+}
+
+void gf_RightClickExecute (int lp_player, point lp_point, unit lp_unit) {
+    lp_unit = gf_ResolveClickEnemy(lp_player, lp_point);
+    if (gf_IsClickEnemy(lp_player, lp_unit)) {
+        gf_ShowTarget(lp_player, lp_unit);
+        gf_CombatManualAttack(lp_player, lp_unit);
+        return;
+    }
+    gf_CombatCancelAuto(lp_player);
+    gv_sCOBAManualOrder[lp_player] = false;
+    gf_CombatSyncRoot(lp_player);
+    if (gf_CombatStandOn(lp_player)) {
+        UnitIssueOrder(gv_tPSUNIT[lp_player], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
+    }
+    else {
+        UnitIssueOrder(gv_tPSUNIT[lp_player], OrderTargetingPoint(AbilityCommand("move", 0), lp_point), c_orderQueueReplace);
+        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_MOVING;
+        gf_ShowMoveMarker(lp_player, lp_point);
+    }
+}
+
+void gf_MousePressRight (int lp_player, int lp_xui, int lp_yui, fixed lp_x, fixed lp_y) {
+    gv_mOUSERIGHT[lp_player] = true;
+    gv_mOUSERIGHTCANCEL[lp_player] = false;
+    gv_mOUSEPRESSXUI[lp_player] = lp_xui;
+    gv_mOUSEPRESSYUI[lp_player] = lp_yui;
+    gv_mOUSEPRESSX[lp_player] = lp_x;
+    gv_mOUSEPRESSY[lp_player] = lp_y;
+    gv_mOUSEPRESSYAW[lp_player] = CameraGetYaw(lp_player);
+    gv_mOUSEPRESSPITCH[lp_player] = CameraGetPitch(lp_player);
+    gv_sCOBAPRESSUNIT[lp_player] = gv_sCOBAHover[lp_player];
+    if (gv_mOUSELEFT[lp_player]) {
+        gv_mOUSERIGHTCANCEL[lp_player] = true;
+        gv_mOUSELEFTCANCEL[lp_player] = true;
+    }
+}
+
+bool gf_MouseReleaseRight (int lp_player, int lp_xui, int lp_yui) {
+    int lv_dx;
+    int lv_dy;
+    unit lv_pressUnit;
+    point lv_point;
+    bool lv_drag;
+
+    gv_mOUSERIGHT[lp_player] = false;
+    gf_MouseForwardStop(lp_player);
+    lv_dx = lp_xui - gv_mOUSEPRESSXUI[lp_player];
+    lv_dy = lp_yui - gv_mOUSEPRESSYUI[lp_player];
+    lv_drag = ((lv_dx * lv_dx) + (lv_dy * lv_dy)) >= (c_SCOBA_CLICK_DRAG_PIXELS * c_SCOBA_CLICK_DRAG_PIXELS);
+    if (AbsF(CameraGetYaw(lp_player) - gv_mOUSEPRESSYAW[lp_player]) >= c_SCOBA_DRAG_DEGREES) {
+        lv_drag = true;
+    }
+    if (AbsF(CameraGetPitch(lp_player) - gv_mOUSEPRESSPITCH[lp_player]) >= c_SCOBA_DRAG_DEGREES) {
+        lv_drag = true;
+    }
+    if (gv_mOUSERIGHTCANCEL[lp_player] || lv_drag) {
+        gv_mOUSERIGHTCANCEL[lp_player] = false;
+        return false;
+    }
+    lv_point = Point(gv_mOUSEPRESSX[lp_player], gv_mOUSEPRESSY[lp_player]);
+    lv_pressUnit = gv_sCOBAPRESSUNIT[lp_player];
+    if (gv_sCOBAOrderMode[lp_player] == true) {
+        gf_OrderExecute(lp_player, gv_mOUSEPRESSX[lp_player], gv_mOUSEPRESSY[lp_player]);
+    }
+    else if (UnitIsValid(gv_tPSUNIT[lp_player])) {
+        gf_RightClickExecute(lp_player, lv_point, lv_pressUnit);
+    }
+    return true;
+}
+
 bool gt_TargetClick_Func (bool testConds, bool runActions) {
     int lv_player;
-    unit lv_picked;
 
     lv_player = EventPlayer();
-    lv_picked = null;
-    if (gf_IsHeroPlayer(lv_player)) {
-        lv_picked = gv_sCOBAHover[lv_player];
-    }
-
     if (!runActions) {
         return true;
     }
-
     if (!gf_IsHeroPlayer(lv_player)) {
         return true;
     }
 
-    if (EventMouseClickedButton() == gv_fIRE) {
-        if (gv_sCOBAOrderMode[lv_player] == true) {
-            gf_OrderExecute(lv_player, EventMouseClickedPosXWorld(), EventMouseClickedPosYWorld());
-        }
-        else if (UnitIsValid(gv_tPSUNIT[lv_player])) {
-            if (UnitIsValid(lv_picked) && (libNtve_gf_PlayerIsEnemy(lv_player, UnitGetOwner(lv_picked), libNtve_ge_PlayerRelation_Ally) == false)) {
-                UnitIssueOrder(gv_tPSUNIT[lv_player], OrderTargetingUnit(AbilityCommand("attack", 0), lv_picked), c_orderQueueReplace);
-                gv_sCOBAAutoTarget[lv_player] = lv_picked;
-            }
-            else {
-                gv_sCOBAAutoTarget[lv_player] = null;
-                if (UnitBehaviorCount(gv_tPSUNIT[lv_player], "SCOBARightClickStandBehavior") > 0) {
-                    UnitIssueOrder(gv_tPSUNIT[lv_player], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
-                }
-                else {
-                    UnitIssueOrder(gv_tPSUNIT[lv_player], OrderTargetingPoint(AbilityCommand("move", 0), Point(EventMouseClickedPosXWorld(), EventMouseClickedPosYWorld())), c_orderQueueReplace);
-                }
-            }
-            gf_ShowTarget(lv_player, null);
+    if (EventMouseClickedButton() == gv_mOUSECURSOR) {
+        gv_mOUSELEFT[lv_player] = true;
+        gv_mOUSELEFTCANCEL[lv_player] = gv_mOUSERIGHT[lv_player];
+        gv_mOUSELEFTPRESSXUI[lv_player] = EventMouseClickedPosXUI();
+        gv_mOUSELEFTPRESSYUI[lv_player] = EventMouseClickedPosYUI();
+        gv_sCOBALEFTPRESSUNIT[lv_player] = gv_sCOBAHover[lv_player];
+        if (gv_mOUSERIGHT[lv_player]) {
+            gv_mOUSERIGHTCANCEL[lv_player] = true;
         }
         return true;
     }
 
-    if (EventMouseClickedButton() == gv_mOUSECURSOR) {
-        if (gv_sCOBAOrderMode[lv_player] == true) {
-            gf_OrderExit(lv_player);
-        }
-        gf_ShowTarget(lv_player, lv_picked);
+    if (EventMouseClickedButton() != gv_fIRE) {
+        return true;
     }
+    gf_MousePressRight(lv_player, EventMouseClickedPosXUI(), EventMouseClickedPosYUI(), EventMouseClickedPosXWorld(), EventMouseClickedPosYWorld());
+    return true;
+}
+
+bool gt_TargetRelease_Func (bool testConds, bool runActions) {
+    int lv_player;
+    int lv_dx;
+    int lv_dy;
+    bool lv_drag;
+
+    lv_player = EventPlayer();
+    if (!runActions) {
+        return true;
+    }
+    if (!gf_IsHeroPlayer(lv_player)) {
+        return true;
+    }
+    if (EventMouseClickedButton() == gv_mOUSECURSOR) {
+        gv_mOUSELEFT[lv_player] = false;
+        gf_MouseForwardStop(lv_player);
+        lv_dx = EventMouseClickedPosXUI() - gv_mOUSELEFTPRESSXUI[lv_player];
+        lv_dy = EventMouseClickedPosYUI() - gv_mOUSELEFTPRESSYUI[lv_player];
+        lv_drag = ((lv_dx * lv_dx) + (lv_dy * lv_dy)) >= (c_SCOBA_CLICK_DRAG_PIXELS * c_SCOBA_CLICK_DRAG_PIXELS);
+        if (!gv_mOUSELEFTCANCEL[lv_player] && !lv_drag) {
+            if (gv_sCOBAOrderMode[lv_player] == true) {
+                gf_OrderExit(lv_player);
+            }
+            gf_ShowTarget(lv_player, gv_sCOBALEFTPRESSUNIT[lv_player]);
+        }
+        gv_mOUSELEFTCANCEL[lv_player] = false;
+        return true;
+    }
+    if (EventMouseClickedButton() != gv_fIRE) {
+        return true;
+    }
+    gf_MouseReleaseRight(lv_player, EventMouseClickedPosXUI(), EventMouseClickedPosYUI());
     return true;
 }
 
@@ -191,6 +338,9 @@ void gt_TargetClick_Init () {
     gt_TargetClick = TriggerCreate("gt_TargetClick_Func");
     TriggerAddEventMouseClicked(gt_TargetClick, c_playerAny, gv_mOUSECURSOR, true);
     TriggerAddEventMouseClicked(gt_TargetClick, c_playerAny, gv_fIRE, true);
+    gt_TargetRelease = TriggerCreate("gt_TargetRelease_Func");
+    TriggerAddEventMouseClicked(gt_TargetRelease, c_playerAny, gv_mOUSECURSOR, false);
+    TriggerAddEventMouseClicked(gt_TargetRelease, c_playerAny, gv_fIRE, false);
 }
 
 bool gt_TargetRing_Func (bool testConds, bool runActions) {

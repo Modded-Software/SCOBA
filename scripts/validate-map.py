@@ -45,6 +45,7 @@ CUSTOM_ABILITIES = [
 CUSTOM_BEHAVIORS = [
     "SCOBAAutoAttackBehavior",
     "SCOBARightClickStandBehavior",
+    "SCOBAStandRoot",
 ]
 
 CUSTOM_BUTTONS = [
@@ -107,6 +108,7 @@ def check_catalogs(map_dir: Path) -> None:
     gamedata = map_dir / "Base.SC2Data" / "GameData"
     abilities = ids_from(gamedata / "AbilData.xml", "CAbilBehavior")
     abilities |= ids_from(gamedata / "AbilData.xml", "CAbilEffectInstant")
+    abilities |= ids_from(gamedata / "AbilData.xml", "CAbilEffectTarget")
     behaviors = ids_from(gamedata / "BehaviorData.xml", "CBehaviorBuff")
     buttons = ids_from(gamedata / "ButtonData.xml", "CButton")
 
@@ -119,6 +121,40 @@ def check_catalogs(map_dir: Path) -> None:
     for button in CUSTOM_BUTTONS:
         if button not in buttons:
             fail(f"missing button: {button}")
+
+    behavior_tree = ET.parse(gamedata / "BehaviorData.xml")
+    stand_root = None
+    for candidate in behavior_tree.getroot().iter("CBehaviorBuff"):
+        if candidate.get("id") == "SCOBAStandRoot":
+            stand_root = candidate
+            break
+    if stand_root is None:
+        fail("missing behavior: SCOBAStandRoot")
+    modification = stand_root.find("Modification")
+    if modification is None:
+        fail("SCOBAStandRoot missing Modification")
+    suppress = modification.find("ModifyFlags[@index='SuppressMoving']")
+    if suppress is None or suppress.get("value") != "1":
+        fail("SCOBAStandRoot missing SuppressMoving")
+    if modification.find("MoveSpeedMultiplier") is not None:
+        fail("SCOBAStandRoot must not use MoveSpeedMultiplier")
+
+    ability_tree = ET.parse(gamedata / "AbilData.xml")
+    weapon_ability = None
+    for candidate in ability_tree.getroot().iter("CAbilEffectTarget"):
+        if candidate.get("id") == "SCOBAAutoAttackStatus":
+            weapon_ability = candidate
+            break
+    if weapon_ability is None:
+        fail("SCOBAAutoAttackStatus must be CAbilEffectTarget")
+    cooldown = weapon_ability.find("Cost/Cooldown")
+    if cooldown is None:
+        fail("SCOBAAutoAttackStatus missing Cost/Cooldown")
+    if cooldown.get("Location") != "Ability":
+        fail("SCOBAAutoAttackStatus cooldown Location must be Ability")
+    time_use = cooldown.get("TimeUse")
+    if time_use is None or float(time_use) <= 0.0:
+        fail("SCOBAAutoAttackStatus cooldown TimeUse must be positive")
 
     unit_tree = ET.parse(gamedata / "UnitData.xml")
     for unit_id in ("Kerrigan", "Tosh"):
@@ -152,7 +188,7 @@ def check_script(map_dir: Path) -> None:
         fail("scripts missing combat tick init")
     if "gt_ToggleCommands_Init();" not in combined:
         fail("scripts missing toggle command init")
-    if 'UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickStandBehavior"' not in combined:
+    if 'UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], Order(AbilityCommand("SCOBARightClickToggle", 0))' not in combined:
         fail("scripts missing default stand behavior")
 
 

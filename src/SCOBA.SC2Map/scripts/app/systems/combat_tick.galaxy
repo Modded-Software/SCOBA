@@ -6,75 +6,12 @@ bool gf_MovementKeyHeld (int lp_player) {
 
 bool gt_AutoAttackTick_Func (bool testConds, bool runActions) {
     int lv_player;
-    unit lv_hero;
-    unit lv_target;
-    unitgroup lv_group;
-    bool lv_stand;
-    bank lv_bank;
 
     if (!runActions) {
         return true;
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
-        lv_hero = gv_tPSUNIT[lv_player];
-        if (lv_player == 1 && UnitIsValid(lv_hero)) {
-            lv_bank = BankLoad("SCOBA", 1);
-            BankSectionCreate(lv_bank, "Debug");
-            BankValueSetFromString(lv_bank, "Debug", "Build", c_SCOBA_BUILD_STAMP);
-            BankValueSetFromInt(lv_bank, "Debug", "AutoCount", UnitBehaviorCount(lv_hero, "SCOBAAutoAttackBehavior"));
-            BankValueSetFromInt(lv_bank, "Debug", "StandCount", UnitBehaviorCount(lv_hero, "SCOBARightClickStandBehavior"));
-            BankValueSetFromInt(lv_bank, "Debug", "Orders", UnitOrderCount(lv_hero));
-            BankValueSetFromFlag(lv_bank, "Debug", "OrderMode", gv_sCOBAOrderMode[lv_player]);
-            BankValueSetFromInt(lv_bank, "Debug", "Weapons", UnitWeaponCount(lv_hero));
-            BankValueSetFromInt(lv_bank, "Debug", "Weapon", gf_HeroWeaponIndex(lv_hero));
-            BankValueSetFromString(lv_bank, "Debug", "WeaponLink", UnitWeaponGet(lv_hero, gf_HeroWeaponIndex(lv_hero)));
-            BankValueSetFromFixed(lv_bank, "Debug", "WeaponPeriod", UnitWeaponPeriod(lv_hero, gf_HeroWeaponIndex(lv_hero)));
-            BankValueSetFromFixed(lv_bank, "Debug", "WeaponRemain", UnitWeaponPeriodRemaining(lv_hero, gf_HeroWeaponIndex(lv_hero)));
-            BankValueSetFromFixed(lv_bank, "Debug", "WeaponRange", UnitWeaponRange(lv_hero, gf_HeroWeaponIndex(lv_hero)));
-            BankSave(lv_bank);
-        }
-        if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
-            gv_sCOBAAutoTarget[lv_player] = null;
-            continue;
-        }
-        if (gv_sCOBAOrderMode[lv_player] == true || UnitBehaviorCount(lv_hero, "SCOBAAutoAttackBehavior") <= 0) {
-            gv_sCOBAAutoTarget[lv_player] = null;
-            continue;
-        }
-        lv_stand = (UnitBehaviorCount(lv_hero, "SCOBARightClickStandBehavior") > 0);
-        lv_target = gv_sCOBAAutoTarget[lv_player];
-        if (lv_stand) {
-            if (UnitOrderCount(lv_hero) == 0 && gf_MovementKeyHeld(lv_player) == false) {
-                lv_group = UnitGroupAlliance(lv_player, c_unitAllianceEnemy, RegionCircle(UnitGetPosition(lv_hero), c_SCOBA_KEEP_RADIUS), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0);
-                if (UnitGroupCount(lv_group, c_unitCountAlive) > 0) {
-                    lv_target = UnitGroupClosestToPoint(lv_group, UnitGetPosition(lv_hero));
-                    if (UnitIsValid(lv_target)) {
-                        UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
-                    }
-                }
-                else {
-                    UnitIssueOrder(lv_hero, Order(AbilityCommand("move", 2)), c_orderQueueReplace);
-                }
-            }
-            continue;
-        }
-        if (UnitIsValid(lv_target) && UnitIsAlive(lv_target) && (libNtve_gf_PlayerIsEnemy(lv_player, UnitGetOwner(lv_target), libNtve_ge_PlayerRelation_Ally) == false) && (DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_target)) <= c_SCOBA_KEEP_RADIUS)) {
-            if (UnitOrderHasAbil(lv_hero, "attack") == false && UnitOrderCount(lv_hero) == 0) {
-                UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
-            }
-            continue;
-        }
-        gv_sCOBAAutoTarget[lv_player] = null;
-        lv_group = UnitGroupAlliance(lv_player, c_unitAllianceEnemy, RegionCircle(UnitGetPosition(lv_hero), c_SCOBA_CHASE_RADIUS), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0);
-        if (UnitGroupCount(lv_group, c_unitCountAlive) == 0) {
-            continue;
-        }
-        lv_target = UnitGroupClosestToPoint(lv_group, UnitGetPosition(lv_hero));
-        if (!UnitIsValid(lv_target)) {
-            continue;
-        }
-        UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
-        gv_sCOBAAutoTarget[lv_player] = lv_target;
+        gf_CombatStep(lv_player);
     }
     return true;
 }
