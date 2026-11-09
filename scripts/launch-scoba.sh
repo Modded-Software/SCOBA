@@ -17,6 +17,15 @@ resolve_root() {
 }
 ROOT_DIR="$(resolve_root)" || { printf 'ERROR: cannot locate project root\n' >&2; exit 1; }
 
+UV_BIN="${UV_BIN:-uv}"
+if [ "${UV_BIN#/}" = "$UV_BIN" ]; then
+    if ! UV_BIN="$(command -v "$UV_BIN")"; then
+        printf 'ERROR: uv not found\n' >&2
+        exit 1
+    fi
+fi
+[ -x "$UV_BIN" ] || { printf 'ERROR: uv not executable: %s\n' "$UV_BIN" >&2; exit 1; }
+
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/scoba"
 mkdir -p "$LOG_DIR"
 exec >>"$LOG_DIR/launcher.log" 2>&1
@@ -63,14 +72,14 @@ done
 
 log "source: $MAP_SOURCE"
 if [ "${SC2_KEEP_RUNNING:-0}" != "1" ]; then
-    uv run python "$ROOT_DIR/scripts/kill-sc2.py"
+    "$UV_BIN" run python "$ROOT_DIR/scripts/kill-sc2.py"
 fi
 if [ -e "$CACHE_DIR" ]; then
     log "clearing cache: $CACHE_DIR"
     rm -rf "$CACHE_DIR"
 fi
 mkdir -p "$MAP_DIR"
-uv run python "$ROOT_DIR/scripts/stage-map.py" "$MAP_SOURCE" "$MAP_TARGET"
+"$UV_BIN" run python "$ROOT_DIR/scripts/stage-map.py" "$MAP_SOURCE" "$MAP_TARGET"
 if [ -d "$MAP_SOURCE" ]; then
     diff -r "$MAP_SOURCE" "$MAP_TARGET" >"$LOG_DIR/stage-check.log" || fail "staged map does not match source"
 elif ! cmp -s "$MAP_SOURCE" "$MAP_TARGET"; then
@@ -101,7 +110,7 @@ fi
 log "launching $MAP_NAME"
 cd "$SC2_DIR"
 
-if ! uv run python "$ROOT_DIR/scripts/sc2-configure-window.py"; then
+if ! "$UV_BIN" run python "$ROOT_DIR/scripts/sc2-configure-window.py"; then
     log "warning: could not configure window size"
 fi
 
