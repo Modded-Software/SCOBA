@@ -1,0 +1,3 @@
+// Module: core/build_stamp
+
+const string c_SCOBA_BUILD_STAMP = "dev";

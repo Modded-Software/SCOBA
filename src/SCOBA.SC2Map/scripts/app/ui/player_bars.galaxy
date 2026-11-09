@@ -1,0 +1,97 @@
+// Module: ui/player_bars
+
+void gf_PlayerBarsCreate () {
+    int lv_player;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        DialogCreate(480, 60, c_anchorTopLeft, 10, 10, false);
+        gv_pbXpDlg[lv_player] = DialogLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 10, StringToText(""), "Assets\\Textures\\btn-ability-kerrigan_revive.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+        libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 410, 24, c_anchorTopLeft, 56, 18, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
+        gv_pbXpBg[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 410, 24, c_anchorTopLeft, 56, 18, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(30,100,30), c_triggerBlendModeNormal);
+        gv_pbXpFill[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemLabel(gv_pbXpDlg[lv_player], 410, 24, c_anchorTopLeft, 56, 18, StringToText(""), Color(100,100,100), false, 2.0);
+        gv_pbXpText[lv_player] = DialogControlLastCreated();
+        DialogSetVisible(gv_pbXpDlg[lv_player], PlayerGroupSingle(lv_player), true);
+
+        DialogCreate(480, 52, c_anchorBottomLeft, 10, 60, false);
+        gv_pbHpDlg[lv_player] = DialogLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbHpDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 6, StringToText(""), "Assets\\Textures\\btn-ability-terran-heal-color.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+        libNtve_gf_CreateDialogItemImage(gv_pbHpDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
+        gv_pbHpBg[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbHpDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(30,100,30), c_triggerBlendModeNormal);
+        gv_pbHpFill[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemLabel(gv_pbHpDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), Color(100,100,100), false, 2.0);
+        gv_pbHpText[lv_player] = DialogControlLastCreated();
+        DialogSetVisible(gv_pbHpDlg[lv_player], PlayerGroupSingle(lv_player), true);
+
+        DialogCreate(480, 52, c_anchorBottomLeft, 10, 10, false);
+        gv_pbNrgDlg[lv_player] = DialogLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbNrgDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 6, StringToText(""), "Assets\\Textures\\btn-ability-protoss-psistorm-color.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+        libNtve_gf_CreateDialogItemImage(gv_pbNrgDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
+        gv_pbNrgBg[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemImage(gv_pbNrgDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(20,60,100), c_triggerBlendModeNormal);
+        gv_pbNrgFill[lv_player] = DialogControlLastCreated();
+        libNtve_gf_CreateDialogItemLabel(gv_pbNrgDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), Color(100,100,100), false, 2.0);
+        gv_pbNrgText[lv_player] = DialogControlLastCreated();
+        DialogSetVisible(gv_pbNrgDlg[lv_player], PlayerGroupSingle(lv_player), true);
+    }
+}
+
+void gf_PlayerBarsUpdate () {
+    int lv_player;
+    int lv_cur;
+    int lv_max;
+    int lv_xpMax;
+    int lv_width;
+    unit lv_unit;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        lv_unit = gv_tPSUNIT[lv_player];
+        if (!UnitIsValid(lv_unit)) {
+            continue;
+        }
+        lv_cur = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent));
+        lv_max = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLifeMax, c_unitPropNormal));
+        if (lv_max < 1) {
+            lv_max = 1;
+        }
+        lv_width = ((410 * lv_cur) / lv_max);
+        DialogControlSetSize(gv_pbHpFill[lv_player], PlayerGroupSingle(lv_player), lv_width, 20);
+        libNtve_gf_SetDialogItemText(gv_pbHpText[lv_player], StringToText(IntToString(lv_cur) + "/" + IntToString(lv_max)), PlayerGroupSingle(lv_player));
+
+        lv_cur = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropEnergy, c_unitPropCurrent));
+        lv_max = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropEnergyMax, c_unitPropNormal));
+        if (lv_max < 1) {
+            lv_max = 1;
+        }
+        lv_width = ((410 * lv_cur) / lv_max);
+        DialogControlSetSize(gv_pbNrgFill[lv_player], PlayerGroupSingle(lv_player), lv_width, 20);
+        libNtve_gf_SetDialogItemText(gv_pbNrgText[lv_player], StringToText(IntToString(lv_cur) + "/" + IntToString(lv_max)), PlayerGroupSingle(lv_player));
+
+        lv_xpMax = ((gv_lEVEL[lv_player] * 298) + PowI(2.0, gv_lEVEL[lv_player]));
+        if (lv_xpMax < 1) {
+            lv_xpMax = 1;
+        }
+        lv_width = ((410 * gv_xP[lv_player]) / lv_xpMax);
+        if (lv_width > 410) {
+            lv_width = 410;
+        }
+        DialogControlSetSize(gv_pbXpFill[lv_player], PlayerGroupSingle(lv_player), lv_width, 24);
+        libNtve_gf_SetDialogItemText(gv_pbXpText[lv_player], StringToText("Lv " + IntToString(gv_lEVEL[lv_player]) + "   " + IntToString(gv_xP[lv_player]) + "/" + IntToString(lv_xpMax)), PlayerGroupSingle(lv_player));
+    }
+}
+
+bool gt_PlayerBars_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_PlayerBarsUpdate();
+    return true;
+}
+
+void gt_PlayerBars_Init () {
+    gt_PlayerBars = TriggerCreate("gt_PlayerBars_Func");
+    TriggerAddEventTimePeriodic(gt_PlayerBars, 0.2, c_timeGame);
+}

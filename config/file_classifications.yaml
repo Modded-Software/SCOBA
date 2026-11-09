@@ -1,0 +1,144 @@
+# Exact-file classifications (reviewed). Roots are structural facts
+# used only by ordinary rules' declared scope; non-exemptible rules
+# apply to every tracked text file regardless of classification.
+# Each entry under 'files' must name exactly one tracked file:
+# check-policy-integrity fails on a zero- or multiple-file match.
+test_roots:
+  - tests/
+doc_roots:
+  - docs/
+doc_files:
+  - README.md
+files:
+  config/banned_words_exceptions_v5.yaml:
+    class: policy-definition
+    owner: workspace-ci
+  config/file_classifications.yaml:
+    class: policy-definition
+    owner: workspace-ci
+  original/SCOBA.SC2Map:
+    class: binary
+    owner: sc2
+  assets/scoba.png:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Attributes.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Base.SC2Data/Cutscenes/Index.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Base.SC2Data/UI/FontStyles.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Base.SC2Data/UI/Layout/DescIndex.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Blank.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/CellAttribute_Cpl:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/CellAttribute_Pnp:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/DocumentHeader:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/DocumentInfo.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/GameData.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/GameText.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/Crosshair.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/Run_Ico.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_ARMOUR.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_ATTACK_RANGE.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_ATTACK_SPEED.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_DAMAGE.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_ENERGY_REGEN.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_HEALTH.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_HEALTH_SHIELD_REGEN.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_Icons.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/SkillTree_MOVEMENT_SPEED.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Ico/UnitControl_Ico.dds:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/MapInfo:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/MapInfo.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Minimap.tga:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Objects.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Regions.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/Triggers.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3CellFlags:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3FluffDoodad:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3HardTile:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3HeightMap:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3SyncCliffLevel:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3SyncHeightMap:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3SyncTextureInfo:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3Terrain.version:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3TextureMasks:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3VertCol:
+    class: binary
+    owner: sc2
+  src/SCOBA.SC2Map/t3Water:
+    class: binary
+    owner: sc2

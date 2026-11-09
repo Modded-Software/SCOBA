@@ -1,0 +1,60 @@
+// Module: ui/hud_buttons
+
+void gf_SBDialogCreateStatsButton () {
+    int lv_localAnchor;
+    string lv_localIcon;
+    text lv_localTooltip;
+
+    lv_localIcon = "Assets\\Textures\\btn-ability-terran-liftoff.dds";
+    lv_localTooltip = StringExternal("Param/Value/8B0DE8A0");
+    lv_localAnchor = c_anchorBottomRight;
+    DialogCreate(64, 64, lv_localAnchor, 429, 35, true);
+    gv_singleButtonDialog = DialogLastCreated();
+    libNtve_gf_CreateDialogItemButton(DialogLastCreated(), gv_singleButtonConstantButtonSize, gv_singleButtonConstantButtonSize, c_anchorCenter, 0, 0, lv_localTooltip, StringToText(""), "");
+    gv_singleButtonButton = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemBackgroundVisible(gv_singleButtonButton, false, PlayerGroupAll());
+    libNtve_gf_SetDialogItemBorderVisible(gv_singleButtonButton, false, PlayerGroupAll());
+    libNtve_gf_CreateDialogItemImage(DialogLastCreated(), gv_singleButtonConstantIconSize, gv_singleButtonConstantIconSize, c_anchorCenter, 0, 0, StringToText(""), lv_localIcon, c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+    DialogControlFadeTransparency(DialogControlLastCreated(), PlayerGroupAll(), 1.0, 50.0);
+    gv_singleButtonIcon = DialogControlLastCreated();
+    libNtve_gf_CreateDialogItemLabel(gv_singleButtonDialog, 24, 20, c_anchorTopLeft, 40, 40, StringToText(""), Color(100,100,100), false, 1.5);
+    gv_singleButtonLabel = DialogControlLastCreated();
+}
+
+void gf_SBDialogCreateAbilitiesButton () {
+    int lv_localAnchor;
+    string lv_localIcon;
+    text lv_localTooltip;
+
+    lv_localIcon = "Assets\\Textures\\btn-ability-terran-emp-color.dds";
+    lv_localTooltip = StringExternal("Param/Value/4BF409FB");
+    lv_localAnchor = c_anchorBottomRight;
+    DialogCreate(64, 64, lv_localAnchor, 429, 112, true);
+    gv_singleButtonDialogAbilities = DialogLastCreated();
+    libNtve_gf_CreateDialogItemButton(DialogLastCreated(), gv_singleButtonConstantButtonSizeAbilities, gv_singleButtonConstantButtonSizeAbilities, c_anchorCenter, 0, 0, lv_localTooltip, StringToText(""), "");
+    gv_singleButtonButtonAbilities = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemBackgroundVisible(gv_singleButtonButtonAbilities, false, PlayerGroupAll());
+    libNtve_gf_SetDialogItemBorderVisible(gv_singleButtonButtonAbilities, false, PlayerGroupAll());
+    libNtve_gf_CreateDialogItemImage(DialogLastCreated(), gv_singleButtonConstantIconSizeAbilities, gv_singleButtonConstantIconSizeAbilities, c_anchorCenter, 0, 0, StringToText(""), lv_localIcon, c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+    DialogControlFadeTransparency(DialogControlLastCreated(), PlayerGroupAll(), 1.0, 50.0);
+    gv_singleButtonIconAbilities = DialogControlLastCreated();
+    libNtve_gf_CreateDialogItemLabel(gv_singleButtonDialogAbilities, 24, 20, c_anchorTopLeft, 40, 40, StringToText(""), Color(100,100,100), false, 1.5);
+    gv_singleButtonLabelAbilities = DialogControlLastCreated();
+}
+
+void gf_SBDialogCreateInventoryButton () {
+    text lv_tooltip;
+
+    lv_tooltip = StringToText("Inventory");
+    DialogCreate(64, 64, c_anchorBottomRight, 429, 189, true);
+    gv_singleButtonDialogInventory = DialogLastCreated();
+    libNtve_gf_CreateDialogItemButton(DialogLastCreated(), gv_singleButtonConstantButtonSizeAbilities, gv_singleButtonConstantButtonSizeAbilities, c_anchorCenter, 0, 0, lv_tooltip, StringToText(""), "");
+    gv_singleButtonButtonInventory = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemBackgroundVisible(gv_singleButtonButtonInventory, false, PlayerGroupAll());
+    libNtve_gf_SetDialogItemBorderVisible(gv_singleButtonButtonInventory, false, PlayerGroupAll());
+    libNtve_gf_CreateDialogItemImage(DialogLastCreated(), gv_singleButtonConstantIconSizeAbilities, gv_singleButtonConstantIconSizeAbilities, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\btn-unit-terran-predator.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+    gv_singleButtonIconInventory = DialogControlLastCreated();
+    libNtve_gf_CreateDialogItemLabel(gv_singleButtonDialogInventory, 24, 20, c_anchorTopLeft, 40, 40, StringToText(""), Color(100,100,100), false, 1.5);
+    gv_singleButtonLabelInventory = DialogControlLastCreated();
+    DialogSetVisible(gv_singleButtonDialogInventory, PlayerGroupAll(), true);
+}

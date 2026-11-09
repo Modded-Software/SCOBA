@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import signal
+import sys
 import time
 
 TARGETS = (
@@ -29,7 +30,8 @@ def find_targets() -> list[int]:
                 cmd = handle.read().replace(b"\x00", b" ").decode("utf-8", "replace")
             with open(f"/proc/{pid}/comm", "r", encoding="utf-8", errors="replace") as handle:
                 comm = handle.read().strip()
-        except OSError:
+        except OSError as exc:
+            print(f"WARNING: cannot read /proc/{pid}: {exc}", file=sys.stderr)
             continue
         haystack = cmd + " " + comm
         if any(target in haystack for target in TARGETS):
@@ -42,15 +44,15 @@ def main() -> int:
     for pid in pids:
         try:
             os.kill(pid, signal.SIGTERM)
-        except OSError:
-            pass
+        except OSError as exc:
+            sys.stderr.write(f"WARNING: cannot terminate pid {pid}: {exc}\n")
     if pids:
         time.sleep(3)
     for pid in find_targets():
         try:
             os.kill(pid, signal.SIGKILL)
-        except OSError:
-            pass
+        except OSError as exc:
+            sys.stderr.write(f"WARNING: cannot kill pid {pid}: {exc}\n")
     print(f"stopped {len(pids)} StarCraft process(es)")
     return 0
 

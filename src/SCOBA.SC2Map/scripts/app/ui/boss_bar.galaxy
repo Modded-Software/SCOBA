@@ -1,0 +1,69 @@
+// Module: ui/boss_bar
+
+void gf_BossBarSetup () {
+    gv_sCOBABB_Panel = c_invalidDialogControlId;
+    gv_sCOBABB_Icon = c_invalidDialogControlId;
+    gv_sCOBABB_Name = c_invalidDialogControlId;
+    gv_sCOBABB_HpImage = c_invalidDialogControlId;
+    gv_sCOBABB_HpLabel = c_invalidDialogControlId;
+    gv_sCOBABB_BarBg = c_invalidDialogControlId;
+    gv_sCOBABB_Border = c_invalidDialogControlId;
+    gv_sCOBABB_HpMaxWidth = 200;
+}
+
+void gf_BossBarEnsure () {
+    if (gv_sCOBABB_Panel != c_invalidDialogControlId) {
+        return;
+    }
+    DialogControlHookupStandard(c_triggerControlTypePanel, "UIContainer/ConsoleUIContainer/BossUnitFrame");
+    gv_sCOBABB_Panel = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeImage, "IconImage");
+    gv_sCOBABB_Icon = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeLabel, "NameLabel");
+    gv_sCOBABB_Name = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeImage, "HealthBarImage");
+    gv_sCOBABB_HpImage = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeLabel, "HealthLabel");
+    gv_sCOBABB_HpLabel = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeImage, "BarBackground");
+    gv_sCOBABB_BarBg = DialogControlLastCreated();
+    DialogControlHookup(gv_sCOBABB_Panel, c_triggerControlTypeImage, "BorderImage");
+    gv_sCOBABB_Border = DialogControlLastCreated();
+    DialogControlSetPosition(gv_sCOBABB_Panel, PlayerGroupAll(), c_anchorTop, 0, 50);
+    if (gv_sCOBAOrderDialog != c_invalidDialogId && gv_sCOBABB_Panel != c_invalidDialogControlId) {
+DialogControlSetPosition(gv_sCOBAOrderDialog, PlayerGroupAll(), c_anchorTop, -157, 50 + DialogControlGetHeight(gv_sCOBABB_Panel, 1) + 8);
+    }
+    gv_sCOBABB_HpMaxWidth = DialogControlGetWidth(gv_sCOBABB_HpImage, 1);
+    if (gv_sCOBABB_HpMaxWidth < 10) {
+        gv_sCOBABB_HpMaxWidth = 200;
+    }
+}
+
+void gf_BossBarUpdate (int lp_player) {
+    unit lv_unit;
+    int lv_cur;
+    int lv_max;
+    int lv_width;
+
+    if (gv_sCOBABB_Panel == c_invalidDialogControlId) {
+        return;
+    }
+    lv_unit = gv_tARGET[lp_player];
+    if (!UnitIsValid(lv_unit)) {
+        return;
+    }
+    lv_cur = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent));
+    lv_max = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLifeMax, c_unitPropNormal));
+    if (lv_max < 1) {
+        lv_max = 1;
+    }
+    if (lv_cur < 0) {
+        lv_cur = 0;
+    }
+    if (lv_cur > lv_max) {
+        lv_cur = lv_max;
+    }
+    lv_width = ((gv_sCOBABB_HpMaxWidth * lv_cur) / lv_max);
+    DialogControlSetSize(gv_sCOBABB_HpImage, PlayerGroupSingle(lp_player), lv_width, DialogControlGetHeight(gv_sCOBABB_HpImage, 1));
+    libNtve_gf_SetDialogItemText(gv_sCOBABB_HpLabel, StringToText(IntToString(lv_cur) + "/" + IntToString(lv_max)), PlayerGroupSingle(lp_player));
+}

@@ -1,6 +1,6 @@
 # SC2Map Format & SC2 Modding Research
 
-Notes compiled 2026-11-03. Sources: reverse-engineered format docs, SC2Mapster/Staredit guides, Galaxy API docs, and inspection of the local `SCOBA.SC2Map` archive.
+Notes compiled 2026-11-03. Sources: reverse-engineered format docs, SC2Mapster/Staredit guides, Galaxy API docs, and inspection of the local `original/SCOBA.SC2Map` archive.
 
 ## 1. Mental Model
 
@@ -105,7 +105,7 @@ Notes compiled 2026-11-03. Sources: reverse-engineered format docs, SC2Mapster/S
 - Layout is 3 tiers × 9 sub-types.
 - Sub-types: root ×3, `Base.SC2Assets`, `Base.SC2Data`, locale assets, locale data, `Teen.SC2Assets`, `Team.SC2Assets`.
 - Numbered variants exist: `Base.SC2Assets1` … `Base.SC2Assets999`.
-- Locale slots fall back to root slots when missing.
+- Locale slots use root slots when missing.
 
 ### Load order
 
@@ -187,7 +187,7 @@ Notes compiled 2026-11-03. Sources: reverse-engineered format docs, SC2Mapster/S
 
 ### `DocumentHeader`
 
-- Binary, versioned 0–8.
+- Binary, versioned 0-8.
 - Current version: 8.
 - All integers little-endian.
 - Fields: product FourCC, format version, flags, build ID, dependency list, locale list.
@@ -229,7 +229,7 @@ Observed `SCOBA.SC2Map`:
 - Variant block: variants, slot arrays, bitsets.
 - v33+ adds lighting and camera block.
 - Integrity hash at end.
-- Width/height are in cells. Valid range 1–256.
+- Width/height are in cells. Valid range 1-256.
 - World units = cells × 4096.
 - Editor concepts: publish mode, map bounds, lobby slots, variants.
 
@@ -318,18 +318,18 @@ Observed `SCOBA.SC2Map`:
 - Do not add logic directly to `MapScript.galaxy`. The editor overwrites it.
 
 Observed `SCOBA.SC2Map`:
-- `Triggers` is 1.7 MB XML.
-- 38,490 lines.
+- `Triggers` is one empty category.
+- Logic lives in `scripts/app/`.
 - Uses `Ntve` library functions.
 
 ## 8. Galaxy Scripting
 
 - Galaxy is a statically typed, C-like language.
 - Entry point: `MapScript.galaxy`.
-- `MapScript.galaxy` includes `TriggerLibs/NativeLib` and expansion libs.
-- Generated file. Do not hand-edit.
-- Put custom code in `scripts/*.galaxy`.
-- Include from a Custom Script element: `include "scripts/main"`.
+- `MapScript.galaxy` includes `TriggerLibs/NativeLib`, expansion libs, and `scripts/app/main`.
+- The build writes the bootstrap; do not hand-edit the built copy.
+- Put custom code in `scripts/app/{core,app,systems,ui}`.
+- Include from the entry point: `include "scripts/app/main"`.
 - Paths are relative to map root, without `.galaxy`.
 - Include order matters.
 - Header file holds forward declarations.
@@ -393,7 +393,7 @@ Terrain is split across one XML descriptor and seven binary files.
 - `<cliffDoodadList>`: cliff doodads.
 - `<blockTextureSetList>`: block texture indices. Size derived from `dim`.
 - `<cliffCellList>` / `<cc>`: per-half-cell cliff IDs and flags.
-- Version gates: `< 114` texture legacy path, `<= 112` clears a cliff flag.
+- Version gates: `< 114` older texture path, `<= 112` clears a cliff flag.
 
 Observed `SCOBA.SC2Map`:
 - `terrain version="114"`.
@@ -414,9 +414,9 @@ Observed `SCOBA.SC2Map`:
 | `t3VertCol` | `VTCL` | 103/104 | Per-vertex color, 56-byte entries |
 | `t3CellFlags` | `LFCT` | ≤102 | Pathing/cell flags |
 | `t3HardTile` | `HRDT` | 102 | Cliff/hard-surface geometry |
-| `t3FluffDoodad` | `DLFT` | 101–103 | Decorative doodads |
+| `t3FluffDoodad` | `DLFT` | 101-103 | Decorative doodads |
 | `t3TextureMasks` | `MASK` | ≤102 | 8-layer texture blend weights |
-| `t3Water` | `WATR` | 104–110 | Water bodies and waves |
+| `t3Water` | `WATR` | 104-110 | Water bodies and waves |
 
 ### Height map
 
@@ -510,7 +510,7 @@ Observed `SCOBA.SC2Map`:
 - Text tables live under `<locale>.SC2Data/LocalizedData/`.
 - Common tables: `GameStrings.txt`, `ObjectStrings.txt`, `TriggerStrings.txt`, `GameHotkeys.txt`.
 - Load order: locale data overrides base data.
-- `enUS` is the usual fallback.
+- `enUS` is the usual default.
 - Preserve BOM and line endings when editing.
 - Text keys are referenced by catalogs, triggers, and UI.
 
@@ -551,24 +551,24 @@ Observed `SCOBA.SC2Map`:
 - `Assets/Models/*.m3`.
 - `Assets/Sounds/*.ogg` / `.wav`.
 - `Ico/` map-specific icons.
-- `Blank.dds` placeholder.
+- `Blank.dds` empty image.
 
 ## 14. Tools and Workflow
 
 ### Editing workflow
 
-1. Unpack the document to a component folder.
+1. Extract the document to a component folder.
 2. Edit XML, Galaxy, layouts, and data spaces on disk.
 3. Test with `scripts/launch-scoba.sh`.
 4. Repack to `.SC2Map` only for publishing or distribution.
 
-The editor's `Save As .SC2Components` is just an unpack. The project uses a
-programmatic unpack instead of the editor UI.
+The editor's `Save As .SC2Components` is just an extraction. The project uses a
+programmatic extraction instead of the editor UI.
 
 Current source tree:
 
-- `src/SCOBA.SC2Map/` is the unpacked component folder.
-- `SCOBA.SC2Map` is the original packed baseline.
+- `src/SCOBA.SC2Map/` is the extracted component folder.
+- `original/SCOBA.SC2Map` is the original packed baseline.
 - `dist/` is reserved for repacked artifacts and is ignored by Git.
 
 ### Read-only inspection
@@ -585,9 +585,9 @@ Current source tree:
 
 ```bash
 uv sync
-uv run scripts/sc2map_ls.py SCOBA.SC2Map
-uv run scripts/sc2map_ls.py SCOBA.SC2Map --cat Build.txt
-uv run scripts/sc2map_ls.py SCOBA.SC2Map --extract src/SCOBA.SC2Map
+uv run scripts/sc2map_ls.py original/SCOBA.SC2Map
+uv run scripts/sc2map_ls.py original/SCOBA.SC2Map --cat Build.txt
+uv run scripts/sc2map_ls.py original/SCOBA.SC2Map --extract src/SCOBA.SC2Map
 ```
 
 ### Build the expanded map
@@ -661,10 +661,10 @@ scripts/install-dock-icon.sh
 
 - Do not treat `.SC2Map` as ZIP. Use an MPQ library.
 - MPQ v3 and SC2-specific quirks break naive readers.
-- `(listfile)` may be missing or incomplete. Have fallback names.
+- `(listfile)` may be missing or incomplete. Have substitute names.
 - Archive paths use backslashes. Normalize on Linux.
 - Some files are flat names containing backslashes.
-- The editor regenerates `MapScript.galaxy`. Do not put logic there.
+- The build writes `MapScript.galaxy`. Keep logic in `scripts/app/`.
 - `GameData.xml` cannot be edited while the project is open.
 - Catalog XML needs correct encoding and line endings.
 - Dependency order is last-wins. A wrong order changes behavior.
@@ -695,10 +695,10 @@ scripts/install-dock-icon.sh
 
 ## 17. Local Sample Summary
 
-`SCOBA.SC2Map`:
+`original/SCOBA.SC2Map`:
 
 - MPQ v3, 16 KB sectors, 94 blocks / 92 listed files.
-- Map name in `MapScript.galaxy` header: `SCOBA`.
+- Map name in `MapInfo`: `SCOBA`.
 - 128×128 map cells, 129×129 terrain vertices.
 - Zerus tileset.
 - Terrain version 114.

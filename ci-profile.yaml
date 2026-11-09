@@ -1,0 +1,39 @@
+# ci-profile.yaml: SC2 CI integration profile.
+# Generated from templates/ci-profile.template.yaml, trimmed for python.
+version: 1
+project: SC2
+languages: [python, galaxy]
+tier: strict
+hooks:
+  pre-commit:
+    - gitleaks
+    - block-sensitive-files
+    - check-trusted-exec
+    - check-unstaged
+    - ci-check-error-swallow
+    - check-coverage-no-devolution
+    - check-portable-shell
+    - check-file-length
+    - check-required-hooks-present
+    - ci-lint
+    - ci-type-check
+    - check-dependency-versions
+    - check-module-size
+    - check-npm-lock-sync
+    - check-policy-integrity
+    - check-banned-words
+    - check-init-files
+    - check-py-not-executable
+    - check-markdown-docs
+    - check-resolution-shapes
+    - check-inline-code
+    - check-boot-venv-layout
+    - check-duplicate-dependencies
+  commit-msg:
+    - check-commit-message
+    - block-coauthored
+  pre-push:
+    - block-coauthored-history
+    - ci-check-push
+    - check-dead-code
+    - osv-scan

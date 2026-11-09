@@ -1,0 +1,86 @@
+// Module: systems/orders
+
+void gf_OrderCreate () {
+    DialogCreate(120, 56, c_anchorTop, -160, 160, false);
+    gv_sCOBAOrderDialog = DialogLastCreated();
+    libNtve_gf_CreateDialogItemButton(gv_sCOBAOrderDialog, 120, 56, c_anchorCenter, 0, 0, StringToText("Order this unit"), StringToText("Order"), "");
+    gv_sCOBAOrderButton = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemRenderPriority(gv_sCOBAOrderButton, 900, PlayerGroupAll());
+    libNtve_gf_CreateDialogItemImage(gv_sCOBAOrderDialog, 9, 3, c_anchorTopLeft, 70, 41, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(255,255,255), c_triggerBlendModeNormal);
+    libNtve_gf_SetDialogItemRenderPriority(DialogControlLastCreated(), 920, PlayerGroupAll());
+    DialogSetVisible(gv_sCOBAOrderDialog, PlayerGroupAll(), false);
+}
+
+void gf_OrderEnter (int lp_player) {
+    unit lv_unit;
+
+    lv_unit = gv_tARGET[lp_player];
+    if (!UnitIsValid(lv_unit)) {
+        return;
+    }
+    if (UnitGetOwner(lv_unit) != lp_player) {
+        return;
+    }
+    gv_sCOBAOrderMode[lp_player] = true;
+    gv_fORWARD[lp_player] = false;
+    gv_bACKWARD[lp_player] = false;
+    gv_lEFT[lp_player] = false;
+    gv_rIGHT[lp_player] = false;
+    gv_sCOBAOrderUnit[lp_player] = lv_unit;
+    UnitSetState(lv_unit, c_unitStateSelectable, true);
+    UnitClearSelection(lp_player);
+    UnitSelect(lv_unit, lp_player, true);
+    libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, true, PlayerGroupSingle(lp_player));
+    UIDisplayMessage(PlayerGroupSingle(lp_player), c_messageAreaSubtitle, StringToText("Ordering " + UnitGetType(lv_unit) + ". Press Ctrl+E or Ctrl+C to cancel."));
+}
+
+void gf_OrderExit (int lp_player) {
+    gv_sCOBAOrderMode[lp_player] = false;
+    gv_sCOBAOrderUnit[lp_player] = null;
+    libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, false, PlayerGroupSingle(lp_player));
+    UnitClearSelection(lp_player);
+    if (UnitIsValid(gv_tARGET[lp_player])) {
+        UnitSetState(gv_tARGET[lp_player], c_unitStateSelectable, false);
+    }
+}
+
+void gf_OrderToggle (int lp_player) {
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    if (gv_sCOBAOrderMode[lp_player] == true) {
+        gf_OrderExit(lp_player);
+    }
+    else {
+        gf_OrderEnter(lp_player);
+    }
+}
+
+void gf_OrderExecute (int lp_player, fixed lp_x, fixed lp_y) {
+    unit lv_unit;
+    unit lv_hover;
+
+    lv_unit = gv_sCOBAOrderUnit[lp_player];
+    if (!UnitIsValid(lv_unit)) {
+        gf_OrderExit(lp_player);
+        return;
+    }
+    lv_hover = gv_sCOBAHover[lp_player];
+    if (UnitIsValid(lv_hover) && (UnitGetOwner(lv_hover) != lp_player)) {
+        UnitIssueOrder(lv_unit, OrderTargetingUnit(AbilityCommand("attack", 0), lv_hover), c_orderQueueReplace);
+    }
+    else {
+        UnitIssueOrder(lv_unit, OrderTargetingPoint(AbilityCommand("move", 0), Point(lp_x, lp_y)), c_orderQueueReplace);
+    }
+}
+
+int gf_HeroPlayerFromUnit (unit lp_unit) {
+    int lv_player;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        if (gv_tPSUNIT[lv_player] == lp_unit) {
+            return lv_player;
+        }
+    }
+    return 0;
+}

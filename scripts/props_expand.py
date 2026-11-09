@@ -8,7 +8,9 @@ import struct
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parent.parent
+from project_root import project_root
+
+ROOT = project_root()
 DEFAULT_MAP = ROOT / "out" / "SCOBA256.SC2Map"
 TREE_TYPE = "ZerusTree"
 TREE_COUNT_FACTOR = 1.5
@@ -101,7 +103,7 @@ def expand_fluff(path: Path, rng: random.Random) -> int:
         record = data[off : off + 9]
         out += record
         if index in duplicate:
-            x, y, flag = struct.unpack("<2fB", record)
+            x, y, flag = struct.unpack_from("<2fB", record, 0)
             out += struct.pack("<2fB", x + rng.uniform(-1.5, 1.5), y + rng.uniform(-1.5, 1.5), flag)
             added += 1
     struct.pack_into("<I", out, 24, count + added)

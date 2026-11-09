@@ -1,0 +1,35 @@
+// Module: systems/status_bar
+
+bool gt_ShowStatusBar_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitStatusBarOverride(EventUnit(), c_unitStatusGroupAll);
+    gv_sCOBAHover[EventPlayer()] = EventUnit();
+    return true;
+}
+
+void gt_ShowStatusBar_Init () {
+    gt_ShowStatusBar = TriggerCreate("gt_ShowStatusBar_Func");
+    TriggerAddEventUnitHighlight(gt_ShowStatusBar, null, c_playerAny, true);
+}
+
+bool gt_HideStatusBar_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitStatusBarOverride(EventUnit(), -1);
+    if (gv_sCOBAHover[EventPlayer()] == EventUnit()) {
+        gv_sCOBAHover[EventPlayer()] = null;
+    }
+    return true;
+}
+
+void gt_HideStatusBar_Init () {
+    gt_HideStatusBar = TriggerCreate("gt_HideStatusBar_Func");
+    TriggerAddEventUnitHighlight(gt_HideStatusBar, null, c_playerAny, false);
+}

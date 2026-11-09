@@ -1,7 +1,9 @@
 from pathlib import Path
 import struct
 
-OURS = Path(__file__).resolve().parent.parent / "out" / "SCOBA256.SC2Map"
+from project_root import project_root
+
+OURS = project_root() / "out" / "SCOBA256.SC2Map"
 REF_DIR = Path("/tmp")
 
 names = [

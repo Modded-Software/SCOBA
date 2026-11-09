@@ -29,9 +29,15 @@ def git_revision(root: Path) -> str:
             cwd=root,
             capture_output=True,
             text=True,
-            check=False,
         )
-    except OSError:
+    except OSError as exc:
+        print(f"WARNING: git revision unavailable: {exc}", file=sys.stderr)
+        return "nogit"
+    if result.returncode != 0:
+        print(
+            f"WARNING: git rev-parse failed: {result.stderr.strip()}",
+            file=sys.stderr,
+        )
         return "nogit"
     value = result.stdout.strip()
     return value or "nogit"
@@ -52,11 +58,11 @@ def main() -> int:
         print(f"ERROR: map folder not found: {map_dir}", file=sys.stderr)
         return 2
 
-    stamp = f"{git_revision(source.parent.parent)}-{source_digest(source)}"
+    stamp = f"{git_revision(source.parent.joinpath('..').resolve())}-{source_digest(source)}"
     (map_dir / "BuildStamp.txt").write_text(stamp + "\n", encoding="utf-8")
 
-    combat = map_dir / "scripts" / "combat.galaxy"
-    text = combat.read_text(encoding="utf-8")
+    stamp_file = map_dir / "scripts" / "app" / "core" / "build_stamp.galaxy"
+    text = stamp_file.read_text(encoding="utf-8")
     replacement = f'const string c_SCOBA_BUILD_STAMP = "{stamp}";'
     if PLACEHOLDER in text:
         text = text.replace(PLACEHOLDER, replacement, 1)
@@ -69,10 +75,10 @@ def main() -> int:
                 replaced = True
                 break
         if not replaced:
-            print("ERROR: build stamp constant not found in combat.galaxy", file=sys.stderr)
+            print("ERROR: build stamp constant not found in build_stamp.galaxy", file=sys.stderr)
             return 1
         text = "\n".join(lines) + "\n"
-    combat.write_text(text, encoding="utf-8", newline="\n")
+    stamp_file.write_text(text, encoding="utf-8", newline="\n")
     print(stamp)
     return 0
 

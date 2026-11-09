@@ -1,0 +1,41 @@
+// Module: systems/energy_bar
+
+bool gt_RefreshEnergyBar_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    unit lv_triggeringUnit;
+    int lv_localPlayer;
+    int lv_localBar;
+
+    // Variable Initialization
+    lv_triggeringUnit = EventUnit();
+    lv_localPlayer = EventPlayer();
+    lv_localBar = ((lv_localPlayer * 10) + 2);
+
+    // Conditions
+    if (testConds) {
+        if (lv_localPlayer < 1 || lv_localPlayer > 6) {
+            return false;
+        }
+
+        if (!UnitIsValid(lv_triggeringUnit) || !UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {
+            return false;
+        }
+
+        if (!((lv_triggeringUnit == gv_tPSUNIT[lv_localPlayer]))) {
+            return false;
+        }
+    }
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    libNtve_gf_SetBossBarCurrentValue(lv_localBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropEnergy, c_unitPropCurrent)), true);
+    return true;
+}
+
+void gt_RefreshEnergyBar_Init () {
+    gt_RefreshEnergyBar = TriggerCreate("gt_RefreshEnergyBar_Func");
+    TriggerAddEventUnitProperty(gt_RefreshEnergyBar, null, c_unitPropEnergy);
+}

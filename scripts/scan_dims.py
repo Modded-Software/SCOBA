@@ -1,7 +1,9 @@
 from pathlib import Path
 import struct
 
-OUT = Path(__file__).resolve().parent.parent / "out" / "SCOBA256.SC2Map"
+from project_root import project_root
+
+OUT = project_root() / "out" / "SCOBA256.SC2Map"
 
 for p in sorted(OUT.iterdir()):
     if not p.is_file():

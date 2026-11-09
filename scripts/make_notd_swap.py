@@ -1,7 +1,9 @@
 from pathlib import Path
 import shutil
 
-ROOT = Path(__file__).resolve().parent.parent
+from project_root import project_root
+
+ROOT = project_root()
 SRC = ROOT / "out" / "SCOBA256.SC2Map"
 DST = ROOT / "out" / "SCOBA256_notd.SC2Map"
 

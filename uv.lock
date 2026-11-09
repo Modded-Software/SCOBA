@@ -94,6 +94,7 @@ dependencies = [
 ]
 
 [package.metadata]
+provides-extras = []
 requires-dist = [
     { name = "mpyq", specifier = ">=0.2.5" },
     { name = "pillow", specifier = ">=13.0.0" },

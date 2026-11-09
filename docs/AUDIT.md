@@ -531,8 +531,8 @@ No single source of truth. The same feature is controlled by:
 git status --short
 git diff --stat
 git diff --ignore-space-at-eol --stat
-git diff --ignore-space-at-eol -- src/SCOBA.SC2Map/MapScript.galaxy
-git diff --ignore-space-at-eol -- src/SCOBA.SC2Map/scripts/combat.galaxy
-git diff --ignore-space-at-eol -- src/SCOBA.SC2Map/Base.SC2Data/GameData
+git diff --ignore-space-at-eol src/SCOBA.SC2Map/MapScript.galaxy
+git diff --ignore-space-at-eol src/SCOBA.SC2Map/scripts/combat.galaxy
+git diff --ignore-space-at-eol src/SCOBA.SC2Map/Base.SC2Data/GameData
 file src/SCOBA.SC2Map/MapScript.galaxy src/SCOBA.SC2Map/Base.SC2Data/GameData/UnitData.xml
 ```

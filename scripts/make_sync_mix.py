@@ -3,7 +3,9 @@ import shutil
 import struct
 import sys
 
-ROOT = Path(__file__).resolve().parent.parent
+from project_root import project_root
+
+ROOT = project_root()
 BASE = ROOT / "out" / "SCOBA256.SC2Map"
 DST = ROOT / "out" / "SCOBA256_mix.SC2Map"
 OURS = BASE / "t3SyncHeightMap"

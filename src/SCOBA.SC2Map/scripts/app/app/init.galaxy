@@ -1,0 +1,170 @@
+// Module: app/init
+
+void InitLibs () {
+    libNtve_InitLib();
+    libSwaC_InitLib();
+}
+
+bool gt_MapInit_Func (bool testConds, bool runActions) {
+    int auto5832FA5B_ae;
+    int auto5832FA5B_ai;
+
+    // Variable Declarations
+    int lv_localPlayer;
+    int lv_localHPBar;
+    int lv_localNRGBar;
+    int lv_localXPBar;
+
+    // Variable Initialization
+    lv_localPlayer = 1;
+    lv_localHPBar = ((lv_localPlayer * 10) + 1);
+    lv_localNRGBar = ((lv_localPlayer * 10) + 2);
+    lv_localXPBar = ((lv_localPlayer * 10) + 3);
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    gv_sPAWNLOCATIONS[1] = RegionFromId(1);
+    gv_sPAWNLOCATIONS[2] = RegionFromId(3);
+    gv_sPAWNLOCATIONS[3] = RegionFromId(4);
+    gv_sPAWNLOCATIONS[4] = RegionFromId(2);
+    gv_sPAWNLOCATIONS[5] = RegionFromId(5);
+    gv_sPAWNLOCATIONS[6] = RegionFromId(6);
+    gv_xLOCATIONS[1] = RegionFromId(8);
+    gv_xLOCATIONS[2] = RegionFromId(7);
+    gv_xLOCATIONS[3] = RegionFromId(9);
+    UnitSelect(UnitFromId(622754155), 1, true);
+    UnitSelect(UnitFromId(649131550), 2, true);
+    Wait(0.5, c_timeReal);
+    auto5832FA5B_ae = 6;
+    auto5832FA5B_ai = 1;
+    lv_localPlayer = 1;
+    for ( ; ( (auto5832FA5B_ai >= 0 && lv_localPlayer <= auto5832FA5B_ae) || (auto5832FA5B_ai <= 0 && lv_localPlayer >= auto5832FA5B_ae) ) ; lv_localPlayer += auto5832FA5B_ai ) {
+        libNtve_gf_SetUpgradeLevelForPlayer(lv_localPlayer, "K5Apocalypse", 1);
+        libNtve_gf_SetUpgradeLevelForPlayer(lv_localPlayer, "HotSHydraliskFrenzy", 1);
+        libNtve_gf_SetUpgradeLevelForPlayer(lv_localPlayer, "BansheeCloak", 1);
+        lv_localHPBar = ((lv_localPlayer * 10) + 1);
+        lv_localNRGBar = ((lv_localPlayer * 10) + 2);
+        lv_localXPBar = ((lv_localPlayer * 10) + 3);
+        if ((UnitHasBehavior(UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1), "UnitDirectControl") == false) && (UnitHasBehavior(UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1), "NeuralParasite") == false) && (UnitGroupCount(UnitGroupSelected(lv_localPlayer), c_unitCountAlive) == 1) && (UnitGetOwner(UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1)) <= 15) && (UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1) == UnitGroupUnit(UnitGroupFilterAlliance(UnitGroupSelected(lv_localPlayer), lv_localPlayer, c_unitAllianceAlly, 0), 1)) && (UnitIsSelected(UnitGroupUnit(UnitGroupFilter(null, c_playerAny, UnitGroupSelected(lv_localPlayer), UnitFilter(0, 0, (1 << c_targetFilterStructure), 0), 0), 1), lv_localPlayer) == true)) {
+            gv_tPSUNIT[lv_localPlayer] = UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1);
+            CameraApplyInfo(lv_localPlayer, CameraInfoDefault(), 1.0, 100.0, 0.0, true);
+            CameraFollowUnitGroup(lv_localPlayer, UnitGroupSelected(lv_localPlayer), true, false);
+            CameraSetValue(lv_localPlayer, c_cameraValuePitch, -30.0, 1.0, -1, 10);
+            CameraSetValue(lv_localPlayer, c_cameraValueFarClip, 500.0, 1.0, -1, 10);
+            CameraLockInput(lv_localPlayer, true);
+            UnitBehaviorAddPlayer(gv_tPSUNIT[lv_localPlayer], "UnitDirectControl", lv_localPlayer, 1);
+            UnitXPGainEnable(gv_tPSUNIT[lv_localPlayer], null, true);
+            UnitSetState(gv_tPSUNIT[lv_localPlayer], c_unitStateStatusBar, false);
+            libNtve_gf_StoreUnitSelection(lv_localPlayer, libNtve_ge_UnitSelectionStoreOption_DoNotClearUnitSelection);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", true);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
+            UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickStandBehavior", gv_tPSUNIT[lv_localPlayer], 1);
+            
+            if (lv_localPlayer <= 3) {
+                libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, (lv_localPlayer + 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 8.0, 45.0));
+                libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, (lv_localPlayer + 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 8.0, 225.0));
+            }
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "heal", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+            Wait(0.01, c_timeGame);
+            CameraSetValue(1, c_cameraValueShadowClip, 25.0, 0.0, -1, 10.0);
+            CameraSetValue(1, c_cameraValueFarClip, 16000.0, 0.0, -1, 10.0);
+            CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, 65.0, 4.0, -1, 10);
+            if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Tosh"))) {
+                CameraSetValue(lv_localPlayer, c_cameraValueDistance, 1.5, 0.5, -1, 10);
+                CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, gv_mARINE, 0.5, -1, 10);
+                CameraUseHeightSmoothing(lv_localPlayer, false);
+            }
+
+            if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Kerrigan"))) {
+                CameraSetValue(lv_localPlayer, c_cameraValueDistance, 2.5, 0.5, -1, 10);
+                CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, gv_iMMORTAL, 0.5, -1, 10);
+            }
+            else {
+                CameraUseHeightSmoothing(lv_localPlayer, false);
+            }
+            gf_ShowStasLevelingInterface(lv_localPlayer);
+            gf_ShowAbilityLevelingInterface(lv_localPlayer);
+            libNtve_gf_DisplayBossBar(lv_localHPBar, "Assets\\Textures\\btn-ability-terran-heal-color.dds", StringExternal("Param/Value/667BCC52"), FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropLife, c_unitPropNormal)), PlayerGroupSingle(lv_localPlayer));
+            libNtve_gf_SetBossBarCurrentValue(lv_localHPBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropLife, c_unitPropCurrent)), true);
+            libNtve_gf_SetBossBarBoss(lv_localHPBar, gv_tPSUNIT[lv_localPlayer], true);
+            libNtve_gf_MoveBossBar(lv_localHPBar, c_anchorBottomLeft, 0, 130);
+            libNtve_gf_DisplayBossBar(lv_localNRGBar, "Assets\\Textures\\btn-ability-protoss-psistorm-color.dds", StringExternal("Param/Value/213EE36E"), FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropEnergyMax, c_unitPropNormal)), PlayerGroupSingle(lv_localPlayer));
+            libNtve_gf_SetBossBarCurrentValue(lv_localNRGBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropEnergy, c_unitPropCurrent)), true);
+            libNtve_gf_MoveBossBar(lv_localNRGBar, c_anchorBottomLeft, 0, 20);
+            libNtve_gf_DisplayBossBar(lv_localXPBar, "Assets\\Textures\\btn-ability-kerrigan_revive.dds", (StringExternal("Param/Value/8C6298BA") + IntToText(gv_lEVEL[lv_localPlayer])), ((gv_lEVEL[lv_localPlayer] * 298) + PowI(2.0, gv_lEVEL[lv_localPlayer])), PlayerGroupSingle(lv_localPlayer));
+            libNtve_gf_SetBossBarCurrentValue(lv_localXPBar, gv_xP[lv_localPlayer], true);
+            libNtve_gf_MoveBossBar(lv_localXPBar, c_anchorTopLeft, 0, 0);
+            libNtve_gf_ShowHideBossBar(false, lv_localHPBar);
+            libNtve_gf_ShowHideBossBar(false, lv_localNRGBar);
+            libNtve_gf_ShowHideBossBar(false, lv_localXPBar);
+        }
+
+    }
+    for (lv_localPlayer = 1; lv_localPlayer <= 6; lv_localPlayer += 1) {
+        UnitClearSelection(lv_localPlayer);
+    }
+    gv_sCOBA_Clock = TimerCreate();
+    TimerStart(gv_sCOBA_Clock, 3600.0, false, c_timeGame);
+    gt_ToggleCommands_Init();
+    gt_AttackEvent_Init();
+    return true;
+}
+
+void gt_MapInit_Init () {
+    gt_MapInit = TriggerCreate("gt_MapInit_Func");
+    TriggerAddEventMapInit(gt_MapInit);
+}

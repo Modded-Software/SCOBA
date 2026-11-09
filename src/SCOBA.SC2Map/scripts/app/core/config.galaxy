@@ -1,0 +1,84 @@
+// Module: core/config
+
+void InitGlobals () {
+    int init_i;
+    int init_j;
+
+    gv_zERGLING = 1.0;
+    gv_mARINE = 1.35;
+    gv_mARAUDER = 1.85;
+    gv_iMMORTAL = 2.3;
+    gv_qUEEN = 2.5;
+    gv_tHOR = 3.0;
+    gv_uLTRALISK = 3.5;
+    gv_oDIN = 4.5;
+    gv_cOLOSSUS = 6.0;
+    gv_mEDIVAC = 5.0;
+    gv_oVERLORD = 5.5;
+    gv_bATTLECRUISER = 6.0;
+    gv_hERCULES = 6.5;
+    gv_mOTHERSHIP = 8.0;
+    gv_lEVIATHAN = 9.0;
+    gv_sPAWNTIMER = TimerCreate();
+    gv_tIMERWINDOW = c_timerWindowNone;
+    for (init_i = 0; init_i <= 7; init_i += 1) {
+        gv_lEVEL[init_i] = 1;
+    }
+    for (init_i = 0; init_i <= 7; init_i += 1) {
+        for (init_j = 0; init_j <= 5; init_j += 1) {
+            gv_sTATLEVEL[init_i][init_j] = 1;
+        }
+    }
+    gv_tERRANALLIANCE = PlayerGroupEmpty();
+    gv_zERGALLIANCE = PlayerGroupEmpty();
+    gv_singleButtonDialog = c_invalidDialogId;
+    gv_singleButtonButton = c_invalidDialogControlId;
+    gv_singleButtonIcon = c_invalidDialogControlId;
+    gv_singleButtonLabel = c_invalidDialogControlId;
+    gv_userSelectionDialog = c_invalidDialogId;
+    for (init_i = 0; init_i <= gv_cButtonAmount; init_i += 1) {
+        gv_userSelectionButtons[init_i] = c_invalidDialogControlId;
+    }
+    for (init_i = 0; init_i <= gv_cButtonAmount; init_i += 1) {
+        gv_userSelectionIcons[init_i] = c_invalidDialogControlId;
+    }
+    gv_userSelectionLabel = c_invalidDialogControlId;
+    for (init_i = 0; init_i <= gv_cButtonAmount; init_i += 1) {
+        gv_unitButtons[init_i].lv_statGet = c_unitPropLife;
+        gv_unitButtons[init_i].lv_statSet = c_unitPropLifePercent;
+    }
+    gv_cButtonInlay = ((gv_cButtonSize / 2) - (gv_cIconSize / 2));
+    gv_cDialogExtra = (gv_cDialogBorder * 2);
+    gv_singleButtonDialogAbilities = c_invalidDialogId;
+    gv_singleButtonButtonAbilities = c_invalidDialogControlId;
+    gv_singleButtonIconAbilities = c_invalidDialogControlId;
+    gv_singleButtonLabelAbilities = c_invalidDialogControlId;
+    gv_singleButtonDialogInventory = c_invalidDialogId;
+    gv_singleButtonButtonInventory = c_invalidDialogControlId;
+    gv_singleButtonIconInventory = c_invalidDialogControlId;
+    gv_singleButtonLabelInventory = c_invalidDialogControlId;
+    gv_abilitiesSelectionDialogCloseButton = c_invalidDialogControlId;
+    gv_abilitiesSelectionAdditionalColumnDialog = c_invalidDialogId;
+    for (init_i = 0; init_i <= 7; init_i += 1) {
+        gv_abilitiesSelectionAdditionalColumnAllocatedPoints[init_i] = 1;
+    }
+    for (init_i = 0; init_i <= gv_abilitiesSelectionTotalColumnButtons; init_i += 1) {
+        gv_abilitiesSelectionAdditionaColumnKeys[init_i] = c_invalidDialogControlId;
+    }
+    for (init_i = 0; init_i <= gv_abilitiesSelectionTotalColumnButtons; init_i += 1) {
+        gv_abilitiesSelectionAdditionaColumnImages[init_i] = c_invalidDialogControlId;
+    }
+    gv_abilitiesSelectionDialog = c_invalidDialogId;
+    for (init_i = 0; init_i <= gv_cButtonAmountAbilities; init_i += 1) {
+        gv_abilitiesSelectionButtons[init_i] = c_invalidDialogControlId;
+    }
+    for (init_i = 0; init_i <= gv_cButtonAmountAbilities; init_i += 1) {
+        gv_abilitiesSelectionIcons[init_i] = c_invalidDialogControlId;
+    }
+    gv_abilitiesSelectionLabel = c_invalidDialogControlId;
+    for (init_i = 0; init_i <= gv_cButtonAmountAbilities; init_i += 1) {
+        gv_abilitiesButtons[init_i].lv_enabled = true;
+    }
+    gv_cButtonInlayAbilities = ((gv_cButtonSizeAbilities / 2) - (gv_cIconSizeAbilities / 2));
+    gv_cDialogExtraAbilities = (gv_cDialogBorderAbilities * 2);
+}

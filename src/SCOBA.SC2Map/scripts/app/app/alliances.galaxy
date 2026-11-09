@@ -1,0 +1,25 @@
+// Module: app/alliances
+
+bool gt_SetAlliances_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    PlayerGroupAdd(gv_tERRANALLIANCE, 1);
+    PlayerGroupAdd(gv_tERRANALLIANCE, 2);
+    PlayerGroupAdd(gv_tERRANALLIANCE, 3);
+    PlayerGroupAdd(gv_tERRANALLIANCE, 7);
+    libNtve_gf_SetPlayerGroupAlliance(gv_tERRANALLIANCE, libNtve_ge_AllianceSetting_AllyWithSharedVision);
+    PlayerGroupAdd(gv_zERGALLIANCE, 4);
+    PlayerGroupAdd(gv_zERGALLIANCE, 5);
+    PlayerGroupAdd(gv_zERGALLIANCE, 6);
+    PlayerGroupAdd(gv_zERGALLIANCE, 8);
+    libNtve_gf_SetPlayerGroupAlliance(gv_zERGALLIANCE, libNtve_ge_AllianceSetting_AllyWithSharedVision);
+    return true;
+}
+
+void gt_SetAlliances_Init () {
+    gt_SetAlliances = TriggerCreate("gt_SetAlliances_Func");
+    TriggerAddEventMapInit(gt_SetAlliances);
+}

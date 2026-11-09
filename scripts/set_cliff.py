@@ -2,7 +2,9 @@ from pathlib import Path
 import struct
 import sys
 
-MAP = Path(__file__).resolve().parent.parent / "out" / "SCOBA256.SC2Map"
+from project_root import project_root
+
+MAP = project_root() / "out" / "SCOBA256.SC2Map"
 value = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 
 p = MAP / "t3SyncCliffLevel"

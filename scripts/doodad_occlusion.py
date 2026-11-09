@@ -5,6 +5,8 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+from project_root import project_root
+
 
 def doodad_types(map_dir: Path) -> list[str]:
     found: set[str] = set()
@@ -45,7 +47,7 @@ def disable_doodad_occlusion(map_dir: Path) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    root = Path(__file__).resolve().parent.parent
+    root = project_root()
     map_dir = Path(argv[1]) if len(argv) > 1 else root / "out" / "SCOBA256.SC2Map"
     ids = disable_doodad_occlusion(map_dir)
     print(f"occlusion disabled for {len(ids)} doodad types: {', '.join(ids)}")

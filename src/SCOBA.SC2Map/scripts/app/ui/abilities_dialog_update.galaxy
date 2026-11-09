@@ -1,0 +1,311 @@
+// Module: ui/abilities_dialog_update
+
+void gf_AbilitiesSelectionDialogLockAbilities (int lp_buttonClicked, int lp_localPlayer) {
+    int autoDC7462C3_ae;
+    int autoDC7462C3_ai;
+
+    // Variable Declarations
+    int lv_startOfRow;
+    int lv_iButton;
+    int lv_nButtons;
+    int lv_skipButton;
+
+    // Variable Initialization
+    lv_startOfRow = (gf_GetNextRow(lp_buttonClicked) - 4);
+    lv_nButtons = (gf_GetNextRow(lp_buttonClicked) - 1);
+    lv_skipButton = lp_buttonClicked;
+
+    // Implementation
+    autoDC7462C3_ae = lv_nButtons;
+    autoDC7462C3_ai = 1;
+    lv_iButton = lv_startOfRow;
+    for ( ; ( (autoDC7462C3_ai >= 0 && lv_iButton <= autoDC7462C3_ae) || (autoDC7462C3_ai <= 0 && lv_iButton >= autoDC7462C3_ae) ) ; lv_iButton += autoDC7462C3_ai ) {
+        if ((lv_iButton != lv_skipButton)) {
+            gv_abilitiesButtons[lv_iButton].lv_enabled = false;
+        }
+
+    }
+}
+
+void gf_AbilitiesSelectionDialogUnlockAbilities (int lp_buttonClicked, int lp_localPlayer) {
+    int autoA462D043_ae;
+    int autoA462D043_ai;
+
+    // Variable Declarations
+    int lv_startOfRow;
+    int lv_iButton;
+    int lv_nButtons;
+
+    // Variable Initialization
+    lv_startOfRow = gf_GetNextRow(lp_buttonClicked);
+    lv_nButtons = (gf_GetNextRow(lp_buttonClicked) + 3);
+
+    // Implementation
+    autoA462D043_ae = lv_nButtons;
+    autoA462D043_ai = 1;
+    lv_iButton = lv_startOfRow;
+    for ( ; ( (autoA462D043_ai >= 0 && lv_iButton <= autoA462D043_ae) || (autoA462D043_ai <= 0 && lv_iButton >= autoA462D043_ae) ) ; lv_iButton += autoA462D043_ai ) {
+        gv_abilitiesButtons[lv_iButton].lv_enabled = true;
+    }
+    gv_abilitiesButtons[lp_buttonClicked].lv_enabled = false;
+    gv_abilitiesButtons[lp_buttonClicked].lv_learned = true;
+    UnitAbilityEnable(gv_tPSUNIT[lp_localPlayer], gv_abilitiesButtons[lp_buttonClicked].lv_ability, true);
+    UnitAbilityShow(gv_tPSUNIT[lp_localPlayer], gv_abilitiesButtons[lp_buttonClicked].lv_ability, true);
+    if ((lp_buttonClicked > 15) && (lp_buttonClicked < 20)) {
+        gf_AbilitiesSelectionDialogUnlockUltimates(lp_localPlayer);
+    }
+
+}
+
+void gf_AbilitiesSelectionDialogUpdateButtonsandIcons (int lp_iPlayer) {
+    int auto6C461372_ae;
+    int auto6C461372_ai;
+
+    // Variable Declarations
+    int lv_iButton;
+    int lv_nButtons;
+
+    // Variable Initialization
+    lv_nButtons = gv_nAbilitiesButtons;
+
+    // Implementation
+    auto6C461372_ae = lv_nButtons;
+    auto6C461372_ai = 1;
+    lv_iButton = 0;
+    for ( ; ( (auto6C461372_ai >= 0 && lv_iButton <= auto6C461372_ae) || (auto6C461372_ai <= 0 && lv_iButton >= auto6C461372_ae) ) ; lv_iButton += auto6C461372_ai ) {
+        if ((gv_abilitiesButtons[lv_iButton].lv_enabled == false) && (gv_abilitiesButtons[lv_iButton].lv_learned == false)) {
+            libNtve_gf_SetDialogItemImage(gv_abilitiesSelectionIcons[lv_iButton], gv_abilitiesButtons[lv_iButton].lv_grayIcon, PlayerGroupSingle(lp_iPlayer));
+            DialogControlSetVisible(gv_abilitiesSelectionButtons[lv_iButton], PlayerGroupSingle(lp_iPlayer), false);
+            libNtve_gf_SetDialogItemRenderPriority(gv_abilitiesSelectionIcons[lv_iButton], 515, PlayerGroupSingle(lp_iPlayer));
+        }
+
+        if ((gv_abilitiesButtons[lv_iButton].lv_enabled == false) && (gv_abilitiesButtons[lv_iButton].lv_learned == true)) {
+            libNtve_gf_SetDialogItemImage(gv_abilitiesSelectionIcons[lv_iButton], gv_abilitiesButtons[lv_iButton].lv_icon, PlayerGroupSingle(lp_iPlayer));
+            DialogControlSetVisible(gv_abilitiesSelectionButtons[lv_iButton], PlayerGroupSingle(lp_iPlayer), false);
+            libNtve_gf_SetDialogItemRenderPriority(gv_abilitiesSelectionIcons[lv_iButton], 515, PlayerGroupSingle(lp_iPlayer));
+        }
+
+        if ((gv_abilitiesButtons[lv_iButton].lv_enabled == true) && (gv_abilitiesButtons[lv_iButton].lv_learned == false)) {
+            libNtve_gf_SetDialogItemImage(gv_abilitiesSelectionIcons[lv_iButton], gv_abilitiesButtons[lv_iButton].lv_icon, PlayerGroupSingle(lp_iPlayer));
+            DialogControlSetVisible(gv_abilitiesSelectionButtons[lv_iButton], PlayerGroupSingle(lp_iPlayer), true);
+            libNtve_gf_SetDialogItemRenderPriority(gv_abilitiesSelectionIcons[lv_iButton], 515, PlayerGroupSingle(lp_iPlayer));
+        }
+
+    }
+}
+
+void gf_AbilitiesSelectionDialogUnlockUltimates (int lp_localPlayer) {
+    int autoB3DD060F_ae;
+    int autoB3DD060F_ai;
+
+    // Variable Declarations
+    const int lv_pointsRequired = 2;
+    int lv_i;
+    const int lv_rowStart = 20;
+
+    // Variable Initialization
+
+    // Implementation
+    autoB3DD060F_ae = 3;
+    autoB3DD060F_ai = 1;
+    lv_i = 0;
+    for ( ; ( (autoB3DD060F_ai >= 0 && lv_i <= autoB3DD060F_ae) || (autoB3DD060F_ai <= 0 && lv_i >= autoB3DD060F_ae) ) ; lv_i += autoB3DD060F_ai ) {
+        if ((gv_allocatedAbilityPoints[lv_i][lp_localPlayer] > lv_pointsRequired)) {
+            gv_abilitiesButtons[(lv_rowStart + lv_i)].lv_enabled = true;
+        }
+        else {
+            gv_abilitiesButtons[(lv_rowStart + lv_i)].lv_enabled = false;
+        }
+    }
+}
+
+void gf_AbilitiesSelectionDialogUpdateKeyColumn (int lp_localPlayer, string lp_imageToChange, text lp_toolTipToChange) {
+    // Variable Declarations
+    int lv_borderSize;
+    int lv_borderHeight;
+
+    // Variable Initialization
+    lv_borderSize = 32;
+    lv_borderHeight = (gv_cDialogBorderAbilities + gv_cHeaderHeightAbilities + gv_cRowGapAbilities);
+
+    // Implementation
+    libNtve_gf_SetDialogItemImage(gv_abilitiesSelectionAdditionaColumnImages[gv_abilitiesSelectionAdditionalColumnAllocatedPoints[lp_localPlayer]], lp_imageToChange, PlayerGroupSingle(lp_localPlayer));
+    libNtve_gf_SetDialogItemTooltip(gv_abilitiesSelectionAdditionaColumnKeys[gv_abilitiesSelectionAdditionalColumnAllocatedPoints[lp_localPlayer]], lp_toolTipToChange, PlayerGroupSingle(lp_localPlayer));
+    gv_abilitiesSelectionAdditionalColumnAllocatedPoints[lp_localPlayer] += 1;
+}
+
+void gf_AbilitiesSelectionDialogHide () {
+    // Implementation
+    DialogSetVisible(gv_abilitiesSelectionDialog, PlayerGroupAll(), false);
+    DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupAll(), false);
+}
+
+void gf_AbilitiesSelectionDialogShow (int lp_iPlayer) {
+    // Implementation
+    gf_AbilitiesSelectionDialogUpdateButtonsandIcons(lp_iPlayer);
+    libNtve_gf_SetDialogItemText(gv_abilitiesSelectionLabel, (StringExternal("Param/Value/11D77532") + IntToText(gv_availableAbilityPoints[lp_iPlayer])), PlayerGroupSingle(lp_iPlayer));
+    DialogSetVisible(gv_abilitiesSelectionDialog, PlayerGroupSingle(lp_iPlayer), true);
+    DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupSingle(lp_iPlayer), true);
+}
+
+bool gt_AbilitiesandStatsTriggerDevelopment_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_iPlayer;
+
+    // Variable Initialization
+    lv_iPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    gv_availableAbilityPoints[lv_iPlayer] += 1;
+    gv_availableStatPoints[lv_iPlayer] += 9;
+    gf_SBDialogShowStatsButton(0);
+    gf_SBDialogShowAbilitiesButton(lv_iPlayer);
+    return true;
+}
+
+void gt_AbilitiesandStatsTriggerDevelopment_Init () {
+    gt_AbilitiesandStatsTriggerDevelopment = TriggerCreate("gt_AbilitiesandStatsTriggerDevelopment_Func");
+    TriggerAddEventKeyPressed(gt_AbilitiesandStatsTriggerDevelopment, c_playerAny, c_keyO, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+
+bool gt_SBDialogAbilitiesCallback_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if ((EventDialogControl() == gv_singleButtonButtonAbilities)) {
+        if ((DialogIsVisible(gv_abilitiesSelectionDialog, EventPlayer()) == true)) {
+            DialogSetVisible(gv_abilitiesSelectionDialog, PlayerGroupSingle(EventPlayer()), false);
+            DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupSingle(EventPlayer()), false);
+        }
+        else {
+            gf_AbilitiesSelectionDialogShow(EventPlayer());
+            DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupSingle(EventPlayer()), true);
+        }
+    }
+
+    return true;
+}
+
+void gt_SBDialogAbilitiesCallback_Init () {
+    gt_SBDialogAbilitiesCallback = TriggerCreate("gt_SBDialogAbilitiesCallback_Func");
+    TriggerAddEventDialogControl(gt_SBDialogAbilitiesCallback, c_playerAny, c_invalidDialogControlId, c_triggerControlEventTypeClick);
+}
+
+bool gt_AbilitiesSelectionDialogCallback_Func (bool testConds, bool runActions) {
+    int autoF8ECBB8E_ae;
+    int autoF8ECBB8E_ai;
+    int autoF1950733_val;
+
+    // Variable Declarations
+    int lv_localPlayer;
+    int lv_iButton;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if ((EventDialogControl() == gv_abilitiesSelectionDialogCloseButton)) {
+        gf_AbilitiesSelectionDialogHide();
+    }
+
+    autoF8ECBB8E_ae = gv_nAbilitiesButtons;
+    autoF8ECBB8E_ai = 1;
+    lv_iButton = 0;
+    for ( ; ( (autoF8ECBB8E_ai >= 0 && lv_iButton <= autoF8ECBB8E_ae) || (autoF8ECBB8E_ai <= 0 && lv_iButton >= autoF8ECBB8E_ae) ) ; lv_iButton += autoF8ECBB8E_ai ) {
+        if ((EventDialogControl() == gv_abilitiesSelectionButtons[lv_iButton])) {
+            if ((gv_abilitiesButtons[lv_iButton].lv_enabled == true) && (gv_abilitiesButtons[lv_iButton].lv_learned == false) && (gv_availableAbilityPoints[lv_localPlayer] > 0) && (lv_iButton < 20)) {
+                gv_abilitiesButtons[lv_iButton].lv_enabled = false;
+                gv_abilitiesButtons[lv_iButton].lv_learned = true;
+                gv_availableAbilityPoints[lv_localPlayer] -= 1;
+                gf_AbilitiesSelectionDialogLockAbilities(lv_iButton, lv_localPlayer);
+                gf_AbilitiesSelectionDialogUnlockAbilities(lv_iButton, lv_localPlayer);
+                gf_AbilitiesSelectionDialogUpdateButtonsandIcons(lv_localPlayer);
+                gv_allocatedAbilityPoints[gf_GetTalentTreeType(lv_iButton)][lv_localPlayer] += 1;
+                gf_AbilitiesSelectionDialogUpdateKeyColumn(lv_localPlayer, gv_abilitiesButtons[lv_iButton].lv_icon, gv_abilitiesButtons[lv_iButton].lv_tooltip);
+            }
+            else {
+                if ((gv_availableAbilityPoints[lv_localPlayer] == 0)) {
+                    UIClearMessages(PlayerGroupSingle(lv_localPlayer), c_messageAreaAll);
+                    UIDisplayMessage(PlayerGroupSingle(lv_localPlayer), c_messageAreaSubtitle, StringExternal("Param/Value/CE73F468"));
+                }
+                else {
+                    if ((gv_abilitiesButtons[lv_iButton].lv_enabled == true) && (gv_abilitiesButtons[lv_iButton].lv_learned == false) && (gv_availableAbilityPoints[lv_localPlayer] > 0) && (lv_iButton >= 20)) {
+                        autoF1950733_val = lv_iButton;
+                        if (autoF1950733_val == 20) {
+                            if ((gv_allocatedAbilityPoints[0][lv_localPlayer] >= 3)) {
+                                gv_abilitiesButtons[lv_iButton].lv_enabled = false;
+                                gv_abilitiesButtons[lv_iButton].lv_learned = true;
+                                gv_availableAbilityPoints[lv_localPlayer] -= 1;
+                                gf_AbilitiesSelectionDialogLockAbilities(lv_iButton, lv_localPlayer);
+                                gf_AbilitiesSelectionDialogUnlockAbilities(lv_iButton, lv_localPlayer);
+                                gf_AbilitiesSelectionDialogUpdateButtonsandIcons(lv_localPlayer);
+                                gv_allocatedAbilityPoints[gf_GetTalentTreeType(lv_iButton)][lv_localPlayer] += 1;
+                                gf_AbilitiesSelectionDialogUpdateKeyColumn(lv_localPlayer, gv_abilitiesButtons[lv_iButton].lv_icon, gv_abilitiesButtons[lv_iButton].lv_tooltip);
+                            }
+
+                        }
+                        else if (autoF1950733_val == 21) {
+                            if ((gv_allocatedAbilityPoints[1][lv_localPlayer] >= 3)) {
+                                gv_abilitiesButtons[lv_iButton].lv_enabled = false;
+                                gv_abilitiesButtons[lv_iButton].lv_learned = true;
+                                gv_availableAbilityPoints[lv_localPlayer] -= 1;
+                                gf_AbilitiesSelectionDialogLockAbilities(lv_iButton, lv_localPlayer);
+                                gf_AbilitiesSelectionDialogUnlockAbilities(lv_iButton, lv_localPlayer);
+                                gf_AbilitiesSelectionDialogUpdateButtonsandIcons(lv_localPlayer);
+                                gv_allocatedAbilityPoints[gf_GetTalentTreeType(lv_iButton)][lv_localPlayer] += 1;
+                                gf_AbilitiesSelectionDialogUpdateKeyColumn(lv_localPlayer, gv_abilitiesButtons[lv_iButton].lv_icon, gv_abilitiesButtons[lv_iButton].lv_tooltip);
+                            }
+
+                        }
+                        else if (autoF1950733_val == 22) {
+                            if ((gv_allocatedAbilityPoints[2][lv_localPlayer] >= 3)) {
+                                gv_abilitiesButtons[lv_iButton].lv_enabled = false;
+                                gv_abilitiesButtons[lv_iButton].lv_learned = true;
+                                gv_availableAbilityPoints[lv_localPlayer] -= 1;
+                                gf_AbilitiesSelectionDialogLockAbilities(lv_iButton, lv_localPlayer);
+                                gf_AbilitiesSelectionDialogUnlockAbilities(lv_iButton, lv_localPlayer);
+                                gf_AbilitiesSelectionDialogUpdateButtonsandIcons(lv_localPlayer);
+                                gv_allocatedAbilityPoints[gf_GetTalentTreeType(lv_iButton)][lv_localPlayer] += 1;
+                                gf_AbilitiesSelectionDialogUpdateKeyColumn(lv_localPlayer, gv_abilitiesButtons[lv_iButton].lv_icon, gv_abilitiesButtons[lv_iButton].lv_tooltip);
+                            }
+
+                        }
+                        else if (autoF1950733_val == 23) {
+                            if ((gv_allocatedAbilityPoints[3][lv_localPlayer] >= 3)) {
+                                gv_abilitiesButtons[lv_iButton].lv_enabled = false;
+                                gv_abilitiesButtons[lv_iButton].lv_learned = true;
+                                gv_availableAbilityPoints[lv_localPlayer] -= 1;
+                                gf_AbilitiesSelectionDialogLockAbilities(lv_iButton, lv_localPlayer);
+                                gf_AbilitiesSelectionDialogUnlockAbilities(lv_iButton, lv_localPlayer);
+                                gf_AbilitiesSelectionDialogUpdateButtonsandIcons(lv_localPlayer);
+                                gv_allocatedAbilityPoints[gf_GetTalentTreeType(lv_iButton)][lv_localPlayer] += 1;
+                                gf_AbilitiesSelectionDialogUpdateKeyColumn(lv_localPlayer, gv_abilitiesButtons[lv_iButton].lv_icon, gv_abilitiesButtons[lv_iButton].lv_tooltip);
+                            }
+
+                        }
+                        else {
+                        }
+                    }
+
+                }
+            }
+        }
+
+    }
+    return true;
+}
+
+void gt_AbilitiesSelectionDialogCallback_Init () {
+    gt_AbilitiesSelectionDialogCallback = TriggerCreate("gt_AbilitiesSelectionDialogCallback_Func");
+    TriggerAddEventDialogControl(gt_AbilitiesSelectionDialogCallback, c_playerAny, c_invalidDialogControlId, c_triggerControlEventTypeClick);
+}

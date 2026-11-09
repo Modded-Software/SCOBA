@@ -5,9 +5,9 @@ Date: 2026-11-03
 ## 1. Current Map Workflow
 
 - Source map folder: `src/SCOBA.SC2Map/`.
-- Packed baseline: `SCOBA.SC2Map`.
+- Packed baseline: `original/SCOBA.SC2Map`.
 - Launcher: `scripts/launch-scoba.sh`.
-- Launcher defaults to the source folder.
+- Launcher uses the source folder.
 - Launcher stages a fresh copy into the SC2 `Maps/SCOBA.SC2Map` target.
 - Launcher then runs `SC2Switcher_x64.exe -run SCOBA.SC2Map`.
 - Dock shortcut runs the launcher.
@@ -199,7 +199,7 @@ Observed failures:
 ### 6.6 Edge Cases
 
 - Fatal damage should be tracked before death.
-- If fatal damage is not tracked, fall back to `libNtve_gf_KillingPlayer()`.
+- If fatal damage is not tracked, use `libNtve_gf_KillingPlayer()`.
 - Ignore deaths with no hero contribution.
 - Ignore non-hero owners.
 - Ignore allied players for damage XP.
@@ -240,7 +240,7 @@ Observed failures:
 
 ### 7.3 Faster Migration Path
 
-- Copy current generated logic into `scripts/legacy.galaxy`.
+- Copy current generated logic into `scripts/previous.galaxy`.
 - Include it from `scripts/main.galaxy`.
 - Replace unsafe functions incrementally.
 - Delete dead trigger logic after replacement.

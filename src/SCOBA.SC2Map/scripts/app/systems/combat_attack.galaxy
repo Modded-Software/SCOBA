@@ -1,0 +1,129 @@
+// Module: systems/combat_attack
+
+void gt_ToggleCommands_Init () {
+    gt_AutoOnCmd = TriggerCreate("gt_AutoOnCmd_Func");
+    TriggerAddEventUnitAbility(gt_AutoOnCmd, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBAAutoAttackToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOnCmd, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBAAutoAttackToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOnCmd, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBAAutoAttackToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOnCmd, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBAAutoAttackToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOnCmd, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBAAutoAttackToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOnCmd, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBAAutoAttackToggle", 0), c_unitAbilStageComplete, false);
+
+    gt_AutoOffCmd = TriggerCreate("gt_AutoOffCmd_Func");
+    TriggerAddEventUnitAbility(gt_AutoOffCmd, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBAAutoAttackToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOffCmd, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBAAutoAttackToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOffCmd, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBAAutoAttackToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOffCmd, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBAAutoAttackToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOffCmd, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBAAutoAttackToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_AutoOffCmd, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBAAutoAttackToggle", 1), c_unitAbilStageComplete, false);
+
+    gt_StandCmd = TriggerCreate("gt_StandCmd_Func");
+    TriggerAddEventUnitAbility(gt_StandCmd, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBARightClickToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_StandCmd, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBARightClickToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_StandCmd, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBARightClickToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_StandCmd, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBARightClickToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_StandCmd, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBARightClickToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_StandCmd, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBARightClickToggle", 0), c_unitAbilStageComplete, false);
+
+    gt_WalkCmd = TriggerCreate("gt_WalkCmd_Func");
+    TriggerAddEventUnitAbility(gt_WalkCmd, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBARightClickToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_WalkCmd, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBARightClickToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_WalkCmd, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBARightClickToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_WalkCmd, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBARightClickToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_WalkCmd, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBARightClickToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_WalkCmd, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBARightClickToggle", 1), c_unitAbilStageComplete, false);
+}
+
+bool gt_AutoOnCmd_Func (bool testConds, bool runActions) {
+    int lv_player;
+    unit lv_hero;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    lv_hero = gv_tPSUNIT[lv_player];
+    if (!UnitIsValid(lv_hero)) {
+        return true;
+    }
+    if (UnitBehaviorCount(lv_hero, "SCOBAAutoAttackBehavior") <= 0) {
+        UnitBehaviorAdd(lv_hero, "SCOBAAutoAttackBehavior", lv_hero, 1);
+    }
+    gv_sCOBAAutoTarget[lv_player] = null;
+    UnitAbilityShow(lv_hero, "SCOBAAutoAttackStatus", true);
+    return true;
+}
+
+bool gt_AutoOffCmd_Func (bool testConds, bool runActions) {
+    int lv_player;
+    int lv_count;
+    unit lv_hero;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    lv_hero = gv_tPSUNIT[lv_player];
+    if (!UnitIsValid(lv_hero)) {
+        return true;
+    }
+    lv_count = UnitBehaviorCount(lv_hero, "SCOBAAutoAttackBehavior");
+    if (lv_count > 0) {
+        UnitBehaviorRemove(lv_hero, "SCOBAAutoAttackBehavior", lv_count);
+    }
+    gv_sCOBAAutoTarget[lv_player] = null;
+    UnitAbilityShow(lv_hero, "SCOBAAutoAttackStatus", false);
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    return true;
+}
+
+bool gt_StandCmd_Func (bool testConds, bool runActions) {
+    int lv_player;
+    unit lv_hero;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    lv_hero = gv_tPSUNIT[lv_player];
+    if (!UnitIsValid(lv_hero)) {
+        return true;
+    }
+    if (UnitBehaviorCount(lv_hero, "SCOBARightClickStandBehavior") <= 0) {
+        UnitBehaviorAdd(lv_hero, "SCOBARightClickStandBehavior", lv_hero, 1);
+    }
+    gv_sCOBAAutoTarget[lv_player] = null;
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("move", 2)), c_orderQueueReplace);
+    return true;
+}
+
+bool gt_WalkCmd_Func (bool testConds, bool runActions) {
+    int lv_player;
+    int lv_count;
+    unit lv_hero;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    lv_hero = gv_tPSUNIT[lv_player];
+    if (!UnitIsValid(lv_hero)) {
+        return true;
+    }
+    lv_count = UnitBehaviorCount(lv_hero, "SCOBARightClickStandBehavior");
+    if (lv_count > 0) {
+        UnitBehaviorRemove(lv_hero, "SCOBARightClickStandBehavior", lv_count);
+    }
+    gv_sCOBAAutoTarget[lv_player] = null;
+    return true;
+}
+
+void gt_AttackEvent_Init () {
+    gt_AttackCooldown = TriggerCreate("gt_AttackCooldown_Func");
+    TriggerAddEventUnitAttacked(gt_AttackCooldown, UnitRefFromVariable("gv_tPSUNIT[1]"));
+    TriggerAddEventUnitAttacked(gt_AttackCooldown, UnitRefFromVariable("gv_tPSUNIT[2]"));
+    TriggerAddEventUnitAttacked(gt_AttackCooldown, UnitRefFromVariable("gv_tPSUNIT[3]"));
+    TriggerAddEventUnitAttacked(gt_AttackCooldown, UnitRefFromVariable("gv_tPSUNIT[4]"));
+    TriggerAddEventUnitAttacked(gt_AttackCooldown, UnitRefFromVariable("gv_tPSUNIT[5]"));
+    TriggerAddEventUnitAttacked(gt_AttackCooldown, UnitRefFromVariable("gv_tPSUNIT[6]"));
+}

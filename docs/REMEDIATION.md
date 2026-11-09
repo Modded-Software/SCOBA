@@ -141,7 +141,7 @@ Exit:
 Covers: A32
 
 Automated:
-- [ ] R6.1 `python scripts/expand_map.py` succeeds twice.
+- [ ] R6.1 `uv run python scripts/expand_map.py` succeeds twice.
 - [ ] R6.2 Compare hashes after second build.
 - [ ] R6.3 Launch and run log checker.
 - [ ] R6.4 Add script assertions for default behavior state.

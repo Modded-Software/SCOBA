@@ -63,14 +63,14 @@ done
 
 log "source: $MAP_SOURCE"
 if [ "${SC2_KEEP_RUNNING:-0}" != "1" ]; then
-    python3 "$ROOT_DIR/scripts/kill-sc2.py"
+    uv run python "$ROOT_DIR/scripts/kill-sc2.py"
 fi
 if [ -e "$CACHE_DIR" ]; then
     log "clearing cache: $CACHE_DIR"
     rm -rf "$CACHE_DIR"
 fi
 mkdir -p "$MAP_DIR"
-python3 "$ROOT_DIR/scripts/stage-map.py" "$MAP_SOURCE" "$MAP_TARGET"
+uv run python "$ROOT_DIR/scripts/stage-map.py" "$MAP_SOURCE" "$MAP_TARGET"
 if [ -d "$MAP_SOURCE" ]; then
     diff -r "$MAP_SOURCE" "$MAP_TARGET" >"$LOG_DIR/stage-check.log" || fail "staged map does not match source"
 elif ! cmp -s "$MAP_SOURCE" "$MAP_TARGET"; then
@@ -101,7 +101,7 @@ fi
 log "launching $MAP_NAME"
 cd "$SC2_DIR"
 
-if ! python3 "$ROOT_DIR/scripts/sc2-configure-window.py"; then
+if ! uv run python "$ROOT_DIR/scripts/sc2-configure-window.py"; then
     log "warning: could not configure window size"
 fi
 

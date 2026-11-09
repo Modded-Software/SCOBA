@@ -1,0 +1,31 @@
+// Module: systems/medic
+
+void gf_MedicSpawn (int lp_player) {
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+    libNtve_gf_CreateUnitsWithDefaultFacing(1, "Medic", 0, lp_player, PointWithOffset(UnitGetPosition(gv_tPSUNIT[lp_player]), 2.0, 2.0));
+    gv_sCOBAMedic[lp_player] = UnitLastCreated();
+    UnitIssueOrder(gv_sCOBAMedic[lp_player], OrderTargetingUnit(AbilityCommand("move", 0), gv_tPSUNIT[lp_player]), c_orderQueueReplace);
+}
+
+bool gt_MedicSpawn_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    Wait(2.0, c_timeGame);
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        gf_MedicSpawn(lv_player);
+    }
+    return true;
+}
+
+void gt_MedicSpawn_Init () {
+    gt_MedicSpawn = TriggerCreate("gt_MedicSpawn_Func");
+    TriggerAddEventMapInit(gt_MedicSpawn);
+}

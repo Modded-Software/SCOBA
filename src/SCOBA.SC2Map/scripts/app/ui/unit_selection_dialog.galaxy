@@ -1,0 +1,209 @@
+// Module: ui/unit_selection_dialog
+
+void gf_UnitSelectionDialogUpdateToolTip (int lp_iPlayer) {
+    int autoC22E70DE_ae;
+    int autoC22E70DE_ai;
+    int auto6617BAFF_val;
+
+    // Variable Declarations
+    fixed lv_hpAmount;
+    fixed lv_hpAmount2;
+    text lv_uHP;
+    fixed lv_nrgAmount;
+    fixed lv_nrgAmount2;
+    text lv_uNRG;
+    fixed lv_hpregenAmount;
+    text lv_uHPREGEN;
+    fixed lv_nrgregenAmount;
+    text lv_uNRGREGEN;
+    fixed lv_maxspeedAmount;
+    text lv_uMAXSPEED;
+    int lv_iButton;
+
+    // Variable Initialization
+    lv_hpAmount = (gf_GetToolTipLifeandEnergyFormula(lp_iPlayer, 0) - gf_GetLifeandEnergyStatFormula(lp_iPlayer, 0));
+    lv_hpAmount2 = ((300.0 + Pow(2.0, (1.0 + gv_sTATLEVEL[lp_iPlayer][0]))) - (300.0 + Pow(2.0, gv_sTATLEVEL[lp_iPlayer][0])));
+    lv_uHP = (StringExternal("Param/Value/1EFA9A4F") + IntToText(FixedToInt(lv_hpAmount)));
+    lv_nrgAmount = (gf_GetToolTipLifeandEnergyFormula(lp_iPlayer, 2) - gf_GetLifeandEnergyStatFormula(lp_iPlayer, 2));
+    lv_nrgAmount2 = ((300.0 + Pow(2.0, (1.0 + gv_sTATLEVEL[lp_iPlayer][2]))) - (300.0 + Pow(2.0, gv_sTATLEVEL[lp_iPlayer][2])));
+    lv_uNRG = (StringExternal("Param/Value/0A5F7310") + IntToText(FixedToInt(lv_nrgAmount)));
+    lv_hpregenAmount = ((UnitGetPropertyFixed(gv_tPSUNIT[lp_iPlayer], c_unitPropLifeRegen, c_unitPropCurrent) + 0.1) + (UnitGetPropertyFixed(gv_tPSUNIT[lp_iPlayer], c_unitPropLifeRegen, c_unitPropCurrent) + 0.1));
+    lv_uHPREGEN = StringExternal("Param/Value/DEC74C6A");
+    lv_nrgregenAmount = ((UnitGetPropertyFixed(gv_tPSUNIT[lp_iPlayer], c_unitPropEnergyRegen, c_unitPropCurrent) + 0.1) + (UnitGetPropertyFixed(gv_tPSUNIT[lp_iPlayer], c_unitPropEnergyRegen, c_unitPropCurrent) + 0.1));
+    lv_uNRGREGEN = StringExternal("Param/Value/648DE532");
+    lv_maxspeedAmount = ((UnitGetPropertyFixed(gv_tPSUNIT[lp_iPlayer], c_unitPropMovementSpeed, c_unitPropCurrent) + 0.005) + (UnitGetPropertyFixed(gv_tPSUNIT[lp_iPlayer], c_unitPropMovementSpeed, c_unitPropCurrent) + 0.005));
+    lv_uMAXSPEED = StringExternal("Param/Value/AA467D80");
+
+    // Implementation
+    autoC22E70DE_ae = gv_nUnitButtons;
+    autoC22E70DE_ai = 1;
+    lv_iButton = 0;
+    for ( ; ( (autoC22E70DE_ai >= 0 && lv_iButton <= autoC22E70DE_ae) || (autoC22E70DE_ai <= 0 && lv_iButton >= autoC22E70DE_ae) ) ; lv_iButton += autoC22E70DE_ai ) {
+        auto6617BAFF_val = lv_iButton;
+        if (auto6617BAFF_val == 0) {
+            libNtve_gf_SetDialogItemTooltip(gv_userSelectionButtons[lv_iButton], lv_uHP, PlayerGroupSingle(lp_iPlayer));
+        }
+        else if (auto6617BAFF_val == 1) {
+            libNtve_gf_SetDialogItemTooltip(gv_userSelectionButtons[lv_iButton], lv_uHPREGEN, PlayerGroupSingle(lp_iPlayer));
+        }
+        else if (auto6617BAFF_val == 2) {
+            libNtve_gf_SetDialogItemTooltip(gv_userSelectionButtons[lv_iButton], lv_uNRG, PlayerGroupSingle(lp_iPlayer));
+        }
+        else if (auto6617BAFF_val == 3) {
+            libNtve_gf_SetDialogItemTooltip(gv_userSelectionButtons[lv_iButton], lv_uNRGREGEN, PlayerGroupSingle(lp_iPlayer));
+        }
+        else if (auto6617BAFF_val == 4) {
+            libNtve_gf_SetDialogItemTooltip(gv_userSelectionButtons[lv_iButton], lv_uMAXSPEED, PlayerGroupSingle(lp_iPlayer));
+        }
+        else {
+        }
+    }
+}
+
+void gf_UnitSelectionDialogShow (int lp_iPlayer) {
+    // Implementation
+    gf_UnitSelectionDialogUpdateToolTip(lp_iPlayer);
+    libNtve_gf_SetDialogItemText(gv_userSelectionLabel, (StringExternal("Param/Value/75E1E0B5") + IntToText(gv_availableStatPoints[lp_iPlayer])), PlayerGroupSingle(lp_iPlayer));
+    DialogSetVisible(gv_userSelectionDialog, PlayerGroupSingle(lp_iPlayer), true);
+}
+
+void gf_UnitSelectionDialogCreate () {
+    int auto3B379B76_ae;
+    int auto3B379B76_ai;
+    int autoEE5F218B_ae;
+    int autoEE5F218B_ai;
+
+    // Variable Declarations
+    text lv_dialogLabel;
+    int lv_bAnchor;
+    int lv_nRows;
+    int lv_cDialogWidth;
+    int lv_cDialogHeight;
+    int lv_headerWidth;
+    int lv_x;
+    int lv_y;
+    int lv_iRow;
+    int lv_iCol;
+    int lv_iButton;
+
+    // Variable Initialization
+    lv_dialogLabel = StringToText("");
+    lv_bAnchor = c_anchorBottom;
+    lv_nRows = CeilingI((IntToFixed(gv_nUnitButtons) / IntToFixed(gv_nCols)));
+    lv_cDialogWidth = (gv_cDialogExtra + (gv_cButtonSize * gv_nCols) + (gv_cButtonGap * (gv_nCols - 1)));
+    lv_cDialogHeight = (gv_cDialogExtra + (gv_cButtonSize * lv_nRows) + (gv_cButtonGap * (lv_nRows - 1)) + gv_cHeaderHeight + gv_cRowGap);
+    lv_headerWidth = (lv_cDialogWidth + gv_cDialogExtra);
+    lv_x = gv_cDialogBorder;
+    lv_y = (gv_cDialogBorder + gv_cHeaderHeight + gv_cRowGap);
+
+    // Implementation
+    DialogCreate(lv_cDialogWidth, lv_cDialogHeight, lv_bAnchor, 0, 20, true);
+    gv_userSelectionDialog = DialogLastCreated();
+    libNtve_gf_CreateDialogItemLabel(DialogLastCreated(), lv_headerWidth, gv_cHeaderHeight, c_anchorTopLeft, gv_cDialogBorder, gv_cDialogBorder, lv_dialogLabel, Color(100,100,100), false, 2.0);
+    gv_userSelectionLabel = DialogControlLastCreated();
+    auto3B379B76_ae = lv_nRows;
+    auto3B379B76_ai = 1;
+    lv_iRow = 1;
+    for ( ; ( (auto3B379B76_ai >= 0 && lv_iRow <= auto3B379B76_ae) || (auto3B379B76_ai <= 0 && lv_iRow >= auto3B379B76_ae) ) ; lv_iRow += auto3B379B76_ai ) {
+        lv_x = gv_cDialogBorder;
+        autoEE5F218B_ae = gv_nCols;
+        autoEE5F218B_ai = 1;
+        lv_iCol = 1;
+        for ( ; ( (autoEE5F218B_ai >= 0 && lv_iCol <= autoEE5F218B_ae) || (autoEE5F218B_ai <= 0 && lv_iCol >= autoEE5F218B_ae) ) ; lv_iCol += autoEE5F218B_ai ) {
+            if ((lv_iButton < gv_nUnitButtons)) {
+                libNtve_gf_CreateDialogItemButton(DialogLastCreated(), gv_cButtonSize, gv_cButtonSize, c_anchorTopLeft, lv_x, lv_y, gv_unitButtons[lv_iButton].lv_tooltip, StringToText(""), "");
+                gv_userSelectionButtons[lv_iButton] = DialogControlLastCreated();
+                libNtve_gf_CreateDialogItemImage(DialogLastCreated(), gv_cIconSize, gv_cIconSize, c_anchorTopLeft, (lv_x + gv_cButtonInlay), (lv_y + gv_cButtonInlay), StringToText(""), gv_unitButtons[lv_iButton].lv_icon, c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+                gv_userSelectionIcons[lv_iButton] = DialogControlLastCreated();
+            }
+
+            lv_x += (gv_cButtonSize + gv_cButtonGap);
+            lv_iButton += 1;
+        }
+        lv_y += (gv_cButtonSize + gv_cButtonGap);
+    }
+}
+
+void gf_InitializeUnitButtons () {
+    // Implementation
+    gf_AddUnitButton(c_unitPropLifeMax, c_unitPropLifeMax, "Assets\\Textures\\btn-ability-terran-heal-color.dds", StringExternal("Param/Value/8C1F8D30"));
+    gf_AddUnitButton(c_unitPropLifeRegen, c_unitPropLifeRegen, "Assets\\Textures\\btn-upgrade-zerg-stukov-regenrate.dds", StringExternal("Param/Value/28B806A0"));
+    gf_AddUnitButton(c_unitPropEnergyMax, c_unitPropEnergyMax, "Assets\\Textures\\icon-energy-nobg.dds", StringExternal("Param/Value/9FCCE5A8"));
+    gf_AddUnitButton(c_unitPropEnergyRegen, c_unitPropEnergyRegen, "Assets\\Textures\\talent-vorazun-level07-improvedshieldregeneration.dds", StringExternal("Param/Value/3B6E434F"));
+    gf_AddUnitButton(c_unitPropMovementSpeed, c_unitPropMovementSpeed, "Assets\\Textures\\btn-upgrade-terran-nova-liferegen.dds", StringExternal("Param/Value/CF6A2539"));
+}
+
+void gf_AddUnitButton (int lp_statGet, int lp_statSet, string lp_icon, text lp_tooltip) {
+    // Implementation
+    gv_unitButtons[gv_nUnitButtons].lv_statGet = lp_statGet;
+    gv_unitButtons[gv_nUnitButtons].lv_statSet = lp_statSet;
+    gv_unitButtons[gv_nUnitButtons].lv_icon = lp_icon;
+    gv_unitButtons[gv_nUnitButtons].lv_tooltip = lp_tooltip;
+    gv_nUnitButtons += 1;
+}
+
+bool gt_UserSelectionDialogCallback_Func (bool testConds, bool runActions) {
+    int autoC19D252A_ae;
+    int autoC19D252A_ai;
+
+    // Variable Declarations
+    int lv_localPlayer;
+    int lv_localHPBar;
+    int lv_localNRGBar;
+    int lv_localXPBar;
+    int lv_iButton;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+    lv_localHPBar = ((lv_localPlayer * 10) + 1);
+    lv_localNRGBar = ((lv_localPlayer * 10) + 2);
+    lv_localXPBar = ((lv_localPlayer * 10) + 3);
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    autoC19D252A_ae = gv_nUnitButtons;
+    autoC19D252A_ai = 1;
+    lv_iButton = 0;
+    for ( ; ( (autoC19D252A_ai >= 0 && lv_iButton <= autoC19D252A_ae) || (autoC19D252A_ai <= 0 && lv_iButton >= autoC19D252A_ae) ) ; lv_iButton += autoC19D252A_ai ) {
+        if ((EventDialogControl() == gv_userSelectionButtons[lv_iButton])) {
+            if (((gv_unitButtons[lv_iButton].lv_statSet == c_unitPropLifeMax) || (gv_unitButtons[lv_iButton].lv_statSet == c_unitPropEnergyMax))) {
+                gv_sTATLEVEL[lv_localPlayer][lv_iButton] += 1;
+                UnitSetPropertyFixed(gv_tPSUNIT[lv_localPlayer], gv_unitButtons[lv_iButton].lv_statSet, gf_GetLifeandEnergyStatFormula(lv_localPlayer, lv_iButton));
+                libNtve_gf_SetBossBarMaximumValue(lv_localHPBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropLifeMax, c_unitPropCurrent)), true);
+                libNtve_gf_SetBossBarBoss(lv_localHPBar, gv_tPSUNIT[lv_localPlayer], true);
+                libNtve_gf_SetBossBarMaximumValue(lv_localNRGBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropEnergyMax, c_unitPropCurrent)), true);
+            }
+
+            if (((gv_unitButtons[lv_iButton].lv_statSet == c_unitPropLifeRegen) || (gv_unitButtons[lv_iButton].lv_statSet == c_unitPropEnergyRegen))) {
+                UnitSetPropertyFixed(gv_tPSUNIT[lv_localPlayer], gv_unitButtons[lv_iButton].lv_statSet, gf_GetRegenStatFormula(lv_localPlayer, lv_iButton));
+                libNtve_gf_SetBossBarMaximumValue(lv_localNRGBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropEnergyMax, c_unitPropCurrent)), true);
+            }
+
+            if (((gv_unitButtons[lv_iButton].lv_statSet == c_unitPropMovementSpeed))) {
+                UnitSetPropertyFixed(gv_tPSUNIT[lv_localPlayer], gv_unitButtons[lv_iButton].lv_statSet, gf_GetMovementStatFormula(lv_localPlayer, lv_iButton));
+            }
+
+            if ((gv_availableStatPoints[lv_localPlayer] == 1)) {
+                gf_UnitSelectionDialogUpdateToolTip(lv_localPlayer);
+                gv_availableStatPoints[lv_localPlayer] -= 1;
+                DialogSetVisible(gv_userSelectionDialog, PlayerGroupSingle(lv_localPlayer), false);
+            }
+            else {
+                gf_UnitSelectionDialogUpdateToolTip(lv_localPlayer);
+                gv_availableStatPoints[lv_localPlayer] -= 1;
+                libNtve_gf_SetDialogItemText(gv_userSelectionLabel, (StringExternal("Param/Value/6E52D896") + IntToText(gv_availableStatPoints[lv_localPlayer])), PlayerGroupSingle(lv_localPlayer));
+            }
+            Wait(0.125, c_timeReal);
+        }
+
+    }
+    return true;
+}
+
+void gt_UserSelectionDialogCallback_Init () {
+    gt_UserSelectionDialogCallback = TriggerCreate("gt_UserSelectionDialogCallback_Func");
+    TriggerAddEventDialogControl(gt_UserSelectionDialogCallback, c_playerAny, c_invalidDialogControlId, c_triggerControlEventTypeClick);
+}

@@ -2,7 +2,9 @@ from pathlib import Path
 import re
 import struct
 
-ROOT = Path(__file__).resolve().parent.parent
+from project_root import project_root
+
+ROOT = project_root()
 SRCDIR = ROOT / "src" / "SCOBA.SC2Map"
 
 xml = (SRCDIR / "t3Terrain.xml").read_text(encoding="utf-8", errors="replace")

@@ -1,0 +1,96 @@
+// Module: systems/companion
+
+bool gt_SummonCompanion_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if ((PlayerRace(EventPlayer()) == "Terr")) {
+        if ((TechTreeUnitCount(lv_localPlayer, "Predator", c_techCountQueuedOrBetter) == 0)) {
+            libNtve_gf_UnitCreateFacingPoint(1, "Predator", 0, lv_localPlayer, UnitGetPosition(EventUnit()), UnitGetPosition(EventUnit()));
+            UnitIssueOrder(UnitLastCreated(), OrderTargetingUnit(AbilityCommand("move", 0), UnitFromId(622754155)), c_orderQueueReplace);
+        }
+        else {
+            UIDisplayMessage(PlayerGroupSingle(lv_localPlayer), c_messageAreaError, StringExternal("Param/Value/131984B8"));
+        }
+    }
+    else {
+        if ((TechTreeUnitCount(lv_localPlayer, "HunterKiller", c_techCountQueuedOrBetter) == 0)) {
+            libNtve_gf_UnitCreateFacingPoint(1, "HunterKiller", 0, lv_localPlayer, UnitGetPosition(EventUnit()), UnitGetPosition(EventUnit()));
+            UnitIssueOrder(UnitLastCreated(), OrderTargetingUnit(AbilityCommand("move", 0), UnitFromId(622754155)), c_orderQueueReplace);
+        }
+        else {
+            UIDisplayMessage(PlayerGroupSingle(lv_localPlayer), c_messageAreaError, StringExternal("Param/Value/20269F38"));
+        }
+    }
+    return true;
+}
+
+void gt_SummonCompanion_Init () {
+    gt_SummonCompanion = TriggerCreate("gt_SummonCompanion_Func");
+    TriggerAddEventUnitAbility(gt_SummonCompanion, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SummonCompanion", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_SummonCompanion, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SummonCompanion", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_SummonCompanion, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SummonCompanion", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_SummonCompanion, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SummonCompanion", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_SummonCompanion, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SummonCompanion", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_SummonCompanion, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SummonCompanion", 0), c_unitAbilStageExecute, false);
+}
+
+bool gt_EnableCloakingField_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "CloakField", gv_tPSUNIT[lv_localPlayer], 1);
+    return true;
+}
+
+void gt_EnableCloakingField_Init () {
+    gt_EnableCloakingField = TriggerCreate("gt_EnableCloakingField_Func");
+    TriggerAddEventUnitAbility(gt_EnableCloakingField, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("BansheeCloak", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_EnableCloakingField, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("BansheeCloak", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_EnableCloakingField, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("BansheeCloak", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_EnableCloakingField, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("BansheeCloak", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_EnableCloakingField, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("BansheeCloak", 0), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_EnableCloakingField, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("BansheeCloak", 0), c_unitAbilStageExecute, false);
+}
+
+bool gt_DisableCloakingField_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitBehaviorRemove(gv_tPSUNIT[lv_localPlayer], "CloakField", 1);
+    return true;
+}
+
+void gt_DisableCloakingField_Init () {
+    gt_DisableCloakingField = TriggerCreate("gt_DisableCloakingField_Func");
+    TriggerAddEventUnitAbility(gt_DisableCloakingField, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("BansheeCloak", 1), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_DisableCloakingField, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("BansheeCloak", 1), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_DisableCloakingField, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("BansheeCloak", 1), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_DisableCloakingField, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("BansheeCloak", 1), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_DisableCloakingField, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("BansheeCloak", 1), c_unitAbilStageExecute, false);
+    TriggerAddEventUnitAbility(gt_DisableCloakingField, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("BansheeCloak", 1), c_unitAbilStageExecute, false);
+}

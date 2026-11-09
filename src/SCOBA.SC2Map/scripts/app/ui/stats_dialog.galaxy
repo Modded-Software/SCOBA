@@ -1,0 +1,100 @@
+// Module: ui/stats_dialog
+
+void gf_InitializeLevelingInterface () {
+    // Implementation
+    gf_SBDialogCreateStatsButton();
+    gf_InitializeUnitButtons();
+    gf_UnitSelectionDialogCreate();
+    gf_SBDialogCreateAbilitiesButton();
+    gf_SBDialogCreateInventoryButton();
+    gf_PlayerBarsCreate();
+    gf_InitializeAbilitiesButtons();
+    gf_AbilitiesSelectionDialogCreate();
+}
+
+void gf_ShowStasLevelingInterface (int lp_iPlayer) {
+    // Implementation
+    if ((DialogIsVisible(gv_userSelectionDialog, lp_iPlayer) == true)) {
+        DialogSetVisible(gv_userSelectionDialog, PlayerGroupAll(), false);
+        gf_SBDialogShowStatsButton(lp_iPlayer);
+    }
+    else {
+        gf_SBDialogShowStatsButton(lp_iPlayer);
+    }
+}
+
+fixed gf_GetLifeandEnergyStatFormula (int lp_localPlayer, int lp_iButton) {
+    // Variable Declarations
+    fixed lv_levelingFormula;
+
+    // Variable Initialization
+    lv_levelingFormula = (300.0 + (PowI(gv_sTATLEVEL[lp_localPlayer][lp_iButton], 2.0) * 2));
+
+    // Implementation
+    return lv_levelingFormula;
+}
+
+fixed gf_GetToolTipLifeandEnergyFormula (int lp_localPlayer, int lp_iButton) {
+    // Variable Declarations
+    fixed lv_levelingFormula2;
+
+    // Variable Initialization
+    lv_levelingFormula2 = (300.0 + (PowI((1.0 + gv_sTATLEVEL[lp_localPlayer][lp_iButton]), 2.0) * 2));
+
+    // Implementation
+    return lv_levelingFormula2;
+}
+
+fixed gf_GetMovementStatFormula (int lp_localPlayer, int lp_iButton) {
+    // Variable Declarations
+    fixed lv_levelingFormula;
+
+    // Variable Initialization
+    lv_levelingFormula = (UnitGetPropertyFixed(gv_tPSUNIT[lp_localPlayer], gv_unitButtons[lp_iButton].lv_statGet, c_unitPropCurrent) + 0.005);
+
+    // Implementation
+    return lv_levelingFormula;
+}
+
+fixed gf_GetRegenStatFormula (int lp_localPlayer, int lp_iButton) {
+    // Variable Declarations
+    fixed lv_levelingFormula;
+
+    // Variable Initialization
+    lv_levelingFormula = (UnitGetPropertyFixed(gv_tPSUNIT[lp_localPlayer], gv_unitButtons[lp_iButton].lv_statGet, c_unitPropCurrent) + 0.1);
+
+    // Implementation
+    return lv_levelingFormula;
+}
+
+void gf_SBDialogShowStatsButton (int lp_iPlayer) {
+    // Implementation
+    libNtve_gf_SetDialogItemText(gv_singleButtonLabel, IntToText(gv_availableStatPoints[lp_iPlayer]), PlayerGroupSingle(lp_iPlayer));
+    DialogSetVisible(gv_singleButtonDialog, PlayerGroupSingle(lp_iPlayer), true);
+}
+
+bool gt_SBDialogStatsCallback_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if ((EventDialogControl() == gv_singleButtonButton)) {
+        if ((DialogIsVisible(gv_userSelectionDialog, EventPlayer()) == true)) {
+            DialogSetVisible(gv_userSelectionDialog, PlayerGroupSingle(EventPlayer()), false);
+        }
+        else {
+            gf_UnitSelectionDialogShow(EventPlayer());
+        }
+    }
+    if ((EventDialogControl() == gv_singleButtonButtonInventory)) {
+        UIDisplayMessage(PlayerGroupSingle(EventPlayer()), c_messageAreaSubtitle, StringToText("Inventory coming soon"));
+    }
+
+    return true;
+}
+
+void gt_SBDialogStatsCallback_Init () {
+    gt_SBDialogStatsCallback = TriggerCreate("gt_SBDialogStatsCallback_Func");
+    TriggerAddEventDialogControl(gt_SBDialogStatsCallback, c_playerAny, c_invalidDialogControlId, c_triggerControlEventTypeClick);
+}

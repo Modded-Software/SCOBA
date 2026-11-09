@@ -1,0 +1,36 @@
+// Module: core/constants
+
+const int gv_zOOM = c_keyShift;
+const int gv_mOVERIGHT = c_keyD;
+const int gv_mOVELEFT = c_keyA;
+const int gv_mOVEBACKWARD = c_keyS;
+const int gv_mOVEFORWARD = c_keyW;
+const int gv_fIRE = c_mouseButtonRight;
+const int gv_mOUSECURSOR = c_mouseButtonLeft;
+const int gv_aBILITYCAMERA = c_mouseButtonMiddle;
+const int gv_jUMP = c_keySpace;
+const int gv_singleButtonConstantButtonSize = 64;
+const int gv_singleButtonConstantIconSize = 48;
+const int gv_nCols = 3;
+const int gv_cRowGap = 4;
+const int gv_cHeaderHeight = 24;
+const int gv_cButtonAmount = 10;
+const int gv_cButtonGap = 2;
+const int gv_cIconSize = 76;
+const int gv_cButtonSize = 84;
+const int gv_cDialogBorder = 30;
+const int gv_singleButtonConstantButtonSizeAbilities = 64;
+const int gv_singleButtonConstantIconSizeAbilities = 48;
+const int gv_abilitiesSelectionTotalColumnButtons = 6;
+const int gv_abilitiesnCols = 4;
+const int gv_cRowGapAbilities = 42;
+const int gv_cHeaderHeightAbilities = 24;
+const int gv_cButtonAmountAbilities = 32;
+const int gv_cButtonGapAbilities = 24;
+const int gv_cIconSizeAbilities = 96;
+const int gv_cButtonSizeAbilities = 104;
+const int gv_cDialogBorderAbilities = 45;
+const int c_SCOBA_HERO_FIRST = 1;
+const int c_SCOBA_HERO_LAST = 6;
+const fixed c_SCOBA_CHASE_RADIUS = 10.0;
+const fixed c_SCOBA_KEEP_RADIUS = 12.0;

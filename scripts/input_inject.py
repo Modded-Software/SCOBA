@@ -37,15 +37,21 @@ def click(x, y):
 
 def shot(path):
     wid = None
-    out = subprocess.run(['xwininfo', '-root', '-tree'], capture_output=True, text=True, env={**os.environ, 'DISPLAY': ':0'}).stdout
+    proc = subprocess.run(['xwininfo', '-root', '-tree'], capture_output=True, text=True, env={**os.environ, 'DISPLAY': ':0'})
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr)
+        print('ERROR: xwininfo failed', file=sys.stderr)
+        return
+    out = proc.stdout
     for line in out.splitlines():
         if 'StarCraft II' in line:
             wid = line.split()[0]
             break
     if not wid:
         print('no window'); return
-    subprocess.run(['xwd', '-id', wid, '-silent', '-out', path + '.xwd'], env={**os.environ, 'DISPLAY': ':0'})
-    subprocess.run(['/home/agent/.local/bin/ffmpeg', '-y', '-loglevel', 'error', '-i', path + '.xwd', path])
+    subprocess.run(['xwd', '-id', wid, '-out', path + '.xwd'], env={**os.environ, 'DISPLAY': ':0'})
+    ffmpeg = os.environ.get('FFMPEG', 'ffmpeg')
+    subprocess.run([ffmpeg, '-y', '-loglevel', 'error', '-i', path + '.xwd', path])
 
 if __name__ == '__main__':
     cmd = sys.argv[1]
@@ -59,7 +65,12 @@ if __name__ == '__main__':
 
 if len(sys.argv) > 1 and sys.argv[1] == "auto":
     import re
-    out = subprocess.run(["xwininfo", "-root", "-tree"], capture_output=True, text=True, env={**os.environ, "DISPLAY": ":0"}).stdout
+    proc = subprocess.run(["xwininfo", "-root", "-tree"], capture_output=True, text=True, env={**os.environ, "DISPLAY": ":0"})
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr)
+        print("ERROR: xwininfo failed", file=sys.stderr)
+        raise SystemExit(1)
+    out = proc.stdout
     geo = None
     wid = None
     for line in out.splitlines():

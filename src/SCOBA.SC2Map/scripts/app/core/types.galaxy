@@ -1,0 +1,17 @@
+// Module: core/types
+
+struct gs_UnitButtonRecord {
+    int lv_statGet;
+    int lv_statSet;
+    string lv_icon;
+    text lv_tooltip;
+};
+
+struct gs_AbilitiesButtonRecord {
+    string lv_ability;
+    bool lv_enabled;
+    bool lv_learned;
+    string lv_icon;
+    string lv_grayIcon;
+    text lv_tooltip;
+};

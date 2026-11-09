@@ -1,0 +1,58 @@
+// Module: systems/input
+
+bool gt_OrderKey_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    lv_player = EventPlayer();
+
+    if (!runActions) {
+        return true;
+    }
+    gf_OrderToggle(lv_player);
+    libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, gv_sCOBAOrderMode[lv_player], PlayerGroupSingle(lv_player));
+    return true;
+}
+
+void gt_OrderKey_Init () {
+    gt_OrderKey = TriggerCreate("gt_OrderKey_Func");
+    TriggerAddEventKeyPressed(gt_OrderKey, c_playerAny, c_keyF, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    TriggerAddEventKeyPressed(gt_OrderKey, c_playerAny, c_keyE, true, c_keyModifierStateIgnore, c_keyModifierStateRequire, c_keyModifierStateIgnore);
+}
+
+bool gt_OrderCancel_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    lv_player = EventPlayer();
+
+    if (!runActions) {
+        return true;
+    }
+    if (gv_sCOBAOrderMode[lv_player] == true) {
+        gf_OrderExit(lv_player);
+    }
+    return true;
+}
+
+void gt_OrderCancel_Init () {
+    gt_OrderCancel = TriggerCreate("gt_OrderCancel_Func");
+    TriggerAddEventKeyPressed(gt_OrderCancel, c_playerAny, c_keyC, true, c_keyModifierStateIgnore, c_keyModifierStateRequire, c_keyModifierStateIgnore);
+}
+
+bool gt_OrderButton_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    lv_player = EventPlayer();
+
+    if (!runActions) {
+        return true;
+    }
+    if (EventDialogControl() == gv_sCOBAOrderButton) {
+        gf_OrderToggle(lv_player);
+    }
+    return true;
+}
+
+void gt_OrderButton_Init () {
+    gt_OrderButton = TriggerCreate("gt_OrderButton_Func");
+    TriggerAddEventDialogControl(gt_OrderButton, c_playerAny, c_invalidDialogControlId, c_triggerControlEventTypeClick);
+}

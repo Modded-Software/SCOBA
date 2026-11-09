@@ -301,10 +301,10 @@
         <AbilArray Link="SCOBARightClickToggle"/>
         <CardLayouts index="0">
             <LayoutButtons index="50" Face="SCOBAAutoAttackStatus" Type="AbilCmd" AbilCmd="SCOBAAutoAttackStatus,Execute" Row="0" Column="0"/>
-            <LayoutButtons index="51" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,On" Row="0" Column="3"/>
-            <LayoutButtons index="52" Face="SCOBAAutoAttackOn" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
-            <LayoutButtons index="53" Face="SCOBARightClickMove" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,On" Row="0" Column="4"/>
-            <LayoutButtons index="54" Face="SCOBARightClickStand" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,Off" Row="0" Column="4"/>
+            <LayoutButtons index="51" Face="SCOBAAutoAttackOn" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,On" Row="0" Column="3"/>
+            <LayoutButtons index="52" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
+            <LayoutButtons index="53" Face="SCOBARightClickStand" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,On" Row="0" Column="4"/>
+            <LayoutButtons index="54" Face="SCOBARightClickMove" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,Off" Row="0" Column="4"/>
             <LayoutButtons index="0" Face="MedicHeal" Type="AbilCmd" AbilCmd="heal,Execute" Row="2" Column="0"/>
             <LayoutButtons index="1" Face="StunningBlast" Type="AbilCmd" AbilCmd="StunningBlast,Execute" Row="2" Column="3"/>
             <LayoutButtons index="2" Face="ForceField" Type="AbilCmd" AbilCmd="ForceField,Execute" Row="2" Column="1"/>
@@ -606,10 +606,10 @@
         <AbilArray Link="SCOBARightClickToggle"/>
         <CardLayouts index="0">
             <LayoutButtons index="50" Face="SCOBAAutoAttackStatus" Type="AbilCmd" AbilCmd="SCOBAAutoAttackStatus,Execute" Row="0" Column="0"/>
-            <LayoutButtons index="51" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,On" Row="0" Column="3"/>
-            <LayoutButtons index="52" Face="SCOBAAutoAttackOn" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
-            <LayoutButtons index="53" Face="SCOBARightClickMove" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,On" Row="0" Column="4"/>
-            <LayoutButtons index="54" Face="SCOBARightClickStand" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,Off" Row="0" Column="4"/>
+            <LayoutButtons index="51" Face="SCOBAAutoAttackOn" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,On" Row="0" Column="3"/>
+            <LayoutButtons index="52" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
+            <LayoutButtons index="53" Face="SCOBARightClickStand" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,On" Row="0" Column="4"/>
+            <LayoutButtons index="54" Face="SCOBARightClickMove" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,Off" Row="0" Column="4"/>
             <LayoutButtons index="0" Face="MedicHeal" Type="AbilCmd" AbilCmd="heal,Execute" Row="2" Column="0"/>
             <LayoutButtons index="1" Face="StunningBlast" Type="AbilCmd" AbilCmd="StunningBlast,Execute" Row="2" Column="3"/>
             <LayoutButtons index="2" Face="ForceField" Type="AbilCmd" AbilCmd="ForceField,Execute" Row="2" Column="1"/>

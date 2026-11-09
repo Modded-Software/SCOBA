@@ -1,0 +1,218 @@
+// Module: systems/targeting
+
+bool gt_Target_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    unit lv_triggeringUnit;
+    unit lv_targetUnit;
+    int lv_localPlayer;
+    int lv_localBar;
+
+    // Variable Initialization
+    lv_triggeringUnit = EventUnit();
+    lv_targetUnit = EventUnitTarget();
+    lv_localPlayer = -1;
+    if (UnitIsValid(lv_targetUnit)) {
+        lv_localPlayer = UnitGetOwner(lv_targetUnit);
+    }
+    lv_localBar = ((lv_localPlayer * 10) + 4);
+
+    // Conditions
+    if (testConds) {
+        if (lv_localPlayer < 1 || lv_localPlayer > 6) {
+            return false;
+        }
+
+        if (!UnitIsValid(lv_triggeringUnit) || !UnitIsValid(lv_targetUnit) || !UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {
+            return false;
+        }
+
+        if (!((lv_targetUnit == gv_tPSUNIT[lv_localPlayer]))) {
+            return false;
+        }
+    }
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    gf_ShowTarget(lv_localPlayer, lv_triggeringUnit);
+    return true;
+}
+
+void gt_Target_Init () {
+    gt_Target = TriggerCreate("gt_Target_Func");
+    TriggerAddEventUnitAttacked2(gt_Target, null, null);
+}
+
+bool gt_ClearTarget_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    unit lv_triggeringUnit;
+    int lv_localPlayer;
+    int lv_localBar;
+
+    // Variable Initialization
+    lv_triggeringUnit = EventUnit();
+    lv_localPlayer = EventPlayer();
+    lv_localBar = ((lv_localPlayer * 10) + 4);
+
+    // Conditions
+    if (testConds) {
+        if (lv_localPlayer < 1 || lv_localPlayer > 6) {
+            return false;
+        }
+
+        if (!UnitIsValid(lv_triggeringUnit) || !UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {
+            return false;
+        }
+
+        if (!((lv_triggeringUnit == gv_tPSUNIT[lv_localPlayer]))) {
+            return false;
+        }
+    }
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    gf_ShowTarget(lv_localPlayer, null);
+    return true;
+}
+
+void gt_ClearTarget_Init () {
+    gt_ClearTarget = TriggerCreate("gt_ClearTarget_Func");
+    TriggerAddEventUnitBecomesIdle(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[1]"), true);
+    TriggerAddEventUnitOrder(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("move", 2));
+    TriggerAddEventUnitBecomesIdle(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[2]"), true);
+    TriggerAddEventUnitOrder(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("move", 2));
+    TriggerAddEventUnitBecomesIdle(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[3]"), true);
+    TriggerAddEventUnitOrder(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("move", 2));
+    TriggerAddEventUnitBecomesIdle(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[4]"), true);
+    TriggerAddEventUnitOrder(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("move", 2));
+    TriggerAddEventUnitBecomesIdle(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[5]"), true);
+    TriggerAddEventUnitOrder(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("move", 2));
+    TriggerAddEventUnitBecomesIdle(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[6]"), true);
+    TriggerAddEventUnitOrder(gt_ClearTarget, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("move", 2));
+}
+
+void gf_ShowTarget (int lp_player, unit lp_unit) {
+    unit lv_old;
+    string lv_portrait;
+    bool lv_enemy;
+    int lv_bar;
+
+    if (UnitIsValid(lp_unit) && (lp_unit == gv_tPSUNIT[lp_player])) {
+        lp_unit = null;
+    }
+    lv_bar = ((lp_player * 10) + 4);
+    lv_old = gv_tARGET[lp_player];
+    if (lv_old != lp_unit) {
+        UnitClearSelection(lp_player);
+        if (UnitIsValid(lv_old)) {
+            UnitStatusBarOverride(lv_old, -1);
+            UnitSetState(lv_old, c_unitStateSelectable, false);
+        }
+    }
+    gv_tARGET[lp_player] = lp_unit;
+    DialogSetVisible(gv_sCOBAOrderDialog, PlayerGroupSingle(lp_player), (UnitIsValid(lp_unit) && (UnitGetOwner(lp_unit) == lp_player)));
+    if (!UnitIsValid(lp_unit)) {
+        libNtve_gf_ShowHideBossBar(false, lv_bar);
+        return;
+    }
+    UnitStatusBarOverride(lp_unit, -1);
+    lv_enemy = (libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Ally) == false);
+    lv_portrait = "";
+    if (CatalogEntryIsValid(c_gameCatalogActor, UnitGetType(lp_unit))) {
+        lv_portrait = CatalogFieldValueGet(c_gameCatalogActor, UnitGetType(lp_unit), "UnitIcon", lp_player);
+    }
+    if (lv_portrait == "") {
+        lv_portrait = "Assets\\Textures\\btn-command-attack.dds";
+    }
+    libNtve_gf_DisplayBossBar(lv_bar, lv_portrait, UnitTypeGetName(UnitGetType(lp_unit)), 100, PlayerGroupSingle(lp_player));
+    if (lv_enemy) {
+        libNtve_gf_SetBossBarRace(lv_bar, libNtve_ge_BossBarRace_Zerg, true);
+    }
+    libNtve_gf_SetBossBarBoss(lv_bar, lp_unit, true);
+    libNtve_gf_MoveBossBar(lv_bar, c_anchorTop, 0, 50);
+}
+
+bool gt_TargetClick_Func (bool testConds, bool runActions) {
+    int lv_player;
+    unit lv_picked;
+
+    lv_player = EventPlayer();
+    lv_picked = null;
+    if (gf_IsHeroPlayer(lv_player)) {
+        lv_picked = gv_sCOBAHover[lv_player];
+    }
+
+    if (!runActions) {
+        return true;
+    }
+
+    if (!gf_IsHeroPlayer(lv_player)) {
+        return true;
+    }
+
+    if (EventMouseClickedButton() == gv_fIRE) {
+        if (gv_sCOBAOrderMode[lv_player] == true) {
+            gf_OrderExecute(lv_player, EventMouseClickedPosXWorld(), EventMouseClickedPosYWorld());
+        }
+        else if (UnitIsValid(gv_tPSUNIT[lv_player])) {
+            if (UnitIsValid(lv_picked) && (libNtve_gf_PlayerIsEnemy(lv_player, UnitGetOwner(lv_picked), libNtve_ge_PlayerRelation_Ally) == false)) {
+                UnitIssueOrder(gv_tPSUNIT[lv_player], OrderTargetingUnit(AbilityCommand("attack", 0), lv_picked), c_orderQueueReplace);
+                gv_sCOBAAutoTarget[lv_player] = lv_picked;
+            }
+            else {
+                gv_sCOBAAutoTarget[lv_player] = null;
+                if (UnitBehaviorCount(gv_tPSUNIT[lv_player], "SCOBARightClickStandBehavior") > 0) {
+                    UnitIssueOrder(gv_tPSUNIT[lv_player], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+                }
+                else {
+                    UnitIssueOrder(gv_tPSUNIT[lv_player], OrderTargetingPoint(AbilityCommand("move", 0), Point(EventMouseClickedPosXWorld(), EventMouseClickedPosYWorld())), c_orderQueueReplace);
+                }
+            }
+            gf_ShowTarget(lv_player, null);
+        }
+        return true;
+    }
+
+    if (EventMouseClickedButton() == gv_mOUSECURSOR) {
+        if (gv_sCOBAOrderMode[lv_player] == true) {
+            gf_OrderExit(lv_player);
+        }
+        gf_ShowTarget(lv_player, lv_picked);
+    }
+    return true;
+}
+
+void gt_TargetClick_Init () {
+    gt_TargetClick = TriggerCreate("gt_TargetClick_Func");
+    TriggerAddEventMouseClicked(gt_TargetClick, c_playerAny, gv_mOUSECURSOR, true);
+    TriggerAddEventMouseClicked(gt_TargetClick, c_playerAny, gv_fIRE, true);
+}
+
+bool gt_TargetRing_Func (bool testConds, bool runActions) {
+    int lv_player;
+    unit lv_unit;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        lv_unit = gv_tARGET[lv_player];
+        if (UnitIsValid(lv_unit)) {
+            if (gv_sCOBAOrderMode[lv_player] == false) {
+                UnitFlashSelection(lv_unit, 1.0);
+            }
+            gf_BossBarUpdate(lv_player);
+        }
+    }
+    return true;
+}
+
+void gt_TargetRing_Init () {
+    gt_TargetRing = TriggerCreate("gt_TargetRing_Func");
+    TriggerAddEventTimePeriodic(gt_TargetRing, 0.2, c_timeGame);
+}

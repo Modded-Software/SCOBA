@@ -2,7 +2,9 @@ from pathlib import Path
 import struct
 import sys
 
-ROOT = Path(__file__).resolve().parent.parent
+from project_root import project_root
+
+ROOT = project_root()
 path = ROOT / "out" / "SCOBA256.SC2Map" / "MapInfo"
 data = bytearray(path.read_bytes())
 version = struct.unpack_from("<I", data, 4)[0]

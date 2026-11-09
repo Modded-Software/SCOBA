@@ -6,7 +6,7 @@ Baseline: `scripts/expand_map.py`, `scripts/stage-map.py`, `scripts/launch-scoba
 
 ## Severity legend
 
-- **S1**: can silently run stale or broken map code.
+- **S1**: can run stale or broken map code without reporting.
 - **S2**: causes unreliable builds or launches.
 - **S3**: maintainability or documentation defect.
 - **S4**: cosmetic.
@@ -175,7 +175,7 @@ Evidence:
 - `cliffCellList num="4096" numOccupied="547"`
 
 Impact:
-- A harmless formatting change silently skips the resize.
+- A harmless formatting change skips the resize without reporting.
 - Resulting map can have mixed dimensions.
 
 Status: open.
@@ -326,8 +326,8 @@ Status: open.
 Severity: **S3**
 
 Evidence:
-- `/home/agent/WORKSPACE-VM/projects/SC2/.venv/bin/python3`
-- `/home/agent/WORKSPACE-VM/projects/SC2/scripts/sc2-check-logs.py`
+- `uv run python` (resolved from the project root)
+- `scripts/sc2-check-logs.py`
 
 Impact:
 - Breaks if the project moves.
@@ -429,7 +429,7 @@ Severity: **S2**
 Evidence:
 - Agent uses `/tmp/opencode/build_sc2.sh`.
 - README documents only `launch-scoba.sh`.
-- AGENTS documents `python scripts/expand_map.py`.
+- AGENTS documents `uv run python scripts/expand_map.py`.
 
 Impact:
 - Different build paths produce different results.
@@ -444,7 +444,7 @@ Severity: **S3**
 Evidence:
 - `pyproject.toml` contains `mpyq` and `pillow`.
 - Build scripts use system `python3`.
-- Some scripts use `.venv/bin/python3`.
+- Some scripts use `uv run python`.
 
 Impact:
 - Different interpreters and packages.

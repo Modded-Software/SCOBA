@@ -10,9 +10,19 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from project_root import project_root
+
+ROOT = project_root()
 DEFAULT_STORMEX = ROOT / "tools" / "stormex"
-DEFAULT_SC2 = Path("/home/agent/Games/battlenet-prefix/pfx/drive_c/Program Files (x86)/StarCraft II")
+DEFAULT_SC2 = Path(
+    os.environ.get(
+        "SC2_INSTALL",
+        str(
+            Path.home()
+            / "Games/battlenet-prefix/pfx/drive_c/Program Files (x86)/StarCraft II"
+        ),
+    )
+)
 DEFAULT_OUT = Path("/mnt/ws-fast/sc2res")
 
 
@@ -45,7 +55,10 @@ def exts_from(value):
 
 def run_stormex(args):
     cmd = [str(find_stormex()), "-S", str(find_sc2())] + args
-    return subprocess.run(cmd, text=True, capture_output=True)
+    proc = subprocess.run(cmd, text=True, capture_output=True)
+    if proc.returncode != 0 and proc.stderr:
+        sys.stderr.write(proc.stderr)
+    return proc
 
 
 def parse_paths(text, exts=None):

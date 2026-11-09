@@ -1,0 +1,253 @@
+// Module: ui/ability_talent_trees
+
+void gf_UnlockSupportTalentTree (int lp_iPlayer) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = lp_iPlayer;
+
+    // Implementation
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", true);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "heal", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "GuardianShield", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Frenzy", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Frenzy", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+}
+
+void gf_UnlockDefenseTalentTree (int lp_iPlayer) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = lp_iPlayer;
+
+    // Implementation
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "heal", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "VoodooShield", true);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "VoodooShield", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+}
+
+void gf_UnlockOffenseTalentTree (int lp_iPlayer) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = lp_iPlayer;
+
+    // Implementation
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "heal", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "PoisonNova", true);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "PoisonNova", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Siphon", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Siphon", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Irradiate", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Irradiate", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+}
+
+void gf_UnlockSpecialistTalentTree (int lp_iPlayer) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = lp_iPlayer;
+
+    // Implementation
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "heal", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", true);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ForceField", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ForceField", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "TemporalField", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "TemporalField", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "StunningBlast", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "StunningBlast", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", true);
+    UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+    UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", true);
+}

@@ -6,7 +6,9 @@ import re
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parent.parent
+from project_root import project_root
+
+ROOT = project_root()
 DEFAULT_MAP = ROOT / "out" / "SCOBA256.SC2Map"
 SPORE_SCALE = 3.0
 SPORE_UNITS = {"SporeCannon", "SporeCrawler"}

@@ -1,7 +1,9 @@
 from pathlib import Path
 import re
 
-MAP = Path(__file__).resolve().parent.parent / "out" / "SCOBA256.SC2Map"
+from project_root import project_root
+
+MAP = project_root() / "out" / "SCOBA256.SC2Map"
 p = MAP / "t3Terrain.xml"
 text = p.read_text(encoding="utf-8")
 new = re.sub(r'<cliffCellList num="\d+" numOccupied="\d+">.*?</cliffCellList>',

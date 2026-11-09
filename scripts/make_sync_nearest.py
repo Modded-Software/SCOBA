@@ -1,7 +1,9 @@
 from pathlib import Path
 import struct
 
-ROOT = Path(__file__).resolve().parent.parent
+from project_root import project_root
+
+ROOT = project_root()
 SRC = ROOT / "src" / "SCOBA.SC2Map" / "t3SyncHeightMap"
 DST = ROOT / "out" / "SCOBA256.SC2Map" / "t3SyncHeightMap"
 NEW = 257

@@ -4,8 +4,5 @@ ROOT_DIR="$PWD"
 if [ ! -f "$ROOT_DIR/scripts/sc2-check-logs.py" ]; then
     ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 fi
-PYTHON="$ROOT_DIR/.venv/bin/python3"
-if [ ! -x "$PYTHON" ]; then
-    PYTHON="python3"
-fi
-exec "$PYTHON" "$ROOT_DIR/scripts/sc2-check-logs.py" "$@"
+cd "$ROOT_DIR"
+exec uv run python "$ROOT_DIR/scripts/sc2-check-logs.py" "$@"

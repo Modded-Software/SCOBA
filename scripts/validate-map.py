@@ -138,18 +138,22 @@ def check_catalogs(map_dir: Path) -> None:
 
 def check_script(map_dir: Path) -> None:
     script = (map_dir / "MapScript.galaxy").read_text(encoding="utf-8", errors="replace")
-    if "RegionPlayableMapSet(RegionRect(0.0, 0.0, 254.0, 254.0));" not in script:
+    galaxy = [script]
+    for path in sorted((map_dir / "scripts").rglob("*.galaxy")):
+        galaxy.append(path.read_text(encoding="utf-8", errors="replace"))
+    combined = "\n".join(galaxy)
+    if "RegionPlayableMapSet(RegionRect(0.0, 0.0, 254.0, 254.0));" not in combined:
         fail("MapScript.galaxy missing expanded playable region")
-    if "CameraSetBounds(PlayerGroupAll(), RegionRect(0.0, 0.0, 254.0, 254.0), true);" not in script:
+    if "CameraSetBounds(PlayerGroupAll(), RegionRect(0.0, 0.0, 254.0, 254.0), true);" not in combined:
         fail("MapScript.galaxy missing expanded camera bounds")
     if "void InitTriggers ()" not in script:
         fail("MapScript.galaxy missing InitTriggers")
-    if "gt_CombatTick_Init();" not in script:
-        fail("MapScript.galaxy missing combat tick init")
-    if "gt_ToggleCommands_Init();" not in script:
-        fail("MapScript.galaxy missing toggle command init")
-    if 'UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickStandBehavior"' not in script:
-        fail("MapScript.galaxy missing default stand behavior")
+    if "gt_CombatTick_Init();" not in combined:
+        fail("scripts missing combat tick init")
+    if "gt_ToggleCommands_Init();" not in combined:
+        fail("scripts missing toggle command init")
+    if 'UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickStandBehavior"' not in combined:
+        fail("scripts missing default stand behavior")
 
 
 def check_stamp(map_dir: Path) -> None:
@@ -159,9 +163,9 @@ def check_stamp(map_dir: Path) -> None:
     stamp = stamp_path.read_text(encoding="utf-8").strip()
     if not stamp:
         fail("empty BuildStamp.txt")
-    combat = (map_dir / "scripts" / "combat.galaxy").read_text(encoding="utf-8", errors="replace")
-    if f'const string c_SCOBA_BUILD_STAMP = "{stamp}";' not in combat:
-        fail("combat.galaxy build stamp does not match BuildStamp.txt")
+    stamp_file = (map_dir / "scripts" / "app" / "core" / "build_stamp.galaxy").read_text(encoding="utf-8", errors="replace")
+    if f'const string c_SCOBA_BUILD_STAMP = "{stamp}";' not in stamp_file:
+        fail("build_stamp.galaxy build stamp does not match BuildStamp.txt")
 
 
 def main() -> int:

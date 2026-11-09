@@ -60,7 +60,7 @@
     </CAbilBehavior>
     <CAbilEffectInstant id="SCOBAAutoAttackStatus">
         <Cost>
-            <Cooldown Link="Abil/SCOBAAutoAttackStatus" TimeUse="1"/>
+            <Cooldown Link="Abil/SCOBAAutoAttackStatus"/>
         </Cost>
         <EditorCategories value="AbilityorEffectType:Units"/>
         <CmdButtonArray index="Execute" DefaultButtonFace="SCOBAAutoAttackStatus"/>

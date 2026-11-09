@@ -4,7 +4,9 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-ROOT = Path(os.environ.get("SC2_PROJECT_ROOT", Path(__file__).resolve().parent.parent))
+from project_root import project_root
+
+ROOT = Path(os.environ.get("SC2_PROJECT_ROOT", project_root()))
 DOCS = Path(
     os.environ.get(
         "SC2_DOCUMENTS",
@@ -17,6 +19,7 @@ DOCS = Path(
 LOG_DIR = DOCS / "GameLogs"
 MAX_AGE = float(os.environ.get("SC2_LOG_MAX_AGE", "300"))
 BANK_SINCE = float(os.environ.get("SC2_BANK_SINCE", "0"))
+LOG_SINCE = float(os.environ.get("SC2_LOG_SINCE", "0"))
 REQUIRE_STAMP = "--require-stamp" in sys.argv
 EXPECTED = os.environ.get("SC2_EXPECT_STAMP", "")
 if not EXPECTED:
@@ -32,10 +35,13 @@ now = time.time()
 candidates = []
 for path in LOG_DIR.glob("*.txt"):
     try:
-        age = now - path.stat().st_mtime
-    except OSError:
+        mtime = path.stat().st_mtime
+    except OSError as exc:
+        sys.stderr.write(f"WARNING: cannot stat {path}: {exc}\n")
         continue
-    if age <= MAX_AGE:
+    if mtime < LOG_SINCE:
+        continue
+    if now - mtime <= MAX_AGE:
         candidates.append(path)
 
 if not candidates:
@@ -47,7 +53,8 @@ warnings = []
 for path in candidates:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    except OSError as exc:
+        sys.stderr.write(f"WARNING: cannot read {path}: {exc}\n")
         continue
     name = path.name
     if "ScriptError" in name:
@@ -81,7 +88,8 @@ def bank_stamp() -> tuple[str, Path] | None:
             try:
                 if path.stat().st_mtime >= BANK_SINCE:
                     found.append(path)
-            except OSError:
+            except OSError as exc:
+                sys.stderr.write(f"WARNING: cannot stat {path}: {exc}\n")
                 continue
     for path in sorted(found, key=lambda p: p.stat().st_mtime, reverse=True):
         for _ in range(3):

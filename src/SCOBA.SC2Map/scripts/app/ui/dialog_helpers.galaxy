@@ -1,0 +1,24 @@
+// Module: ui/dialog_helpers
+
+void gf_Createalinefordialog (int lp_dialog, int lp_x1, int lp_y1, int lp_x2, int lp_y2, int lp_thick, color lp_color) {
+    // Variable Declarations
+    fixed lv_dx;
+    fixed lv_dy;
+    int lv_xm;
+    int lv_ym;
+    fixed lv_length;
+    int lv_angle;
+
+    // Variable Initialization
+
+    // Implementation
+    lv_dx = IntToFixed((lp_x2 - lp_x1));
+    lv_dy = IntToFixed((lp_y2 - lp_y1));
+    lv_length = SquareRoot((Pow(lv_dx, 2.0) + Pow(lv_dy, 2.0)));
+    lv_xm = FixedToInt(((IntToFixed(lp_x1) + IntToFixed(lp_x2)) / 2.0));
+    lv_ym = FixedToInt(((IntToFixed(lp_y1) + IntToFixed(lp_y2)) / 2.0));
+    lv_angle = FixedToInt(ATan2(lv_dy, lv_dx));
+    libNtve_gf_CreateDialogItemImage(lp_dialog, FixedToInt(lv_length), lp_thick, c_anchorTopLeft, (lv_xm - (FixedToInt(lv_length) / 2)), (lv_ym - (lp_thick / 2)), StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, lp_color, c_triggerBlendModeNormal);
+    libNtve_gf_SetDialogItemRotation(DialogControlLastCreated(), lv_angle, PlayerGroupAll());
+    libNtve_gf_SetDialogItemRenderPriority(DialogControlLastCreated(), 513, PlayerGroupAll());
+}

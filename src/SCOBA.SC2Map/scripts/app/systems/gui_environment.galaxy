@@ -1,0 +1,76 @@
+// Module: systems/gui_environment
+
+bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_lOCALPLAYER;
+
+    // Variable Initialization
+    lv_lOCALPLAYER = 1;
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UISetDragSelectEnabled(PlayerGroupAll(), false);
+    UISetCommandAllowed(PlayerGroupAll(), c_uiCommandAllowMinimap, false);
+    GameSetSpeedValue(c_gameSpeedNormal);
+    GameSetSpeedLocked(true);
+    Wait(0.01, c_timeGame);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeStatusUI, true);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeCommandPanel, true);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMenuBar, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMinimapPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeVictoryPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTipAlertPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTextTag, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTechTreePanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTechGlossaryPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTeamResourceButton, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeSupply, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeRoomPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeResourcePanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeResearchPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypePylonButton, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypePurchasePanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypePlanetPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypePingPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeObjectivePanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMissionTimePanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeBattleReportPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMercenaryPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeLeaderPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeInventoryPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeInfoPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeIdleWorkerButton, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeHeroPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeHelpMenuButton, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeErrorDisplayPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeCreditsPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeControlGroupPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeConsolePanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeCharacterSheetButton, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeCashPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeArmyButton, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeAllianceButton, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeAlertPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeAchievementMenuButton, false);
+    TimerWindowCreate(gv_sPAWNTIMER, StringExternal("Param/Value/A217A367"), true, false);
+    TimerWindowSetTimer(gv_tIMERWINDOW, gv_sPAWNTIMER);
+    TimerWindowSetAnchor(gv_tIMERWINDOW, c_anchorTopRight, -50, -50);
+    TimerStart(gv_sPAWNTIMER, 40.0, true, c_timeReal);
+    GameTimeOfDaySetLength(60.0);
+    FogSetStartHeight(32.0);
+    FogSetColor(Color(18.04, 18.43, 5.88));
+    FogSetDensity(0.0002);
+    GameSetBackground(c_backgroundFixed, "AiurSkybox", 10.0);
+    GameTimeOfDaySet("00");
+    VisEnable(c_visTypeMask, false);
+    VisEnable(c_visTypeFog, false);
+    return true;
+}
+
+void gt_GUIEnvironmentSetup_Init () {
+    gt_GUIEnvironmentSetup = TriggerCreate("gt_GUIEnvironmentSetup_Func");
+    TriggerAddEventMapInit(gt_GUIEnvironmentSetup);
+}

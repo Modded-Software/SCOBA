@@ -7,13 +7,14 @@
 - Scripts must be idempotent: running them again on the same target must not double-apply.
 - Scripts must be reversible when possible:
   - Preferred: `out/SCOBA256.SC2Map` is derived from `src/SCOBA.SC2Map`; rebuilding reverts everything.
+  - The original packed baseline is `original/SCOBA.SC2Map`.
   - Provide `--revert` or document the revert command in the script.
 - Never hand-edit generated files in `out/` without a corresponding script.
 - Keep scripts deterministic (fixed seeds) so rebuilds are stable.
 
 ## Verification
 
-- Rebuild with `python scripts/expand_map.py`.
+- Rebuild with `uv run python scripts/expand_map.py`.
 - Confirm idempotency (run twice, compare hashes).
 - Launch via the `scoba.desktop` shortcut to check in game.
 
@@ -23,6 +24,9 @@
 - `scripts/doodad_occlusion.py` — disable doodad auto-transparency (idempotent, wired into the pipeline).
 - `scripts/props_expand.py` — 1.5× trees, 2× fluff, tree scale remapped to max 8 (idempotent, reversible, wired into the pipeline).
 - `scripts/spore_scale.py` — scale SporeCannon/SporeCrawler units 3× and projectile speed 1.5× (idempotent, reversible, wired into the pipeline).
+- `scripts/bootstrap_galaxy.py` — write the minimal `MapScript.galaxy` bootstrap (idempotent, wired into the pipeline).
+- `scripts/strip_gui_triggers.py` — replace the GUI trigger graph with one empty category (idempotent, reversible from git, wired into the pipeline).
+- `scripts/migrate_galaxy_modules.py` — one-time generator for `scripts/app/`; it refuses to run after the source monoliths are removed.
 
 ## Project docs
 

@@ -1,0 +1,208 @@
+// Module: systems/spawns
+
+bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
+    int auto58D71E67_ae;
+    int auto58D71E67_ai;
+
+    // Variable Declarations
+    int lv_playerIndex;
+
+    // Variable Initialization
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    auto58D71E67_ae = 6;
+    auto58D71E67_ai = 1;
+    lv_playerIndex = 4;
+    for ( ; ( (auto58D71E67_ai >= 0 && lv_playerIndex <= auto58D71E67_ae) || (auto58D71E67_ai <= 0 && lv_playerIndex >= auto58D71E67_ae) ) ; lv_playerIndex += auto58D71E67_ai ) {
+        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Zerg, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), false, lv_playerIndex);
+        Wait((RandomInt(1, 10) / 10.0), c_timeGame);
+        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Zerg, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), false, lv_playerIndex);
+        Wait((RandomInt(1, 10) / 10.0), c_timeGame);
+        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Zerg, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), false, lv_playerIndex);
+        Wait(4.0, c_timeGame);
+        libNtve_gf_CreateUnitsAtPoint2(8, "Zergling", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
+        UnitGroupLoopBegin(UnitLastCreatedGroup());
+        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        }
+        UnitGroupLoopEnd();
+        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)])), c_orderQueueReplace);
+        libNtve_gf_CreateUnitsAtPoint2(1, "RoachCorpser", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
+        UnitGroupLoopBegin(UnitLastCreatedGroup());
+        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        }
+        UnitGroupLoopEnd();
+        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)])), c_orderQueueReplace);
+        libNtve_gf_CreateUnitsAtPoint2(2, "Roach", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
+        UnitGroupLoopBegin(UnitLastCreatedGroup());
+        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        }
+        UnitGroupLoopEnd();
+        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)])), c_orderQueueReplace);
+        if ((TechTreeUnitCount(lv_playerIndex, "Queen", c_techCountQueuedOrBetter) == 0)) {
+            libNtve_gf_CreateUnitsAtPoint2(1, "Queen", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
+            UnitGroupLoopBegin(UnitLastCreatedGroup());
+            for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+                UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+            }
+            UnitGroupLoopEnd();
+            UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)])), c_orderQueueReplace);
+        }
+
+    }
+    return true;
+}
+
+void gt_ZerusSpawn_Init () {
+    gt_ZerusSpawn = TriggerCreate("gt_ZerusSpawn_Func");
+    TriggerAddEventTimer(gt_ZerusSpawn, gv_sPAWNTIMER);
+}
+
+bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
+    int autoA973637F_ae;
+    int autoA973637F_ai;
+
+    // Variable Declarations
+    int lv_playerIndex;
+
+    // Variable Initialization
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    autoA973637F_ae = 3;
+    autoA973637F_ai = 1;
+    lv_playerIndex = 1;
+    for ( ; ( (autoA973637F_ai >= 0 && lv_playerIndex <= autoA973637F_ae) || (autoA973637F_ai <= 0 && lv_playerIndex >= autoA973637F_ae) ) ; lv_playerIndex += autoA973637F_ai ) {
+        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Terran, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), false, lv_playerIndex);
+        Wait((RandomInt(1, 10) / 10.0), c_timeGame);
+        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Terran, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), true, lv_playerIndex);
+        libNtve_gf_CreateUnitsAtPoint2(4, "Marine", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
+        UnitGroupLoopBegin(UnitLastCreatedGroup());
+        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        }
+        UnitGroupLoopEnd();
+        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[lv_playerIndex])), c_orderQueueReplace);
+        if ((TechTreeUnitCount(lv_playerIndex, "Goliath", c_techCountQueuedOrBetter) == 0)) {
+            libNtve_gf_CreateUnitsAtPoint2(1, "Goliath", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
+            UnitGroupLoopBegin(UnitLastCreatedGroup());
+            for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+                UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+            }
+            UnitGroupLoopEnd();
+            UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[lv_playerIndex])), c_orderQueueReplace);
+        }
+
+        libNtve_gf_CreateUnitsAtPoint2(2, "Marauder", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
+        UnitGroupLoopBegin(UnitLastCreatedGroup());
+        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        }
+        UnitGroupLoopEnd();
+        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[lv_playerIndex])), c_orderQueueReplace);
+        libNtve_gf_CreateUnitsAtPoint2(1, "Firebat", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
+        UnitGroupLoopBegin(UnitLastCreatedGroup());
+        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        }
+        UnitGroupLoopEnd();
+        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[lv_playerIndex])), c_orderQueueReplace);
+    }
+    return true;
+}
+
+void gt_TerranSpawn_Init () {
+    gt_TerranSpawn = TriggerCreate("gt_TerranSpawn_Func");
+    TriggerAddEventTimer(gt_TerranSpawn, gv_sPAWNTIMER);
+}
+
+bool gt_JungleCatsLeft_Func (bool testConds, bool runActions) {
+    // Conditions
+    if (testConds) {
+        if (!((UnitGetType(EventUnit()) == "Predator"))) {
+            return false;
+        }
+
+        if (!((libNtve_gf_UnitInRegion(EventUnit(), RegionFromId(12)) == true))) {
+            return false;
+        }
+    }
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitIssueOrder(EventUnit(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionRandomPoint(RegionFromId(12))), c_orderQueueReplace);
+    return true;
+}
+
+void gt_JungleCatsLeft_Init () {
+    gt_JungleCatsLeft = TriggerCreate("gt_JungleCatsLeft_Func");
+    TriggerAddEventUnitBecomesIdle(gt_JungleCatsLeft, null, true);
+}
+
+bool gt_JungleCatsRight_Func (bool testConds, bool runActions) {
+    // Conditions
+    if (testConds) {
+        if (!((UnitGetType(EventUnit()) == "Predator"))) {
+            return false;
+        }
+
+        if (!((libNtve_gf_UnitInRegion(EventUnit(), RegionFromId(13)) == true))) {
+            return false;
+        }
+    }
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitIssueOrder(EventUnit(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionRandomPoint(RegionFromId(13))), c_orderQueueReplace);
+    return true;
+}
+
+void gt_JungleCatsRight_Init () {
+    gt_JungleCatsRight = TriggerCreate("gt_JungleCatsRight_Func");
+    TriggerAddEventUnitBecomesIdle(gt_JungleCatsRight, null, true);
+}
+
+bool gt_JungleCatsLeftInit_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitGroupIssueOrder(UnitGroup(null, c_playerAny, RegionFromId(12), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0), OrderTargetingPoint(AbilityCommand("attack", 0), RegionRandomPoint(RegionFromId(12))), c_orderQueueReplace);
+    return true;
+}
+
+void gt_JungleCatsLeftInit_Init () {
+    gt_JungleCatsLeftInit = TriggerCreate("gt_JungleCatsLeftInit_Func");
+    TriggerAddEventMapInit(gt_JungleCatsLeftInit);
+}
+
+bool gt_JungleCatsRightInit_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitGroupIssueOrder(UnitGroup(null, c_playerAny, RegionFromId(13), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0), OrderTargetingPoint(AbilityCommand("attack", 0), RegionRandomPoint(RegionFromId(13))), c_orderQueueReplace);
+    return true;
+}
+
+void gt_JungleCatsRightInit_Init () {
+    gt_JungleCatsRightInit = TriggerCreate("gt_JungleCatsRightInit_Func");
+    TriggerAddEventMapInit(gt_JungleCatsRightInit);
+}

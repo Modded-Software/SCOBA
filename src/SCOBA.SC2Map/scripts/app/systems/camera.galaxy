@@ -1,0 +1,222 @@
+// Module: systems/camera
+
+bool gt_CameraFollowDistance_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    CameraSetValue(lv_localPlayer, c_cameraValueDistance, (CameraGetDistance(lv_localPlayer) - (EventMouseWheelSpin() / 2.0)), 0.2, -1, 10);
+    return true;
+}
+
+void gt_CameraFollowDistance_Init () {
+    gt_CameraFollowDistance = TriggerCreate("gt_CameraFollowDistance_Func");
+    TriggerAddEventMouseWheel(gt_CameraFollowDistance, c_playerAny);
+}
+
+bool gt_Jump_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "DehakaJump", gv_tPSUNIT[lv_localPlayer], 1);
+    return true;
+}
+
+void gt_Jump_Init () {
+    gt_Jump = TriggerCreate("gt_Jump_Func");
+    TriggerAddEventKeyPressed(gt_Jump, c_playerAny, gv_jUMP, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+
+bool gt_ZoomEnd_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, 65.0, 0.5, -1, 10.0);
+    return true;
+}
+
+void gt_ZoomEnd_Init () {
+    gt_ZoomEnd = TriggerCreate("gt_ZoomEnd_Func");
+    TriggerAddEventKeyPressed(gt_ZoomEnd, c_playerAny, gv_zOOM, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+
+bool gt_ZoomStart_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, 25.0, 0.5, -1, 10.0);
+    return true;
+}
+
+void gt_ZoomStart_Init () {
+    gt_ZoomStart = TriggerCreate("gt_ZoomStart_Func");
+    TriggerAddEventKeyPressed(gt_ZoomStart, c_playerAny, gv_zOOM, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+
+bool gt_CursorStart_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if ((EventMouseClickedButton() == gv_fIRE) && (gv_sCOBAOrderMode[lv_localPlayer] == true)) {
+        return true;
+    }
+
+    if (((EventMouseClickedButton() == gv_fIRE) || (EventMouseClickedButton() == gv_aBILITYCAMERA))) {
+        gv_rOTATEUNIT[lv_localPlayer] = true;
+    }
+
+    if ((EventMouseClickedButton() == gv_mOUSECURSOR)) {
+        gv_rOTATECAMERA[lv_localPlayer] = true;
+    }
+
+    if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == true))) {
+        CameraSetMouseRotates(lv_localPlayer, true);
+        CameraForceMouseRelative(lv_localPlayer, true);
+        CameraLockInput(lv_localPlayer, false);
+    }
+
+    return true;
+}
+
+void gt_CursorStart_Init () {
+    gt_CursorStart = TriggerCreate("gt_CursorStart_Func");
+    TriggerAddEventMouseClicked(gt_CursorStart, c_playerAny, gv_mOUSECURSOR, true);
+    TriggerAddEventMouseClicked(gt_CursorStart, c_playerAny, gv_fIRE, true);
+    TriggerAddEventMouseClicked(gt_CursorStart, c_playerAny, gv_aBILITYCAMERA, true);
+}
+
+bool gt_CursorEnd_Func (bool testConds, bool runActions) {
+    // Variable Declarations
+    int lv_localPlayer;
+
+    // Variable Initialization
+    lv_localPlayer = EventPlayer();
+
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if (((EventMouseClickedButton() == gv_fIRE) || (EventMouseClickedButton() == gv_aBILITYCAMERA))) {
+        gv_rOTATEUNIT[lv_localPlayer] = false;
+    }
+
+    if ((EventMouseClickedButton() == gv_mOUSECURSOR)) {
+        gv_rOTATECAMERA[lv_localPlayer] = false;
+    }
+
+    if (((gv_rOTATEUNIT[lv_localPlayer] == false) && (gv_rOTATECAMERA[lv_localPlayer] == false))) {
+        CameraSetMouseRotates(lv_localPlayer, false);
+        CameraForceMouseRelative(lv_localPlayer, false);
+        UISetCursorVisible(PlayerGroupSingle(lv_localPlayer), true);
+        CameraLockInput(lv_localPlayer, true);
+    }
+
+    return true;
+}
+
+void gt_CursorEnd_Init () {
+    gt_CursorEnd = TriggerCreate("gt_CursorEnd_Func");
+    TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_fIRE, false);
+    TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_mOUSECURSOR, false);
+    TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_aBILITYCAMERA, false);
+}
+
+bool gt_XCenterUnitOrders_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if ((PlayerRace(EventPlayer()) == "Terr")) {
+        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(2))), c_orderQueueReplace);
+    }
+    else {
+        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(1))), c_orderQueueReplace);
+    }
+    return true;
+}
+
+void gt_XCenterUnitOrders_Init () {
+    gt_XCenterUnitOrders = TriggerCreate("gt_XCenterUnitOrders_Func");
+    TriggerAddEventUnitRegion(gt_XCenterUnitOrders, null, RegionFromId(8), true);
+}
+
+bool gt_XTopUnitOrders_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if ((PlayerRace(EventPlayer()) == "Terr")) {
+        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(6))), c_orderQueueReplace);
+    }
+    else {
+        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(4))), c_orderQueueReplace);
+    }
+    return true;
+}
+
+void gt_XTopUnitOrders_Init () {
+    gt_XTopUnitOrders = TriggerCreate("gt_XTopUnitOrders_Func");
+    TriggerAddEventUnitRegion(gt_XTopUnitOrders, null, RegionFromId(9), true);
+}
+
+bool gt_XBottomUnitOrders_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    if ((PlayerRace(EventPlayer()) == "Terr")) {
+        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(5))), c_orderQueueReplace);
+    }
+    else {
+        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(3))), c_orderQueueReplace);
+    }
+    return true;
+}
+
+void gt_XBottomUnitOrders_Init () {
+    gt_XBottomUnitOrders = TriggerCreate("gt_XBottomUnitOrders_Func");
+    TriggerAddEventUnitRegion(gt_XBottomUnitOrders, null, RegionFromId(7), true);
+}

@@ -1,0 +1,79 @@
+// Module: systems/selection
+
+bool gt_UnitSelection_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitGroupLoopBegin(UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0));
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        UnitSetState(UnitGroupLoopCurrent(), c_unitStateSelectable, false);
+    }
+    UnitGroupLoopEnd();
+    return true;
+}
+
+void gt_UnitSelection_Init () {
+    gt_UnitSelection = TriggerCreate("gt_UnitSelection_Func");
+    TriggerAddEventTimeElapsed(gt_UnitSelection, 1.0, c_timeGame);
+}
+
+bool gt_NewUnitSelection_Func (bool testConds, bool runActions) {
+    // Actions
+    if (!runActions) {
+        return true;
+    }
+
+    UnitGroupLoopBegin(UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0));
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (true) {
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateSelectable, false);
+        }
+
+    }
+    UnitGroupLoopEnd();
+    return true;
+}
+
+void gt_NewUnitSelection_Init () {
+    gt_NewUnitSelection = TriggerCreate("gt_NewUnitSelection_Func");
+    TriggerAddEventUnitCreated(gt_NewUnitSelection, null, null, null);
+}
+
+bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
+    int lv_player;
+    unit lv_hero;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        if (gv_sCOBAOrderMode[lv_player] == true) {
+            continue;
+        }
+        if (lv_player == 1) {
+            lv_hero = UnitFromId(622754155);
+        }
+        else if (lv_player == 2) {
+            lv_hero = UnitFromId(649131550);
+        }
+        else {
+            lv_hero = gv_tPSUNIT[lv_player];
+        }
+        if (!UnitIsValid(lv_hero)) {
+            continue;
+        }
+        gv_tPSUNIT[lv_player] = lv_hero;
+        UnitSetState(lv_hero, c_unitStateSelectable, true);
+        UnitSelect(lv_hero, lv_player, true);
+    }
+    return true;
+}
+
+void gt_KeepHeroSelected_Init () {
+    gt_KeepHeroSelected = TriggerCreate("gt_KeepHeroSelected_Func");
+    TriggerAddEventTimePeriodic(gt_KeepHeroSelected, 0.1, c_timeGame);
+}

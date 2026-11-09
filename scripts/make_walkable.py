@@ -1,7 +1,9 @@
 from pathlib import Path
 import struct
 
-MAP = Path(__file__).resolve().parent.parent / "out" / "SCOBA256.SC2Map"
+from project_root import project_root
+
+MAP = project_root() / "out" / "SCOBA256.SC2Map"
 
 
 def read(p):
