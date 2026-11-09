@@ -271,8 +271,8 @@ void InitMap () {
 - `scripts/launch-and-check.sh` reports a runtime stamp and no recent script errors.
 - The map test compiles, writes its bank, and passes its behavior checks. It logs one movement probe for review.
 
-## Remaining operator steps
+## CI integration
 
-- Add `".galaxy"` to `config/file_length_limits.yaml` in both repositories.
-- Deploy the updated `WORKSPACE-CI` code to `/opt/workspace-ci`.
-- Add `check-galaxy` to `config/required_hooks.yaml` and regenerate the pre-commit file.
+- `".galaxy"` is in `config/file_length_limits.yaml` in both repositories.
+- `WORKSPACE-CI` is deployed to `/opt/workspace-ci`.
+- `check-galaxy` is in `config/required_hooks.yaml`; the pre-commit file is generated.
