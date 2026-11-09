@@ -34,3 +34,4 @@ const int c_SCOBA_HERO_FIRST = 1;
 const int c_SCOBA_HERO_LAST = 6;
 const fixed c_SCOBA_CHASE_RADIUS = 10.0;
 const fixed c_SCOBA_KEEP_RADIUS = 12.0;
+const bool c_SCOBA_DEBUG_COOLDOWN = false;

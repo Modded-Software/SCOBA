@@ -360,22 +360,6 @@ def write_pathing_info(dst: Path) -> None:
     write(dst, bytes(out))
 
 
-def patch_mapscript(src: Path, dst: Path) -> None:
-    text = src.read_text(encoding="utf-8")
-    call = (
-        "    RegionPlayableMapSet(RegionRect(0.0, 0.0, 254.0, 254.0));\n"
-        "    CameraSetBounds(PlayerGroupAll(), RegionRect(0.0, 0.0, 254.0, 254.0), true);\n"
-    )
-    if call in text:
-        dst.write_text(text, encoding="utf-8")
-        return
-    func = "bool gt_MapInit_Func (bool testConds, bool runActions) {"
-    guard = "    if (!runActions) {\n        return true;\n    }\n"
-    func_at = text.index(func)
-    at = text.index(guard, func_at) + len(guard)
-    dst.write_text(text[:at] + call + text[at:], encoding="utf-8")
-
-
 def expand_terrain_xml(src: Path, dst: Path) -> None:
     text = src.read_text(encoding="utf-8")
     text = re.sub(r'dim="\d+ \d+ "', 'dim="257 257 "', text, count=1)

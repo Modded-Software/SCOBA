@@ -83,14 +83,16 @@ def read_bank(path: Path) -> dict | None:
     except (ET.ParseError, OSError) as exc:
         sys.stderr.write(f"WARNING: cannot parse bank {path}: {exc}\n")
         return None
-    data: dict[str, dict[str, int]] = {}
+    data: dict[str, dict[str, int | bool]] = {}
     for section in root.findall("Section"):
         name = section.get("name", "")
-        values: dict[str, int] = {}
+        values: dict[str, int | bool] = {}
         for key in section.findall("Key"):
             value = key.find("Value")
             if value is not None and value.get("int") is not None:
                 values[key.get("name", "")] = int(value.get("int"))
+            elif value is not None and value.get("flag") is not None:
+                values[key.get("name", "")] = value.get("flag") == "1"
         data[name] = values
     return data
 
@@ -176,6 +178,7 @@ def main() -> int:
         "autoOff": 0,
         "standAgain": 1,
         "walkStand": 0,
+        "autoAttack": True,
     }
     failures = 0
     for key, want in expected.items():
@@ -187,6 +190,9 @@ def main() -> int:
     if meta.get("done") != 1:
         print(f"meta done: got={meta.get('done')} want=1 FAIL")
         failures += 1
+    if meta.get("moveOrders", 0) < 1:
+        print(f"meta moveOrders: got={meta.get('moveOrders')} want>=1 FAIL")
+        failures += 1
 
     for p, info in PROBES.items():
         vals = data.get(p, {})
@@ -195,7 +201,8 @@ def main() -> int:
         tx, ty = info["target"]
         print(f"\nprobe {p} ({info['axis']}): start=({sx},{sy}) target=({tx},{ty}) final=({fx},{fy})")
         if fx is None or fy is None:
-            print("  NOTE: no final position")
+            print("  FAIL: no final position")
+            failures += 1
             continue
         remaining = abs(tx - fx) + abs(ty - fy)
         start_dist = abs(tx - sx) + abs(ty - sy)

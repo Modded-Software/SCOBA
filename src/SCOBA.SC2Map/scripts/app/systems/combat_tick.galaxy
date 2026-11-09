@@ -45,7 +45,16 @@ bool gt_AutoAttackTick_Func (bool testConds, bool runActions) {
         lv_target = gv_sCOBAAutoTarget[lv_player];
         if (lv_stand) {
             if (UnitOrderCount(lv_hero) == 0 && gf_MovementKeyHeld(lv_player) == false) {
-                UnitIssueOrder(lv_hero, Order(AbilityCommand("move", 2)), c_orderQueueReplace);
+                lv_group = UnitGroupAlliance(lv_player, c_unitAllianceEnemy, RegionCircle(UnitGetPosition(lv_hero), c_SCOBA_KEEP_RADIUS), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0);
+                if (UnitGroupCount(lv_group, c_unitCountAlive) > 0) {
+                    lv_target = UnitGroupClosestToPoint(lv_group, UnitGetPosition(lv_hero));
+                    if (UnitIsValid(lv_target)) {
+                        UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
+                    }
+                }
+                else {
+                    UnitIssueOrder(lv_hero, Order(AbilityCommand("move", 2)), c_orderQueueReplace);
+                }
             }
             continue;
         }

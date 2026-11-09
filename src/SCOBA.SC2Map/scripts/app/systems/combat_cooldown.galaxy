@@ -22,6 +22,7 @@ bool gt_AttackCooldown_Func (bool testConds, bool runActions) {
     fixed lv_now;
     fixed lv_delta;
     fixed lv_period;
+    bank lv_bank;
 
     if (!runActions) {
         return true;
@@ -44,12 +45,14 @@ bool gt_AttackCooldown_Func (bool testConds, bool runActions) {
         gv_sCOBA_AttackPeriod[lv_player] = lv_delta;
     }
     gv_sCOBA_LastAttackAt[lv_player] = lv_now;
-    debugBank = BankLoad("SCOBA", 1);
-    BankSectionCreate(debugBank, "Debug");
-    BankValueSetFromFixed(debugBank, "Debug", "AtkMeasured", gv_sCOBA_AttackPeriod[lv_player]);
-    BankValueSetFromFixed(debugBank, "Debug", "AtkDelta", lv_delta);
-    BankValueSetFromFixed(debugBank, "Debug", "AtkNow", lv_now);
-    BankSave(debugBank);
+    if (c_SCOBA_DEBUG_COOLDOWN) {
+        lv_bank = BankLoad("SCOBA", 1);
+        BankSectionCreate(lv_bank, "Debug");
+        BankValueSetFromFixed(lv_bank, "Debug", "AtkMeasured", gv_sCOBA_AttackPeriod[lv_player]);
+        BankValueSetFromFixed(lv_bank, "Debug", "AtkDelta", lv_delta);
+        BankValueSetFromFixed(lv_bank, "Debug", "AtkNow", lv_now);
+        BankSave(lv_bank);
+    }
     lv_period = gv_sCOBA_AttackPeriod[lv_player];
     if (lv_period <= 0.0) {
         lv_period = UnitWeaponPeriodRemaining(lv_hero, lv_weapon);

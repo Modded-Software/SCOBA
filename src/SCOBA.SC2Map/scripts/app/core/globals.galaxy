@@ -153,7 +153,7 @@ trigger gt_OrderKey;
 trigger gt_OrderButton;
 trigger gt_OrderCancel;
 trigger gt_TargetRing;
-bank debugBank;
+
 trigger gt_AutoOnCmd;
 trigger gt_AutoOffCmd;
 trigger gt_StandCmd;

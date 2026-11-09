@@ -45,11 +45,14 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
     BankValueSetFromInt(gv_dbgBank, "meta", "tick", -1);
     BankValueSetFromInt(gv_dbgBank, "meta", "startX", FixedToInt(PointGetX(UnitGetPosition(gv_tPSUNIT[1]))));
     BankValueSetFromInt(gv_dbgBank, "meta", "startY", FixedToInt(PointGetY(UnitGetPosition(gv_tPSUNIT[1]))));
-    BankValueSetFromInt(gv_dbgBank, "meta", "targetX", FixedToInt(PointGetX(UnitGetPosition(gv_tPSUNIT[1])) - 20.0));
-    BankValueSetFromInt(gv_dbgBank, "meta", "targetY", FixedToInt(PointGetY(UnitGetPosition(gv_tPSUNIT[1]))));
+    BankValueSetFromInt(gv_dbgBank, "meta", "targetX", 128);
+    BankValueSetFromInt(gv_dbgBank, "meta", "targetY", 128);
+    BankValueSetFromInt(gv_dbgBank, "meta", "startOrders", UnitOrderCount(gv_tPSUNIT[1]));
     BankSave(gv_dbgBank);
     gf_DbgLogUnit(gv_dbgBank, "P1", gv_tPSUNIT[1]);
-    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), Point(PointGetX(UnitGetPosition(gv_tPSUNIT[1])) - 20.0, PointGetY(UnitGetPosition(gv_tPSUNIT[1])))), c_orderQueueReplace);
+    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), Point(128.0, 128.0)), c_orderQueueReplace);
+    BankValueSetFromInt(gv_dbgBank, "meta", "moveOrders", UnitOrderCount(gv_tPSUNIT[1]));
+    BankSave(gv_dbgBank);
     for (lv_i = 0; lv_i < 30; lv_i += 1) {
         BankValueSetFromInt(gv_dbgBank, "meta", "tick", lv_i);
         gf_DbgLogUnit(gv_dbgBank, "P1", gv_tPSUNIT[1]);
@@ -73,7 +76,9 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
     BankValueSetFromInt(gv_dbgBank, "behavior", "standStartY", FixedToInt(PointGetY(UnitGetPosition(gv_tPSUNIT[1]))));
     libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, 4, PointWithOffset(UnitGetPosition(gv_tPSUNIT[1]), 3.0, 0.0));
     BankValueSetFromInt(gv_dbgBank, "behavior", "enemiesNear", UnitGroupCount(UnitGroupAlliance(1, c_unitAllianceEnemy, RegionCircle(UnitGetPosition(gv_tPSUNIT[1]), 6.0), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0), c_unitCountAlive));
-    Wait(3.0, c_timeGame);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, "behavior", "autoAttack", UnitOrderHasAbil(gv_tPSUNIT[1], "attack"));
+    Wait(2.0, c_timeGame);
     BankValueSetFromInt(gv_dbgBank, "behavior", "enemiesAfter", UnitGroupCount(UnitGroupAlliance(1, c_unitAllianceEnemy, RegionCircle(UnitGetPosition(gv_tPSUNIT[1]), 6.0), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0), c_unitCountAlive));
     BankValueSetFromInt(gv_dbgBank, "behavior", "standOrders", UnitOrderCount(gv_tPSUNIT[1]));
     BankValueSetFromFlag(gv_dbgBank, "behavior", "standAttack", UnitOrderHasAbil(gv_tPSUNIT[1], "attack"));
@@ -195,41 +200,10 @@ def patch_banklist(path: Path) -> None:
     path.write_text(text)
 
 
-def patch_script(path: Path) -> None:
-    text = path.read_text()
-    if "gt_DbgTest_Func" in text:
-        return
-    text = text.replace(
-        "unit[8] gv_tPSUNIT;",
-        "unit[8] gv_tPSUNIT;\nbank gv_dbgBank;\nunit gv_dbgA;\nunit gv_dbgB;\nunit gv_dbgC;\nunit gv_dbgD;",
-        1,
-    )
-    text = text.replace(
-        "trigger gt_DisableCloakingField;",
-        "trigger gt_DisableCloakingField;\ntrigger gt_DbgTest;",
-        1,
-    )
-    anchor = (
-        "//--------------------------------------------------------------------------------------------------\n"
-        "// Trigger Initialization\n"
-        "//--------------------------------------------------------------------------------------------------\n"
-        "void InitTriggers () {"
-    )
-    if anchor not in text:
-        raise SystemExit("InitTriggers anchor not found")
-    text = text.replace(anchor, HARNESS + anchor, 1)
-    text = text.replace(
-        "void InitTriggers () {\n    gt_MapInit_Init();",
-        "void InitTriggers () {\n    gt_DbgTest_Init();\n    gt_MapInit_Init();",
-        1,
-    )
-    path.write_text(text)
-
-
 def patch_script_modules(root: Path) -> None:
     main_path = root / "scripts" / "app" / "main.galaxy"
     if not main_path.is_file():
-        return
+        raise SystemExit(f"missing module entry point: {main_path}")
     text = main_path.read_text(encoding="utf-8")
     if "gt_DbgTest_Func" in text:
         return
@@ -288,10 +262,7 @@ def main() -> int:
         path.write_bytes(bytes(data))
     patch_mapinfo(DST / "MapInfo")
     patch_banklist(DST / "BankList.xml")
-    if (DST / "scripts" / "app" / "main.galaxy").is_file():
-        patch_script_modules(DST)
-    else:
-        patch_script(DST / "MapScript.galaxy")
+    patch_script_modules(DST)
     print(DST)
     return 0
 

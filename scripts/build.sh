@@ -24,6 +24,10 @@ fail() {
     exit 1
 }
 
+BOOTSTRAP="$ROOT_DIR/src/SCOBA.SC2Map/MapScript.galaxy"
+grep -q 'include "scripts/app/main"' "$BOOTSTRAP" \
+    || fail "$BOOTSTRAP lost its scripts/app/main include; restore it from git"
+
 mkdir -p "$OUT_DIR"
 exec 9>"$OUT_DIR/.build.lock"
 if ! flock -n 9; then
