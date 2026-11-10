@@ -13,7 +13,7 @@ bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     }
 
     UISetDragSelectEnabled(PlayerGroupAll(), false);
-    UISetCommandAllowed(PlayerGroupAll(), c_uiCommandAllowMinimap, false);
+    UISetCommandAllowed(PlayerGroupAll(), c_uiCommandAllowMinimap, true);
     UISetCommandAllowed(PlayerGroupAll(), c_uiCommandAllowSmartClick, false);
     GameSetSpeedValue(c_gameSpeedNormal);
     GameSetSpeedLocked(true);
@@ -21,7 +21,9 @@ bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeStatusUI, true);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeCommandPanel, true);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMenuBar, false);
-    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMinimapPanel, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMinimapPanel, true);
+    UISetMiniMapBackGroundColor(Color(0,0,0));
+    UISetMiniMapCameraFoVVisible(false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeVictoryPanel, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTipAlertPanel, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTextTag, false);

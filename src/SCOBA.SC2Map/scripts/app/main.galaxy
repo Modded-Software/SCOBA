@@ -24,6 +24,7 @@ include "scripts/app/systems/selection"
 include "scripts/app/systems/spawns"
 include "scripts/app/systems/status_bar"
 include "scripts/app/systems/targeting"
+include "scripts/app/systems/visual_tuning"
 include "scripts/app/systems/xp"
 include "scripts/app/ui/abilities_dialog"
 include "scripts/app/ui/abilities_dialog_update"
@@ -58,6 +59,7 @@ void main () {
     gt_OrderCancel_Init();
     gt_CombatTick_Init();
     gt_MedicSpawn_Init();
+    gt_VisualTuning_Init();
     gt_TargetRing_Init();
     gt_TargetClick_Init();
     gt_CameraFollowDistance_Init();

@@ -2,7 +2,7 @@
 
 void InitLibs () {
     libNtve_InitLib();
-    libSwaC_InitLib();
+    libVCMI_InitLib();
 }
 
 bool gt_MapInit_Func (bool testConds, bool runActions) {

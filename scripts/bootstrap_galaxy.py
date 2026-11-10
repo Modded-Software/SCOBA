@@ -9,7 +9,7 @@ from pathlib import Path
 
 BOOTSTRAP = """// Generated bootstrap. Do not edit the built copy.
 include "TriggerLibs/NativeLib"
-include "TriggerLibs/SwarmCampaignLib"
+include "TriggerLibs/VoidCampaignLib"
 include "scripts/app/main"
 
 void InitTriggers () { main(); }

@@ -1,0 +1,90 @@
+// Module: systems/visual_tuning
+
+void gf_TripleDeathTime (string lp_unitType) {
+    int lv_player;
+    string lv_value;
+    fixed lv_death;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        lv_value = CatalogFieldValueGet(c_gameCatalogUnit, lp_unitType, "DeathTime", lv_player);
+        if (lv_value == "") {
+            continue;
+        }
+        lv_death = StringToFixed(lv_value);
+        if (lv_death <= 0.0) {
+            continue;
+        }
+        CatalogFieldValueSet(c_gameCatalogUnit, lp_unitType, "DeathTime", lv_player, FixedToString((lv_death * 3.0), c_fixedPrecisionAny));
+    }
+}
+
+bool gt_VisualTuning_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_TripleDeathTime("Armory");
+    gf_TripleDeathTime("AutoTurret");
+    gf_TripleDeathTime("Banshee");
+    gf_TripleDeathTime("Barracks");
+    gf_TripleDeathTime("BarracksTechLab");
+    gf_TripleDeathTime("Battlecruiser");
+    gf_TripleDeathTime("Brakk");
+    gf_TripleDeathTime("Bunker");
+    gf_TripleDeathTime("CommandCenter");
+    gf_TripleDeathTime("DukesRevenge");
+    gf_TripleDeathTime("EngineeringBay");
+    gf_TripleDeathTime("Factory");
+    gf_TripleDeathTime("FactoryTechLab");
+    gf_TripleDeathTime("Firebat");
+    gf_TripleDeathTime("GehennaCruiser");
+    gf_TripleDeathTime("Goliath");
+    gf_TripleDeathTime("GreaterNydusWorm");
+    gf_TripleDeathTime("Hellion");
+    gf_TripleDeathTime("HybridUltraliskShackled");
+    gf_TripleDeathTime("InfestedAbomination");
+    gf_TripleDeathTime("InfestedCivilian");
+    gf_TripleDeathTime("InfestedColonistShip");
+    gf_TripleDeathTime("InfestedSiegeBreaker");
+    gf_TripleDeathTime("InfestedSiegeBreakerSieged");
+    gf_TripleDeathTime("InfestedTerranCampaign");
+    gf_TripleDeathTime("Infestor");
+    gf_TripleDeathTime("InfestorBurrowed");
+    gf_TripleDeathTime("Kerrigan");
+    gf_TripleDeathTime("KorhalPalaceTurret");
+    gf_TripleDeathTime("Kraith");
+    gf_TripleDeathTime("KraithSpineVolleyWeapon");
+    gf_TripleDeathTime("Marauder");
+    gf_TripleDeathTime("Marine");
+    gf_TripleDeathTime("Medic");
+    gf_TripleDeathTime("MengskBC");
+    gf_TripleDeathTime("MercCompound");
+    gf_TripleDeathTime("Mitosaurus");
+    gf_TripleDeathTime("MitosaurusB");
+    gf_TripleDeathTime("MitosaurusC");
+    gf_TripleDeathTime("Mothership");
+    gf_TripleDeathTime("Overlord");
+    gf_TripleDeathTime("Overseer");
+    gf_TripleDeathTime("PerditionTurret");
+    gf_TripleDeathTime("PerditionTurretUnderground");
+    gf_TripleDeathTime("Predator");
+    gf_TripleDeathTime("Queen");
+    gf_TripleDeathTime("Roach");
+    gf_TripleDeathTime("RoachCorpser");
+    gf_TripleDeathTime("SCV");
+    gf_TripleDeathTime("SensorTower");
+    gf_TripleDeathTime("SpineCrawler");
+    gf_TripleDeathTime("SporeCannon");
+    gf_TripleDeathTime("SporeCrawler");
+    gf_TripleDeathTime("SupplyDepot");
+    gf_TripleDeathTime("Thor");
+    gf_TripleDeathTime("Tosh");
+    gf_TripleDeathTime("Ultralisk");
+    gf_TripleDeathTime("WarpPrismPhasing");
+    gf_TripleDeathTime("Zergling");
+    return true;
+}
+
+void gt_VisualTuning_Init () {
+    gt_VisualTuning = TriggerCreate("gt_VisualTuning_Func");
+    TriggerAddEventMapInit(gt_VisualTuning);
+}

@@ -1,11 +1,56 @@
 // Module: systems/spawns
 
+point gf_DropPodPoint (region lp_region, point lp_usedA, point lp_usedB) {
+    int lv_try;
+    point lv_pick;
+    point lv_best;
+    fixed lv_bestDistance;
+    fixed lv_distance;
+
+    lv_best = RegionRandomPoint(lp_region);
+    lv_bestDistance = 0.0;
+    for (lv_try = 0; lv_try < 16; lv_try += 1) {
+        lv_pick = RegionRandomPoint(lp_region);
+        lv_distance = 9999.0;
+        if (lp_usedA != null) {
+            lv_distance = MinF(lv_distance, DistanceBetweenPoints(lv_pick, lp_usedA));
+        }
+        if (lp_usedB != null) {
+            lv_distance = MinF(lv_distance, DistanceBetweenPoints(lv_pick, lp_usedB));
+        }
+        if (lv_distance > lv_bestDistance) {
+            lv_bestDistance = lv_distance;
+            lv_best = lv_pick;
+        }
+    }
+    return lv_best;
+}
+
+unitgroup gf_CreateSpawnGroup (int lp_count, string lp_type, int lp_player, point lp_point) {
+    libNtve_gf_CreateUnitsAtPoint2(lp_count, lp_type, 0, lp_player, lp_point);
+    return UnitLastCreatedGroup();
+}
+
+void gf_OrderSpawnGroup (unitgroup lp_group, point lp_target) {
+    UnitGroupLoopBegin(lp_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+    }
+    UnitGroupLoopEnd();
+    UnitGroupIssueOrder(lp_group, OrderTargetingPoint(AbilityCommand("attack", 0), lp_target), c_orderQueueReplace);
+}
+
 bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
     int auto58D71E67_ae;
     int auto58D71E67_ai;
 
     // Variable Declarations
     int lv_playerIndex;
+    point lv_target;
+    point lv_podA;
+    point lv_podB;
+    point lv_podC;
+    unitgroup lv_group;
 
     // Variable Initialization
 
@@ -18,43 +63,29 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
     auto58D71E67_ai = 1;
     lv_playerIndex = 4;
     for ( ; ( (auto58D71E67_ai >= 0 && lv_playerIndex <= auto58D71E67_ae) || (auto58D71E67_ai <= 0 && lv_playerIndex >= auto58D71E67_ae) ) ; lv_playerIndex += auto58D71E67_ai ) {
-        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Zerg, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), false, lv_playerIndex);
-        Wait((RandomInt(1, 10) / 10.0), c_timeGame);
-        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Zerg, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), false, lv_playerIndex);
-        Wait((RandomInt(1, 10) / 10.0), c_timeGame);
-        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Zerg, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), false, lv_playerIndex);
-        Wait(4.0, c_timeGame);
-        libNtve_gf_CreateUnitsAtPoint2(8, "Zergling", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
-        UnitGroupLoopBegin(UnitLastCreatedGroup());
-        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
-            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-        }
-        UnitGroupLoopEnd();
-        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)])), c_orderQueueReplace);
-        libNtve_gf_CreateUnitsAtPoint2(1, "RoachCorpser", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
-        UnitGroupLoopBegin(UnitLastCreatedGroup());
-        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
-            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-        }
-        UnitGroupLoopEnd();
-        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)])), c_orderQueueReplace);
-        libNtve_gf_CreateUnitsAtPoint2(2, "Roach", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
-        UnitGroupLoopBegin(UnitLastCreatedGroup());
-        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
-            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-        }
-        UnitGroupLoopEnd();
-        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)])), c_orderQueueReplace);
-        if ((TechTreeUnitCount(lv_playerIndex, "Queen", c_techCountQueuedOrBetter) == 0)) {
-            libNtve_gf_CreateUnitsAtPoint2(1, "Queen", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
-            UnitGroupLoopBegin(UnitLastCreatedGroup());
-            for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
-                UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-            }
-            UnitGroupLoopEnd();
-            UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)])), c_orderQueueReplace);
-        }
+        lv_target = RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)]);
+        lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], null, null);
+        lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, null);
+        lv_podC = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, lv_podB);
 
+        lv_group = gf_CreateSpawnGroup(8, "Zergling", lv_playerIndex, lv_podA);
+        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podA, lv_group, false, lv_playerIndex);
+        Wait(4.0, c_timeGame);
+        gf_OrderSpawnGroup(lv_group, lv_target);
+
+        lv_group = gf_CreateSpawnGroup(1, "RoachCorpser", lv_playerIndex, lv_podB);
+        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podB, lv_group, false, lv_playerIndex);
+        Wait(4.0, c_timeGame);
+        gf_OrderSpawnGroup(lv_group, lv_target);
+
+        lv_group = gf_CreateSpawnGroup(2, "Roach", lv_playerIndex, lv_podC);
+        if ((TechTreeUnitCount(lv_playerIndex, "Queen", c_techCountQueuedOrBetter) == 0)) {
+            libNtve_gf_CreateUnitsAtPoint2(1, "Queen", 0, lv_playerIndex, lv_podC);
+            UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
+        }
+        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podC, lv_group, false, lv_playerIndex);
+        Wait(4.0, c_timeGame);
+        gf_OrderSpawnGroup(lv_group, lv_target);
     }
     return true;
 }
@@ -70,6 +101,10 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
 
     // Variable Declarations
     int lv_playerIndex;
+    point lv_target;
+    point lv_podA;
+    point lv_podB;
+    unitgroup lv_group;
 
     // Variable Initialization
 
@@ -82,40 +117,23 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
     autoA973637F_ai = 1;
     lv_playerIndex = 1;
     for ( ; ( (autoA973637F_ai >= 0 && lv_playerIndex <= autoA973637F_ae) || (autoA973637F_ai <= 0 && lv_playerIndex >= autoA973637F_ae) ) ; lv_playerIndex += autoA973637F_ai ) {
-        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Terran, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), false, lv_playerIndex);
-        Wait((RandomInt(1, 10) / 10.0), c_timeGame);
-        libSwaC_gf_CreateDropPod(libSwaC_ge_DropPodRace_Terran, RegionRandomPoint(gv_sPAWNLOCATIONS[lv_playerIndex]), UnitGroupEmpty(), true, lv_playerIndex);
-        libNtve_gf_CreateUnitsAtPoint2(4, "Marine", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
-        UnitGroupLoopBegin(UnitLastCreatedGroup());
-        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
-            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-        }
-        UnitGroupLoopEnd();
-        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[lv_playerIndex])), c_orderQueueReplace);
-        if ((TechTreeUnitCount(lv_playerIndex, "Goliath", c_techCountQueuedOrBetter) == 0)) {
-            libNtve_gf_CreateUnitsAtPoint2(1, "Goliath", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
-            UnitGroupLoopBegin(UnitLastCreatedGroup());
-            for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
-                UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-            }
-            UnitGroupLoopEnd();
-            UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[lv_playerIndex])), c_orderQueueReplace);
-        }
+        lv_target = RegionGetCenter(gv_xLOCATIONS[lv_playerIndex]);
+        lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], null, null);
+        lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, null);
 
-        libNtve_gf_CreateUnitsAtPoint2(2, "Marauder", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
-        UnitGroupLoopBegin(UnitLastCreatedGroup());
-        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
-            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        lv_group = gf_CreateSpawnGroup(4, "Marine", lv_playerIndex, lv_podA);
+        if ((TechTreeUnitCount(lv_playerIndex, "Goliath", c_techCountQueuedOrBetter) == 0)) {
+            libNtve_gf_CreateUnitsAtPoint2(1, "Goliath", 0, lv_playerIndex, lv_podA);
+            UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
         }
-        UnitGroupLoopEnd();
-        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[lv_playerIndex])), c_orderQueueReplace);
-        libNtve_gf_CreateUnitsAtPoint2(1, "Firebat", 0, lv_playerIndex, RegionGetCenter(gv_sPAWNLOCATIONS[lv_playerIndex]));
-        UnitGroupLoopBegin(UnitLastCreatedGroup());
-        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
-            UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-        }
-        UnitGroupLoopEnd();
-        UnitGroupIssueOrder(UnitLastCreatedGroup(), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[lv_playerIndex])), c_orderQueueReplace);
+        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podA, lv_group, true, lv_playerIndex);
+        gf_OrderSpawnGroup(lv_group, lv_target);
+
+        lv_group = gf_CreateSpawnGroup(2, "Marauder", lv_playerIndex, lv_podB);
+        libNtve_gf_CreateUnitsAtPoint2(1, "Firebat", 0, lv_playerIndex, lv_podB);
+        UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
+        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podB, lv_group, true, lv_playerIndex);
+        gf_OrderSpawnGroup(lv_group, lv_target);
     }
     return true;
 }

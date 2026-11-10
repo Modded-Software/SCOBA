@@ -4,9 +4,10 @@ void gf_PlayerBarsCreate () {
     int lv_player;
 
     for (lv_player = 1; lv_player <= 6; lv_player += 1) {
-        DialogCreate(480, 60, c_anchorTopLeft, 10, 10, false);
+        DialogCreate(480, 60, c_anchorTopRight, -10, 10, false);
         gv_pbXpDlg[lv_player] = DialogLastCreated();
         libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 10, StringToText(""), "Assets\\Textures\\btn-ability-kerrigan_revive.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+        gv_pbXpIcon[lv_player] = DialogControlLastCreated();
         libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 410, 24, c_anchorTopLeft, 56, 18, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
         gv_pbXpBg[lv_player] = DialogControlLastCreated();
         libNtve_gf_CreateDialogItemImage(gv_pbXpDlg[lv_player], 410, 24, c_anchorTopLeft, 56, 18, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(30,100,30), c_triggerBlendModeNormal);
@@ -46,11 +47,20 @@ void gf_PlayerBarsUpdate () {
     int lv_xpMax;
     int lv_width;
     unit lv_unit;
+    string lv_icon;
 
     for (lv_player = 1; lv_player <= 6; lv_player += 1) {
         lv_unit = gv_tPSUNIT[lv_player];
         if (!UnitIsValid(lv_unit)) {
             continue;
+        }
+        lv_icon = "";
+        if (CatalogEntryIsValid(c_gameCatalogActor, UnitGetType(lv_unit))) {
+            lv_icon = CatalogFieldValueGet(c_gameCatalogActor, UnitGetType(lv_unit), "UnitIcon", lv_player);
+        }
+        if ((lv_icon != "") && (lv_icon != gv_pbXpIconPath[lv_player])) {
+            gv_pbXpIconPath[lv_player] = lv_icon;
+            libNtve_gf_SetDialogItemImage(gv_pbXpIcon[lv_player], lv_icon, PlayerGroupSingle(lv_player));
         }
         lv_cur = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent));
         lv_max = FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropLifeMax, c_unitPropNormal));

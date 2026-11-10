@@ -10,6 +10,7 @@ No keyboard or mouse input is needed: the test build has Wait-for-Key cleared.
 from __future__ import annotations
 
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -105,6 +106,76 @@ def latest_script_error(started: float) -> Path | None:
     return max(candidates, key=lambda p: p.stat().st_mtime) if candidates else None
 
 
+RED = "\033[31m"
+RESET = "\033[0m"
+ALERT_PREFIX = re.compile(r"^USER\s+\d+\s+[\d.]+\s+[\d.]+\s+(.*)$")
+ALERT_FAIL_WORDS = ("error", "damaged", "failed", "exception", "assert", "script")
+
+
+def collect_new_logs(started: float) -> dict:
+    logs = DOCS / "GameLogs"
+    result = {"script_errors": [], "error_dirs": [], "alerts": []}
+    if not logs.is_dir():
+        return result
+    result["script_errors"] = sorted(
+        p for p in logs.glob("*ScriptError.txt") if p.stat().st_mtime >= started
+    )
+    result["error_dirs"] = sorted(
+        p for p in logs.glob("*Error") if p.is_dir() and p.stat().st_mtime >= started
+    )
+    for path in sorted(logs.glob("*Alerts.txt")):
+        if path.stat().st_mtime < started:
+            continue
+        for line in path.read_text(errors="replace").splitlines():
+            match = ALERT_PREFIX.match(line)
+            if not match:
+                continue
+            message = match.group(1).strip()
+            if not message or message.startswith("===="):
+                continue
+            if message.startswith(("StarCraft II", "Executable", "Parent Executable", "Grandparent Executable")):
+                continue
+            if message.startswith(("<Parameters>", "LocalTime", "<ComputerUser>", "<ComputerName>", "<Exe.Architecture>", "<Version>", "<DataBuild>", "<CodeBranch>", "<CodeRevision>", "<Locale.", "<AccountCountry>", "<AgentVersion>")):
+                continue
+            result["alerts"].append(f"{path.name}: {message}")
+    return result
+
+
+def print_red(title: str, lines: list[str]) -> None:
+    print(f"{RED}{title}{RESET}", file=sys.stderr)
+    for line in lines:
+        print(f"{RED}{line}{RESET}", file=sys.stderr)
+
+
+def report_logs(started: float) -> int:
+    logs = collect_new_logs(started)
+    failures = 0
+    script_lines: list[str] = []
+    for path in logs["script_errors"]:
+        script_lines.append(f"{path}")
+        script_lines.extend(path.read_text(errors="replace").splitlines())
+    if script_lines:
+        print_red("CONSOLE SCRIPT ERRORS", script_lines)
+        failures += 1
+    if logs["error_dirs"]:
+        print_red("CONSOLE ERROR FOLDERS", [str(p) for p in logs["error_dirs"]])
+        failures += 1
+    if logs["alerts"]:
+        error_alerts = [
+            line for line in logs["alerts"]
+            if any(word in line.lower() for word in ALERT_FAIL_WORDS)
+        ]
+        warnings = [line for line in logs["alerts"] if line not in error_alerts]
+        if error_alerts:
+            print_red("CONSOLE ALERTS", error_alerts)
+            failures += 1
+        if warnings:
+            print("CONSOLE WARNINGS", file=sys.stderr)
+            for line in warnings:
+                print(line, file=sys.stderr)
+    return failures
+
+
 def main() -> int:
     import shutil
     shutil.rmtree(MAP_CACHE, ignore_errors=True)
@@ -155,7 +226,7 @@ def main() -> int:
         err = latest_script_error(started)
         if err is not None:
             print(f"FAIL: script compile or runtime error: {err}", file=sys.stderr)
-            print(err.read_text(errors="replace"), file=sys.stderr)
+            report_logs(started)
             kill_sc2()
             return 1
 
@@ -171,11 +242,9 @@ def main() -> int:
             lines = log_path.read_text(errors="replace").splitlines()[-40:]
             print("launcher log tail:", file=sys.stderr)
             print("\n".join(lines), file=sys.stderr)
+        report_logs(started)
         kill_sc2()
         return 1
-    err = latest_script_error(started)
-    if err is not None:
-        print(f"WARNING: script errors logged: {err}", file=sys.stderr)
 
     print(f"bank: {bank_path}")
     meta = data.get("meta", {})
@@ -353,6 +422,7 @@ def main() -> int:
     import shutil
     shutil.rmtree(MAP_CACHE, ignore_errors=True)
     kill_sc2()
+    failures += report_logs(started)
     return 0 if failures == 0 else 1
 
 

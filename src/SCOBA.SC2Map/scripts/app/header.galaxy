@@ -196,3 +196,5 @@ void gt_OrderButton_Init ();
 void gf_MedicSpawn (int lp_player);
 bool gt_MedicSpawn_Func (bool testConds, bool runActions);
 void gt_MedicSpawn_Init ();
+bool gt_VisualTuning_Func (bool testConds, bool runActions);
+void gt_VisualTuning_Init ();
