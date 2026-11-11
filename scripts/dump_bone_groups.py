@@ -19,6 +19,7 @@ import m3
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--map", type=Path, default=ROOT / "out" / "SCOBA256.SC2Map")
+    parser.add_argument("--tree", action="store_true")
     args = parser.parse_args()
     for name, data in assets.SOURCE_MODELS.items():
         target = data[1]
@@ -27,6 +28,17 @@ def main() -> int:
         model = m3.loadModel(str(args.map / target))
         upper, lower = assets.classify_bones(model, upper_roots, lower_roots)
         print(f"model: {name}")
+        if args.tree:
+            for index, bone in enumerate(model.bones):
+                parent = model.bones[bone.parent].name if bone.parent >= 0 else "-"
+                print(
+                    f"  {index}\t{bone.name}\tparent={parent}"
+                    f"\tpos=({bone.location.initValue.x:.4f},{bone.location.initValue.y:.4f},"
+                    f"{bone.location.initValue.z:.4f})"
+                    f"\trot=({bone.rotation.initValue.x:.4f},{bone.rotation.initValue.y:.4f},"
+                    f"{bone.rotation.initValue.z:.4f},{bone.rotation.initValue.w:.4f})"
+                )
+            continue
         for group_name, ids in (("upper", upper), ("lower", lower)):
             names = sorted(
                 bone.name

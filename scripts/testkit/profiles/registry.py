@@ -9,6 +9,7 @@ PROFILE_OUTPUTS = {
     "aim": ROOT / "out" / "SCOBA256_aimtest.SC2Map",
     "controls": ROOT / "out" / "SCOBA256_controlstest.SC2Map",
     "motion": ROOT / "out" / "SCOBA256_motiontest.SC2Map",
+    "pitch": ROOT / "out" / "SCOBA256_pitchtest.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -16,6 +17,7 @@ PROFILE_BANKS = {
     "aim": ("SCOBAAIMTEST",),
     "controls": ("SCOBACONTROLSTEST",),
     "motion": ("SCOBAMOTIONTEST",),
+    "pitch": ("SCOBAPITCHTEST",),
 }
 
 
@@ -29,6 +31,9 @@ def profile_module(name):
     if name == "controls":
         from . import controls
         return controls
+    if name == "pitch":
+        from . import pitch
+        return pitch
     if name == "motion":
         from . import motion
         return motion

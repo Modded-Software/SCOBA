@@ -46,6 +46,7 @@ actions:
   aim                    rebuild, build aim test map, run aim profile
   motion                 rebuild, build motion test map, run motion profile
   controls               rebuild, build controls test map, run controls profile
+  pitch                  rebuild, build pitch test map, run 10-second pitch playtest
   build-profile <name>   rebuild, build one profile map, stop
   run-profile <name>     rebuild, build one profile map, run it
 EOF
@@ -59,6 +60,7 @@ profile_timeout() {
     case "$1" in
         aim) printf '%s\n' "${SC2_CASE_TIMEOUT:-150}" ;;
         motion) printf '%s\n' "${SC2_CASE_TIMEOUT:-80}" ;;
+        pitch) printf '%s\n' "${SC2_CASE_TIMEOUT:-18}" ;;
         *) printf '%s\n' "${SC2_CASE_TIMEOUT:-40}" ;;
     esac
 }
@@ -77,7 +79,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|aim|motion|controls) ;;
+        combat|aim|motion|controls|pitch) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -117,7 +119,7 @@ case "$ACTION" in
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-and-check.sh"
         ;;
-    combat|aim|motion|controls)
+    combat|aim|motion|controls|pitch)
         run_profile "$ACTION"
         ;;
     build-profile)

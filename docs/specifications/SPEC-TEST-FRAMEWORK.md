@@ -20,7 +20,7 @@ It defines:
 - the input and frame hooks;
 - the in-game character frame probe;
 - the check module;
-- the combat and aim profiles;
+- the combat, aim, pitch, controls, and motion profiles;
 - animation layer and generated asset checks;
 - the command line;
 - the run artifact layout;
@@ -320,7 +320,6 @@ Required sections:
 | `aim_idle` | Aim held at rest |
 | `aim_enemy` | Enemy under the centered cursor |
 | `aim_hold` | Aim pose after one second |
-| `aim_fixed` | Aim pose after camera pitch change |
 | `aim_walk` | Movement and baseline leg frames |
 | `aim_turn` | Facing while aiming and moving |
 | `aim_stop` | Movement stopped frame |
@@ -353,19 +352,18 @@ Aim case flow:
 6. Save `aim_enter`.
 7. Wait and save `aim_idle`.
 8. Wait one second and save `aim_hold`.
-9. Change camera pitch and save `aim_fixed`.
-10. Spawn an enemy at the aim point.
-11. Save `aim_enemy`.
-12. Set `aim_walk` visual ready state.
-13. Save the bank.
-14. Wait for the input hook while aim is active.
-15. Save `aim_walk`.
-16. Save `aim_turn` after a camera yaw change while moving.
-19. Save `aim_stop` after forward release.
-20. Save `aim_settle` after the idle settle.
-21. Call `gf_AimEnd(1)`.
-22. Wait and save `aim_release`.
-23. Write the finish marker.
+9. Spawn an enemy at the aim point.
+10. Save `aim_enemy`.
+11. Set `aim_walk` visual ready state.
+12. Save the bank.
+13. Wait for the input hook while aim is active.
+14. Save `aim_walk`.
+15. Save `aim_turn` after a camera yaw change while moving.
+16. Save `aim_stop` after forward release.
+17. Save `aim_settle` after the idle settle.
+18. Call `gf_AimEnd(1)`.
+19. Wait and save `aim_release`.
+20. Write the finish marker.
 
 The input hook holds the forward key and captures three frames.
 The input hook changes camera yaw before the `aim_turn` snapshot.
@@ -374,7 +372,41 @@ The stop frame must differ from the last walk frame.
 The `aim_hold` upper state must still be an aim state after one second.
 The aim group lower STC must keep the lower frame IDs advancing.
 
-### 6.4 Controls harness
+### 6.4 Pitch harness
+
+`testkit/galaxy/pitch.galaxy` owns the dedicated pitch case.
+
+Required sections:
+
+| Section | Purpose |
+| --- | --- |
+| `meta` | Profile and finish state |
+| `pitch` | Ready marker and camera pitch samples |
+
+Required keys per pitch sample:
+
+- `<tag>Camera`;
+- `<tag>Rest`;
+- `<tag>Time`.
+
+Pitch case flow:
+
+1. Open the pitch bank.
+2. Capture the anchor.
+3. Reset player to stand.
+4. Call `gf_AimBegin(1)`.
+5. Save `entry`.
+6. Set camera pitch to -55 and save `down`.
+7. Set camera pitch to -30 and save `mid`.
+8. Set camera pitch to -5 and save `up`.
+9. Set camera pitch back to -30 and save `hold`.
+10. Call `gf_AimEnd(1)`.
+11. Write the finish marker.
+
+Camera pitch is recorded in degrees and normalized to signed range.
+Selected keyframes must reach the target within tolerance.
+
+### 6.5 Controls harness
 
 `testkit/galaxy/controls.galaxy` owns control mode cases.
 
@@ -670,12 +702,7 @@ Aim leg frame check:
 - compare frame 2 with frame 3;
 - pass when either region changes above the profile threshold.
 
-Aim fixed pose check:
 
-- capture one frame at low camera pitch;
-- capture one frame at high camera pitch;
-- compare the torso crop of both frames;
-- pass when the region stays within the profile tolerance.
 
 ## 11A. Character frame probe
 
@@ -1157,7 +1184,7 @@ Aim checks:
 | `aim_hold AimGroup` | the generated `Attack Stand` splitbody group |
 | `aim_hold UpperClip` | frozen aim upper STC |
 | `aim_hold LowerClip` | idle lower STC |
-| aim upper overlay start count | zero |
+| aim upper pitch start count | one at entry, no repeats |
 | aim lower frame IDs | advance during aim idle, walk, and backpedal |
 | real W/A/S/D and diagonal keys | eight directions are selected |
 | `aim_direction UnitFacing` | within tolerance of `CameraYaw` |
@@ -1166,7 +1193,6 @@ Aim checks:
 | `aim_strafe` displacement | lateral to camera forward |
 | `aim_twist Twist` | at or below 65 degrees in either strafe direction |
 | `aim_attack` | deferred; no aim attack overlay in this stage |
-| `aim_fixed UpperState` | same as `aim_hold UpperState` |
 | `aim_hold AimActive` | `1` |
 | `aim_walk AimActive` | `1` |
 | `aim_walk LowerState` | a walk state |
@@ -1177,7 +1203,6 @@ Aim checks:
 | `aim_settle LowerState` | idle |
 | stop frame versus last walk frame | at least profile threshold |
 | stop frame 1 versus stop frame 2 | below profile threshold |
-| `aim_fixed_pose UpperClip` | same as `aim_hold UpperClip` |
 | `aim_turn` facing delta | within profile tolerance |
 | `aim_enemy AimCursorTarget` | `1` |
 | `aim_enemy CursorVisible` | `1` |
@@ -1190,7 +1215,75 @@ Aim checks:
 | generated model data | points to generated files |
 | model hash repeat | equal |
 
-### 13.3 Controls profile
+### 13.3 Pitch profile
+
+File: `testkit/profiles/pitch.py`
+
+Map spec:
+
+```py
+TestMapSpec(
+    profile="pitch",
+    source=ROOT / "out" / "SCOBA256.SC2Map",
+    output=ROOT / "out" / "SCOBA256_pitchtest.SC2Map",
+    bank_names=("SCOBAPITCHTEST",),
+    galaxy_files=(
+        ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
+        ROOT / "scripts" / "testkit" / "galaxy" / "pitch.galaxy",
+    ),
+    galaxy_includes=(
+        'scripts/test/pitch/common',
+        'scripts/test/pitch/pitch',
+    ),
+    init_calls=('gt_PitchTest_Init();',),
+)
+```
+
+The pitch profile is a dedicated ten-second playtest.
+It does not run aim movement, targeting, combat, or turn cases.
+
+Pitch case flow:
+
+1. Open the pitch bank.
+2. Capture the anchor.
+3. Reset player to stand.
+4. Call `gf_AimBegin(1)`.
+5. Save `entry`.
+6. Set camera pitch to -55 and save `down`.
+7. Set camera pitch to -30 and save `mid`.
+8. Set camera pitch to -5 and save `up`.
+9. Set camera pitch back to -30 and save `hold`.
+10. Call `gf_AimEnd(1)`.
+11. Write the finish marker.
+
+Pitch samples record normalized camera pitch, rest pitch, and `SCOBAUp` time.
+Camera pitch is recorded in degrees and normalized to signed range.
+Selected keyframes must be tightly spaced and reach the target within tolerance.
+
+Pitch bank sections:
+
+| Section | Purpose |
+| --- | --- |
+| `meta` | Profile and finish state |
+| `pitch` | Ready marker and pitch samples |
+
+Pitch checks:
+
+| Check | Rule |
+| --- | --- |
+| `meta done` | `1` |
+| `meta profile` | `pitch` |
+| `down Camera` | near -55 degrees |
+| `mid Camera` | near -30 degrees |
+| `up Camera` | near -5 degrees |
+| `down Time` | greater than `mid Time` |
+| `up Time` | less than `mid Time` |
+| `hold Time` | near `mid Time` |
+| selected keyframe | reaches target within tolerance |
+| pitch samples | lower frame ID unchanged |
+| pitch samples | model root rotation unchanged |
+
+### 13.4 Controls profile
 
 File: `testkit/profiles/controls.py`
 

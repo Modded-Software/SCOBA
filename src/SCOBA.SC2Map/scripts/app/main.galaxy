@@ -93,6 +93,7 @@ void main () {
     gt_ActionModeToggle_Init();
     gt_AnimInit_Init();
     gt_AnimTick_Init();
+    gt_AnimPitchTick_Init();
     gt_AnimProbe_Init();
     gt_AnimProbeLower_Init();
     gt_AnimProbeToggle_Init();

@@ -67,6 +67,9 @@ void gf_AnimReset (int lp_player) {
     gv_animHasTurnTarget[lp_player] = false;
     gv_animHasMoveTarget[lp_player] = false;
     gv_animAimYawSeen[lp_player] = false;
+    gv_animAimUpperOn[lp_player] = false;
+    gv_animAimPitchTime[lp_player] = -1.0;
+    gv_animAimPitchRest[lp_player] = c_ANIM_AIM_PITCH_REST;
     gv_animHasPos[lp_player] = false;
     if (UnitIsValid(gv_tPSUNIT[lp_player])) {
         gv_animLastPos[lp_player] = UnitGetPosition(gv_tPSUNIT[lp_player]);
@@ -139,6 +142,16 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
     gf_AnimEvent(lp_player, "upper_start", lv_clip, lv_flags);
     gf_ProbeEvent(lp_player, "upper_start", lv_clip, lv_flags);
     ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, lv_flags, lv_blend, lv_blend, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    if (gv_aIMACTIVE[lp_player]) {
+        gv_animAimUpperOn[lp_player] = true;
+        gv_animAimPitchRest[lp_player] = CameraGetPitch(lp_player);
+        if (gv_animAimPitchRest[lp_player] > 180.0) {
+            gv_animAimPitchRest[lp_player] = gv_animAimPitchRest[lp_player] - 360.0;
+        }
+        ActorSend(ActorFromActor(lv_actor, "Model"), "AnimSetTimeScale " + c_ANIM_BRACKET_UPPER + " 0.000000");
+        gv_animAimPitchTime[lp_player] = -1.0;
+        gf_AnimAimPitchTick(lp_player);
+    }
     gv_animUpperState[lp_player] = lp_state;
     gv_animUpperClipIndex[lp_player] = lp_state;
     gf_ProbeSetUpperClip(lp_player, lv_clip);
@@ -401,8 +414,9 @@ void gf_AnimTick (int lp_player) {
     lv_lower = gf_AnimLowerState(lp_player);
     if (gv_aIMACTIVE[lp_player]) {
         gf_AnimUpdateAimDir(lp_player);
-        gf_AnimUpperSet(lp_player, c_ANIM_UPPER_NONE);
         gf_AnimFullSet(lp_player, lv_lower);
+        gf_AnimUpperSet(lp_player, c_ANIM_UPPER_AIM_MID);
+        gf_AnimAimPitchTick(lp_player);
         lv_upper = c_ANIM_UPPER_AIM_MID;
     }
     else {
@@ -469,6 +483,9 @@ void gf_AnimConfigInit () {
         gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_DOWN, "Attack,Ready", 0.15);
         gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_MID, "Attack,Ready", 0.15);
         gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_UP, "Attack,Ready", 0.15);
+        if (lv_profile == c_ANIM_HERO_TOSH || lv_profile == c_ANIM_HERO_KERRIGAN) {
+            gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_MID, "Ready", 0.15);
+        }
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_IDLE, "Stand,Leg", true, 0.15, 0.0);
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_WALK, "Walk,Leg", true, 0.15, lv_walk_speed);
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_WALK_BACK, "Walk,Leg", true, 0.15, lv_walk_speed);

@@ -121,11 +121,19 @@
 - Aim adds `SCOBAAimNoTurn` (`SuppressTurning`) on entry and removes it on exit.
 - Do not disable `Turnable` or permanently zero turning rates.
 - Tosh and Kerrigan use high `StationaryTurningRate` and `TurningRate` so camera facing does not lag.
-- Aim must not play separate render brackets. Use concurrent STCs in one group.
-- Aim hold must not loop the attack swing. Upper tracks are clamped to one key at time zero.
-- Aim hold produces no upper overlay start event.
-- Aim upper pitch follows camera pitch in a later pitch sub-stage.
-- Aim pitch must use spine, shoulder, arm, and elbow pose changes, not only a lower-back pivot.
+- Aim uses two concurrent brackets: `SCOBAUp` for upper aim pitch and `SCOBALo` for lower locomotion.
+- Aim hold must not loop the attack swing. Non-spine upper tracks are held at one key across the clip duration.
+- Aim hold produces one upper pitch start event and no repeated upper start events.
+- Aim upper pitch follows camera pitch with a 40 degree limit in each direction.
+- Aim pitch pivots the whole upper body around one lower-back spine bone, including the head, shoulders, and arms. Do not rotate the lower body or model root.
+- Aim pitch uses densely spaced keyframes and sends the nearest target time when camera pitch changes.
+- Aim pitch selects the nearest `SCOBAUp` target time from `CameraGetPitch`.
+- Galaxy angles are degrees. Normalize wrapped camera pitch above 180 degrees to signed pitch before mapping.
+- Aim pitch sends `AnimSetTime SCOBAUp` directly when the target time changes.
+- Aim pitch sends `AnimSetTime SCOBAUp` to the unit main actor only; never rely on `AnimSetTimeScale`.
+- Do not use `AnimSetTimeScale` for pitch; scale messages do not move the pose.
+- Apply `AnimBlendTimeApply 0` on aim entry so `AnimSetTime` changes pose without a 0.5 second blend.
+- Aim pitch must not use actor root rotation or whole-model rotation.
 - Aim movement keeps lower frame IDs advancing.
 - Facing changes use `UnitSetFacing` with `c_ANIM_TURN_DURATION` outside aim and `c_ANIM_AIM_TURN_DURATION` during aim.
 - Aim facing is written only by `gf_AnimFacingTick`; movement never writes facing.

@@ -90,11 +90,6 @@ void gf_AimTestRealKey (string lp_tag) {
     Wait(0.2, c_timeGame);
 }
 
-void gf_AimTestFixedPose () {
-    CameraSetValue(1, c_cameraValuePitch, (CameraGetPitch(1) + 8.0), 0.2, -1, 10);
-    Wait(0.2, c_timeGame);
-    gf_AimTestSnap("aim_fixed", "t0200", 1);
-}
 
 void gf_AimTestEnemy () {
     gv_dbgEnemy = gf_DbgSpawnOne("aim_enemy", 0.5, 500.0);
@@ -131,7 +126,6 @@ bool gt_AimTest_Func (bool testConds, bool runActions) {
     gf_AimTestSnap("aim_idle", "t0700", 1);
     Wait(1.0, c_timeGame);
     gf_AimTestSnap("aim_hold", "t1700", 1);
-    gf_AimTestFixedPose();
 
     gf_AimTestEnemy();
     Wait(0.1, c_timeGame);

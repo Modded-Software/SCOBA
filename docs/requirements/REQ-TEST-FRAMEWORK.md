@@ -128,6 +128,12 @@ Implementation lives in
 | R-TF-68 | The aim profile MUST prove `SCOBAAimNoTurn` is present during aim and removed after release. |
 | R-TF-69 | The aim profile MUST prove aim movement issues no per-key orders and writes no facing. |
 | R-TF-70 | The aim profile MUST prove facing and movement remain smooth while camera yaw rotates. |
+| R-TF-71 | The pitch profile MUST prove camera pitch changes `SCOBAUp` time and the spine pose using the `SCOBAUp` animation reference. |
+| R-TF-72 | The pitch profile MUST prove pitch reaches 40 degrees up and 40 degrees down. |
+| R-TF-73 | The pitch profile MUST prove pitch changes no lower-body frame and no model root rotation. |
+| R-TF-74 | The pitch profile MUST normalize wrapped camera pitch above 180 degrees before checking pitch time. |
+| R-TF-75 | The pitch profile MUST prove pitch keyframes are tightly spaced and camera pitch selects the nearest keyframe immediately. |
+| R-TF-76 | The pitch profile MUST use one lower-back spine pivot for the whole upper body and MUST NOT rotate the lower body or model root. |
 
 ### 3.9 Command line
 

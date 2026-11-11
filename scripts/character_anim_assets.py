@@ -13,7 +13,7 @@ from pathlib import Path
 
 from project_root import project_root
 from animation_tokens import validate_animation_name
-from character_anim_m3 import clone, make_splitbody_group
+from character_anim_m3 import clone, make_lower_group, make_pitch_group
 
 ROOT = project_root()
 M3_VENDOR = ROOT / "scripts" / "vendor" / "m3addon"
@@ -22,6 +22,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
+MARKER_VERSION = "16\n"
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -33,6 +34,10 @@ SOURCE_MODELS = {
         ("BoneWaist", "Root", "Main"),
         "BoneWaist",
         3.1015,
+        ("BoneSpine01",),
+        (1.0,),
+        "Y",
+        1.0,
     ),
     "kerrigan": (
         r"mods\liberty.sc2mod\base.sc2assets\assets\units\zerg\kerrigan\kerrigan.m3",
@@ -43,6 +48,10 @@ SOURCE_MODELS = {
         ("Box01", "Bone34", "Bone34(mirrored)", "Root", "Bone_Link_Object"),
         "Box01",
         2.5,
+        ("Bone07",),
+        (1.0,),
+        "Y",
+        1.0,
     ),
 }
 
@@ -60,6 +69,12 @@ CLIP_JOBS = (
 HOLD_CLIP_MS = {
     "Attack Ready": 1,
 }
+
+AIM_PITCH_GROUP = "Ready"
+AIM_PITCH_SOURCE = "Attack Ready"
+AIM_PITCH_LIMIT_DEG = 40.0
+AIM_PITCH_TIME_MS = 10000
+AIM_PITCH_SAMPLES = 601
 
 AIM_DIRECTIONS = (
     ("Forward", 0.0, False),
@@ -174,7 +189,18 @@ def validate_model_names(model) -> None:
 
 
 
-def generate_model(source: Path, target: Path, upper_roots: tuple[str, ...], lower_roots: tuple[str, ...], turn_bone: str, unit_speed: float) -> None:
+def generate_model(
+    source: Path,
+    target: Path,
+    upper_roots: tuple[str, ...],
+    lower_roots: tuple[str, ...],
+    turn_bone: str,
+    unit_speed: float,
+    pitch_bones: tuple[str, ...],
+    pitch_weights: tuple[float, ...],
+    pitch_axis: str,
+    pitch_sign: float,
+) -> None:
     model = m3.loadModel(str(source))
     upper_ids, lower_ids = classify_bones(model, upper_roots, lower_roots)
     groups = {group.name: group for group in model.sequenceTransformationGroups}
@@ -197,18 +223,30 @@ def generate_model(source: Path, target: Path, upper_roots: tuple[str, ...], low
         group_ids = upper_ids if bone_group == "upper" else lower_ids
         make_clip(model, group, source_clip, group_ids, new_name, bone_group, unit_speed)
     turn_anim_id = next(bone.rotation.header.animId for bone in model.bones if bone.name == turn_bone)
-    make_splitbody_group(model, groups, "Attack Stand", "Stand Leg", "Attack Ready", 0.0, False, turn_anim_id)
+    make_lower_group(model, groups, "Attack Stand", "Stand Leg", 0.0, False, turn_anim_id)
     for direction_name, yaw, reverse in AIM_DIRECTIONS:
-        make_splitbody_group(
+        make_lower_group(
             model,
             groups,
             "Attack Walk " + direction_name,
             "Walk Leg",
-            "Attack Ready",
             yaw,
             reverse,
             turn_anim_id,
         )
+    make_pitch_group(
+        model,
+        groups,
+        AIM_PITCH_GROUP,
+        AIM_PITCH_SOURCE,
+        pitch_bones,
+        pitch_weights,
+        pitch_axis,
+        pitch_sign,
+        AIM_PITCH_LIMIT_DEG,
+        AIM_PITCH_TIME_MS,
+        AIM_PITCH_SAMPLES,
+    )
     print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)}")
     target.parent.mkdir(parents=True, exist_ok=True)
     m3.saveAndInvalidateModel(model, str(target))
@@ -270,17 +308,41 @@ def revert(root: Path) -> None:
 
 def generate(root: Path, force: bool) -> None:
     marker = root / MARKER
-    if marker.exists() and not force:
+    if marker.exists() and not force and marker.read_text() == MARKER_VERSION:
         return
     temp_root = Path(tempfile.mkdtemp(prefix="sco anim ", dir=root.parent))
     try:
         entries = []
-        for entry, target, model_id, model_value, upper_roots, lower_roots, turn_bone, unit_speed in SOURCE_MODELS.values():
+        for (
+            entry,
+            target,
+            model_id,
+            model_value,
+            upper_roots,
+            lower_roots,
+            turn_bone,
+            unit_speed,
+            pitch_bones,
+            pitch_weights,
+            pitch_axis,
+            pitch_sign,
+        ) in SOURCE_MODELS.values():
             source = extract_model(entry, temp_root)
-            generate_model(source, root / target, upper_roots, lower_roots, turn_bone, unit_speed)
+            generate_model(
+                source,
+                root / target,
+                upper_roots,
+                lower_roots,
+                turn_bone,
+                unit_speed,
+                pitch_bones,
+                pitch_weights,
+                pitch_axis,
+                pitch_sign,
+            )
             entries.append((model_id, model_value))
         (root / MODEL_DATA).write_text(model_data_text(root, entries))
-        marker.write_text("1\n")
+        marker.write_text(MARKER_VERSION)
     finally:
         if temp_root.exists():
             shutil.rmtree(temp_root)

@@ -11,15 +11,17 @@
 
 Outside aim, the native unit baseline is authoritative for idle, walk, and turn.
 
-Inside aim, one generated splitbody group is authoritative.
-The group contains a frozen upper aim pose and the active lower-body direction.
-The two STCs run concurrently inside that group.
-The map does not play separate render brackets during aim.
+Inside aim, two animation brackets run concurrently on the same model:
 
-This shape is required because StarCraft II does not render two independent
-brackets at the same time on one model. Higher priority hides the lower bracket.
-Lower priority hides the upper bracket. Concurrent STCs inside one group avoid
-that choice.
+- `SCOBAUp` plays one shared upper aim clip with dense keyframe-driven lower-back pitch.
+- `SCOBALo` plays the active lower-body direction group.
+
+These are animation brackets on one model, not separate render brackets.
+The map does not create a second model or a separate render actor during aim.
+
+The upper clip contains the frozen aim pose plus a lower-back pitch sweep.
+Non-spine upper tracks stay held at one key across the clip duration.
+The lower group contains one lower STC for the active state and direction.
 
 ## 2. Existing System
 
@@ -97,7 +99,7 @@ The upper STC and lower STC names stay tied to the group name.
 
 ## 5. Runtime Aim State
 
-`gv_animAimClip[profile][lower_state][direction]` stores the aim group name.
+`gv_animAimClip[profile][lower_state][direction]` stores the lower group name.
 
 In `gf_AnimTick`:
 
@@ -105,31 +107,54 @@ In `gf_AnimTick`:
 2. Compute movement heading relative to camera yaw.
 3. Snap to one of eight directions.
 4. Apply direction hysteresis.
-5. On aim, play the selected splitbody group.
-6. Keep hero facing on camera yaw.
-7. Keep the lower direction on movement heading.
-8. Outside aim, clear the aim group and restore baseline lower playback.
-9. Keep the upper bracket clear outside aim.
+5. On aim, play the shared upper pitch clip on `SCOBAUp`.
+6. On aim, play the selected lower-only group on `SCOBALo`.
+7. Apply camera pitch time to the SCOBAUp animation reference.
+8. Keep hero facing on camera yaw.
+9. Keep the lower direction on movement heading.
+10. Outside aim, clear both aim brackets and restore baseline playback.
 
 `gf_AnimFullSet` records `gv_animFullState` and skips a repeated state write.
-`gf_AnimFullClear` clears the aim group and resets the splitbody state.
+`gf_AnimFullClear` clears the lower aim group and resets the splitbody state.
+`gf_AnimAimUpperClear` clears the upper aim clip and resets pitch time.
 
-Aim holds one fixed upper pose.
-Camera pitch does not change the upper pose.
-Aim exit clears the aim group and leaves the baseline visible.
+Aim holds one upper clip while camera pitch changes its playback time.
+Aim exit clears both aim brackets and leaves the baseline visible.
 Control mode change and hero reassignment also clear animation state.
 
-Turning uses no upper overlay.
+Turning uses no upper turn overlay.
 
 ### 5A. Upper-Body Pitch
 
-Aim pitch follows camera pitch in a later pitch sub-stage.
-The first step is yaw and movement correctness.
-Pitch must use upper-body joints: spine, shoulders, arms, and elbows.
-A lower-back-only pivot is not acceptable as the final pitch system.
-The upper yaw STC remains frozen for the yaw stage.
-Pitch poses will be generated as upper-body pitch variants once the yaw and
-movement system is proven.
+Aim pitch follows camera pitch with a 40 degree limit up and down.
+The whole upper body pivots at one lower-back spine bone, including the head.
+A single lower-back pivot keeps the head, neck, and shoulders connected.
+The pivot does not rotate the lower body or model root.
+Shoulder, arm, and elbow correction is deferred until visual validation.
+
+Asset generation creates one shared upper pitch clip per hero:
+
+- the Attack Ready upper pose is the base pose.
+- the lower-back rotation track sweeps from 40 degrees down to 40 degrees up.
+- keyframes are densely spaced so nearest-keyframe selection looks continuous.
+- all other upper position, rotation, and scale tracks stay held at one key
+  across the clip duration.
+- the clip duration is fixed by `c_ANIM_AIM_PITCH_TIME`.
+- the clip is shared across all eight lower directions.
+
+Runtime pitch:
+
+1. Read CameraGetPitch(player) in degrees.
+2. Normalize wrapped pitch: if above 180 degrees, subtract 360.
+3. Subtract rest pitch and clamp to the pitch limit.
+4. Map clamped pitch to a target time on the dense keyframe range.
+5. When the target time changes, send AnimSetTime immediately.
+6. Do not use AnimSetTimeScale; it does not move the pitch pose.
+6a. Apply AnimBlendTimeApply 0 on aim entry so AnimSetTime does not blend over the default 0.5 seconds.
+7. Clear SCOBAUp on aim exit.
+
+Pitch uses local bone rotation. The local pitch axis and sign are per-hero
+configuration values validated in game.
 
 ## 6. Attack While Aiming
 
@@ -199,8 +224,11 @@ Combat state is untouched.
 
 Use the existing generator for Tosh and Kerrigan.
 It reads source models, writes models into the built map, and updates model data.
-It generates splitbody aim groups with one upper STC and one lower STC.
-It generates eight lower directions, including reversed backpedal clips.
+It generates one shared upper pitch clip per hero.
+It generates lower-only groups for idle and eight movement directions,
+including reversed backpedal clips.
+Spine pitch bones, weights, axis, sign, and sample count are per-hero
+configuration values.
 It keeps full-body Stand, Walk, Stand Left, and Stand Right clips.
 
 Keep generated asset output out of hand edits.
@@ -220,15 +248,19 @@ Live actor time is reported only when a real actor query worker exists.
 
 Aim tests must prove:
 
-1. Aim uses one splitbody group.
-2. The upper pose does not loop.
-3. Lower frame IDs advance in all eight directions.
-4. Backward movement uses a reversed backpedal clip.
-5. Torso-to-lower twist stays at or below 65 degrees in either strafe direction.
-6. Aim hold records no upper overlay start event.
-7. Real W/A/S/D and diagonal keys keep unit facing within tolerance of camera yaw.
-8. S moves opposite camera forward and A/D move laterally without turning.
-9. Aim release restores the baseline.
+1. Aim uses `SCOBAUp` for the shared upper pitch clip.
+2. Aim uses `SCOBALo` for lower state and direction.
+3. The upper pose does not loop.
+4. Lower frame IDs advance in all eight directions.
+5. Backward movement uses a reversed backpedal clip.
+6. Torso-to-lower twist stays at or below 65 degrees in either strafe direction.
+7. Aim hold records one upper pitch start event and no repeated upper start events.
+8. Real W/A/S/D and diagonal keys keep unit facing within tolerance of camera yaw.
+9. S moves opposite camera forward and A/D move laterally without turning.
+10. Aim release restores the baseline.
+11. Camera pitch up and down changes upper clip time and the spine pose.
+12. Pitch reaches 40 degrees up and 40 degrees down.
+13. Pitch changes no lower frame and no model root rotation.
 
 ## 11. Change Rule
 

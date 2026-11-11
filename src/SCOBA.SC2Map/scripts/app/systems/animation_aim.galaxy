@@ -129,3 +129,62 @@ void gf_AnimConfigAimWalk (int lp_profile, int lp_state) {
     gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_RIGHT, "Attack,Walk,Right");
     gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_FORWARD_RIGHT, "Attack,Walk,Forward,Right");
 }
+void gf_AnimAimPitchTick (int lp_player) {
+    unit lv_hero;
+    actor lv_actor;
+    fixed lv_pitch;
+    fixed lv_time;
+    fixed lv_camera;
+
+    if (!gv_animAimUpperOn[lp_player]) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_camera = CameraGetPitch(lp_player);
+    if (lv_camera > 180.0) {
+        lv_camera = lv_camera - 360.0;
+    }
+    lv_pitch = gv_animAimPitchRest[lp_player] - lv_camera;
+    if (lv_pitch > c_ANIM_AIM_PITCH_LIMIT) {
+        lv_pitch = c_ANIM_AIM_PITCH_LIMIT;
+    }
+    if (lv_pitch < -c_ANIM_AIM_PITCH_LIMIT) {
+        lv_pitch = -c_ANIM_AIM_PITCH_LIMIT;
+    }
+    lv_time = ((lv_pitch + c_ANIM_AIM_PITCH_LIMIT) / (c_ANIM_AIM_PITCH_LIMIT * 2.0)) * c_ANIM_AIM_PITCH_TIME;
+    if (lv_time < 0.0) {
+        lv_time = 0.0;
+    }
+    if (lv_time > c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY) {
+        lv_time = c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY;
+    }
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    if (gv_animAimPitchTime[lp_player] < 0.0) {
+        ActorSend(lv_actor, "AnimBlendTimeApply 0.000000");
+    }
+    if (gv_animAimPitchTime[lp_player] == lv_time) {
+        return;
+    }
+    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_AIM_PITCH_CLIP + " " + FixedToString(lv_time, c_fixedPrecisionAny) + " 0");
+    gv_animAimPitchTime[lp_player] = lv_time;
+}
+
+bool gt_AnimPitchTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_AnimAimPitchTick(lv_player);
+    }
+    return true;
+}
+
+void gt_AnimPitchTick_Init () {
+    gt_AnimPitchTick = TriggerCreate("gt_AnimPitchTick_Func");
+    TriggerAddEventTimePeriodic(gt_AnimPitchTick, c_ANIM_AIM_PITCH_TICK, c_timeGame);
+}

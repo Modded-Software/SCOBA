@@ -66,7 +66,7 @@ bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     FogSetStartHeight(32.0);
     FogSetColor(Color(18.04, 18.43, 5.88));
     FogSetDensity(0.0002);
-    GameSetBackground(c_backgroundFixed, "AiurSkybox", 10.0);
+    GameSetBackground(c_backgroundFixed, "AiurSkybox", 100.0);
     GameTimeOfDaySet("00");
     VisEnable(c_visTypeMask, false);
     VisEnable(c_visTypeFog, false);

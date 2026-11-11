@@ -126,8 +126,6 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("aim_idle", "t0700", "LowerState", 1)
     checks.eq("aim_hold", "t1700", "AimActive", 1)
     checks.eq("aim_hold", "t1700", "UpperState", 4)
-    checks.eq("aim_fixed", "t0200", "UpperState", 4)
-    checks.eq("aim_fixed", "t0200", "UpperClip", checks.value("aim_hold", "t1700", "UpperClip"))
     checks.eq("aim_settle", "t1500", "LowerState", 1)
     checks.eq("aim_enemy", "t0000", "AimCursorTarget", 1)
     checks.eq("aim_enemy", "t0000", "CursorVisible", 1)
@@ -241,34 +239,20 @@ def check(ctx, data: dict, checks) -> None:
         and int(record.get("aim", 0)) == 1
         and int(record.get("lo", 0)) == 2
     ]
-    upper_frames = [int(record.get("uframe", -1)) for record in aim_walk if int(record.get("uframe", -1)) >= 0]
     lower_ids = [int(record.get("lfid", -1)) for record in aim_walk if int(record.get("lfid", -1)) >= 0]
-    if upper_frames and len(set(upper_frames)) == 1:
-        print(f"aim_upper_frozen: count={len(upper_frames)} PASS")
-    else:
-        print(f"aim_upper_frozen: count={len(upper_frames)} unique={len(set(upper_frames))} FAIL")
-        checks.failures += 1
     if len(set(lower_ids)) > 1:
         print(f"aim_lower_moving: count={len(lower_ids)} unique={len(set(lower_ids))} PASS")
     else:
         print(f"aim_lower_moving: count={len(lower_ids)} unique={len(set(lower_ids))} FAIL")
         checks.failures += 1
     turn_starts = 0
-    aim_starts = 0
     for text in ctx.anim_data.get("events", {}).values():
         if "kind=upper_start" in str(text) and "clip=Turn" in str(text):
             turn_starts += 1
-        if "kind=upper_start" in str(text) and "clip=Attack,Ready" in str(text):
-            aim_starts += 1
     if turn_starts == 0:
         print("aim upper_start turn count: PASS")
     else:
         print(f"aim upper_start turn count: got={turn_starts} want=0 FAIL")
-        checks.failures += 1
-    if aim_starts == 0:
-        print("aim upper_start hold count: PASS")
-    else:
-        print(f"aim upper_start hold count: got={aim_starts} want=0 FAIL")
         checks.failures += 1
 
     for key in ("Auto", "Stand"):

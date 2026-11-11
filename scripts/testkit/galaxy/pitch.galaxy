@@ -1,0 +1,56 @@
+// Dedicated 10-second aim pitch playtest.
+
+void gf_PitchSnap (string lp_tag) {
+    fixed lv_camera;
+    lv_camera = CameraGetPitch(1);
+    if (lv_camera > 180.0) {
+        lv_camera = lv_camera - 360.0;
+    }
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Camera", FixedToInt(lv_camera));
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Rest", FixedToInt(gv_animAimPitchRest[1]));
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Time", FixedToInt(gv_animAimPitchTime[1] * 1000.0));
+    BankSave(gv_dbgBank);
+}
+
+trigger gt_PitchTest;
+
+bool gt_PitchTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(1.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAPITCHTEST", 1);
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "pitch");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    BankValueSetFromInt(gv_dbgBank, "pitch", "Ready", 1);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    BankValueSetFromInt(gv_dbgBank, "meta", "anchorX", FixedToInt(PointGetX(gv_dbgAnchor)));
+    BankValueSetFromInt(gv_dbgBank, "meta", "anchorY", FixedToInt(PointGetY(gv_dbgAnchor)));
+    BankSave(gv_dbgBank);
+    gf_DbgReset("pitch_start", false, true);
+    gf_AimBegin(1);
+    Wait(0.3, c_timeGame);
+    gf_PitchSnap("entry");
+    CameraSetValue(1, c_cameraValuePitch, -55.0, 0.2, -1, 10);
+    Wait(2.0, c_timeGame);
+    gf_PitchSnap("down");
+    CameraSetValue(1, c_cameraValuePitch, -30.0, 0.2, -1, 10);
+    Wait(2.0, c_timeGame);
+    gf_PitchSnap("mid");
+    CameraSetValue(1, c_cameraValuePitch, -5.0, 0.2, -1, 10);
+    Wait(2.0, c_timeGame);
+    gf_PitchSnap("up");
+    CameraSetValue(1, c_cameraValuePitch, -30.0, 0.2, -1, 10);
+    Wait(2.0, c_timeGame);
+    gf_PitchSnap("hold");
+    Wait(1.0, c_timeGame);
+    gf_AimEnd(1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_PitchTest_Init () {
+    gt_PitchTest = TriggerCreate("gt_PitchTest_Func");
+    TriggerAddEventMapInit(gt_PitchTest);
+}

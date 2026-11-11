@@ -100,7 +100,7 @@ clean-precommit: ## Remove pre-commit framework traces
 # =============================================================================
 PLAYTEST := $(REPO_ROOT)/scripts/playtest.sh
 
-.PHONY: map-build map-launch combat aim motion controls
+.PHONY: map-build map-launch combat aim motion controls pitch
 map-build: ## Rebuild the map fresh and stop
 	$(SCRIPT_BASH) $(PLAYTEST) build
 
@@ -118,3 +118,6 @@ motion: ## Rebuild and run the motion profile
 
 controls: ## Rebuild and run the controls profile
 	$(SCRIPT_BASH) $(PLAYTEST) controls
+
+pitch: ## Rebuild and run the 10-second pitch profile
+	$(SCRIPT_BASH) $(PLAYTEST) pitch

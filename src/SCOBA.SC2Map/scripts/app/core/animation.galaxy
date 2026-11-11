@@ -33,6 +33,12 @@ const int c_ANIM_HERO_COUNT = 4;
 
 const fixed c_ANIM_TURN_DURATION = 0.1;
 const fixed c_ANIM_AIM_TURN_DURATION = 0.05;
+const fixed c_ANIM_AIM_PITCH_LIMIT = 40.0;
+const fixed c_ANIM_AIM_PITCH_REST = -30.0;
+const fixed c_ANIM_AIM_PITCH_TIME = 10.0;
+const fixed c_ANIM_AIM_PITCH_KEY = 0.0166667;
+const fixed c_ANIM_AIM_PITCH_TICK = 0.01;
+const string c_ANIM_AIM_PITCH_CLIP = "SCOBAUp";
 const fixed c_ANIM_TURN_DEADBAND = 3.0;
 const int c_ANIM_LOWER_HOLD_TICKS = 3;
 
