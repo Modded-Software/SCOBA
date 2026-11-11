@@ -60,6 +60,7 @@ void gf_ControlsToggle (int lp_command) {
 bool gt_ControlsTest_Func (bool testConds, bool runActions) {
     unit lv_enemy;
     point lv_point;
+    fixed lv_dist;
 
     if (!runActions) {
         return true;
@@ -188,6 +189,25 @@ bool gt_ControlsTest_Func (bool testConds, bool runActions) {
     gf_ControlsToggle(1);
     Wait(0.5, c_timeGame);
     gf_ControlsSnap("controls_rpg", "t0500");
+
+    lv_dist = CameraGetDistance(1);
+    gv_cameraCollisionOff[1] = true;
+    gv_cameraDistanceDesired[1] = lv_dist + 1.5;
+    gf_CameraZoomApply(1);
+    Wait(0.1, c_timeGame);
+    gf_ControlsSnap("controls_zoom", "t0100");
+    gv_cameraDistanceDesired[1] = lv_dist;
+    gf_CameraZoomApply(1);
+    Wait(0.1, c_timeGame);
+    gv_cameraCollisionOff[1] = false;
+    Wait(0.1, c_timeGame);
+    gf_ControlsSnap("controls_collision", "t0200");
+    CameraSetValue(1, c_cameraValuePitch, -60.0, 0.1, -1, 10);
+    Wait(0.5, c_timeGame);
+    gf_ControlsSnap("controls_collision_clamp", "t0500");
+    CameraSetValue(1, c_cameraValuePitch, 30.0, 0.1, -1, 10);
+    Wait(0.8, c_timeGame);
+    gf_ControlsSnap("controls_collision_restore", "t0800");
 
     gf_ProbeDisable(1);
     BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);

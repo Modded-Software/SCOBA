@@ -135,6 +135,9 @@ void gf_AnimAimPitchTick (int lp_player) {
     fixed lv_pitch;
     fixed lv_time;
     fixed lv_camera;
+    int lv_now;
+    fixed lv_advance;
+    fixed lv_set;
 
     if (!gv_animAimUpperOn[lp_player]) {
         return;
@@ -143,6 +146,7 @@ void gf_AnimAimPitchTick (int lp_player) {
     if (!UnitIsValid(lv_hero)) {
         return;
     }
+    gv_animAimPitchTicks[lp_player] += 1;
     lv_camera = CameraGetPitch(lp_player);
     if (lv_camera > 180.0) {
         lv_camera = lv_camera - 360.0;
@@ -162,14 +166,29 @@ void gf_AnimAimPitchTick (int lp_player) {
         lv_time = c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY;
     }
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    lv_now = gf_AnimNowMs();
+    lv_advance = 0.0;
+    if (gv_animAimPitchLastMs[lp_player] >= 0) {
+        lv_advance = (lv_now - gv_animAimPitchLastMs[lp_player]) / 1000.0;
+        if (lv_advance < 0.0) {
+            lv_advance = 0.0;
+        }
+        if (lv_advance > 0.05) {
+            lv_advance = 0.05;
+        }
+    }
+    gv_animAimPitchLastMs[lp_player] = lv_now;
+    lv_set = lv_time + lv_advance;
+    if (lv_set > c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY) {
+        lv_set = c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY;
+    }
     if (gv_animAimPitchTime[lp_player] < 0.0) {
         ActorSend(lv_actor, "AnimBlendTimeApply 0.000000");
+        ActorSend(ActorFromActor(lv_actor, "Model"), "AnimBlendTimeApply 0.000000");
     }
-    if (gv_animAimPitchTime[lp_player] == lv_time) {
-        return;
-    }
-    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_AIM_PITCH_CLIP + " " + FixedToString(lv_time, c_fixedPrecisionAny) + " 0");
+    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_AIM_PITCH_CLIP + " " + FixedToString(lv_set, c_fixedPrecisionAny) + " 0");
     gv_animAimPitchTime[lp_player] = lv_time;
+    gv_animAimPitchSends[lp_player] += 1;
 }
 
 bool gt_AnimPitchTick_Func (bool testConds, bool runActions) {
@@ -187,4 +206,5 @@ bool gt_AnimPitchTick_Func (bool testConds, bool runActions) {
 void gt_AnimPitchTick_Init () {
     gt_AnimPitchTick = TriggerCreate("gt_AnimPitchTick_Func");
     TriggerAddEventTimePeriodic(gt_AnimPitchTick, c_ANIM_AIM_PITCH_TICK, c_timeGame);
+    TriggerAddEventCameraMove(gt_AnimPitchTick, c_playerAny, c_cameraMoveReasonAny);
 }

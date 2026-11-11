@@ -118,6 +118,31 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("controls_rpg", "t0500", "UpperState", 0)
     checks.eq("controls_rpg", "t0500", "LowerState", 1)
     checks.eq("controls_action", "t0500", "CooldownMs", checks.value("controls_default", "t0000", "CooldownMs"))
+    base_distance = checks.value("controls_default", "t0000", "Distance") or 0
+    zoom_distance = checks.value("controls_zoom", "t0100", "Distance") or 0
+    if zoom_distance - base_distance >= 1:
+        print("controls_zoom immediate distance: PASS")
+    else:
+        print(f"controls_zoom immediate distance: got={zoom_distance} base={base_distance} FAIL")
+        checks.failures += 1
+    collision_distance = checks.value("controls_collision", "t0200", "Distance") or 0
+    if abs(collision_distance - base_distance) <= 1:
+        print("controls_collision flat distance: PASS")
+    else:
+        print(f"controls_collision flat distance: got={collision_distance} base={base_distance} FAIL")
+        checks.failures += 1
+    clamp_distance = checks.value("controls_collision_clamp", "t0500", "Distance") or 0
+    if clamp_distance < collision_distance:
+        print("controls_collision_clamp distance: PASS")
+    else:
+        print(f"controls_collision_clamp distance: got={clamp_distance} base={collision_distance} FAIL")
+        checks.failures += 1
+    restore_distance = checks.value("controls_collision_restore", "t0800", "Distance") or 0
+    if abs(restore_distance - collision_distance) <= 1:
+        print("controls_collision_restore distance: PASS")
+    else:
+        print(f"controls_collision_restore distance: got={restore_distance} base={collision_distance} FAIL")
+        checks.failures += 1
     _check_icons(checks)
 
     yaw = checks.value("controls_mouselook", "t0200", "CameraYaw")

@@ -307,6 +307,12 @@
     <!--                                                                                         -->
     <!-- Tosh .................................................................................. -->
     <!--                                                                                         -->
+    <CActorModel id="ToshSCOBA">
+        <AnimBlendTime value="0.000000"/>
+    </CActorModel>
+    <CActorModel id="KerriganSCOBA">
+        <AnimBlendTime value="0.000000"/>
+    </CActorModel>
     <CActorUnit id="Tosh">
         <Model value="ToshSCOBA"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>

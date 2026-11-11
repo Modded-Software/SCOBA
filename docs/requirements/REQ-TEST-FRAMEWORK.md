@@ -134,6 +134,9 @@ Implementation lives in
 | R-TF-74 | The pitch profile MUST normalize wrapped camera pitch above 180 degrees before checking pitch time. |
 | R-TF-75 | The pitch profile MUST prove pitch keyframes are tightly spaced and camera pitch selects the nearest keyframe immediately. |
 | R-TF-76 | The pitch profile MUST use one lower-back spine pivot for the whole upper body and MUST NOT rotate the lower body or model root. |
+| R-TF-77 | The pitch profile MUST record pitch ticks, pitch sends, remaining clip time, and model remaining time. |
+| R-TF-78 | The pitch profile MUST prove camera pitch sends are paced by camera moves and reasserts. |
+| R-TF-79 | Tests MUST cover camera collision distance clamping and restoration. |
 
 ### 3.9 Command line
 

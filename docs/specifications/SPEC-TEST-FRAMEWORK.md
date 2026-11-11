@@ -346,7 +346,7 @@ Aim case flow:
 
 1. Open the aim bank.
 2. Capture the anchor.
-3. Reset player to stand.
+3. Reset player to stand and set `gv_cameraCollisionOff[1]` so collision cannot write distance during pitch sampling.
 4. Call `gf_AimBegin(1)`.
 5. Wait until aim is active.
 6. Save `aim_enter`.
@@ -393,13 +393,13 @@ Pitch case flow:
 
 1. Open the pitch bank.
 2. Capture the anchor.
-3. Reset player to stand.
+3. Reset player to stand and set `gv_cameraCollisionOff[1]` so collision cannot write distance during pitch sampling.
 4. Call `gf_AimBegin(1)`.
 5. Save `entry`.
-6. Set camera pitch to -55 and save `down`.
-7. Set camera pitch to -30 and save `mid`.
-8. Set camera pitch to -5 and save `up`.
-9. Set camera pitch back to -30 and save `hold`.
+6. Set camera pitch to 60 and save `down`.
+7. Set camera pitch to 30 and save `mid`.
+8. Set camera pitch to 5 and save `up`.
+9. Set camera pitch back to 30 and save `hold`.
 10. Call `gf_AimEnd(1)`.
 11. Write the finish marker.
 
@@ -428,6 +428,10 @@ Required sections:
 | `controls_ground` | Ground left click |
 | `controls_alt_click` | Alt UI click |
 | `controls_rpg` | Return to RPG mode |
+| `controls_zoom` | Zoom write applies immediately |
+| `controls_collision` | Flat-ground collision keeps the desired distance |
+| `controls_collision_clamp` | Underground eye shortens camera distance |
+| `controls_collision_restore` | Clear view restores the desired distance |
 | `controls_rpg_hold` | RPG right hold does not aim |
 | `controls_rpg_click_move` | RPG Walk real right-click movement |
 | `controls_rpg_click_stop` | RPG Stand real right-click stop |
@@ -1246,13 +1250,13 @@ Pitch case flow:
 
 1. Open the pitch bank.
 2. Capture the anchor.
-3. Reset player to stand.
+3. Reset player to stand and set `gv_cameraCollisionOff[1]` so collision cannot write distance during pitch sampling.
 4. Call `gf_AimBegin(1)`.
 5. Save `entry`.
-6. Set camera pitch to -55 and save `down`.
-7. Set camera pitch to -30 and save `mid`.
-8. Set camera pitch to -5 and save `up`.
-9. Set camera pitch back to -30 and save `hold`.
+6. Set camera pitch to 60 and save `down`.
+7. Set camera pitch to 30 and save `mid`.
+8. Set camera pitch to 5 and save `up`.
+9. Set camera pitch back to 30 and save `hold`.
 10. Call `gf_AimEnd(1)`.
 11. Write the finish marker.
 
@@ -1273,11 +1277,11 @@ Pitch checks:
 | --- | --- |
 | `meta done` | `1` |
 | `meta profile` | `pitch` |
-| `down Camera` | near -55 degrees |
-| `mid Camera` | near -30 degrees |
-| `up Camera` | near -5 degrees |
-| `down Time` | greater than `mid Time` |
-| `up Time` | less than `mid Time` |
+| `down Camera` | near 60 degrees |
+| `mid Camera` | near 30 degrees |
+| `up Camera` | near 5 degrees |
+| `down Time` | less than `mid Time` |
+| `up Time` | greater than `mid Time` |
 | `hold Time` | near `mid Time` |
 | selected keyframe | reaches target within tolerance |
 | pitch samples | lower frame ID unchanged |
@@ -1380,6 +1384,10 @@ Controls checks:
 | `controls_rpg_stale CombatState` | no attack |
 | `controls_rpg_stop_idle LowerState` | idle |
 | `controls_aim_distance CameraDistance` | equals `controls_action` |
+| `controls_zoom Distance` | at least `controls_default` + `1` |
+| `controls_collision Distance` | within `1` of `controls_default` on flat ground |
+| `controls_collision_clamp Distance` | less than flat-ground distance |
+| `controls_collision_restore Distance` | within `1` of flat-ground distance |
 | `controls_move_tick MoveTarget` | equals `c_ANIM_MOVE_TARGET` |
 | `controls_move_tick` tick interval | `c_ANIM_MOVE_TICK` |
 | `controls_action_left` facing delta | turns left |

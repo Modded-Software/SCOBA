@@ -282,6 +282,7 @@ def make_pitch_group(
         if (anim_ref >> 16) & 0xFFFF != 3:
             raise ValueError(f"pitch bone {bone_name} has no rotation track")
         block = upper_stc.sd4q[anim_ref & 0xFFFF]
+        flags = block.flags
         if not block.keys:
             raise ValueError(f"pitch bone {bone_name} has an empty rotation track")
         base = clone(block.keys[0])
@@ -303,7 +304,7 @@ def make_pitch_group(
         block.frames = frames
         block.keys = keys
         block.fend = duration_ms
-        block.flags = 0
+        block.flags = flags
 
     upper_index = append_stc(model, upper_stc, 11)
     group = clone(upper_group)

@@ -52,6 +52,16 @@ def check(ctx, data: dict, checks) -> None:
         print(f"pitch {tag}: camera={checks.value('pitch', '', tag + 'Camera')} rest={checks.value('pitch', '', tag + 'Rest')} time={checks.value('pitch', '', tag + 'Time')}")
     checks.eq("meta", "", "done", 1)
     checks.eq("meta", "", "profile", "pitch")
+    checks.between("pitch", "", "midCamera", 25, 35)
+    down_time = checks.value("pitch", "", "downTime") or 0
+    mid_time = checks.value("pitch", "", "midTime") or 0
+    up_time = checks.value("pitch", "", "upTime") or 0
+    if down_time < mid_time < up_time:
+        print("pitch direction: PASS")
+    else:
+        print(f"pitch direction: got down={down_time} mid={mid_time} up={up_time} FAIL")
+        checks.failures += 1
+    
 
 
 def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> TestRunSpec:

@@ -79,7 +79,7 @@ prevents right-click state races.
 | `c_ANIM_MOVE_RETARGET` | 2.0 | Remaining distance that refreshes the target |
 | `c_ANIM_MOVE_HEADING` | 12.0 | Heading change that refreshes the target |
 | `c_ANIM_MOVE_TICK` | 0.015 | Aim movement loop interval |
-| `c_ANIM_AIM_TURN_DURATION` | 0.05 | Aim facing interpolation duration |
+| `c_ANIM_AIM_TURN_DURATION` | 0.03 | Aim facing interpolation duration |
 | `SCOBAAimNoTurn` | buff | Suppresses native turn-to-travel during aim |
 | `c_SCOBA_ACTION_ROW` | 0 | Control mode button row |
 | `c_SCOBA_ACTION_COLUMN` | 2 | Control mode button column |
@@ -277,6 +277,35 @@ W up:
    `gv_fORWARD[player] = false`.
 
 The forward loop runs while `gv_fORWARD` is true.
+
+## 12A. Camera collision
+
+Camera collision owns only `c_cameraValueDistance`.
+
+It never writes camera pitch, camera yaw, camera target, or the camera data
+object.
+
+1. Read the camera target, yaw, pitch, and current distance.
+2. Normalize wrapped pitch above 180 degrees for collision math only.
+3. Compute the desired eye from the target, yaw, pitch, and desired distance.
+4. Sweep from the target to the desired eye.
+5. Use a probe radius that covers the camera near plane.
+6. Ignore obstacles closer than the minimum pivot distance of `0.8`.
+7. Sample terrain height along the sweep.
+8. Use the camera target height plus the authored height offset, raised to terrain height when lower.
+9. Find the earliest blocked fraction.
+10. Safe distance is `max(minDistance, hitDistance - probeRadius)`.
+11. Keep `gv_cameraDistanceDesired` owned by scroll input.
+12. Apply a shorter distance immediately.
+13. Restore the desired distance slowly after a clear dwell.
+14. Never infer desired distance from a collision-shortened distance.
+15. Apply the clamp on every collision tick, including while pitch or yaw is changing.
+
+Collision runs on a 0.02 s periodic tick. Do not write distance from a camera
+move event; that can recurse and bounce.
+
+Scroll input recomputes the safe distance on every wheel event and writes
+`min(desired, safe)` with zero duration.
 
 ## 13. Camera events
 

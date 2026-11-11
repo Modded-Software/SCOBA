@@ -183,6 +183,13 @@ Implementation lives in
 | R-MC-96 | Aim entry without a movement key MUST stop stale movement and restore idle. |
 | R-MC-97 | Normal action A/D MUST turn the hero left or right and move. |
 | R-MC-98 | Normal action S MUST turn the hero around and move. |
+| R-MC-107 | Camera collision MUST clamp only `c_cameraValueDistance`. It MUST NOT write pitch or yaw. |
+| R-MC-108 | Camera collision MUST keep a desired scroll distance and restore it when terrain clears. |
+| R-MC-109 | Camera collision MUST sweep from the camera target toward the desired eye with a camera radius. |
+| R-MC-110 | Camera collision MUST shorten distance immediately and restore it slowly. |
+| R-MC-111 | Camera collision MUST apply the safety clamp on every tick, including while pitch or yaw is changing. |
+| R-MC-112 | Scroll input MUST write the clamped distance immediately on every wheel event. |
+| R-MC-113 | Camera collision MUST check terrain height along the sweep. |
 | R-MC-99 | Normal action movement MUST NOT use lateral strafe behavior. |
 
 ## 4. Acceptance criteria

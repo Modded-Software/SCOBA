@@ -132,8 +132,23 @@
 - Aim pitch sends `AnimSetTime SCOBAUp` directly when the target time changes.
 - Aim pitch sends `AnimSetTime SCOBAUp` to the unit main actor only; never rely on `AnimSetTimeScale`.
 - Do not use `AnimSetTimeScale` for pitch; scale messages do not move the pose.
+- Reassert `AnimSetTime` every pitch tick; the message does not freeze playback.
+- Add elapsed time between sends so reasserts keep visible pitch continuous.
+- Drive pitch updates from `TriggerAddEventCameraMove` and a periodic timer.
 - Apply `AnimBlendTimeApply 0` on aim entry so `AnimSetTime` changes pose without a 0.5 second blend.
+- Tosh and Kerrigan `CActorModel` entries set `AnimBlendTime` to 0.
+- Aim entry must start at the current camera pitch without blending from idle.
 - Aim pitch must not use actor root rotation or whole-model rotation.
+- Camera collision owns only `c_cameraValueDistance`. It never writes pitch or yaw.
+- SC2 camera pitch is degrees down from horizontal. Positive pitch places the eye above the target.
+- Scroll zoom applies immediately on every wheel event.
+- Camera collision checks terrain height along the sweep and includes the camera height offset.
+- Keep one desired scroll distance. Collision never overwrites it with a shortened distance.
+- Sweep the arm from the camera target to the desired eye with a camera radius.
+- Ignore obstacles closer than the minimum pivot distance.
+- Shorten distance immediately. Restore desired distance slowly after a clear dwell.
+- The collision tick applies the clamp on every tick, including while pitch or yaw is changing.
+- Collision runs on a 0.02 s periodic tick. Never write distance from a camera move event.
 - Aim movement keeps lower frame IDs advancing.
 - Facing changes use `UnitSetFacing` with `c_ANIM_TURN_DURATION` outside aim and `c_ANIM_AIM_TURN_DURATION` during aim.
 - Aim facing is written only by `gf_AnimFacingTick`; movement never writes facing.
@@ -147,7 +162,7 @@
 - Reset animation state on aim entry, control mode change, and hero reassignment.
 - Clearing the aim group must reset the splitbody state and upper state in the same call.
 - Use movement intent plus a hold timer for lower walk and idle selection. Select the aim group from that lower state and direction.
-- Controls tests must cover real clicks, target persistence, stale hover, aim distance, movement tick, and animation reset.
+- Controls tests must cover real clicks, target persistence, stale hover, aim distance, movement tick, animation reset, immediate zoom, and collision clamp/restore.
 
 ## Resource tools
 

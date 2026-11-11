@@ -1,5 +1,18 @@
 // Module: systems/camera
 
+void gf_CameraZoomApply (int lp_player) {
+    fixed lv_desired;
+    fixed lv_safe;
+
+    lv_desired = gv_cameraDistanceDesired[lp_player];
+    lv_safe = gf_CameraSafeDistance(lp_player, lv_desired);
+    if (lv_safe > lv_desired) {
+        lv_safe = lv_desired;
+    }
+    CameraSetValue(lp_player, c_cameraValueDistance, lv_safe, 0.0, -1, 10);
+    gv_cameraDistanceApplied[lp_player] = lv_safe;
+}
+
 bool gt_CameraFollowDistance_Func (bool testConds, bool runActions) {
     // Variable Declarations
     int lv_localPlayer;
@@ -12,7 +25,17 @@ bool gt_CameraFollowDistance_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    CameraSetValue(lv_localPlayer, c_cameraValueDistance, (CameraGetDistance(lv_localPlayer) - (EventMouseWheelSpin() / 2.0)), 0.2, -1, 10);
+    if (gv_cameraDistanceDesired[lv_localPlayer] <= 0.0) {
+        gv_cameraDistanceDesired[lv_localPlayer] = CameraGetDistance(lv_localPlayer);
+    }
+    gv_cameraDistanceDesired[lv_localPlayer] = gv_cameraDistanceDesired[lv_localPlayer] - (EventMouseWheelSpin() / 2.0);
+    if (gv_cameraDistanceDesired[lv_localPlayer] < 1.0) {
+        gv_cameraDistanceDesired[lv_localPlayer] = 1.0;
+    }
+    if (gv_cameraDistanceDesired[lv_localPlayer] > 40.0) {
+        gv_cameraDistanceDesired[lv_localPlayer] = 40.0;
+    }
+    gf_CameraZoomApply(lv_localPlayer);
     return true;
 }
 
@@ -189,6 +212,106 @@ void gt_CursorEnd_Init () {
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_fIRE, false);
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_mOUSECURSOR, false);
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_aBILITYCAMERA, false);
+}
+
+fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {
+    fixed lv_pitch;
+    fixed lv_yaw;
+    fixed lv_horiz;
+    fixed lv_tx;
+    fixed lv_ty;
+    fixed lv_tz;
+    fixed lv_offset;
+    fixed lv_ex;
+    fixed lv_ey;
+    fixed lv_ez;
+    fixed lv_fraction;
+    fixed lv_sampleZ;
+    fixed lv_safe;
+    int lv_seg;
+    point lv_target;
+    point lv_eye;
+    point lv_sample;
+
+    if (lp_desired <= 0.0) {
+        return 0.0;
+    }
+    lv_pitch = CameraGetPitch(lp_player);
+    if (lv_pitch > 180.0) {
+        lv_pitch = lv_pitch - 360.0;
+    }
+    lv_yaw = CameraGetYaw(lp_player);
+    lv_horiz = Cos(lv_pitch) * lp_desired;
+    lv_target = CameraGetTarget(lp_player);
+    lv_eye = PointWithOffsetPolar(lv_target, lv_horiz, lv_yaw + 180.0);
+    lv_tx = PointGetX(lv_target);
+    lv_ty = PointGetY(lv_target);
+    lv_tz = PointGetHeight(lv_target);
+    if (lv_tz < WorldHeight(c_heightMapGround, lv_target)) {
+        lv_tz = WorldHeight(c_heightMapGround, lv_target);
+    }
+    lv_offset = gv_iMMORTAL;
+    if (UnitGetType(gv_tPSUNIT[lp_player]) == "Tosh") {
+        lv_offset = gv_mARINE;
+    }
+    lv_ex = PointGetX(lv_eye);
+    lv_ey = PointGetY(lv_eye);
+    lv_ez = lv_tz + lv_offset + (Sin(lv_pitch) * lp_desired);
+    for (lv_seg = 1; lv_seg <= 16; lv_seg += 1) {
+        lv_fraction = lv_seg / 16.0;
+        lv_sample = Point(lv_tx + ((lv_ex - lv_tx) * lv_fraction), lv_ty + ((lv_ey - lv_ty) * lv_fraction));
+        lv_sampleZ = lv_tz + ((lv_ez - lv_tz) * lv_fraction);
+        if (((lv_fraction * lp_desired) > 0.8) && ((lv_sampleZ - 0.25) < WorldHeight(c_heightMapGround, lv_sample))) {
+            lv_safe = (lp_desired * ((lv_seg - 1) / 16.0)) - 0.25;
+            if (lv_safe < 0.4) {
+                lv_safe = 0.4;
+            }
+            return lv_safe;
+        }
+        
+    }
+    return lp_desired;
+}
+
+void gf_CameraCollisionApply (int lp_player) {
+    fixed lv_desired;
+    fixed lv_current;
+    fixed lv_safe;
+
+    if (!UnitIsValid(gv_tPSUNIT[lp_player]) || gv_cameraCollisionOff[lp_player]) {
+        return;
+    }
+    if (gv_cameraDistanceDesired[lp_player] <= 0.0) {
+        gv_cameraDistanceDesired[lp_player] = CameraGetDistance(lp_player);
+    }
+    lv_desired = gv_cameraDistanceDesired[lp_player];
+    lv_current = CameraGetDistance(lp_player);
+    lv_safe = gf_CameraSafeDistance(lp_player, lv_desired);
+    if ((lv_safe < (lv_current - 0.15)) && (AbsF(lv_safe - gv_cameraDistanceApplied[lp_player]) > 0.15)) {
+        CameraSetValue(lp_player, c_cameraValueDistance, lv_safe, 0.0, -1, 10);
+        gv_cameraDistanceApplied[lp_player] = lv_safe;
+    }
+    else if ((lv_current < (lv_desired - 0.15)) && (lv_safe >= (lv_desired - 0.05)) && (AbsF(lv_desired - gv_cameraDistanceApplied[lp_player]) > 0.15)) {
+        CameraSetValue(lp_player, c_cameraValueDistance, lv_desired, 0.12, -1, 10);
+        gv_cameraDistanceApplied[lp_player] = lv_desired;
+    }
+}
+
+bool gt_CameraCollisionTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_CameraCollisionApply(lv_player);
+    }
+    return true;
+}
+
+void gt_CameraCollisionTick_Init () {
+    gt_CameraCollisionTick = TriggerCreate("gt_CameraCollisionTick_Func");
+    TriggerAddEventTimePeriodic(gt_CameraCollisionTick, 0.02, c_timeGame);
 }
 
 bool gt_CameraTurnTick_Func (bool testConds, bool runActions) {

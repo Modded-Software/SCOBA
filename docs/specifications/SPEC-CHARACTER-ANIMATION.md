@@ -146,12 +146,22 @@ Runtime pitch:
 
 1. Read CameraGetPitch(player) in degrees.
 2. Normalize wrapped pitch: if above 180 degrees, subtract 360.
-3. Subtract rest pitch and clamp to the pitch limit.
+3. Subtract camera pitch from rest pitch and clamp to the pitch limit.
+   Camera up produces a positive value and a higher `SCOBAUp` time. Camera down
+   produces a negative value and a lower `SCOBAUp` time.
 4. Map clamped pitch to a target time on the dense keyframe range.
 5. When the target time changes, send AnimSetTime immediately.
-6. Do not use AnimSetTimeScale; it does not move the pitch pose.
-6a. Apply AnimBlendTimeApply 0 on aim entry so AnimSetTime does not blend over the default 0.5 seconds.
-7. Clear SCOBAUp on aim exit.
+7. Do not use AnimSetTimeScale; it does not move the pitch pose.
+8. Reassert `AnimSetTime` on every pitch tick; the message does not freeze playback.
+9. Add elapsed time since the previous send so reasserts preserve visible pose time.
+10. Drive the tick from `TriggerAddEventCameraMove` and a periodic timer.
+11. Apply `AnimBlendTimeApply 0` on aim entry so AnimSetTime does not blend over
+    the default 0.5 seconds.
+12. Set model actor `AnimBlendTime` to 0 for Tosh and Kerrigan.
+13. Clear SCOBAUp on aim exit.
+
+Pitch entry must reset the upper pose and write the current camera pitch
+before the first frame. Do not blend or add to the prior idle upper pose.
 
 Pitch uses local bone rotation. The local pitch axis and sign are per-hero
 configuration values validated in game.

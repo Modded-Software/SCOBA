@@ -58,6 +58,9 @@ fixed[8] gv_animAimYawLast;
 bool[8] gv_animAimYawSeen;
 bool[8] gv_animAimUpperOn;
 fixed[8] gv_animAimPitchTime;
+int[8] gv_animAimPitchTicks;
+int[8] gv_animAimPitchSends;
+int[8] gv_animAimPitchLastMs;
 fixed[8] gv_animAimPitchRest;
 int[8] gv_animMoveHold;
 int[8] gv_animLogIndex;
@@ -95,6 +98,10 @@ bool[c_ANIM_HERO_COUNT][c_ANIM_LOWER_COUNT] gv_animLowerLoop;
 fixed[c_ANIM_HERO_COUNT][c_ANIM_LOWER_COUNT] gv_animLowerMoveSpeed;
 string[c_ANIM_HERO_COUNT][c_ANIM_LOWER_COUNT][c_ANIM_DIR_COUNT] gv_animAimClip;
 fixed[8] gv_cAMERAFOV;
+fixed[8] gv_cameraDistanceDesired;
+fixed[8] gv_cameraDistanceApplied;
+bool[8] gv_cameraCollisionOff;
+
 
 int[8] gv_mOUSEPRESSXUI;
 int[8] gv_mOUSEPRESSYUI;
@@ -210,6 +217,7 @@ trigger gt_ZoomStart;
 trigger gt_CursorStart;
 trigger gt_CursorEnd;
 trigger gt_CameraTurnTick;
+trigger gt_CameraCollisionTick;
 trigger gt_AimInit;
 trigger gt_AimCursorTick;
 trigger gt_AimMoveTick;

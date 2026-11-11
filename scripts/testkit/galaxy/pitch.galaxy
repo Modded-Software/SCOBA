@@ -1,6 +1,10 @@
 // Dedicated 10-second aim pitch playtest.
 
 void gf_PitchSnap (string lp_tag) {
+    actor lv_actor;
+    generichandle lv_query;
+    fixed lv_len;
+    fixed lv_rem;
     fixed lv_camera;
     lv_camera = CameraGetPitch(1);
     if (lv_camera > 180.0) {
@@ -9,6 +13,23 @@ void gf_PitchSnap (string lp_tag) {
     BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Camera", FixedToInt(lv_camera));
     BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Rest", FixedToInt(gv_animAimPitchRest[1]));
     BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Time", FixedToInt(gv_animAimPitchTime[1] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Ticks", gv_animAimPitchTicks[1]);
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Sends", gv_animAimPitchSends[1]);
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Dist", FixedToInt(CameraGetDistance(1) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Desired", FixedToInt(gv_cameraDistanceDesired[1] * 1000.0));
+    lv_actor = libNtve_gf_MainActorofUnit(gv_tPSUNIT[1]);
+    AnimLengthQueryByName(lv_actor, c_ANIM_AIM_PITCH_CLIP, false);
+    AnimLengthQueryWait();
+    lv_query = AnimLengthQueryLastCreated();
+    lv_len = AnimLengthSync(lv_query);
+    lv_rem = AnimLengthRemainingSync(lv_query);
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Len", FixedToInt(lv_len * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "Rem", FixedToInt(lv_rem * 1000.0));
+    AnimLengthQueryByName(ActorFromActor(lv_actor, "Model"), c_ANIM_AIM_PITCH_CLIP, false);
+    AnimLengthQueryWait();
+    lv_query = AnimLengthQueryLastCreated();
+    lv_rem = AnimLengthRemainingSync(lv_query);
+    BankValueSetFromInt(gv_dbgBank, "pitch", lp_tag + "ModelRem", FixedToInt(lv_rem * 1000.0));
     BankSave(gv_dbgBank);
 }
 
@@ -18,6 +39,7 @@ bool gt_PitchTest_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    gv_cameraCollisionOff[1] = true;
     Wait(1.0, c_timeGame);
     gv_dbgBank = BankLoad("SCOBAPITCHTEST", 1);
     BankValueSetFromString(gv_dbgBank, "meta", "profile", "pitch");
@@ -31,16 +53,16 @@ bool gt_PitchTest_Func (bool testConds, bool runActions) {
     gf_AimBegin(1);
     Wait(0.3, c_timeGame);
     gf_PitchSnap("entry");
-    CameraSetValue(1, c_cameraValuePitch, -55.0, 0.2, -1, 10);
+    CameraSetValue(1, c_cameraValuePitch, 60.0, 0.2, -1, 10);
     Wait(2.0, c_timeGame);
     gf_PitchSnap("down");
-    CameraSetValue(1, c_cameraValuePitch, -30.0, 0.2, -1, 10);
+    CameraSetValue(1, c_cameraValuePitch, 30.0, 0.2, -1, 10);
     Wait(2.0, c_timeGame);
     gf_PitchSnap("mid");
-    CameraSetValue(1, c_cameraValuePitch, -5.0, 0.2, -1, 10);
+    CameraSetValue(1, c_cameraValuePitch, 5.0, 0.2, -1, 10);
     Wait(2.0, c_timeGame);
     gf_PitchSnap("up");
-    CameraSetValue(1, c_cameraValuePitch, -30.0, 0.2, -1, 10);
+    CameraSetValue(1, c_cameraValuePitch, 30.0, 0.2, -1, 10);
     Wait(2.0, c_timeGame);
     gf_PitchSnap("hold");
     Wait(1.0, c_timeGame);
