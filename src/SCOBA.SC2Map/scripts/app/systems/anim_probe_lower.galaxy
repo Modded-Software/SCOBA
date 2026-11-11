@@ -1,0 +1,122 @@
+// Module: systems/anim_probe_lower
+
+string gf_ProbeLowerBase (int lp_state) {
+    if (lp_state == c_ANIM_LOWER_IDLE) {
+        return "Stand";
+    }
+    if (lp_state == c_ANIM_LOWER_WALK) {
+        return "Walk";
+    }
+    if (lp_state == c_ANIM_LOWER_WALK_BACK) {
+        return "Walk";
+    }
+    return "";
+}
+
+int gf_ProbeQueryLen (actor lp_actor, string lp_clip) {
+    generichandle lv_query;
+    fixed lv_len;
+
+    AnimLengthQueryByName(lp_actor, lp_clip, true);
+    AnimLengthQueryWait();
+    lv_query = AnimLengthQueryLastCreated();
+    lv_len = AnimLengthSync(lv_query);
+    return FixedToInt(lv_len * 1000.0);
+}
+
+void gf_ProbeActorDiag (int lp_player, actor lp_actor, string lp_clip) {
+    actor lv_model;
+    actor lv_main;
+
+    lv_model = ActorFromActor(lp_actor, "Model");
+    lv_main = ActorRefGet(lp_actor, "::Main");
+    gf_ProbeEvent(lp_player, "diag_main", lp_clip, gf_ProbeQueryLen(lp_actor, lp_clip));
+    gf_ProbeEvent(lp_player, "diag_model", lp_clip, gf_ProbeQueryLen(lv_model, lp_clip));
+    gf_ProbeEvent(lp_player, "diag_refmain", lp_clip, gf_ProbeQueryLen(lv_main, lp_clip));
+    gf_ProbeEvent(lp_player, "diag_full", lp_clip, gf_ProbeQueryLen(lp_actor, "Stand_full"));
+}
+
+void gf_ProbeLowerQuery (int lp_player) {
+    unit lv_hero;
+    actor lv_actor;
+    int lv_profile;
+    string lv_clip;
+    generichandle lv_query;
+    fixed lv_len;
+    fixed lv_rem;
+    int lv_now;
+    int lv_len_ms;
+    int lv_rem_ms;
+    int lv_frames;
+    int lv_played;
+    int lv_frame;
+
+    if (!gv_bPROBE) {
+        return;
+    }
+    if (gv_probeLowerQueries >= c_PROBE_LOWER_QUERY_LIMIT) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    if (gv_animLowerState[lp_player] == c_ANIM_LOWER_NONE) {
+        gv_probeClipName[lp_player][1] = "";
+        gv_probeClipQuery[lp_player][1] = 0;
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    if (gv_aIMACTIVE[lp_player]) {
+        lv_clip = gv_animAimClip[lv_profile][gv_animLowerState[lp_player]][gv_animAimDir[lp_player]];
+    }
+    else {
+        lv_clip = gv_animLowerClip[lv_profile][gv_animLowerState[lp_player]];
+    }
+    if (lv_clip == "") {
+        gv_probeClipName[lp_player][1] = "";
+        gv_probeClipQuery[lp_player][1] = 0;
+        return;
+    }
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    AnimLengthQueryByName(lv_actor, c_ANIM_BRACKET_LOWER, true);
+    AnimLengthQueryWait();
+    lv_query = AnimLengthQueryLastCreated();
+    lv_len = AnimLengthSync(lv_query);
+    lv_rem = AnimLengthRemainingSync(lv_query);
+    lv_len_ms = FixedToInt(lv_len * 1000.0);
+    lv_rem_ms = FixedToInt(lv_rem * 1000.0);
+    gv_probeLowerQueries += 1;
+    gv_probeClipName[lp_player][1] = lv_clip;
+    if (lv_len_ms <= 0) {
+        gv_probeClipLen[lp_player][1] = 0;
+        gv_probeClipFrameMs[lp_player][1] = 0;
+        gv_probeClipFrames[lp_player][1] = 0;
+        gv_probeClipQuery[lp_player][1] = 3;
+        return;
+    }
+    lv_now = gf_AnimNowMs();
+    gf_ProbeLoadClipMetrics(lp_player, 1, lv_clip);
+    gv_probeClipLen[lp_player][1] = lv_len_ms;
+    gv_probeClipStartMs[lp_player][1] = lv_now - (lv_len_ms - lv_rem_ms);
+    gv_probeClipQuery[lp_player][1] = 2;
+    lv_played = lv_len_ms - lv_rem_ms;
+    lv_frames = 0;
+    if (gv_probeClipFrameMs[lp_player][1] > 0) {
+        lv_frames = lv_len_ms / gv_probeClipFrameMs[lp_player][1];
+        lv_frame = lv_played / gv_probeClipFrameMs[lp_player][1];
+        if (lv_frame >= lv_frames) {
+            lv_frame = lv_frames - 1;
+        }
+        if (lv_frame < 0) {
+            lv_frame = 0;
+        }
+    }
+    else {
+        lv_frame = 0;
+    }
+    gv_probeClipFrames[lp_player][1] = lv_frames;
+    gv_probeClipQueryMs[lp_player][1] = lv_now;
+    gv_probeClipQueryPlayed[lp_player][1] = lv_played;
+    gv_probeClipQueryFrame[lp_player][1] = lv_frame;
+}

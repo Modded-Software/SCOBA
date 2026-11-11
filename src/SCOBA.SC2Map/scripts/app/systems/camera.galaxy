@@ -54,7 +54,8 @@ bool gt_ZoomEnd_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, 65.0, 0.5, -1, 10.0);
+    gv_cAMERAFOV[lv_localPlayer] = c_SCOBA_REST_FOV;
+    CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, c_SCOBA_REST_FOV, 0.5, -1, 10.0);
     return true;
 }
 
@@ -75,7 +76,8 @@ bool gt_ZoomStart_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, 25.0, 0.5, -1, 10.0);
+    gv_cAMERAFOV[lv_localPlayer] = c_SCOBA_ZOOM_FOV;
+    CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, c_SCOBA_ZOOM_FOV, 0.5, -1, 10.0);
     return true;
 }
 
@@ -96,12 +98,23 @@ bool gt_CursorStart_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if (((EventMouseClickedButton() == gv_fIRE) || (EventMouseClickedButton() == gv_aBILITYCAMERA))) {
-        gv_rOTATEUNIT[lv_localPlayer] = true;
+    if (gf_ActionModeActive(lv_localPlayer)) {
+        if ((EventMouseClickedButton() == gv_fIRE) && !gv_aCTIONALT[lv_localPlayer]) {
+            gf_AimBegin(lv_localPlayer);
+        }
+        return true;
     }
 
     if ((EventMouseClickedButton() == gv_mOUSECURSOR)) {
         gv_rOTATECAMERA[lv_localPlayer] = true;
+    }
+
+    if ((EventMouseClickedButton() == gv_aBILITYCAMERA)) {
+        gv_mOUSEMIDDLE[lv_localPlayer] = true;
+    }
+
+    if (((EventMouseClickedButton() == gv_fIRE) || (EventMouseClickedButton() == gv_aBILITYCAMERA))) {
+        gv_rOTATEUNIT[lv_localPlayer] = true;
     }
 
     if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == true))) {
@@ -134,15 +147,34 @@ bool gt_CursorEnd_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if (((EventMouseClickedButton() == gv_fIRE) || (EventMouseClickedButton() == gv_aBILITYCAMERA))) {
-        gv_rOTATEUNIT[lv_localPlayer] = false;
+    if (gf_ActionModeActive(lv_localPlayer)) {
+        if (EventMouseClickedButton() == gv_fIRE) {
+            gf_AimEnd(lv_localPlayer);
+        }
+        return true;
     }
 
     if ((EventMouseClickedButton() == gv_mOUSECURSOR)) {
+        gv_mOUSELEFT[lv_localPlayer] = false;
         gv_rOTATECAMERA[lv_localPlayer] = false;
     }
 
-    if (((gv_rOTATEUNIT[lv_localPlayer] == false) && (gv_rOTATECAMERA[lv_localPlayer] == false))) {
+    if ((EventMouseClickedButton() == gv_fIRE)) {
+        gv_mOUSERIGHT[lv_localPlayer] = false;
+    }
+
+    if ((EventMouseClickedButton() == gv_aBILITYCAMERA)) {
+        gv_mOUSEMIDDLE[lv_localPlayer] = false;
+    }
+
+    gv_rOTATEUNIT[lv_localPlayer] = (gv_mOUSERIGHT[lv_localPlayer] || gv_mOUSEMIDDLE[lv_localPlayer]);
+
+    if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == true))) {
+        CameraSetMouseRotates(lv_localPlayer, true);
+        CameraForceMouseRelative(lv_localPlayer, true);
+        CameraLockInput(lv_localPlayer, false);
+    }
+    else {
         CameraSetMouseRotates(lv_localPlayer, false);
         CameraForceMouseRelative(lv_localPlayer, false);
         UISetCursorVisible(PlayerGroupSingle(lv_localPlayer), true);
@@ -157,6 +189,28 @@ void gt_CursorEnd_Init () {
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_fIRE, false);
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_mOUSECURSOR, false);
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_aBILITYCAMERA, false);
+}
+
+bool gt_CameraTurnTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (!gf_ActionModeActive(lv_player) && (gv_rOTATEUNIT[lv_player] == true) && UnitIsValid(gv_tPSUNIT[lv_player])) {
+            gf_TurnToYaw(lv_player, CameraGetYaw(lv_player));
+        }
+        else if (!gf_ActionModeActive(lv_player) && !gv_aIMACTIVE[lv_player]) {
+            gv_animHasTurnTarget[lv_player] = false;
+        }
+    }
+    return true;
+}
+
+void gt_CameraTurnTick_Init () {
+    gt_CameraTurnTick = TriggerCreate("gt_CameraTurnTick_Func");
+    TriggerAddEventTimePeriodic(gt_CameraTurnTick, 0.05, c_timeGame);
 }
 
 bool gt_XCenterUnitOrders_Func (bool testConds, bool runActions) {

@@ -58,6 +58,18 @@
         <Flags index="Transient" value="1"/>
         <BehaviorArray value="SCOBARightClickStandBehavior"/>
     </CAbilBehavior>
+    <CAbilBehavior id="SCOBAActionModeToggle">
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <CmdButtonArray index="On" DefaultButtonFace="SCOBAActionModeRPG">
+            <Flags index="ToSelection" value="1"/>
+        </CmdButtonArray>
+        <CmdButtonArray index="Off" DefaultButtonFace="SCOBAActionModeActions">
+            <Flags index="ToSelection" value="1"/>
+        </CmdButtonArray>
+        <Flags index="Toggle" value="1"/>
+        <Flags index="Transient" value="1"/>
+        <BehaviorArray value="SCOBAActionModeBehavior"/>
+    </CAbilBehavior>
     <CAbilEffectTarget id="SCOBAAutoAttackStatus">
         <Effect index="0" value="SCOBAWeaponAttackDummy"/>
         <TargetFilters value="Visible;Self,Ally,Neutral,Missile,Dead,Hidden,Invulnerable"/>

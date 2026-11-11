@@ -1,0 +1,131 @@
+// Module: systems/animation_aim
+
+fixed gf_AnimDirCenter (int lp_dir) {
+    if (lp_dir == c_ANIM_DIR_FORWARD_LEFT) {
+        return 45.0;
+    }
+    if (lp_dir == c_ANIM_DIR_LEFT) {
+        return 90.0;
+    }
+    if (lp_dir == c_ANIM_DIR_BACK_LEFT) {
+        return 135.0;
+    }
+    if (lp_dir == c_ANIM_DIR_BACK) {
+        return 180.0;
+    }
+    if (lp_dir == c_ANIM_DIR_BACK_RIGHT) {
+        return -135.0;
+    }
+    if (lp_dir == c_ANIM_DIR_RIGHT) {
+        return -90.0;
+    }
+    if (lp_dir == c_ANIM_DIR_FORWARD_RIGHT) {
+        return -45.0;
+    }
+    return 0.0;
+}
+
+int gf_AnimNearestDir (fixed lp_delta) {
+    if (lp_delta >= 157.5 || lp_delta <= -157.5) {
+        return c_ANIM_DIR_BACK;
+    }
+    if (lp_delta >= 112.5) {
+        return c_ANIM_DIR_BACK_LEFT;
+    }
+    if (lp_delta >= 67.5) {
+        return c_ANIM_DIR_LEFT;
+    }
+    if (lp_delta >= 22.5) {
+        return c_ANIM_DIR_FORWARD_LEFT;
+    }
+    if (lp_delta > -22.5) {
+        return c_ANIM_DIR_FORWARD;
+    }
+    if (lp_delta > -67.5) {
+        return c_ANIM_DIR_FORWARD_RIGHT;
+    }
+    if (lp_delta > -112.5) {
+        return c_ANIM_DIR_RIGHT;
+    }
+    return c_ANIM_DIR_BACK_RIGHT;
+}
+
+int gf_AnimPickDir (int lp_player, fixed lp_delta) {
+    int lv_current;
+
+    lv_current = gv_animAimDir[lp_player];
+    if (lv_current >= 0 && lv_current < c_ANIM_DIR_COUNT) {
+        if (AbsF(gf_AnimYawDelta(gf_AnimDirCenter(lv_current), lp_delta)) <= (22.5 + c_ANIM_DIR_HYSTERESIS)) {
+            return lv_current;
+        }
+    }
+    return gf_AnimNearestDir(lp_delta);
+}
+
+fixed gf_AnimInputHeading (int lp_player) {
+    fixed lv_yaw;
+
+    lv_yaw = CameraGetYaw(lp_player);
+    if (gv_fORWARD[lp_player] && !gv_bACKWARD[lp_player]) {
+        if (gv_lEFT[lp_player]) {
+            lv_yaw = lv_yaw + 45.0;
+        }
+        if (gv_rIGHT[lp_player]) {
+            lv_yaw = lv_yaw - 45.0;
+        }
+        return lv_yaw;
+    }
+    if (gv_bACKWARD[lp_player] && !gv_fORWARD[lp_player]) {
+        lv_yaw = lv_yaw + 180.0;
+        if (gv_lEFT[lp_player]) {
+            lv_yaw = lv_yaw - 45.0;
+        }
+        if (gv_rIGHT[lp_player]) {
+            lv_yaw = lv_yaw + 45.0;
+        }
+        return lv_yaw;
+    }
+    if (gv_lEFT[lp_player]) {
+        return lv_yaw + 90.0;
+    }
+    if (gv_rIGHT[lp_player]) {
+        return lv_yaw - 90.0;
+    }
+    return lv_yaw;
+}
+
+void gf_AnimUpdateAimDir (int lp_player) {
+    fixed lv_delta;
+
+    if (!gv_aIMACTIVE[lp_player]) {
+        return;
+    }
+    if (!gf_MovementKeyHeld(lp_player)) {
+        return;
+    }
+    lv_delta = gf_AnimYawDelta(CameraGetYaw(lp_player), gf_AnimInputHeading(lp_player));
+    gv_animAimDir[lp_player] = gf_AnimPickDir(lp_player, lv_delta);
+}
+
+void gf_AnimConfigAimAll (int lp_profile, int lp_state, string lp_clip) {
+    int lv_dir;
+
+    for (lv_dir = 0; lv_dir < c_ANIM_DIR_COUNT; lv_dir += 1) {
+        gv_animAimClip[lp_profile][lp_state][lv_dir] = lp_clip;
+    }
+}
+
+void gf_AnimConfigAimDir (int lp_profile, int lp_state, int lp_dir, string lp_clip) {
+    gv_animAimClip[lp_profile][lp_state][lp_dir] = lp_clip;
+}
+
+void gf_AnimConfigAimWalk (int lp_profile, int lp_state) {
+    gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_FORWARD, "Attack,Walk,Forward");
+    gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_FORWARD_LEFT, "Attack,Walk,Forward,Left");
+    gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_LEFT, "Attack,Walk,Left");
+    gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_BACK_LEFT, "Attack,Walk,Back,Left");
+    gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_BACK, "Attack,Walk,Back");
+    gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_BACK_RIGHT, "Attack,Walk,Back,Right");
+    gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_RIGHT, "Attack,Walk,Right");
+    gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_FORWARD_RIGHT, "Attack,Walk,Forward,Right");
+}

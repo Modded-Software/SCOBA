@@ -1,5 +1,95 @@
 // Module: systems/movement
 
+bool gf_AimMoveActive (int lp_player) {
+    return gv_aIMACTIVE[lp_player];
+}
+
+void gf_AimMoveStep (int lp_player, fixed lp_angle) {
+    unit lv_hero;
+    point lv_next;
+    fixed lv_dist;
+    bool lv_need;
+
+    if (!gf_AimMoveActive(lp_player)) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_need = false;
+    if (!lv_need) {
+        lv_need = !gv_animHasMoveTarget[lp_player];
+    }
+    if (!lv_need) {
+        lv_need = !UnitOrderHasAbil(lv_hero, "move");
+    }
+    if (!lv_need) {
+        lv_need = DistanceBetweenPoints(UnitGetPosition(lv_hero), gv_animMoveTarget[lp_player]) <= c_ANIM_MOVE_RETARGET;
+    }
+    if (!lv_need) {
+        lv_need = AbsF(gf_AnimYawDelta(gv_animMoveHeading[lp_player], lp_angle)) >= c_ANIM_MOVE_HEADING;
+    }
+    if (lv_need) {
+        lv_dist = c_ANIM_MOVE_TARGET;
+        while (lv_dist >= (c_ANIM_MOVE_RETARGET * 3.0)) {
+            lv_next = PointWithOffsetPolar(UnitGetPosition(lv_hero), lv_dist, lp_angle);
+            if (PointPathingPassable(lv_next) && UnitPathableToPoint(lv_hero, lv_next, 0.0, lv_dist)) {
+                break;
+            }
+            lv_dist = lv_dist - c_ANIM_MOVE_RETARGET;
+        }
+        if (lv_dist >= (c_ANIM_MOVE_RETARGET * 3.0)) {
+            UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), lv_next), c_orderQueueReplace);
+            gv_animMoveTarget[lp_player] = lv_next;
+            gv_animMoveHeading[lp_player] = lp_angle;
+            gv_animHasMoveTarget[lp_player] = true;
+        }
+    }
+}
+
+
+bool gt_AimMoveTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (!gf_AimMoveActive(lv_player)) {
+            continue;
+        }
+        if (!gf_MovementKeyHeld(lv_player)) {
+            continue;
+        }
+        gf_AimMoveStep(lv_player, gf_AnimInputHeading(lv_player));
+    }
+    return true;
+}
+
+void gt_AimMoveTick_Init () {
+    gt_AimMoveTick = TriggerCreate("gt_AimMoveTick_Func");
+    TriggerAddEventTimePeriodic(gt_AimMoveTick, c_ANIM_MOVE_TICK, c_timeGame);
+}
+
+void gf_AimMoveStop (int lp_player) {
+    unit lv_hero;
+
+    if (gf_AimMoveActive(lp_player) && gf_MovementKeyHeld(lp_player)) {
+        return;
+    }
+    gv_animHasMoveTarget[lp_player] = false;
+    if (!gf_AimMoveActive(lp_player)) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
+}
+
 bool gt_DisableClickMove_Func (bool testConds, bool runActions) {
     int lv_player;
 
@@ -51,9 +141,14 @@ void gf_ForwardBegin (int lp_player) {
             lv_angle = (lv_angle - 45.0);
         }
 
-        UnitIssueOrder(gv_tPSUNIT[lp_player], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lp_player]), 0.5, lv_angle)), c_orderQueueReplace);
-        UnitSetFacing(gv_tPSUNIT[lp_player], lv_angle, 0.01);
-        Wait(0.01, c_timeGame);
+        if (gf_AimMoveActive(lp_player)) {
+            Wait(c_ANIM_MOVE_TICK, c_timeGame);
+        }
+        else {
+            UnitIssueOrder(gv_tPSUNIT[lp_player], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lp_player]), 0.5, lv_angle)), c_orderQueueReplace);
+            UnitSetFacing(gv_tPSUNIT[lp_player], lv_angle, 0.01);
+            Wait(0.01, c_timeGame);
+        }
     }
 }
 
@@ -76,6 +171,7 @@ void gf_MouseForwardStop (int lp_player) {
         gv_fORWARD[lp_player] = false;
     }
     if (!gf_MovementKeyHeld(lp_player)) {
+        gf_AimMoveStop(lp_player);
         gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
     }
 }
@@ -125,6 +221,7 @@ bool gt_ForwardEnd_Func (bool testConds, bool runActions) {
         gv_fORWARD[lv_localPlayer] = false;
     }
     if (!gf_MovementKeyHeld(lv_localPlayer)) {
+        gf_AimMoveStop(lv_localPlayer);
         gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
     }
     return true;
@@ -173,9 +270,14 @@ bool gt_BackwardStart_Func (bool testConds, bool runActions) {
             lv_angle = (lv_angle + 45.0);
         }
 
-        UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 0.5, lv_angle)), c_orderQueueReplace);
-        UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
-        Wait(0.01, c_timeGame);
+        if (gf_AimMoveActive(lv_localPlayer)) {
+            Wait(c_ANIM_MOVE_TICK, c_timeGame);
+        }
+        else {
+            UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 0.5, lv_angle)), c_orderQueueReplace);
+            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
+            Wait(0.01, c_timeGame);
+        }
     }
     return true;
 }
@@ -200,6 +302,7 @@ bool gt_BackwardEnd_Func (bool testConds, bool runActions) {
     gv_bACKWARD[lv_localPlayer] = false;
     UnitBehaviorRemove(gv_tPSUNIT[lv_localPlayer], "VileAcidSlowEffectsLevel2", 1);
     if (!gf_MovementKeyHeld(lv_localPlayer)) {
+        gf_AimMoveStop(lv_localPlayer);
         gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
     }
     return true;
@@ -244,9 +347,14 @@ bool gt_LeftStart_Func (bool testConds, bool runActions) {
             lv_angle = (lv_angle + 45.0);
         }
 
-        UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 0.5, lv_angle)), c_orderQueueReplace);
-        UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
-        Wait(0.01, c_timeGame);
+        if (gf_AimMoveActive(lv_localPlayer)) {
+            Wait(c_ANIM_MOVE_TICK, c_timeGame);
+        }
+        else {
+            UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 0.5, lv_angle)), c_orderQueueReplace);
+            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
+            Wait(0.01, c_timeGame);
+        }
     }
     return true;
 }
@@ -270,6 +378,7 @@ bool gt_LeftEnd_Func (bool testConds, bool runActions) {
 
     gv_lEFT[lv_localPlayer] = false;
     if (!gf_MovementKeyHeld(lv_localPlayer)) {
+        gf_AimMoveStop(lv_localPlayer);
         gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
     }
     return true;
@@ -314,9 +423,14 @@ bool gt_RightStart_Func (bool testConds, bool runActions) {
             lv_angle = (lv_angle - 45.0);
         }
 
-        UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 0.5, lv_angle)), c_orderQueueReplace);
-        UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
-        Wait(0.01, c_timeGame);
+        if (gf_AimMoveActive(lv_localPlayer)) {
+            Wait(c_ANIM_MOVE_TICK, c_timeGame);
+        }
+        else {
+            UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 0.5, lv_angle)), c_orderQueueReplace);
+            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
+            Wait(0.01, c_timeGame);
+        }
     }
     return true;
 }
@@ -340,6 +454,7 @@ bool gt_RightEnd_Func (bool testConds, bool runActions) {
 
     gv_rIGHT[lv_localPlayer] = false;
     if (!gf_MovementKeyHeld(lv_localPlayer)) {
+        gf_AimMoveStop(lv_localPlayer);
         gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
     }
     return true;

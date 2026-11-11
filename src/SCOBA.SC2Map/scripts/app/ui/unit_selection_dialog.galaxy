@@ -155,9 +155,9 @@ bool gt_UserSelectionDialogCallback_Func (bool testConds, bool runActions) {
 
     // Variable Initialization
     lv_localPlayer = EventPlayer();
-    lv_localHPBar = ((lv_localPlayer * 10) + 1);
-    lv_localNRGBar = ((lv_localPlayer * 10) + 2);
-    lv_localXPBar = ((lv_localPlayer * 10) + 3);
+    lv_localHPBar = gf_BossBarId(lv_localPlayer, 1);
+    lv_localNRGBar = gf_BossBarId(lv_localPlayer, 2);
+    lv_localXPBar = gf_BossBarId(lv_localPlayer, 3);
 
     // Actions
     if (!runActions) {

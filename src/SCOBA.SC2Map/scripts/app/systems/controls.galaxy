@@ -1,0 +1,201 @@
+// Module: systems/controls
+
+bool gf_ActionModeActive (int lp_player) {
+    unit lv_hero;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return false;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return false;
+    }
+    return UnitBehaviorCount(lv_hero, c_SCOBA_ACTION_BEHAVIOR) > 0;
+}
+
+void gf_ActionModeRestoreRPG (int lp_player) {
+    fixed lv_fov;
+
+    if (gv_aIMACTIVE[lp_player]) {
+        gf_AimEnd(lp_player);
+    }
+    lv_fov = gv_cAMERAFOV[lp_player];
+    if (lv_fov <= 0.0) {
+        lv_fov = c_SCOBA_REST_FOV;
+    }
+    CameraSetValue(lp_player, c_cameraValueFieldOfView, lv_fov, 0.2, -1, 10);
+    gf_AimCameraSet(lp_player, false);
+    gv_rOTATEUNIT[lp_player] = false;
+    gv_rOTATECAMERA[lp_player] = false;
+    gv_mOUSERIGHT[lp_player] = false;
+    gv_mOUSEMIDDLE[lp_player] = false;
+    gv_mOUSELEFT[lp_player] = false;
+    gv_mOUSEFORWARD[lp_player] = false;
+}
+
+void gf_ActionModeApply (int lp_player) {
+    unit lv_hero;
+    playergroup lv_group;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    gv_aCTIONPRESSED[lp_player] = false;
+    gv_aCTIONALT[lp_player] = false;
+    gv_mOUSERIGHTCANCEL[lp_player] = false;
+    gv_mOUSELEFTCANCEL[lp_player] = false;
+    gv_mOUSERIGHT[lp_player] = false;
+    gv_mOUSELEFT[lp_player] = false;
+    gv_mOUSEMIDDLE[lp_player] = false;
+    gv_sCOBAPRESSUNIT[lp_player] = null;
+    gv_sCOBALEFTPRESSUNIT[lp_player] = null;
+    gf_AnimReset(lp_player);
+    lv_group = PlayerGroupSingle(lp_player);
+    if (gf_ActionModeActive(lp_player)) {
+        CameraSetMouseRotates(lp_player, true);
+        CameraForceMouseRelative(lp_player, true);
+        CameraLockInput(lp_player, false);
+        UISetCursorVisible(lv_group, true);
+        UISetCursorAutoHide(lv_group, false, 0.0);
+    }
+    else {
+        gf_ActionModeRestoreRPG(lp_player);
+        CameraSetMouseRotates(lp_player, false);
+        CameraForceMouseRelative(lp_player, false);
+        CameraLockInput(lp_player, true);
+        UISetCursorVisible(lv_group, true);
+        UISetCursorAutoHide(lv_group, false, 0.0);
+    }
+}
+
+void gf_ActionModeEnsureRPG (int lp_player) {
+    unit lv_hero;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    UnitBehaviorRemove(lv_hero, c_SCOBA_ACTION_BEHAVIOR, 1);
+    gf_ActionModeApply(lp_player);
+}
+
+void gf_ActionModeAltApply (int lp_player) {
+    unit lv_hero;
+    playergroup lv_group;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    if (!gf_ActionModeActive(lp_player)) {
+        return;
+    }
+    lv_group = PlayerGroupSingle(lp_player);
+    if (gv_aCTIONALT[lp_player]) {
+        CameraSetMouseRotates(lp_player, false);
+        CameraForceMouseRelative(lp_player, false);
+        CameraLockInput(lp_player, true);
+        UISetCursorVisible(lv_group, true);
+        UISetCursorAutoHide(lv_group, false, 0.0);
+    }
+    else {
+        CameraSetMouseRotates(lp_player, true);
+        CameraForceMouseRelative(lp_player, true);
+        CameraLockInput(lp_player, false);
+        UISetCursorVisible(lv_group, true);
+        UISetCursorAutoHide(lv_group, false, 0.0);
+    }
+}
+
+bool gt_ActionAltStart_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    if (!gf_ActionModeActive(lv_player)) {
+        return true;
+    }
+    gv_aCTIONALT[lv_player] = true;
+    gf_ActionModeAltApply(lv_player);
+    return true;
+}
+
+void gt_ActionAltStart_Init () {
+    gt_ActionAltStart = TriggerCreate("gt_ActionAltStart_Func");
+    TriggerAddEventKeyPressed(gt_ActionAltStart, c_playerAny, c_keyAlt, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+
+bool gt_ActionAltEnd_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    if (!gf_ActionModeActive(lv_player)) {
+        return true;
+    }
+    gv_aCTIONALT[lv_player] = false;
+    gf_ActionModeAltApply(lv_player);
+    return true;
+}
+
+void gt_ActionAltEnd_Init () {
+    gt_ActionAltEnd = TriggerCreate("gt_ActionAltEnd_Func");
+    TriggerAddEventKeyPressed(gt_ActionAltEnd, c_playerAny, c_keyAlt, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+
+bool gt_ActionModeOn_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    gf_ActionModeApply(lv_player);
+    return true;
+}
+
+bool gt_ActionModeOff_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    if (gv_aIMACTIVE[lv_player]) {
+        gf_AimEnd(lv_player);
+    }
+    gf_ActionModeApply(lv_player);
+    return true;
+}
+
+void gt_ActionModeToggle_Init () {
+    gt_ActionModeOn = TriggerCreate("gt_ActionModeOn_Func");
+    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
+
+    gt_ActionModeOff = TriggerCreate("gt_ActionModeOff_Func");
+    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
+}

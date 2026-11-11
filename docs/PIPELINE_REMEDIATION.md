@@ -27,11 +27,16 @@ Make every launch provably run the freshly built map.
 - [ ] R0.3 Add `scripts/kill-sc2.py`.
 - [ ] R0.4 Document all three in `AGENTS.md` and `README.md`.
 - [ ] R0.5 Remove or redirect `/tmp` build helpers.
+- [ ] R0.6 Add `scripts/playtest.sh` as the single build, test, launch, and dock-icon entrypoint.
+- [ ] R0.7 Make every wrapper delegate through `scripts/playtest.sh` unless `SC2_PLAYTEST_ACTIVE=1`.
+- [ ] R0.8 Add `make map-build`, `make map-launch`, `make combat`, `make aim`, `make motion`, and `make controls`.
+- [ ] R0.9 Make the GNOME desktop Exec call `scripts/playtest.sh launch`.
 
 Exit:
 - One build command.
 - One validation command.
 - One process-stop command.
+- One test and launch command that always rebuilds fresh first.
 
 ## Phase 1 - Atomic build
 

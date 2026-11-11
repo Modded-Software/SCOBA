@@ -18,9 +18,9 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
 
     // Variable Initialization
     lv_localPlayer = 1;
-    lv_localHPBar = ((lv_localPlayer * 10) + 1);
-    lv_localNRGBar = ((lv_localPlayer * 10) + 2);
-    lv_localXPBar = ((lv_localPlayer * 10) + 3);
+    lv_localHPBar = gf_BossBarId(lv_localPlayer, 1);
+    lv_localNRGBar = gf_BossBarId(lv_localPlayer, 2);
+    lv_localXPBar = gf_BossBarId(lv_localPlayer, 3);
 
     // Actions
     if (!runActions) {
@@ -46,11 +46,12 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
         libNtve_gf_SetUpgradeLevelForPlayer(lv_localPlayer, "K5Apocalypse", 1);
         libNtve_gf_SetUpgradeLevelForPlayer(lv_localPlayer, "HotSHydraliskFrenzy", 1);
         libNtve_gf_SetUpgradeLevelForPlayer(lv_localPlayer, "BansheeCloak", 1);
-        lv_localHPBar = ((lv_localPlayer * 10) + 1);
-        lv_localNRGBar = ((lv_localPlayer * 10) + 2);
-        lv_localXPBar = ((lv_localPlayer * 10) + 3);
+        lv_localHPBar = gf_BossBarId(lv_localPlayer, 1);
+        lv_localNRGBar = gf_BossBarId(lv_localPlayer, 2);
+        lv_localXPBar = gf_BossBarId(lv_localPlayer, 3);
         if ((UnitHasBehavior(UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1), "UnitDirectControl") == false) && (UnitHasBehavior(UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1), "NeuralParasite") == false) && (UnitGroupCount(UnitGroupSelected(lv_localPlayer), c_unitCountAlive) == 1) && (UnitGetOwner(UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1)) <= 15) && (UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1) == UnitGroupUnit(UnitGroupFilterAlliance(UnitGroupSelected(lv_localPlayer), lv_localPlayer, c_unitAllianceAlly, 0), 1)) && (UnitIsSelected(UnitGroupUnit(UnitGroupFilter(null, c_playerAny, UnitGroupSelected(lv_localPlayer), UnitFilter(0, 0, (1 << c_targetFilterStructure), 0), 0), 1), lv_localPlayer) == true)) {
             gv_tPSUNIT[lv_localPlayer] = UnitGroupUnit(UnitGroupSelected(lv_localPlayer), 1);
+            gf_AnimReset(lv_localPlayer);
             CameraApplyInfo(lv_localPlayer, CameraInfoDefault(), 1.0, 100.0, 0.0, true);
             CameraFollowUnitGroup(lv_localPlayer, UnitGroupSelected(lv_localPlayer), true, false);
             CameraSetValue(lv_localPlayer, c_cameraValuePitch, -30.0, 1.0, -1, 10);
@@ -64,12 +65,10 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", true);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAActionModeToggle", true);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAActionModeToggle", true);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
-            if (lv_localPlayer <= 3) {
-                libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, (lv_localPlayer + 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 8.0, 45.0));
-                libNtve_gf_CreateUnitsAtPoint2(2, "Zergling", 0, (lv_localPlayer + 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[lv_localPlayer]), 8.0, 225.0));
-            }
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", false);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "heal", false);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
@@ -167,6 +166,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
     for (lv_localPlayer = 1; lv_localPlayer <= 6; lv_localPlayer += 1) {
         if (UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {
             UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], Order(AbilityCommand("SCOBARightClickToggle", 0)), c_orderQueueReplace);
+            gf_ActionModeEnsureRPG(lv_localPlayer);
         }
     }
     return true;

@@ -435,7 +435,29 @@ Impact:
 - Different build paths produce different results.
 - Temp scripts are lost.
 
-Status: open.
+Status: resolved.
+Resolution: `scripts/playtest.sh` is the single build, test, launch, and
+dock-icon entrypoint. It always rebuilds fresh first. The Makefile exposes
+`map-build`, `map-launch`, `combat`, `aim`, `motion`, and `controls`.
+
+### P36 - Test and launch wrappers reused stale `out` maps
+
+Severity: **S1**
+
+Evidence:
+- Profile map sources were hardcoded to `out/SCOBA256.SC2Map`.
+- Profile build scripts did not rebuild that map from `src/`.
+- Profile run scripts did not build anything.
+- The dock entry launched `out/SCOBA256.SC2Map` directly.
+
+Impact:
+- Tests and live play could run old Galaxy code.
+- A source fix appeared broken because the game loaded a previous build.
+
+Status: resolved.
+Resolution: every build, test, and launch wrapper delegates to
+`scripts/playtest.sh` unless `SC2_PLAYTEST_ACTIVE=1`. The entrypoint rebuilds
+before every action.
 
 ### P30 - No dependency-aware build
 

@@ -16,6 +16,9 @@ resolve_root() {
     return 1
 }
 ROOT_DIR="$(resolve_root)" || { printf 'ERROR: cannot locate project root\n' >&2; exit 1; }
+if [ "${SC2_PLAYTEST_ACTIVE:-}" != "1" ]; then
+    exec bash "$ROOT_DIR/scripts/playtest.sh" launch
+fi
 
 UV_BIN="${UV_BIN:-uv}"
 if [ "${UV_BIN#/}" = "$UV_BIN" ]; then
@@ -87,6 +90,11 @@ elif ! cmp -s "$MAP_SOURCE" "$MAP_TARGET"; then
 fi
 if [ -f "$MAP_TARGET/BuildStamp.txt" ]; then
     log "stamp: $(cat "$MAP_TARGET/BuildStamp.txt")"
+fi
+if [ -d "$MAP_SOURCE" ]; then
+    DOCS_DIR="${SC2_DOCUMENTS:-$BNET_PREFIX/pfx/drive_c/users/steamuser/Documents/StarCraft II}"
+    "$UV_BIN" run python "$ROOT_DIR/scripts/dump_m3_clip_metrics.py" --map "$MAP_SOURCE" --docs "$DOCS_DIR" >>"$LOG_DIR/clip-metrics.log" 2>&1
+    log "clip metrics: $DOCS_DIR/Banks/SCOBACLIPMETRICS.SC2Bank"
 fi
 
 export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT"

@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$PWD"
-if [ ! -f "$ROOT_DIR/scripts/build.sh" ]; then
-    ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
+if [ -n "${SC2_PROJECT_ROOT:-}" ] && [ -f "$SC2_PROJECT_ROOT/scripts/build.sh" ]; then
+    ROOT_DIR="$SC2_PROJECT_ROOT"
+elif [ -f "$PWD/scripts/build.sh" ]; then
+    ROOT_DIR="$PWD"
+else
+    ROOT_DIR="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+fi
+if [ "${SC2_PLAYTEST_ACTIVE:-}" != "1" ]; then
+    exec bash "$ROOT_DIR/scripts/playtest.sh" build
 fi
 OUT_DIR="$ROOT_DIR/out"
 FINAL="$OUT_DIR/SCOBA256.SC2Map"
@@ -11,8 +17,20 @@ TMP="$OUT_DIR/.build-tmp"
 OLD="$OUT_DIR/.build-old"
 cd "$ROOT_DIR"
 
+UV_BIN="${UV_BIN:-uv}"
+if [ "${UV_BIN#/}" = "$UV_BIN" ]; then
+    UV_BIN="$(command -v "$UV_BIN")" || {
+        printf 'ERROR: uv not found\n' >&2
+        exit 1
+    }
+fi
+[ -x "$UV_BIN" ] || {
+    printf 'ERROR: uv not executable: %s\n' "$UV_BIN" >&2
+    exit 1
+}
+
 py() {
-    uv run python "$@"
+    "$UV_BIN" run python "$@"
 }
 
 log() {

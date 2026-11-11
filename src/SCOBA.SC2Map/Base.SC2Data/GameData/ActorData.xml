@@ -1,10 +1,27 @@
 <?xml version="1.0" encoding="us-ascii"?>
 <Catalog>
-    <CActorSelection id="PreSelection">
+    <CActorSelection default="1" id="PreSelection">
+        <Alpha value="0.750000,0.750000,0.750000"/>
+        <InnerWidth value="0.090000"/>
+        <OuterWidth value="0.030000"/>
         <RotationSpeed value="0.250000"/>
+        <SegmentCount value="8"/>
+        <SegmentPercentSolid value="0.800000"/>
+        <Inherits index="BaseModelScale" value="1"/>
+        <Inherits index="Scale" value="1"/>
     </CActorSelection>
     <CActorSelection id="FlashingSelection">
+        <SelectionFlags index="IsFlash" value="1"/>
+        <FogVisibility value="Visible"/>
+        <Alpha value="0.750000,0.750000,0.750000"/>
+        <InnerWidth value="0.150000"/>
+        <OuterWidth value="0.030000"/>
         <RotationSpeed value="4.000000"/>
+        <SegmentCount value="4"/>
+        <SegmentPercentSolid value="0.400000"/>
+        <HoldTime value="1.500000"/>
+        <Inherits index="BaseModelScale" value="1"/>
+        <Inherits index="Scale" value="1"/>
     </CActorSelection>
     <!--                                                                                         -->
     <!-- Armory ................................................................................ -->
@@ -63,7 +80,7 @@
     </CActorUnit>
     <CActorUnit id="Firebat">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
-        <WalkAnimMoveSpeed value="1.406250"/>
+        <WalkAnimMoveSpeed value="2.812500"/>
     </CActorUnit>
     <CActorModel id="FirebatAttackModel">
         <Scale value="2.000000"/>
@@ -291,9 +308,12 @@
     <!-- Tosh .................................................................................. -->
     <!--                                                                                         -->
     <CActorUnit id="Tosh">
-        <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
+        <Model value="ToshSCOBA"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
         <VarianceWindowWalk value="0.000000"/>
+    </CActorUnit>
+    <CActorUnit id="QueenOfBlades">
+        <Model value="KerriganSCOBA"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Ultralisk ............................................................................. -->

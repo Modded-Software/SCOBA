@@ -94,3 +94,27 @@ clean: ## Remove build artifacts
 
 clean-precommit: ## Remove pre-commit framework traces
 	$(SCRIPT_BASH) $(CI_DIR)/scripts/cleanup-precommit
+
+# =============================================================================
+# SCOBA map entrypoints
+# =============================================================================
+PLAYTEST := $(REPO_ROOT)/scripts/playtest.sh
+
+.PHONY: map-build map-launch combat aim motion controls
+map-build: ## Rebuild the map fresh and stop
+	$(SCRIPT_BASH) $(PLAYTEST) build
+
+map-launch: ## Rebuild the map fresh, then launch it
+	$(SCRIPT_BASH) $(PLAYTEST) launch
+
+combat: ## Rebuild and run the combat profile
+	$(SCRIPT_BASH) $(PLAYTEST) combat
+
+aim: ## Rebuild and run the aim profile
+	$(SCRIPT_BASH) $(PLAYTEST) aim
+
+motion: ## Rebuild and run the motion profile
+	$(SCRIPT_BASH) $(PLAYTEST) motion
+
+controls: ## Rebuild and run the controls profile
+	$(SCRIPT_BASH) $(PLAYTEST) controls

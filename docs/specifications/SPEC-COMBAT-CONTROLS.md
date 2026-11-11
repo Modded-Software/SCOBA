@@ -68,7 +68,7 @@ for the weapon. This is the primary cooldown source.
 
 `TriggerAddEventUnitAttacked2(trigger, unitref, weapon)` fires when a unit is
 attacked. Its `EventUnitTarget()` is the attacking unit. It measures received
-attacks and MUST NOT be used for cooldown.
+attacks and is not used for cooldown.
 
 ## 3. State model
 
@@ -122,6 +122,10 @@ The FSM stores intent:
 | MOVING | order mode exit | auto on | IDLE | next tick resumes |
 | any | hero dead | any | IDLE | clear target and orders |
 
+Target clearing in the auto rows clears `gv_sCOBAAutoTarget`.
+It does not clear `gv_tARGET` on idle, Stop, or move completion.
+`gv_tARGET` clears on target death, removal, ground left click, or explicit clear.
+
 ## 5. Module layout
 
 | Module | Responsibility |
@@ -131,6 +135,7 @@ The FSM stores intent:
 | `systems/combat_attack.galaxy` | toggle handlers and attack event registration |
 | `systems/combat_cooldown.galaxy` | outgoing attack measurement and status cooldown |
 | `systems/targeting.galaxy` | right-click enemy calls `gf_CombatManualAttack` |
+| `systems/controls.galaxy` | control mode toggle and action mode left-click attack |
 | `systems/movement.galaxy` | WASD and order mode notify the FSM |
 | `core/globals.galaxy` | FSM and cooldown globals |
 | `core/constants.galaxy` | state constants and period bounds |
@@ -260,6 +265,39 @@ Layout buttons therefore map as follows:
 
 This makes the visible face, name, and tooltip match the current state.
 
+### 6.6.2 Control mode toggle
+
+`SCOBAActionModeBehavior` is the only control mode state.
+RPG mode is the absence of the behavior.
+The control mode button sits at top row column 2.
+
+`CAbilBehavior SCOBAActionModeToggle`:
+
+- On command face: `SCOBAActionModeRPG`.
+- Off command face: `SCOBAActionModeActions`.
+- Toggle flag: on.
+- Transient flag: on.
+- Behavior: `SCOBAActionModeBehavior`.
+
+Layout buttons:
+
+| Layout index | Command | Face |
+| --- | --- | --- |
+| 55 | action On | `SCOBAActionModeRPG` |
+| 56 | action Off | `SCOBAActionModeActions` |
+
+The On command face is shown while RPG mode is active.
+The Off command face is shown while action mode is active.
+Names are `Controls: RPG` and `Controls: Actions`.
+
+The toggle handlers call `gf_ActionModeApply` after the behavior changes.
+They do not call the combat controller.
+They do not change auto-attack, chase stance, cooldown, or the combat FSM.
+
+Action mode left click resolves a hostile at `CameraGetTarget` and calls
+`gf_CombatManualAttack`. Ground clicks do nothing. Alt UI clicks do nothing.
+Action mode right hold calls aim mode and does not call the combat controller.
+
 ### 6.7 Cooldown
 
 `gt_CombatStartedAttack` is registered per hero with
@@ -331,8 +369,10 @@ Right-click targeting is specified in
 [SPEC-MOUSE-CONTROLS](SPEC-MOUSE-CONTROLS.md).
 
 The right command runs on clean right-button release. It uses the hover unit
-saved at press time. That unit comes from the same engine highlight event used
-by left-click selection.
+saved at press time when the press point is inside that unit's radius. That unit
+comes from the same engine highlight event used by left-click selection.
+A stale hover unit outside the press-point radius falls through to the target
+resolver and the click-point enemy scan.
 
 Right command flow:
 
@@ -343,9 +383,31 @@ Right command flow:
 5. A right drag runs no command.
 
 A ground right click does not clear `gv_tARGET`.
+Hero idle, Stop, and move-order completion do not clear `gv_tARGET`.
+Only target death, removal, ground left click, or an explicit clear removes it.
 
 `gt_DisableClickMove` blocks move orders only in Stand with no movement key held.
-It allows move orders in Walk and during WASD.
+It allows move orders in Walk, during WASD, and in action mode.
+It does not cancel the RPG Walk custom move.
+
+### 6.10 Right-hold aim interaction
+
+Right-hold aim is owned by [SPEC-MOUSE-CONTROLS](SPEC-MOUSE-CONTROLS.md).
+
+Aim mode does not call the combat controller. It does not cancel auto-attack,
+issue combat orders, change FSM state, or touch cooldown. The right command
+still runs only from `gf_MouseReleaseRight` after the drag and cancel checks.
+
+In action mode, right hold enters aim and runs no right command.
+Action mode left click on the hostile at `CameraGetTarget` calls
+`gf_CombatManualAttack`.
+Action mode left click on ground, and any Alt UI click, does not call the
+combat controller.
+
+Aim animation layers, facing updates, and aim movement do not call the combat
+controller. Aim movement is owned by `gt_AimMoveTick`; it never enters a combat
+FSM state or issues a combat order. Their implementation is specified in
+[SPEC-CHARACTER-ANIMATION](SPEC-CHARACTER-ANIMATION.md).
 
 ## 7. Event registration
 
@@ -356,6 +418,8 @@ It allows move orders in Walk and during WASD.
 | `TriggerAddEventUnitAbility` stage Off | auto toggle | read behavior, cancel auto, refresh button |
 | `TriggerAddEventUnitAbility` stage On | chase toggle | read behavior, call stance, refresh button |
 | `TriggerAddEventUnitAbility` stage Off | chase toggle | read behavior, call stance, refresh button |
+| `TriggerAddEventUnitAbility` stage On | control toggle | apply action mode, refresh button |
+| `TriggerAddEventUnitAbility` stage Off | control toggle | apply RPG mode, refresh button |
 | `TriggerAddEventUnitAbility` stage Execute | Weapon Attack | manual attack |
 | `TriggerAddEventUnitBehaviorChange` | auto behavior | sync auto state, step or cancel |
 | `TriggerAddEventUnitBehaviorChange` | Stand behavior | sync root and stance |
@@ -397,14 +461,23 @@ distance. It records elapsed time for every sample.
 | Stand movement wake | none | held key, before and after `gf_CombatBeginMove`, release | root 1 then 0, move suppressed then clear, move order moves hero, root returns after release |
 | Stand auto off manual | 9.0 east | manual attack +2.0 | root 1, no displacement |
 | Stand repeated clicks | 9.0 east | 5 manual attacks | root stays, no displacement |
-| Walk ground click | none | ground point 5.0 west | hero moves |
-| Stand ground click | none | ground point 5.0 west | hero stays |
 | Right press unit | 3.0 east | save hover, press, release | enemy returned from saved hover |
+| Right stale hover | 3.0 east | stale enemy hover, press ground, release | no attack order, ground command by stance |
 | Right drag cancel | 3.0 east | press, camera yaw change, release | no attack order |
 | Right target select | 3.0 east | clean click enemy | target set, attack order |
+| Target persists | 3.0 east | select, idle, Stop, idle | target remains selected |
+| Walk ground click | none | clean ground right click in Walk | hero moves |
+| Stand ground click | none | clean ground right click in Stand | hero stops, root present |
 | Walk chase | 9.0 east | +1.0, +3.0 | root 0, distance decreases, attack order, damage |
 | Walk idle | 13.0 east | +2.0 | root 0, no movement, no attack order |
 | Weapon attack | 3.0 east | +0.1, +0.2, +0.5, +1.0 | cooldown positive, command cooldown true, attack order, damage |
+| Control default | none | map init | RPG behavior absent, RPG button shown |
+| Control action on | none | toggle action | behavior present, Actions button shown |
+| Control action attack | 3.0 east | left click enemy in action mode | manual attack, target set |
+| Control action ground | none | left click ground in action mode | no order, no target change |
+| Control action Alt | 3.0 east | hold Alt, left click enemy | no attack, no target change |
+| Control action right | 3.0 east | right hold in action mode | aim active, no combat order |
+| Control RPG return | none | toggle to RPG | behavior absent, RPG button shown, aim exited |
 
 The harness writes position, distance, root count, move suppression, order state,
 HP, cooldown remaining, command cooldown state, and elapsed time to the bank.
@@ -420,6 +493,11 @@ command state only.
 - Manual orders are never cancelled by auto off.
 - Cooldown uses outgoing attack events only.
 - The FSM step is the only place that issues automatic orders.
+- Control mode state lives only in `SCOBAActionModeBehavior`.
+- Control mode changes never alter combat state.
+- Action mode right hold never calls the combat controller.
+- Action mode left click on ground never calls the combat controller.
+- Alt UI clicks never call the combat controller.
 - Every Galaxy file stays below 512 lines.
 
 ## 11. Rollout

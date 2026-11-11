@@ -66,9 +66,14 @@ bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
         if (!UnitIsValid(lv_hero)) {
             continue;
         }
-        gv_tPSUNIT[lv_player] = lv_hero;
+        if (gv_tPSUNIT[lv_player] != lv_hero) {
+            gv_tPSUNIT[lv_player] = lv_hero;
+            gf_AnimReset(lv_player);
+        }
         UnitSetState(lv_hero, c_unitStateSelectable, true);
-        UnitSelect(lv_hero, lv_player, true);
+        if (!UnitIsSelected(lv_hero, lv_player)) {
+            UnitSelect(lv_hero, lv_player, true);
+        }
     }
     return true;
 }

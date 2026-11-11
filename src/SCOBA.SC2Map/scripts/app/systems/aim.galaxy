@@ -1,0 +1,97 @@
+// Module: systems/aim
+
+void gf_AimCameraSet (int lp_player, bool lp_aim) {
+    unit lv_hero;
+    unitgroup lv_group;
+    point lv_focus;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_group = libNtve_gf_ConvertUnitToUnitGroup(lv_hero);
+    CameraFollowUnitGroup(lp_player, lv_group, false, false);
+    if (lp_aim) {
+        lv_focus = PointWithOffsetPolar(UnitGetPosition(lv_hero), c_SCOBA_AIM_SHOULDER_OFFSET, (CameraGetYaw(lp_player) + 90.0));
+        CameraLookAt(lp_player, lv_focus, 0.15, -1, 10);
+        CameraFollowUnitGroup(lp_player, lv_group, true, true);
+    }
+    else {
+        CameraFollowUnitGroup(lp_player, lv_group, true, false);
+    }
+}
+
+void gf_AimBegin (int lp_player) {
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    if (gv_aIMACTIVE[lp_player]) {
+        return;
+    }
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+    gv_aIMACTIVE[lp_player] = true;
+    UnitBehaviorAdd(gv_tPSUNIT[lp_player], "SCOBAAimNoTurn", gv_tPSUNIT[lp_player], 1);
+    if (!gf_MovementKeyHeld(lp_player)) {
+        gf_AimMoveStop(lp_player);
+    }
+    gf_AnimReset(lp_player);
+    CameraSetValue(lp_player, c_cameraValueFieldOfView, c_SCOBA_AIM_FOV, 0.2, -1, 10);
+    gf_AimCameraSet(lp_player, true);
+    UISetCursorVisible(PlayerGroupSingle(lp_player), true);
+    UISetCursorAutoHide(PlayerGroupSingle(lp_player), false, 0.0);
+}
+
+void gf_AimEnd (int lp_player) {
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    if (!gv_aIMACTIVE[lp_player]) {
+        return;
+    }
+    if (!gf_MovementKeyHeld(lp_player)) {
+        gf_AimMoveStop(lp_player);
+    }
+    if (UnitIsValid(gv_tPSUNIT[lp_player])) {
+        UnitSetFacing(gv_tPSUNIT[lp_player], CameraGetYaw(lp_player), c_ANIM_AIM_TURN_DURATION);
+        UnitBehaviorRemove(gv_tPSUNIT[lp_player], "SCOBAAimNoTurn", 1);
+    }
+    gv_aIMACTIVE[lp_player] = false;
+    gf_AnimReset(lp_player);
+    if (gv_cAMERAFOV[lp_player] <= 0.0) {
+        gv_cAMERAFOV[lp_player] = c_SCOBA_REST_FOV;
+    }
+    CameraSetValue(lp_player, c_cameraValueFieldOfView, gv_cAMERAFOV[lp_player], 0.2, -1, 10);
+    gf_AimCameraSet(lp_player, false);
+}
+
+bool gt_AimInit_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gv_aIMACTIVE[lv_player] = false;
+        gv_cAMERAFOV[lv_player] = c_SCOBA_REST_FOV;
+    }
+    return true;
+}
+
+void gt_AimInit_Init () {
+    gt_AimInit = TriggerCreate("gt_AimInit_Func");
+    TriggerAddEventMapInit(gt_AimInit);
+}
+
+bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    return true;
+}
+
+void gt_AimCursorTick_Init () {
+    gt_AimCursorTick = TriggerCreate("gt_AimCursorTick_Func");
+    TriggerAddEventTimePeriodic(gt_AimCursorTick, 0.05, c_timeGame);
+}

@@ -1,0 +1,80 @@
+// Motion test profile
+
+trigger gt_MotionTest;
+
+void gf_MotionModeKey (string lp_section, string lp_tag) {
+    if (gf_ActionModeActive(1)) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ActionMode", 1);
+    }
+    else {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ActionMode", 0);
+    }
+    if (gv_aIMACTIVE[1]) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AimActive", 1);
+    }
+    else {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AimActive", 0);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UpperState", gv_animUpperState[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LowerState", gv_animLowerState[1]);
+    BankSave(gv_dbgBank);
+}
+
+bool gt_MotionTest_Func (bool testConds, bool runActions) {
+    int lv_player;
+    point lv_center;
+    fixed lv_angle;
+
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAMOTIONTEST", 1);
+    gv_bINPUTLOG = false;
+    gv_bANIMLOG = true;
+    gf_ProbeEnable(1);
+    gv_animLogIndex[1] = 0;
+    gv_animMoveHold[1] = 0;
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "motion");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    BankValueSetFromInt(gv_dbgBank, "meta", "anchorX", FixedToInt(PointGetX(gv_dbgAnchor)));
+    BankValueSetFromInt(gv_dbgBank, "meta", "anchorY", FixedToInt(PointGetY(gv_dbgAnchor)));
+    BankSave(gv_dbgBank);
+
+    for (lv_player = 2; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (UnitIsValid(gv_tPSUNIT[lv_player])) {
+            UnitSetPosition(gv_tPSUNIT[lv_player], PointWithOffset(gv_dbgAnchor, 80.0 + lv_player * 4.0, 80.0 + lv_player * 4.0), false);
+        }
+    }
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBAActionModeToggle", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    lv_center = Point(128.0, 128.0);
+    lv_angle = AngleBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), lv_center);
+    CameraSetValue(1, c_cameraValueYaw, lv_angle, 0.0, 0.0, 0.0);
+    UnitSetFacing(gv_tPSUNIT[1], lv_angle, 0.0);
+    gf_AimBegin(1);
+    Wait(0.2, c_timeGame);
+    gf_DbgSnap("motion_start", "t0000");
+    gf_MotionModeKey("motion_start", "t0000");
+    BankValueSetFromInt(gv_dbgBank, "motion_start", "MotionReady", 1);
+    BankSave(gv_dbgBank);
+
+    Wait(15.0, c_timeGame);
+    gf_DbgSnap("motion_move", "t15000");
+    gf_MotionModeKey("motion_move", "t15000");
+
+    Wait(5.0, c_timeGame);
+    gf_DbgSnap("motion_lateral", "t20000");
+    gf_MotionModeKey("motion_lateral", "t20000");
+
+    gf_ProbeDisable(1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_MotionTest_Init () {
+    gt_MotionTest = TriggerCreate("gt_MotionTest_Func");
+    TriggerAddEventMapInit(gt_MotionTest);
+}

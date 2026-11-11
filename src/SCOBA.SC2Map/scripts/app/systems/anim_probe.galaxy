@@ -1,0 +1,475 @@
+// Module: systems/anim_probe
+
+const string c_PROBE_BANK = "SCOBAFRAMELOG";
+const string c_PROBE_METRICS = "SCOBACLIPMETRICS";
+
+void gf_ProbeConfigInit () {
+    gv_probeHeroName[c_ANIM_HERO_TOSH] = "Tosh";
+    gv_probeHeroName[c_ANIM_HERO_KERRIGAN] = "Kerrigan";
+    gv_probeHeroName[c_ANIM_HERO_FIREBAT] = "Firebat";
+    gv_probeHeroName[c_ANIM_HERO_GENERIC] = "Generic";
+
+    gv_probeAttachment[c_ANIM_HERO_TOSH][0] = "";
+    gv_probeAttachment[c_ANIM_HERO_KERRIGAN][0] = "";
+}
+
+string gf_ProbeClipList (int lp_profile, bool lp_upper) {
+    int lv_state;
+    string lv_text;
+
+    lv_text = "";
+    if (lp_upper) {
+        for (lv_state = 1; lv_state < c_ANIM_UPPER_COUNT; lv_state += 1) {
+            if (gv_animUpperClip[lp_profile][lv_state] != "") {
+                if (lv_text != "") {
+                    lv_text = lv_text + ",";
+                }
+                lv_text = lv_text + gv_animUpperClip[lp_profile][lv_state];
+            }
+        }
+        return lv_text;
+    }
+    for (lv_state = 1; lv_state < c_ANIM_LOWER_COUNT; lv_state += 1) {
+        if (gv_animLowerClip[lp_profile][lv_state] != "") {
+            if (lv_text != "") {
+                lv_text = lv_text + ",";
+            }
+            lv_text = lv_text + gv_animLowerClip[lp_profile][lv_state];
+        }
+    }
+    return lv_text;
+}
+
+void gf_ProbeWriteConfig (bank lp_bank, int lp_player) {
+    int lv_profile;
+    int lv_index;
+    string lv_model;
+
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(gv_tPSUNIT[lp_player]);
+    lv_model = UnitGetType(gv_tPSUNIT[lp_player]);
+    BankSectionCreate(lp_bank, "config");
+    BankValueSetFromString(lp_bank, "config", "hero", gv_probeHeroName[lv_profile]);
+    BankValueSetFromString(lp_bank, "config", "model", lv_model);
+    BankValueSetFromString(lp_bank, "config", "upper", gf_ProbeClipList(lv_profile, true));
+    BankValueSetFromString(lp_bank, "config", "lower", gf_ProbeClipList(lv_profile, false));
+    for (lv_index = 0; lv_index < c_PROBE_ATTACHMENT_COUNT; lv_index += 1) {
+        BankValueSetFromString(lp_bank, "config", "a" + IntToString(lv_index), gv_probeAttachment[lv_profile][lv_index]);
+    }
+}
+
+void gf_ProbeFlush () {
+    if (gv_probeRowCount <= 0) {
+        return;
+    }
+    BankSectionCreate(gv_probeBank, "frames");
+    BankValueSetFromInt(gv_probeBank, "meta", "tick", gv_probeTick);
+    BankValueSetFromInt(gv_probeBank, "meta", "rows", gv_probeSeq);
+    BankSave(gv_probeBank);
+    gv_probeRowCount = 0;
+    gv_probeLastFlush = TimerGetElapsed(gv_sCOBA_Clock);
+}
+
+void gf_ProbeStore (string lp_key, string lp_text) {
+    BankSectionCreate(gv_probeBank, "frames");
+    BankValueSetFromString(gv_probeBank, "frames", lp_key, lp_text);
+    gv_probeRowCount += 1;
+    if (gv_probeRowCount >= c_PROBE_BUFFER_ROWS) {
+        gf_ProbeFlush();
+    }
+}
+
+string gf_ProbeMetricClip (string lp_clip) {
+    return StringReplaceWord(lp_clip, ",", " ", c_stringReplaceAll, false);
+}
+
+void gf_ProbeLoadClipMetrics (int lp_player, int lp_slot, string lp_clip) {
+    string lv_model;
+    string lv_key;
+    string lv_clip;
+    int lv_fms;
+    int lv_frames;
+    int lv_duration;
+
+    gv_probeClipLen[lp_player][lp_slot] = 0;
+    gv_probeClipFrameMs[lp_player][lp_slot] = 0;
+    gv_probeClipFrames[lp_player][lp_slot] = 0;
+    if (!UnitIsValid(gv_tPSUNIT[lp_player]) || lp_clip == "") {
+        gv_probeClipQuery[lp_player][lp_slot] = 3;
+        return;
+    }
+    lv_model = UnitGetType(gv_tPSUNIT[lp_player]);
+    lv_clip = gf_ProbeMetricClip(lp_clip);
+    lv_key = lv_clip + ".fms";
+    lv_fms = 0;
+    lv_frames = 0;
+    lv_duration = 0;
+    if (BankSectionExists(gv_probeMetrics, lv_model)) {
+        if (BankKeyExists(gv_probeMetrics, lv_model, lv_key)) {
+            lv_fms = BankValueGetAsInt(gv_probeMetrics, lv_model, lv_key);
+        }
+        if (BankKeyExists(gv_probeMetrics, lv_model, lv_clip + ".fc")) {
+            lv_frames = BankValueGetAsInt(gv_probeMetrics, lv_model, lv_clip + ".fc");
+        }
+        if (BankKeyExists(gv_probeMetrics, lv_model, lv_clip + ".dur")) {
+            lv_duration = BankValueGetAsInt(gv_probeMetrics, lv_model, lv_clip + ".dur");
+        }
+    }
+    if (lv_fms > 0 && lv_frames > 0 && lv_duration > 0) {
+        lv_frames = lv_duration / lv_fms;
+        gv_probeClipLen[lp_player][lp_slot] = lv_duration;
+        gv_probeClipFrameMs[lp_player][lp_slot] = lv_fms;
+        gv_probeClipFrames[lp_player][lp_slot] = lv_frames;
+        gv_probeClipQuery[lp_player][lp_slot] = 2;
+        return;
+    }
+    gv_probeClipQuery[lp_player][lp_slot] = 3;
+}
+
+void gf_ProbeSetUpperClip (int lp_player, string lp_clip) {
+    if (!gv_bPROBE) {
+        return;
+    }
+    if (gv_probeClipName[lp_player][0] == lp_clip) {
+        return;
+    }
+    gv_probeClipName[lp_player][0] = lp_clip;
+    gv_probeClipStartMs[lp_player][0] = gf_AnimNowMs();
+    gf_ProbeLoadClipMetrics(lp_player, 0, lp_clip);
+}
+
+void gf_ProbeClearUpperClip (int lp_player) {
+    if (!gv_bPROBE) {
+        return;
+    }
+    gv_probeClipName[lp_player][0] = "";
+    gv_probeClipStartMs[lp_player][0] = 0;
+    gv_probeClipLen[lp_player][0] = 0;
+    gv_probeClipFrameMs[lp_player][0] = 0;
+    gv_probeClipFrames[lp_player][0] = 0;
+    gv_probeClipQuery[lp_player][0] = 0;
+}
+
+void gf_ProbeSetLowerClip (int lp_player, string lp_clip) {
+    if (!gv_bPROBE) {
+        return;
+    }
+    if (gv_probeClipName[lp_player][1] == lp_clip) {
+        return;
+    }
+    gv_probeClipName[lp_player][1] = lp_clip;
+    gv_probeClipStartMs[lp_player][1] = gf_AnimNowMs();
+    gf_ProbeLoadClipMetrics(lp_player, 1, lp_clip);
+}
+
+void gf_ProbeClearLowerClip (int lp_player) {
+    if (!gv_bPROBE) {
+        return;
+    }
+    gv_probeClipName[lp_player][1] = "";
+    gv_probeClipStartMs[lp_player][1] = 0;
+    gv_probeClipLen[lp_player][1] = 0;
+    gv_probeClipFrameMs[lp_player][1] = 0;
+    gv_probeClipFrames[lp_player][1] = 0;
+    gv_probeClipQuery[lp_player][1] = 0;
+}
+
+void gf_ProbeSeedPlayer (int lp_player) {
+    int lv_profile;
+
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(gv_tPSUNIT[lp_player]);
+    if (gv_probeClipName[lp_player][0] == "" && gv_animUpperState[lp_player] > 0) {
+        gf_ProbeSetUpperClip(lp_player, gv_animUpperClip[lv_profile][gv_animUpperState[lp_player]]);
+    }
+}
+
+void gf_ProbeEnable (int lp_player) {
+    bank lv_bank;
+
+    gv_bPROBE = true;
+    gv_probeTick = 0;
+    gv_probeSeq = 0;
+    gv_probeEventSeq = 0;
+    gv_probeRowCount = 0;
+    gv_probeLowerQueries = 0;
+    lv_bank = BankLoad(c_PROBE_BANK, 1);
+    BankRemove(lv_bank);
+    gv_probeBank = BankLoad(c_PROBE_BANK, 1);
+    gv_probeMetrics = BankLoad(c_PROBE_METRICS, 1);
+    BankSectionCreate(gv_probeBank, "meta");
+    BankSectionCreate(gv_probeBank, "config");
+    BankSectionCreate(gv_probeBank, "frames");
+    BankSectionCreate(gv_probeBank, "events");
+    BankValueSetFromInt(gv_probeBank, "meta", "probe", 1);
+    BankValueSetFromInt(gv_probeBank, "meta", "started", gf_AnimNowMs());
+    BankValueSetFromInt(gv_probeBank, "meta", "tick", 0);
+    BankValueSetFromInt(gv_probeBank, "meta", "rows", 0);
+    gf_ProbeWriteConfig(gv_probeBank, lp_player);
+    BankSave(gv_probeBank);
+    gv_probeLastFlush = TimerGetElapsed(gv_sCOBA_Clock);
+    gf_ProbeSeedPlayer(lp_player);
+}
+
+void gf_ProbeDisable (int lp_player) {
+    if (!gv_bPROBE) {
+        return;
+    }
+    gf_ProbeFlush();
+    BankSectionCreate(gv_probeBank, "meta");
+    BankValueSetFromInt(gv_probeBank, "meta", "probe", 0);
+    BankValueSetFromInt(gv_probeBank, "meta", "stopped", gf_AnimNowMs());
+    BankValueSetFromInt(gv_probeBank, "meta", "tick", gv_probeTick);
+    BankValueSetFromInt(gv_probeBank, "meta", "rows", gv_probeSeq);
+    BankValueSetFromInt(gv_probeBank, "meta", "player", lp_player);
+    BankSave(gv_probeBank);
+    gv_bPROBE = false;
+}
+
+void gf_ProbeEvent (int lp_player, string lp_kind, string lp_clip, int lp_flags) {
+    string lv_key;
+    string lv_text;
+
+    if (!gv_bPROBE) {
+        return;
+    }
+    gv_probeEventSeq += 1;
+    lv_key = "p" + IntToString(lp_player) + "_" + IntToString(gf_AnimNowMs()) + "_" + IntToString(gv_probeEventSeq);
+    lv_text = "ms=" + IntToString(gf_AnimNowMs());
+    lv_text = lv_text + " seq=" + IntToString(gv_probeEventSeq);
+    lv_text = lv_text + " kind=" + lp_kind;
+    lv_text = lv_text + " clip=" + lp_clip;
+    lv_text = lv_text + " flags=" + IntToString(lp_flags);
+    lv_text = lv_text + " up=" + IntToString(gv_animUpperState[lp_player]);
+    lv_text = lv_text + " lo=" + IntToString(gv_animLowerState[lp_player]);
+    BankSectionCreate(gv_probeBank, "events");
+    BankValueSetFromString(gv_probeBank, "events", lv_key, lv_text);
+    BankSave(gv_probeBank);
+}
+
+int gf_ProbePlayed (int lp_player, int lp_slot) {
+    int lv_now;
+    int lv_start;
+    int lv_len;
+    int lv_time;
+
+    lv_now = gf_AnimNowMs();
+    lv_start = gv_probeClipStartMs[lp_player][lp_slot];
+    lv_len = gv_probeClipLen[lp_player][lp_slot];
+    if (lv_start <= 0) {
+        lv_start = lv_now;
+        gv_probeClipStartMs[lp_player][lp_slot] = lv_now;
+    }
+    lv_time = lv_now - lv_start;
+    if (lv_time < 0) {
+        lv_time = 0;
+    }
+    if (lv_len > 0) {
+        while (lv_time >= lv_len) {
+            lv_time -= lv_len;
+        }
+    }
+    return lv_time;
+}
+
+int gf_ProbeRemaining (int lp_player, int lp_slot, int lp_played) {
+    int lv_len;
+
+    lv_len = gv_probeClipLen[lp_player][lp_slot];
+    if (lv_len <= 0) {
+        return 0;
+    }
+    return lv_len - lp_played;
+}
+
+
+
+int gf_ProbeFrame (int lp_player, int lp_slot, int lp_played) {
+    int lv_fms;
+    int lv_frames;
+    int lv_frame;
+
+    lv_fms = gv_probeClipFrameMs[lp_player][lp_slot];
+    lv_frames = gv_probeClipFrames[lp_player][lp_slot];
+    if (lv_fms <= 0 || lv_frames <= 0) {
+        return -1;
+    }
+    lv_frame = lp_played / lv_fms;
+    while (lv_frame >= lv_frames) {
+        lv_frame -= lv_frames;
+    }
+    return lv_frame;
+}
+
+string gf_ProbeQueryName (int lp_player, int lp_slot) {
+    int lv_state;
+
+    lv_state = gv_probeClipQuery[lp_player][lp_slot];
+    if (lv_state == 1) {
+        return "pending";
+    }
+    if (lv_state == 2) {
+        return "ok";
+    }
+    if (lv_state == 3) {
+        return "fail";
+    }
+    return "none";
+}
+
+void gf_ProbePlayer (int lp_player) {
+    unit lv_hero;
+    point lv_attach;
+    int lv_profile;
+    int lv_index;
+    int lv_now;
+    int lv_uplayed;
+    int lv_lplayed;
+    int lv_uframe;
+    int lv_lframe;
+    string lv_text;
+    string lv_key;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    gf_ProbeSeedPlayer(lp_player);
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    lv_now = gf_AnimNowMs();
+    lv_uplayed = gf_ProbePlayed(lp_player, 0);
+    lv_lplayed = gf_ProbePlayed(lp_player, 1);
+    lv_uframe = gf_ProbeFrame(lp_player, 0, lv_uplayed);
+    lv_lframe = gf_ProbeFrame(lp_player, 1, lv_lplayed);
+    lv_text = "ms=" + IntToString(lv_now);
+    lv_text = lv_text + " seq=" + IntToString(gv_probeSeq);
+    lv_text = lv_text + " tick=" + IntToString(gv_probeTick);
+    lv_text = lv_text + " type=" + UnitGetType(lv_hero);
+    lv_text = lv_text + " up=" + IntToString(gv_animUpperState[lp_player]);
+    lv_text = lv_text + " lo=" + IntToString(gv_animLowerState[lp_player]);
+    lv_text = lv_text + " uc=" + IntToString(gv_animUpperClipIndex[lp_player]);
+    lv_text = lv_text + " lc=" + IntToString(gv_animLowerClipIndex[lp_player]);
+    lv_text = lv_text + " uclip=" + gv_probeClipName[lp_player][0];
+    lv_text = lv_text + " lclip=" + gv_probeClipName[lp_player][1];
+    lv_text = lv_text + " uq=" + gf_ProbeQueryName(lp_player, 0);
+    lv_text = lv_text + " lq=" + gf_ProbeQueryName(lp_player, 1);
+    lv_text = lv_text + " ulen=" + IntToString(gv_probeClipLen[lp_player][0]);
+    lv_text = lv_text + " urem=" + IntToString(gf_ProbeRemaining(lp_player, 0, lv_uplayed));
+    lv_text = lv_text + " uplayed=" + IntToString(lv_uplayed);
+    lv_text = lv_text + " uframe=" + IntToString(lv_uframe);
+    lv_text = lv_text + " uframes=" + IntToString(gv_probeClipFrames[lp_player][0]);
+    lv_text = lv_text + " ufms=" + IntToString(gv_probeClipFrameMs[lp_player][0]);
+    lv_text = lv_text + " llen=" + IntToString(gv_probeClipLen[lp_player][1]);
+    lv_text = lv_text + " lrem=" + IntToString(gf_ProbeRemaining(lp_player, 1, lv_lplayed));
+    lv_text = lv_text + " lplayed=" + IntToString(lv_lplayed);
+    lv_text = lv_text + " lframe=" + IntToString(lv_lframe);
+    lv_text = lv_text + " lframes=" + IntToString(gv_probeClipFrames[lp_player][1]);
+    lv_text = lv_text + " lfms=" + IntToString(gv_probeClipFrameMs[lp_player][1]);
+    lv_text = lv_text + " lfid=" + IntToString(gv_probeClipQueryFrame[lp_player][1]);
+    lv_text = lv_text + " lplay=" + IntToString(gv_probeClipQueryPlayed[lp_player][1]);
+    lv_text = lv_text + " lqms=" + IntToString(gv_probeClipQueryMs[lp_player][1]);
+    lv_text = lv_text + " x=" + IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_hero))));
+    lv_text = lv_text + " y=" + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_hero))));
+    lv_text = lv_text + " xf=" + IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_hero)) * 1000.0));
+    lv_text = lv_text + " yf=" + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_hero)) * 1000.0));
+    lv_text = lv_text + " z=" + IntToString(FixedToInt(UnitGetHeight(lv_hero)));
+    lv_text = lv_text + " facing=" + IntToString(FixedToInt(UnitGetFacing(lv_hero)));
+    lv_text = lv_text + " speed=" + IntToString(FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent)));
+    lv_text = lv_text + " orders=" + IntToString(UnitOrderCount(lv_hero));
+    lv_text = lv_text + " yaw=" + IntToString(FixedToInt(CameraGetYaw(lp_player)));
+    lv_text = lv_text + " pitch=" + IntToString(FixedToInt(CameraGetPitch(lp_player)));
+    lv_text = lv_text + " dist=" + IntToString(FixedToInt(CameraGetDistance(lp_player)));
+    lv_text = lv_text + " aim=" + gf_AnimFlag(gv_aIMACTIVE[lp_player]);
+    lv_text = lv_text + " action=" + gf_AnimFlag(gf_ActionModeActive(lp_player));
+    lv_text = lv_text + " alt=" + gf_AnimFlag(gv_aCTIONALT[lp_player]);
+    lv_text = lv_text + " hold=" + IntToString(gv_animMoveHold[lp_player]);
+    lv_text = lv_text + " resets=" + IntToString(gv_animResets[lp_player]);
+    lv_text = lv_text + " fwd=" + gf_AnimFlag(gv_fORWARD[lp_player]);
+    lv_text = lv_text + " mt=" + gf_AnimFlag(gv_animHasMoveTarget[lp_player]);
+    if (gv_animHasMoveTarget[lp_player]) {
+        lv_text = lv_text + " mtd=" + IntToString(FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), gv_animMoveTarget[lp_player])));
+    }
+    else {
+        lv_text = lv_text + " mtd=-1";
+    }
+    lv_text = lv_text + " mob=" + gf_AnimFlag(UnitOrderHasAbil(lv_hero, "move"));
+    for (lv_index = 0; lv_index < c_PROBE_ATTACHMENT_COUNT; lv_index += 1) {
+        if (gv_probeAttachment[lv_profile][lv_index] != "") {
+            lv_attach = UnitGetAttachmentPoint(lv_hero, gv_probeAttachment[lv_profile][lv_index]);
+            lv_text = lv_text + " a" + IntToString(lv_index) + "=";
+            lv_text = lv_text + IntToString(FixedToInt(PointGetX(lv_attach))) + ",";
+            lv_text = lv_text + IntToString(FixedToInt(PointGetY(lv_attach))) + ",";
+            lv_text = lv_text + IntToString(FixedToInt(PointGetHeight(lv_attach)));
+        }
+    }
+    lv_key = "p" + IntToString(lp_player) + "_" + IntToString(gv_probeSeq);
+    gv_probeSeq += 1;
+    gf_ProbeStore(lv_key, lv_text);
+}
+
+bool gt_AnimProbe_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    if (!gv_bPROBE) {
+        return true;
+    }
+    gv_probeTick += 1;
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_ProbePlayer(lv_player);
+    }
+    if (TimerGetElapsed(gv_sCOBA_Clock) - gv_probeLastFlush >= c_PROBE_FLUSH_INTERVAL) {
+        gf_ProbeFlush();
+    }
+    return true;
+}
+
+void gt_AnimProbe_Init () {
+    gf_ProbeConfigInit();
+    gt_AnimProbe = TriggerCreate("gt_AnimProbe_Func");
+    TriggerAddEventTimePeriodic(gt_AnimProbe, c_PROBE_TICK_INTERVAL, c_timeGame);
+}
+
+bool gt_AnimProbeLower_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    if (!gv_bPROBE) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_ProbeLowerQuery(lv_player);
+    }
+    return true;
+}
+
+void gt_AnimProbeLower_Init () {
+    gt_AnimProbeLower = TriggerCreate("gt_AnimProbeLower_Func");
+    TriggerAddEventTimePeriodic(gt_AnimProbeLower, c_PROBE_LOWER_INTERVAL, c_timeGame);
+}
+
+bool gt_AnimProbeToggle_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (gv_bPROBE) {
+        gf_ProbeDisable(1);
+    }
+    else {
+        gf_ProbeEnable(1);
+    }
+    return true;
+}
+
+void gt_AnimProbeToggle_Init () {
+    gt_AnimProbeToggle = TriggerCreate("gt_AnimProbeToggle_Func");
+    TriggerAddEventKeyPressed(gt_AnimProbeToggle, 1, c_keyF9, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}

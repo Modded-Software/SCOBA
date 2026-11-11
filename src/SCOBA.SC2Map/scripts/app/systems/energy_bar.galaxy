@@ -9,7 +9,7 @@ bool gt_RefreshEnergyBar_Func (bool testConds, bool runActions) {
     // Variable Initialization
     lv_triggeringUnit = EventUnit();
     lv_localPlayer = EventPlayer();
-    lv_localBar = ((lv_localPlayer * 10) + 2);
+    lv_localBar = gf_BossBarId(lv_localPlayer, 2);
 
     // Conditions
     if (testConds) {
@@ -31,6 +31,9 @@ bool gt_RefreshEnergyBar_Func (bool testConds, bool runActions) {
         return true;
     }
 
+    if (lv_localBar <= 0) {
+        return true;
+    }
     libNtve_gf_SetBossBarCurrentValue(lv_localBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropEnergy, c_unitPropCurrent)), true);
     return true;
 }

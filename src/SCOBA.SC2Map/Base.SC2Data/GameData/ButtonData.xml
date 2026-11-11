@@ -47,6 +47,22 @@
         <Name value="Chase: Walk"/>
         <Tooltip value="Hero chases enemies to attack them. Click to switch to Stand."/>
     </CButton>
+    <CButton id="SCOBAActionModeRPG">
+        <Icon value="Assets\Textures\SCOBAModeRPG.dds"/>
+        <AlertIcon value="Assets\Textures\SCOBAModeRPG.dds"/>
+        <EditorCategories value="Race:Terran"/>
+        <TintRacially value="1"/>
+        <Name value="Controls: RPG"/>
+        <Tooltip value="RPG controls: right and middle button turn the character, right click commands, left click selects. Click to switch to Actions."/>
+    </CButton>
+    <CButton id="SCOBAActionModeActions">
+        <Icon value="Assets\Textures\SCOBAModeActions.dds"/>
+        <AlertIcon value="Assets\Textures\SCOBAModeActions.dds"/>
+        <EditorCategories value="Race:Terran"/>
+        <TintRacially value="1"/>
+        <Name value="Controls: Actions"/>
+        <Tooltip value="Action controls: mouse look, right hold aims, left click attacks, Alt shows the cursor. Click to switch to RPG."/>
+    </CButton>
     <CButton id="SCOBAAutoAttackStatus">
         <Icon value="Assets\Textures\btn-command-attack.dds"/>
         <AlertIcon value="Assets\Textures\btn-command-attack.dds"/>

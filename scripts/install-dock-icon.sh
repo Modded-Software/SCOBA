@@ -35,7 +35,7 @@ fail() {
 }
 
 [ -f "$ICON_SOURCE" ] || fail "icon not found: $ICON_SOURCE"
-[ -x "$ROOT_DIR/scripts/launch-scoba.sh" ] || fail "launcher not executable: $ROOT_DIR/scripts/launch-scoba.sh"
+[ -x "$ROOT_DIR/scripts/playtest.sh" ] || fail "entrypoint not executable: $ROOT_DIR/scripts/playtest.sh"
 if ! UV_BIN="$(command -v uv)"; then
     fail "uv not found"
 fi
@@ -44,7 +44,7 @@ fi
 mkdir -p "$ICON_DIR" "$APPS_DIR"
 cp -f "$ICON_SOURCE" "$ICON_DIR/$ICON_NAME.png"
 
-printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=env UV_BIN="%s" SC2_PROJECT_ROOT="%s" SC2_MAP_SOURCE="%s/out/SCOBA256.SC2Map" SC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s/scripts/launch-scoba.sh"\nIcon=%s\nTerminal=false\nType=Application\nCategories=Game;StrategyGame;\nStartupNotify=true\nStartupWMClass=StarCraft II.exe\n' \
+printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=env UV_BIN="%s" SC2_PROJECT_ROOT="%s" SC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s/scripts/playtest.sh" launch\nPath=%s\nIcon=%s\nTerminal=false\nType=Application\nCategories=Game;StrategyGame;\nStartupNotify=true\nStartupWMClass=StarCraft II.exe\n' \
     "$APP_NAME" \
     "Launch the SCOBA StarCraft II custom map" \
     "$UV_BIN" \
@@ -54,6 +54,11 @@ printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=env UV_BIN="%s" SC2_PROJECT_R
     "$ICON_NAME" > "$DESKTOP_FILE"
 
 chmod +x "$DESKTOP_FILE"
+if command -v desktop-file-validate; then
+    if ! output="$(desktop-file-validate "$DESKTOP_FILE" 2>&1)"; then
+        fail "invalid desktop entry: $output"
+    fi
+fi
 if ! output="$(update-desktop-database "$APPS_DIR" 2>&1)"; then
     log "warning: update-desktop-database: $output"
 fi

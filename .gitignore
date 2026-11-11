@@ -10,4 +10,5 @@ out/
 *.log
 tools/stormex
 .DS_Store
-
+src/SCOBA.SC2Map/Assets/
+src/SCOBA.SC2Map/.character_anim_assets

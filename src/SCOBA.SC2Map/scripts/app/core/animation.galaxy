@@ -1,0 +1,47 @@
+// Module: core/animation
+
+const int c_ANIM_UPPER_NONE = 0;
+const int c_ANIM_UPPER_IDLE = 1;
+const int c_ANIM_UPPER_READY = 2;
+const int c_ANIM_UPPER_AIM_DOWN = 3;
+const int c_ANIM_UPPER_AIM_MID = 4;
+const int c_ANIM_UPPER_AIM_UP = 5;
+const int c_ANIM_UPPER_COUNT = 6;
+
+const int c_ANIM_LOWER_NONE = 0;
+const int c_ANIM_LOWER_IDLE = 1;
+const int c_ANIM_LOWER_WALK = 2;
+const int c_ANIM_LOWER_WALK_BACK = 3;
+const int c_ANIM_LOWER_COUNT = 4;
+
+const int c_ANIM_DIR_FORWARD = 0;
+const int c_ANIM_DIR_FORWARD_LEFT = 1;
+const int c_ANIM_DIR_LEFT = 2;
+const int c_ANIM_DIR_BACK_LEFT = 3;
+const int c_ANIM_DIR_BACK = 4;
+const int c_ANIM_DIR_BACK_RIGHT = 5;
+const int c_ANIM_DIR_RIGHT = 6;
+const int c_ANIM_DIR_FORWARD_RIGHT = 7;
+const int c_ANIM_DIR_COUNT = 8;
+const fixed c_ANIM_DIR_HYSTERESIS = 5.0;
+
+const int c_ANIM_HERO_TOSH = 0;
+const int c_ANIM_HERO_KERRIGAN = 1;
+const int c_ANIM_HERO_FIREBAT = 2;
+const int c_ANIM_HERO_GENERIC = 3;
+const int c_ANIM_HERO_COUNT = 4;
+
+const fixed c_ANIM_TURN_DURATION = 0.1;
+const fixed c_ANIM_AIM_TURN_DURATION = 0.05;
+const fixed c_ANIM_TURN_DEADBAND = 3.0;
+const int c_ANIM_LOWER_HOLD_TICKS = 3;
+
+const string c_ANIM_BRACKET_UPPER = "SCOBAUp";
+const string c_ANIM_BRACKET_LOWER = "SCOBALo";
+const int c_PROBE_ATTACHMENT_COUNT = 6;
+const int c_PROBE_BUFFER_ROWS = 64;
+const fixed c_PROBE_FLUSH_INTERVAL = 0.25;
+const fixed c_PROBE_TICK_INTERVAL = 0.01;
+const fixed c_PROBE_LOWER_INTERVAL = 0.1;
+const int c_PROBE_LOWER_QUERY_LIMIT = 480;
+

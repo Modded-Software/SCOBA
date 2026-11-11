@@ -5,4 +5,15 @@ if [ ! -f "$ROOT_DIR/scripts/sc2-check-logs.py" ]; then
     ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 fi
 cd "$ROOT_DIR"
-exec uv run python "$ROOT_DIR/scripts/sc2-check-logs.py" "$@"
+UV_BIN="${UV_BIN:-uv}"
+if [ "${UV_BIN#/}" = "$UV_BIN" ]; then
+    UV_BIN="$(command -v "$UV_BIN")" || {
+        printf 'ERROR: uv not found\n' >&2
+        exit 1
+    }
+fi
+[ -x "$UV_BIN" ] || {
+    printf 'ERROR: uv not executable: %s\n' "$UV_BIN" >&2
+    exit 1
+}
+exec "$UV_BIN" run python "$ROOT_DIR/scripts/sc2-check-logs.py" "$@"

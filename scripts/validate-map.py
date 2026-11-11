@@ -4,10 +4,27 @@
 from __future__ import annotations
 
 import argparse
+import re
 import struct
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR / "vendor" / "m3addon"))
+
+import m3
+from animation_tokens import normalized_animation_name, validate_animation_name
+
+GENERATED_MODELS = [
+    Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3",
+    Path("Assets") / "Units" / "Zerg" / "Kerrigan" / "KerriganSCOBA.m3",
+]
+
+ANIM_CONFIG_RE = re.compile(r'gf_AnimConfig(?:Upper|Lower)\([^,]+,[^,]+,\s*"([^"]+)"')
+HERO_CONFIG_RE = re.compile(
+    r'gf_AnimConfig(?:Upper|Lower)\((c_ANIM_HERO_TOSH|c_ANIM_HERO_KERRIGAN),[^,]+,\s*"([^"]+)"'
+)
 
 REQUIRED = [
     "MapScript.galaxy",
@@ -39,12 +56,14 @@ XML_FILES = [
 CUSTOM_ABILITIES = [
     "SCOBAAutoAttackToggle",
     "SCOBARightClickToggle",
+    "SCOBAActionModeToggle",
     "SCOBAAutoAttackStatus",
 ]
 
 CUSTOM_BEHAVIORS = [
     "SCOBAAutoAttackBehavior",
     "SCOBARightClickStandBehavior",
+    "SCOBAActionModeBehavior",
     "SCOBAStandRoot",
 ]
 
@@ -53,7 +72,14 @@ CUSTOM_BUTTONS = [
     "SCOBAAutoAttackOff",
     "SCOBARightClickMove",
     "SCOBARightClickStand",
+    "SCOBAActionModeRPG",
+    "SCOBAActionModeActions",
     "SCOBAAutoAttackStatus",
+]
+
+CONTROL_ICONS = [
+    "SCOBAModeRPG.dds",
+    "SCOBAModeActions.dds",
 ]
 
 
@@ -122,6 +148,23 @@ def check_catalogs(map_dir: Path) -> None:
         if button not in buttons:
             fail(f"missing button: {button}")
 
+    button_tree = ET.parse(gamedata / "ButtonData.xml")
+    button_icons = {
+        'SCOBAActionModeRPG': r'Assets\Textures\SCOBAModeRPG.dds',
+        'SCOBAActionModeActions': r'Assets\Textures\SCOBAModeActions.dds',
+    }
+    for button_id, icon_path in button_icons.items():
+        button = None
+        for candidate in button_tree.getroot().iter("CButton"):
+            if candidate.get("id") == button_id:
+                button = candidate
+                break
+        if button is None:
+            fail(f"missing button: {button_id}")
+        icon = button.find("Icon")
+        if icon is None or icon.get("value") != icon_path:
+            fail(f"{button_id} has wrong control icon")
+
     behavior_tree = ET.parse(gamedata / "BehaviorData.xml")
     stand_root = None
     for candidate in behavior_tree.getroot().iter("CBehaviorBuff"):
@@ -172,12 +215,70 @@ def check_catalogs(map_dir: Path) -> None:
         
 
 
-def check_script(map_dir: Path) -> None:
+def check_control_icons(map_dir: Path) -> None:
+    icon_dir = map_dir / "Assets" / "Textures"
+    hashes = []
+    for name in CONTROL_ICONS:
+        path = icon_dir / name
+        if not path.is_file():
+            fail(f"missing control icon: {name}")
+        data = path.read_bytes()
+        if len(data) < 128 or data[:4] != b"DDS ":
+            fail(f"invalid control icon: {name}")
+        hashes.append(data)
+    if hashes[0] == hashes[1]:
+        fail("control mode icons must differ")
+
+
+def galaxy_text(map_dir: Path) -> str:
     script = (map_dir / "MapScript.galaxy").read_text(encoding="utf-8", errors="replace")
     galaxy = [script]
     for path in sorted((map_dir / "scripts").rglob("*.galaxy")):
         galaxy.append(path.read_text(encoding="utf-8", errors="replace"))
-    combined = "\n".join(galaxy)
+    return "\n".join(galaxy)
+
+
+def check_animation_names(map_dir: Path) -> None:
+    text = galaxy_text(map_dir)
+    for clip in ANIM_CONFIG_RE.findall(text):
+        try:
+            validate_animation_name(clip)
+        except ValueError as exc:
+            fail(str(exc))
+
+    model_groups: list[set[str]] = []
+    for relative in GENERATED_MODELS:
+        path = map_dir / relative
+        if not path.is_file():
+            fail(f"missing generated model: {relative}")
+        model = m3.loadModel(str(path))
+        groups = set()
+        for group in model.sequenceTransformationGroups:
+            try:
+                groups.add(normalized_animation_name(group.name))
+            except ValueError as exc:
+                fail(f"{relative}: {exc}")
+        for name in ("Stand Left", "Stand Right"):
+            if normalized_animation_name(name) not in groups:
+                fail(f"{relative} missing native turn group {name!r}")
+        for name in ("Turn Left", "Turn Right"):
+            if normalized_animation_name(name) in groups:
+                fail(f"{relative} has upper turn group {name!r}")
+        model_groups.append(groups)
+
+    for profile, clip in HERO_CONFIG_RE.findall(text):
+        try:
+            name = normalized_animation_name(clip)
+        except ValueError as exc:
+            fail(str(exc))
+        for relative, groups in zip(GENERATED_MODELS, model_groups):
+            if name not in groups:
+                fail(f"{profile} clip {clip!r} missing from {relative}")
+
+
+def check_script(map_dir: Path) -> None:
+    script = (map_dir / "MapScript.galaxy").read_text(encoding="utf-8", errors="replace")
+    combined = galaxy_text(map_dir)
     if "RegionPlayableMapSet(RegionRect(0.0, 0.0, 254.0, 254.0));" not in combined:
         fail("MapScript.galaxy missing expanded playable region")
     if "CameraSetBounds(PlayerGroupAll(), RegionRect(0.0, 0.0, 254.0, 254.0), true);" not in combined:
@@ -215,7 +316,9 @@ def main() -> int:
     check_xml(map_dir)
     check_dimensions(map_dir)
     check_catalogs(map_dir)
+    check_control_icons(map_dir)
     check_script(map_dir)
+    check_animation_names(map_dir)
     check_stamp(map_dir)
     print(f"OK: validated {map_dir}")
     return 0

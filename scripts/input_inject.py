@@ -47,6 +47,22 @@ def rclick(x, y):
     button(3, True)
     button(3, False)
 
+def rclick_fast(x, y):
+    move(x, y)
+    xt.XTestFakeButtonEvent(d, 3, 1, 0); x11.XFlush(d)
+    time.sleep(0.002)
+    xt.XTestFakeButtonEvent(d, 3, 0, 0); x11.XFlush(d)
+
+
+
+def ldrag(x1, y1, x2, y2):
+    move(x1, y1)
+    button(1, True)
+    steps = 8
+    for i in range(1, steps + 1):
+        move(x1 + (x2 - x1) * i // steps, y1 + (y2 - y1) * i // steps)
+    button(1, False)
+
 def rdrag(x1, y1, x2, y2):
     move(x1, y1)
     button(3, True)
@@ -62,6 +78,11 @@ def bothclick(x, y, hold_ms):
     time.sleep(hold_ms / 1000.0)
     button(3, False)
     button(1, False)
+
+def rhold(x, y, hold_ms):
+    move(x, y)
+    button(3, True)
+    time.sleep(hold_ms / 1000.0)
 
 def shot(path):
     wid = None
@@ -91,10 +112,16 @@ if __name__ == '__main__':
         shot(sys.argv[2])
     elif cmd == 'rclick':
         rclick(int(sys.argv[2]), int(sys.argv[3]))
+    elif cmd == 'ldrag':
+        ldrag(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]))
     elif cmd == 'rdrag':
         rdrag(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]))
     elif cmd == 'both':
         bothclick(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))
+    elif cmd == 'rhold':
+        rhold(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))
+    elif cmd == 'rrelease':
+        button(3, False)
     print('ok', cmd)
 
 if len(sys.argv) > 1 and sys.argv[1] == "auto":

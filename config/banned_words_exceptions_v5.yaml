@@ -1,1 +1,31 @@
-exceptions: []
+exceptions:
+  - rule: bgetattr
+    path: ^scripts/vendor/m3addon/m3\.py$
+    rationale: Vendored third-party M3 parser uses reflective attribute reads for schema-driven structures.
+    owner: sc2
+    review_date: '2026-11-10'
+    removal: Remove when the vendored parser is replaced or updated upstream.
+  - rule: bsetattr
+    path: ^scripts/vendor/m3addon/m3\.py$
+    rationale: Vendored third-party M3 parser uses reflective attribute writes for schema-driven structures.
+    owner: sc2
+    review_date: '2026-11-10'
+    removal: Remove when the vendored parser is replaced or updated upstream.
+  - rule: bhasattr
+    path: ^scripts/vendor/m3addon/m3\.py$
+    rationale: Vendored third-party M3 parser checks dynamic fields during schema parsing.
+    owner: sc2
+    review_date: '2026-11-10'
+    removal: Remove when the vendored parser is replaced or updated upstream.
+  - rule: bunpack-b
+    path: ^scripts/vendor/m3addon/m3\.py$
+    rationale: Vendored third-party M3 parser uses struct unpack for binary decoding.
+    owner: sc2
+    review_date: '2026-11-10'
+    removal: Remove when the vendored parser is replaced or updated upstream.
+  - rule: bmaybe-b
+    path: ^scripts/vendor/m3addon/structures\.xml$
+    rationale: Vendored third-party structure metadata contains the word in a field description.
+    owner: sc2
+    review_date: '2026-11-10'
+    removal: Remove when the vendored parser is replaced or updated upstream.

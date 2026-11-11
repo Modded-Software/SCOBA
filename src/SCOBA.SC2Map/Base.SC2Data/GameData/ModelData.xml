@@ -122,4 +122,10 @@
     <CModel id="ZerusTree">
         <VariationCount value="12"/>
     </CModel>
+    <CModel id="ToshSCOBA">
+        <Model value="Assets\Units\Terran\Tosh\ToshSCOBA.m3"/>
+    </CModel>
+    <CModel id="KerriganSCOBA">
+        <Model value="Assets\Units\Zerg\Kerrigan\KerriganSCOBA.m3"/>
+    </CModel>
 </Catalog>

@@ -1,0 +1,230 @@
+// Combat test profile
+trigger gt_DbgTest;
+
+bool gt_DbgTest_Func (bool testConds, bool runActions) {
+    int lv_i;
+
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBATEST", 1);
+    gv_bINPUTLOG = true;
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    BankValueSetFromInt(gv_dbgBank, "meta", "anchorX", FixedToInt(PointGetX(gv_dbgAnchor)));
+    BankValueSetFromInt(gv_dbgBank, "meta", "anchorY", FixedToInt(PointGetY(gv_dbgAnchor)));
+    BankSave(gv_dbgBank);
+
+    gf_DbgReset("startup", false, true);
+    gf_DbgSnap("startup", "t0000");
+
+    gf_DbgReset("auto_off", false, true);
+    gf_DbgSpawnOne("auto_off", 3.0, 500.0);
+    gf_DbgSnap("auto_off", "t0000");
+    Wait(3.0, c_timeGame);
+    gf_DbgSnap("auto_off", "t3000");
+
+    gf_DbgReset("stand_in", true, true);
+    gf_DbgSpawnOne("stand_in", 3.0, 500.0);
+    gf_DbgSnap("stand_in", "t0000");
+    Wait(0.5, c_timeGame);
+    gf_DbgSnap("stand_in", "t0500");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("stand_in", "t1500");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("stand_in", "t2500");
+
+    gf_DbgReset("stand_out", true, true);
+    gf_DbgSpawnOne("stand_out", 11.0, 500.0);
+    gf_DbgSnap("stand_out", "t0000");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("stand_out", "t1000");
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap("stand_out", "t2500");
+
+    gf_DbgReset("stand_outside", true, true);
+    gf_DbgSpawnOne("stand_outside", 13.0, 500.0);
+    gf_DbgSnap("stand_outside", "t0000");
+    Wait(2.0, c_timeGame);
+    gf_DbgSnap("stand_outside", "t2000");
+
+    gf_DbgReset("stand_auto_off", false, true);
+    gf_DbgSpawnOne("stand_auto_off", 9.0, 500.0);
+    gf_DbgSnap("stand_auto_off", "t0000");
+    for (lv_i = 0; lv_i < 5; lv_i += 1) {
+        gf_CombatManualAttack(1, gv_dbgEnemy);
+        Wait(0.2, c_timeGame);
+    }
+    gf_DbgSnap("stand_auto_off", "t1000");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("stand_auto_off", "t2000");
+
+    gf_DbgReset("stand_wake_manual", true, true);
+    gf_DbgSpawnOne("stand_wake_manual", 9.0, 500.0);
+    gf_DbgSnap("stand_wake_manual", "t0000");
+    gv_fORWARD[1] = true;
+    gf_CombatBeginMove(1);
+    Wait(0.2, c_timeGame);
+    gf_DbgSnap("stand_wake_manual", "t0200");
+    gv_fORWARD[1] = false;
+    Wait(0.8, c_timeGame);
+    gf_DbgSnap("stand_wake_manual", "t1000");
+    gf_CombatManualAttack(1, gv_dbgEnemy);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("stand_wake_manual", "t2000");
+
+    gf_DbgReset("right_click", false, true);
+    gf_DbgSpawnOne("right_click", 3.0, 500.0);
+    gv_sCOBAHover[1] = gv_dbgEnemy;
+    gf_MousePressRight(1, 100, 100, PointGetX(UnitGetPosition(gv_dbgEnemy)), PointGetY(UnitGetPosition(gv_dbgEnemy)));
+    BankValueSetFromFlag(gv_dbgBank, "right_click", "ran", gf_MouseReleaseRight(1, 100, 100));
+    BankSave(gv_dbgBank);
+    Wait(0.2, c_timeGame);
+    gf_DbgSnap("right_click", "t0200");
+
+    gf_DbgReset("right_drag", false, true);
+    gf_DbgSpawnOne("right_drag", 3.0, 500.0);
+    gv_sCOBAHover[1] = gv_dbgEnemy;
+    gf_MousePressRight(1, 100, 100, PointGetX(UnitGetPosition(gv_dbgEnemy)), PointGetY(UnitGetPosition(gv_dbgEnemy)));
+    BankValueSetFromFlag(gv_dbgBank, "right_drag", "ran", gf_MouseReleaseRight(1, 110, 100));
+    BankSave(gv_dbgBank);
+    gf_DbgSnap("right_drag", "t0000");
+    Wait(0.5, c_timeGame);
+    gf_DbgSnap("right_drag", "t0500");
+
+    gf_DbgReset("right_point", false, false);
+    gf_DbgSpawnOne("right_point", 3.0, 500.0);
+    BankValueSetFromFlag(gv_dbgBank, "right_point", "pickValid", UnitIsValid(gf_ResolveClickEnemy(1, UnitGetPosition(gv_dbgEnemy))));
+    BankSave(gv_dbgBank);
+
+    gf_DbgReset("right_ground_walk", false, false);
+    gf_MousePressRight(1, 100, 100, PointGetX(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), PointGetY(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)));
+    BankValueSetFromFlag(gv_dbgBank, "right_ground_walk", "ran", gf_MouseReleaseRight(1, 100, 100));
+    BankSave(gv_dbgBank);
+    gf_DbgSnap("right_ground_walk", "t0000");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("right_ground_walk", "t1000");
+
+    gf_DbgReset("right_ground_stand", false, true);
+    gf_MousePressRight(1, 100, 100, PointGetX(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), PointGetY(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)));
+    BankValueSetFromFlag(gv_dbgBank, "right_ground_stand", "ran", gf_MouseReleaseRight(1, 100, 100));
+    BankSave(gv_dbgBank);
+    gf_DbgSnap("right_ground_stand", "t0000");
+    Wait(0.5, c_timeGame);
+    gf_DbgSnap("right_ground_stand", "t0500");
+
+    gf_DbgReset("right_target_kept", false, false);
+    gf_DbgSpawnOne("right_target_kept", 3.0, 500.0);
+    gf_ShowTarget(1, gv_dbgEnemy);
+    gv_sCOBAHover[1] = null;
+    gf_MousePressRight(1, 100, 100, PointGetX(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), PointGetY(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)));
+    gf_MouseReleaseRight(1, 100, 100);
+    Wait(0.2, c_timeGame);
+    gf_DbgSnap("right_target_kept", "t0200");
+
+    gf_DbgReset("both_forward", false, false);
+    gv_mOUSELEFT[1] = true;
+    gv_mOUSERIGHT[1] = true;
+    gv_mOUSEFORWARD[1] = true;
+    gv_kEYFORWARD[1] = true;
+    gv_fORWARD[1] = true;
+    gf_MouseForwardStop(1);
+    gf_DbgSnap("both_forward", "tkey");
+    gv_mOUSEFORWARD[1] = true;
+    gv_kEYFORWARD[1] = false;
+    gv_fORWARD[1] = true;
+    gf_MouseForwardStop(1);
+    gf_DbgSnap("both_forward", "tmouse");
+
+    gf_DbgReset("walk_ground", true, false);
+    gf_DbgSnap("walk_ground", "t0000");
+    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), c_orderQueueReplace);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("walk_ground", "t1000");
+
+    gf_DbgReset("stand_ground", true, true);
+    gf_DbgSnap("stand_ground", "t0000");
+    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), c_orderQueueReplace);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("stand_ground", "t1000");
+
+    gf_DbgReset("move_wake", true, true);
+    gf_DbgSnap("move_wake", "t0000");
+    gv_fORWARD[1] = true;
+    gf_CombatBeginMove(1);
+    Wait(0.2, c_timeGame);
+    gf_DbgSnap("move_wake", "t0200");
+    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, 5.0, 0.0)), c_orderQueueReplace);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("move_wake", "t1200");
+    gv_fORWARD[1] = false;
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("move_wake", "t2200");
+
+    gf_DbgReset("walk_chase", true, false);
+    gf_DbgSpawnOne("walk_chase", 9.0, 500.0);
+    gf_DbgSnap("walk_chase", "t0000");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("walk_chase", "t1000");
+    Wait(2.0, c_timeGame);
+    gf_DbgSnap("walk_chase", "t3000");
+
+    gf_DbgReset("walk_idle", true, false);
+    gf_DbgSpawnOne("walk_idle", 13.0, 500.0);
+    gf_DbgSnap("walk_idle", "t0000");
+    Wait(2.0, c_timeGame);
+    gf_DbgSnap("walk_idle", "t2000");
+
+    gf_DbgReset("weapon", false, false);
+    gf_DbgSpawnOne("weapon", 3.0, 500.0);
+    gf_DbgSnap("weapon", "t0000");
+    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingUnit(AbilityCommand("SCOBAAutoAttackStatus", 0), gv_dbgEnemy), c_orderQueueReplace);
+    Wait(0.1, c_timeGame);
+    gf_DbgSnap("weapon", "t0100");
+    Wait(0.1, c_timeGame);
+    gf_DbgSnap("weapon", "t0200");
+    Wait(0.3, c_timeGame);
+    gf_DbgSnap("weapon", "t0500");
+    Wait(0.5, c_timeGame);
+    gf_DbgSnap("weapon", "t1000");
+
+    gf_DbgReset("camera_heading", false, false);
+    CameraSetValue(1, c_cameraValueYaw, 90.0, 0.0, -1, 10);
+    gv_rOTATEUNIT[1] = true;
+    gt_CameraTurnTick_Func(true, true);
+    Wait(0.1, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, "camera_heading", "facing", FixedToInt(UnitGetFacing(gv_tPSUNIT[1])));
+    gv_rOTATEUNIT[1] = false;
+    BankSave(gv_dbgBank);
+
+    gf_DbgReset("real_input", false, false);
+    gv_bINPUTLOG = true;
+    gf_DbgInputLog("target", "none");
+    gf_DbgInputLog("right", "none");
+    gf_DbgInputLog("rightRan", "no");
+    gf_DbgInputLog("leftDrag", "no");
+    gf_DbgInputLog("leftDx", "0");
+    gf_DbgInputLog("leftDy", "0");
+    gf_DbgInputLog("leftCancel", "no");
+    gf_DbgInputLog("rightDrag", "no");
+    gf_DbgInputLog("rightDx", "0");
+    gf_DbgInputLog("rightDy", "0");
+    gf_DbgInputLog("rightCancel", "no");
+    gf_DbgInputLog("hover", "none");
+    gf_DbgSpawnOne("real_input", 3.0, 500.0);
+    gf_DbgSnap("real_input", "t0000");
+    BankValueSetFromInt(gv_dbgBank, "real_input", "ready", 1);
+    BankSave(gv_dbgBank);
+    Wait(60.0, c_timeGame);
+    gf_DbgSnap("real_input", "after");
+
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_DbgTest_Init () {
+    gt_DbgTest = TriggerCreate("gt_DbgTest_Func");
+    TriggerAddEventMapInit(gt_DbgTest);
+}

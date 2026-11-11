@@ -10,4 +10,7 @@
     <Bank Name="ZStory" Player="1"/>
     <Bank Name="ZStoryTransition" Player="1"/>
     <Bank Name="TCampaign" Player="1"/>
+    <Bank Name="SCOBAANIMLOG" Player="1"/>
+    <Bank Name="SCOBAFRAMELOG" Player="1"/>
+    <Bank Name="SCOBACLIPMETRICS" Player="1"/>
 </BankList>

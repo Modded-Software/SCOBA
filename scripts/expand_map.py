@@ -11,6 +11,8 @@ import struct
 from pathlib import Path
 
 from bootstrap_galaxy import write_bootstrap
+from character_anim_assets import generate as generate_character_anim
+from control_mode_icons import generate as generate_control_icons
 from doodad_occlusion import disable_doodad_occlusion
 from expand_helpers import clone_cells, read, upsample_grid, write
 from project_root import project_root
@@ -467,6 +469,8 @@ def main() -> int:
     write_bootstrap(dst)
     expand_minimap(src / "Minimap.tga", dst / "Minimap.tga")
     disable_doodad_occlusion(dst)
+    generate_character_anim(dst, False)
+    generate_control_icons(dst, False)
     if os.environ.get("SC2_NO_PROPS") != "1":
         expand_props(dst)
     if os.environ.get("SC2_NO_SPORES") != "1":
