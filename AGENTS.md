@@ -67,6 +67,7 @@
 ## Test framework
 
 - `scripts/playtest.sh <profile>` - canonical profile test command with a fresh rebuild.
+- `scripts/playtest.sh aimfreeze` - 10-second upper aim freeze and pitch-change check.
 - `scripts/testmap.py` - generic build and run command for test profiles.
 - `scripts/build-test-map.py` - build the combat test map.
 - `scripts/run-map-test.py` - run the combat test profile.
@@ -134,13 +135,15 @@
 - Aim pitch uses densely spaced keyframes and sends the nearest target time when camera pitch changes.
 - Aim pitch selects the nearest `SCOBAUp` target time from `CameraGetPitch`.
 - Galaxy angles are degrees. Normalize wrapped camera pitch above 180 degrees to signed pitch before mapping.
-- Aim pitch sends `AnimSetTime SCOBAUp` to the unit main actor on every aim tick.
-- Reassert `SCOBAUp` every aim tick to pin the upper pose. Do not use `AnimSetPaused`.
+- Aim pitch plays `SCOBAUp` on the main actor and sets `AnimSetTime` there.
+- On each pitch change, unpause `SCOBAUp`, send `AnimSetTime`, then pause `SCOBAUp`.
+- Freeze only after the camera-matched frame is applied. Never pause before setting the frame.
+- Do not use `AnimSetPaused` on `SCOBALo`.
 - The lower `SCOBALo` bracket must keep its Stand or Walk animation playing while the upper is held.
 - Aim idle uses `Attack,Stand`; aim in-place turn uses `Attack,Stand,Left` or `Attack,Stand,Right`.
 - Keep `c_ANIM_AIM_PITCH_REST` fixed. Never capture the aim-entry camera pitch as rest.
 - Drive pitch updates from `TriggerAddEventCameraMove` and a periodic timer.
-- On aim exit, send `AnimBlendTimeRemove` and clear `SCOBAUp`.
+- On aim exit, send `AnimBlendTimeRemove`, unpause `SCOBAUp`, and clear it.
 - Tosh and Kerrigan `CActorModel` entries set `AnimBlendTime` to 0.
 - Aim entry must start at the current camera pitch without blending from idle.
 - Aim pitch must not use actor root rotation or whole-model rotation.

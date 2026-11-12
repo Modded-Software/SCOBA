@@ -29,6 +29,7 @@ void gf_AnimUpperClear (int lp_player) {
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     gf_AnimEvent(lp_player, "upper_stop", "", 0);
     gf_ProbeEvent(lp_player, "upper_stop", "", 0);
+    ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
     ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_UPPER);
     gv_animUpperState[lp_player] = c_ANIM_UPPER_NONE;
     gv_animUpperClipIndex[lp_player] = -1;

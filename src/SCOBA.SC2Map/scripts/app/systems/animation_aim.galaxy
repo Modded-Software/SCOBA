@@ -203,8 +203,13 @@ void gf_AnimAimPitchTick (int lp_player) {
     if (lv_time > c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY) {
         lv_time = c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY;
     }
+    if ((gv_animAimPitchTime[lp_player] >= 0.0) && (AbsF(gv_animAimPitchTime[lp_player] - lv_time) < 0.0001)) {
+        return;
+    }
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
     ActorSend(lv_actor, "AnimSetTime " + c_ANIM_AIM_PITCH_CLIP + " " + FixedToString(lv_time, c_fixedPrecisionAny) + " 0");
+    ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER);
     gv_animAimPitchTime[lp_player] = lv_time;
     gv_animAimPitchSends[lp_player] += 1;
 }

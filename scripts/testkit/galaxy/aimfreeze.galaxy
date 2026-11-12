@@ -1,0 +1,49 @@
+// 10-second aim freeze test.
+
+void gf_AimFreezeSnap (string lp_tag) {
+    BankValueSetFromInt(gv_dbgBank, "freeze", lp_tag + "At", gf_AnimNowMs());
+    BankValueSetFromInt(gv_dbgBank, "freeze", lp_tag + "Time", FixedToInt(gv_animAimPitchTime[1] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, "freeze", lp_tag + "Camera", FixedToInt(CameraGetPitch(1)));
+    BankSave(gv_dbgBank);
+}
+
+trigger gt_AimFreezeTest;
+
+bool gt_AimFreezeTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(1.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAAIMFREETEST", 1);
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "aimfreeze");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    BankValueSetFromInt(gv_dbgBank, "freeze", "Ready", 1);
+    BankSave(gv_dbgBank);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgReset("aimfreeze", false, true);
+    gv_bANIMLOG = true;
+    gv_animLogIndex[1] = 0;
+    gf_ProbeEnable(1);
+    gf_AimBegin(1);
+    Wait(0.5, c_timeGame);
+    gf_AimFreezeSnap("entry");
+    Wait(1.0, c_timeGame);
+    gf_AimFreezeSnap("hold1");
+    Wait(1.0, c_timeGame);
+    gf_AimFreezeSnap("hold2");
+    CameraSetValue(1, c_cameraValuePitch, CameraGetPitch(1) + 20.0, 0.2, -1, 10);
+    Wait(0.5, c_timeGame);
+    gf_AimFreezeSnap("move1");
+    Wait(1.0, c_timeGame);
+    gf_AimFreezeSnap("move2");
+    gf_ProbeDisable(1);
+    gf_AimEnd(1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_AimFreezeTest_Init () {
+    gt_AimFreezeTest = TriggerCreate("gt_AimFreezeTest_Func");
+    TriggerAddEventMapInit(gt_AimFreezeTest);
+}
