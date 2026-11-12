@@ -34,7 +34,7 @@ const int c_ANIM_HERO_GENERIC = 3;
 const int c_ANIM_HERO_COUNT = 4;
 
 const fixed c_ANIM_TURN_DURATION = 0.1;
-const fixed c_ANIM_AIM_TURN_DURATION = 0.03;
+const fixed c_ANIM_AIM_TURN_DURATION = 0.006;
 const fixed c_ANIM_AIM_PITCH_MIN = -95.0;
 const fixed c_ANIM_AIM_PITCH_MAX = 50.0;
 const fixed c_ANIM_AIM_PITCH_REST = -13.0;

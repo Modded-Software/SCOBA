@@ -15,14 +15,25 @@ from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 ROOT = project_root()
 PITCH_TIME_MS = 10000.0
 PITCH_STEPS = 99
-STATIC_FRAME_MS = 1000
+STATIC_FRAME_MS = 100
+PITCH_MIN = -95.0
+PITCH_MAX = 50.0
+PITCH_REST = -13.0
 
 
-def expected_clip(time_ms: int) -> str:
-    ratio = max(0.0, min(1.0, time_ms / PITCH_TIME_MS))
-    step = int(round(ratio * (PITCH_STEPS - 1))) + 1
-    step = max(1, min(PITCH_STEPS, step))
-    return f"Ready,{step:02d}"
+def expected_step(camera_deg: float) -> int:
+    aim = PITCH_REST - camera_deg
+    ratio = max(0.0, min(1.0, (aim - PITCH_MIN) / (PITCH_MAX - PITCH_MIN)))
+    return max(1, min(PITCH_STEPS, int(round(ratio * (PITCH_STEPS - 1))) + 1))
+
+
+def clip_step(text: str) -> int | None:
+    parts = text.split(",")
+    if len(parts) != 2 or parts[0] != "Ready":
+        return None
+    if not parts[1].isdigit():
+        return None
+    return int(parts[1])
 
 
 def map_spec() -> TestMapSpec:
@@ -63,43 +74,50 @@ def check(ctx, data: dict, checks) -> None:
     hold2_at = checks.value("freeze", "", "hold2At") or 0
     move1_at = checks.value("freeze", "", "move1At") or 0
     move2_at = checks.value("freeze", "", "move2At") or 0
-    hold1_time = checks.value("freeze", "", "hold1Time") or 0
-    move1_time = checks.value("freeze", "", "move1Time") or 0
     frames = parse_section(ctx.frame_data.get("frames", {}))
-    hold_rows = [
+    rows = [
         record
         for record in frames
-        if int(record["player"]) == 1 and hold1_at <= int(record["ms"]) <= hold2_at
+        if int(record["player"]) == 1
+        and hold1_at <= int(record["ms"]) <= move2_at
     ]
-    move_rows = [
-        record
-        for record in frames
-        if int(record["player"]) == 1 and move1_at <= int(record["ms"]) <= move2_at
-    ]
-    hold_uclip = sorted({str(record.get("uclip", "")) for record in hold_rows})
-    move_uclip = sorted({str(record.get("uclip", "")) for record in move_rows})
-    hold_ulen = sorted({int(record.get("ulen", -1)) for record in hold_rows})
-    move_ulen = sorted({int(record.get("ulen", -1)) for record in move_rows})
-    want_hold = expected_clip(hold1_time)
-    want_move = expected_clip(move1_time)
+    hold_rows = [record for record in rows if int(record["ms"]) <= hold2_at]
+    move_rows = [record for record in rows if int(record["ms"]) >= move1_at]
+    bad_clip = []
+    bad_len = []
+    for record in rows:
+        step = clip_step(str(record.get("uclip", "")))
+        want = expected_step(int(record.get("pitch", 0)))
+        if step is None or abs(step - want) > 1:
+            bad_clip.append((int(record["ms"]), step, want))
+        length = int(record.get("ulen", -1))
+        if abs(length - STATIC_FRAME_MS) > 2:
+            bad_len.append((int(record["ms"]), length))
+    hold_steps = sorted({clip_step(str(record.get("uclip", ""))) for record in hold_rows})
+    move_steps = sorted({clip_step(str(record.get("uclip", ""))) for record in move_rows})
     print(
-        f"freeze animation: hold={hold_uclip} move={move_uclip} "
-        f"len_hold={hold_ulen} len_move={move_ulen} "
-        f"want_hold={want_hold} want_move={want_move}"
+        f"freeze animation: hold={hold_steps} move={move_steps} "
+        f"bad_clip={len(bad_clip)} bad_len={len(bad_len)}"
     )
-    playing = (
-        hold_uclip == [want_hold]
-        and move_uclip == [want_move]
-        and hold_ulen == [STATIC_FRAME_MS]
-        and move_ulen == [STATIC_FRAME_MS]
-    )
+    if bad_clip:
+        print(f"freeze clip mismatches: {bad_clip[:5]}")
+    if bad_len:
+        print(f"freeze length mismatches: {bad_len[:5]}")
+    playing = not bad_clip and not bad_len
     if playing:
         print("freeze correct animation: PASS")
     else:
         print("freeze correct animation: FAIL")
         checks.failures += 1
-    held = hold_uclip == [want_hold] and move_uclip == [want_move] and want_move != want_hold
-    if held:
+    stable = True
+    for before, after in zip(rows, rows[1:]):
+        if int(before.get("pitch", 0)) != int(after.get("pitch", 0)):
+            continue
+        if before.get("uclip") != after.get("uclip"):
+            stable = False
+            break
+    changed = bool(move_steps) and bool(hold_steps) and move_steps != hold_steps
+    if stable and changed:
         print("freeze camera frame held and changed: PASS")
     else:
         print("freeze camera frame held and changed: FAIL")

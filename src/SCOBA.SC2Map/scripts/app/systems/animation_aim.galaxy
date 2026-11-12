@@ -166,11 +166,14 @@ void gf_AnimConfigAimWalk (int lp_profile, int lp_state) {
     gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_RIGHT, "Attack,Walk,Right");
     gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_FORWARD_RIGHT, "Attack,Walk,Forward,Right");
 }
-string gf_AnimAimPitchClip (int lp_step) {
-    if (lp_step < 10) {
-        return "Ready,0" + IntToString(lp_step);
+string gf_AnimAimPitchNum (int lp_value) {
+    if (lp_value < 10) {
+        return "0" + IntToString(lp_value);
     }
-    return "Ready," + IntToString(lp_step);
+    return IntToString(lp_value);
+}
+string gf_AnimAimPitchClip (int lp_step) {
+    return "Ready," + gf_AnimAimPitchNum(lp_step);
 }
 void gf_AnimAimPitchTick (int lp_player) {
     unit lv_hero;
@@ -218,10 +221,11 @@ void gf_AnimAimPitchTick (int lp_player) {
     }
     lv_clip = gf_AnimAimPitchClip(lv_step);
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
-    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, 0.0, 0.0, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, c_animFlagPlayForever, 0.06, 0.06, c_animTimeDefault, c_animTimeVariantAsAutomatic));
     gv_animAimPitchStep[lp_player] = lv_step;
     gv_animAimPitchTime[lp_player] = lv_time;
     gv_animAimPitchSends[lp_player] += 1;
+    gf_AnimEvent(lp_player, "pitch_step", lv_clip, lv_step);
     gf_ProbeSetUpperClip(lp_player, lv_clip);
 }
 

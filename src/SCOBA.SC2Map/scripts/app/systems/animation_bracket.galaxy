@@ -95,7 +95,9 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
     }
     gv_animUpperState[lp_player] = lp_state;
     gv_animUpperClipIndex[lp_player] = lp_state;
-    gf_ProbeSetUpperClip(lp_player, lv_clip);
+    if (!gv_aIMACTIVE[lp_player]) {
+        gf_ProbeSetUpperClip(lp_player, lv_clip);
+    }
 }
 void gf_AnimLowerSet (int lp_player, int lp_state) {
     unit lv_hero;

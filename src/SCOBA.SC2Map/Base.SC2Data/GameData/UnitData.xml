@@ -363,8 +363,8 @@
         <AbilArray Link="ArtanisVortex"/>
         <AbilArray Link="ZHybridPsionicShockwave"/>
         <AbilArray Link="Apocalypse"/>
-        <StationaryTurningRate value="1440"/>
-        <TurningRate value="1440"/>
+        <StationaryTurningRate value="7200"/>
+        <TurningRate value="7200"/>
         <Speed value="3.1015"/>
     </CUnit>
     <CUnit id="KorhalPalaceTurret">
@@ -645,8 +645,8 @@
             <LayoutButtons Face="SpectreNukeCalldown" Type="AbilCmd" AbilCmd="HeroNuclearStrike,Execute" Row="1" Column="4"/>
             <LayoutButtons Face="PsionicShockwave" Type="AbilCmd" AbilCmd="ZHybridPsionicShockwave,Execute" Row="1" Column="4"/>
         </CardLayouts>
-        <StationaryTurningRate value="1440"/>
-        <TurningRate value="1440"/>
+        <StationaryTurningRate value="7200"/>
+        <TurningRate value="7200"/>
     </CUnit>
     <CUnit id="Ultralisk">
         <Radius value="2"/>
