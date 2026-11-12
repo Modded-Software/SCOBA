@@ -1,0 +1,195 @@
+// Module: systems/animation_bracket
+
+int gf_AnimHeroProfile (unit lp_unit) {
+    string lv_type;
+
+    if (!UnitIsValid(lp_unit)) {
+        return c_ANIM_HERO_GENERIC;
+    }
+    lv_type = UnitGetType(lp_unit);
+    if (lv_type == "Tosh") {
+        return c_ANIM_HERO_TOSH;
+    }
+    if (lv_type == "Kerrigan") {
+        return c_ANIM_HERO_KERRIGAN;
+    }
+    if (lv_type == "Firebat") {
+        return c_ANIM_HERO_FIREBAT;
+    }
+    return c_ANIM_HERO_GENERIC;
+}
+void gf_AnimUpperClear (int lp_player) {
+    unit lv_hero;
+    actor lv_actor;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    gf_AnimEvent(lp_player, "upper_stop", "", 0);
+    gf_ProbeEvent(lp_player, "upper_stop", "", 0);
+    ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_UPPER);
+    gv_animUpperState[lp_player] = c_ANIM_UPPER_NONE;
+    gv_animUpperClipIndex[lp_player] = -1;
+    gf_ProbeClearUpperClip(lp_player);
+}
+void gf_AnimLowerClear (int lp_player) {
+    unit lv_hero;
+    actor lv_actor;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    gf_AnimEvent(lp_player, "lower_stop", "", 0);
+    gf_ProbeEvent(lp_player, "lower_stop", "", 0);
+    ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_LOWER);
+    gv_animLowerState[lp_player] = c_ANIM_LOWER_NONE;
+    gv_animLowerClipIndex[lp_player] = -1;
+    gf_ProbeClearLowerClip(lp_player);
+}
+void gf_AnimUpperSet (int lp_player, int lp_state) {
+    unit lv_hero;
+    actor lv_actor;
+    int lv_profile;
+    int lv_flags;
+    fixed lv_blend;
+    string lv_clip;
+
+    if (lp_state == c_ANIM_UPPER_NONE) {
+        if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE) {
+            gf_AnimUpperClear(lp_player);
+        }
+        return;
+    }
+    if (lp_state == gv_animUpperState[lp_player]) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    lv_clip = gv_animUpperClip[lv_profile][lp_state];
+    if (lv_clip == "") {
+        if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE) {
+            gf_AnimUpperClear(lp_player);
+        }
+        return;
+    }
+    lv_flags = c_animFlagFullMatch | c_animFlagPlayForever | c_animFlagNonLooping;
+    lv_blend = gv_animUpperBlend[lv_profile][lp_state];
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    gv_animUpperStarts[lp_player] += 1;
+    gf_AnimEvent(lp_player, "upper_start", lv_clip, lv_flags);
+    gf_ProbeEvent(lp_player, "upper_start", lv_clip, lv_flags);
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, lv_flags, lv_blend, lv_blend, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    if (gv_aIMACTIVE[lp_player]) {
+        gv_animAimUpperOn[lp_player] = true;
+        gv_animAimPitchTime[lp_player] = -1.0;
+        gf_AnimAimPitchTick(lp_player);
+    }
+    gv_animUpperState[lp_player] = lp_state;
+    gv_animUpperClipIndex[lp_player] = lp_state;
+    gf_ProbeSetUpperClip(lp_player, lv_clip);
+}
+void gf_AnimLowerSet (int lp_player, int lp_state) {
+    unit lv_hero;
+    actor lv_actor;
+    int lv_profile;
+    int lv_flags;
+    fixed lv_blend;
+    fixed lv_move_speed;
+    fixed lv_unit_speed;
+    fixed lv_anim_scale;
+    string lv_clip;
+
+    if (lp_state == c_ANIM_LOWER_NONE) {
+        if (gv_animLowerState[lp_player] != c_ANIM_LOWER_NONE) {
+            gf_AnimLowerClear(lp_player);
+        }
+        return;
+    }
+    if (lp_state == gv_animLowerState[lp_player]) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    lv_clip = gv_animLowerClip[lv_profile][lp_state];
+    if (lv_clip == "") {
+        if (gv_animLowerState[lp_player] != c_ANIM_LOWER_NONE) {
+            gf_AnimLowerClear(lp_player);
+        }
+        return;
+    }
+    lv_flags = c_animFlagFullMatch;
+    if (gv_animLowerLoop[lv_profile][lp_state]) {
+        lv_flags = lv_flags | c_animFlagPlayForever;
+    }
+    lv_blend = gv_animLowerBlend[lv_profile][lp_state];
+    lv_move_speed = gv_animLowerMoveSpeed[lv_profile][lp_state];
+    lv_anim_scale = 1.0;
+    if (lv_move_speed > 0.0) {
+        lv_unit_speed = UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent);
+        if (lv_unit_speed > 0.0) {
+            lv_anim_scale = lv_move_speed / (lv_unit_speed * 100.0);
+        }
+    }
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    gv_animLowerStarts[lp_player] += 1;
+    gf_AnimEvent(lp_player, "lower_start", lv_clip, lv_flags);
+    gf_ProbeEvent(lp_player, "lower_start", lv_clip, lv_flags);
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, lv_flags, lv_blend, lv_blend, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    gv_animLowerState[lp_player] = lp_state;
+    gv_animLowerClipIndex[lp_player] = lp_state;
+    gf_ProbeSetLowerClip(lp_player, lv_clip);
+}
+void gf_AnimFullClear (int lp_player) {
+    unit lv_hero;
+    actor lv_actor;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_LOWER);
+    gv_animFullState[lp_player] = c_ANIM_LOWER_NONE;
+    gv_animFullDir[lp_player] = -1;
+}
+void gf_AnimFullSet (int lp_player, int lp_state) {
+    unit lv_hero;
+    actor lv_actor;
+    int lv_profile;
+    int lv_dir;
+    string lv_clip;
+
+    if (lp_state == c_ANIM_LOWER_NONE) {
+        gf_AnimFullClear(lp_player);
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    lv_dir = gv_animAimDir[lp_player];
+    if (gv_animFullState[lp_player] == lp_state && gv_animFullDir[lp_player] == lv_dir) {
+        return;
+    }
+    lv_clip = gv_animAimClip[lv_profile][lp_state][lv_dir];
+    if (lv_clip == "") {
+        gf_AnimFullClear(lp_player);
+        return;
+    }
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, 0.15, 0.15, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    gv_animFullState[lp_player] = lp_state;
+    gv_animFullDir[lp_player] = lv_dir;
+    gf_ProbeSetLowerClip(lp_player, lv_clip);
+}

@@ -150,18 +150,21 @@ Runtime pitch:
 3. Subtract camera pitch from rest pitch and clamp to the range `-95..50`.
    Camera up produces a positive value and a higher `SCOBAUp` time. Camera down
    produces a negative value and a lower `SCOBAUp` time.
-4. Map clamped pitch to a target time on the dense keyframe range.
-5. When the target time changes, send AnimSetTime immediately.
+4. Map clamped pitch to the nearest dense keyframe time.
+5. Send `AnimSetTime SCOBAUp` every aim tick to pin the upper pose.
 6. Send the exact target time. Do not add elapsed time.
-7. Keep `SCOBAUp` frozen with `AnimSetTimeScale SCOBAUp 0` on the main actor
-   and model while aim is active.
-8. Do not advance time when the target time is unchanged.
+7. Do not use `AnimSetPaused` for the upper bracket.
+8. Do not advance time between sends.
 9. The rest pitch stays fixed at `c_ANIM_AIM_PITCH_REST`; aim entry never
    captures the current camera pitch as rest.
 10. Drive the tick from `TriggerAddEventCameraMove` and a periodic timer.
 11. Send `AnimBlendTimeRemove` on aim exit so engine blend defaults return.
 12. Set model actor `AnimBlendTime` to 0 for Tosh and Kerrigan.
-13. Clear SCOBAUp and set its time scale back to `1.0` on aim exit.
+13. Clear `SCOBAUp` on aim exit.
+14. Keep the lower `SCOBALo` bracket playing its Stand or Walk animation while
+    the upper body is held. Aim idle uses `Attack,Stand`; aim in-place turn
+    uses `Attack,Stand,Left` or `Attack,Stand,Right`; aim walk uses
+    `Attack,Walk,<direction>`.
 
 Pitch entry must reset the upper pose and write the current camera pitch
 before the first frame. Do not blend or add to the prior idle upper pose.

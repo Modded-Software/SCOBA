@@ -226,6 +226,8 @@ def generate_model(
         make_clip(model, group, source_clip, group_ids, new_name, bone_group, unit_speed)
     turn_anim_id = next(bone.rotation.header.animId for bone in model.bones if bone.name == turn_bone)
     make_lower_group(model, groups, "Attack Stand", "Stand Leg", 0.0, False, turn_anim_id)
+    make_lower_group(model, groups, "Attack Stand Left", "Stand Left Leg", 0.0, False, turn_anim_id)
+    make_lower_group(model, groups, "Attack Stand Right", "Stand Right Leg", 0.0, False, turn_anim_id)
     for direction_name, yaw, reverse in AIM_DIRECTIONS:
         make_lower_group(
             model,

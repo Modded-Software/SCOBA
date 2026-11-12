@@ -1,0 +1,58 @@
+// Module: systems/animation_turn
+
+fixed gf_AnimYawDelta (fixed lp_from, fixed lp_to) {
+    fixed lv_delta;
+
+    lv_delta = lp_to - lp_from;
+    while (lv_delta > 180.0) {
+        lv_delta = lv_delta - 360.0;
+    }
+    while (lv_delta < -180.0) {
+        lv_delta = lv_delta + 360.0;
+    }
+    return lv_delta;
+}
+void gf_TurnToYaw (int lp_player, fixed lp_yaw) {
+    unit lv_hero;
+    fixed lv_delta;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    if (gv_animHasTurnTarget[lp_player]) {
+        lv_delta = gf_AnimYawDelta(gv_animTurnTarget[lp_player], lp_yaw);
+        if (AbsF(lv_delta) < c_ANIM_TURN_DEADBAND) {
+            return;
+        }
+    }
+    gv_animTurnTarget[lp_player] = lp_yaw;
+    gv_animHasTurnTarget[lp_player] = true;
+    UnitSetFacing(lv_hero, lp_yaw, c_ANIM_TURN_DURATION);
+}
+void gf_AnimFacingTick (int lp_player) {
+    unit lv_hero;
+    fixed lv_yaw;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    if (gv_aIMACTIVE[lp_player]) {
+        lv_yaw = CameraGetYaw(lp_player);
+        UnitSetFacing(lv_hero, lv_yaw, c_ANIM_AIM_TURN_DURATION);
+        gv_animTurnTarget[lp_player] = lv_yaw;
+        gv_animHasTurnTarget[lp_player] = true;
+        return;
+    }
+    if (!gf_ActionModeActive(lp_player)) {
+        return;
+    }
+    if (gv_aCTIONALT[lp_player]) {
+        return;
+    }
+    if (gf_MovementKeyHeld(lp_player)) {
+        return;
+    }
+    gf_TurnToYaw(lp_player, CameraGetYaw(lp_player));
+}

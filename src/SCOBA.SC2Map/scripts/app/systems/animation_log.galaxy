@@ -1,0 +1,75 @@
+// Module: systems/animation_log
+
+int gf_AnimNowMs () {
+    return FixedToInt(TimerGetElapsed(gv_sCOBA_Clock) * 1000.0);
+}
+void gf_AnimEvent (int lp_player, string lp_kind, string lp_clip, int lp_flags) {
+    bank lv_bank;
+    string lv_key;
+    string lv_text;
+
+    if (!gv_bANIMLOG) {
+        return;
+    }
+    gv_animLogIndex[lp_player] += 1;
+    lv_key = "p" + IntToString(lp_player) + "_" + IntToString(gf_AnimNowMs()) + "_" + IntToString(gv_animLogIndex[lp_player]);
+    lv_text = "ms=" + IntToString(gf_AnimNowMs());
+    lv_text = lv_text + " kind=" + lp_kind;
+    lv_text = lv_text + " clip=" + lp_clip;
+    lv_text = lv_text + " flags=" + IntToString(lp_flags);
+    lv_text = lv_text + " ustate=" + IntToString(gv_animUpperState[lp_player]);
+    lv_text = lv_text + " lstate=" + IntToString(gv_animLowerState[lp_player]);
+    lv_text = lv_text + " ucount=" + IntToString(gv_animUpperStarts[lp_player]);
+    lv_text = lv_text + " lcount=" + IntToString(gv_animLowerStarts[lp_player]);
+    lv_text = lv_text + " resets=" + IntToString(gv_animResets[lp_player]);
+    lv_bank = BankLoad("SCOBAANIMLOG", 1);
+    BankSectionCreate(lv_bank, "events");
+    BankValueSetFromString(lv_bank, "events", lv_key, lv_text);
+    BankSave(lv_bank);
+}
+string gf_AnimFlag (bool lp_value) {
+    if (lp_value) {
+        return "1";
+    }
+    return "0";
+}
+void gf_AnimLog (int lp_player) {
+    bank lv_bank;
+    unit lv_hero;
+    string lv_key;
+    string lv_text;
+
+    if (!gv_bANIMLOG) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    gv_animLogIndex[lp_player] += 1;
+    lv_key = "p" + IntToString(lp_player) + "_" + IntToString(gf_AnimNowMs()) + "_" + IntToString(gv_animLogIndex[lp_player]);
+    lv_text = "ms=" + IntToString(gf_AnimNowMs());
+    lv_text = lv_text + " seq=" + IntToString(gv_animLogIndex[lp_player]);
+    lv_text = lv_text + " up=" + IntToString(gv_animUpperState[lp_player]);
+    lv_text = lv_text + " lo=" + IntToString(gv_animLowerState[lp_player]);
+    lv_text = lv_text + " uc=" + IntToString(gv_animUpperClipIndex[lp_player]);
+    lv_text = lv_text + " lc=" + IntToString(gv_animLowerClipIndex[lp_player]);
+    lv_text = lv_text + " dir=" + IntToString(gv_animAimDir[lp_player]);
+    lv_text = lv_text + " hold=" + IntToString(gv_animMoveHold[lp_player]);
+    lv_text = lv_text + " intent=" + gf_AnimFlag(gf_AnimMoveIntent(lp_player));
+    lv_text = lv_text + " fwd=" + gf_AnimFlag(gv_fORWARD[lp_player]);
+    lv_text = lv_text + " back=" + gf_AnimFlag(gv_bACKWARD[lp_player]);
+    lv_text = lv_text + " left=" + gf_AnimFlag(gv_lEFT[lp_player]);
+    lv_text = lv_text + " right=" + gf_AnimFlag(gv_rIGHT[lp_player]);
+    lv_text = lv_text + " x=" + IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_hero))));
+    lv_text = lv_text + " y=" + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_hero))));
+    lv_text = lv_text + " facing=" + IntToString(FixedToInt(UnitGetFacing(lv_hero)));
+    lv_text = lv_text + " orders=" + IntToString(UnitOrderCount(lv_hero));
+    lv_text = lv_text + " ucount=" + IntToString(gv_animUpperStarts[lp_player]);
+    lv_text = lv_text + " lcount=" + IntToString(gv_animLowerStarts[lp_player]);
+    lv_text = lv_text + " resets=" + IntToString(gv_animResets[lp_player]);
+    lv_bank = BankLoad("SCOBAANIMLOG", 1);
+    BankSectionCreate(lv_bank, "frames");
+    BankValueSetFromString(lv_bank, "frames", lv_key, lv_text);
+    BankSave(lv_bank);
+}

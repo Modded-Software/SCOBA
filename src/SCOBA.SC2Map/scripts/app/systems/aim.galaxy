@@ -135,7 +135,6 @@ void gf_AimEnd (int lp_player) {
         lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
         ActorSend(lv_actor, "AnimBlendTimeRemove");
         ActorSend(ActorFromActor(lv_actor, "Model"), "AnimBlendTimeRemove");
-        gf_AnimAimTimeScale(lp_player, 1.0);
     }
     if (gv_cAMERAFOV[lp_player] <= 0.0) {
         gv_cAMERAFOV[lp_player] = c_SCOBA_REST_FOV;

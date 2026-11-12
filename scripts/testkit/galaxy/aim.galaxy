@@ -145,6 +145,19 @@ bool gt_AimTest_Func (bool testConds, bool runActions) {
     Wait(1.5, c_timeGame);
     gf_AimTestSnap("aim_settle", "t1500", 1);
 
+    CameraSetValue(1, c_cameraValueYaw, CameraGetYaw(1) + 25.0, 0.0, -1, 10);
+    Wait(0.08, c_timeGame);
+    gf_AimTestSnap("aim_turn_left", "t0080", 1);
+    Wait(0.1, c_timeGame);
+    gf_AimTestSnap("aim_turn_left", "t0180", 1);
+    Wait(0.3, c_timeGame);
+    CameraSetValue(1, c_cameraValueYaw, CameraGetYaw(1) - 25.0, 0.0, -1, 10);
+    Wait(0.08, c_timeGame);
+    gf_AimTestSnap("aim_turn_right", "t0080", 1);
+    Wait(0.1, c_timeGame);
+    gf_AimTestSnap("aim_turn_right", "t0180", 1);
+    Wait(0.3, c_timeGame);
+
     lv_yaw = CameraGetYaw(1);
     gf_AimTestDirection("d0", true, false, false, false, lv_yaw);
     gf_AimTestDirection("d1", true, false, true, false, lv_yaw + 45.0);

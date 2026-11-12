@@ -58,6 +58,8 @@ fixed[8] gv_animMoveHeading;
 bool[8] gv_animHasMoveTarget;
 fixed[8] gv_animAimYawLast;
 bool[8] gv_animAimYawSeen;
+int[8] gv_animAimTurn;
+int[8] gv_animAimTurnHold;
 bool[8] gv_animAimUpperOn;
 fixed[8] gv_animAimPitchTime;
 int[8] gv_animAimPitchTicks;

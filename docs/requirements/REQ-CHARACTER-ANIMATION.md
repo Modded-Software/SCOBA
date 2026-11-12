@@ -75,15 +75,17 @@ Implementation lives in
 | R-ANIM-50 | Aim pitch MUST NOT use actor root or whole-model rotation. |
 | R-ANIM-51 | Galaxy angles are degrees. `CameraGetPitch` MAY return a wrapped value above 180 degrees; aim pitch MUST normalize it to the signed range before use. |
 | R-ANIM-52 | Aim pitch MUST use the animation reference name `SCOBAUp`, not the clip props name `Ready`, for `AnimSetTime`. |
-| R-ANIM-53a | Aim pitch MUST freeze the `SCOBAUp` group with `AnimSetTimeScale SCOBAUp 0` on the main actor and model while aim is active. |
-| R-ANIM-53 | Aim pitch MUST use densely spaced keyframes and send the nearest target time only when camera pitch changes. |
-| R-ANIM-54 | Aim pitch MUST send the exact target time. It MUST NOT advance time between unchanged sends. |
-| R-ANIM-55 | Aim pitch MUST skip duplicate `AnimSetTime` sends while the target pitch time is unchanged. |
+| R-ANIM-53a | Aim pitch MUST pin the `SCOBAUp` group by sending `AnimSetTime` on every aim tick. It MUST NOT use `AnimSetPaused` and MUST NOT freeze `SCOBALo`. |
+| R-ANIM-53 | Aim pitch MUST use densely spaced keyframes and map camera pitch to the nearest target time. |
+| R-ANIM-53b | Aim pitch MUST send the exact target time on every aim tick. It MUST NOT advance time between sends. |
+| R-ANIM-54 | Aim pitch MUST send the exact target time. It MUST NOT add elapsed time. |
+| R-ANIM-55 | Aim pitch MUST reassert the target time every aim tick, even when the target is unchanged, so the upper pose does not drift. |
 | R-ANIM-56 | Aim pitch MUST update on camera move events, not only on a periodic timer. |
 | R-ANIM-57 | Tosh and Kerrigan `CActorModel` entries MUST set `AnimBlendTime` to 0 so `AnimSetTime` changes pose immediately. |
 | R-ANIM-58 | Aim entry MUST apply the frozen upper pose at the current camera pitch without blending from the prior idle pose. |
 | R-ANIM-59 | Aim pitch rest MUST stay fixed at `c_ANIM_AIM_PITCH_REST`. Aim entry MUST NOT capture the current camera pitch as rest. |
-| R-ANIM-60 | Aim exit MUST send `AnimBlendTimeRemove`, set `SCOBAUp` time scale back to `1.0`, and clear pitch state. |
+| R-ANIM-60 | Aim exit MUST send `AnimBlendTimeRemove`, unpause `SCOBAUp`, and clear pitch state. |
+| R-ANIM-61 | Aim lower body MUST keep its idle, in-place turn, or walk animation playing while the upper body is held. Aim idle MUST use `Attack,Stand`; aim in-place turn MUST use `Attack,Stand,Left` or `Attack,Stand,Right`; aim walk MUST use `Attack,Walk,<direction>`. |
 
 
 ## 3. Acceptance criteria

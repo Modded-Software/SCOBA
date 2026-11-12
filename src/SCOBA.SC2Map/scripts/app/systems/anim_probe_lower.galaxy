@@ -36,6 +36,86 @@ void gf_ProbeActorDiag (int lp_player, actor lp_actor, string lp_clip) {
     gf_ProbeEvent(lp_player, "diag_full", lp_clip, gf_ProbeQueryLen(lp_actor, "Stand_full"));
 }
 
+void gf_ProbeUpperQuery (int lp_player) {
+    unit lv_hero;
+    actor lv_actor;
+    int lv_profile;
+    string lv_clip;
+    generichandle lv_query;
+    fixed lv_len;
+    fixed lv_rem;
+    int lv_now;
+    int lv_len_ms;
+    int lv_rem_ms;
+    int lv_frames;
+    int lv_played;
+    int lv_frame;
+
+    if (!gv_bPROBE) {
+        return;
+    }
+    if (gv_probeLowerQueries >= c_PROBE_LOWER_QUERY_LIMIT) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    if (gv_animUpperState[lp_player] == c_ANIM_UPPER_NONE) {
+        gv_probeClipName[lp_player][0] = "";
+        gv_probeClipQuery[lp_player][0] = 0;
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    lv_clip = gv_animUpperClip[lv_profile][gv_animUpperState[lp_player]];
+    if (lv_clip == "") {
+        gv_probeClipName[lp_player][0] = "";
+        gv_probeClipQuery[lp_player][0] = 0;
+        return;
+    }
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    AnimLengthQueryByName(lv_actor, c_ANIM_BRACKET_UPPER, true);
+    AnimLengthQueryWait();
+    lv_query = AnimLengthQueryLastCreated();
+    lv_len = AnimLengthSync(lv_query);
+    lv_rem = AnimLengthRemainingSync(lv_query);
+    lv_len_ms = FixedToInt(lv_len * 1000.0);
+    lv_rem_ms = FixedToInt(lv_rem * 1000.0);
+    gv_probeLowerQueries += 1;
+    gv_probeClipName[lp_player][0] = lv_clip;
+    if (lv_len_ms <= 0) {
+        gv_probeClipLen[lp_player][0] = 0;
+        gv_probeClipFrameMs[lp_player][0] = 0;
+        gv_probeClipFrames[lp_player][0] = 0;
+        gv_probeClipQuery[lp_player][0] = 3;
+        return;
+    }
+    lv_now = gf_AnimNowMs();
+    gf_ProbeLoadClipMetrics(lp_player, 0, lv_clip);
+    gv_probeClipLen[lp_player][0] = lv_len_ms;
+    gv_probeClipStartMs[lp_player][0] = lv_now - (lv_len_ms - lv_rem_ms);
+    gv_probeClipQuery[lp_player][0] = 2;
+    lv_played = lv_len_ms - lv_rem_ms;
+    lv_frames = 0;
+    if (gv_probeClipFrameMs[lp_player][0] > 0) {
+        lv_frames = lv_len_ms / gv_probeClipFrameMs[lp_player][0];
+        lv_frame = lv_played / gv_probeClipFrameMs[lp_player][0];
+        if (lv_frame >= lv_frames) {
+            lv_frame = lv_frames - 1;
+        }
+        if (lv_frame < 0) {
+            lv_frame = 0;
+        }
+    }
+    else {
+        lv_frame = 0;
+    }
+    gv_probeClipFrames[lp_player][0] = lv_frames;
+    gv_probeClipQueryMs[lp_player][0] = lv_now;
+    gv_probeClipQueryPlayed[lp_player][0] = lv_played;
+    gv_probeClipQueryFrame[lp_player][0] = lv_frame;
+}
+
 void gf_ProbeLowerQuery (int lp_player) {
     unit lv_hero;
     actor lv_actor;

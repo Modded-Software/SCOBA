@@ -134,13 +134,13 @@
 - Aim pitch uses densely spaced keyframes and sends the nearest target time when camera pitch changes.
 - Aim pitch selects the nearest `SCOBAUp` target time from `CameraGetPitch`.
 - Galaxy angles are degrees. Normalize wrapped camera pitch above 180 degrees to signed pitch before mapping.
-- Aim pitch sends `AnimSetTime SCOBAUp` to the unit main actor only.
-- Freeze `SCOBAUp` with `AnimSetTimeScale SCOBAUp 0` on the main actor and model while aim is active.
-- Send the exact target time only when camera pitch changes. Do not advance time between sends.
-- Skip duplicate `AnimSetTime` sends while the pitch target is unchanged.
+- Aim pitch sends `AnimSetTime SCOBAUp` to the unit main actor on every aim tick.
+- Reassert `SCOBAUp` every aim tick to pin the upper pose. Do not use `AnimSetPaused`.
+- The lower `SCOBALo` bracket must keep its Stand or Walk animation playing while the upper is held.
+- Aim idle uses `Attack,Stand`; aim in-place turn uses `Attack,Stand,Left` or `Attack,Stand,Right`.
 - Keep `c_ANIM_AIM_PITCH_REST` fixed. Never capture the aim-entry camera pitch as rest.
 - Drive pitch updates from `TriggerAddEventCameraMove` and a periodic timer.
-- On aim exit, send `AnimBlendTimeRemove` and restore `SCOBAUp` time scale to `1.0`.
+- On aim exit, send `AnimBlendTimeRemove` and clear `SCOBAUp`.
 - Tosh and Kerrigan `CActorModel` entries set `AnimBlendTime` to 0.
 - Aim entry must start at the current camera pitch without blending from idle.
 - Aim pitch must not use actor root rotation or whole-model rotation.

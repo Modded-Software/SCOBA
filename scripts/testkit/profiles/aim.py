@@ -135,6 +135,15 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("aim_walk", "t1800", "LowerState", 2)
     checks.eq("aim_stop", "t2500", "LowerState", 1)
     checks.eq("aim_stop", "t2750", "LowerState", 1)
+    checks.eq("aim_turn_left", "t0080", "LowerState", 4)
+    checks.eq("aim_turn_right", "t0080", "LowerState", 5)
+    for section, token in (("aim_turn_left", "Stand,Left"), ("aim_turn_right", "Stand,Right")):
+        clip = str(checks.value(section, "t0080", "AimClip"))
+        if token in clip:
+            print(f"{section} clip: PASS")
+        else:
+            print(f"{section} clip: got={clip} want={token} FAIL")
+            checks.failures += 1
     checks.eq("aim_release", "t0500", "AimActive", 0)
     directions = {
         "d0": (0, "Forward"),
@@ -244,6 +253,32 @@ def check(ctx, data: dict, checks) -> None:
         print(f"aim_lower_moving: count={len(lower_ids)} unique={len(set(lower_ids))} PASS")
     else:
         print(f"aim_lower_moving: count={len(lower_ids)} unique={len(set(lower_ids))} FAIL")
+        checks.failures += 1
+    aim_idle = [
+        record
+        for record in frames
+        if int(record["player"]) == 1
+        and int(record.get("aim", 0)) == 1
+        and int(record.get("lo", 0)) == 1
+    ]
+    upper_ids = [int(record.get("ufid", -1)) for record in aim_idle if int(record.get("ufid", -1)) > 0]
+    if upper_ids and len(set(upper_ids)) == 1:
+        print(f"aim_upper_held: count={len(upper_ids)} frame={upper_ids[0]} PASS")
+    else:
+        print(f"aim_upper_held: count={len(upper_ids)} unique={len(set(upper_ids))} FAIL")
+        checks.failures += 1
+    turn_frames = [
+        record
+        for record in frames
+        if int(record["player"]) == 1
+        and int(record.get("aim", 0)) == 1
+        and int(record.get("lo", 0)) in (4, 5)
+    ]
+    turn_played = [int(record.get("lplayed", -1)) for record in turn_frames if int(record.get("lplayed", -1)) >= 0]
+    if len(set(turn_played)) > 1:
+        print(f"aim_turn_lower: count={len(turn_played)} unique={len(set(turn_played))} PASS")
+    else:
+        print(f"aim_turn_lower: count={len(turn_played)} unique={len(set(turn_played))} FAIL")
         checks.failures += 1
     turn_starts = 0
     for text in ctx.anim_data.get("events", {}).values():

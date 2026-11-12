@@ -12,7 +12,9 @@ const int c_ANIM_LOWER_NONE = 0;
 const int c_ANIM_LOWER_IDLE = 1;
 const int c_ANIM_LOWER_WALK = 2;
 const int c_ANIM_LOWER_WALK_BACK = 3;
-const int c_ANIM_LOWER_COUNT = 4;
+const int c_ANIM_LOWER_TURN_LEFT = 4;
+const int c_ANIM_LOWER_TURN_RIGHT = 5;
+const int c_ANIM_LOWER_COUNT = 6;
 
 const int c_ANIM_DIR_FORWARD = 0;
 const int c_ANIM_DIR_FORWARD_LEFT = 1;
@@ -41,7 +43,9 @@ const fixed c_ANIM_AIM_PITCH_KEY = 0.0166667;
 const fixed c_ANIM_AIM_PITCH_TICK = 0.01;
 const string c_ANIM_AIM_PITCH_CLIP = "SCOBAUp";
 const fixed c_ANIM_TURN_DEADBAND = 3.0;
+const fixed c_ANIM_AIM_TURN_DEADBAND = 0.5;
 const int c_ANIM_LOWER_HOLD_TICKS = 3;
+const int c_ANIM_AIM_TURN_HOLD_TICKS = 3;
 
 const string c_ANIM_BRACKET_UPPER = "SCOBAUp";
 const string c_ANIM_BRACKET_LOWER = "SCOBALo";
@@ -50,5 +54,5 @@ const int c_PROBE_BUFFER_ROWS = 64;
 const fixed c_PROBE_FLUSH_INTERVAL = 0.25;
 const fixed c_PROBE_TICK_INTERVAL = 0.01;
 const fixed c_PROBE_LOWER_INTERVAL = 0.1;
-const int c_PROBE_LOWER_QUERY_LIMIT = 480;
+const int c_PROBE_LOWER_QUERY_LIMIT = 250;
 

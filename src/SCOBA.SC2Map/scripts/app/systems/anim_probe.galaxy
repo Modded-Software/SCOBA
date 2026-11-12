@@ -363,6 +363,9 @@ void gf_ProbePlayer (int lp_player) {
     lv_text = lv_text + " uframe=" + IntToString(lv_uframe);
     lv_text = lv_text + " uframes=" + IntToString(gv_probeClipFrames[lp_player][0]);
     lv_text = lv_text + " ufms=" + IntToString(gv_probeClipFrameMs[lp_player][0]);
+    lv_text = lv_text + " ufid=" + IntToString(gv_probeClipQueryFrame[lp_player][0]);
+    lv_text = lv_text + " uplay=" + IntToString(gv_probeClipQueryPlayed[lp_player][0]);
+    lv_text = lv_text + " uqms=" + IntToString(gv_probeClipQueryMs[lp_player][0]);
     lv_text = lv_text + " llen=" + IntToString(gv_probeClipLen[lp_player][1]);
     lv_text = lv_text + " lrem=" + IntToString(gf_ProbeRemaining(lp_player, 1, lv_lplayed));
     lv_text = lv_text + " lplayed=" + IntToString(lv_lplayed);
@@ -446,6 +449,7 @@ bool gt_AnimProbeLower_Func (bool testConds, bool runActions) {
         return true;
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_ProbeUpperQuery(lv_player);
         gf_ProbeLowerQuery(lv_player);
     }
     return true;

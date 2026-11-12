@@ -1,0 +1,55 @@
+// Module: systems/animation_config
+
+void gf_AnimConfigUpper (int lp_profile, int lp_state, string lp_clip, fixed lp_blend) {
+    gv_animUpperClip[lp_profile][lp_state] = lp_clip;
+    gv_animUpperBlend[lp_profile][lp_state] = lp_blend;
+}
+void gf_AnimConfigLower (int lp_profile, int lp_state, string lp_clip, bool lp_loop, fixed lp_blend, fixed lp_move_speed) {
+    gv_animLowerClip[lp_profile][lp_state] = lp_clip;
+    gv_animLowerBlend[lp_profile][lp_state] = lp_blend;
+    gv_animLowerLoop[lp_profile][lp_state] = lp_loop;
+    gv_animLowerMoveSpeed[lp_profile][lp_state] = lp_move_speed;
+}
+void gf_AnimConfigInit () {
+    int lv_profile;
+    int lv_player;
+    fixed lv_walk_speed;
+
+    for (lv_profile = 0; lv_profile < c_ANIM_HERO_COUNT; lv_profile += 1) {
+        lv_walk_speed = 0.0;
+        if (lv_profile == c_ANIM_HERO_TOSH) {
+            lv_walk_speed = 225.0;
+        }
+        else if (lv_profile == c_ANIM_HERO_KERRIGAN) {
+            lv_walk_speed = 120.0;
+        }
+        gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_DOWN, "Attack,Ready", 0.15);
+        gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_MID, "Attack,Ready", 0.15);
+        gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_UP, "Attack,Ready", 0.15);
+        if (lv_profile == c_ANIM_HERO_TOSH || lv_profile == c_ANIM_HERO_KERRIGAN) {
+            gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_MID, "Ready", 0.15);
+        }
+        gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_IDLE, "Stand,Leg", true, 0.15, 0.0);
+        gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_WALK, "Walk,Leg", true, 0.15, lv_walk_speed);
+        gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_WALK_BACK, "Walk,Leg", true, 0.15, lv_walk_speed);
+        gf_AnimConfigAimAll(lv_profile, c_ANIM_LOWER_IDLE, "Attack,Stand");
+        gf_AnimConfigAimAll(lv_profile, c_ANIM_LOWER_TURN_LEFT, "Attack,Stand,Left");
+        gf_AnimConfigAimAll(lv_profile, c_ANIM_LOWER_TURN_RIGHT, "Attack,Stand,Right");
+        gf_AnimConfigAimWalk(lv_profile, c_ANIM_LOWER_WALK);
+        gf_AnimConfigAimWalk(lv_profile, c_ANIM_LOWER_WALK_BACK);
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_AnimReset(lv_player);
+    }
+}
+bool gt_AnimInit_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_AnimConfigInit();
+    return true;
+}
+void gt_AnimInit_Init () {
+    gt_AnimInit = TriggerCreate("gt_AnimInit_Func");
+    TriggerAddEventMapInit(gt_AnimInit);
+}
