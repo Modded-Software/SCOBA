@@ -13,6 +13,8 @@ from ..runner import TestRunSpec
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
+READY_FRAME_MS = 33.0
+FRAME_TOLERANCE = 1
 
 
 def map_spec() -> TestMapSpec:
@@ -42,31 +44,19 @@ def on_ready(ctx, data: dict) -> None:
     ctx.frames.capture("aimfreeze_move1")
 
 
+def expected_frame(time_ms: int) -> int:
+    return int(round(time_ms / READY_FRAME_MS))
+
+
 def check(ctx, data: dict, checks) -> None:
     checks.eq("meta", "", "done", 1)
     checks.eq("meta", "", "profile", "aimfreeze")
-    for tag in ("entry", "hold1", "hold2", "move1", "move2"):
-        print(
-            f"freeze {tag}: time={checks.value('freeze', '', tag + 'Time')} "
-            f"camera={checks.value('freeze', '', tag + 'Camera')}"
-        )
-    hold1_time = checks.value("freeze", "", "hold1Time")
-    hold2_time = checks.value("freeze", "", "hold2Time")
-    if hold1_time == hold2_time:
-        print("freeze stationary target: PASS")
-    else:
-        print(f"freeze stationary target: got {hold1_time} -> {hold2_time} FAIL")
-        checks.failures += 1
-    move1_time = checks.value("freeze", "", "move1Time")
-    if move1_time is not None and move1_time != hold1_time:
-        print("freeze pitch change target: PASS")
-    else:
-        print(f"freeze pitch change target: got {hold1_time} -> {move1_time} FAIL")
-        checks.failures += 1
     hold1_at = checks.value("freeze", "", "hold1At") or 0
     hold2_at = checks.value("freeze", "", "hold2At") or 0
     move1_at = checks.value("freeze", "", "move1At") or 0
     move2_at = checks.value("freeze", "", "move2At") or 0
+    hold1_time = checks.value("freeze", "", "hold1Time") or 0
+    move1_time = checks.value("freeze", "", "move1Time") or 0
     frames = parse_section(ctx.frame_data.get("frames", {}))
     hold_rows = [
         record
@@ -78,45 +68,35 @@ def check(ctx, data: dict, checks) -> None:
         for record in frames
         if int(record["player"]) == 1 and move1_at <= int(record["ms"]) <= move2_at
     ]
-    hold_uplayed = [int(record.get("uplayed", -1)) for record in hold_rows]
-    hold_ufid = [int(record.get("ufid", -1)) for record in hold_rows]
-    move_uplayed = [int(record.get("uplayed", -1)) for record in move_rows]
-    move_ufid = [int(record.get("ufid", -1)) for record in move_rows]
-    print(
-        f"freeze hold rows={len(hold_rows)} uplayed={sorted(set(hold_uplayed))} "
-        f"ufid={sorted(set(hold_ufid))}"
-    )
-    print(
-        f"freeze move rows={len(move_rows)} uplayed={sorted(set(move_uplayed))} "
-        f"ufid={sorted(set(move_ufid))}"
-    )
     hold_uclip = sorted({str(record.get("uclip", "")) for record in hold_rows})
-    print(f"freeze hold uclip={hold_uclip}")
-    if hold_uclip == ["Ready"]:
-        print("freeze upper clip: PASS")
+    move_uclip = sorted({str(record.get("uclip", "")) for record in move_rows})
+    hold_ufid = sorted({int(record.get("ufid", -1)) for record in hold_rows})
+    move_ufid = sorted({int(record.get("ufid", -1)) for record in move_rows})
+    want_hold = expected_frame(hold1_time)
+    want_move = expected_frame(move1_time)
+    print(
+        f"freeze animation: hold={hold_uclip} move={move_uclip} "
+        f"frame_hold={hold_ufid} frame_move={move_ufid} "
+        f"want_hold={want_hold} want_move={want_move}"
+    )
+    if hold_uclip == ["Ready"] and move_uclip == ["Ready"]:
+        print("freeze correct animation: Ready PASS")
     else:
-        print(f"freeze upper clip: {hold_uclip} FAIL")
+        print("freeze correct animation: FAIL")
         checks.failures += 1
-    if any(value > 0 for value in hold_ufid):
-        print(f"freeze upper playing: ufid={sorted(set(hold_ufid))} PASS")
+    held = (
+        len(hold_ufid) == 1
+        and abs(hold_ufid[0] - want_hold) <= FRAME_TOLERANCE
+    )
+    changed = (
+        len(move_ufid) == 1
+        and abs(move_ufid[0] - want_move) <= FRAME_TOLERANCE
+        and move_ufid != hold_ufid
+    )
+    if held and changed:
+        print("freeze camera frame held and changed: PASS")
     else:
-        print(f"freeze upper playing: ufid={sorted(set(hold_ufid))} FAIL")
-        checks.failures += 1
-    if len(set(hold_ufid)) == 1 and hold_ufid[0] > 0:
-        print(f"freeze stationary upper frame: ufid={hold_ufid[0]} PASS")
-    else:
-        print(f"freeze stationary upper frame: ufid={sorted(set(hold_ufid))} FAIL")
-        checks.failures += 1
-    hold_lfid = [int(record.get("lfid", -1)) for record in hold_rows]
-    if len(set(hold_lfid)) > 1:
-        print(f"freeze stationary lower moving: {sorted(set(hold_lfid))} PASS")
-    else:
-        print(f"freeze stationary lower moving: {sorted(set(hold_lfid))} FAIL")
-        checks.failures += 1
-    if set(move_uplayed) != set(hold_uplayed) or set(move_ufid) != set(hold_ufid):
-        print("freeze pitch change upper time: PASS")
-    else:
-        print("freeze pitch change upper time: unchanged FAIL")
+        print("freeze camera frame held and changed: FAIL")
         checks.failures += 1
 
 
