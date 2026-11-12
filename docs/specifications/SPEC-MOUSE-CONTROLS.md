@@ -457,8 +457,8 @@ RPG right-button input never calls `gf_AimBegin` or `gf_AimEnd`.
 8. Request the splitbody aim state from `gf_AnimTick`.
 9. Set the field of view to `c_SCOBA_AIM_FOV` once.
 10. Compute the proxy point on the ground plane at twice the shoulder offset:
-    `x = heroX + cos(yaw + c_SCOBA_AIM_SHOULDER_ANGLE) * c_SCOBA_AIM_SHOULDER_OFFSET * 2`,
-    `y = heroY + sin(yaw + c_SCOBA_AIM_SHOULDER_ANGLE) * c_SCOBA_AIM_SHOULDER_OFFSET * 2`.
+    `x = heroX + cos(yaw + c_SCOBA_AIM_SHOULDER_ANGLE) * c_SCOBA_AIM_SHOULDER_OFFSET`,
+    `y = heroY + sin(yaw + c_SCOBA_AIM_SHOULDER_ANGLE) * c_SCOBA_AIM_SHOULDER_OFFSET`.
 11. Create one hidden `InvisibleTargetDummy` at that point.
 12. Follow the unit group containing the hero and the proxy.
 13. Move the proxy each 0.02 s. Engine follow tracks the group center, which sits at the shoulder offset.
@@ -535,9 +535,9 @@ The animation implementation is specified in
 [SPEC-CHARACTER-ANIMATION](SPEC-CHARACTER-ANIMATION.md).
 
 The aim cursor is a screen-center image overlay drawn with the native
-StarCraft II cursor textures `storm_ui_cursor_default_base.dds`,
-`storm_ui_cursor_default_enemy.dds`, and
-`storm_ui_cursor_default_friendly.dds`. `gt_AimCursorTick` runs every 0.01 s,
+StarCraft II cursor textures `cursor-target-none.dds` for neutral,
+`storm_ui_cursor_default_enemy.dds` for hostile, and
+`storm_ui_cursor_default_friendly.dds` for friendly targets. `gt_AimCursorTick` runs every 0.01 s,
 resolves the unit at `CameraGetTarget`, and shows the matching image. The
 reticle is visible in action and aim mode and hidden in RPG mode or while Alt
 shows the free UI cursor. The engine cursor stays hidden.
@@ -726,7 +726,7 @@ source of hero right-click orders. Ability target mode is unchanged.
 | aim cursor | enemy at center | right down | enemy cursor image visible at screen center |
 | aim neutral | ground at center | right down | base cursor image visible at screen center |
 | aim release | aim active | right up | aim inactive, idle pose, centered follow, FOV restored, cursor hidden |
-| aim scroll | aim active | wheel change, right up | scroll distance survives release |
+| aim scroll | aim active | wheel change, right up | saved scroll distance restores on release |
 | aim drag | aim active | right down, camera yaw change, right up | aim exits, no right command |
 | aim click | aim active | aim drag then clean right click | no right command |
 | aim smooth | hero moving and turning | right hold | no camera origin orbit or snap |
@@ -827,7 +827,7 @@ reticle.
 - Engine smart click is disabled for all players.
 - In action mode, aim mode starts on right press and ends on right release.
 - RPG right press never enters aim mode.
-- Aim mode never writes the scroll camera distance.
+- Aim mode shortens the camera arm by `c_SCOBA_AIM_ARM_SCALE` and restores the saved scroll distance on exit.
 - Aim mode never changes combat state.
 - Aim mode holds one fixed upper pose from the Attack start key.
 - Aim mode keeps lower-body locomotion in one splitbody group while the upper body aims.

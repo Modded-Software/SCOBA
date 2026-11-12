@@ -51,6 +51,7 @@ const fixed c_SCOBA_CLICK_MARGIN = 0.75;
 const fixed c_SCOBA_AIM_FOV = 45.0;
 const fixed c_SCOBA_AIM_SHOULDER_OFFSET = 0.5;
 const fixed c_SCOBA_AIM_SHOULDER_ANGLE = -90.0;
+const fixed c_SCOBA_AIM_ARM_SCALE = 0.7;
 const fixed c_SCOBA_ZOOM_BLEND = 0.18;
 const fixed c_SCOBA_COLLISION_CLAMP_BLEND = 0.06;
 const fixed c_SCOBA_COLLISION_RESTORE_BLEND = 0.28;

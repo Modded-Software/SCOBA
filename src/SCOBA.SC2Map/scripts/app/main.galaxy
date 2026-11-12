@@ -98,6 +98,7 @@ void main () {
     gt_CameraTurnTick_Init();
     gt_CameraCollisionTick_Init();
     gt_AimInit_Init();
+    gt_AimCameraTick_Init();
     gt_AimCursorTick_Init();
     gt_AimMoveTick_Init();
     gt_ActionModeToggle_Init();

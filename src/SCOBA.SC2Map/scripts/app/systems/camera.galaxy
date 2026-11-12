@@ -81,6 +81,9 @@ bool gt_CameraDebug_Func (bool testConds, bool runActions) {
     lv_text = lv_text + " aim=" + gf_AnimFlag(gv_aIMACTIVE[1]);
     lv_text = lv_text + " count=" + IntToString(gv_cAMDBGCOUNT[1]);
     lv_text = lv_text + " last=" + IntToString(gv_cAMDBGLAST[1]);
+    lv_text = lv_text + " step=" + FixedToString(gv_aimDbgMaxStep[1], c_fixedPrecisionAny);
+    lv_text = lv_text + " clamps=" + IntToString(gv_aimDbgClamps[1]);
+    lv_text = lv_text + " dist=" + FixedToString(CameraGetDistance(1), c_fixedPrecisionAny);
     lv_hero = gv_tPSUNIT[1];
     if (UnitIsValid(lv_hero)) {
         lv_target = CameraGetTarget(1);
@@ -359,10 +362,16 @@ void gf_CameraCollisionApply (int lp_player) {
     if ((lv_safe < (lv_current - 0.15)) && (AbsF(lv_safe - gv_cameraDistanceApplied[lp_player]) > 0.15)) {
         CameraSetValue(lp_player, c_cameraValueDistance, lv_safe, c_SCOBA_COLLISION_CLAMP_BLEND, -1, 10);
         gv_cameraDistanceApplied[lp_player] = lv_safe;
+        if (gv_aIMACTIVE[lp_player]) {
+            gv_aimDbgClamps[lp_player] += 1;
+        }
     }
     else if ((lv_current < (lv_desired - 0.15)) && (lv_safe >= (lv_desired - 0.05)) && (AbsF(lv_desired - gv_cameraDistanceApplied[lp_player]) > 0.15)) {
         CameraSetValue(lp_player, c_cameraValueDistance, lv_desired, c_SCOBA_COLLISION_RESTORE_BLEND, -1, 10);
         gv_cameraDistanceApplied[lp_player] = lv_desired;
+        if (gv_aIMACTIVE[lp_player]) {
+            gv_aimDbgClamps[lp_player] += 1;
+        }
     }
 }
 
@@ -373,7 +382,6 @@ bool gt_CameraCollisionTick_Func (bool testConds, bool runActions) {
         return true;
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
-        gf_AimCameraTick(lv_player);
         gf_CameraCollisionApply(lv_player);
     }
     return true;

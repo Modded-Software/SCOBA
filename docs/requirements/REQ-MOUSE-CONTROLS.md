@@ -149,7 +149,7 @@ Implementation lives in
 | R-MC-48 | Aim mode MUST show the screen-center reticle with native cursor textures and hostile/friendly/neutral color. |
 | R-MC-49 | Right release MUST exit aim mode. |
 | R-MC-50 | Aim exit MUST restore idle animation, centered follow camera, and field of view. |
-| R-MC-51 | Aim mode MUST keep the scroll camera distance. |
+| R-MC-51 | Aim mode MUST shorten the camera arm by `c_SCOBA_AIM_ARM_SCALE` and restore the saved scroll distance on exit. |
 | R-MC-52 | Aim mode MUST leave combat state unchanged. |
 | R-MC-53 | Aim mode MUST run no right command. |
 | R-MC-54 | Left drag MUST stay camera-only during and after aim. |
@@ -224,7 +224,7 @@ Implementation lives in
 | R-MC-119 | RPG hover MUST be set from the engine `UnitHighlight` event and cleared when that unit is no longer highlighted. |
 | R-MC-120 | RPG click points MUST come from the engine `EventMouseClickedPosXWorld` and `EventMouseClickedPosYWorld` values. |
 | R-MC-121 | Aim mode camera origin MUST translate slightly left of the hero, using `c_SCOBA_AIM_SHOULDER_ANGLE`. It MUST NOT rotate the camera away from hero heading and MUST NOT sit directly behind the hero. |
-| R-MC-122 | The reticle MUST use `storm_ui_cursor_default_base.dds`, `storm_ui_cursor_default_enemy.dds`, and `storm_ui_cursor_default_friendly.dds`. |
+| R-MC-122 | The reticle MUST use `cursor-target-none.dds` for neutral, `storm_ui_cursor_default_enemy.dds` for hostile, and `storm_ui_cursor_default_friendly.dds` for friendly. |
 | R-MC-123 | The reticle MUST resolve at `CameraGetTarget` every 0.01 s and show enemy, friendly, or neutral art. |
 | R-MC-124 | The reticle MUST hide in RPG mode and while Alt shows the free UI cursor. |
 | R-MC-99 | Normal action movement MUST NOT use lateral strafe behavior. |

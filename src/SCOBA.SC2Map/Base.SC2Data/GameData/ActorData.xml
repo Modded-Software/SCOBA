@@ -315,11 +315,13 @@
     </CActorModel>
     <CActorUnit id="Tosh">
         <Model value="ToshSCOBA"/>
+        <Scale value="0.750000"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
         <VarianceWindowWalk value="0.000000"/>
     </CActorUnit>
     <CActorUnit id="QueenOfBlades">
         <Model value="KerriganSCOBA"/>
+        <Scale value="0.750000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Ultralisk ............................................................................. -->

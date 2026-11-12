@@ -124,8 +124,10 @@
     </CModel>
     <CModel id="ToshSCOBA">
         <Model value="Assets\Units\Terran\Tosh\ToshSCOBA.m3"/>
+        <AnimSpeed value="0.750000"/>
     </CModel>
     <CModel id="KerriganSCOBA">
         <Model value="Assets\Units\Zerg\Kerrigan\KerriganSCOBA.m3"/>
+        <AnimSpeed value="0.750000"/>
     </CModel>
 </Catalog>

@@ -101,10 +101,10 @@
 - RPG Walk ground right click moves and shows the move marker.
 - RPG right click never aims. Aim only starts on Action mode right hold.
 - Action mode right clean click runs no right command.
-- Aim must not write camera distance. Scroll distance survives aim entry and exit.
+- Aim shortens the camera arm by `c_SCOBA_AIM_ARM_SCALE`. Aim exit restores the saved scroll distance.
 - Aim camera sits slightly left of the hero center, never directly behind it. Offset the camera origin; do not rotate the camera.
 - Aim applies the offset by following a hero plus hidden-proxy group; the group center is the shoulder pivot. Never pan on top of follow.
-- Action and aim use a screen-center reticle overlay with `storm_ui_cursor_default_base/enemy/friendly.dds`.
+- Action and aim use a screen-center reticle overlay with `cursor-target-none.dds` for neutral and `storm_ui_cursor_default_enemy/friendly.dds` for unit targets.
 - `gt_AimCursorTick` resolves `CameraGetTarget` every 0.01 s and selects enemy, friendly, or neutral art.
 - Hide the reticle in RPG mode and while Alt shows the free UI cursor.
 - Terminology: Unit Highlight is the hover ring. Unit Target is the boss-bar target. Unit Select is native engine selection. Ability targeting is separate.

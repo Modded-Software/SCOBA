@@ -112,7 +112,13 @@ string[c_ANIM_HERO_COUNT][c_ANIM_LOWER_COUNT][c_ANIM_DIR_COUNT] gv_animAimClip;
 fixed[8] gv_cAMERAFOV;
 fixed[8] gv_cameraDistanceDesired;
 fixed[8] gv_cameraDistanceApplied;
+fixed[8] gv_cameraAimSavedDistance;
 bool[8] gv_cameraCollisionOff;
+fixed[8] gv_aimDbgMaxStep;
+fixed[8] gv_aimDbgLastX;
+fixed[8] gv_aimDbgLastY;
+int[8] gv_aimDbgTicks;
+int[8] gv_aimDbgClamps;
 
 
 int[8] gv_mOUSEPRESSXUI;
@@ -241,6 +247,7 @@ trigger gt_LeftOrbitStart;
 trigger gt_CameraTurnTick;
 trigger gt_CameraCollisionTick;
 trigger gt_AimInit;
+trigger gt_AimCameraTick;
 trigger gt_AimCursorTick;
 trigger gt_AimMoveTick;
 trigger gt_ActionAltStart;

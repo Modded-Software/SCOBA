@@ -120,6 +120,8 @@ void gf_AimEnd (int lp_player);
 int gf_ReticleKind (int lp_player);
 int gf_ReticleKindAt (int lp_player, point lp_point);
 bool gt_AimInit_Func (bool testConds, bool runActions);
+bool gt_AimCameraTick_Func (bool testConds, bool runActions);
+void gt_AimCameraTick_Init ();
 void gt_AimInit_Init ();
 bool gt_AimCursorTick_Func (bool testConds, bool runActions);
 void gt_AimCursorTick_Init ();
