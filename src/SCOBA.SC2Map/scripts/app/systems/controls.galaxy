@@ -20,13 +20,13 @@ void gf_ControlApply (int lp_player) {
     if (!gf_IsHeroPlayer(lp_player)) {
         return;
     }
-    gv_rOTATEUNIT[lp_player] = (gv_mOUSERIGHT[lp_player] || gv_mOUSEMIDDLE[lp_player]);
+    gv_rOTATEUNIT[lp_player] = (gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player]) || gv_mOUSEMIDDLE[lp_player];
     gv_rOTATECAMERA[lp_player] = gv_lEFTORBIT[lp_player];
     if (gf_ActionModeActive(lp_player)) {
         lv_relative = !gv_aCTIONALT[lp_player];
     }
     else {
-        lv_relative = (gv_lEFTORBIT[lp_player] || gv_mOUSERIGHT[lp_player] || gv_mOUSEMIDDLE[lp_player]);
+        lv_relative = (gv_lEFTORBIT[lp_player] || (gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player]) || gv_mOUSEMIDDLE[lp_player]);
     }
     if (gv_aIMACTIVE[lp_player]) {
         lv_relative = true;
@@ -55,6 +55,7 @@ void gf_ActionModeRestoreRPG (int lp_player) {
     gv_mOUSEMIDDLE[lp_player] = false;
     gv_mOUSELEFT[lp_player] = false;
     gv_lEFTORBIT[lp_player] = false;
+    gv_rIGHTORBIT[lp_player] = false;
     gv_mOUSEFORWARD[lp_player] = false;
     gf_ControlApply(lp_player);
 }
@@ -76,6 +77,7 @@ void gf_ActionModeApply (int lp_player) {
     gv_mOUSERIGHT[lp_player] = false;
     gv_mOUSELEFT[lp_player] = false;
     gv_lEFTORBIT[lp_player] = false;
+    gv_rIGHTORBIT[lp_player] = false;
     gv_mOUSEMIDDLE[lp_player] = false;
     gf_AnimReset(lp_player);
     if (gf_ActionModeActive(lp_player)) {

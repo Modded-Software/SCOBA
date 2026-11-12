@@ -3,7 +3,7 @@
     <CCamera id="Dflt">
         <ParamInitial index="FarClip" value="50.000000"/>
         <ParamInitial index="ShadowClip" value="45.000000"/>
-        <TargetSmooth SmoothTimeMin="0.120000" SmoothTimeMax="0.120000" VelocityMax="80.000000"/>
+        <TargetSmooth SmoothTimeMin="0.005000" SmoothTimeMax="0.005000" VelocityMax="80.000000"/>
         <PitchMin value="300.000000"/>
         <PitchMax value="80.000000"/>
         <YawLeft value="0.000000"/>

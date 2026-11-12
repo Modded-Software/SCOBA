@@ -19,6 +19,7 @@ from project_root import project_root
 from props_expand import expand_props
 from spore_scale import scale_spores
 from strip_gui_triggers import strip_triggers
+from water_splashes import apply as apply_water_splashes
 
 SCALE = 2
 OLD_CELLS = 128
@@ -469,6 +470,8 @@ def main() -> int:
     write_bootstrap(dst)
     expand_minimap(src / "Minimap.tga", dst / "Minimap.tga")
     disable_doodad_occlusion(dst)
+    if os.environ.get("SC2_NO_WATER_SPLASHES") != "1":
+        apply_water_splashes(dst)
     generate_character_anim(dst, False)
     generate_control_icons(dst, False)
     if os.environ.get("SC2_NO_PROPS") != "1":

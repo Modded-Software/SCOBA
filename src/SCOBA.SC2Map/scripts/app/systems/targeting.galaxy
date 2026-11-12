@@ -250,7 +250,7 @@ bool gf_MouseReleaseRight (int lp_player, int lp_xui, int lp_yui) {
     unit lv_unit;
 
     gf_MouseForwardStop(lp_player);
-    lv_drag = (AbsF(gf_AnimYawDelta(CameraGetYaw(lp_player), gv_mOUSEPRESSYAW[lp_player])) >= c_SCOBA_CLICK_DRAG_ANGLE) || (AbsF(CameraGetPitch(lp_player) - gv_mOUSEPRESSPITCH[lp_player]) >= c_SCOBA_CLICK_DRAG_ANGLE);
+    lv_drag = gv_rIGHTORBIT[lp_player] || (AbsF(gf_AnimYawDelta(CameraGetYaw(lp_player), gv_mOUSEPRESSYAW[lp_player])) >= c_SCOBA_CLICK_DRAG_ANGLE) || (AbsF(CameraGetPitch(lp_player) - gv_mOUSEPRESSPITCH[lp_player]) >= c_SCOBA_CLICK_DRAG_ANGLE);
     if (gv_mOUSERIGHTCANCEL[lp_player] || lv_drag) {
         gv_mOUSERIGHTCANCEL[lp_player] = false;
         return false;

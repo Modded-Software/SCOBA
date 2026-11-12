@@ -46,6 +46,7 @@ const fixed c_SCOBA_MAX_ATTACK_PERIOD = 2.0;
 const fixed c_SCOBA_INITIAL_WEAPON_PERIOD = 0.75;
 const fixed c_SCOBA_CLICK_DRAG_ANGLE = 2.0;
 const int c_SCOBA_LEFT_ORBIT_PIXELS = 2;
+const int c_SCOBA_RIGHT_ORBIT_PIXELS = 4;
 const fixed c_SCOBA_CLICK_SCAN_RADIUS = 8.0;
 const fixed c_SCOBA_CLICK_MARGIN = 0.75;
 const fixed c_SCOBA_AIM_FOV = 45.0;

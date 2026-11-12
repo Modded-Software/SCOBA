@@ -24,6 +24,7 @@
 - `scripts/doodad_occlusion.py` - disable doodad auto-transparency (idempotent, wired into the pipeline).
 - `scripts/props_expand.py` - 1.5× trees, 2× fluff, tree scale remapped to max 8 (idempotent, reversible, wired into the pipeline).
 - `scripts/spore_scale.py` - scale SporeCannon/SporeCrawler units 3× and projectile speed 1.5× (idempotent, reversible, wired into the pipeline).
+- `scripts/water_splashes.py` - add missing water terrain squibs to ground unit actors (idempotent, reversible, wired into the pipeline). Use `scripts/audit_water_splashes.py` to list missing and skipped actors.
 - `scripts/character_anim_assets.py` - generate splitbody aim groups for Tosh and Kerrigan while preserving full-body baseline Stand, Walk, Stand Left, and Stand Right (idempotent, reversible, wired into the pipeline). Each aim group has a frozen upper STC and one of eight directional lower STCs, including reversed backpedal. Generated animation group names and actor clip references must use allowed SC2 animation tokens; validation rejects unknown token names.
 - `scripts/character_anim_m3.py` - M3 clone, freeze, reverse, and splitbody group helpers used by the asset generator.
 - `scripts/animation_tokens.py`: allowed SC2 animation tokens and clip name checks used by asset generation and `scripts/validate-map.py`.

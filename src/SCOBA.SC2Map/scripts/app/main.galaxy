@@ -95,6 +95,7 @@ void main () {
     gt_CursorStart_Init();
     gt_CursorEnd_Init();
     gt_LeftOrbitStart_Init();
+    gt_RightOrbitStart_Init();
     gt_CameraTurnTick_Init();
     gt_CameraCollisionTick_Init();
     gt_AimInit_Init();

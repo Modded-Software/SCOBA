@@ -195,6 +195,9 @@ bool gt_CursorStart_Func (bool testConds, bool runActions) {
     }
     else if ((EventMouseClickedButton() == gv_fIRE)) {
         gv_mOUSERIGHT[lv_localPlayer] = true;
+        gv_rIGHTORBIT[lv_localPlayer] = false;
+        gv_mOUSERIGHTPRESSXUI[lv_localPlayer] = EventMouseClickedPosXUI();
+        gv_mOUSERIGHTPRESSYUI[lv_localPlayer] = EventMouseClickedPosYUI();
     }
     else if ((EventMouseClickedButton() == gv_aBILITYCAMERA)) {
         gv_mOUSEMIDDLE[lv_localPlayer] = true;
@@ -239,6 +242,7 @@ bool gt_CursorEnd_Func (bool testConds, bool runActions) {
     }
     else if ((EventMouseClickedButton() == gv_fIRE)) {
         gv_mOUSERIGHT[lv_localPlayer] = false;
+        gv_rIGHTORBIT[lv_localPlayer] = false;
     }
     else if ((EventMouseClickedButton() == gv_aBILITYCAMERA)) {
         gv_mOUSEMIDDLE[lv_localPlayer] = false;
@@ -284,6 +288,38 @@ bool gt_LeftOrbitStart_Func (bool testConds, bool runActions) {
 void gt_LeftOrbitStart_Init () {
     gt_LeftOrbitStart = TriggerCreate("gt_LeftOrbitStart_Func");
     TriggerAddEventMouseMoved(gt_LeftOrbitStart, c_playerAny);
+}
+
+bool gt_RightOrbitStart_Func (bool testConds, bool runActions) {
+    int lv_player;
+    int lv_dx;
+    int lv_dy;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    if (!gf_IsHeroPlayer(lv_player)) {
+        return true;
+    }
+    if (!gv_mOUSERIGHT[lv_player] || gv_mOUSERIGHTCANCEL[lv_player] || gv_rIGHTORBIT[lv_player]) {
+        return true;
+    }
+    lv_dx = EventMouseMovedPosXUI() - gv_mOUSERIGHTPRESSXUI[lv_player];
+    lv_dy = EventMouseMovedPosYUI() - gv_mOUSERIGHTPRESSYUI[lv_player];
+    if ((lv_dx * lv_dx + lv_dy * lv_dy) > (c_SCOBA_RIGHT_ORBIT_PIXELS * c_SCOBA_RIGHT_ORBIT_PIXELS)) {
+        gv_rIGHTORBIT[lv_player] = true;
+        gv_rOTATEUNIT[lv_player] = true;
+        gv_cONTROLRELATIVE[lv_player] = true;
+        CameraSetMouseRotates(lv_player, true);
+        CameraForceMouseRelative(lv_player, true);
+    }
+    return true;
+}
+
+void gt_RightOrbitStart_Init () {
+    gt_RightOrbitStart = TriggerCreate("gt_RightOrbitStart_Func");
+    TriggerAddEventMouseMoved(gt_RightOrbitStart, c_playerAny);
 }
 
 fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {

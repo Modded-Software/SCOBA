@@ -106,6 +106,8 @@ bool gt_CursorEnd_Func (bool testConds, bool runActions);
 void gt_CursorEnd_Init ();
 bool gt_LeftOrbitStart_Func (bool testConds, bool runActions);
 void gt_LeftOrbitStart_Init ();
+bool gt_RightOrbitStart_Func (bool testConds, bool runActions);
+void gt_RightOrbitStart_Init ();
 bool gt_CameraTurnTick_Func (bool testConds, bool runActions);
 void gt_CameraTurnTick_Init ();
 fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired);
