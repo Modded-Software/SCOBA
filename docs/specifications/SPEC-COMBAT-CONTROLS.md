@@ -123,8 +123,8 @@ The FSM stores intent:
 | any | hero dead | any | IDLE | clear target and orders |
 
 Target clearing in the auto rows clears `gv_sCOBAAutoTarget`.
-It does not clear `gv_tARGET` on idle, Stop, or move completion.
-`gv_tARGET` clears on target death, removal, ground left click, or explicit clear.
+It does not clear `gv_unitTarget` on idle, Stop, or move completion.
+`gv_unitTarget` clears on target death, removal, ground left click, or explicit clear.
 
 ## 5. Module layout
 
@@ -368,22 +368,21 @@ Button state:
 Right-click targeting is specified in
 [SPEC-MOUSE-CONTROLS](SPEC-MOUSE-CONTROLS.md).
 
-The right command runs on clean right-button release. It uses the hover unit
-saved at press time when the press point is inside that unit's radius. That unit
-comes from the same engine highlight event used by left-click selection.
-A stale hover unit outside the press-point radius falls through to the target
-resolver and the click-point enemy scan.
+The right command runs on clean right-button release. It uses the unit from the
+native per-player `UnitClick` event. The same `UnitClick` unit serves RPG left
+target, right attack, and order-mode right click. Action-mode left click uses
+`gf_UnitTargetAtPoint` at the camera target. Unit Highlight may also supply the press-time Unit Target candidate but is never used for ability targeting.
 
 Right command flow:
 
-1. Right-click enemy: select it and call `gf_CombatManualAttack`.
+1. Right-click enemy: set target and call `gf_CombatManualAttack`.
 2. Right-click ground in Stand: issue Stop and keep the root.
 3. Right-click ground in Walk: issue Move.
 4. Order mode: use the same target resolver at the press point.
 5. A right drag runs no command.
 
-A ground right click does not clear `gv_tARGET`.
-Hero idle, Stop, and move-order completion do not clear `gv_tARGET`.
+A ground right click does not clear `gv_unitTarget`.
+Hero idle, Stop, and move-order completion do not clear `gv_unitTarget`.
 Only target death, removal, ground left click, or an explicit clear removes it.
 
 `gt_DisableClickMove` blocks move orders only in Stand with no movement key held.
@@ -428,7 +427,7 @@ FSM state or issues a combat order. Their implementation is specified in
 | `TriggerAddEventUnitBecomesIdle` | FSM | clear manual, resume |
 | `TriggerAddEventMouseClicked` fire down | targeting | save press state |
 | `TriggerAddEventMouseClicked` fire up | targeting | run clean-click right command |
-| `TriggerAddEventMouseClicked` cursor down and up | targeting | left selection and button state |
+| `TriggerAddEventMouseClicked` cursor down and up | targeting | left target and button state |
 | WASD key start and end | movement | cancel auto, set MOVING or resume |
 | order mode enter and exit | orders | cancel auto, set MOVING or resume |
 
@@ -461,11 +460,11 @@ distance. It records elapsed time for every sample.
 | Stand movement wake | none | held key, before and after `gf_CombatBeginMove`, release | root 1 then 0, move suppressed then clear, move order moves hero, root returns after release |
 | Stand auto off manual | 9.0 east | manual attack +2.0 | root 1, no displacement |
 | Stand repeated clicks | 9.0 east | 5 manual attacks | root stays, no displacement |
-| Right press unit | 3.0 east | save hover, press, release | enemy returned from saved hover |
-| Right stale hover | 3.0 east | stale enemy hover, press ground, release | no attack order, ground command by stance |
+| Right press resolve | 3.0 east | press, release | enemy returned from shared resolver |
+| Right ground outside radius | 3.0 east | hover enemy, press ground, release | no attack order, ground command by stance |
 | Right drag cancel | 3.0 east | press, camera yaw change, release | no attack order |
 | Right target select | 3.0 east | clean click enemy | target set, attack order |
-| Target persists | 3.0 east | select, idle, Stop, idle | target remains selected |
+| Target persists | 3.0 east | target, idle, Stop, idle | target remains set |
 | Walk ground click | none | clean ground right click in Walk | hero moves |
 | Stand ground click | none | clean ground right click in Stand | hero stops, root present |
 | Walk chase | 9.0 east | +1.0, +3.0 | root 0, distance decreases, attack order, damage |

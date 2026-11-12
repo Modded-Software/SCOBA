@@ -20,7 +20,7 @@ prevents right-click state races.
 - `systems/animation_fsm.galaxy`: splitbody aim selection, direction selection,
   turn state, and action-mode facing.
 - `systems/targeting.galaxy`: mouse press, release, drag detection, right
-  command, and left selection.
+  command, and Unit Target resolution.
 - `systems/movement.galaxy`: forward movement loop, both-button alias, and aim
   movement.
 - `systems/controls.galaxy`: control mode toggle, action mode mouse look, Alt
@@ -43,15 +43,18 @@ prevents right-click state races.
 | `gv_mOUSEPRESSYUI` | `int[8]` | Press UI Y |
 | `gv_mOUSEPRESSX` | `fixed[8]` | Press world X |
 | `gv_mOUSEPRESSY` | `fixed[8]` | Press world Y |
-| `gv_sCOBAPRESSUNIT` | `unit[8]` | Hover unit at right press |
-| `gv_sCOBALEFTPRESSUNIT` | `unit[8]` | Hover unit at left press |
-| `gv_mOUSELEFTCANCEL` | `bool[8]` | Left selection is cancelled |
+| `gv_mOUSELEFTCANCEL` | `bool[8]` | Left target click is cancelled |
 | `gv_mOUSELEFTPRESSXUI` | `int[8]` | Left press UI X |
 | `gv_mOUSELEFTPRESSYUI` | `int[8]` | Left press UI Y |
 | `gv_mOUSELEFTPRESSX` | `fixed[8]` | Left press world X |
 | `gv_mOUSELEFTPRESSY` | `fixed[8]` | Left press world Y |
 | `gv_mOUSERIGHTPRESSX` | `fixed[8]` | Right press world X |
 | `gv_mOUSERIGHTPRESSY` | `fixed[8]` | Right press world Y |
+| `gv_unitClickCandidate` | `unit[8]` | Unit from the native `UnitClick` event for that player |
+| `gv_unitHighlight` | `unit[8]` | Current Unit Highlight for that player |
+| `gv_unitPressHighlight` | `unit[8]` | Unit Highlight snapshotted at left press |
+| `gv_unitRightPressHighlight` | `unit[8]` | Unit Highlight snapshotted at right press |
+| `gv_unitTarget` | `unit[8]` | Current Unit Target for the boss bar |
 | `gv_aIMACTIVE` | `bool[8]` | Right-hold aim mode is active |
 | `gv_cAMERAFOV` | `fixed[8]` | Field of view without aim mode |
 | `gv_animUpperState` | `int[8]` | Active logical upper state |
@@ -68,7 +71,7 @@ prevents right-click state races.
 
 | Constant | Value | Purpose |
 | --- | --- | --- |
-| `c_SCOBA_CLICK_DRAG_PIXELS` | 4 | Click versus drag threshold |
+| `c_SCOBA_CLICK_DRAG_ANGLE` | 2.0 | Click versus drag camera-angle threshold in degrees |
 | `c_SCOBA_CLICK_SCAN_RADIUS` | 8.0 | Point pick search radius |
 | `c_SCOBA_CLICK_MARGIN` | 0.75 | Point pick radius margin |
 | `c_SCOBA_AIM_FOV` | 45.0 | Field of view while aiming |
@@ -97,9 +100,13 @@ Flat point distance is never the primary target source.
 | Event | Trigger | Action |
 | --- | --- | --- |
 | Left mouse down | `gt_TargetClick` | Set left state; save press point; cancel on both-button |
-| Left mouse up | `gt_TargetRelease` | Clear left state; stop both-button forward; select on clean release |
+| Left mouse up | `gt_TargetRelease` | Clear left state; stop both-button forward; set target on clean release |
 | Right mouse down | `gt_TargetClick` | Set right state; snapshot press; cancel on both-button |
 | Right mouse up | `gt_TargetRelease` | Clear right state; run clean-click command; stop both-button forward |
+| Unit clicked | `gt_UnitClick[player]` | Store the click candidate for the hard-coded player; engine-select the hero |
+| Unit highlighted | `gt_UnitHighlightOn[player]` | Store the Unit Highlight for the hard-coded player |
+| Unit unhighlighted | `gt_UnitHighlightOff[player]` | Clear the matching Unit Highlight for the hard-coded player |
+| Unit engine-selected | `gt_HeroReselect[player]` | Immediate hero engine reselect for the hard-coded player |
 | Right mouse down | `gt_CursorStart` | RPG: start camera turn. Action: start aim mode |
 | Right mouse up | `gt_CursorEnd` | RPG: stop camera turn. Action: stop aim mode |
 | Middle mouse down | `gt_CursorStart` | Start camera turn |
@@ -126,22 +133,27 @@ On left-button down:
 3. Save `EventMouseClickedPosXUI` and `EventMouseClickedPosYUI`.
 4. Save `EventMouseClickedPosXWorld` and `EventMouseClickedPosYWorld`.
 5. Save `CameraGetYaw` and `CameraGetPitch`.
-6. Save `gv_sCOBAHover[player]` as `gv_sCOBALEFTPRESSUNIT[player]`.
-7. Set `gv_mOUSERIGHTCANCEL[player] = true` when the right button is held.
+6. Set `gv_mOUSERIGHTCANCEL[player] = true` when the right button is held.
 
 On left-button up:
 
 1. Set `gv_mOUSELEFT[player] = false`.
 2. Stop both-button forward.
-3. Compute UI pixel distance from the press point.
-4. Set drag when the pixel distance is at least
-   `c_SCOBA_CLICK_DRAG_PIXELS`.
+3. Compute camera yaw and pitch change from the press point.
+4. Set drag when the yaw or pitch change is at least `c_SCOBA_CLICK_DRAG_ANGLE`.
 5. When the click is clean and not cancelled:
    - exit order mode;
-   - select `gv_sCOBALEFTPRESSUNIT[player]` when it is inside the press-point radius;
-   - resolve the unit at the saved press world point when the hover unit is absent or outside that radius;
-   - clear the target when no unit resolves.
+   - read `gv_unitClickCandidate[player]`, then the press-time Unit Highlight, then press-point geometry;
+   - when one is valid, set `gv_unitTarget` to it;
+   - when none is valid, clear `gv_unitTarget`;
+   - clear both candidates;
+   - do not change native unit selection;
+   - reselect the hero.
 6. Clear `gv_mOUSELEFTCANCEL[player]`.
+
+`gt_UnitClick[player]` stores `EventUnit()` and immediately engine-selects the hero.
+The Unit Target candidate order is `UnitClick`, then the press-time Unit
+Highlight, then press-point geometry.
 
 The left-click target remains active after hero idle, Stop, and move-order
 completion. It changes only on replacement, ground left click, death, removal,
@@ -152,8 +164,54 @@ orbit changes the camera only. It does not change character heading.
 
 In action mode, camera look is already active. Left click does not start orbit.
 A clean left click resolves a hostile under the cursor and
-calls `gf_CombatManualAttack`. It does not run the RPG left selection path.
+calls `gf_CombatManualAttack`. It does not run the RPG left target path.
 While Alt is held, the click goes to the UI and no game action runs.
+
+## 6A. Selection and order button
+
+The hero remains natively selected outside order mode.
+The hero reselect poll restores hero selection every 0.1 s as a final safety net.
+A left click on a unit or building only sets `gv_unitTarget`.
+It does not call `UnitClearSelection` or `UnitSelect` on the clicked unit.
+A left click on ground only clears `gv_unitTarget`.
+The left-click path immediately reselects the hero.
+Ctrl+C cancels order mode. It does not clear native selection.
+Every unit type clears `FlagArray[Unclickable]` and
+`FlagArray[Unhighlightable]`.
+Every unit and building stays `Selectable=true` so the engine can emit
+`UnitHighlight`, `UnitClick`, and the custom `PreSelection` ring.
+A selected non-hero unit triggers an immediate per-player hero reselect outside
+order mode. The reselect does not wait for the 0.1 s poll.
+
+`UnitClick` and `UnitSelected` are unit events. `EventPlayer()` can return the
+unit owner, not the clicking player. The implementation MUST register both
+events separately for players 1 through 6. Each callback MUST hard-code its
+player and MUST NOT read `EventPlayer()`.
+
+`gf_UnitTargetSet`:
+
+1. Update the target info panel and boss bar.
+2. Show the Order button only when the target is valid and owned by the player.
+3. Hide the Order button for hostile and neutral targets.
+4. Leave native selection unchanged.
+5. Never set any unit `Selectable=false`.
+
+`gf_OrderEnter` is the only path that changes native selection to a
+non-hero unit:
+
+1. Require a valid owned target.
+2. Clear native selection.
+3. Select the order unit.
+4. Set order mode and store the order unit.
+5. Toggle the Order button on.
+
+`gf_OrderExit`:
+
+1. Clear order mode, order unit, and manual order.
+2. Clear native selection.
+3. Toggle the Order button off.
+4. Never set the target `Selectable=false`.
+5. Let the hero reselect poll restore hero selection.
 
 ## 7. Right press
 
@@ -166,12 +224,10 @@ On right-button down:
    `EventMouseClickedPosXWorld`, and `EventMouseClickedPosYWorld` as
    `gv_mOUSERIGHTPRESSX` and `gv_mOUSERIGHTPRESSY`.
 5. Save `CameraGetYaw` and `CameraGetPitch`.
-6. Save `gv_sCOBAHover[player]` as `gv_sCOBAPRESSUNIT[player]` when the press point is inside that unit's radius.
-7. Set `gv_sCOBAPRESSUNIT[player]` to null when the hover unit is outside the press-point radius.
-8. Set `gv_mOUSERIGHTCANCEL[player] = false`.
-9. If `gv_mOUSELEFT[player]` is true, set the cancel flag and start
+6. Set `gv_mOUSERIGHTCANCEL[player] = false`.
+7. If `gv_mOUSELEFT[player]` is true, set the cancel flag and start
    both-button forward.
-10. Return without changing combat state.
+8. Return without changing combat state.
 
 Camera turn starts in `gt_CursorStart` after press state is saved.
 
@@ -185,55 +241,76 @@ On right-button up:
 1. Read player.
 2. Set `gv_mOUSERIGHT[player] = false`.
 3. Stop both-button forward when the both-button hold has ended.
-4. Read release UI position.
-5. Compute UI pixel distance from the press point.
-6. Set drag when the pixel distance is at least
-   `c_SCOBA_CLICK_DRAG_PIXELS`.
+4. Read release camera yaw and pitch.
+5. Compute the absolute yaw and pitch change from the press point.
+6. Set drag when either change is at least `c_SCOBA_CLICK_DRAG_ANGLE`.
 7. Return when the cancel flag is set.
 8. Return when drag is set.
-9. Run `gf_RightClickExecute` with the saved press point and saved hover unit.
+9. When `gv_unitClickCandidate[player]` is valid, run the right command with it.
+10. When it is not valid, run the ground command.
 
 In RPG mode, camera turn stops in `gt_CursorEnd` after the command decision.
 
 In action mode, right up exits aim mode and returns before
 `gf_RightClickExecute`. No right command runs.
 
-## 9. Order-mode click resolver
+## 9. Click resolver
 
-`gf_ResolveClickEnemy(int lp_player, point lp_point)` serves order-mode clicks.
-RPG left and right selection use the engine hover unit instead.
+RPG left, right, and order clicks resolve one Unit Target candidate.
 
-1. Return `gv_sCOBAPRESSUNIT[lp_player]` when it is alive, hostile, and
-   `lp_point` is inside its unit radius plus `c_SCOBA_CLICK_MARGIN`.
-2. Return `gv_tARGET[lp_player]` when it is alive and hostile and
-   `lp_point` is inside its unit radius plus `c_SCOBA_CLICK_MARGIN`.
-3. Search enemies inside `c_SCOBA_CLICK_SCAN_RADIUS` around `lp_point`.
-4. Return the closest enemy whose distance from `lp_point` is no more than
-   `UnitGetPropertyFixed(unit, c_unitPropRadius, c_unitPropNormal)` plus
-   `c_SCOBA_CLICK_MARGIN`.
-5. Return null.
+1. Clear the old candidate on every press.
+2. Register `TriggerAddEventUnitClick` and Unit Highlight separately for players
+   1 through 6. Each callback hard-codes its player.
+3. Use the press-time Unit Highlight as the second candidate.
+4. Use `gf_UnitTargetAtPoint` at the press point as the final candidate.
+5. Reject invalid, dead, hidden, missile, and hero units through
+   `gf_UnitTargetValid`. Right and order clicks additionally require a hostile
+   unit.
+6. Consume and clear both candidates on clean release.
+
+`gf_UnitTargetAtPoint(int lp_player, point lp_point, bool lp_enemyOnly)` also
+serves action-mode screen-center attacks and engine-independent test paths.
+
+1. Build one group from `UnitGroup(null, c_playerAny, RegionCircle(...))`.
+2. Reject missiles, dead units, hidden units, invalid units, and the hero.
+3. When `lp_enemyOnly` is true, reject non-hostile units.
+4. Reject units outside `unit radius + c_SCOBA_CLICK_MARGIN`.
+5. Return the closest valid unit or building.
+6. Return null when none match.
+
+Call sites:
+
+- RPG left target: `UnitClick`, press-time Unit Highlight, then press-point geometry.
+- RPG right attack: `UnitClick`, right-press Unit Highlight, then press-point geometry.
+- Order-mode right attack: the same three-step candidate order.
+- Action-mode left attack: `gf_UnitTargetAtPoint(player, CameraGetTarget(player), true)`.
+
+Engine Unit Highlight drives hover rings and supplies the press-time Unit Target
+candidate. It never supplies an ability target.
+
+RPG click resolution never changes native selection.
 
 ## 10. Right command execution
 
-`gf_RightClickExecute(int lp_player, point lp_point, unit lp_unit)`:
+`gf_RightClickExecute(int lp_player, point lp_point, unit lp_pressUnit)`:
 
-1. When `lp_unit` is valid, hostile, and `lp_point` is inside its unit radius
-   plus `c_SCOBA_CLICK_MARGIN`:
-   - call `gf_ShowTarget(lp_player, lp_unit)`;
+1. Set `lp_unit = lp_pressUnit`.
+2. When `lp_unit` is valid:
+   - call `gf_UnitTargetSet(lp_player, lp_unit)`;
    - call `gf_CombatManualAttack(lp_player, lp_unit)`;
    - return.
-2. Call `gf_CombatCancelAuto(lp_player)`.
-3. Set `gv_sCOBAManualOrder[lp_player] = false`.
-4. Call `gf_CombatSyncRoot(lp_player)`.
-5. When RPG Stand is active:
+3. Call `gf_CombatCancelAuto(lp_player)`.
+4. Set `gv_sCOBAManualOrder[lp_player] = false`.
+5. Call `gf_CombatSyncRoot(lp_player)`.
+6. When RPG Stand is active:
    - issue `Order(AbilityCommand("stop", 0))`;
    - set `gv_sCOBAFSM[lp_player]` to `c_SCOBA_FSM_IDLE`.
-6. Otherwise, in RPG Walk:
+7. Otherwise, in RPG Walk:
    - issue `OrderTargetingPoint(AbilityCommand("move", 0), lp_point)`;
    - set `gv_sCOBAFSM[lp_player]` to `c_SCOBA_FSM_MOVING`;
    - call `gf_ShowMoveMarker(lp_player, lp_point)`.
-7. Do not change `gv_tARGET[lp_player]`.
-8. Do not run this function in action mode.
+8. Do not change `gv_unitTarget[lp_player]`.
+9. Do not run this function in action mode.
 
 `gf_ShowMoveMarker` uses the built-in waypoint model:
 
@@ -314,13 +391,21 @@ Scroll input recomputes the safe distance on every wheel event and writes
 orbit state for the left button. It then applies mouse-relative camera control
 when any camera button is active.
 
+Screen-edge scrolling is disabled in `Base.SC2Data/GameData/CameraData.xml`.
+`CCamera id="Dflt"` sets `BorderSizeX=0`, `BorderSizeY=0`,
+`MaxScrollRate Follow=0`, `MaxScrollDistance Follow=0`, and
+`FollowScrollLimit=0`.
+This blocks screen-edge scrolling while native camera follow stays smooth.
+Do not use camera input lock toggles for edge scrolling.
+
 `gt_CameraTurnTick` turns the character to the camera yaw in RPG mode while a
 right or middle button is held. It does nothing for left-button orbit and does
 nothing in action mode.
 
 `gt_CursorEnd` clears state for the released button. It keeps mouse-relative
-camera control active while any camera button remains held. It restores cursor
-visibility and camera lock when all camera buttons are released.
+camera control active while any camera button remains held. It restores free
+cursor visibility when all camera buttons are released. It never enables
+camera input lock in RPG idle.
 
 Right and middle buttons use the same state and the same camera calls. Left
 orbit uses the same camera calls but does not turn the character.
@@ -449,10 +534,13 @@ baseline animation.
 The animation implementation is specified in
 [SPEC-CHARACTER-ANIMATION](SPEC-CHARACTER-ANIMATION.md).
 
-The aim cursor is the native StarCraft II selection cursor. Mouse-relative mode
-already pins the cursor to screen center. Aim mode only makes that cursor
-visible. The cursor therefore keeps the engine hostile and neutral color
-changes. Aim mode uses no dialog, no image panel, and no custom cursor texture.
+The aim cursor is a screen-center image overlay drawn with the native
+StarCraft II cursor textures `storm_ui_cursor_default_base.dds`,
+`storm_ui_cursor_default_enemy.dds`, and
+`storm_ui_cursor_default_friendly.dds`. `gt_AimCursorTick` runs every 0.01 s,
+resolves the unit at `CameraGetTarget`, and shows the matching image. The
+reticle is visible in action and aim mode and hidden in RPG mode or while Alt
+shows the free UI cursor. The engine cursor stays hidden.
 
 ## 14A. Actions and RPG control modes
 
@@ -487,7 +575,7 @@ behavior and applies RPG camera and cursor state.
 2. Clear `gv_actionPressed[player]`.
 3. Clear `gv_actionAlt[player]`.
 4. Clear `gv_mOUSERIGHTCANCEL[player]` and `gv_mOUSELEFTCANCEL[player]`.
-5. Clear left, right, and middle button state and saved press units.
+5. Clear left, right, and middle button state.
 6. Call `gf_AnimReset(player)`.
 7. Call `gf_ControlApply(player)`.
 
@@ -501,24 +589,25 @@ It derives state from control mode, aim state, Alt state, and held buttons:
 5. In RPG mode, enable relative mouse only while a mouse button is held.
 6. Force relative mouse while aim is active.
 7. Set `gv_cONTROLRELATIVE` to the derived value.
-8. Call `CameraSetMouseRotates`, `CameraForceMouseRelative`, and
-   `CameraLockInput` from that value.
+8. Call `CameraSetMouseRotates` and `CameraForceMouseRelative` from that value.
 9. Make the cursor visible with auto-hide disabled.
+10. Never call `CameraLockInput(true)` in RPG idle.
 
 Mouse press and release handlers in `camera.galaxy` own the held button state.
 They update that state and call `gf_ControlApply`.
 Targeting handlers read held state and never write it.
 No trigger-order dependency is allowed.
 
-RPG hover uses the engine highlight event.
-`gt_ShowStatusBar` sets `gv_sCOBAHover[EventPlayer()] = EventUnit()`.
-`gt_HideStatusBar` clears `gv_sCOBAHover[EventPlayer()]` when that unit is
-the hidden unit.
+Unit Highlight uses the per-player engine highlight events.
+Each `gt_UnitHighlightOn[player]` handler stores `EventUnit()` under its
+hard-coded player.
+Each `gt_UnitHighlightOff[player]` handler clears the matching Unit Highlight
+under its hard-coded player.
 No custom mouse-position raycast writes hover.
 
-RPG click points use `EventMouseClickedPosXWorld` and
-`EventMouseClickedPosYWorld`.
-This keeps the press point on the engine-selected world position.
+RPG click points record `EventMouseClickedPosXWorld` and
+`EventMouseClickedPosYWorld` for ground commands and drag checks.
+RPG Unit Targets come from the native per-player `UnitClick` event, then the press-time Unit Highlight, then press-point geometry.
 
 At map init and on control-mode changes, call `gf_ControlApply`.
 
@@ -559,15 +648,16 @@ Action mode mouse input:
 | --- | --- |
 | Right down | Call `gf_AimBegin` and set action aim state |
 | Right up | Call `gf_AimEnd` |
-| Left down, Alt not held | Use the engine hover unit and call `gf_CombatManualAttack` |
-| Left up, Alt not held | Clear action press state |
+| Left down, Alt not held | Set action press state |
+| Left up, Alt not held | Resolve `CameraGetTarget` and call `gf_CombatManualAttack` |
 | Any click, Alt held | UI handles the click; no game attack, aim, or order |
 | Right clean click | No right command |
 | Ground left click | No Move or Stop |
 
-Action mode left attack uses the engine hover unit.
-When the hover unit is hostile, it calls `gf_ShowTarget` and
-`gf_CombatManualAttack`. When no hostile hover unit exists, nothing changes.
+Action mode left attack resolves the hostile at `CameraGetTarget`.
+When the centered target is hostile, it calls `gf_UnitTargetSet` and
+`gf_CombatManualAttack`. When no hostile centered target exists, nothing
+changes.
 
 Action mode does not call `gf_RightClickExecute`.
 Action mode does not issue a right command.
@@ -603,17 +693,27 @@ source of hero right-click orders. Ability target mode is unchanged.
 
 | Scenario | Setup | Action | Assertions |
 | --- | --- | --- | --- |
-| left clean click | enemy under cursor | left down, left up, no camera motion | target selected |
-| left clean click world point | enemy under cursor, no hover event | left down, left up | target resolved from press world point |
-| left target persists | selected enemy | hero idle and Stop | target remains selected |
-| left drag camera | enemy under cursor | left down, camera yaw change, left up | no target selected |
-| right press | hero, enemy | right down | press unit saved, combat state unchanged |
-| RPG right clean click | enemy under press | right down, right up, no camera motion | attack order, target selected |
+| left clean click | enemy under cursor | left down, left up, no camera motion | Unit Target set from the candidate order, hero still engine-selected |
+| left click no flash | owned unit under cursor | left down, left up | unit is not selected past the event tick |
+| ground click after unit click | unit clicked, then ground clicked | two clean clicks | ground click clears target and does not reuse stale unit |
+| left owned building | owned building under cursor | left down, left up | target set, Order button visible, hero still selected |
+| left ground | ground under cursor | left down, left up | target cleared, hero still selected |
+| left target persists | selected enemy | hero idle and Stop | target remains set |
+| left drag camera | enemy under cursor | left down, camera yaw change, left up | no target set |
+| selectability | mixed units and buildings | map init | every unit and building is selectable, `PreSelection` ring available |
+| hover ring | selectable unit under cursor | native highlight fires | `PreSelection` ring is shown |
+| order button hostile | hostile target | read Order button | button hidden |
+| order button owned | owned target | read Order button | button visible |
+| order entry | owned target | press Order button | order unit selected, hero not selected |
+| order exit | order mode active | cancel order | order unit deselected, hero reselected |
+| clear selection key | no order mode | Ctrl+C | no selection change |
+| right press | hero, enemy | right down | press point saved, combat state unchanged |
+| RPG right clean click | enemy under press | right down, right up, no camera motion | attack order, target set |
 | right drag camera | enemy under press | right down, camera yaw change, right up | no attack order, no state change |
 | right ground Walk | RPG Walk | clean right click ground | move order, move target model created |
 | right ground RPG Stand | RPG Stand | clean right click ground | stop order, root present, no displacement |
-| right stale hover | stale enemy hover, ground press | clean right click ground | move or stop by stance, no attack |
-| target kept | selected enemy | clean right click ground | `gv_tARGET` unchanged |
+| right ground outside radius | enemy hover, ground press | clean right click ground | move or stop by stance, no attack |
+| target kept | target enemy | clean right click ground | `gv_unitTarget` unchanged |
 | both forward | none | left down, right down | Move Forward starts |
 | both release left | none | both down, left up | Move Forward stops |
 | both release right | none | both down, right up | Move Forward stops |
@@ -623,14 +723,14 @@ source of hero right-click orders. Ability target mode is unchanged.
 | smart click | map init | read setup | smart click is disabled |
 | aim start | hero | right down | aim active, aim animation plays, FOV is narrower |
 | aim camera | hero | right down | shoulder follow offset is active, distance is unchanged |
-| aim cursor | enemy at center | right down | native cursor visible, engine hostile color |
-| aim neutral | ground at center | right down | native cursor visible, engine neutral color |
+| aim cursor | enemy at center | right down | enemy cursor image visible at screen center |
+| aim neutral | ground at center | right down | base cursor image visible at screen center |
 | aim release | aim active | right up | aim inactive, idle pose, centered follow, FOV restored, cursor hidden |
 | aim scroll | aim active | wheel change, right up | scroll distance survives release |
 | aim drag | aim active | right down, camera yaw change, right up | aim exits, no right command |
 | aim click | aim active | aim drag then clean right click | no right command |
 | aim smooth | hero moving and turning | right hold | no camera origin orbit or snap |
-| aim no UI | hero | right down | no dialog or custom crosshair image |
+| aim no UI | hero | right down | reticle uses native cursor textures, no button icon |
 | aim layers | hero | right down | splitbody idle aim group is active |
 | aim walk | hero | right down, forward held | splitbody walk group and leg motion are active |
 | aim directions | hero | right down, each WASD direction | eight distinct lower clips are selected |
@@ -648,7 +748,7 @@ source of hero right-click orders. Ability target mode is unchanged.
 | action default | new hero | read command card | RPG button is shown |
 | action toggle | hero | click action toggle | action mode behavior is present |
 | action mouse look | action mode | move mouse, no button | camera yaw changes and facing follows |
-| action cursor | action mode | read cursor | native cursor is centered |
+| action cursor | action mode | read cursor | screen-center reticle is visible |
 | action alt | action mode | hold Alt | mouse look pauses and UI cursor is free |
 | action alt release | action mode, Alt held | release Alt | mouse look resumes and cursor recenters |
 | action aim | action mode | real right hold | aim mode is active and no right command runs |
@@ -663,16 +763,18 @@ source of hero right-click orders. Ability target mode is unchanged.
 | RPG right hold | RPG mode | right hold | aim stays inactive and FOV stays unchanged |
 | RPG right click ground | RPG mode | clean right click ground | move order runs |
 | RPG right drag | RPG mode | right drag | no right command runs |
+| edge scroll | RPG idle | move cursor to each screen edge | camera does not move, follow stays smooth |
 | toggle icons | RPG and action mode | read button faces | two different custom DDS files |
-| control state RPG rest | RPG mode, no buttons | read `gv_cONTROLRELATIVE` | relative off, cursor free |
+| control state RPG rest | RPG mode, no buttons | read `gv_cONTROLRELATIVE` | relative off, cursor free, camera input lock off |
 | control state RPG right | RPG mode, right held | read `gv_cONTROLRELATIVE` | relative on, unit rotate on |
 | control state RPG release | RPG mode, right released | read `gv_cONTROLRELATIVE` | relative off, rotate off |
 | control state action | action mode | read `gv_cONTROLRELATIVE` | relative on, cursor centered |
 | control state alt | action mode, Alt held | read `gv_cONTROLRELATIVE` | relative off, cursor free |
 | control state aim | action mode, aim active | read `gv_cONTROLRELATIVE` | relative on |
-| hover highlight | enemy under cursor | native highlight fires | `gv_sCOBAHover` is the enemy |
+| hover highlight | enemy under cursor | native highlight fires | `gv_unitHighlight` is the enemy |
 | hover clear | pointer leaves enemy | native unhighlight fires | matching hover is cleared |
-| click world point | free cursor over ground | button down | press point equals engine click world point |
+| click player | enemy owned by another player | left click | Unit Target resolves for the clicking hero player |
+| right click enemy | enemy owned by another player | right click | attack issued without changing native selection |
 
 The map test harness calls the mouse functions with synthetic press and
 release data for logic checks. Real input injection covers camera, both-button,
@@ -680,18 +782,31 @@ click, and right-hold aim paths.
 Synthetic pointer warps do not emit engine highlight events, so hover is
 verified in live play.
 Aim tests read `gv_aIMACTIVE`, `CameraGetTarget`, `CameraGetDistance`,
-animation layer state, hero facing, and screenshots of the native
-cursor at screen center.
+animation layer state, hero facing, and screenshots of the screen-center
+reticle.
 
 ## 17. Invariants
 
-- Left drag never selects a target.
-- Both-button forward never selects a target.
+- Left drag never sets a target.
+- Both-button forward never sets a target.
+- A left click sets or clears the target only; it never changes native selection.
+- The hero stays natively selected outside order mode.
+- Ctrl+C cancels order mode and never clears native selection.
+- The Order button is the only path that changes native selection to a non-hero unit.
+- Order exit or cancel restores hero selection.
+- Every unit and building stays selectable so `PreSelection` hover rings work.
+- A selected non-hero unit triggers an immediate hero reselect outside order mode.
+- Target changes and order exit never set `Selectable=false`.
+- The Order button is visible only for a valid owned target.
 - Right down never changes combat state.
 - A right drag never changes combat state.
 - One clean right click produces at most one right command.
-- The hover unit at press is the primary right-click target only inside its radius.
-- A stale hover unit never becomes the click target.
+- RPG left, right, and order clicks use `UnitClick`, then press-time Unit Highlight, then press-point geometry.
+- `EventPlayer` never determines the RPG clicking player.
+- A new press clears the old Unit Target candidate; a clean release consumes it.
+- A left click never leaves a non-hero unit natively selected past the event tick.
+- Action-mode attacks use `gf_UnitTargetAtPoint` at the camera target.
+- Engine Unit Highlight may become the press-time Unit Target candidate; ability targeting never uses it.
 - Ground right clicks never clear the left-click target.
 - Hero idle, Stop, and move completion never clear the left-click target.
 - RPG Stand ground right click stops and keeps the root.
@@ -699,14 +814,16 @@ cursor at screen center.
 - Both-button forward ends when either button is released.
 - The W key and both-button forward share one forward loop.
 - Right and middle camera behavior use the same state and calls.
-- Only `gf_ControlApply` writes camera mouse-rotate, mouse-relative, camera input lock, and cursor visibility state.
+- Only `gf_ControlApply` writes camera mouse-rotate, mouse-relative, and cursor visibility state.
+- `gf_ControlApply` never enables camera input lock in RPG idle.
 - Held button state is owned by mouse press/release handlers.
 - Targeting never writes held button state.
 - Cursor mode never depends on trigger execution order.
 - Releasing a button always restores the derived cursor mode.
-- `gv_sCOBAHover` is written only by the engine highlight handlers.
-- Engine highlight hide clears only the matching hover unit.
-- Click press points come from engine mouse-click world coordinates.
+- `gv_unitHighlight` is written only by the per-player engine highlight handlers.
+- Engine highlight hide clears only the matching Unit Highlight.
+- RPG Unit Targets use per-player `UnitClick`, then press-time Unit Highlight, then press-point geometry.
+- Click press points still come from engine mouse-click world coordinates for ground commands and drag checks.
 - Engine smart click is disabled for all players.
 - In action mode, aim mode starts on right press and ends on right release.
 - RPG right press never enters aim mode.
@@ -727,7 +844,7 @@ cursor at screen center.
 - Action mode uses engine turn duration and native baseline turn clips.
 - Action mode creates no upper turn overlay.
 - Aim mode moves with one camera-relative travel heading per tick and no turn deadband.
-- Aim mode uses the native selection cursor and keeps engine hover colors.
+- Aim mode uses the screen-center reticle and keeps engine hover colors.
 - Aim mode never uses camera bounds.
 - Aim mode never writes camera values on a periodic timer.
 - Aim release restores centered follow and the non-aim field of view.
@@ -737,7 +854,7 @@ cursor at screen center.
 - Control mode state lives only in `SCOBAActionModeBehavior`.
 - Control mode changes reset animation state and clear pending press state.
 - Action mode keeps mouse look active without a held button.
-- Action mode keeps the native cursor centered.
+- Action mode keeps the screen-center reticle visible.
 - Action mode turns hero facing from camera yaw when idle.
 - Action mode keeps the current follow camera and scroll distance.
 - Action mode right hold applies aim camera and release restores action camera.
@@ -764,10 +881,14 @@ cursor at screen center.
 - Confirm action idle turning feels smooth at `c_ANIM_TURN_DURATION`.
 - Confirm aim movement is smooth with native orders and keeps camera facing.
 - Confirm aim facing rotation keeps up with camera rotation.
-- Confirm the native cursor is visible while mouse-relative mode is active.
+- Confirm the screen-center reticle is visible while mouse-relative mode is active.
 - Confirm offset unit follow keeps the shoulder view without camera orbit.
 - Confirm Alt reaches the map while action mode mouse look is active.
 - Confirm the UI cursor can click command card buttons while Alt is held.
 - Confirm action mode left click hits the unit under the centered cursor.
-- Confirm left and right click world points match the visible cursor in RPG mode.
+- Confirm left and right clicks target the unit under the visible cursor in RPG mode.
+- Confirm hover rings render on every selectable unit and building.
+- Confirm left click sets the target and does not leave the clicked unit selected.
+- Confirm Ctrl+C does not clear hero selection.
+- Confirm the Order button appears only for owned targets and restores hero selection on exit.
 - Confirm control mode toggle faces and names match the current mode.

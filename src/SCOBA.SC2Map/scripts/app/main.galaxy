@@ -61,8 +61,9 @@ void main () {
     gt_UnitSelection_Init();
     gt_NewUnitSelection_Init();
     gt_KeepHeroSelected_Init();
-    gt_ShowStatusBar_Init();
-    gt_HideStatusBar_Init();
+    gt_HeroReselectOnSelect_Init();
+    gt_UnitHighlightOn_Init();
+    gt_UnitHighlightOff_Init();
     gf_OrderCreate();
     gf_BossBarSetup();
     gt_OrderKey_Init();
@@ -73,7 +74,10 @@ void main () {
     gt_VisualTuning_Init();
     gt_TargetRing_Init();
     gt_TargetClick_Init();
+    gt_UnitClick_Init();
     gt_CameraFollowDistance_Init();
+    gt_CameraDebugMove_Init();
+    gt_CameraDebug_Init();
     gt_RefreshEnergyBar_Init();
     gt_PlayerBars_Init();
     gt_Jump_Init();
@@ -90,6 +94,7 @@ void main () {
     gt_ZoomStart_Init();
     gt_CursorStart_Init();
     gt_CursorEnd_Init();
+    gt_LeftOrbitStart_Init();
     gt_CameraTurnTick_Init();
     gt_CameraCollisionTick_Init();
     gt_AimInit_Init();

@@ -1,35 +1,131 @@
 // Module: systems/status_bar
 
-bool gt_ShowStatusBar_Func (bool testConds, bool runActions) {
-    // Actions
+void gf_UnitHighlightOn (int lp_player, bool testConds, bool runActions) {
     if (!runActions) {
-        return true;
+        return;
     }
-
     UnitStatusBarOverride(EventUnit(), c_unitStatusGroupAll);
-    gv_sCOBAHover[EventPlayer()] = EventUnit();
-    return true;
+    gv_unitHighlight[lp_player] = EventUnit();
 }
 
-void gt_ShowStatusBar_Init () {
-    gt_ShowStatusBar = TriggerCreate("gt_ShowStatusBar_Func");
-    TriggerAddEventUnitHighlight(gt_ShowStatusBar, null, c_playerAny, true);
-}
-
-bool gt_HideStatusBar_Func (bool testConds, bool runActions) {
-    // Actions
+void gf_UnitHighlightOff (int lp_player, bool testConds, bool runActions) {
     if (!runActions) {
-        return true;
+        return;
     }
-
     UnitStatusBarOverride(EventUnit(), -1);
-    if (gv_sCOBAHover[EventPlayer()] == EventUnit()) {
-        gv_sCOBAHover[EventPlayer()] = null;
+    if (gv_unitHighlight[lp_player] == EventUnit()) {
+        gv_unitHighlight[lp_player] = null;
     }
+}
+
+bool gt_UnitHighlightOn1_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOn(1, testConds, runActions);
     return true;
 }
 
-void gt_HideStatusBar_Init () {
-    gt_HideStatusBar = TriggerCreate("gt_HideStatusBar_Func");
-    TriggerAddEventUnitHighlight(gt_HideStatusBar, null, c_playerAny, false);
+bool gt_UnitHighlightOn2_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOn(2, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOn3_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOn(3, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOn4_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOn(4, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOn5_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOn(5, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOn6_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOn(6, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOff1_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOff(1, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOff2_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOff(2, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOff3_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOff(3, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOff4_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOff(4, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOff5_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOff(5, testConds, runActions);
+    return true;
+}
+
+bool gt_UnitHighlightOff6_Func (bool testConds, bool runActions) {
+    gf_UnitHighlightOff(6, testConds, runActions);
+    return true;
+}
+
+void gt_UnitHighlightOn_Init () {
+    int lv_player;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        if (lv_player == 1) {
+            gt_UnitHighlightOn[lv_player] = TriggerCreate("gt_UnitHighlightOn1_Func");
+        }
+        else if (lv_player == 2) {
+            gt_UnitHighlightOn[lv_player] = TriggerCreate("gt_UnitHighlightOn2_Func");
+        }
+        else if (lv_player == 3) {
+            gt_UnitHighlightOn[lv_player] = TriggerCreate("gt_UnitHighlightOn3_Func");
+        }
+        else if (lv_player == 4) {
+            gt_UnitHighlightOn[lv_player] = TriggerCreate("gt_UnitHighlightOn4_Func");
+        }
+        else if (lv_player == 5) {
+            gt_UnitHighlightOn[lv_player] = TriggerCreate("gt_UnitHighlightOn5_Func");
+        }
+        else {
+            gt_UnitHighlightOn[lv_player] = TriggerCreate("gt_UnitHighlightOn6_Func");
+        }
+        TriggerAddEventUnitHighlight(gt_UnitHighlightOn[lv_player], null, lv_player, true);
+    }
+}
+
+void gt_UnitHighlightOff_Init () {
+    int lv_player;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        if (lv_player == 1) {
+            gt_UnitHighlightOff[lv_player] = TriggerCreate("gt_UnitHighlightOff1_Func");
+        }
+        else if (lv_player == 2) {
+            gt_UnitHighlightOff[lv_player] = TriggerCreate("gt_UnitHighlightOff2_Func");
+        }
+        else if (lv_player == 3) {
+            gt_UnitHighlightOff[lv_player] = TriggerCreate("gt_UnitHighlightOff3_Func");
+        }
+        else if (lv_player == 4) {
+            gt_UnitHighlightOff[lv_player] = TriggerCreate("gt_UnitHighlightOff4_Func");
+        }
+        else if (lv_player == 5) {
+            gt_UnitHighlightOff[lv_player] = TriggerCreate("gt_UnitHighlightOff5_Func");
+        }
+        else {
+            gt_UnitHighlightOff[lv_player] = TriggerCreate("gt_UnitHighlightOff6_Func");
+        }
+        TriggerAddEventUnitHighlight(gt_UnitHighlightOff[lv_player], null, lv_player, false);
+    }
 }

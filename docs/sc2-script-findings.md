@@ -360,7 +360,7 @@ Observed failures:
 ### 12.3 Galaxy Notes Learned
 
 - Galaxy global names are case-sensitive.
-- `gv_TARGET` is invalid; the declared array is `gv_tARGET`.
+- `gv_TARGET` is invalid; the declared array is `gv_unitTarget`.
 - `UnitIsValid` is the safe null check for units.
 - Unit values cannot be compared directly with `null`.
 - `PowI` returns `int`; do not wrap it with `FixedToInt`.

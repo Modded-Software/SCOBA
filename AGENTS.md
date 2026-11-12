@@ -104,11 +104,36 @@
 - Aim must not write camera distance. Scroll distance survives aim entry and exit.
 - Aim camera sits slightly left of the hero center, never directly behind it. Offset the camera origin; do not rotate the camera.
 - Aim applies the offset by following a hero plus hidden-proxy group; the group center is the shoulder pivot. Never pan on top of follow.
+- Action and aim use a screen-center reticle overlay with `storm_ui_cursor_default_base/enemy/friendly.dds`.
+- `gt_AimCursorTick` resolves `CameraGetTarget` every 0.01 s and selects enemy, friendly, or neutral art.
+- Hide the reticle in RPG mode and while Alt shows the free UI cursor.
+- Terminology: Unit Highlight is the hover ring. Unit Target is the boss-bar target. Unit Select is native engine selection. Ability targeting is separate.
+- RPG left, right, and order clicks resolve a Unit Target from `UnitClick`, then the press-time Unit Highlight, then press-point geometry.
+- Register `UnitClick`, `UnitSelected`, and Unit Highlight separately for each hero player. Never use `EventPlayer` to infer the clicker.
+- Every unit type must clear `FlagArray[Unclickable]` and `FlagArray[Unhighlightable]`.
+- Action-mode attacks use `gf_UnitTargetAtPoint` at the camera target.
+- Unit Highlight drives hover rings and the press-time target candidate. Never use it for ability targeting.
+- Clear the Unit Target candidate on press and consume it on clean release.
+- Left click sets or clears the target only. It never changes native selection past the event tick.
+- `UnitClick` must immediately reselect the hero outside order mode.
+- Left click on ground clears the target only. The hero stays selected.
+- The hero stays natively selected outside order mode.
+- Ctrl+C cancels order mode. It never clears native selection.
+- The Order button is the only path that changes native selection to a non-hero unit.
+- The Order button is visible only for a valid owned target.
+- Order entry clears selection and selects the order unit. Order exit or cancel restores hero selection.
+- Every unit and building stays selectable so the `PreSelection` hover ring renders.
+- Left click must not leave the clicked unit selected.
+- The hero stays natively selected outside order mode.
+- The Order button is the only lasting native selection change to a non-hero unit.
+- Never set any unit `Selectable=false`.
 - Aim must not change combat FSM state or issue combat orders.
-- `gf_ControlApply` is the only writer of mouse-relative, camera input lock, and cursor visibility. Mouse press/release handlers own held button state. Targeting only reads it.
+- `gf_ControlApply` is the only writer of mouse-relative and cursor visibility. It never enables camera input lock in RPG idle. Mouse press/release handlers own held button state. Targeting only reads it.
+- Screen-edge camera scroll is disabled in map camera data: `CCamera id="Dflt"` sets `BorderSizeX=0`, `BorderSizeY=0`, `MaxScrollRate Follow=0`, `MaxScrollDistance Follow=0`, and `FollowScrollLimit=0`. Do not re-add camera input lock hacks. Native follow stays smooth.
 - Control mode changes, Alt changes, aim entry/exit, and map init route through `gf_ControlApply`.
 - Left-click target persists through hero idle, Stop, and move completion.
-- Reject stale hover with a press-point radius check.
+- Reject action-mode clicks outside the unit radius.
+- Detect a drag from camera yaw or pitch change, not release UI distance.
 - Aim uses one splitbody group per lower state and direction. Each group has two concurrent STCs.
 - The upper STC is frozen at the Attack start keyframe. The lower STC animates Stand or Walk.
 - Aim uses eight lower-body directions. Lower direction comes from the camera-relative travel vector.
@@ -170,7 +195,7 @@
 - Reset animation state on aim entry, control mode change, and hero reassignment.
 - Clearing the aim group must reset the splitbody state and upper state in the same call.
 - Use movement intent plus a hold timer for lower walk and idle selection. Select the aim group from that lower state and direction.
-- Controls tests must cover real clicks, target persistence, stale hover, aim distance, movement tick, animation reset, immediate zoom, and collision clamp/restore.
+- Controls tests must cover real clicks, target persistence, click radius, aim distance, movement tick, animation reset, immediate zoom, and collision clamp/restore.
 
 ## Resource tools
 

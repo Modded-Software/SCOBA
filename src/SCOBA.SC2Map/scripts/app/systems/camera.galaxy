@@ -44,6 +44,62 @@ void gt_CameraFollowDistance_Init () {
     TriggerAddEventMouseWheel(gt_CameraFollowDistance, c_playerAny);
 }
 
+bool gt_CameraDebugMove_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    if (!gf_IsHeroPlayer(lv_player)) {
+        return true;
+    }
+    gv_cAMDBGCOUNT[lv_player] += 1;
+    gv_cAMDBGLAST[lv_player] = EventCameraMoveReason();
+    return true;
+}
+
+void gt_CameraDebugMove_Init () {
+    gt_CameraDebugMove = TriggerCreate("gt_CameraDebugMove_Func");
+    TriggerAddEventCameraMove(gt_CameraDebugMove, c_playerAny, c_cameraMoveReasonAny);
+}
+
+bool gt_CameraDebug_Func (bool testConds, bool runActions) {
+    bank lv_bank;
+    unit lv_hero;
+    point lv_target;
+    string lv_text;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_bank = BankLoad("SCOBACAMDBG", 1);
+    BankSectionCreate(lv_bank, "state");
+    lv_text = "lock=" + gf_AnimFlag(gv_eDGEBLOCK[1]);
+    lv_text = lv_text + " rel=" + gf_AnimFlag(gv_cONTROLRELATIVE[1]);
+    lv_text = lv_text + " action=" + gf_AnimFlag(gf_ActionModeActive(1));
+    lv_text = lv_text + " aim=" + gf_AnimFlag(gv_aIMACTIVE[1]);
+    lv_text = lv_text + " count=" + IntToString(gv_cAMDBGCOUNT[1]);
+    lv_text = lv_text + " last=" + IntToString(gv_cAMDBGLAST[1]);
+    lv_hero = gv_tPSUNIT[1];
+    if (UnitIsValid(lv_hero)) {
+        lv_target = CameraGetTarget(1);
+        lv_text = lv_text + " hx=" + IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_hero))));
+        lv_text = lv_text + " hy=" + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_hero))));
+        lv_text = lv_text + " tx=" + IntToString(FixedToInt(PointGetX(lv_target)));
+        lv_text = lv_text + " ty=" + IntToString(FixedToInt(PointGetY(lv_target)));
+    }
+    BankValueSetFromString(lv_bank, "state", "p1", lv_text);
+    BankSave(lv_bank);
+    return true;
+}
+
+void gt_CameraDebug_Init () {
+    gt_CameraDebug = TriggerCreate("gt_CameraDebug_Func");
+    TriggerAddEventTimePeriodic(gt_CameraDebug, 1.0, c_timeGame);
+}
+
+
 bool gt_Jump_Func (bool testConds, bool runActions) {
     // Variable Declarations
     int lv_localPlayer;
@@ -130,6 +186,9 @@ bool gt_CursorStart_Func (bool testConds, bool runActions) {
 
     if ((EventMouseClickedButton() == gv_mOUSECURSOR)) {
         gv_mOUSELEFT[lv_localPlayer] = true;
+        gv_lEFTORBIT[lv_localPlayer] = false;
+        gv_mOUSELEFTPRESSXUI[lv_localPlayer] = EventMouseClickedPosXUI();
+        gv_mOUSELEFTPRESSYUI[lv_localPlayer] = EventMouseClickedPosYUI();
     }
     else if ((EventMouseClickedButton() == gv_fIRE)) {
         gv_mOUSERIGHT[lv_localPlayer] = true;
@@ -173,6 +232,7 @@ bool gt_CursorEnd_Func (bool testConds, bool runActions) {
 
     if ((EventMouseClickedButton() == gv_mOUSECURSOR)) {
         gv_mOUSELEFT[lv_localPlayer] = false;
+        gv_lEFTORBIT[lv_localPlayer] = false;
     }
     else if ((EventMouseClickedButton() == gv_fIRE)) {
         gv_mOUSERIGHT[lv_localPlayer] = false;
@@ -189,6 +249,38 @@ void gt_CursorEnd_Init () {
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_fIRE, false);
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_mOUSECURSOR, false);
     TriggerAddEventMouseClicked(gt_CursorEnd, c_playerAny, gv_aBILITYCAMERA, false);
+}
+
+bool gt_LeftOrbitStart_Func (bool testConds, bool runActions) {
+    int lv_player;
+    int lv_dx;
+    int lv_dy;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_player = EventPlayer();
+    if (!gf_IsHeroPlayer(lv_player)) {
+        return true;
+    }
+    if (!gv_mOUSELEFT[lv_player] || gv_mOUSELEFTCANCEL[lv_player] || gv_lEFTORBIT[lv_player]) {
+        return true;
+    }
+    lv_dx = EventMouseMovedPosXUI() - gv_mOUSELEFTPRESSXUI[lv_player];
+    lv_dy = EventMouseMovedPosYUI() - gv_mOUSELEFTPRESSYUI[lv_player];
+    if ((lv_dx * lv_dx + lv_dy * lv_dy) > (c_SCOBA_LEFT_ORBIT_PIXELS * c_SCOBA_LEFT_ORBIT_PIXELS)) {
+        gv_lEFTORBIT[lv_player] = true;
+        gv_rOTATECAMERA[lv_player] = true;
+        gv_cONTROLRELATIVE[lv_player] = true;
+        CameraSetMouseRotates(lv_player, true);
+        CameraForceMouseRelative(lv_player, true);
+    }
+    return true;
+}
+
+void gt_LeftOrbitStart_Init () {
+    gt_LeftOrbitStart = TriggerCreate("gt_LeftOrbitStart_Func");
+    TriggerAddEventMouseMoved(gt_LeftOrbitStart, c_playerAny);
 }
 
 fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {

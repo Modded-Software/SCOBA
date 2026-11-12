@@ -164,14 +164,82 @@ void gt_AimInit_Init () {
     TriggerAddEventMapInit(gt_AimInit);
 }
 
+int gf_ReticleKindAt (int lp_player, point lp_point) {
+    unit lv_unit;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return 0;
+    }
+    lv_unit = gf_UnitTargetAtPoint(lp_player, lp_point, false);
+    if (!UnitIsValid(lv_unit)) {
+        return 0;
+    }
+    if (gf_IsClickEnemy(lp_player, lv_unit)) {
+        return 1;
+    }
+    if (UnitGetOwner(lv_unit) == lp_player) {
+        return 2;
+    }
+    return 0;
+}
+
+int gf_ReticleKind (int lp_player) {
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return 0;
+    }
+    return gf_ReticleKindAt(lp_player, CameraGetTarget(lp_player));
+}
+
+void gf_ReticleCreate (int lp_player) {
+    playergroup lv_group;
+
+    if (gv_reticleDialog[lp_player] != c_invalidDialogId) {
+        return;
+    }
+    lv_group = PlayerGroupSingle(lp_player);
+    DialogCreate(32, 32, c_anchorCenter, 0, 0, false);
+    gv_reticleDialog[lp_player] = DialogLastCreated();
+    libNtve_gf_CreateDialogItemImage(gv_reticleDialog[lp_player], 32, 32, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\storm_ui_cursor_default_base.dds", c_triggerImageTypeNormal, false, Color(255,255,255), c_triggerBlendModeNormal);
+    gv_reticleBase[lp_player] = DialogControlLastCreated();
+    libNtve_gf_CreateDialogItemImage(gv_reticleDialog[lp_player], 32, 32, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\storm_ui_cursor_default_enemy.dds", c_triggerImageTypeNormal, false, Color(255,255,255), c_triggerBlendModeNormal);
+    gv_reticleEnemy[lp_player] = DialogControlLastCreated();
+    libNtve_gf_CreateDialogItemImage(gv_reticleDialog[lp_player], 32, 32, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\storm_ui_cursor_default_friendly.dds", c_triggerImageTypeNormal, false, Color(255,255,255), c_triggerBlendModeNormal);
+    gv_reticleFriendly[lp_player] = DialogControlLastCreated();
+    DialogControlSetVisible(gv_reticleBase[lp_player], lv_group, true);
+    DialogControlSetVisible(gv_reticleEnemy[lp_player], lv_group, false);
+    DialogControlSetVisible(gv_reticleFriendly[lp_player], lv_group, false);
+    DialogSetVisible(gv_reticleDialog[lp_player], lv_group, false);
+}
+
 bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+    int lv_kind;
+    playergroup lv_group;
+    bool lv_visible;
+
     if (!runActions) {
         return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (!gf_IsHeroPlayer(lv_player)) {
+            continue;
+        }
+        gf_ReticleCreate(lv_player);
+        lv_group = PlayerGroupSingle(lv_player);
+        lv_visible = gf_ActionModeActive(lv_player) && !gv_aCTIONALT[lv_player];
+        DialogSetVisible(gv_reticleDialog[lv_player], lv_group, lv_visible);
+        if (!lv_visible) {
+            continue;
+        }
+        lv_kind = gf_ReticleKind(lv_player);
+        DialogControlSetVisible(gv_reticleBase[lv_player], lv_group, lv_kind == 0);
+        DialogControlSetVisible(gv_reticleEnemy[lv_player], lv_group, lv_kind == 1);
+        DialogControlSetVisible(gv_reticleFriendly[lv_player], lv_group, lv_kind == 2);
     }
     return true;
 }
 
 void gt_AimCursorTick_Init () {
     gt_AimCursorTick = TriggerCreate("gt_AimCursorTick_Func");
-    TriggerAddEventTimePeriodic(gt_AimCursorTick, 0.05, c_timeGame);
+    TriggerAddEventTimePeriodic(gt_AimCursorTick, 0.01, c_timeGame);
 }

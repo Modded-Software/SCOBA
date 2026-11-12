@@ -5,7 +5,7 @@ trigger gt_ControlsTest;
 void gf_ControlsTargetKey (string lp_section, string lp_tag) {
     unit lv_target;
 
-    lv_target = gv_tARGET[1];
+    lv_target = gv_unitTarget[1];
     if (gf_IsClickEnemy(1, lv_target)) {
         BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "TargetType", "hostile");
     }
@@ -121,20 +121,19 @@ bool gt_ControlsTest_Func (bool testConds, bool runActions) {
     Wait(0.5, c_timeGame);
 
     lv_enemy = gf_DbgSpawnOne("controls_rpg_select", 5.0, 500.0);
-    gf_ShowTarget(1, lv_enemy);
+    gf_UnitTargetSet(1, lv_enemy);
     Wait(0.1, c_timeGame);
     gf_ControlsSnap("controls_rpg_select", "t0100");
     UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
     Wait(0.3, c_timeGame);
     gf_ControlsSnap("controls_rpg_target_idle", "t0300");
 
-    gv_sCOBAPRESSUNIT[1] = lv_enemy;
     gv_mOUSERIGHTCANCEL[1] = false;
     lv_point = UnitGetPosition(gv_tPSUNIT[1]);
-    gf_RightClickExecute(1, lv_point, lv_enemy);
+    gf_RightClickExecute(1, lv_point, null);
     Wait(0.1, c_timeGame);
     gf_ControlsSnap("controls_rpg_stale", "t0100");
-    gf_ShowTarget(1, null);
+    gf_UnitTargetSet(1, null);
 
     gf_ControlsToggle(0);
     Wait(0.5, c_timeGame);
@@ -196,7 +195,7 @@ bool gt_ControlsTest_Func (bool testConds, bool runActions) {
 
     lv_enemy = gf_DbgSpawnOne("controls_attack", 0.0, 500.0);
     UnitSetPosition(lv_enemy, CameraGetTarget(1), false);
-    gf_ShowTarget(1, lv_enemy);
+    gf_UnitTargetSet(1, lv_enemy);
     gf_CombatManualAttack(1, lv_enemy);
     Wait(0.1, c_timeGame);
     gf_ControlsSnap("controls_attack", "t0100");

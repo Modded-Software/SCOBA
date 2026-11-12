@@ -59,8 +59,8 @@ Implementation lives in
 
 | ID | Requirement |
 | --- | --- |
-| R-MA-1 | A right-click on an enemy MUST select it, move the boss-bar target, and issue attack. |
-| R-MA-2 | Right targeting MUST use the hover unit saved at press time. |
+| R-MA-1 | A right-click on an enemy MUST target it, move the boss-bar target, and issue attack. Native unit selection MUST NOT change. |
+| R-MA-2 | Right targeting MUST use the native per-player `UnitClick` unit. |
 | R-MA-3 | A right drag MUST issue no attack order. |
 | R-MA-4 | A right click on ground MUST move in Walk and stop in Stand. |
 | R-MA-5 | Ground right clicks, idle, and Stop MUST keep the left-click target. |
@@ -163,8 +163,8 @@ Implementation lives in
 | AC-22 | Repeated Stand right clicks keep the hero in place. |
 | AC-23 | Stand after WASD release restores the root. |
 | AC-24 | Walk ground click moves and Stand ground click stops. |
-| AC-25 | Right targeting uses the press-time hover unit. |
-| AC-26 | Right click on an enemy selects and attacks it. |
+| AC-25 | Right targeting uses the shared click resolver. |
+| AC-26 | Right click on an enemy targets and attacks it. |
 | AC-27 | Right drag issues no attack. |
 | AC-28 | Ground right click, idle, and Stop keep the left-click target. |
 | AC-29 | RPG Walk move orders pass and Stand move orders are blocked. |

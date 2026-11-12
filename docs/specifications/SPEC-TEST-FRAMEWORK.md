@@ -439,9 +439,9 @@ Required sections:
 | `controls_rpg_hold` | RPG right hold does not aim |
 | `controls_rpg_click_move` | RPG Walk real right-click movement |
 | `controls_rpg_click_stop` | RPG Stand real right-click stop |
-| `controls_rpg_select` | Real left click selects an enemy |
+| `controls_rpg_select` | Real left click sets an enemy target and keeps the hero selected |
 | `controls_rpg_target_idle` | Target persists through idle and Stop |
-| `controls_rpg_stale` | Stale hover is rejected at a ground press point |
+| `controls_rpg_stale` | Outside-radius click is rejected at a ground press point |
 | `controls_aim_distance` | Action right hold keeps scroll distance |
 | `controls_move_tick` | Aim movement loop order and displacement bounds |
 | `controls_action_turn` | Action A/D/S turn toward movement |
@@ -481,7 +481,7 @@ Controls case flow:
 7. Save `controls_rpg_click_stop` after the RPG Stand ground click.
 8. Save `controls_rpg_select` after the real left click.
 9. Save `controls_rpg_target_idle` after idle and Stop.
-10. Save `controls_rpg_stale` after the stale hover ground press.
+10. Save `controls_rpg_stale` after the outside-radius ground press.
 11. Save `controls_rpg_stop_idle` after movement stops.
 12. Toggle to action mode and save `controls_action`.
 13. Move the mouse with no button held and save `controls_mouselook`.
@@ -502,8 +502,9 @@ The input hook drives RPG right hold, real clean clicks, real ground clicks,
 action mode mouse movement, forward movement, Alt, right hold, and click
 positions.
 The RPG input phase must finish before the action mode toggle.
-Each click uses the engine mouse-click world point and engine hover unit.
-The stale hover case keeps an enemy hover unit while the press point moves to
+Each RPG click uses the native per-player `UnitClick` unit.
+Action-mode clicks use `gf_UnitTargetAtPoint` at the camera target.
+The outside-radius case keeps an enemy hover while the press point moves to
 a ground point.
 The movement tick case samples hero position across two consecutive
 `gt_AimMoveTick` intervals.
@@ -1332,7 +1333,7 @@ Controls case flow:
 6. Set Stand and save `controls_rpg_click_stop`.
 7. Save `controls_rpg_select` after the real left click.
 8. Issue a Stop order and save `controls_rpg_target_idle`.
-9. Save `controls_rpg_stale` after the stale hover ground press.
+9. Save `controls_rpg_stale` after the outside-radius ground press.
 10. Move the hero, then Stop and save `controls_rpg_stop_idle`.
 11. Toggle to action mode and save `controls_action`.
 12. Change camera yaw and save `controls_mouselook`.

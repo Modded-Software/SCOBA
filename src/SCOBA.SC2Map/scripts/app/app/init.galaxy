@@ -54,6 +54,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             gf_AnimReset(lv_localPlayer);
             CameraApplyInfo(lv_localPlayer, CameraInfoDefault(), 1.0, 100.0, 0.0, true);
             CameraFollowUnitGroup(lv_localPlayer, UnitGroupSelected(lv_localPlayer), true, false);
+            gf_ControlApply(lv_localPlayer);
             CameraSetValue(lv_localPlayer, c_cameraValuePitch, 30.0, 1.0, -1, 10);
             CameraSetValue(lv_localPlayer, c_cameraValueFarClip, 500.0, 1.0, -1, 10);
             UnitBehaviorAddPlayer(gv_tPSUNIT[lv_localPlayer], "UnitDirectControl", lv_localPlayer, 1);

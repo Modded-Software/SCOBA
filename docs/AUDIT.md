@@ -53,21 +53,21 @@ Impact:
 - Initial selection behavior changed.
 - Possible interference with new selection polling.
 
-Status: open.
+Status: superseded by R-MC-128. Hero selection replaces the init deselect loop.
 
-### A03 - `UnitClearSelection` removed from `gf_ShowTarget`
+### A03 - `UnitClearSelection` removed from `gf_UnitTargetSet`
 
 Severity: **S2**  
 File: `src/SCOBA.SC2Map/scripts/combat.galaxy`
 
 Evidence:
-- Diff removes `UnitClearSelection(lp_player);` inside `gf_ShowTarget`.
+- Diff removes `UnitClearSelection(lp_player);` inside `gf_UnitTargetSet`.
 
 Impact:
 - Target hover/selection behavior changed.
 - Stale selections can persist.
 
-Status: open.
+Status: superseded by R-MC-134. `gf_UnitTargetSet` must not clear native selection or set `Selectable=false`. Order exit restores hero selection.
 
 ### A04 - `gt_DisableClickMove` disabled but left dead
 
@@ -95,11 +95,9 @@ Evidence:
 - Reselects heroes every 0.1s, skipping only order mode.
 
 Impact:
-- Fights manual selection.
-- Fights target ring and order UI.
-- Constant trigger churn.
+- Required hero selection persistence outside order mode.
 
-Status: open.
+Status: superseded by R-MC-128. Hero reselection outside order mode is required.
 
 ### A06 - Custom `CAbilBehavior` toggles with hidden buffs as state flags
 

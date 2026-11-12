@@ -45,8 +45,8 @@ Covers: A01, A02, A03, A04, A24, A25, A26, A27, A28, A29, A30, A31
 
 - [ ] R1.1 Restore CRLF endings on all originally-CRLF files.
 - [ ] R1.2 Reapply only intentional changes on top of restored endings.
-- [ ] R1.3 Restore deleted end-of-MapInit `UnitClearSelection` loop.
-- [ ] R1.4 Restore `UnitClearSelection` in `gf_ShowTarget` unless a documented replacement exists.
+- [ ] R1.3 Superseded by R-MC-128: hero selection replaces the init deselect loop.
+- [ ] R1.4 Do not restore. `gf_UnitTargetSet` must not clear native selection (R-MC-134).
 - [ ] R1.5 Decide `gt_DisableClickMove`: restore init or delete function and document why.
 - [ ] R1.6 Revert `scripts/expand_map.py` anchor to explicit stable anchor, or add an idempotent guard.
 - [ ] R1.7 Decide tracking policy for `tools/stormex`, `scripts/sc2res*`, `scripts/sc2-check-logs*`.
@@ -127,14 +127,14 @@ Exit:
 
 Covers: A05, A23
 
-- [ ] R5.1 Remove 0.1s hero reselection poll.
-- [ ] R5.2 Replace with selection event handling if needed.
-- [ ] R5.3 Confirm selection no longer fights target ring or order mode.
+- [ ] R5.1 Superseded by R-MC-128: keep hero reselection outside order mode.
+- [ ] R5.2 Superseded: selection stays target-only outside order mode.
+- [ ] R5.3 Confirm the hero selection poll does not fight target rings or order mode.
 - [ ] R5.4 Move Zergling test spawns to a dedicated test flag or remove.
 
 Exit:
-- Manual selection works.
-- No background selection churn.
+- Manual target selection works and the hero stays selected outside order mode.
+- No background selection churn outside order mode.
 
 ## Phase 6 - Verification
 

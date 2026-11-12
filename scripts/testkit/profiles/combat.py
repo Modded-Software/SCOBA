@@ -220,6 +220,11 @@ def check(ctx, data: dict, checks) -> None:
 
     checks.true("right_point", "", "pickValid")
 
+    checks.true("right_null_resolve", "t0100", "AttackOrder")
+    checks.true("right_null_resolve", "t0100", "TargetEnemy")
+    checks.true("left_null_resolve", "t0000", "TargetEnemy")
+    checks.false("left_stale_resolve", "", "pickValid")
+
     checks.true("right_ground_walk", "", "ran")
     checks.displacement("right_ground_walk", "t0000", "t1000")
 

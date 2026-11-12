@@ -1,5 +1,22 @@
 // Module: systems/selection
 
+void gf_EnableClickEventsUnit (unit lp_unit) {
+    int lv_player;
+    string lv_type;
+
+    if (!UnitIsValid(lp_unit)) {
+        return;
+    }
+    lv_type = UnitGetType(lp_unit);
+    if (!CatalogEntryIsValid(c_gameCatalogUnit, lv_type)) {
+        return;
+    }
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        CatalogFieldValueSet(c_gameCatalogUnit, lv_type, "FlagArray[Unclickable]", lv_player, "0");
+        CatalogFieldValueSet(c_gameCatalogUnit, lv_type, "FlagArray[Unhighlightable]", lv_player, "0");
+    }
+}
+
 bool gt_UnitSelection_Func (bool testConds, bool runActions) {
     // Actions
     if (!runActions) {
@@ -8,8 +25,9 @@ bool gt_UnitSelection_Func (bool testConds, bool runActions) {
 
     UnitGroupLoopBegin(UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0));
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        gf_EnableClickEventsUnit(UnitGroupLoopCurrent());
         UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-        UnitSetState(UnitGroupLoopCurrent(), c_unitStateSelectable, false);
+        UnitSetState(UnitGroupLoopCurrent(), c_unitStateSelectable, true);
     }
     UnitGroupLoopEnd();
     return true;
@@ -17,6 +35,7 @@ bool gt_UnitSelection_Func (bool testConds, bool runActions) {
 
 void gt_UnitSelection_Init () {
     gt_UnitSelection = TriggerCreate("gt_UnitSelection_Func");
+    TriggerAddEventMapInit(gt_UnitSelection);
     TriggerAddEventTimeElapsed(gt_UnitSelection, 1.0, c_timeGame);
 }
 
@@ -29,8 +48,9 @@ bool gt_NewUnitSelection_Func (bool testConds, bool runActions) {
     UnitGroupLoopBegin(UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0));
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
         if (true) {
+            gf_EnableClickEventsUnit(UnitGroupLoopCurrent());
             UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-            UnitSetState(UnitGroupLoopCurrent(), c_unitStateSelectable, false);
+            UnitSetState(UnitGroupLoopCurrent(), c_unitStateSelectable, true);
         }
 
     }
@@ -41,6 +61,37 @@ bool gt_NewUnitSelection_Func (bool testConds, bool runActions) {
 void gt_NewUnitSelection_Init () {
     gt_NewUnitSelection = TriggerCreate("gt_NewUnitSelection_Func");
     TriggerAddEventUnitCreated(gt_NewUnitSelection, null, null, null);
+}
+
+unit gf_HeroUnit (int lp_player) {
+    unit lv_hero;
+
+    if (lp_player == 1) {
+        lv_hero = UnitFromId(622754155);
+    }
+    else if (lp_player == 2) {
+        lv_hero = UnitFromId(649131550);
+    }
+    else {
+        lv_hero = gv_tPSUNIT[lp_player];
+    }
+    return lv_hero;
+}
+
+void gf_SelectHero (int lp_player) {
+    unit lv_hero;
+
+    if (gv_sCOBAOrderMode[lp_player] == true) {
+        return;
+    }
+    lv_hero = gf_HeroUnit(lp_player);
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    if (UnitGroupCount(UnitGroupSelected(lp_player), c_unitCountAlive) != 1 || !UnitIsSelected(lv_hero, lp_player)) {
+        UnitClearSelection(lp_player);
+        UnitSelect(lv_hero, lp_player, true);
+    }
 }
 
 bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
@@ -54,15 +105,7 @@ bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
         if (gv_sCOBAOrderMode[lv_player] == true) {
             continue;
         }
-        if (lv_player == 1) {
-            lv_hero = UnitFromId(622754155);
-        }
-        else if (lv_player == 2) {
-            lv_hero = UnitFromId(649131550);
-        }
-        else {
-            lv_hero = gv_tPSUNIT[lv_player];
-        }
+        lv_hero = gf_HeroUnit(lv_player);
         if (!UnitIsValid(lv_hero)) {
             continue;
         }
@@ -71,9 +114,7 @@ bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
             gf_AnimReset(lv_player);
         }
         UnitSetState(lv_hero, c_unitStateSelectable, true);
-        if (!UnitIsSelected(lv_hero, lv_player)) {
-            UnitSelect(lv_hero, lv_player, true);
-        }
+        gf_SelectHero(lv_player);
     }
     return true;
 }
@@ -81,4 +122,71 @@ bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
 void gt_KeepHeroSelected_Init () {
     gt_KeepHeroSelected = TriggerCreate("gt_KeepHeroSelected_Func");
     TriggerAddEventTimePeriodic(gt_KeepHeroSelected, 0.1, c_timeGame);
+}
+
+bool gf_HeroReselectEvent (int lp_player, bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return true;
+    }
+    if (gv_sCOBAOrderMode[lp_player] == true) {
+        return true;
+    }
+    if (EventUnit() == gf_HeroUnit(lp_player)) {
+        return true;
+    }
+    gf_SelectHero(lp_player);
+    return true;
+}
+
+bool gt_HeroReselect1_Func (bool testConds, bool runActions) {
+    return gf_HeroReselectEvent(1, testConds, runActions);
+}
+
+bool gt_HeroReselect2_Func (bool testConds, bool runActions) {
+    return gf_HeroReselectEvent(2, testConds, runActions);
+}
+
+bool gt_HeroReselect3_Func (bool testConds, bool runActions) {
+    return gf_HeroReselectEvent(3, testConds, runActions);
+}
+
+bool gt_HeroReselect4_Func (bool testConds, bool runActions) {
+    return gf_HeroReselectEvent(4, testConds, runActions);
+}
+
+bool gt_HeroReselect5_Func (bool testConds, bool runActions) {
+    return gf_HeroReselectEvent(5, testConds, runActions);
+}
+
+bool gt_HeroReselect6_Func (bool testConds, bool runActions) {
+    return gf_HeroReselectEvent(6, testConds, runActions);
+}
+
+void gt_HeroReselectOnSelect_Init () {
+    int lv_player;
+
+    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        if (lv_player == 1) {
+            gt_HeroReselectOnSelect[lv_player] = TriggerCreate("gt_HeroReselect1_Func");
+        }
+        else if (lv_player == 2) {
+            gt_HeroReselectOnSelect[lv_player] = TriggerCreate("gt_HeroReselect2_Func");
+        }
+        else if (lv_player == 3) {
+            gt_HeroReselectOnSelect[lv_player] = TriggerCreate("gt_HeroReselect3_Func");
+        }
+        else if (lv_player == 4) {
+            gt_HeroReselectOnSelect[lv_player] = TriggerCreate("gt_HeroReselect4_Func");
+        }
+        else if (lv_player == 5) {
+            gt_HeroReselectOnSelect[lv_player] = TriggerCreate("gt_HeroReselect5_Func");
+        }
+        else {
+            gt_HeroReselectOnSelect[lv_player] = TriggerCreate("gt_HeroReselect6_Func");
+        }
+        TriggerAddEventUnitSelected(gt_HeroReselectOnSelect[lv_player], null, lv_player, true);
+    }
 }

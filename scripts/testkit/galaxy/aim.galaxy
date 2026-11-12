@@ -6,7 +6,7 @@ void gf_AimTestSnap (string lp_section, string lp_tag, int lp_active) {
     unit lv_target;
 
     gf_DbgSnap(lp_section, lp_tag);
-    lv_target = gf_ResolvePointEnemy(1, CameraGetTarget(1));
+    lv_target = gf_UnitTargetAtPoint(1, CameraGetTarget(1), true);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AimActive", lp_active);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UpperState", gv_animUpperState[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LowerState", gv_animLowerState[1]);

@@ -8,10 +8,13 @@
         <PitchMax value="80.000000"/>
         <YawLeft value="0.000000"/>
         <YawRight value="0.000000"/>
-        <MaxScrollRate index="Follow" value="200.000000"/>
+        <MaxScrollRate index="Follow" value="0.000000"/>
         <ScrollAccelerationPeriod index="Follow" value="0.000000"/>
         <ScrollDecelerationPeriod index="Follow" value="0.000000"/>
-        <FollowScrollLimit value="1000.000000"/>
+        <FollowScrollLimit value="0.000000"/>
+        <BorderSizeX value="0"/>
+        <BorderSizeY value="0"/>
+        <MaxScrollDistance index="Follow" value="0.000000"/>
         <HeightDisplacementFactor value="0.000000"/>
         <HeightDisplacementPitchMin value="0.000000"/>
         <HeightDisplacementPitchMax value="0.000000"/>

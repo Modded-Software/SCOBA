@@ -26,13 +26,16 @@ Implementation lives in
 ## 2. Definitions
 
 - **Press point**: UI and world position at mouse button down.
-- **Drag**: cursor movement at or above the drag threshold during one hold.
+- **Drag**: camera yaw or pitch change at or above the drag threshold during one hold.
 - **Clean click**: a press and release with no drag.
 - **Right command**: the action run by a clean right click.
-- **Hover unit**: the unit highlighted at press time.
+- **Unit Highlight**: the engine hover unit and `PreSelection` ring under the cursor. It is informational only.
+- **Unit Target**: the RPG boss-bar target chosen by a clean left or right click. This is not engine selection.
+- **Unit Select**: native engine selection. Only the Order button changes it to a non-hero unit.
+- **Ability target**: engine ability target mode. It is separate from Unit Target.
 - **Both-button hold**: left and right buttons held together.
 - **Aim mode**: the state entered by a right hold in action mode.
-- **Aim cursor**: the native selection cursor pinned to screen center.
+- **Aim cursor**: the screen-center image overlay drawn with native cursor textures.
 - **RPG mode**: the default mode with right-click commands and no aim.
 - **Action mode**: mouse look stays active, right hold aims, left click attacks.
 - **Alt pause**: Alt held in action mode; mouse look pauses and the UI cursor moves freely.
@@ -47,7 +50,7 @@ Implementation lives in
 | R-MC-2 | In RPG mode, middle hold MUST turn camera and character. |
 | R-MC-3 | Right and middle hold MUST behave the same in RPG mode. |
 | R-MC-4 | A left press MUST orbit the camera without turning the character. |
-| R-MC-5 | Releasing the last turn button MUST stop rotation and restore camera lock and cursor visibility. |
+| R-MC-5 | Releasing the last turn button MUST stop rotation and restore free cursor visibility. It MUST NOT enable camera input lock. |
 | R-MC-6 | Camera turn MUST work in normal and order modes. |
 
 ### 3.2 Click versus drag
@@ -55,23 +58,23 @@ Implementation lives in
 | ID | Requirement |
 | --- | --- |
 | R-MC-7 | A right drag MUST run no right command. |
-| R-MC-8 | A left drag MUST select no target. |
-| R-MC-9 | Left selection MUST run on clean release. |
+| R-MC-8 | A left drag MUST set no target. |
+| R-MC-9 | Left target selection MUST run on clean release. It MUST NOT change native unit selection. |
 | R-MC-10 | RPG right clean click MUST run the right command on release. |
-| R-MC-11 | Drag detection MUST use press and release UI distance. |
-| R-MC-12 | Mouse-relative mode MUST pin the real cursor to screen center. |
-| R-MC-13 | The cursor MUST stay hidden outside aim and action mode. |
-| R-MC-14 | Aim mode MUST show the native cursor at screen center. |
+| R-MC-11 | Drag detection MUST use camera yaw or pitch change from press to release. It MUST NOT use release UI distance. |
+| R-MC-12 | Mouse-relative mode MUST hide the free cursor and show the screen-center reticle. |
+| R-MC-13 | The reticle MUST be hidden outside aim and action mode. |
+| R-MC-14 | Aim mode MUST show the screen-center reticle using native cursor textures. |
 | R-MC-15 | A both-button hold MUST cancel a pending right command. |
 
 ### 3.3 Right command
 
 | ID | Requirement |
 | --- | --- |
-| R-MC-16 | Right targeting MUST use a hover unit saved at press time when the press point is inside its radius. |
-| R-MC-17 | A stale hover unit outside the press-point radius MUST be rejected. |
-| R-MC-18 | The hover unit MUST be alive and hostile to the hero player. |
-| R-MC-19 | A right click on an enemy MUST select it and issue a manual attack. |
+| R-MC-16 | Every RPG Unit Target MUST come from the click under the cursor for the clicking player, using `UnitClick` first, then press-time Unit Highlight, then press-point geometry. |
+| R-MC-17 | `UnitClick` and Unit Highlight events MUST be registered per player. `EventPlayer` MUST NOT be used to infer the clicking player. |
+| R-MC-18 | Right targeting MUST accept only alive hostile units. |
+| R-MC-19 | A right click on an enemy MUST target it and issue a manual attack. It MUST NOT change native unit selection. |
 | R-MC-20 | A right click on an enemy MUST move the boss-bar target. |
 | R-MC-21 | A right click on ground in Walk MUST issue Move. |
 | R-MC-22 | A right click on ground in RPG Stand MUST issue Stop and keep the root. |
@@ -80,8 +83,8 @@ Implementation lives in
 | R-MC-25 | Order mode MUST use the same right target resolver as normal mode. |
 | R-MC-26 | A Walk ground right click MUST show the built-in move target effect at the press point. |
 | R-MC-27 | The move target effect MUST use the player race model. |
-| R-MC-28 | The selected left-click target MAY be used when the press point is inside its radius. |
-| R-MC-29 | Point picking MUST use unit radius when the hover unit is absent or outside the press-point radius. |
+| R-MC-28 | RPG Unit Target clicks MUST prefer the engine `UnitClick` unit, then the press-time highlighted unit, then press-point geometry. |
+| R-MC-29 | Action-mode attacks MAY use `gf_UnitTargetAtPoint`; RPG left, right, and order clicks MUST use the same Unit Target candidate order. |
 
 ### 3.4 Both-button movement
 
@@ -92,7 +95,7 @@ Implementation lives in
 | R-MC-32 | Both-button Move Forward MUST steer by camera yaw while a turn button is held. |
 | R-MC-33 | Releasing either button MUST end both-button Move Forward. |
 | R-MC-34 | Independent W press and release MUST NOT change both-button Move Forward. |
-| R-MC-35 | Both-button Move Forward MUST NOT select a target. |
+| R-MC-35 | Both-button Move Forward MUST NOT set a target. |
 
 ### 3.5 Engine smart click
 
@@ -101,7 +104,30 @@ Implementation lives in
 | R-MC-36 | Engine smart click MUST be disabled for all players. |
 | R-MC-37 | Right commands MUST be the only source of right-click orders. |
 | R-MC-38 | Ability target mode MUST stay engine handled. |
-| R-MC-39 | Left selection MUST use the hover unit first and the press world point second. |
+| R-MC-39 | RPG left, right, and order clicks MUST use the same Unit Target candidate order for the clicking player. |
+
+### 3.5.1 Selection and order button
+
+| ID | Requirement |
+| --- | --- |
+| R-MC-125 | Every unit and building MUST remain native selectable so the engine can draw the custom `PreSelection` hover ring. |
+| R-MC-126 | A left click on a unit or building MUST set the left-click target and MUST NOT change native unit selection. |
+| R-MC-127 | A left click on ground MUST clear the left-click target only. It MUST NOT change native unit selection. |
+| R-MC-128 | The hero MUST remain natively selected outside order mode. |
+| R-MC-129 | Ctrl+C MUST cancel order mode when active. It MUST NOT clear native selection. |
+| R-MC-130 | The Order button MUST be visible when the left-click target is valid and owned by the player. |
+| R-MC-131 | The Order button MUST be the only action that changes native selection to a non-hero unit. |
+| R-MC-132 | Order entry MUST clear native selection, select the order unit, and enter order mode. |
+| R-MC-133 | Order exit or cancel MUST clear the order-unit selection and restore hero selection. |
+| R-MC-134 | Target changes and order exit MUST NOT set any unit `Selectable=false`. |
+| R-MC-135 | Unit Highlight MUST drive hover rings and may provide the press-time Unit Target candidate. Ability targeting is never derived from it. |
+| R-MC-136 | Map camera data MUST set `BorderSizeX=0`, `BorderSizeY=0`, `MaxScrollRate Follow=0`, `MaxScrollDistance Follow=0`, and `FollowScrollLimit=0` on `CCamera id="Dflt"`. Screen-edge scrolling MUST NOT move the camera. |
+| R-MC-137 | Order-mode right click MUST attack a resolved enemy or move the order unit. It MUST keep order mode active. |
+| R-MC-138 | Every unit type on the map MUST clear `FlagArray[Unclickable]` and `FlagArray[Unhighlightable]` at map init and on creation. |
+| R-MC-139 | `UnitClick` and Unit Highlight MUST be registered separately for each hero player; each callback MUST hard-code its clicking player. |
+| R-MC-140 | A new press MUST clear the old Unit Target candidate. A clean release MUST consume and clear the candidate so later ground clicks cannot reuse it. |
+| R-MC-141 | The click handler MUST immediately reselect the hero outside order mode. The hero reselect MUST NOT wait for the 0.1 s poll. |
+| R-MC-142 | Native unit selection flash from a click MUST last at most the current event tick. |
 
 ### 3.6 Combat state
 
@@ -120,7 +146,7 @@ Implementation lives in
 | R-MC-45 | Aim mode MUST use the splitbody weapon-ready animation group. |
 | R-MC-46 | Aim mode MUST use an over-the-shoulder camera with a lateral focus offset. |
 | R-MC-47 | Aim mode MUST narrow the field of view once on entry. |
-| R-MC-48 | Aim mode MUST show the native cursor at screen center with engine hover colors. |
+| R-MC-48 | Aim mode MUST show the screen-center reticle with native cursor textures and hostile/friendly/neutral color. |
 | R-MC-49 | Right release MUST exit aim mode. |
 | R-MC-50 | Aim exit MUST restore idle animation, centered follow camera, and field of view. |
 | R-MC-51 | Aim mode MUST keep the scroll camera distance. |
@@ -152,14 +178,14 @@ Implementation lives in
 | R-MC-68 | The toggle MUST work for every hero. |
 | R-MC-69 | Control mode changes MUST leave combat state and cooldown unchanged. |
 | R-MC-70 | Action mode MUST keep mouse look active without a held button. |
-| R-MC-71 | Action mode MUST keep the native cursor at screen center. |
+| R-MC-71 | Action mode MUST keep the screen-center reticle visible. |
 | R-MC-72 | Action mode MUST turn hero facing from camera yaw when not moving and not aiming. |
 | R-MC-73 | Alt MUST pause mouse look, pause character turn, and show a free UI cursor. |
 | R-MC-74 | Alt release MUST restore mouse look and the centered cursor. |
 | R-MC-75 | A right hold in action mode MUST enter aim mode. |
 | R-MC-76 | A right release in action mode MUST exit aim mode. |
 | R-MC-77 | A right click in action mode MUST run no right command. |
-| R-MC-78 | A left click in action mode MUST select and attack a hostile unit under the cursor. |
+| R-MC-78 | A left click in action mode MUST target and attack a hostile unit under the cursor. |
 | R-MC-79 | A left click on ground in action mode MUST issue no Move or Stop. |
 | R-MC-80 | Any click while Alt is held MUST interact with the UI and run no game order. |
 | R-MC-81 | RPG return MUST restore RPG mouse, cursor, right-click behavior, field of view, and centered follow. |
@@ -190,7 +216,7 @@ Implementation lives in
 | R-MC-111 | Camera collision MUST apply the safety clamp on every tick, including while pitch or yaw is changing. |
 | R-MC-112 | Scroll input MUST animate the distance change with `c_SCOBA_ZOOM_BLEND`. It MUST NOT install a zero-duration distance change. |
 | R-MC-113 | Camera collision MUST check terrain height along the sweep. |
-| R-MC-114 | `gf_ControlApply` MUST be the only writer of camera mouse-rotate, mouse-relative, camera input lock, and cursor visibility state. |
+| R-MC-114 | `gf_ControlApply` MUST be the only writer of camera mouse-rotate, mouse-relative, and cursor visibility state. It MUST NOT enable camera input lock in RPG idle. |
 | R-MC-115 | Mouse press/release handlers MUST own held button state. Targeting MUST read that state and MUST NOT write it. |
 | R-MC-116 | Control state MUST derive from control mode, aim state, Alt state, and held buttons. It MUST NOT depend on trigger execution order. |
 | R-MC-117 | Releasing a mouse button MUST restore RPG cursor mode even when targeting release is skipped or reordered. |
@@ -198,6 +224,9 @@ Implementation lives in
 | R-MC-119 | RPG hover MUST be set from the engine `UnitHighlight` event and cleared when that unit is no longer highlighted. |
 | R-MC-120 | RPG click points MUST come from the engine `EventMouseClickedPosXWorld` and `EventMouseClickedPosYWorld` values. |
 | R-MC-121 | Aim mode camera origin MUST translate slightly left of the hero, using `c_SCOBA_AIM_SHOULDER_ANGLE`. It MUST NOT rotate the camera away from hero heading and MUST NOT sit directly behind the hero. |
+| R-MC-122 | The reticle MUST use `storm_ui_cursor_default_base.dds`, `storm_ui_cursor_default_enemy.dds`, and `storm_ui_cursor_default_friendly.dds`. |
+| R-MC-123 | The reticle MUST resolve at `CameraGetTarget` every 0.01 s and show enemy, friendly, or neutral art. |
+| R-MC-124 | The reticle MUST hide in RPG mode and while Alt shows the free UI cursor. |
 | R-MC-99 | Normal action movement MUST NOT use lateral strafe behavior. |
 
 ## 4. Acceptance criteria
@@ -208,14 +237,14 @@ Implementation lives in
 | AC-MC-2 | Middle hold behaves like right hold. |
 | AC-MC-3 | RPG right clean click runs one right command. |
 | AC-MC-4 | Right drag runs no right command. |
-| AC-MC-5 | Left drag selects no target. |
-| AC-MC-6 | Right click on an enemy selects and attacks it. |
+| AC-MC-5 | Left drag sets no target. |
+| AC-MC-6 | Right click on an enemy targets and attacks it. |
 | AC-MC-7 | Walk ground right click issues Move and shows the move target effect. |
 | AC-MC-8 | Stand ground right click issues Stop and keeps the root. |
 | AC-MC-9 | Both-button hold starts Move Forward and releasing either button stops it. |
 | AC-MC-10 | Independent W press and release do not change both-button Move Forward. |
 | AC-MC-11 | Engine smart click is disabled at map init. |
-| AC-MC-12 | Aim entry uses the weapon-ready pose, shoulder camera, narrower field of view, and centered native cursor. |
+| AC-MC-12 | Aim entry uses the weapon-ready pose, shoulder camera, narrower field of view, and centered reticle. |
 | AC-MC-13 | Aim exit restores idle, follow camera, field of view, and scroll distance. |
 | AC-MC-14 | Aim drag exits aim and runs no right command. |
 | AC-MC-15 | Aim does not change combat state. |
@@ -240,13 +269,13 @@ Implementation lives in
 | AC-MC-33 | RPG right hold does not enter aim. |
 | AC-MC-34 | RPG and action mode show different icons. |
 | AC-MC-35 | A left-click target survives idle, Stop, and move completion. |
-| AC-MC-36 | A stale hover unit does not hijack a ground click. |
-| AC-MC-37 | RPG left and right click selection works after a fresh launch. |
-| AC-MC-38 | A right-click release restores cursor mode and hover selection. |
+| AC-MC-36 | A click outside the unit radius does not target that unit. |
+| AC-MC-37 | RPG left and right click target resolution works after a fresh launch. |
+| AC-MC-38 | A right-click release restores cursor mode and hover state. |
 | AC-MC-39 | Control mode, Alt, and aim transitions leave one consistent cursor state. |
 | AC-MC-40 | Held button state is released even when targeting release runs late. |
-| AC-MC-58 | RPG hover follows the engine `UnitHighlight` event. |
-| AC-MC-59 | RPG clicks resolve from engine mouse-click world coordinates. |
+| AC-MC-58 | RPG hover follows the engine `UnitHighlight` event and shows the `PreSelection` ring. |
+| AC-MC-59 | RPG clicks resolve a Unit Target for the clicking player from `UnitClick`, press-time Unit Highlight, or press-point geometry. |
 | AC-MC-60 | Scroll zoom and collision distance changes animate instead of snapping. |
 | AC-MC-61 | Aim camera origin is translated slightly left of the hero without rotating the camera. |
 | AC-MC-52 | Ground right clicks do not clear the left-click target. |
@@ -265,6 +294,17 @@ Implementation lives in
 | AC-MC-50 | Aim facing follows camera rotation without perceptible lag. |
 | AC-MC-51 | Aim adds and removes `SCOBAAimNoTurn` without changing `Turnable` or turning rates. |
 | AC-MC-50 | Aim attack animation is not implemented in this stage. |
+| AC-MC-66 | All units and buildings remain selectable and show the `PreSelection` hover ring. |
+| AC-MC-67 | Left clicking a unit or building sets the target without changing native selection. |
+| AC-MC-68 | Left clicking ground clears the target and leaves the hero selected. |
+| AC-MC-69 | The Order button appears for an owned target and is hidden for hostiles and neutral units. |
+| AC-MC-70 | Pressing Order selects the order unit; exit or cancel restores hero selection. |
+| AC-MC-71 | Order-mode right click attacks or moves the order unit and keeps order mode active. |
+| AC-MC-72 | Target changes and order exit do not set `Selectable=false`. |
+| AC-MC-73 | Moving the cursor to a screen edge does not move the camera. |
+| AC-MC-74 | A ground click after a unit click clears the target and does not reuse the old unit. |
+| AC-MC-75 | A left click on an enemy, neutral, owned unit, or building does not leave that unit natively selected past the event tick. |
+| AC-MC-76 | Right-click attack works on enemies owned by players other than the clicking player. |
 
 ## 5. Non-functional requirements
 

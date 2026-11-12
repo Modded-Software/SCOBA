@@ -114,7 +114,7 @@ Implementation lives in
 | R-TF-37 | The aim profile MUST cover aim entry, rest, movement, enemy crosshair, fixed pose, facing, and release. |
 | R-TF-38 | The aim profile MUST cover splitbody aim hold, eight lower directions, backpedal, and generated model checks. |
 | R-TF-39 | The controls profile MUST cover RPG mode, control toggle, action mouse look, aim, attack, clicks, Alt, facing, and movement. |
-| R-TF-40 | The controls profile MUST cover target persistence, stale hover, aim distance, movement bounds, and animation reset. |
+| R-TF-40 | The controls profile MUST cover target persistence, click radius, aim distance, movement bounds, and animation reset. |
 | R-TF-41 | The controls profile MUST cover RPG Stand and Walk ground clicks. |
 | R-TF-42 | The aim profile MUST prove the upper aim pose does not loop and lower frame IDs advance in all eight directions. |
 | R-TF-43 | The motion profile MUST prove aim movement has no stop and go bursts. |
@@ -138,7 +138,16 @@ Implementation lives in
 | R-TF-78 | The pitch profile MUST prove camera pitch sends are paced by camera moves and reasserts. |
 | R-TF-79 | Tests MUST cover camera collision distance clamping and restoration. |
 | R-TF-80 | Tests MUST cover derived control/cursor state after real RPG clicks, action mode, Alt, and aim transitions. |
-| R-TF-81 | Tests MUST use engine `UnitHighlight` and engine mouse-click world coordinates as the RPG hover and click inputs. |
+| R-TF-81 | Tests MUST use engine `UnitHighlight` for RPG hover and native per-player `UnitClick` for RPG click targets. |
+| R-TF-82 | Tests MUST cover per-player `UnitClick` for left, right, and order clicks, and `gf_UnitTargetAtPoint` for action clicks. |
+| R-TF-83 | Manual play MUST verify real left and right click behavior, target selection, hover rings, and Order button behavior. |
+| R-TF-84 | Tests MUST capture the screen-center reticle in action mode. |
+| R-TF-85 | Tests MUST prove left click sets the target without changing native unit selection. |
+| R-TF-86 | Tests MUST prove all units and buildings stay selectable and expose the `PreSelection` hover ring. |
+| R-TF-87 | Tests MUST prove the Order button is visible only for an owned target and is the only path that selects a non-hero unit. |
+| R-TF-88 | Tests MUST prove order exit or cancel restores hero selection. |
+| R-TF-89 | Tests MUST prove drag detection uses camera yaw or pitch change, not release UI distance. |
+| R-TF-90 | Manual play MUST verify screen-edge mouse movement does not move the camera. |
 
 ### 3.9 Command line
 
@@ -208,7 +217,7 @@ Implementation lives in
 | AC-TF-10 | Aim animation, facing, and release cases report pass or fail. |
 | AC-TF-11 | Generated model and model data checks report pass or fail. |
 | AC-TF-12 | Controls mode, cursor, aim, attack, click, Alt, facing, and movement cases report pass or fail. |
-| AC-TF-13 | Target persistence, stale hover, aim distance, movement bounds, and animation reset cases report pass or fail. |
+| AC-TF-13 | Target persistence, click radius, aim distance, movement bounds, and animation reset cases report pass or fail. |
 | AC-TF-14 | RPG Stand and Walk ground click cases report pass or fail. |
 | AC-TF-15 | Frame probe rows report model frame values for any model. |
 | AC-TF-16 | Idle, turn, and walk runs report one baseline loop without model frame gaps. |
@@ -216,3 +225,5 @@ Implementation lives in
 | AC-TF-18 | Attachment and clip metrics dump tools report model data. |
 | AC-TF-19 | A profile run after a source change uses the freshly built map. |
 | AC-TF-20 | A direct wrapper call rebuilds fresh through `scripts/playtest.sh`. |
+| AC-TF-21 | Target clicks, hover rings, and Order button cases report pass or fail. |
+| AC-TF-22 | Hero selection persistence and order-unit selection cases report pass or fail. |

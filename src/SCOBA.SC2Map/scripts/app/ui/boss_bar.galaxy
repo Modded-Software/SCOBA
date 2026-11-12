@@ -48,7 +48,7 @@ void gf_BossBarUpdate (int lp_player) {
     if (gv_sCOBABB_Panel == c_invalidDialogControlId) {
         return;
     }
-    lv_unit = gv_tARGET[lp_player];
+    lv_unit = gv_unitTarget[lp_player];
     if (!UnitIsValid(lv_unit)) {
         return;
     }

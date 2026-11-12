@@ -76,7 +76,7 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
 
     gf_DbgReset("right_click", false, true);
     gf_DbgSpawnOne("right_click", 3.0, 500.0);
-    gv_sCOBAHover[1] = gv_dbgEnemy;
+    gv_unitHighlight[1] = gv_dbgEnemy;
     gf_MousePressRight(1, 100, 100, PointGetX(UnitGetPosition(gv_dbgEnemy)), PointGetY(UnitGetPosition(gv_dbgEnemy)));
     BankValueSetFromFlag(gv_dbgBank, "right_click", "ran", gf_MouseReleaseRight(1, 100, 100));
     BankSave(gv_dbgBank);
@@ -85,7 +85,7 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
 
     gf_DbgReset("right_drag", false, true);
     gf_DbgSpawnOne("right_drag", 3.0, 500.0);
-    gv_sCOBAHover[1] = gv_dbgEnemy;
+    gv_unitHighlight[1] = gv_dbgEnemy;
     gf_MousePressRight(1, 100, 100, PointGetX(UnitGetPosition(gv_dbgEnemy)), PointGetY(UnitGetPosition(gv_dbgEnemy)));
     BankValueSetFromFlag(gv_dbgBank, "right_drag", "ran", gf_MouseReleaseRight(1, 110, 100));
     BankSave(gv_dbgBank);
@@ -95,7 +95,24 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
 
     gf_DbgReset("right_point", false, false);
     gf_DbgSpawnOne("right_point", 3.0, 500.0);
-    BankValueSetFromFlag(gv_dbgBank, "right_point", "pickValid", UnitIsValid(gf_ResolveClickEnemy(1, UnitGetPosition(gv_dbgEnemy))));
+    BankValueSetFromFlag(gv_dbgBank, "right_point", "pickValid", UnitIsValid(gf_UnitTargetAtPoint(1, UnitGetPosition(gv_dbgEnemy), true)));
+    BankSave(gv_dbgBank);
+
+    gf_DbgReset("right_null_resolve", false, false);
+    gf_DbgSpawnOne("right_null_resolve", 3.0, 500.0);
+    gv_unitHighlight[1] = null;
+    gf_RightClickExecute(1, UnitGetPosition(gv_dbgEnemy), null);
+    Wait(0.1, c_timeGame);
+    gf_DbgSnap("right_null_resolve", "t0100");
+
+    gf_DbgReset("left_null_resolve", false, false);
+    gf_DbgSpawnOne("left_null_resolve", 3.0, 500.0);
+    gf_UnitTargetSet(1, gf_UnitTargetAtPoint(1, UnitGetPosition(gv_dbgEnemy), false));
+    gf_DbgSnap("left_null_resolve", "t0000");
+
+    gf_DbgReset("left_stale_resolve", false, false);
+    gf_DbgSpawnOne("left_stale_resolve", 3.0, 500.0);
+    BankValueSetFromFlag(gv_dbgBank, "left_stale_resolve", "pickValid", UnitIsValid(gf_UnitTargetAtPoint(1, PointWithOffset(gv_dbgAnchor, 20.0, 0.0), false)));
     BankSave(gv_dbgBank);
 
     gf_DbgReset("right_ground_walk", false, false);
@@ -116,8 +133,8 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
 
     gf_DbgReset("right_target_kept", false, false);
     gf_DbgSpawnOne("right_target_kept", 3.0, 500.0);
-    gf_ShowTarget(1, gv_dbgEnemy);
-    gv_sCOBAHover[1] = null;
+    gf_UnitTargetSet(1, gv_dbgEnemy);
+    gv_unitHighlight[1] = null;
     gf_MousePressRight(1, 100, 100, PointGetX(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), PointGetY(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)));
     gf_MouseReleaseRight(1, 100, 100);
     Wait(0.2, c_timeGame);

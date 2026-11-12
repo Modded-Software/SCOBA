@@ -110,7 +110,7 @@ core -> systems -> ui -> app -> main
 
 - `gs_UnitButtonRecord`, `gs_AbilitiesButtonRecord`: `core/types.galaxy`
 - `gv_c*`, `gv_singleButtonConstant*`, `gv_abilities*Constant*`: `core/constants.galaxy`
-- `gv_tPSUNIT`, `gv_tARGET`, `gv_xP`, `gv_lEVEL`, `gv_sTATLEVEL`, `gv_sPAWN*`, dialog handles: `core/globals.galaxy`
+- `gv_tPSUNIT`, `gv_unitTarget`, `gv_xP`, `gv_lEVEL`, `gv_sTATLEVEL`, `gv_sPAWN*`, dialog handles: `core/globals.galaxy`
 - `InitGlobals`: `core/config.galaxy`
 - `InitLibs`: `app/init.galaxy`
 
@@ -128,12 +128,12 @@ core -> systems -> ui -> app -> main
 ### systems
 
 - `gt_UnitSelection*`, `gt_NewUnitSelection*`, `gt_KeepHeroSelected*`: `systems/selection.galaxy`
-- `gt_ShowStatusBar*`, `gt_HideStatusBar*`: `systems/status_bar.galaxy`
+- `gt_UnitHighlightOn*`, `gt_UnitHighlightOff*`: `systems/status_bar.galaxy`
 - `gt_CameraFollowDistance*`, `gt_Jump*`, `gt_Zoom*`, `gt_Cursor*`, `gt_X*UnitOrders*`: `systems/camera.galaxy`
 - `gt_Forward*`, `gt_Backward*`, `gt_Left*`, `gt_Right*`, `gt_DisableClickMove*`: `systems/movement.galaxy`
 - `gt_OrderKey*`, `gt_OrderButton*`, `gt_OrderCancel*`: `systems/input.galaxy`
 - `gf_OrderCreate`, `gf_OrderEnter`, `gf_OrderExit`, `gf_OrderToggle`, `gf_OrderExecute`, `gf_HeroPlayerFromUnit`: `systems/orders.galaxy`
-- `gt_Target*`, `gt_ClearTarget*`, `gf_ShowTarget`, `gt_TargetRing*`, `gt_TargetClick*`: `systems/targeting.galaxy`
+- `gt_Target*`, `gt_ClearTarget*`, `gf_UnitTargetSet`, `gt_TargetRing*`, `gt_TargetClick*`: `systems/targeting.galaxy`
 - `gt_ToggleCommands_Init`, `gt_AutoOnCmd*`, `gt_AutoOffCmd*`, `gt_StandCmd*`, `gt_WalkCmd*`, `gt_AttackEvent*`: `systems/combat_attack.galaxy`
 - `gf_HeroWeaponIndex`, `gt_AttackCooldown*`, `gt_CooldownSync*`: `systems/combat_cooldown.galaxy`
 - `gf_MovementKeyHeld`, `gt_AutoAttackTick*`, `gt_CombatTick*`: `systems/combat_tick.galaxy`

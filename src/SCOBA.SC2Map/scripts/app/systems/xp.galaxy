@@ -240,8 +240,8 @@ bool gt_DeathAward_Func (bool testConds, bool runActions) {
     gf_ClearDamageRecord(lv_tag);
 
     for (lv_player = 1; lv_player <= 6; lv_player += 1) {
-        if (UnitIsValid(gv_tARGET[lv_player]) && (gv_tARGET[lv_player] == lv_victim)) {
-            gf_ShowTarget(lv_player, null);
+        if (UnitIsValid(gv_unitTarget[lv_player]) && (gv_unitTarget[lv_player] == lv_victim)) {
+            gf_UnitTargetSet(lv_player, null);
         }
     }
     return true;

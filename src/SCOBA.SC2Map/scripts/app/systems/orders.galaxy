@@ -14,7 +14,7 @@ void gf_OrderCreate () {
 void gf_OrderEnter (int lp_player) {
     unit lv_unit;
 
-    lv_unit = gv_tARGET[lp_player];
+    lv_unit = gv_unitTarget[lp_player];
     if (!UnitIsValid(lv_unit)) {
         return;
     }
@@ -42,9 +42,6 @@ void gf_OrderExit (int lp_player) {
     gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
     libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, false, PlayerGroupSingle(lp_player));
     UnitClearSelection(lp_player);
-    if (UnitIsValid(gv_tARGET[lp_player])) {
-        UnitSetState(gv_tARGET[lp_player], c_unitStateSelectable, false);
-    }
 }
 
 void gf_OrderToggle (int lp_player) {
@@ -59,18 +56,16 @@ void gf_OrderToggle (int lp_player) {
     }
 }
 
-void gf_OrderExecute (int lp_player, fixed lp_x, fixed lp_y) {
+void gf_OrderExecute (int lp_player, fixed lp_x, fixed lp_y, unit lp_pressUnit) {
     unit lv_unit;
-    unit lv_hover;
 
     lv_unit = gv_sCOBAOrderUnit[lp_player];
     if (!UnitIsValid(lv_unit)) {
         gf_OrderExit(lp_player);
         return;
     }
-    lv_hover = gf_ResolveClickEnemy(lp_player, Point(lp_x, lp_y));
-    if (UnitIsValid(lv_hover)) {
-        UnitIssueOrder(lv_unit, OrderTargetingUnit(AbilityCommand("attack", 0), lv_hover), c_orderQueueReplace);
+    if (gf_UnitTargetValid(lp_player, lp_pressUnit, true)) {
+        UnitIssueOrder(lv_unit, OrderTargetingUnit(AbilityCommand("attack", 0), lp_pressUnit), c_orderQueueReplace);
     }
     else {
         UnitIssueOrder(lv_unit, OrderTargetingPoint(AbilityCommand("move", 0), Point(lp_x, lp_y)), c_orderQueueReplace);
