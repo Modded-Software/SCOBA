@@ -8,7 +8,6 @@ bool gt_ShowStatusBar_Func (bool testConds, bool runActions) {
 
     UnitStatusBarOverride(EventUnit(), c_unitStatusGroupAll);
     gv_sCOBAHover[EventPlayer()] = EventUnit();
-    gf_DbgInputLog("hover", UnitGetType(EventUnit()));
     return true;
 }
 
@@ -26,7 +25,6 @@ bool gt_HideStatusBar_Func (bool testConds, bool runActions) {
     UnitStatusBarOverride(EventUnit(), -1);
     if (gv_sCOBAHover[EventPlayer()] == EventUnit()) {
         gv_sCOBAHover[EventPlayer()] = null;
-        gf_DbgInputLog("hover", "none");
     }
     return true;
 }

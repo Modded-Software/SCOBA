@@ -129,16 +129,33 @@ void gf_AnimConfigAimWalk (int lp_profile, int lp_state) {
     gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_RIGHT, "Attack,Walk,Right");
     gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_FORWARD_RIGHT, "Attack,Walk,Forward,Right");
 }
+void gf_AnimAimTimeScale (int lp_player, fixed lp_scale) {
+    unit lv_hero;
+    actor lv_actor;
+    string lv_msg;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_actor = ActorFromActor(libNtve_gf_MainActorofUnit(lv_hero), "Model");
+    lv_msg = "AnimSetTimeScale " + c_ANIM_BRACKET_UPPER + " 1.000000";
+    if (lp_scale <= 0.0) {
+        lv_msg = "AnimSetTimeScale " + c_ANIM_BRACKET_UPPER + " 0.000000";
+    }
+    ActorSend(lv_actor, lv_msg);
+}
+
 void gf_AnimAimPitchTick (int lp_player) {
     unit lv_hero;
     actor lv_actor;
     fixed lv_pitch;
     fixed lv_time;
     fixed lv_camera;
-    int lv_now;
-    fixed lv_advance;
-    fixed lv_set;
 
+    if (!gv_aIMACTIVE[lp_player]) {
+        return;
+    }
     if (!gv_animAimUpperOn[lp_player]) {
         return;
     }
@@ -152,41 +169,24 @@ void gf_AnimAimPitchTick (int lp_player) {
         lv_camera = lv_camera - 360.0;
     }
     lv_pitch = gv_animAimPitchRest[lp_player] - lv_camera;
-    if (lv_pitch > c_ANIM_AIM_PITCH_LIMIT) {
-        lv_pitch = c_ANIM_AIM_PITCH_LIMIT;
+    if (lv_pitch > c_ANIM_AIM_PITCH_MAX) {
+        lv_pitch = c_ANIM_AIM_PITCH_MAX;
     }
-    if (lv_pitch < -c_ANIM_AIM_PITCH_LIMIT) {
-        lv_pitch = -c_ANIM_AIM_PITCH_LIMIT;
+    if (lv_pitch < c_ANIM_AIM_PITCH_MIN) {
+        lv_pitch = c_ANIM_AIM_PITCH_MIN;
     }
-    lv_time = ((lv_pitch + c_ANIM_AIM_PITCH_LIMIT) / (c_ANIM_AIM_PITCH_LIMIT * 2.0)) * c_ANIM_AIM_PITCH_TIME;
+    lv_time = ((lv_pitch - c_ANIM_AIM_PITCH_MIN) / (c_ANIM_AIM_PITCH_MAX - c_ANIM_AIM_PITCH_MIN)) * c_ANIM_AIM_PITCH_TIME;
     if (lv_time < 0.0) {
         lv_time = 0.0;
     }
     if (lv_time > c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY) {
         lv_time = c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY;
     }
+    if ((gv_animAimPitchTime[lp_player] >= 0.0) && (AbsF(gv_animAimPitchTime[lp_player] - lv_time) < 0.0001)) {
+        return;
+    }
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
-    lv_now = gf_AnimNowMs();
-    lv_advance = 0.0;
-    if (gv_animAimPitchLastMs[lp_player] >= 0) {
-        lv_advance = (lv_now - gv_animAimPitchLastMs[lp_player]) / 1000.0;
-        if (lv_advance < 0.0) {
-            lv_advance = 0.0;
-        }
-        if (lv_advance > 0.05) {
-            lv_advance = 0.05;
-        }
-    }
-    gv_animAimPitchLastMs[lp_player] = lv_now;
-    lv_set = lv_time + lv_advance;
-    if (lv_set > c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY) {
-        lv_set = c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY;
-    }
-    if (gv_animAimPitchTime[lp_player] < 0.0) {
-        ActorSend(lv_actor, "AnimBlendTimeApply 0.000000");
-        ActorSend(ActorFromActor(lv_actor, "Model"), "AnimBlendTimeApply 0.000000");
-    }
-    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_AIM_PITCH_CLIP + " " + FixedToString(lv_set, c_fixedPrecisionAny) + " 0");
+    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_AIM_PITCH_CLIP + " " + FixedToString(lv_time, c_fixedPrecisionAny) + " 0");
     gv_animAimPitchTime[lp_player] = lv_time;
     gv_animAimPitchSends[lp_player] += 1;
 }

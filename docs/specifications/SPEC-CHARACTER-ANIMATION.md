@@ -126,7 +126,8 @@ Turning uses no upper turn overlay.
 
 ### 5A. Upper-Body Pitch
 
-Aim pitch follows camera pitch with a 40 degree limit up and down.
+Aim pitch follows camera pitch across the full camera range: 80 degrees down and 60 degrees up.
+The torso clip sweeps from -95 to 50 degrees with fixed rest -13.
 The whole upper body pivots at one lower-back spine bone, including the head.
 A single lower-back pivot keeps the head, neck, and shoulders connected.
 The pivot does not rotate the lower body or model root.
@@ -134,8 +135,8 @@ Shoulder, arm, and elbow correction is deferred until visual validation.
 
 Asset generation creates one shared upper pitch clip per hero:
 
-- the Attack Ready upper pose is the base pose.
-- the lower-back rotation track sweeps from 40 degrees down to 40 degrees up.
+- the Attack upper pose sampled at 350 ms is the base pose, where the gun is near horizontal.
+- the lower-back rotation track sweeps from 95 degrees down to 50 degrees up.
 - keyframes are densely spaced so nearest-keyframe selection looks continuous.
 - all other upper position, rotation, and scale tracks stay held at one key
   across the clip duration.
@@ -146,19 +147,21 @@ Runtime pitch:
 
 1. Read CameraGetPitch(player) in degrees.
 2. Normalize wrapped pitch: if above 180 degrees, subtract 360.
-3. Subtract camera pitch from rest pitch and clamp to the pitch limit.
+3. Subtract camera pitch from rest pitch and clamp to the range `-95..50`.
    Camera up produces a positive value and a higher `SCOBAUp` time. Camera down
    produces a negative value and a lower `SCOBAUp` time.
 4. Map clamped pitch to a target time on the dense keyframe range.
 5. When the target time changes, send AnimSetTime immediately.
-7. Do not use AnimSetTimeScale; it does not move the pitch pose.
-8. Reassert `AnimSetTime` on every pitch tick; the message does not freeze playback.
-9. Add elapsed time since the previous send so reasserts preserve visible pose time.
+6. Send the exact target time. Do not add elapsed time.
+7. Keep `SCOBAUp` frozen with `AnimSetTimeScale SCOBAUp 0` on the main actor
+   and model while aim is active.
+8. Do not advance time when the target time is unchanged.
+9. The rest pitch stays fixed at `c_ANIM_AIM_PITCH_REST`; aim entry never
+   captures the current camera pitch as rest.
 10. Drive the tick from `TriggerAddEventCameraMove` and a periodic timer.
-11. Apply `AnimBlendTimeApply 0` on aim entry so AnimSetTime does not blend over
-    the default 0.5 seconds.
+11. Send `AnimBlendTimeRemove` on aim exit so engine blend defaults return.
 12. Set model actor `AnimBlendTime` to 0 for Tosh and Kerrigan.
-13. Clear SCOBAUp on aim exit.
+13. Clear SCOBAUp and set its time scale back to `1.0` on aim exit.
 
 Pitch entry must reset the upper pose and write the current camera pitch
 before the first frame. Do not blend or add to the prior idle upper pose.
@@ -269,7 +272,7 @@ Aim tests must prove:
 9. S moves opposite camera forward and A/D move laterally without turning.
 10. Aim release restores the baseline.
 11. Camera pitch up and down changes upper clip time and the spine pose.
-12. Pitch reaches 40 degrees up and 40 degrees down.
+12. Pitch reaches 80 degrees down and 60 degrees up.
 13. Pitch changes no lower frame and no model root rotation.
 
 ## 11. Change Rule

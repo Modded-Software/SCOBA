@@ -129,7 +129,7 @@ Implementation lives in
 | R-TF-69 | The aim profile MUST prove aim movement issues no per-key orders and writes no facing. |
 | R-TF-70 | The aim profile MUST prove facing and movement remain smooth while camera yaw rotates. |
 | R-TF-71 | The pitch profile MUST prove camera pitch changes `SCOBAUp` time and the spine pose using the `SCOBAUp` animation reference. |
-| R-TF-72 | The pitch profile MUST prove pitch reaches 40 degrees up and 40 degrees down. |
+| R-TF-72 | The pitch profile MUST prove pitch reaches the 60 degree up and 80 degree down camera limits. |
 | R-TF-73 | The pitch profile MUST prove pitch changes no lower-body frame and no model root rotation. |
 | R-TF-74 | The pitch profile MUST normalize wrapped camera pitch above 180 degrees before checking pitch time. |
 | R-TF-75 | The pitch profile MUST prove pitch keyframes are tightly spaced and camera pitch selects the nearest keyframe immediately. |
@@ -137,6 +137,8 @@ Implementation lives in
 | R-TF-77 | The pitch profile MUST record pitch ticks, pitch sends, remaining clip time, and model remaining time. |
 | R-TF-78 | The pitch profile MUST prove camera pitch sends are paced by camera moves and reasserts. |
 | R-TF-79 | Tests MUST cover camera collision distance clamping and restoration. |
+| R-TF-80 | Tests MUST cover derived control/cursor state after real RPG clicks, action mode, Alt, and aim transitions. |
+| R-TF-81 | Tests MUST use engine `UnitHighlight` and engine mouse-click world coordinates as the RPG hover and click inputs. |
 
 ### 3.9 Command line
 

@@ -22,7 +22,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "16\n"
+MARKER_VERSION = "17\n"
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -71,8 +71,10 @@ HOLD_CLIP_MS = {
 }
 
 AIM_PITCH_GROUP = "Ready"
-AIM_PITCH_SOURCE = "Attack Ready"
-AIM_PITCH_LIMIT_DEG = 40.0
+AIM_PITCH_SOURCE = "Attack"
+AIM_PITCH_SOURCE_MS = 350
+AIM_PITCH_MIN_DEG = -95.0
+AIM_PITCH_MAX_DEG = 50.0
 AIM_PITCH_TIME_MS = 10000
 AIM_PITCH_SAMPLES = 601
 
@@ -239,11 +241,13 @@ def generate_model(
         groups,
         AIM_PITCH_GROUP,
         AIM_PITCH_SOURCE,
+        AIM_PITCH_SOURCE_MS,
         pitch_bones,
         pitch_weights,
         pitch_axis,
         pitch_sign,
-        AIM_PITCH_LIMIT_DEG,
+        AIM_PITCH_MIN_DEG,
+        AIM_PITCH_MAX_DEG,
         AIM_PITCH_TIME_MS,
         AIM_PITCH_SAMPLES,
     )

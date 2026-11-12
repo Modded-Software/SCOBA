@@ -72,7 +72,11 @@ prevents right-click state races.
 | `c_SCOBA_CLICK_SCAN_RADIUS` | 8.0 | Point pick search radius |
 | `c_SCOBA_CLICK_MARGIN` | 0.75 | Point pick radius margin |
 | `c_SCOBA_AIM_FOV` | 45.0 | Field of view while aiming |
-| `c_SCOBA_AIM_SHOULDER_OFFSET` | 1.0 | Camera focus offset to the weapon shoulder |
+| `c_SCOBA_AIM_SHOULDER_OFFSET` | 2.0 | Camera focus offset to the weapon shoulder |
+| `c_SCOBA_AIM_SHOULDER_ANGLE` | -90.0 | Shoulder origin offset from hero heading, left of center |
+| `c_SCOBA_ZOOM_BLEND` | 0.18 | Scroll zoom distance blend duration |
+| `c_SCOBA_COLLISION_CLAMP_BLEND` | 0.06 | Collision shorten blend duration |
+| `c_SCOBA_COLLISION_RESTORE_BLEND` | 0.28 | Collision restore blend duration |
 | `c_ANIM_TURN_DURATION` | 0.1 | Engine facing interpolation duration |
 | `c_ANIM_TURN_DEADBAND` | 3.0 | Non-aim yaw change that writes a new facing target |
 | `c_ANIM_MOVE_TARGET` | 30.0 | Continuous move order target distance |
@@ -194,9 +198,10 @@ In RPG mode, camera turn stops in `gt_CursorEnd` after the command decision.
 In action mode, right up exits aim mode and returns before
 `gf_RightClickExecute`. No right command runs.
 
-## 9. Right command resolver
+## 9. Order-mode click resolver
 
-`gf_ResolveClickEnemy(int lp_player, point lp_point)`:
+`gf_ResolveClickEnemy(int lp_player, point lp_point)` serves order-mode clicks.
+RPG left and right selection use the engine hover unit instead.
 
 1. Return `gv_sCOBAPRESSUNIT[lp_player]` when it is alive, hostile, and
    `lp_point` is inside its unit radius plus `c_SCOBA_CLICK_MARGIN`.
@@ -208,31 +213,27 @@ In action mode, right up exits aim mode and returns before
    `c_SCOBA_CLICK_MARGIN`.
 5. Return null.
 
-Step 1 is the engine hit-test source used by left-click selection.
-A saved hover unit outside the press-point radius falls through to steps 2
-and 3. Step 3 is the last check and does not override a valid hover unit.
-
 ## 10. Right command execution
 
 `gf_RightClickExecute(int lp_player, point lp_point, unit lp_unit)`:
 
-1. Set `lp_unit = gf_ResolveClickEnemy(lp_player, lp_point)`.
-2. When `lp_unit` is valid:
+1. When `lp_unit` is valid, hostile, and `lp_point` is inside its unit radius
+   plus `c_SCOBA_CLICK_MARGIN`:
    - call `gf_ShowTarget(lp_player, lp_unit)`;
    - call `gf_CombatManualAttack(lp_player, lp_unit)`;
    - return.
-3. Call `gf_CombatCancelAuto(lp_player)`.
-4. Set `gv_sCOBAManualOrder[lp_player] = false`.
-5. Call `gf_CombatSyncRoot(lp_player)`.
-6. When RPG Stand is active:
+2. Call `gf_CombatCancelAuto(lp_player)`.
+3. Set `gv_sCOBAManualOrder[lp_player] = false`.
+4. Call `gf_CombatSyncRoot(lp_player)`.
+5. When RPG Stand is active:
    - issue `Order(AbilityCommand("stop", 0))`;
    - set `gv_sCOBAFSM[lp_player]` to `c_SCOBA_FSM_IDLE`.
-7. Otherwise, in RPG Walk:
+6. Otherwise, in RPG Walk:
    - issue `OrderTargetingPoint(AbilityCommand("move", 0), lp_point)`;
    - set `gv_sCOBAFSM[lp_player]` to `c_SCOBA_FSM_MOVING`;
    - call `gf_ShowMoveMarker(lp_player, lp_point)`.
-8. Do not change `gv_tARGET[lp_player]`.
-9. Do not run this function in action mode.
+7. Do not change `gv_tARGET[lp_player]`.
+8. Do not run this function in action mode.
 
 `gf_ShowMoveMarker` uses the built-in waypoint model:
 
@@ -296,8 +297,8 @@ object.
 9. Find the earliest blocked fraction.
 10. Safe distance is `max(minDistance, hitDistance - probeRadius)`.
 11. Keep `gv_cameraDistanceDesired` owned by scroll input.
-12. Apply a shorter distance immediately.
-13. Restore the desired distance slowly after a clear dwell.
+12. Apply a shorter distance with `c_SCOBA_COLLISION_CLAMP_BLEND`.
+13. Restore the desired distance slowly with `c_SCOBA_COLLISION_RESTORE_BLEND`.
 14. Never infer desired distance from a collision-shortened distance.
 15. Apply the clamp on every collision tick, including while pitch or yaw is changing.
 
@@ -305,7 +306,7 @@ Collision runs on a 0.02 s periodic tick. Do not write distance from a camera
 move event; that can recurse and bounce.
 
 Scroll input recomputes the safe distance on every wheel event and writes
-`min(desired, safe)` with zero duration.
+`min(desired, safe)` with `c_SCOBA_ZOOM_BLEND`.
 
 ## 13. Camera events
 
@@ -370,13 +371,15 @@ RPG right-button input never calls `gf_AimBegin` or `gf_AimEnd`.
 7. Clear stale splitbody and baseline animation during that reset.
 8. Request the splitbody aim state from `gf_AnimTick`.
 9. Set the field of view to `c_SCOBA_AIM_FOV` once.
-10. Compute the shoulder focus point with
-    `PointWithOffsetPolar(heroPos, c_SCOBA_AIM_SHOULDER_OFFSET, CameraGetYaw(player) + 90.0)`.
-11. Look the camera at the shoulder focus point once.
-12. Re-apply unit follow with the offset retained by passing `true` for
-    `isOffset`.
-13. Show the native cursor with `UISetCursorVisible`.
-14. Do not write `c_cameraValueDistance`.
+10. Compute the proxy point on the ground plane at twice the shoulder offset:
+    `x = heroX + cos(yaw + c_SCOBA_AIM_SHOULDER_ANGLE) * c_SCOBA_AIM_SHOULDER_OFFSET * 2`,
+    `y = heroY + sin(yaw + c_SCOBA_AIM_SHOULDER_ANGLE) * c_SCOBA_AIM_SHOULDER_OFFSET * 2`.
+11. Create one hidden `InvisibleTargetDummy` at that point.
+12. Follow the unit group containing the hero and the proxy.
+13. Move the proxy each 0.02 s. Engine follow tracks the group center, which sits at the shoulder offset.
+14. The engine `TargetSmooth` path smooths the camera. Do not pan on top of follow.
+15. Show the native cursor with `UISetCursorVisible`.
+16. Do not write `c_cameraValueDistance`.
 
 `gf_AimEnd`:
 
@@ -386,11 +389,13 @@ RPG right-button input never calls `gf_AimBegin` or `gf_AimEnd`.
 4. Remove `SCOBAAimNoTurn`.
 5. Set `gv_aIMACTIVE[player] = false`.
 6. Clear the aim group and restore baseline animation.
-7. Set the field of view to `gv_cAMERAFOV[player]` once.
-8. Re-apply centered unit follow with `isOffset` false.
-9. Hide the native cursor.
-10. Restore the mouse-relative cursor pin for the next camera hold.
-11. Do not write `c_cameraValueDistance`.
+7. Send `AnimBlendTimeRemove` to the main actor and model.
+8. Set `SCOBAUp` time scale back to `1.0` on the main actor and model.
+9. Set the field of view to `gv_cAMERAFOV[player]` once.
+10. Remove the proxy unit and follow the hero alone.
+11. Hide the native cursor.
+12. Restore the mouse-relative cursor pin for the next camera hold.
+13. Do not write `c_cameraValueDistance`.
 
 `gt_AnimTick` runs every 0.05 seconds while the map is running.
 During aim mode it:
@@ -482,24 +487,40 @@ behavior and applies RPG camera and cursor state.
 2. Clear `gv_actionPressed[player]`.
 3. Clear `gv_actionAlt[player]`.
 4. Clear `gv_mOUSERIGHTCANCEL[player]` and `gv_mOUSELEFTCANCEL[player]`.
-5. Clear left and right button state and saved press units.
+5. Clear left, right, and middle button state and saved press units.
 6. Call `gf_AnimReset(player)`.
-7. When action mode is active:
-   - call `CameraSetMouseRotates(player, true)`;
-   - call `CameraForceMouseRelative(player, true)`;
-   - call `CameraLockInput(player, false)`;
-   - call `UISetCursorVisible(PlayerGroupSingle(player), true)`;
-   - call `UISetCursorAutoHide(PlayerGroupSingle(player), false, 0.0)`.
-8. When RPG mode is active:
-   - call `gf_AimEnd(player)` when aim is active;
-   - restore `c_cameraValueFieldOfView` to the non-aim value;
-   - restore centered unit follow;
-   - clear camera turn and orbit state;
-   - call `CameraSetMouseRotates(player, false)`;
-   - call `CameraForceMouseRelative(player, false)`;
-   - call `CameraLockInput(player, true)`;
-   - call `UISetCursorVisible(PlayerGroupSingle(player), true)`;
-   - call `UISetCursorAutoHide(PlayerGroupSingle(player), false, 0.0)`.
+7. Call `gf_ControlApply(player)`.
+
+`gf_ControlApply(player)` is the only writer of cursor and camera-input state.
+It derives state from control mode, aim state, Alt state, and held buttons:
+
+1. Return when the hero is invalid.
+2. Set `gv_rOTATEUNIT` from held right or middle buttons.
+3. Set `gv_rOTATECAMERA` from the held left button.
+4. In action mode, enable relative mouse unless Alt is held.
+5. In RPG mode, enable relative mouse only while a mouse button is held.
+6. Force relative mouse while aim is active.
+7. Set `gv_cONTROLRELATIVE` to the derived value.
+8. Call `CameraSetMouseRotates`, `CameraForceMouseRelative`, and
+   `CameraLockInput` from that value.
+9. Make the cursor visible with auto-hide disabled.
+
+Mouse press and release handlers in `camera.galaxy` own the held button state.
+They update that state and call `gf_ControlApply`.
+Targeting handlers read held state and never write it.
+No trigger-order dependency is allowed.
+
+RPG hover uses the engine highlight event.
+`gt_ShowStatusBar` sets `gv_sCOBAHover[EventPlayer()] = EventUnit()`.
+`gt_HideStatusBar` clears `gv_sCOBAHover[EventPlayer()]` when that unit is
+the hidden unit.
+No custom mouse-position raycast writes hover.
+
+RPG click points use `EventMouseClickedPosXWorld` and
+`EventMouseClickedPosYWorld`.
+This keeps the press point on the engine-selected world position.
+
+At map init and on control-mode changes, call `gf_ControlApply`.
 
 Action mode mouse look runs without a held mouse button.
 It keeps the current third-person follow camera, field of view, and scroll
@@ -522,17 +543,13 @@ Scroll distance survives both transitions.
 Alt down in action mode:
 
 1. Set `gv_actionAlt[player] = true`.
-2. Call `CameraSetMouseRotates(player, false)`.
-3. Call `CameraForceMouseRelative(player, false)`.
-4. Call `CameraLockInput(player, true)`.
-5. Call `UISetCursorVisible(PlayerGroupSingle(player), true)`.
-6. Call `UISetCursorAutoHide(PlayerGroupSingle(player), false, 0.0)`.
-7. Stop the action mode facing writer.
+2. Call `gf_ControlApply(player)`.
+3. Stop the action mode facing writer.
 
 Alt up in action mode:
 
 1. Set `gv_actionAlt[player] = false`.
-2. Call `gf_ActionModeApply(player)`.
+2. Call `gf_ControlApply(player)`.
 
 Alt events are ignored in RPG mode.
 
@@ -542,15 +559,15 @@ Action mode mouse input:
 | --- | --- |
 | Right down | Call `gf_AimBegin` and set action aim state |
 | Right up | Call `gf_AimEnd` |
-| Left down, Alt not held | Resolve hostile at `CameraGetTarget` and call `gf_CombatManualAttack` |
+| Left down, Alt not held | Use the engine hover unit and call `gf_CombatManualAttack` |
 | Left up, Alt not held | Clear action press state |
 | Any click, Alt held | UI handles the click; no game attack, aim, or order |
 | Right clean click | No right command |
 | Ground left click | No Move or Stop |
 
-Action mode left attack resolves the enemy at `CameraGetTarget` with
-`gf_ResolveClickEnemy`. When an enemy resolves, it calls `gf_ShowTarget` and
-`gf_CombatManualAttack`. When no enemy resolves, nothing changes.
+Action mode left attack uses the engine hover unit.
+When the hover unit is hostile, it calls `gf_ShowTarget` and
+`gf_CombatManualAttack`. When no hostile hover unit exists, nothing changes.
 
 Action mode does not call `gf_RightClickExecute`.
 Action mode does not issue a right command.
@@ -647,10 +664,21 @@ source of hero right-click orders. Ability target mode is unchanged.
 | RPG right click ground | RPG mode | clean right click ground | move order runs |
 | RPG right drag | RPG mode | right drag | no right command runs |
 | toggle icons | RPG and action mode | read button faces | two different custom DDS files |
+| control state RPG rest | RPG mode, no buttons | read `gv_cONTROLRELATIVE` | relative off, cursor free |
+| control state RPG right | RPG mode, right held | read `gv_cONTROLRELATIVE` | relative on, unit rotate on |
+| control state RPG release | RPG mode, right released | read `gv_cONTROLRELATIVE` | relative off, rotate off |
+| control state action | action mode | read `gv_cONTROLRELATIVE` | relative on, cursor centered |
+| control state alt | action mode, Alt held | read `gv_cONTROLRELATIVE` | relative off, cursor free |
+| control state aim | action mode, aim active | read `gv_cONTROLRELATIVE` | relative on |
+| hover highlight | enemy under cursor | native highlight fires | `gv_sCOBAHover` is the enemy |
+| hover clear | pointer leaves enemy | native unhighlight fires | matching hover is cleared |
+| click world point | free cursor over ground | button down | press point equals engine click world point |
 
 The map test harness calls the mouse functions with synthetic press and
 release data for logic checks. Real input injection covers camera, both-button,
-click, hover, and right-hold aim paths.
+click, and right-hold aim paths.
+Synthetic pointer warps do not emit engine highlight events, so hover is
+verified in live play.
 Aim tests read `gv_aIMACTIVE`, `CameraGetTarget`, `CameraGetDistance`,
 animation layer state, hero facing, and screenshots of the native
 cursor at screen center.
@@ -671,6 +699,14 @@ cursor at screen center.
 - Both-button forward ends when either button is released.
 - The W key and both-button forward share one forward loop.
 - Right and middle camera behavior use the same state and calls.
+- Only `gf_ControlApply` writes camera mouse-rotate, mouse-relative, camera input lock, and cursor visibility state.
+- Held button state is owned by mouse press/release handlers.
+- Targeting never writes held button state.
+- Cursor mode never depends on trigger execution order.
+- Releasing a button always restores the derived cursor mode.
+- `gv_sCOBAHover` is written only by the engine highlight handlers.
+- Engine highlight hide clears only the matching hover unit.
+- Click press points come from engine mouse-click world coordinates.
 - Engine smart click is disabled for all players.
 - In action mode, aim mode starts on right press and ends on right release.
 - RPG right press never enters aim mode.

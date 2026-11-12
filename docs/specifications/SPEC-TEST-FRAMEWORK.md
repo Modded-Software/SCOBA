@@ -396,12 +396,16 @@ Pitch case flow:
 3. Reset player to stand and set `gv_cameraCollisionOff[1]` so collision cannot write distance during pitch sampling.
 4. Call `gf_AimBegin(1)`.
 5. Save `entry`.
-6. Set camera pitch to 60 and save `down`.
+6. Set camera pitch to 80 and save `down`.
 7. Set camera pitch to 30 and save `mid`.
-8. Set camera pitch to 5 and save `up`.
+8. Set camera pitch to -60 and save `up`.
 9. Set camera pitch back to 30 and save `hold`.
 10. Call `gf_AimEnd(1)`.
-11. Write the finish marker.
+11. Set camera pitch to 70, call `gf_AimBegin(1)`, and save `entry70`.
+12. Set camera pitch to 80 and save `down70`.
+13. Set camera pitch to -60 and save `up70`.
+14. Set camera pitch back to 30 and save `hold70`.
+15. Call `gf_AimEnd(1)` and write the finish marker.
 
 Camera pitch is recorded in degrees and normalized to signed range.
 Selected keyframes must reach the target within tolerance.
@@ -428,7 +432,7 @@ Required sections:
 | `controls_ground` | Ground left click |
 | `controls_alt_click` | Alt UI click |
 | `controls_rpg` | Return to RPG mode |
-| `controls_zoom` | Zoom write applies immediately |
+| `controls_zoom` | Zoom distance animates to the target |
 | `controls_collision` | Flat-ground collision keeps the desired distance |
 | `controls_collision_clamp` | Underground eye shortens camera distance |
 | `controls_collision_restore` | Clear view restores the desired distance |
@@ -498,9 +502,9 @@ The input hook drives RPG right hold, real clean clicks, real ground clicks,
 action mode mouse movement, forward movement, Alt, right hold, and click
 positions.
 The RPG input phase must finish before the action mode toggle.
-Each real click records its press world point and hover unit.
-The stale hover case moves the cursor to a ground point while the saved hover
-unit is an enemy.
+Each click uses the engine mouse-click world point and engine hover unit.
+The stale hover case keeps an enemy hover unit while the press point moves to
+a ground point.
 The movement tick case samples hero position across two consecutive
 `gt_AimMoveTick` intervals.
 
@@ -1253,12 +1257,16 @@ Pitch case flow:
 3. Reset player to stand and set `gv_cameraCollisionOff[1]` so collision cannot write distance during pitch sampling.
 4. Call `gf_AimBegin(1)`.
 5. Save `entry`.
-6. Set camera pitch to 60 and save `down`.
+6. Set camera pitch to 80 and save `down`.
 7. Set camera pitch to 30 and save `mid`.
-8. Set camera pitch to 5 and save `up`.
+8. Set camera pitch to -60 and save `up`.
 9. Set camera pitch back to 30 and save `hold`.
 10. Call `gf_AimEnd(1)`.
-11. Write the finish marker.
+11. Set camera pitch to 70, call `gf_AimBegin(1)`, and save `entry70`.
+12. Set camera pitch to 80 and save `down70`.
+13. Set camera pitch to -60 and save `up70`.
+14. Set camera pitch back to 30 and save `hold70`.
+15. Call `gf_AimEnd(1)` and write the finish marker.
 
 Pitch samples record normalized camera pitch, rest pitch, and `SCOBAUp` time.
 Camera pitch is recorded in degrees and normalized to signed range.
@@ -1277,11 +1285,14 @@ Pitch checks:
 | --- | --- |
 | `meta done` | `1` |
 | `meta profile` | `pitch` |
-| `down Camera` | near 60 degrees |
+| `down Camera` | near 80 degrees |
 | `mid Camera` | near 30 degrees |
-| `up Camera` | near 5 degrees |
-| `down Time` | less than `mid Time` |
-| `up Time` | greater than `mid Time` |
+| `up Camera` | near -60 degrees |
+| `down Time` | at most `400` ms and less than `mid Time` |
+| `up Time` | at least `9590` ms and greater than `mid Time` |
+| `entry70 Rest` | `-13` |
+| `down70 Time` | at most `400` ms |
+| `up70 Time` | at least `9590` ms |
 | `hold Time` | near `mid Time` |
 | selected keyframe | reaches target within tolerance |
 | pitch samples | lower frame ID unchanged |
@@ -1358,6 +1369,9 @@ Controls checks:
 | `controls_move UnitFacing` | matches camera yaw |
 | `controls_cursor CursorVisible` | `1` |
 | `controls_cursor CursorCentered` | `1` |
+| `controls_default ControlRelative` | `0` |
+| `controls_default RotateUnit` | `0` |
+| `controls_default RotateCamera` | `0` |
 | `controls_alt AltPaused` | `1` |
 | `controls_alt CursorVisible` | `1` |
 | `controls_alt_release AltPaused` | `0` |

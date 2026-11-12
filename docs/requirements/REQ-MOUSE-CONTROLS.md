@@ -186,10 +186,18 @@ Implementation lives in
 | R-MC-107 | Camera collision MUST clamp only `c_cameraValueDistance`. It MUST NOT write pitch or yaw. |
 | R-MC-108 | Camera collision MUST keep a desired scroll distance and restore it when terrain clears. |
 | R-MC-109 | Camera collision MUST sweep from the camera target toward the desired eye with a camera radius. |
-| R-MC-110 | Camera collision MUST shorten distance immediately and restore it slowly. |
+| R-MC-110 | Camera collision MUST shorten distance with a short blend and restore it with a slower blend. Neither transition may snap. |
 | R-MC-111 | Camera collision MUST apply the safety clamp on every tick, including while pitch or yaw is changing. |
-| R-MC-112 | Scroll input MUST write the clamped distance immediately on every wheel event. |
+| R-MC-112 | Scroll input MUST animate the distance change with `c_SCOBA_ZOOM_BLEND`. It MUST NOT install a zero-duration distance change. |
 | R-MC-113 | Camera collision MUST check terrain height along the sweep. |
+| R-MC-114 | `gf_ControlApply` MUST be the only writer of camera mouse-rotate, mouse-relative, camera input lock, and cursor visibility state. |
+| R-MC-115 | Mouse press/release handlers MUST own held button state. Targeting MUST read that state and MUST NOT write it. |
+| R-MC-116 | Control state MUST derive from control mode, aim state, Alt state, and held buttons. It MUST NOT depend on trigger execution order. |
+| R-MC-117 | Releasing a mouse button MUST restore RPG cursor mode even when targeting release is skipped or reordered. |
+| R-MC-118 | Map init, control mode changes, Alt changes, and aim entry/exit MUST route through `gf_ControlApply`. |
+| R-MC-119 | RPG hover MUST be set from the engine `UnitHighlight` event and cleared when that unit is no longer highlighted. |
+| R-MC-120 | RPG click points MUST come from the engine `EventMouseClickedPosXWorld` and `EventMouseClickedPosYWorld` values. |
+| R-MC-121 | Aim mode camera origin MUST translate slightly left of the hero, using `c_SCOBA_AIM_SHOULDER_ANGLE`. It MUST NOT rotate the camera away from hero heading and MUST NOT sit directly behind the hero. |
 | R-MC-99 | Normal action movement MUST NOT use lateral strafe behavior. |
 
 ## 4. Acceptance criteria
@@ -216,7 +224,7 @@ Implementation lives in
 | AC-MC-18 | Aim facing tracks camera yaw at rest and in motion. |
 | AC-MC-19 | Aim movement stops at unpathable points. |
 | AC-MC-20 | Aim lateral movement shows Walk with advancing lower frame IDs. |
-| AC-MC-20 | RPG mode is active at map init and hero spawn. |
+| AC-MC-51 | RPG mode is active at map init and hero spawn. |
 | AC-MC-21 | The toggle shows the correct label for each mode. |
 | AC-MC-22 | Action mode mouse look, centered cursor, and facing work without a held button. |
 | AC-MC-23 | Alt pauses mouse look, pauses turn, and shows the UI cursor. |
@@ -233,12 +241,20 @@ Implementation lives in
 | AC-MC-34 | RPG and action mode show different icons. |
 | AC-MC-35 | A left-click target survives idle, Stop, and move completion. |
 | AC-MC-36 | A stale hover unit does not hijack a ground click. |
-| AC-MC-37 | Ground right clicks do not clear the left-click target. |
-| AC-MC-38 | Aim movement uses one periodic movement loop with native move orders. |
-| AC-MC-39 | Aim entry and control mode changes reset animation state. |
-| AC-MC-40 | Idle action facing reaches camera yaw and no upper turn overlay starts. |
-| AC-MC-41 | Aim movement runs without stop and go bursts. |
-| AC-MC-42 | Aim entry without a movement key shows the idle splitbody aim group. |
+| AC-MC-37 | RPG left and right click selection works after a fresh launch. |
+| AC-MC-38 | A right-click release restores cursor mode and hover selection. |
+| AC-MC-39 | Control mode, Alt, and aim transitions leave one consistent cursor state. |
+| AC-MC-40 | Held button state is released even when targeting release runs late. |
+| AC-MC-58 | RPG hover follows the engine `UnitHighlight` event. |
+| AC-MC-59 | RPG clicks resolve from engine mouse-click world coordinates. |
+| AC-MC-60 | Scroll zoom and collision distance changes animate instead of snapping. |
+| AC-MC-61 | Aim camera origin is translated slightly left of the hero without rotating the camera. |
+| AC-MC-52 | Ground right clicks do not clear the left-click target. |
+| AC-MC-53 | Aim movement uses one periodic movement loop with native move orders. |
+| AC-MC-54 | Aim entry and control mode changes reset animation state. |
+| AC-MC-55 | Idle action facing reaches camera yaw and no upper turn overlay starts. |
+| AC-MC-56 | Aim movement runs without stop and go bursts. |
+| AC-MC-57 | Aim entry without a movement key shows the idle splitbody aim group. |
 | AC-MC-43 | Non-aim action A/D turns left or right and moves without strafing. |
 | AC-MC-44 | Non-aim action S turns around and moves. |
 | AC-MC-45 | Aim movement shows eight distinct lower directions. |

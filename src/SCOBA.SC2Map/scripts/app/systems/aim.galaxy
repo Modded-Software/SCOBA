@@ -1,23 +1,90 @@
 // Module: systems/aim
 
+point gf_AimShoulderPoint (int lp_player) {
+    unit lv_hero;
+    point lv_pos;
+    fixed lv_yaw;
+    fixed lv_x;
+    fixed lv_y;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return Point(0.0, 0.0);
+    }
+    lv_pos = UnitGetPosition(lv_hero);
+    lv_yaw = CameraGetYaw(lp_player) + c_SCOBA_AIM_SHOULDER_ANGLE;
+    lv_x = PointGetX(lv_pos) + (Cos(lv_yaw) * c_SCOBA_AIM_SHOULDER_OFFSET);
+    lv_y = PointGetY(lv_pos) + (Sin(lv_yaw) * c_SCOBA_AIM_SHOULDER_OFFSET);
+    return Point(lv_x, lv_y);
+}
+
+point gf_AimProxyPoint (int lp_player) {
+    unit lv_hero;
+    point lv_pos;
+    fixed lv_yaw;
+    fixed lv_x;
+    fixed lv_y;
+    fixed lv_offset;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return Point(0.0, 0.0);
+    }
+    lv_pos = UnitGetPosition(lv_hero);
+    lv_yaw = CameraGetYaw(lp_player) + c_SCOBA_AIM_SHOULDER_ANGLE;
+    lv_offset = c_SCOBA_AIM_SHOULDER_OFFSET * 2.0;
+    lv_x = PointGetX(lv_pos) + (Cos(lv_yaw) * lv_offset);
+    lv_y = PointGetY(lv_pos) + (Sin(lv_yaw) * lv_offset);
+    return Point(lv_x, lv_y);
+}
+
+void gf_AimProxyCreate (int lp_player) {
+    point lv_point;
+
+    if (UnitIsValid(gv_aimCameraProxy[lp_player])) {
+        return;
+    }
+    lv_point = gf_AimProxyPoint(lp_player);
+    libNtve_gf_UnitCreateFacingPoint(1, "InvisibleTargetDummy", 0, lp_player, lv_point, lv_point);
+    gv_aimCameraProxy[lp_player] = UnitLastCreated();
+    UnitSetState(gv_aimCameraProxy[lp_player], c_unitStateSelectable, false);
+    UnitSetState(gv_aimCameraProxy[lp_player], c_unitStateStatusBar, false);
+}
+
+void gf_AimProxyDestroy (int lp_player) {
+    if (UnitIsValid(gv_aimCameraProxy[lp_player])) {
+        UnitRemove(gv_aimCameraProxy[lp_player]);
+    }
+    gv_aimCameraProxy[lp_player] = null;
+}
+
+void gf_AimCameraTick (int lp_player) {
+    if (!gv_aIMACTIVE[lp_player]) {
+        return;
+    }
+    if (!UnitIsValid(gv_aimCameraProxy[lp_player])) {
+        return;
+    }
+    UnitSetPosition(gv_aimCameraProxy[lp_player], gf_AimProxyPoint(lp_player), false);
+}
+
 void gf_AimCameraSet (int lp_player, bool lp_aim) {
     unit lv_hero;
     unitgroup lv_group;
-    point lv_focus;
 
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
         return;
     }
-    lv_group = libNtve_gf_ConvertUnitToUnitGroup(lv_hero);
-    CameraFollowUnitGroup(lp_player, lv_group, false, false);
     if (lp_aim) {
-        lv_focus = PointWithOffsetPolar(UnitGetPosition(lv_hero), c_SCOBA_AIM_SHOULDER_OFFSET, (CameraGetYaw(lp_player) + 90.0));
-        CameraLookAt(lp_player, lv_focus, 0.15, -1, 10);
-        CameraFollowUnitGroup(lp_player, lv_group, true, true);
+        gf_AimProxyCreate(lp_player);
+        lv_group = libNtve_gf_ConvertUnitToUnitGroup(lv_hero);
+        UnitGroupAddUnitGroup(lv_group, libNtve_gf_ConvertUnitToUnitGroup(gv_aimCameraProxy[lp_player]));
+        CameraFollowUnitGroup(lp_player, lv_group, true, false);
     }
     else {
-        CameraFollowUnitGroup(lp_player, lv_group, true, false);
+        gf_AimProxyDestroy(lp_player);
+        CameraFollowUnitGroup(lp_player, libNtve_gf_ConvertUnitToUnitGroup(lv_hero), true, false);
     }
 }
 
@@ -39,11 +106,13 @@ void gf_AimBegin (int lp_player) {
     gf_AnimReset(lp_player);
     CameraSetValue(lp_player, c_cameraValueFieldOfView, c_SCOBA_AIM_FOV, 0.2, -1, 10);
     gf_AimCameraSet(lp_player, true);
-    UISetCursorVisible(PlayerGroupSingle(lp_player), true);
-    UISetCursorAutoHide(PlayerGroupSingle(lp_player), false, 0.0);
+    gf_ControlApply(lp_player);
 }
 
 void gf_AimEnd (int lp_player) {
+    unit lv_hero;
+    actor lv_actor;
+
     if (!gf_IsHeroPlayer(lp_player)) {
         return;
     }
@@ -58,12 +127,22 @@ void gf_AimEnd (int lp_player) {
         UnitBehaviorRemove(gv_tPSUNIT[lp_player], "SCOBAAimNoTurn", 1);
     }
     gv_aIMACTIVE[lp_player] = false;
+    gv_animAimUpperOn[lp_player] = false;
+    gv_animAimPitchTime[lp_player] = -1.0;
     gf_AnimReset(lp_player);
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (UnitIsValid(lv_hero)) {
+        lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+        ActorSend(lv_actor, "AnimBlendTimeRemove");
+        ActorSend(ActorFromActor(lv_actor, "Model"), "AnimBlendTimeRemove");
+        gf_AnimAimTimeScale(lp_player, 1.0);
+    }
     if (gv_cAMERAFOV[lp_player] <= 0.0) {
         gv_cAMERAFOV[lp_player] = c_SCOBA_REST_FOV;
     }
     CameraSetValue(lp_player, c_cameraValueFieldOfView, gv_cAMERAFOV[lp_player], 0.2, -1, 10);
     gf_AimCameraSet(lp_player, false);
+    gf_ControlApply(lp_player);
 }
 
 bool gt_AimInit_Func (bool testConds, bool runActions) {
@@ -74,6 +153,7 @@ bool gt_AimInit_Func (bool testConds, bool runActions) {
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
         gv_aIMACTIVE[lv_player] = false;
+        gv_aimCameraProxy[lv_player] = null;
         gv_cAMERAFOV[lv_player] = c_SCOBA_REST_FOV;
     }
     return true;

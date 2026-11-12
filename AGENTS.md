@@ -101,7 +101,11 @@
 - RPG right click never aims. Aim only starts on Action mode right hold.
 - Action mode right clean click runs no right command.
 - Aim must not write camera distance. Scroll distance survives aim entry and exit.
+- Aim camera sits slightly left of the hero center, never directly behind it. Offset the camera origin; do not rotate the camera.
+- Aim applies the offset by following a hero plus hidden-proxy group; the group center is the shoulder pivot. Never pan on top of follow.
 - Aim must not change combat FSM state or issue combat orders.
+- `gf_ControlApply` is the only writer of mouse-relative, camera input lock, and cursor visibility. Mouse press/release handlers own held button state. Targeting only reads it.
+- Control mode changes, Alt changes, aim entry/exit, and map init route through `gf_ControlApply`.
 - Left-click target persists through hero idle, Stop, and move completion.
 - Reject stale hover with a press-point radius check.
 - Aim uses one splitbody group per lower state and direction. Each group has two concurrent STCs.
@@ -124,29 +128,30 @@
 - Aim uses two concurrent brackets: `SCOBAUp` for upper aim pitch and `SCOBALo` for lower locomotion.
 - Aim hold must not loop the attack swing. Non-spine upper tracks are held at one key across the clip duration.
 - Aim hold produces one upper pitch start event and no repeated upper start events.
-- Aim upper pitch follows camera pitch with a 40 degree limit in each direction.
+- Aim upper pitch follows camera pitch over the camera range: 80 degrees down and 60 degrees up. The clip sweeps -95..50 degrees with fixed rest -13.
+- The aim base pose is the Attack frame at 350 ms, where the gun is near horizontal.
 - Aim pitch pivots the whole upper body around one lower-back spine bone, including the head, shoulders, and arms. Do not rotate the lower body or model root.
 - Aim pitch uses densely spaced keyframes and sends the nearest target time when camera pitch changes.
 - Aim pitch selects the nearest `SCOBAUp` target time from `CameraGetPitch`.
 - Galaxy angles are degrees. Normalize wrapped camera pitch above 180 degrees to signed pitch before mapping.
-- Aim pitch sends `AnimSetTime SCOBAUp` directly when the target time changes.
-- Aim pitch sends `AnimSetTime SCOBAUp` to the unit main actor only; never rely on `AnimSetTimeScale`.
-- Do not use `AnimSetTimeScale` for pitch; scale messages do not move the pose.
-- Reassert `AnimSetTime` every pitch tick; the message does not freeze playback.
-- Add elapsed time between sends so reasserts keep visible pitch continuous.
+- Aim pitch sends `AnimSetTime SCOBAUp` to the unit main actor only.
+- Freeze `SCOBAUp` with `AnimSetTimeScale SCOBAUp 0` on the main actor and model while aim is active.
+- Send the exact target time only when camera pitch changes. Do not advance time between sends.
+- Skip duplicate `AnimSetTime` sends while the pitch target is unchanged.
+- Keep `c_ANIM_AIM_PITCH_REST` fixed. Never capture the aim-entry camera pitch as rest.
 - Drive pitch updates from `TriggerAddEventCameraMove` and a periodic timer.
-- Apply `AnimBlendTimeApply 0` on aim entry so `AnimSetTime` changes pose without a 0.5 second blend.
+- On aim exit, send `AnimBlendTimeRemove` and restore `SCOBAUp` time scale to `1.0`.
 - Tosh and Kerrigan `CActorModel` entries set `AnimBlendTime` to 0.
 - Aim entry must start at the current camera pitch without blending from idle.
 - Aim pitch must not use actor root rotation or whole-model rotation.
 - Camera collision owns only `c_cameraValueDistance`. It never writes pitch or yaw.
 - SC2 camera pitch is degrees down from horizontal. Positive pitch places the eye above the target.
-- Scroll zoom applies immediately on every wheel event.
+- Scroll zoom animates with `c_SCOBA_ZOOM_BLEND` on every wheel event.
 - Camera collision checks terrain height along the sweep and includes the camera height offset.
 - Keep one desired scroll distance. Collision never overwrites it with a shortened distance.
 - Sweep the arm from the camera target to the desired eye with a camera radius.
 - Ignore obstacles closer than the minimum pivot distance.
-- Shorten distance immediately. Restore desired distance slowly after a clear dwell.
+- Shorten distance with `c_SCOBA_COLLISION_CLAMP_BLEND`. Restore with `c_SCOBA_COLLISION_RESTORE_BLEND`.
 - The collision tick applies the clamp on every tick, including while pitch or yaw is changing.
 - Collision runs on a 0.02 s periodic tick. Never write distance from a camera move event.
 - Aim movement keeps lower frame IDs advancing.

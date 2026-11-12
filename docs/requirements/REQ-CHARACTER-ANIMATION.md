@@ -50,7 +50,7 @@ Implementation lives in
 | R-ANIM-25 | Non-aim facing changes MUST use engine turn duration, not per-tick angle stepping. |
 | R-ANIM-26 | Turning MUST use the full-body baseline Stand Left and Stand Right clips. |
 | R-ANIM-27 | The map MUST NOT create an upper-body turn overlay. |
-| R-ANIM-28 | The frozen upper pose MUST come from the Attack start keyframe. |
+| R-ANIM-28 | The frozen upper pose MUST come from the Attack aim frame at 350 ms, where the gun is near horizontal. |
 | R-ANIM-29 | Aim attack animation is DEFERRED to a later stage. |
 | R-ANIM-30 | Aim clip changes MUST be idempotent for an unchanged lower-body state. |
 | R-ANIM-31 | Non-aim A/D/S movement MUST turn the hero toward the movement direction and use the Walk lower clip. |
@@ -61,7 +61,7 @@ Implementation lives in
 | R-ANIM-36 | Backward aim movement MUST use reversed backpedal animations. |
 | R-ANIM-37 | Aim MUST NOT turn the unit 180 degrees toward travel or show a planted-feet torso twist. |
 | R-ANIM-38 | Aim MUST NOT use a turn deadband. Camera facing MUST be applied every animation tick, independent of movement orders. |
-| R-ANIM-39 | Aim upper-body pitch MUST follow camera pitch within 40 degrees up and 40 degrees down. |
+| R-ANIM-39 | Aim upper-body pitch MUST follow camera pitch across the full camera range: 80 degrees down and 60 degrees up. The torso clip sweeps -95..50 degrees with fixed rest -13. |
 | R-ANIM-40 | Aim upper-body pitch MUST pivot the whole upper body around one lower-back spine bone, including the head, shoulders, and arms. It MUST NOT rotate the lower body or model root. |
 | R-ANIM-41 | Aim S MUST backpedal, A/D MUST strafe, and diagonals MUST preserve both camera-relative components. |
 | R-ANIM-42 | Aim per-key movement loops MUST NOT issue separate move orders; one aim movement loop owns travel. |
@@ -75,13 +75,15 @@ Implementation lives in
 | R-ANIM-50 | Aim pitch MUST NOT use actor root or whole-model rotation. |
 | R-ANIM-51 | Galaxy angles are degrees. `CameraGetPitch` MAY return a wrapped value above 180 degrees; aim pitch MUST normalize it to the signed range before use. |
 | R-ANIM-52 | Aim pitch MUST use the animation reference name `SCOBAUp`, not the clip props name `Ready`, for `AnimSetTime`. |
-| R-ANIM-53a | Aim pitch MUST NOT use `AnimSetTimeScale`; scale messages do not move the pose. |
-| R-ANIM-53 | Aim pitch MUST use densely spaced keyframes and send the nearest target time when camera pitch changes. |
-| R-ANIM-54 | Aim pitch MUST reassert `AnimSetTime` on every pitch tick. `AnimSetTime` does not freeze playback. |
-| R-ANIM-55 | Aim pitch MUST compensate for elapsed time between sends so visible pose time stays continuous. |
+| R-ANIM-53a | Aim pitch MUST freeze the `SCOBAUp` group with `AnimSetTimeScale SCOBAUp 0` on the main actor and model while aim is active. |
+| R-ANIM-53 | Aim pitch MUST use densely spaced keyframes and send the nearest target time only when camera pitch changes. |
+| R-ANIM-54 | Aim pitch MUST send the exact target time. It MUST NOT advance time between unchanged sends. |
+| R-ANIM-55 | Aim pitch MUST skip duplicate `AnimSetTime` sends while the target pitch time is unchanged. |
 | R-ANIM-56 | Aim pitch MUST update on camera move events, not only on a periodic timer. |
 | R-ANIM-57 | Tosh and Kerrigan `CActorModel` entries MUST set `AnimBlendTime` to 0 so `AnimSetTime` changes pose immediately. |
 | R-ANIM-58 | Aim entry MUST apply the frozen upper pose at the current camera pitch without blending from the prior idle pose. |
+| R-ANIM-59 | Aim pitch rest MUST stay fixed at `c_ANIM_AIM_PITCH_REST`. Aim entry MUST NOT capture the current camera pitch as rest. |
+| R-ANIM-60 | Aim exit MUST send `AnimBlendTimeRemove`, set `SCOBAUp` time scale back to `1.0`, and clear pitch state. |
 
 
 ## 3. Acceptance criteria
@@ -112,7 +114,7 @@ Implementation lives in
 | AC-ANIM-22 | Aim facing follows camera rotation without perceptible lag. |
 | AC-ANIM-23 | Aim movement does not write facing and does not change `Turnable` or turning rates. |
 | AC-ANIM-24 | Aim camera pitch up and down changes only the upper body spine pose. |
-| AC-ANIM-25 | Aim pitch reaches the 40 degree up and down limits. |
+| AC-ANIM-25 | Aim pitch reaches the 80 degree down and 60 degree up camera limits. |
 | AC-ANIM-26 | Aim pitch does not move the lower body or the model root. |
 | AC-ANIM-27 | Aim pitch stays continuous while the lower animation changes direction. |
 | AC-ANIM-28 | Camera pitch 59, 29, and 4 degrees map to three distinct `SCOBAUp` times after wrap normalization, with 59 lowest and 4 highest. |
@@ -121,6 +123,8 @@ Implementation lives in
 | AC-ANIM-31 | Camera pitch changes update the upper pose on the same camera move, without a fixed slow delay. |
 | AC-ANIM-32 | Reasserting pitch does not drift or stutter during a held camera pitch. |
 | AC-ANIM-33 | Aim entry starts at the current camera pitch pose without a visible idle-to-aim blend offset. |
+| AC-ANIM-34 | Aim hold shows no two-frame alternating jitter at a fixed camera pitch. |
+| AC-ANIM-35 | Aim exit restores engine blend defaults and normal animation playback. |
 
 ## 4. Out of scope
 

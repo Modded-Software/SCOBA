@@ -171,6 +171,47 @@ def reverse_lower(stc):
         reverse_block(block)
 
 
+def sample_block(block, sample_ms):
+    if not block.keys:
+        return
+    frames = list(block.frames)
+    index = 0
+    for i, frame in enumerate(frames):
+        if frame <= sample_ms:
+            index = i
+        else:
+            break
+    key = clone(block.keys[index])
+    block.frames = [0]
+    block.keys = [key]
+    block.fend = 0
+    block.flags = 0
+
+
+def sample_upper(stc, sample_ms):
+    if sample_ms <= 0:
+        return
+    for block in stc.sd3v:
+        sample_block(block, sample_ms)
+    for block in stc.sd4q:
+        sample_block(block, sample_ms)
+    for block in stc.sdcc:
+        sample_block(block, sample_ms)
+    for block in stc.sdr3:
+        sample_block(block, sample_ms)
+    for block in stc.sds6:
+        sample_block(block, sample_ms)
+    for block in stc.sdu6:
+        sample_block(block, sample_ms)
+    for block in stc.sdu3:
+        sample_block(block, sample_ms)
+    for block in stc.sdfg:
+        sample_block(block, sample_ms)
+    for block in stc.sdmb:
+        sample_block(block, sample_ms)
+    stc.sdev = []
+
+
 def freeze_upper(stc, hold_ms=0):
     for block in stc.sd3v:
         freeze_block(block, hold_ms)
@@ -249,11 +290,13 @@ def make_pitch_group(
     groups,
     name,
     upper_name,
+    source_ms,
     pitch_bones,
     pitch_weights,
     pitch_axis,
     pitch_sign,
-    limit_degrees,
+    min_degrees,
+    max_degrees,
     duration_ms,
     samples,
 ):
@@ -267,6 +310,7 @@ def make_pitch_group(
 
     upper_stc = clone(upper_source)
     upper_stc.name = name + " Upper"
+    sample_upper(upper_stc, source_ms)
     freeze_upper(upper_stc, duration_ms)
 
     bones = {bone.name: bone for bone in model.bones}
@@ -291,7 +335,7 @@ def make_pitch_group(
         keys = []
         for sample in range(samples):
             t = sample / (samples - 1)
-            angle = pitch_sign * limit_degrees * ((2.0 * t) - 1.0) * weight
+            angle = pitch_sign * (min_degrees + ((max_degrees - min_degrees) * t)) * weight
             pitch = axis_quaternion(pitch_axis, angle)
             qx, qy, qz, qw = quat_multiply(base_q, pitch)
             key = clone(base)

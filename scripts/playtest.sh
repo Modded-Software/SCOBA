@@ -60,7 +60,7 @@ profile_timeout() {
     case "$1" in
         aim) printf '%s\n' "${SC2_CASE_TIMEOUT:-150}" ;;
         motion) printf '%s\n' "${SC2_CASE_TIMEOUT:-80}" ;;
-        pitch) printf '%s\n' "${SC2_CASE_TIMEOUT:-18}" ;;
+        pitch) printf '%s\n' "${SC2_CASE_TIMEOUT:-30}" ;;
         *) printf '%s\n' "${SC2_CASE_TIMEOUT:-40}" ;;
     esac
 }

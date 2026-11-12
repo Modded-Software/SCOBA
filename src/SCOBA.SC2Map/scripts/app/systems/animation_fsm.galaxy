@@ -144,11 +144,7 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
     ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, lv_flags, lv_blend, lv_blend, c_animTimeDefault, c_animTimeVariantAsAutomatic));
     if (gv_aIMACTIVE[lp_player]) {
         gv_animAimUpperOn[lp_player] = true;
-        gv_animAimPitchRest[lp_player] = CameraGetPitch(lp_player);
-        if (gv_animAimPitchRest[lp_player] > 180.0) {
-            gv_animAimPitchRest[lp_player] = gv_animAimPitchRest[lp_player] - 360.0;
-        }
-        ActorSend(ActorFromActor(lv_actor, "Model"), "AnimSetTimeScale " + c_ANIM_BRACKET_UPPER + " 0.000000");
+        gf_AnimAimTimeScale(lp_player, 0.0);
         gv_animAimPitchTime[lp_player] = -1.0;
         gf_AnimAimPitchTick(lp_player);
     }

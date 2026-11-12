@@ -44,6 +44,12 @@ def on_ready(ctx, data: dict) -> None:
     time.sleep(2.0)
     ctx.frames.capture("pitch_hold")
     time.sleep(3.0)
+    ctx.frames.capture("pitch_entry70")
+    time.sleep(2.0)
+    ctx.frames.capture("pitch_down70")
+    time.sleep(2.0)
+    ctx.frames.capture("pitch_up70")
+    time.sleep(2.0)
     return None
 
 
@@ -60,6 +66,21 @@ def check(ctx, data: dict, checks) -> None:
         print("pitch direction: PASS")
     else:
         print(f"pitch direction: got down={down_time} mid={mid_time} up={up_time} FAIL")
+        checks.failures += 1
+    if down_time <= 400 and up_time >= 9590:
+        print("pitch full range: PASS")
+    else:
+        print(f"pitch full range: got down={down_time} up={up_time} FAIL")
+        checks.failures += 1
+    entry70_rest = checks.value("pitch", "", "entry70Rest") or 0
+    down70_time = checks.value("pitch", "", "down70Time") or 0
+    up70_time = checks.value("pitch", "", "up70Time") or 0
+    if entry70_rest == -13 and down70_time <= 400 and up70_time >= 9590:
+        print("pitch fixed rest at entry 70: PASS")
+    else:
+        print(
+            f"pitch fixed rest at entry 70: got rest={entry70_rest} down={down70_time} up={up70_time} FAIL"
+        )
         checks.failures += 1
     
 

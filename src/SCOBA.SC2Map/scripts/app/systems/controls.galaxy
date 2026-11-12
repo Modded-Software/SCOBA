@@ -13,6 +13,33 @@ bool gf_ActionModeActive (int lp_player) {
     return UnitBehaviorCount(lv_hero, c_SCOBA_ACTION_BEHAVIOR) > 0;
 }
 
+void gf_ControlApply (int lp_player) {
+    bool lv_relative;
+    playergroup lv_group;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    gv_rOTATEUNIT[lp_player] = (gv_mOUSERIGHT[lp_player] || gv_mOUSEMIDDLE[lp_player]);
+    gv_rOTATECAMERA[lp_player] = gv_mOUSELEFT[lp_player];
+    if (gf_ActionModeActive(lp_player)) {
+        lv_relative = !gv_aCTIONALT[lp_player];
+    }
+    else {
+        lv_relative = (gv_mOUSELEFT[lp_player] || gv_mOUSERIGHT[lp_player] || gv_mOUSEMIDDLE[lp_player]);
+    }
+    if (gv_aIMACTIVE[lp_player]) {
+        lv_relative = true;
+    }
+    gv_cONTROLRELATIVE[lp_player] = lv_relative;
+    CameraSetMouseRotates(lp_player, lv_relative);
+    CameraForceMouseRelative(lp_player, lv_relative);
+    CameraLockInput(lp_player, !lv_relative);
+    lv_group = PlayerGroupSingle(lp_player);
+    UISetCursorVisible(lv_group, true);
+    UISetCursorAutoHide(lv_group, false, 0.0);
+}
+
 void gf_ActionModeRestoreRPG (int lp_player) {
     fixed lv_fov;
 
@@ -25,17 +52,15 @@ void gf_ActionModeRestoreRPG (int lp_player) {
     }
     CameraSetValue(lp_player, c_cameraValueFieldOfView, lv_fov, 0.2, -1, 10);
     gf_AimCameraSet(lp_player, false);
-    gv_rOTATEUNIT[lp_player] = false;
-    gv_rOTATECAMERA[lp_player] = false;
     gv_mOUSERIGHT[lp_player] = false;
     gv_mOUSEMIDDLE[lp_player] = false;
     gv_mOUSELEFT[lp_player] = false;
     gv_mOUSEFORWARD[lp_player] = false;
+    gf_ControlApply(lp_player);
 }
 
 void gf_ActionModeApply (int lp_player) {
     unit lv_hero;
-    playergroup lv_group;
 
     if (!gf_IsHeroPlayer(lp_player)) {
         return;
@@ -54,21 +79,11 @@ void gf_ActionModeApply (int lp_player) {
     gv_sCOBAPRESSUNIT[lp_player] = null;
     gv_sCOBALEFTPRESSUNIT[lp_player] = null;
     gf_AnimReset(lp_player);
-    lv_group = PlayerGroupSingle(lp_player);
     if (gf_ActionModeActive(lp_player)) {
-        CameraSetMouseRotates(lp_player, true);
-        CameraForceMouseRelative(lp_player, true);
-        CameraLockInput(lp_player, false);
-        UISetCursorVisible(lv_group, true);
-        UISetCursorAutoHide(lv_group, false, 0.0);
+        gf_ControlApply(lp_player);
     }
     else {
         gf_ActionModeRestoreRPG(lp_player);
-        CameraSetMouseRotates(lp_player, false);
-        CameraForceMouseRelative(lp_player, false);
-        CameraLockInput(lp_player, true);
-        UISetCursorVisible(lv_group, true);
-        UISetCursorAutoHide(lv_group, false, 0.0);
     }
 }
 
@@ -88,7 +103,6 @@ void gf_ActionModeEnsureRPG (int lp_player) {
 
 void gf_ActionModeAltApply (int lp_player) {
     unit lv_hero;
-    playergroup lv_group;
 
     if (!gf_IsHeroPlayer(lp_player)) {
         return;
@@ -100,21 +114,7 @@ void gf_ActionModeAltApply (int lp_player) {
     if (!gf_ActionModeActive(lp_player)) {
         return;
     }
-    lv_group = PlayerGroupSingle(lp_player);
-    if (gv_aCTIONALT[lp_player]) {
-        CameraSetMouseRotates(lp_player, false);
-        CameraForceMouseRelative(lp_player, false);
-        CameraLockInput(lp_player, true);
-        UISetCursorVisible(lv_group, true);
-        UISetCursorAutoHide(lv_group, false, 0.0);
-    }
-    else {
-        CameraSetMouseRotates(lp_player, true);
-        CameraForceMouseRelative(lp_player, true);
-        CameraLockInput(lp_player, false);
-        UISetCursorVisible(lv_group, true);
-        UISetCursorAutoHide(lv_group, false, 0.0);
-    }
+    gf_ControlApply(lp_player);
 }
 
 bool gt_ActionAltStart_Func (bool testConds, bool runActions) {

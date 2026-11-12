@@ -37,12 +37,7 @@ def on_ready(ctx, data: dict) -> None:
     from .. import input_driver
 
     input_driver.focus()
-    time.sleep(0.1)
-    point = input_driver.center_point()
-    input_driver.rclick_fast(point[0] + 30, point[1])
-    time.sleep(0.2)
-    input_driver.rclick_fast(point[0] + 30, point[1])
-    time.sleep(1.8)
+    time.sleep(1.9)
 
 
 def _check_icons(checks) -> None:
@@ -79,6 +74,10 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("meta", "", "done", 1)
     checks.eq("meta", "", "profile", "controls")
     checks.eq("controls_default", "t0000", "ActionMode", 0)
+    checks.eq("controls_default", "t0000", "ControlRelative", 0)
+    checks.eq("controls_default", "t0000", "RotateUnit", 0)
+    checks.eq("controls_default", "t0000", "RotateCamera", 0)
+    # Synthetic pointer warps do not emit mouse-moved events; hover is checked live.
     checks.eq("controls_rpg_hold", "t0800", "AimActive", 0)
     checks.eq("controls_rpg_hold", "t0800", "Fov", checks.value("controls_default", "t0000", "Fov"))
     move_dx = (checks.value("controls_rpg_move", "t1500", "HeroX") or 0) - (checks.value("controls_rpg_hold", "t0800", "HeroX") or 0)
@@ -106,6 +105,20 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("controls_aim", "t0200", "MoveTarget", 3000)
     checks.eq("controls_aim", "t0200", "MoveRetarget", 200)
     checks.eq("controls_aim", "t0200", "MoveTick", 15)
+    aim_dx = ((checks.value("controls_aim", "t0200", "CamTargetXM") or 0) - (checks.value("controls_aim", "t0200", "HeroXM") or 0)) / 1000.0
+    aim_dy = ((checks.value("controls_aim", "t0200", "CamTargetYM") or 0) - (checks.value("controls_aim", "t0200", "HeroYM") or 0)) / 1000.0
+    if abs(aim_dx) + abs(aim_dy) >= 0.5:
+        print(f"controls_aim target offset: PASS ({aim_dx:.2f},{aim_dy:.2f})")
+    else:
+        print(f"controls_aim target offset: got=({aim_dx:.2f},{aim_dy:.2f}) want>=0.5 FAIL")
+        checks.failures += 1
+    stable_dx = ((checks.value("controls_aim", "t1200", "CamTargetXM") or 0) - (checks.value("controls_aim", "t0200", "CamTargetXM") or 0)) / 1000.0
+    stable_dy = ((checks.value("controls_aim", "t1200", "CamTargetYM") or 0) - (checks.value("controls_aim", "t0200", "CamTargetYM") or 0)) / 1000.0
+    if abs(stable_dx) + abs(stable_dy) <= 1:
+        print("controls_aim target stable: PASS")
+    else:
+        print(f"controls_aim target stable: got=({stable_dx},{stable_dy}) want<=1 FAIL")
+        checks.failures += 1
     checks.eq("controls_attack", "t0100", "TargetType", "hostile")
     checks.eq("controls_attack", "t0100", "CombatState", 4)
     checks.eq("controls_ground", "t0000", "TargetType", checks.value("controls_ground", "t0100", "TargetType"))
@@ -121,9 +134,9 @@ def check(ctx, data: dict, checks) -> None:
     base_distance = checks.value("controls_default", "t0000", "Distance") or 0
     zoom_distance = checks.value("controls_zoom", "t0100", "Distance") or 0
     if zoom_distance - base_distance >= 1:
-        print("controls_zoom immediate distance: PASS")
+        print("controls_zoom animated distance: PASS")
     else:
-        print(f"controls_zoom immediate distance: got={zoom_distance} base={base_distance} FAIL")
+        print(f"controls_zoom animated distance: got={zoom_distance} base={base_distance} FAIL")
         checks.failures += 1
     collision_distance = checks.value("controls_collision", "t0200", "Distance") or 0
     if abs(collision_distance - base_distance) <= 1:

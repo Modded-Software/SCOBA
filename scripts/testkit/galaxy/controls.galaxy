@@ -39,7 +39,31 @@ void gf_ControlsSnap (string lp_section, string lp_tag) {
     }
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CursorVisible", 1);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CursorCentered", 1);
+    if (gv_cONTROLRELATIVE[1]) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ControlRelative", 1);
+    }
+    else {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ControlRelative", 0);
+    }
+    if (gv_rOTATEUNIT[1]) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "RotateUnit", 1);
+    }
+    else {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "RotateUnit", 0);
+    }
+    if (gv_rOTATECAMERA[1]) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "RotateCamera", 1);
+    }
+    else {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "RotateCamera", 0);
+    }
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CameraYaw", FixedToInt(CameraGetYaw(1)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamTargetX", FixedToInt(PointGetX(CameraGetTarget(1))));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamTargetY", FixedToInt(PointGetY(CameraGetTarget(1))));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamTargetXM", FixedToInt(PointGetX(CameraGetTarget(1)) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamTargetYM", FixedToInt(PointGetY(CameraGetTarget(1)) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroXM", FixedToInt(PointGetX(UnitGetPosition(lv_hero)) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroYM", FixedToInt(PointGetY(UnitGetPosition(lv_hero)) * 1000.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UnitFacing", FixedToInt(UnitGetFacing(lv_hero)));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CombatState", gv_sCOBAFSM[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Fov", FixedToInt(gv_cAMERAFOV[1]));
@@ -167,6 +191,8 @@ bool gt_ControlsTest_Func (bool testConds, bool runActions) {
     gf_AimBegin(1);
     Wait(0.2, c_timeGame);
     gf_ControlsSnap("controls_aim", "t0200");
+    Wait(1.0, c_timeGame);
+    gf_ControlsSnap("controls_aim", "t1200");
 
     lv_enemy = gf_DbgSpawnOne("controls_attack", 0.0, 500.0);
     UnitSetPosition(lv_enemy, CameraGetTarget(1), false);
@@ -194,13 +220,13 @@ bool gt_ControlsTest_Func (bool testConds, bool runActions) {
     gv_cameraCollisionOff[1] = true;
     gv_cameraDistanceDesired[1] = lv_dist + 1.5;
     gf_CameraZoomApply(1);
-    Wait(0.1, c_timeGame);
+    Wait(0.35, c_timeGame);
     gf_ControlsSnap("controls_zoom", "t0100");
     gv_cameraDistanceDesired[1] = lv_dist;
     gf_CameraZoomApply(1);
-    Wait(0.1, c_timeGame);
+    Wait(0.35, c_timeGame);
     gv_cameraCollisionOff[1] = false;
-    Wait(0.1, c_timeGame);
+    Wait(0.15, c_timeGame);
     gf_ControlsSnap("controls_collision", "t0200");
     CameraSetValue(1, c_cameraValuePitch, -60.0, 0.1, -1, 10);
     Wait(0.5, c_timeGame);
