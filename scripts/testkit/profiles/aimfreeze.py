@@ -13,8 +13,16 @@ from ..runner import TestRunSpec
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
-READY_FRAME_MS = 33.0
-FRAME_TOLERANCE = 1
+PITCH_TIME_MS = 10000.0
+PITCH_STEPS = 99
+STATIC_FRAME_MS = 1000
+
+
+def expected_clip(time_ms: int) -> str:
+    ratio = max(0.0, min(1.0, time_ms / PITCH_TIME_MS))
+    step = int(round(ratio * (PITCH_STEPS - 1))) + 1
+    step = max(1, min(PITCH_STEPS, step))
+    return f"Ready,{step:02d}"
 
 
 def map_spec() -> TestMapSpec:
@@ -70,30 +78,28 @@ def check(ctx, data: dict, checks) -> None:
     ]
     hold_uclip = sorted({str(record.get("uclip", "")) for record in hold_rows})
     move_uclip = sorted({str(record.get("uclip", "")) for record in move_rows})
-    hold_ufid = sorted({int(record.get("ufid", -1)) for record in hold_rows})
-    move_ufid = sorted({int(record.get("ufid", -1)) for record in move_rows})
-    want_hold = expected_frame(hold1_time)
-    want_move = expected_frame(move1_time)
+    hold_ulen = sorted({int(record.get("ulen", -1)) for record in hold_rows})
+    move_ulen = sorted({int(record.get("ulen", -1)) for record in move_rows})
+    want_hold = expected_clip(hold1_time)
+    want_move = expected_clip(move1_time)
     print(
         f"freeze animation: hold={hold_uclip} move={move_uclip} "
-        f"frame_hold={hold_ufid} frame_move={move_ufid} "
+        f"len_hold={hold_ulen} len_move={move_ulen} "
         f"want_hold={want_hold} want_move={want_move}"
     )
-    if hold_uclip == ["Ready"] and move_uclip == ["Ready"]:
-        print("freeze correct animation: Ready PASS")
+    playing = (
+        hold_uclip == [want_hold]
+        and move_uclip == [want_move]
+        and hold_ulen == [STATIC_FRAME_MS]
+        and move_ulen == [STATIC_FRAME_MS]
+    )
+    if playing:
+        print("freeze correct animation: PASS")
     else:
         print("freeze correct animation: FAIL")
         checks.failures += 1
-    held = (
-        len(hold_ufid) == 1
-        and abs(hold_ufid[0] - want_hold) <= FRAME_TOLERANCE
-    )
-    changed = (
-        len(move_ufid) == 1
-        and abs(move_ufid[0] - want_move) <= FRAME_TOLERANCE
-        and move_ufid != hold_ufid
-    )
-    if held and changed:
+    held = hold_uclip == [want_hold] and move_uclip == [want_move] and want_move != want_hold
+    if held:
         print("freeze camera frame held and changed: PASS")
     else:
         print("freeze camera frame held and changed: FAIL")

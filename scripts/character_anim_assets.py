@@ -75,8 +75,8 @@ AIM_PITCH_SOURCE = "Attack"
 AIM_PITCH_SOURCE_MS = 350
 AIM_PITCH_MIN_DEG = -95.0
 AIM_PITCH_MAX_DEG = 50.0
-AIM_PITCH_TIME_MS = 10000
-AIM_PITCH_SAMPLES = 601
+AIM_PITCH_FRAME_MS = 1000
+AIM_PITCH_STEPS = 99
 
 AIM_DIRECTIONS = (
     ("Forward", 0.0, False),
@@ -238,21 +238,24 @@ def generate_model(
             reverse,
             turn_anim_id,
         )
-    make_pitch_group(
-        model,
-        groups,
-        AIM_PITCH_GROUP,
-        AIM_PITCH_SOURCE,
-        AIM_PITCH_SOURCE_MS,
-        pitch_bones,
-        pitch_weights,
-        pitch_axis,
-        pitch_sign,
-        AIM_PITCH_MIN_DEG,
-        AIM_PITCH_MAX_DEG,
-        AIM_PITCH_TIME_MS,
-        AIM_PITCH_SAMPLES,
-    )
+    for step in range(AIM_PITCH_STEPS):
+        t = step / (AIM_PITCH_STEPS - 1)
+        angle = AIM_PITCH_MIN_DEG + (AIM_PITCH_MAX_DEG - AIM_PITCH_MIN_DEG) * t
+        make_pitch_group(
+            model,
+            groups,
+            f"{AIM_PITCH_GROUP} {step + 1:02d}",
+            AIM_PITCH_SOURCE,
+            AIM_PITCH_SOURCE_MS,
+            pitch_bones,
+            pitch_weights,
+            pitch_axis,
+            pitch_sign,
+            angle,
+            angle,
+            AIM_PITCH_FRAME_MS,
+            2,
+        )
     print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)}")
     target.parent.mkdir(parents=True, exist_ok=True)
     m3.saveAndInvalidateModel(model, str(target))

@@ -27,7 +27,7 @@ void gf_AnimConfigInit () {
         gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_MID, "Attack,Ready", 0.15);
         gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_UP, "Attack,Ready", 0.15);
         if (lv_profile == c_ANIM_HERO_TOSH || lv_profile == c_ANIM_HERO_KERRIGAN) {
-            gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_MID, "Ready", 0.15);
+            gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_MID, "Ready,50", 0.0);
         }
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_IDLE, "Stand,Leg", true, 0.15, 0.0);
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_WALK, "Walk,Leg", true, 0.15, lv_walk_speed);

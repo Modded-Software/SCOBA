@@ -166,12 +166,21 @@ void gf_AnimConfigAimWalk (int lp_profile, int lp_state) {
     gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_RIGHT, "Attack,Walk,Right");
     gf_AnimConfigAimDir(lp_profile, lp_state, c_ANIM_DIR_FORWARD_RIGHT, "Attack,Walk,Forward,Right");
 }
+string gf_AnimAimPitchClip (int lp_step) {
+    if (lp_step < 10) {
+        return "Ready,0" + IntToString(lp_step);
+    }
+    return "Ready," + IntToString(lp_step);
+}
 void gf_AnimAimPitchTick (int lp_player) {
     unit lv_hero;
     actor lv_actor;
     fixed lv_pitch;
     fixed lv_time;
     fixed lv_camera;
+    fixed lv_ratio;
+    int lv_step;
+    string lv_clip;
 
     if (!gv_aIMACTIVE[lp_player]) {
         return;
@@ -195,23 +204,25 @@ void gf_AnimAimPitchTick (int lp_player) {
     if (lv_pitch < c_ANIM_AIM_PITCH_MIN) {
         lv_pitch = c_ANIM_AIM_PITCH_MIN;
     }
-    lv_time = ((lv_pitch - c_ANIM_AIM_PITCH_MIN) / (c_ANIM_AIM_PITCH_MAX - c_ANIM_AIM_PITCH_MIN)) * c_ANIM_AIM_PITCH_TIME;
-    lv_time = Round(lv_time / c_ANIM_AIM_PITCH_KEY) * c_ANIM_AIM_PITCH_KEY;
-    if (lv_time < 0.0) {
-        lv_time = 0.0;
+    lv_ratio = (lv_pitch - c_ANIM_AIM_PITCH_MIN) / (c_ANIM_AIM_PITCH_MAX - c_ANIM_AIM_PITCH_MIN);
+    lv_time = lv_ratio * c_ANIM_AIM_PITCH_TIME;
+    lv_step = FixedToInt(Round(lv_ratio * (c_ANIM_AIM_PITCH_STEPS - 1))) + 1;
+    if (lv_step < 1) {
+        lv_step = 1;
     }
-    if (lv_time > c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY) {
-        lv_time = c_ANIM_AIM_PITCH_TIME - c_ANIM_AIM_PITCH_KEY;
+    if (lv_step > c_ANIM_AIM_PITCH_STEPS) {
+        lv_step = c_ANIM_AIM_PITCH_STEPS;
     }
-    if ((gv_animAimPitchTime[lp_player] >= 0.0) && (AbsF(gv_animAimPitchTime[lp_player] - lv_time) < 0.0001)) {
+    if (lv_step == gv_animAimPitchStep[lp_player]) {
         return;
     }
+    lv_clip = gf_AnimAimPitchClip(lv_step);
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
-    ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
-    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_AIM_PITCH_CLIP + " " + FixedToString(lv_time, c_fixedPrecisionAny) + " 0");
-    ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER);
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, 0.0, 0.0, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    gv_animAimPitchStep[lp_player] = lv_step;
     gv_animAimPitchTime[lp_player] = lv_time;
     gv_animAimPitchSends[lp_player] += 1;
+    gf_ProbeSetUpperClip(lp_player, lv_clip);
 }
 
 bool gt_AnimPitchTick_Func (bool testConds, bool runActions) {

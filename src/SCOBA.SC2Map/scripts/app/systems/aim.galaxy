@@ -129,6 +129,7 @@ void gf_AimEnd (int lp_player) {
     gv_aIMACTIVE[lp_player] = false;
     gv_animAimUpperOn[lp_player] = false;
     gv_animAimPitchTime[lp_player] = -1.0;
+    gv_animAimPitchStep[lp_player] = 0;
     gf_AnimReset(lp_player);
     lv_hero = gv_tPSUNIT[lp_player];
     if (UnitIsValid(lv_hero)) {

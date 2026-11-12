@@ -67,7 +67,10 @@ void gf_ProbeUpperQuery (int lp_player) {
         return;
     }
     lv_profile = gf_AnimHeroProfile(lv_hero);
-    lv_clip = gv_animUpperClip[lv_profile][gv_animUpperState[lp_player]];
+    lv_clip = gv_probeClipName[lp_player][0];
+    if (lv_clip == "") {
+        lv_clip = gv_animUpperClip[lv_profile][gv_animUpperState[lp_player]];
+    }
     if (lv_clip == "") {
         gv_probeClipName[lp_player][0] = "";
         gv_probeClipQuery[lp_player][0] = 0;

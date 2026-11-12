@@ -62,6 +62,7 @@ int[8] gv_animAimTurn;
 int[8] gv_animAimTurnHold;
 bool[8] gv_animAimUpperOn;
 fixed[8] gv_animAimPitchTime;
+int[8] gv_animAimPitchStep;
 int[8] gv_animAimPitchTicks;
 int[8] gv_animAimPitchSends;
 fixed[8] gv_animAimPitchRest;
