@@ -26,7 +26,7 @@ bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     UISetMiniMapCameraFoVVisible(false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeVictoryPanel, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTipAlertPanel, false);
-    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTextTag, false);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTextTag, true);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTechTreePanel, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTechGlossaryPanel, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTeamResourceButton, false);

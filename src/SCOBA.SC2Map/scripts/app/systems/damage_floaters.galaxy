@@ -1,0 +1,59 @@
+// Module: systems/damage_floaters
+
+void gf_FloaterCreate (int lp_player, point lp_point, text lp_text, color lp_color) {
+    int lv_tag;
+
+    TextTagCreate(lp_text, 24, lp_point, 1.6, true, false, PlayerGroupSingle(lp_player));
+    lv_tag = TextTagLastCreated();
+    TextTagSetColor(lv_tag, c_textTagColorText, lp_color);
+    TextTagSetVelocity(lv_tag, 0.35, 90.0);
+    TextTagSetTime(lv_tag, c_textTagTimeDuration, 1.6);
+    TextTagSetTime(lv_tag, c_textTagTimeFadeOut, 1.1);
+    TextTagShow(lv_tag, PlayerGroupSingle(lp_player), true);
+}
+
+bool gt_DamageFloater_Func (bool testConds, bool runActions) {
+    unit lv_victim;
+    unit lv_source;
+    int lv_player;
+    fixed lv_damage;
+    int lv_amount;
+    text lv_text;
+
+    lv_victim = EventUnit();
+    lv_source = EventUnitDamageSourceUnit();
+    lv_damage = EventUnitDamageAmount();
+
+    if (!runActions) {
+        return true;
+    }
+
+    if (!UnitIsValid(lv_victim) || !UnitIsValid(lv_source)) {
+        return true;
+    }
+    if (lv_victim == lv_source) {
+        return true;
+    }
+    if (gf_AimShotProxyIs(lv_victim)) {
+        return true;
+    }
+    
+    if (lv_damage <= 0.0) {
+        return true;
+    }
+
+    lv_player = gf_HeroPlayerFromUnit(lv_source);
+    if (!gf_IsHeroPlayer(lv_player)) {
+        return true;
+    }
+
+    lv_amount = FixedToInt(Round(lv_damage));
+    lv_text = StringToText(IntToString(lv_amount));
+    gf_FloaterCreate(lv_player, UnitGetPosition(lv_victim), lv_text, Color(100.0, 25.0, 25.0));
+    return true;
+}
+
+void gt_DamageFloater_Init () {
+    gt_DamageFloater = TriggerCreate("gt_DamageFloater_Func");
+    TriggerAddEventUnitDamaged(gt_DamageFloater, null, c_unitDamageTypeAny, c_unitDamageEither, null);
+}

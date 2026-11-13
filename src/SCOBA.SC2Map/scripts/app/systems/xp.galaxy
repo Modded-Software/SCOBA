@@ -114,6 +114,9 @@ bool gt_DamageTrack_Func (bool testConds, bool runActions) {
     if (!UnitIsValid(lv_victim) || !UnitIsValid(lv_source)) {
         return true;
     }
+    if (gf_AimShotProxyIs(lv_victim)) {
+        return true;
+    }
     if (!gf_IsHeroPlayer(lv_player)) {
         return true;
     }
@@ -217,6 +220,9 @@ bool gt_DeathAward_Func (bool testConds, bool runActions) {
     }
 
     if (!UnitIsValid(lv_victim)) {
+        return true;
+    }
+    if (gf_AimShotProxyIs(lv_victim)) {
         return true;
     }
     if (lv_tag <= 0) {

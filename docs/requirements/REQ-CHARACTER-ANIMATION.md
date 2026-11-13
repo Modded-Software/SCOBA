@@ -52,7 +52,7 @@ Implementation lives in
 | R-ANIM-26 | Turning MUST use the full-body baseline Stand Left and Stand Right clips. |
 | R-ANIM-27 | The map MUST NOT create an upper-body turn overlay. |
 | R-ANIM-28 | The frozen upper pose MUST come from the upper-only Attack aim frame at 350 ms, where the gun is near horizontal. The pitch source MUST NOT include lower-body tracks. |
-| R-ANIM-29 | Aim attack animation is DEFERRED to a later stage. |
+| R-ANIM-29 | Aim attack animation MUST use a concurrent root-excluded upper attack overlay. |
 | R-ANIM-30 | Aim clip changes MUST be idempotent for an unchanged lower-body state. |
 | R-ANIM-31 | Non-aim A/D/S movement MUST turn the hero toward the movement direction and use native Walk. |
 | R-ANIM-32 | Aim MUST use eight lower-body movement directions. |
@@ -88,13 +88,24 @@ Implementation lives in
 | R-ANIM-60 | Aim exit MUST send `AnimBlendTimeRemove`, unpause `SCOBAUp`, and clear pitch state. |
 | R-ANIM-61 | Aim lower body MUST keep its idle, in-place turn, or walk animation playing while the upper body is held. Aim idle MUST use `Attack,Stand`; aim in-place turn MUST use `Attack,Stand,Left` or `Attack,Stand,Right`; aim walk MUST use `Attack,Walk,<direction>`. |
 | R-ANIM-62 | Non-aim attack animation MUST be independent of lower-body locomotion. The upper body MUST play the attack clip while the lower body keeps its Stand or Walk animation. |
+| R-ANIM-62a | RPG attack torso pitch MUST follow the vector from the hero to the current target actor. |
+| R-ANIM-62b | Action-mode aim attack torso pitch MUST follow camera pitch. |
+| R-ANIM-62c | RPG target pitch MUST use the target actor height, not only its ground point. |
+| R-ANIM-62d | RPG target pitch MUST clamp to the shared pitch range `-95..50` with rest `-13`. |
+| R-ANIM-62e | RPG target pitch MUST use the root-excluded attack clip on `SCOBAAimAtk` and the shared `SCOBAUp` pitch clip. |
 | R-ANIM-63 | Gameplay MUST use clean unit types `ToshSCOBA` and `KerriganSCOBA` with clean actors `ToshSCOBAUnit` and `KerriganSCOBAUnit`. Clean actor `unitName` MUST equal the clean unit type. |
-| R-ANIM-64 | Every `UnitStartedAttack2` event MUST restart the upper attack clip. The attack MUST clear on actual animation completion or weapon stop. A fixed timer MAY exist only as a safety cap. |
+| R-ANIM-64 | Every `UnitStartedAttack2` event MUST restart the upper attack clip. The attack MUST clear on actual animation completion or weapon stop. A fixed timer MAY exist only as a safety cap. The attack animation MUST play at 2x speed. |
+| R-ANIM-64a | Attack playback MUST start at the firing/recoil frame, not the clip windup. |
+| R-ANIM-64b | Attack playback MUST skip the shared `c_ANIM_ATTACK_START_TIME` offset after `AnimPlay`. |
 | R-ANIM-65 | Attack clip selection MUST use the started weapon. Tosh MUST use `Attack Arm Alternate`. Kerrigan `RazorTalons` MUST use `Attack Arm Alternate`. Kerrigan `QueenOfBladesPsiBlast` MUST use `Spell Arm Alternate`. |
-| R-ANIM-66 | Attack animation MUST NOT run while aim is active. Aim keeps sole ownership of `SCOBAUp`. |
+| R-ANIM-66 | Aim attack MUST play on `SCOBAAimAtk`; aim pitch MUST remain on `SCOBAUp`. |
+| R-ANIM-66a | Attack clips MUST omit the pitch root tracks so the active pitch source survives the attack. |
+| R-ANIM-66b | Attack MUST NOT pause, clear, or replace the active `SCOBAUp` pitch while the attack is running. |
+| R-ANIM-66c | Attack MUST clear on aim exit, attack end, hero switch, and animation reset. |
+| R-ANIM-66d | RPG attack MUST play the root-excluded attack on `SCOBAAimAtk` and target pitch on `SCOBAUp`. |
 | R-ANIM-67 | Non-aim lower body animation MUST be native Stand, Walk, and turn. The map MUST NOT select or play non-aim lower clips. |
 | R-ANIM-68 | Attack animation MUST NOT change combat orders, unit facing, camera state, or control state. |
-| R-ANIM-69 | Model generation MUST preserve the native baseline Stand, Walk, and turn groups. It MUST add upper-only clips `Attack Arm Alternate` and `Spell Arm Alternate` with `runsConcurrent=1` and priority 10. It MUST NOT alter native attack groups. |
+| R-ANIM-69 | Model generation MUST preserve the native baseline Stand, Walk, and turn groups. It MUST add upper-only clips `Attack Arm Alternate` and `Spell Arm Alternate` with `runsConcurrent=1` and priority 10. It MUST add root-excluded attack clips `Attack Arm Alternate 01` and `Spell Arm Alternate 01` with `runsConcurrent=1` and priority 12. It MUST NOT alter native attack groups. |
 | R-ANIM-70 | Build validation MUST assert that every configured animation name exists in the generated M3. |
 | R-ANIM-71 | `SCOBAUp` and `SCOBALo` are `AnimPlay` animation instance names. They MUST NOT be sent to `AnimBracketStart`, `AnimBracketStop`, `AnimSetTime`, `AnimSetTimeScale`, or `AnimSetPaused` before their `AnimPlay` exists. |
 | R-ANIM-72 | Clean actors MUST define no `Abil.attack.*`, `WeaponStart.*`, `WeaponStop.*`, or `Abil.attack.ReadyStart` events. |
@@ -117,7 +128,7 @@ Implementation lives in
 | AC-ANIM-10 | Turning uses native full-body turn clips and creates no upper turn events. |
 | AC-ANIM-11 | Aim hold records one upper pitch start event and no repeated upper start events. |
 | AC-ANIM-12 | Splitbody aim groups contain one upper key per upper track. |
-| AC-ANIM-13 | Aim attack animation is not implemented in this stage. |
+| AC-ANIM-13 | Aim attack plays on `SCOBAAimAtk` and preserves aim yaw and pitch. |
 | AC-ANIM-14 | Non-aim A/D/S turns the hero toward movement and keeps Walk frame IDs advancing. |
 | AC-ANIM-15 | Backward aim movement uses a reversed backpedal clip. |
 | AC-ANIM-16 | Aim twist stays at or below 65 degrees in either strafe direction. |
@@ -145,11 +156,15 @@ Implementation lives in
 | AC-ANIM-38 | Repeated swings restart the upper attack clip. |
 | AC-ANIM-39 | Kerrigan `RazorTalons` and `QueenOfBladesPsiBlast` use distinct upper clips. |
 | AC-ANIM-40 | Actor logs show no duplicate `CActorUnit` for Tosh or Kerrigan. |
-| AC-ANIM-41 | RPG and Action attack both use the same attack overlay. |
-| AC-ANIM-42 | Aim never shows the non-aim attack overlay. |
+| AC-ANIM-41 | RPG and Action attack use the same root-excluded attack overlay. |
+| AC-ANIM-42 | Aim attack plays on `SCOBAAimAtk`, keeps the aim yaw and pitch, and never writes the non-aim `SCOBAUp` overlay. |
+| AC-ANIM-50 | RPG attack torso pitch follows the target actor vector and clamps to the shared pitch range. |
+| AC-ANIM-51 | Action-mode aim attack torso pitch follows camera pitch. |
+| AC-ANIM-52 | RPG attack while moving keeps the native Walk lower clip. |
+| AC-ANIM-53 | RPG attack against a high or low target visibly pitches the torso up or down. |
 | AC-ANIM-43 | `ToshSCOBA` and `KerriganSCOBA` unit types exist and parent the native heroes. |
 | AC-ANIM-44 | `ToshSCOBAUnit` and `KerriganSCOBAUnit` use matching `unitName` values and define no native attack events. |
-| AC-ANIM-45 | Generated models keep native Stand, Walk, and turn groups and add `Attack Arm Alternate`/`Spell Arm Alternate` with `runsConcurrent=1` and priority 10, without altering native attack groups. |
+| AC-ANIM-45 | Generated models keep native Stand, Walk, and turn groups and add `Attack Arm Alternate`/`Spell Arm Alternate` at priority 10 plus `Attack Arm Alternate 01`/`Spell Arm Alternate 01` at priority 12, without altering native attack groups. |
 | AC-ANIM-46 | Attacking while stationary keeps the native Stand lower clip advancing. Attacking while moving keeps the native Walk lower clip advancing. |
 | AC-ANIM-47 | Runtime actor logs contain no invalid actor message for `SCOBAUp` or `SCOBALo`. |
 | AC-ANIM-48 | Every aim pitch clip contains only upper-body tracks and no lower-body tracks. |

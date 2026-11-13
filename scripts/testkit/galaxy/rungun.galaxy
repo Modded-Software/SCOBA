@@ -1,0 +1,72 @@
+// Fast Action/aim moving-fire test profile
+
+trigger gt_RungunTest;
+
+void gf_RungunSnap (string lp_tag) {
+    unit lv_hero;
+    bool lv_ready;
+    bool lv_aim_attack;
+
+    lv_hero = gv_tPSUNIT[1];
+    lv_ready = gf_WeaponReady(1);
+    lv_aim_attack = gf_AnimAimAttackActive(1);
+    gf_DbgSnap("rungun", lp_tag);
+    BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "AimShots", gv_aimShots[1]);
+    BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "AimOut", gv_aimOutOfRange[1]);
+    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "AimActive", gv_aIMACTIVE[1]);
+    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "WeaponReady", lv_ready);
+    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "AimAttackActive", lv_aim_attack);
+    BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "WeaponCount", UnitWeaponCount(lv_hero));
+    BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "WeaponPeriodMs", FixedToInt(UnitWeaponPeriodRemaining(lv_hero, 1) * 1000.0));
+    BankSave(gv_dbgBank);
+}
+
+bool gt_RungunTest_Func (bool testConds, bool runActions) {
+    int lv_i;
+
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBARUNGUNTEST", 1);
+    gv_bINPUTLOG = false;
+    gv_bANIMLOG = true;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "rungun");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgReset("rungun", false, true);
+    gf_AimBegin(1);
+    Wait(0.4, c_timeGame);
+    gf_RungunSnap("t0000");
+    BankValueSetFromString(gv_dbgBank, "rungun_start", "ToshAllowedMovement", CatalogFieldValueGet(c_gameCatalogWeapon, "Tosh", "AllowedMovement", 1));
+    BankValueSetFromInt(gv_dbgBank, "rungun_start", "ready", 1);
+    BankSave(gv_dbgBank);
+
+    gv_fORWARD[1] = true;
+    for (lv_i = 0; lv_i < 300; lv_i += 1) {
+        if (lv_i == 30) {
+            gf_AimShotPress(1);
+        }
+        if (lv_i == 40) {
+            gf_RungunSnap("shot");
+        }
+        if (lv_i == 99) {
+            gf_RungunSnap("t1000");
+        }
+        if (lv_i == 199) {
+            gf_RungunSnap("t2000");
+        }
+        Wait(0.01, c_timeGame);
+    }
+    gv_fORWARD[1] = false;
+    gf_RungunSnap("t3000");
+    gf_AimEnd(1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_RungunTest_Init () {
+    gt_RungunTest = TriggerCreate("gt_RungunTest_Func");
+    TriggerAddEventMapInit(gt_RungunTest);
+}

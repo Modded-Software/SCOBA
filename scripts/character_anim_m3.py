@@ -285,6 +285,117 @@ def axis_quaternion(axis: str, degrees: float):
     raise ValueError(f"unsupported pitch axis {axis!r}")
 
 
+def add_kickback(model, stc, kick_bones, kick_axis, kick_sign, kick_degrees, start_ms, duration_ms):
+    bones = {bone.name: bone for bone in model.bones}
+    kick_ids = set()
+    for bone_name in kick_bones:
+        bone = bones.get(bone_name)
+        if bone is None:
+            raise KeyError(bone_name)
+        kick_ids.add(bone.rotation.header.animId)
+    for anim_id, anim_ref in zip(stc.animIds, stc.animRefs):
+        if anim_id not in kick_ids:
+            continue
+        if (anim_ref >> 16) & 0xFFFF != 3:
+            continue
+        block = stc.sd4q[anim_ref & 0xFFFF]
+        if not block.keys:
+            raise ValueError(f"empty kick track for {anim_id}")
+        base = clone(block.keys[0])
+        base_q = (float(base.x), float(base.y), float(base.z), float(base.w))
+        offsets = [0.0, 40.0, 120.0, 300.0, duration_ms]
+        angles = [0.0, kick_degrees, kick_degrees * 0.65, kick_degrees * 0.15, 0.0]
+        keys = [clone(base)]
+        frames = [0]
+        for offset, angle in zip(offsets[1:], angles[1:]):
+            quat = axis_quaternion(kick_axis, kick_sign * angle)
+            qx, qy, qz, qw = quat_multiply(base_q, quat)
+            key = clone(base)
+            key.x = qx
+            key.y = qy
+            key.z = qz
+            key.w = qw
+            frames.append(start_ms + int(offset))
+            keys.append(key)
+        block.frames = frames
+        block.keys = keys
+        block.fend = start_ms + duration_ms
+        block.flags = 0
+    return bones
+
+
+def make_kick_group(
+    model,
+    groups,
+    name,
+    source_name,
+    kick_bones,
+    kick_axis,
+    kick_sign,
+    kick_degrees,
+    duration_ms,
+):
+    validate_animation_name(name)
+    source_group = groups[source_name]
+    source_stc = model.sequenceTransformationCollections[source_group.stcIndices[0]]
+    bones = {bone.name: bone for bone in model.bones}
+    kick_ids = set()
+    for bone_name in kick_bones:
+        bone = bones.get(bone_name)
+        if bone is None:
+            raise KeyError(bone_name)
+        kick_ids.add(bone.rotation.header.animId)
+    pairs = [
+        (anim_id, anim_ref)
+        for anim_id, anim_ref in zip(source_stc.animIds, source_stc.animRefs)
+        if anim_id in kick_ids
+    ]
+    if not pairs:
+        raise ValueError(f"kick bones {kick_bones!r} are missing from {source_name}")
+    stc = clone(source_stc)
+    stc.name = name + " Upper"
+    stc.animIds = [pair[0] for pair in pairs]
+    stc.animRefs = [pair[1] for pair in pairs]
+    freeze_upper(stc, 0)
+    frames = [0, 40, 120, 300, duration_ms]
+    angles = [0.0, kick_degrees, kick_degrees * 0.65, kick_degrees * 0.15, 0.0]
+    for _, anim_ref in pairs:
+        if (anim_ref >> 16) & 0xFFFF != 3:
+            continue
+        block = stc.sd4q[anim_ref & 0xFFFF]
+        base = clone(block.keys[0])
+        base_q = (float(base.x), float(base.y), float(base.z), float(base.w))
+        keys = []
+        for angle in angles:
+            quat = axis_quaternion(kick_axis, kick_sign * angle)
+            qx, qy, qz, qw = quat_multiply(base_q, quat)
+            key = clone(base)
+            key.x = qx
+            key.y = qy
+            key.z = qz
+            key.w = qw
+            keys.append(key)
+        block.frames = list(frames)
+        block.keys = keys
+        block.fend = duration_ms
+        block.flags = 0
+    stc_index = append_stc(model, stc, 13)
+    group = clone(source_group)
+    group.name = name
+    group.stcIndices = [stc_index]
+    model.sequenceTransformationGroups.append(group)
+    groups[name] = group
+    sequences = {sequence.name: sequence for sequence in model.sequences}
+    target_sequence = clone(sequences[source_name])
+    target_sequence.name = name
+    target_sequence.animStartInMS = 0
+    target_sequence.animEndInMS = duration_ms
+    target_sequence.movementSpeed = 0.0
+    target_sequence.frequency = 100
+    target_sequence.flags = 0
+    model.sequences.append(target_sequence)
+
+
 def make_pitch_group(
     model,
     groups,

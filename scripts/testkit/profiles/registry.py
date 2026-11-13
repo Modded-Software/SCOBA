@@ -11,6 +11,7 @@ PROFILE_OUTPUTS = {
     "motion": ROOT / "out" / "SCOBA256_motiontest.SC2Map",
     "pitch": ROOT / "out" / "SCOBA256_pitchtest.SC2Map",
     "aimfreeze": ROOT / "out" / "SCOBA256_aimfreezetest.SC2Map",
+    "rungun": ROOT / "out" / "SCOBA256_runguntest.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -20,6 +21,7 @@ PROFILE_BANKS = {
     "motion": ("SCOBAMOTIONTEST",),
     "pitch": ("SCOBAPITCHTEST",),
     "aimfreeze": ("SCOBAAIMFREETEST",),
+    "rungun": ("SCOBARUNGUNTEST",),
 }
 
 
@@ -42,4 +44,7 @@ def profile_module(name):
     if name == "aimfreeze":
         from . import aimfreeze
         return aimfreeze
+    if name == "rungun":
+        from . import rungun
+        return rungun
     raise SystemExit(f"unknown test profile: {name}")

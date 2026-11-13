@@ -1,19 +1,8 @@
 // Module: systems/selection
 
 void gf_EnableClickEventsUnit (unit lp_unit) {
-    int lv_player;
-    string lv_type;
-
     if (!UnitIsValid(lp_unit)) {
         return;
-    }
-    lv_type = UnitGetType(lp_unit);
-    if (!CatalogEntryIsValid(c_gameCatalogUnit, lv_type)) {
-        return;
-    }
-    for (lv_player = 1; lv_player <= 6; lv_player += 1) {
-        CatalogFieldValueSet(c_gameCatalogUnit, lv_type, "FlagArray[Unclickable]", lv_player, "0");
-        CatalogFieldValueSet(c_gameCatalogUnit, lv_type, "FlagArray[Unhighlightable]", lv_player, "0");
     }
 }
 
@@ -174,6 +163,30 @@ bool gt_HeroReselect5_Func (bool testConds, bool runActions) {
 
 bool gt_HeroReselect6_Func (bool testConds, bool runActions) {
     return gf_HeroReselectEvent(6, testConds, runActions);
+}
+
+bool gt_UnitClick1_Func (bool testConds, bool runActions) {
+    return gf_UnitClickEvent(1, testConds, runActions);
+}
+
+bool gt_UnitClick2_Func (bool testConds, bool runActions) {
+    return gf_UnitClickEvent(2, testConds, runActions);
+}
+
+bool gt_UnitClick3_Func (bool testConds, bool runActions) {
+    return gf_UnitClickEvent(3, testConds, runActions);
+}
+
+bool gt_UnitClick4_Func (bool testConds, bool runActions) {
+    return gf_UnitClickEvent(4, testConds, runActions);
+}
+
+bool gt_UnitClick5_Func (bool testConds, bool runActions) {
+    return gf_UnitClickEvent(5, testConds, runActions);
+}
+
+bool gt_UnitClick6_Func (bool testConds, bool runActions) {
+    return gf_UnitClickEvent(6, testConds, runActions);
 }
 
 void gt_HeroReselectOnSelect_Init () {

@@ -29,10 +29,13 @@ void gf_AnimUpperClear (int lp_player) {
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     gf_AnimEvent(lp_player, "upper_stop", "", 0);
     gf_ProbeEvent(lp_player, "upper_stop", "", 0);
-    if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE || gv_animAimUpperOn[lp_player]) {
+    if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE || gv_animAimUpperOn[lp_player] || gv_animTargetPitchStep[lp_player] > 0) {
         ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
         ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_UPPER);
     }
+    ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_ATTACK);
+    
+    gf_AnimTargetPitchClear(lp_player);
     gv_animUpperState[lp_player] = c_ANIM_UPPER_NONE;
     gv_animUpperClipIndex[lp_player] = -1;
     gf_ProbeClearUpperClip(lp_player);
@@ -72,6 +75,10 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
     if (lp_state == gv_animUpperState[lp_player]) {
         return;
     }
+    if (lp_state == c_ANIM_UPPER_ATTACK || lp_state == c_ANIM_UPPER_ATTACK_SPELL) {
+        gf_AnimUpperAttackStart(lp_player, lp_state);
+        return;
+    }
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
         return;
@@ -103,6 +110,55 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
         gf_ProbeSetUpperClip(lp_player, lv_clip);
     }
 }
+void gf_AnimAimAttackStart (int lp_player, string lp_weapon) {
+    unit lv_hero;
+    actor lv_actor;
+    int lv_profile;
+    int lv_state;
+    int lv_flags;
+    string lv_clip;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    if (lv_profile != c_ANIM_HERO_TOSH && lv_profile != c_ANIM_HERO_KERRIGAN) {
+        return;
+    }
+    lv_state = c_ANIM_UPPER_ATTACK_AIM;
+    if ((UnitGetType(lv_hero) == "Kerrigan" || UnitGetType(lv_hero) == "KerriganSCOBA") && lp_weapon == "QueenOfBladesPsiBlast") {
+        lv_state = c_ANIM_UPPER_ATTACK_SPELL_AIM;
+    }
+    lv_clip = gv_animUpperClip[lv_profile][lv_state];
+    if (lv_clip == "") {
+        return;
+    }
+    lv_flags = c_animFlagFullMatch | c_animFlagNonLooping;
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    gv_animUpperStarts[lp_player] += 1;
+    gf_AnimEvent(lp_player, "aim_attack_start", lv_clip, lv_flags);
+    gf_ProbeEvent(lp_player, "aim_attack_start", lv_clip, lv_flags);
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_AIM_ATTACK, lv_clip, lv_flags, c_ANIM_AIM_ATTACK_BLEND, c_ANIM_AIM_ATTACK_BLEND, c_ANIM_ATTACK_TIME_SCALE, c_animTimeVariantAsTimeScale));
+    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_BRACKET_AIM_ATTACK + " " + FixedToString(c_ANIM_ATTACK_START_TIME, c_fixedPrecisionAny) + " 0");
+    
+    gv_animAimAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_ANIM_ATTACK_DURATION;
+    gv_animAimUpperOn[lp_player] = true;
+}
+void gf_AnimAimAttackClear (int lp_player) {
+    unit lv_hero;
+    actor lv_actor;
+
+    if (gv_animAimAttackUntil[lp_player] >= 0.0) {
+        lv_hero = gv_tPSUNIT[lp_player];
+        if (UnitIsValid(lv_hero)) {
+            lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+            ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_AIM_ATTACK);
+        }
+    }
+    gv_animAimAttackUntil[lp_player] = -1.0;
+    
+}
 void gf_AnimUpperAttackStart (int lp_player, int lp_state) {
     unit lv_hero;
     actor lv_actor;
@@ -128,8 +184,10 @@ void gf_AnimUpperAttackStart (int lp_player, int lp_state) {
     gv_animUpperStarts[lp_player] += 1;
     gf_AnimEvent(lp_player, "upper_start", lv_clip, lv_flags);
     gf_ProbeEvent(lp_player, "upper_start", lv_clip, lv_flags);
-    ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
-    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, lv_flags, 0.0, 0.0, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_ATTACK);
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_ATTACK, lv_clip, lv_flags, 0.0, 0.0, c_ANIM_ATTACK_TIME_SCALE, c_animTimeVariantAsTimeScale));
+    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_BRACKET_ATTACK + " " + FixedToString(c_ANIM_ATTACK_START_TIME, c_fixedPrecisionAny) + " 0");
+    
     gv_animUpperState[lp_player] = lp_state;
     gv_animUpperClipIndex[lp_player] = lp_state;
     gf_ProbeSetUpperClip(lp_player, lv_clip);

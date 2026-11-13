@@ -21,6 +21,7 @@ void gf_OrderEnter (int lp_player) {
     if (UnitGetOwner(lv_unit) != lp_player) {
         return;
     }
+    gf_CombatCancelAuto(lp_player);
     gf_CombatBeginMove(lp_player);
     gv_sCOBAOrderMode[lp_player] = true;
     gv_fORWARD[lp_player] = false;

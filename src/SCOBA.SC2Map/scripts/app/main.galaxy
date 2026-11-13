@@ -10,6 +10,7 @@ include "scripts/app/core/config"
 include "scripts/app/app/init"
 include "scripts/app/app/alliances"
 include "scripts/app/systems/aim"
+include "scripts/app/systems/aim_shooting"
 include "scripts/app/systems/camera"
 include "scripts/app/systems/combat_attack"
 include "scripts/app/systems/animation_bracket"
@@ -25,6 +26,7 @@ include "scripts/app/systems/combat_cooldown"
 include "scripts/app/systems/combat_fsm"
 include "scripts/app/systems/combat_tick"
 include "scripts/app/systems/companion"
+include "scripts/app/systems/damage_floaters"
 include "scripts/app/systems/energy_bar"
 include "scripts/app/systems/gui_environment"
 include "scripts/app/systems/input"
@@ -100,6 +102,7 @@ void main () {
     gt_CameraTurnTick_Init();
     gt_CameraCollisionTick_Init();
     gt_AimInit_Init();
+    gt_AimShootingInit_Init();
     gt_AimCameraTick_Init();
     gt_AimCursorTick_Init();
     gt_AimMoveTick_Init();
@@ -130,4 +133,5 @@ void main () {
     gt_HealAward_Init();
     gt_DeathAward_Init();
     gt_DamageCleanup_Init();
+    gt_DamageFloater_Init();
 }

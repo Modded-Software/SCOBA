@@ -106,6 +106,9 @@ void gf_UnitTargetSet (int lp_player, unit lp_unit) {
     if (!gf_IsHeroPlayer(lp_player)) {
         return;
     }
+    if (gf_AimShotProxyIs(lp_unit)) {
+        lp_unit = null;
+    }
     if (UnitIsValid(lp_unit) && (lp_unit == gv_tPSUNIT[lp_player])) {
         lp_unit = null;
     }
@@ -144,6 +147,9 @@ bool gf_IsClickEnemy (int lp_player, unit lp_unit) {
     if (!UnitIsValid(lp_unit) || !UnitIsAlive(lp_unit)) {
         return false;
     }
+    if (gf_AimShotProxyIs(lp_unit)) {
+        return false;
+    }
     return libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Ally) == false;
 }
 
@@ -152,6 +158,9 @@ bool gf_UnitTargetValid (int lp_player, unit lp_unit, bool lp_enemyOnly) {
         return false;
     }
     if (lp_unit == gv_tPSUNIT[lp_player]) {
+        return false;
+    }
+    if (gf_AimShotProxyIs(lp_unit)) {
         return false;
     }
     if (lp_enemyOnly && !gf_IsClickEnemy(lp_player, lp_unit)) {
@@ -175,6 +184,9 @@ unit gf_UnitTargetAtPoint (int lp_player, point lp_point, bool lp_enemyOnly) {
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
         lv_unit = UnitGroupLoopCurrent();
         if (lv_unit == gv_tPSUNIT[lp_player] || !UnitIsValid(lv_unit) || !UnitIsAlive(lv_unit)) {
+            continue;
+        }
+        if (gf_AimShotProxyIs(lv_unit)) {
             continue;
         }
         if (lp_enemyOnly && !gf_IsClickEnemy(lp_player, lv_unit)) {
@@ -296,6 +308,15 @@ bool gt_TargetClick_Func (bool testConds, bool runActions) {
         }
         if (EventMouseClickedButton() == gv_mOUSECURSOR) {
             gv_aCTIONPRESSED[lv_player] = true;
+            gv_mOUSELEFTPRESSX[lv_player] = EventMouseClickedPosXWorld();
+            gv_mOUSELEFTPRESSY[lv_player] = EventMouseClickedPosYWorld();
+            gv_mOUSELEFTPRESSYAW[lv_player] = CameraGetYaw(lv_player);
+            gv_mOUSELEFTPRESSPITCH[lv_player] = CameraGetPitch(lv_player);
+            gv_unitClickCandidate[lv_player] = null;
+            gv_unitPressHighlight[lv_player] = gv_unitHighlight[lv_player];
+            if (gv_aIMACTIVE[lv_player]) {
+                gf_AimShotPress(lv_player);
+            }
         }
         return true;
     }
@@ -354,10 +375,15 @@ bool gt_TargetRelease_Func (bool testConds, bool runActions) {
                 return true;
             }
             gv_aCTIONPRESSED[lv_player] = false;
-            lv_unit = gf_UnitTargetAtPoint(lv_player, CameraGetTarget(lv_player), true);
-            if (UnitIsValid(lv_unit)) {
-                gf_UnitTargetSet(lv_player, lv_unit);
-                gf_CombatManualAttack(lv_player, lv_unit);
+            lv_drag = (AbsF(gf_AnimYawDelta(CameraGetYaw(lv_player), gv_mOUSELEFTPRESSYAW[lv_player])) >= c_SCOBA_CLICK_DRAG_ANGLE) || (AbsF(CameraGetPitch(lv_player) - gv_mOUSELEFTPRESSPITCH[lv_player]) >= c_SCOBA_CLICK_DRAG_ANGLE);
+            gv_unitClickCandidate[lv_player] = null;
+            gv_unitPressHighlight[lv_player] = null;
+            if (!lv_drag && !gv_aIMACTIVE[lv_player]) {
+                lv_unit = gf_UnitTargetAtPoint(lv_player, CameraGetTarget(lv_player), true);
+                if (UnitIsValid(lv_unit)) {
+                    gf_UnitTargetSet(lv_player, lv_unit);
+                    gf_CombatManualAttack(lv_player, lv_unit);
+                }
             }
         }
         return true;
@@ -428,30 +454,6 @@ bool gf_UnitClickEvent (int lp_player, bool testConds, bool runActions) {
     }
     gf_SelectHero(lp_player);
     return true;
-}
-
-bool gt_UnitClick1_Func (bool testConds, bool runActions) {
-    return gf_UnitClickEvent(1, testConds, runActions);
-}
-
-bool gt_UnitClick2_Func (bool testConds, bool runActions) {
-    return gf_UnitClickEvent(2, testConds, runActions);
-}
-
-bool gt_UnitClick3_Func (bool testConds, bool runActions) {
-    return gf_UnitClickEvent(3, testConds, runActions);
-}
-
-bool gt_UnitClick4_Func (bool testConds, bool runActions) {
-    return gf_UnitClickEvent(4, testConds, runActions);
-}
-
-bool gt_UnitClick5_Func (bool testConds, bool runActions) {
-    return gf_UnitClickEvent(5, testConds, runActions);
-}
-
-bool gt_UnitClick6_Func (bool testConds, bool runActions) {
-    return gf_UnitClickEvent(6, testConds, runActions);
 }
 
 void gt_UnitClick_Init () {

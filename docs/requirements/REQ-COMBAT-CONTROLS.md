@@ -20,8 +20,9 @@ Implementation lives in
 ## 2. Definitions
 
 - **Auto-attack**: target selection and attack orders without a player click.
-- **Stand**: the hero holds position and attacks inside the keep radius.
-- **Walk**: the hero moves toward enemies inside the chase radius and attacks.
+- **Stand**: the hero holds position when idle and attacks inside the keep radius.
+- **Walk**: the hero moves toward enemies inside the chase radius and attacks when idle.
+- **Run-and-gun**: the hero attacks while a movement key controls position.
 - **Manual attack**: a player right-click on an enemy or a Weapon Attack click.
 - **Keep radius**: maximum Stand attack distance.
 - **Chase radius**: maximum Walk acquisition distance.
@@ -44,9 +45,9 @@ Implementation lives in
 
 | ID | Requirement |
 | --- | --- |
-| R-CH-1 | Stand MUST hold position and MUST not chase. |
+| R-CH-1 | Stand MUST hold position when idle and MUST not chase. |
 | R-CH-2 | Walk MUST move toward enemies inside the chase radius and attack them. |
-| R-CH-3 | Stand MUST attack enemies inside the keep radius and stop when they leave. |
+| R-CH-3 | Stand MUST attack enemies inside the keep radius when idle and stop when they leave. |
 | R-CH-4 | Player movement MUST move the hero and release the Stand root. |
 | R-CH-5 | Stand MUST restore the root after WASD release and after manual attack. |
 | R-CH-6 | User attacks in Stand MUST stay in Stand and MUST not chase. |
@@ -54,6 +55,13 @@ Implementation lives in
 | R-CH-8 | The chase toggle MUST work from the command card for every hero. |
 | R-CH-9 | The chase button face, name, and tooltip MUST match the current stance. |
 | R-CH-10 | Entering Stand MUST clear an earlier move order. |
+| R-CH-11 | Stand and Walk MUST attack while a movement key is held. |
+| R-CH-12 | Movement input MUST own position while attacking. |
+| R-CH-13 | A moving attack MUST NOT chase in Stand and MUST NOT replace movement in Walk. |
+| R-CH-14 | Moving attacks MUST use native attack orders and MUST respect weapon cooldown. |
+| R-CH-15 | Tosh, RazorTalons, and QueenOfBladesPsiBlast weapons MUST allow movement while firing. |
+| R-CH-16 | A pending shot MUST suspend movement-order replacement until the native attack event or timeout. |
+| R-CH-17 | Each moving shot MUST issue exactly one native attack order. |
 
 ### 3.3 Manual attack
 
@@ -72,6 +80,8 @@ Implementation lives in
 | R-MA-11 | The attacked enemy MUST come from the ability target. |
 | R-MA-12 | Cancelling target mode MUST do nothing and start no cooldown. |
 | R-MA-13 | Stand move orders MUST be blocked only with no movement key held. |
+| R-MA-14 | Manual attack MUST work while a movement key is held. |
+| R-MA-15 | Moving manual attacks MUST keep the manual target until it dies or is cleared. |
 
 ### 3.4 Weapon Attack and cooldown
 
@@ -176,6 +186,9 @@ Implementation lives in
 | AC-35 | RPG return exits aim without a right command. |
 | AC-36 | Action left click on an enemy attacks; on ground it issues no order. |
 | AC-37 | Alt click and action right hold issue no combat order. |
+| AC-38 | Stand move-and-shoot displaces the hero and fires without the root. |
+| AC-39 | Walk move-and-shoot displaces the hero and fires without stopping. |
+| AC-40 | A moving attack does not cancel the held movement input. |
 
 ## 5. Non-functional requirements
 

@@ -34,12 +34,19 @@ NATIVE_GROUPS = (
 UPPER_GROUPS = (
     "Attack Arm Alternate",
     "Spell Arm Alternate",
+    "Attack Arm Alternate 01",
+    "Spell Arm Alternate 01",
 )
 
 GAMEPLAY_ACTORS = (
     ("ToshSCOBAUnit", "ToshSCOBA", "ToshSCOBA"),
     ("KerriganSCOBAUnit", "KerriganSCOBA", "KerriganSCOBA"),
 )
+
+AIM_ATTACK_PITCH = {
+    Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3": "BoneSpine01",
+    Path("Assets") / "Units" / "Zerg" / "Kerrigan" / "KerriganSCOBA.m3": "Bone07",
+}
 
 ANIM_CONFIG_RE = re.compile(r'gf_AnimConfig(?:Upper|Lower)\([^,]+,[^,]+,\s*"([^"]+)"')
 HERO_CONFIG_RE = re.compile(
@@ -61,6 +68,7 @@ REQUIRED = [
     "Base.SC2Data/GameData/AbilData.xml",
     "Base.SC2Data/GameData/BehaviorData.xml",
     "Base.SC2Data/GameData/ButtonData.xml",
+    "scripts/app/systems/aim_shooting.galaxy",
 ]
 
 XML_FILES = [
@@ -243,7 +251,24 @@ def check_catalogs(map_dir: Path) -> None:
             fail(f"missing unit: {unit_id}")
         if unit.get("parent") != parent_id:
             fail(f"{unit_id} parent must be {parent_id}")
-        
+
+    weapon_tree = ET.parse(gamedata / "WeaponData.xml")
+    for weapon_id in ("Tosh", "RazorTalons", "QueenOfBladesPsiBlast"):
+        weapon = None
+        for candidate in weapon_tree.getroot().iter("CWeaponLegacy"):
+            if candidate.get("id") == weapon_id:
+                weapon = candidate
+                break
+        if weapon is None:
+            fail(f"missing weapon override: {weapon_id}")
+        allowed = weapon.find("AllowedMovement")
+        if allowed is None or allowed.get("value") != "Moving":
+            fail(f"{weapon_id} must allow moving fire")
+        options = {o.get("index"): o.get("value") for o in weapon.findall("Options")}
+        if options.get("OnlyFireWhileInAttackOrder") != "0":
+            fail(f"{weapon_id} must fire outside attack orders")
+        if options.get("OnlyFireAtAttackOrderTarget") != "0":
+            fail(f"{weapon_id} must fire outside attack-order targets")
 
 
 def check_control_icons(map_dir: Path) -> None:
@@ -298,6 +323,27 @@ def check_animation_names(map_dir: Path) -> None:
         for name in ("Turn Left", "Turn Right"):
             if normalized_animation_name(name) in groups:
                 fail(f"{relative} has upper turn group {name!r}")
+        pitch_bone = AIM_ATTACK_PITCH.get(relative)
+        if pitch_bone is not None:
+            pitch_ids = set()
+            for bone in model.bones:
+                if bone.name == pitch_bone:
+                    pitch_ids.update(
+                        (
+                            bone.location.header.animId,
+                            bone.rotation.header.animId,
+                            bone.scale.header.animId,
+                        )
+                    )
+            for aim_group in ("Attack Arm Alternate 01", "Spell Arm Alternate 01"):
+                group = next(
+                    candidate
+                    for candidate in model.sequenceTransformationGroups
+                    if normalized_animation_name(candidate.name) == normalized_animation_name(aim_group)
+                )
+                stc = model.sequenceTransformationCollections[group.stcIndices[0]]
+                if pitch_ids & set(stc.animIds):
+                    fail(f"{relative} {aim_group} contains pitch root {pitch_bone}")
         model_groups.append(groups)
 
     for profile, clip in HERO_CONFIG_RE.findall(text):
@@ -346,6 +392,35 @@ def check_script(map_dir: Path) -> None:
         fail("scripts missing toggle command init")
     if 'UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], Order(AbilityCommand("SCOBARightClickToggle", 0))' not in combined:
         fail("scripts missing default stand behavior")
+    if "UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTextTag, true);" not in combined:
+        fail("scripts must keep the text tag frame visible")
+    if "gf_AimShotPress" not in combined:
+        fail("scripts missing aim shot press handler")
+    if "gf_AimCrosshairPoint" not in combined:
+        fail("scripts missing aim crosshair point")
+    if "gf_WeaponReady" not in combined or "UnitWeaponPeriodRemaining" not in combined:
+        fail("scripts missing weapon cooldown gate")
+    if "gf_AimShotProxyCreate" not in combined:
+        fail("scripts missing targetless shot proxy")
+    if "gf_AimShotProxyIs" not in combined:
+        fail("scripts missing shot proxy target filter")
+    if "storm_ui_cursor_default_enemy" in combined or "storm_ui_cursor_default_friendly" in combined:
+        fail("reticle must use the crosshair texture, not arrow cursors")
+    if combined.count("cursor-target-none.dds") < 3:
+        fail("reticle must use the crosshair texture for every state")
+    if "gf_AimMissFloater" not in combined:
+        fail("scripts missing aim miss floater")
+    if "gf_AnimTargetPitchTick" not in combined:
+        fail("scripts missing RPG target pitch")
+    if "gf_CombatRunGunActive" not in combined or "gv_sCOBAManualTarget" not in combined:
+        fail("scripts missing combat run-and-gun")
+    if 'AbilityCommand("move", 3)' not in combined:
+        fail("scripts missing run-and-gun acquire move")
+    if "c_ANIM_ATTACK_START_TIME" not in combined or combined.count("AnimSetTime ") < 2:
+        fail("scripts missing attack windup skip")
+    
+    if "gf_FloaterCreate" not in combined:
+        fail("scripts missing shared floater helper")
 
 
 def check_stamp(map_dir: Path) -> None:

@@ -11,6 +11,8 @@
 > and destroy everything. Understand how it works before changing it.
 
 Outside aim, the native unit baseline is authoritative for idle, walk, and turn.
+RPG attack adds one root-excluded upper attack instance and one target-pitch
+instance. It never writes the lower body.
 
 Inside aim, two animation instances run concurrently on the same model:
 
@@ -184,39 +186,77 @@ configuration values validated in game.
 
 ## 5B. Non-Aim Attack Overlay
 
-Non-aim attack is an upper-body overlay on the `SCOBAUp` animation instance.
-It never writes `SCOBALo`, native lower animation, movement orders, facing, camera, or control state.
+Non-aim attack uses two upper-body instances:
 
+- `SCOBAAimAtk` plays the root-excluded attack clip.
+- `SCOBAUp` holds the target pitch clip.
+
+It never writes `SCOBALo`, native lower animation, movement orders, facing,
+camera, or control state.
 The overlay must not rely on native actor attack events.
 Clean actors define no native attack events.
+
+Force kickback:
+
+- The attack clips contain a 0.5 s weapon-shoulder kickback.
+- It starts at the firing frame, flexes the weapon shoulder back rapidly, then returns.
+- Tosh uses `BoneShoulderR`; Kerrigan uses `Box04`.
+- It is baked into `Attack Arm Alternate 01` and `Spell Arm Alternate 01`.
+- It must not write the spine, pitch root, lower body, or model root.
 
 Attack state:
 
 | State | Clip | Duration |
 | --- | --- | --- |
-| `c_ANIM_UPPER_ATTACK` | `Attack Arm Alternate` | Native Attack clip |
-| `c_ANIM_UPPER_ATTACK_SPELL` | `Spell Arm Alternate` | Native Spell clip |
+| `c_ANIM_UPPER_ATTACK` | `Attack Arm Alternate 01` | Native Attack clip |
+| `c_ANIM_UPPER_ATTACK_SPELL` | `Spell Arm Alternate 01` | Native Spell clip |
 
 `UnitStartedAttack2` starts the overlay:
 
 1. Ignore the event while aim is active.
 2. Read `EventUnitGetWeapon()`.
-3. Tosh uses `Attack Arm Alternate`.
-4. Kerrigan `RazorTalons` uses `Attack Arm Alternate`.
-5. Kerrigan `QueenOfBladesPsiBlast` uses `Spell Arm Alternate`.
-6. Clear and restart `SCOBAUp` with `FullMatch | NonLooping`.
-7. Clear on animation completion or weapon stop.
-8. A fixed timer may exist only as a safety cap.
+3. Read `EventUnitTarget()`; use `gv_unitTarget[player]` when the event target is invalid.
+4. Tosh uses `Attack Arm Alternate 01`.
+5. Kerrigan `RazorTalons` uses `Attack Arm Alternate 01`.
+6. Kerrigan `QueenOfBladesPsiBlast` uses `Spell Arm Alternate 01`.
+7. Start the attack on `SCOBAAimAtk` with `FullMatch | NonLooping`.
+8. Play at `c_ANIM_ATTACK_TIME_SCALE` 2.0 with `c_animTimeVariantAsTimeScale`.
+9. Send `AnimSetTime SCOBAAimAtk c_ANIM_ATTACK_START_TIME 0` so playback starts at the firing/recoil frame.
+10. Start `SCOBAUp` target pitch from the hero-to-target vector.
+11. Clear both instances on attack end or weapon stop.
+12. A fixed timer may exist only as a safety cap.
+
+Target pitch:
+
+1. `dz = UnitGetHeight(target) - UnitGetHeight(hero)`.
+2. `dist = DistanceBetweenPoints(UnitGetPosition(hero), UnitGetPosition(target))`.
+3. `angle = ATan2(dz, dist)`.
+4. `pitch = c_ANIM_AIM_PITCH_REST + angle`.
+5. Clamp to `c_ANIM_AIM_PITCH_MIN..c_ANIM_AIM_PITCH_MAX`.
+6. Map pitch to the nearest `Ready Alternate NN` step.
+7. Play `SCOBAUp` with the shared pitch clip.
+8. Refresh the step on every animation tick while the attack is active.
+9. Clear `SCOBAUp` when the attack ends.
+
+The target height is required so air and elevated targets pitch the torso up
+and low targets pitch it down.
+Do not use only the target ground point.
+
+Attack-mode pitch is camera-driven.
+RPG pitch is target-driven.
+Both use the same `SCOBAUp` pitch clips and the same clamp range.
 
 `gv_animAttackState` stores the active attack state.
 `gv_animAttackUntil` stores the safety-cap end time.
+`gv_animTargetPitchStep` stores the active target pitch key.
 
 `gf_AnimTick` outside aim:
 
 1. Do not select or play any lower-body animation.
-2. Select the attack upper state while the attack is active.
-3. Otherwise select no upper state.
-4. Clear the upper state when the attack ends.
+2. While attacking, refresh the target pitch on `SCOBAUp`.
+3. Select the root-excluded attack state on `SCOBAAimAtk`.
+4. Otherwise clear both upper instances.
+5. Clear the upper state when the attack ends.
 
 The upper attack state is one-shot. It must not use `PlayForever`.
 The attack state is reset by `gf_AnimReset`.
@@ -271,10 +311,48 @@ Attacking while stationary keeps the Stand clip advancing.
 
 ## 6. Attack While Aiming
 
-Aim attack animation is DEFERRED to a later stage.
-This stage must not add an aim attack overlay or attack STC.
-The non-aim attack overlay is suppressed while aim is active.
-The lower body must not depend on an aim attack feature.
+Aim attack is a separate upper overlay on the `SCOBAAimAtk` animation instance.
+`SCOBAUp` remains the sole owner of the aim spine pitch.
+
+The aim attack clips omit the pitch root tracks:
+
+- Tosh: `BoneSpine01`.
+- Kerrigan: `Bone07`.
+
+The overlay animates the remaining upper bones relative to the aim spine.
+It must not pause, clear, restart, or replace `SCOBAUp`.
+It must not touch `SCOBALo`.
+
+The overlay clips are:
+
+| State | Clip | Priority |
+| --- | --- | --- |
+| `c_ANIM_UPPER_ATTACK_AIM` | `Attack Arm Alternate 01` | 12 |
+| `c_ANIM_UPPER_ATTACK_SPELL_AIM` | `Spell Arm Alternate 01` | 12 |
+
+`gf_AnimAimAttackStart`:
+
+1. Select the aim attack state from the started weapon.
+2. Play `gv_animUpperClip[profile][state]` on `SCOBAAimAtk`.
+3. Use `FullMatch | NonLooping`.
+4. Blend with `c_ANIM_AIM_ATTACK_BLEND`.
+5. Play at `c_ANIM_ATTACK_TIME_SCALE` 2.0 with
+   `c_animTimeVariantAsTimeScale`.
+6. Send `AnimSetTime SCOBAAimAtk c_ANIM_ATTACK_START_TIME 0`.
+7. Set `gv_animAimAttackUntil`.
+8. Leave the upper state, pitch time, and pitch step unchanged.
+
+`gf_AnimTick` keeps calling `gf_AnimUpperSet` and `gf_AnimAimPitchTick` during
+the aim attack.
+Aim pitch remains live during the attack.
+
+`gf_AnimAimPitchTick` does not return early for an aim attack.
+
+`gf_AnimAttackStart` sends the aim branch to `gf_AnimAimAttackStart`.
+`gf_AnimReset`, `gf_AimEnd`, and hero switch clear `SCOBAAimAtk`.
+
+The aim attack must preserve the aim yaw and pitch.
+It must not snap the torso to the native forward pose.
 
 ## 7. States and Config
 
@@ -296,7 +374,7 @@ Firebat uses its shipped model and baseline animation.
 
 Actor clip references use comma-separated props.
 Use existing animation names and the token validator.
-Generated upper-only clips use unique names `Attack Arm Alternate` and `Spell Arm Alternate`.
+Generated root-excluded attack clips use unique names `Attack Arm Alternate 01` and `Spell Arm Alternate 01`.
 Pitch groups use `Ready Alternate NN`.
 Clean actors have no native attack events.
 
@@ -314,18 +392,15 @@ Aim does not use the non-aim facing path.
 Aim facing is camera yaw at all times, including while moving.
 Aim movement uses one camera-relative travel heading per tick.
 Per-key movement loops only set and clear input flags during aim.
-One aim movement loop owns travel and issues at most one movement command per tick.
-Aim MUST write camera facing every 0.05 seconds with
-`c_ANIM_AIM_TURN_DURATION`.
-Aim facing MUST be independent of movement orders.
+One aim movement loop owns travel.
+Aim movement writes camera facing immediately before it issues a move order.
+`gf_AnimFacingTick` writes aim facing when no movement key is held.
 Aim MUST NOT use `c_ANIM_TURN_DEADBAND`.
 Aim MUST add `SCOBAAimNoTurn` (`SuppressTurning`) on entry and remove it on
 exit.
 Aim MUST NOT disable `Turnable` or zero turning rates.
 Tosh and Kerrigan MUST use high turning rates so aim facing does not lag.
 Aim movement MUST use native path-checked move orders.
-Aim movement MUST NOT write facing. `gf_AnimFacingTick` is the only aim facing
-writer.
 W moves camera-forward, S moves camera-backward, A/D move camera-left/right.
 Diagonals preserve both components.
 S uses reversed backpedal lower animation and never turns the unit around.
@@ -346,7 +421,13 @@ Use the existing generator for Tosh and Kerrigan.
 It reads source models, writes models into the built map, and updates model data.
 It keeps native Stand, Walk, Stand Left, Stand Right, and Stand Work groups intact.
 It adds upper-only `Attack Arm Alternate` and `Spell Arm Alternate` clips.
+Upper attack clips keep only the weapon shoulder chains and the head chain.
+Tosh keeps `BoneShoulderL`, `BoneShoulderR`, and `BoneHead` descendants.
+Kerrigan keeps `Box04`, `Box05`, and `Bone29` descendants.
+Upper attack clips drop the spine, waist, and back tracks.
 Upper attack clips set `runsConcurrent=1` and priority 10 so they layer over native lower locomotion.
+It adds root-excluded `Attack Arm Alternate 01` and `Spell Arm Alternate 01` clips at priority 12.
+The aim attack clips remove every track for the hero pitch root bone.
 Actor messages use the unique clip names.
 Token form uses commas only where needed. Do not use spaces in actor messages.
 It generates one shared upper pitch clip per hero.

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from project_root import project_root
 from animation_tokens import validate_animation_name
-from character_anim_m3 import clone, make_lower_group, make_pitch_group
+from character_anim_m3 import add_kickback, clone, make_lower_group, make_pitch_group
 
 ROOT = project_root()
 M3_VENDOR = ROOT / "scripts" / "vendor" / "m3addon"
@@ -22,7 +22,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "24\n"
+MARKER_VERSION = "30\n"
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -31,6 +31,7 @@ SOURCE_MODELS = {
         "ToshSCOBA",
         "Assets\\Units\\Terran\\Tosh\\ToshSCOBA.m3",
         ("BoneSpine01",),
+        ("BoneShoulderL", "BoneShoulderR", "BoneHead"),
         ("BoneWaist", "Root", "Main"),
         "BoneWaist",
         3.1015,
@@ -38,6 +39,10 @@ SOURCE_MODELS = {
         (1.0,),
         "Y",
         1.0,
+        ("BoneShoulderR",),
+        "Y",
+        -1.0,
+        12.0,
     ),
     "kerrigan": (
         r"mods\liberty.sc2mod\base.sc2assets\assets\units\zerg\kerrigan\kerrigan.m3",
@@ -45,6 +50,7 @@ SOURCE_MODELS = {
         "KerriganSCOBA",
         "Assets\\Units\\Zerg\\Kerrigan\\KerriganSCOBA.m3",
         ("Bone07",),
+        ("Box04", "Box05", "Bone29"),
         ("Box01", "Bone34", "Bone34(mirrored)", "Root", "Bone_Link_Object"),
         "Box01",
         2.5,
@@ -52,6 +58,10 @@ SOURCE_MODELS = {
         (1.0,),
         "Y",
         1.0,
+        ("Box04",),
+        "Y",
+        -1.0,
+        12.0,
     ),
 }
 
@@ -62,6 +72,11 @@ CLIP_JOBS = (
     ("Walk", "Walk Leg", "lower"),
     ("Stand Left", "Stand Left Leg", "lower"),
     ("Stand Right", "Stand Right Leg", "lower"),
+)
+
+AIM_ATTACK_JOBS = (
+    ("Attack", "Attack Arm Alternate 01"),
+    ("Spell", "Spell Arm Alternate 01"),
 )
 
 AIM_PITCH_GROUP = "Ready Alternate"
@@ -169,7 +184,10 @@ def make_clip(model, group, source_index: int, group_ids: set[int], name: str, b
     stc.animRefs = anim_refs
     stc.stsIndex = sts_index
     stc.stsIndexCopy = sts_index
-    stc.priority = 10 if bone_group == "upper" else 0
+    if bone_group == "upper_aim":
+        stc.priority = 12
+    else:
+        stc.priority = 10 if bone_group == "upper" else 0
     stc.runsConcurrent = 1
     model.sequenceTransformationCollections.append(stc)
     stc_index = len(model.sequenceTransformationCollections) - 1
@@ -187,6 +205,7 @@ def generate_model(
     source: Path,
     target: Path,
     upper_roots: tuple[str, ...],
+    attack_roots: tuple[str, ...],
     lower_roots: tuple[str, ...],
     turn_bone: str,
     unit_speed: float,
@@ -194,9 +213,14 @@ def generate_model(
     pitch_weights: tuple[float, ...],
     pitch_axis: str,
     pitch_sign: float,
+    kick_bones: tuple[str, ...],
+    kick_axis: str,
+    kick_sign: float,
+    kick_degrees: float,
 ) -> None:
     model = m3.loadModel(str(source))
     upper_ids, lower_ids = classify_bones(model, upper_roots, lower_roots)
+    attack_ids, _ = classify_bones(model, attack_roots, lower_roots)
     groups = {group.name: group for group in model.sequenceTransformationGroups}
     validate_model_names(model)
     
@@ -214,8 +238,33 @@ def generate_model(
             groups[new_name] = group
         if source_clip is None:
             raise KeyError(new_name)
-        group_ids = upper_ids if bone_group == "upper" else lower_ids
+        group_ids = attack_ids if bone_group == "upper" else lower_ids
         make_clip(model, group, source_clip, group_ids, new_name, bone_group, unit_speed)
+    pitch_ids = set()
+    for bone in model.bones:
+        if bone.name in pitch_bones:
+            pitch_ids.update(bone_anim_ids(bone))
+    aim_attack_ids = attack_ids - pitch_ids
+    for source_name, new_name in AIM_ATTACK_JOBS:
+        source_group = groups.get(source_name)
+        source_clip = clips.get(source_name)
+        if source_group is None or source_clip is None:
+            raise KeyError(new_name)
+        group = clone(source_group)
+        group.name = new_name
+        model.sequenceTransformationGroups.append(group)
+        groups[new_name] = group
+        stc_index = make_clip(model, group, source_clip, aim_attack_ids, new_name, "upper_aim", unit_speed)
+        add_kickback(
+            model,
+            model.sequenceTransformationCollections[stc_index],
+            kick_bones,
+            kick_axis,
+            kick_sign,
+            kick_degrees,
+            350,
+            500,
+        )
     turn_anim_id = next(bone.rotation.header.animId for bone in model.bones if bone.name == turn_bone)
     make_lower_group(model, groups, "Attack Stand", "Stand Leg", 0.0, False, turn_anim_id)
     make_lower_group(model, groups, "Attack Stand Left", "Stand Left Leg", 0.0, False, turn_anim_id)
@@ -320,6 +369,7 @@ def generate(root: Path, force: bool) -> None:
             model_id,
             model_value,
             upper_roots,
+            attack_roots,
             lower_roots,
             turn_bone,
             unit_speed,
@@ -327,12 +377,17 @@ def generate(root: Path, force: bool) -> None:
             pitch_weights,
             pitch_axis,
             pitch_sign,
+            kick_bones,
+            kick_axis,
+            kick_sign,
+            kick_degrees,
         ) in SOURCE_MODELS.values():
             source = extract_model(entry, temp_root)
             generate_model(
                 source,
                 root / target,
                 upper_roots,
+                attack_roots,
                 lower_roots,
                 turn_bone,
                 unit_speed,
@@ -340,6 +395,10 @@ def generate(root: Path, force: bool) -> None:
                 pitch_weights,
                 pitch_axis,
                 pitch_sign,
+                kick_bones,
+                kick_axis,
+                kick_sign,
+                kick_degrees,
             )
             entries.append((model_id, model_value))
         (root / MODEL_DATA).write_text(model_data_text(root, entries))

@@ -534,13 +534,15 @@ baseline animation.
 The animation implementation is specified in
 [SPEC-CHARACTER-ANIMATION](SPEC-CHARACTER-ANIMATION.md).
 
-The aim cursor is a screen-center image overlay drawn with the native
-StarCraft II cursor textures `cursor-target-none.dds` for neutral,
-`storm_ui_cursor_default_enemy.dds` for hostile, and
-`storm_ui_cursor_default_friendly.dds` for friendly targets. `gt_AimCursorTick` runs every 0.01 s,
-resolves the unit at `CameraGetTarget`, and shows the matching image. The
-reticle is visible in action and aim mode and hidden in RPG mode or while Alt
-shows the free UI cursor. The engine cursor stays hidden.
+The aim cursor is a screen-center image overlay.
+Every state uses the same `cursor-target-none.dds` crosshair texture.
+Neutral is white, hostile is red, friendly is blue, and hostile out of range is
+desaturated gray.
+Do not use the `storm_ui_cursor_default_*` arrow cursor textures.
+`gt_AimCursorTick` runs every 0.01 s, resolves the unit at
+`gf_AimCrosshairPoint`, and shows the matching image. The reticle is visible in
+action and aim mode and hidden in RPG mode or while Alt shows the free UI
+cursor. The engine cursor stays hidden.
 
 ## 14A. Actions and RPG control modes
 
@@ -649,15 +651,16 @@ Action mode mouse input:
 | Right down | Call `gf_AimBegin` and set action aim state |
 | Right up | Call `gf_AimEnd` |
 | Left down, Alt not held | Set action press state |
-| Left up, Alt not held | Resolve `CameraGetTarget` and call `gf_CombatManualAttack` |
+| Left up, Alt not held | Resolve `CameraGetTarget` outside aim; aim shooting fires on press |
 | Any click, Alt held | UI handles the click; no game attack, aim, or order |
 | Right clean click | No right command |
 | Ground left click | No Move or Stop |
 
-Action mode left attack resolves the hostile at `CameraGetTarget`.
+Action mode left attack outside aim resolves the hostile at `CameraGetTarget`.
+Aim mode left attack resolves the hostile at `gf_AimCrosshairPoint` on press.
 When the centered target is hostile, it calls `gf_UnitTargetSet` and
 `gf_CombatManualAttack`. When no hostile centered target exists, nothing
-changes.
+changes outside aim.
 
 Action mode does not call `gf_RightClickExecute`.
 Action mode does not issue a right command.

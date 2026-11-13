@@ -3,6 +3,7 @@
 bool gt_CombatStartedAttack_Func (bool testConds, bool runActions) {
     int lv_player;
     unit lv_hero;
+    unit lv_target;
     fixed lv_now;
     fixed lv_delta;
     fixed lv_period;
@@ -18,7 +19,8 @@ bool gt_CombatStartedAttack_Func (bool testConds, bool runActions) {
     if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
         return true;
     }
-    gf_AnimAttackStart(lv_player, EventUnitGetWeapon());
+    lv_target = EventUnitTarget();
+    gf_AnimAttackStart(lv_player, EventUnitGetWeapon(), lv_target);
     lv_now = TimerGetElapsed(gv_sCOBA_Clock);
     lv_delta = lv_now - gv_sCOBA_LastAttackAt[lv_player];
     if (gv_sCOBA_LastAttackAt[lv_player] > 0.0 && lv_delta >= c_SCOBA_MIN_ATTACK_PERIOD && lv_delta <= c_SCOBA_MAX_ATTACK_PERIOD) {

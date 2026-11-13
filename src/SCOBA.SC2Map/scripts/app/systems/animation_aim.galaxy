@@ -229,6 +229,90 @@ void gf_AnimAimPitchTick (int lp_player) {
     gf_ProbeSetUpperClip(lp_player, lv_clip);
 }
 
+int gf_AnimTargetPitchKey (fixed lp_pitch) {
+    fixed lv_ratio;
+    int lv_step;
+
+    if (lp_pitch > c_ANIM_AIM_PITCH_MAX) {
+        lp_pitch = c_ANIM_AIM_PITCH_MAX;
+    }
+    if (lp_pitch < c_ANIM_AIM_PITCH_MIN) {
+        lp_pitch = c_ANIM_AIM_PITCH_MIN;
+    }
+    lv_ratio = (lp_pitch - c_ANIM_AIM_PITCH_MIN) / (c_ANIM_AIM_PITCH_MAX - c_ANIM_AIM_PITCH_MIN);
+    lv_step = FixedToInt(Round(lv_ratio * (c_ANIM_AIM_PITCH_STEPS - 1))) + 1;
+    if (lv_step < 1) {
+        lv_step = 1;
+    }
+    if (lv_step > c_ANIM_AIM_PITCH_STEPS) {
+        lv_step = c_ANIM_AIM_PITCH_STEPS;
+    }
+    return lv_step;
+}
+
+void gf_AnimTargetPitchApply (int lp_player, int lp_step) {
+    unit lv_hero;
+    actor lv_actor;
+    string lv_clip;
+
+    if (gv_aIMACTIVE[lp_player]) {
+        return;
+    }
+    if (lp_step == gv_animTargetPitchStep[lp_player]) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_clip = gf_AnimAimPitchClip(lp_step);
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, c_animFlagPlayForever, 0.06, 0.06, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    gv_animTargetPitchStep[lp_player] = lp_step;
+    gv_animTargetPitchTime[lp_player] = ((lp_step - 1) * c_ANIM_AIM_PITCH_TIME) / (c_ANIM_AIM_PITCH_STEPS - 1);
+    gf_AnimEvent(lp_player, "target_pitch_step", lv_clip, lp_step);
+}
+
+void gf_AnimTargetPitchBegin (int lp_player, unit lp_target) {
+    gv_animAttackTarget[lp_player] = lp_target;
+    gf_AnimTargetPitchTick(lp_player);
+}
+
+void gf_AnimTargetPitchTick (int lp_player) {
+    unit lv_hero;
+    unit lv_target;
+    fixed lv_dz;
+    fixed lv_dist;
+    fixed lv_pitch;
+
+    if (gv_aIMACTIVE[lp_player]) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_target = gv_animAttackTarget[lp_player];
+    if (!UnitIsValid(lv_target)) {
+        lv_target = gv_unitTarget[lp_player];
+        gv_animAttackTarget[lp_player] = lv_target;
+    }
+    lv_pitch = c_ANIM_AIM_PITCH_REST;
+    if (UnitIsValid(lv_target)) {
+        lv_dz = UnitGetHeight(lv_target) - UnitGetHeight(lv_hero);
+        lv_dist = DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_target));
+        if (lv_dist > 0.01) {
+            lv_pitch = c_ANIM_AIM_PITCH_REST + ATan2(lv_dz, lv_dist);
+        }
+    }
+    gf_AnimTargetPitchApply(lp_player, gf_AnimTargetPitchKey(lv_pitch));
+}
+
+void gf_AnimTargetPitchClear (int lp_player) {
+    gv_animTargetPitchStep[lp_player] = 0;
+    gv_animTargetPitchTime[lp_player] = -1.0;
+}
+
 bool gt_AnimPitchTick_Func (bool testConds, bool runActions) {
     int lv_player;
 

@@ -74,6 +74,42 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
     Wait(1.0, c_timeGame);
     gf_DbgSnap("stand_wake_manual", "t2000");
 
+    gf_DbgReset("stand_run_gun", true, true);
+    gf_DbgSpawnOne("stand_run_gun", 3.0, 500.0);
+    gv_fORWARD[1] = true;
+    gf_CombatBeginMove(1);
+    gf_DbgSnap("stand_run_gun", "t0000");
+    for (lv_i = 0; lv_i < 80; lv_i += 1) {
+        if (gf_CombatRunGunActive(1)) {
+            UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 0.5, 270.0)), c_orderQueueReplace);
+        }
+        else {
+            UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 0.5, 270.0)), c_orderQueueReplace);
+        }
+        UnitSetFacing(gv_tPSUNIT[1], 270.0, 0.01);
+        Wait(0.01, c_timeGame);
+    }
+    gv_fORWARD[1] = false;
+    gf_DbgSnap("stand_run_gun", "t0800");
+
+    gf_DbgReset("walk_run_gun", true, false);
+    gf_DbgSpawnOne("walk_run_gun", 3.0, 500.0);
+    gv_fORWARD[1] = true;
+    gf_CombatBeginMove(1);
+    gf_DbgSnap("walk_run_gun", "t0000");
+    for (lv_i = 0; lv_i < 80; lv_i += 1) {
+        if (gf_CombatRunGunActive(1)) {
+            UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 0.5, 270.0)), c_orderQueueReplace);
+        }
+        else {
+            UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 0.5, 270.0)), c_orderQueueReplace);
+        }
+        UnitSetFacing(gv_tPSUNIT[1], 270.0, 0.01);
+        Wait(0.01, c_timeGame);
+    }
+    gv_fORWARD[1] = false;
+    gf_DbgSnap("walk_run_gun", "t0800");
+
     gf_DbgReset("right_click", false, true);
     gf_DbgSpawnOne("right_click", 3.0, 500.0);
     gv_unitHighlight[1] = gv_dbgEnemy;

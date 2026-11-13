@@ -208,6 +208,12 @@ def check(ctx, data: dict, checks) -> None:
         print("stand_wake_manual displacement: want<=1 FAIL")
         checks.failures += 1
 
+    for section in ("stand_run_gun", "walk_run_gun"):
+        checks.eq(section, "t0000", "Root", 0)
+        checks.true(section, "t0800", "AttackOrder")
+        checks.damage(section, "t0000", "t0800")
+        checks.displacement(section, "t0000", "t0800", minimum=1)
+
     checks.true("right_click", "", "ran")
     checks.true("right_click", "t0200", "AttackOrder")
     checks.true("right_click", "t0200", "TargetEnemy")

@@ -53,7 +53,8 @@ The implementation separates stance state from movement lock:
 - removing the root restores movement, so WASD still works in Stand;
 - the FSM issues attack orders on enemies inside the keep radius;
 - user-issued attacks stay in Stand and do not chase;
-- the root returns after WASD release and after manual attack;
+- the root returns after WASD release while stationary;
+- movement keys keep the root removed and attacks run while moving;
 - `UnitTestState(hero, c_unitStateMoveSuppressed)` is the state readback.
 
 `MoveSpeedMultiplier` is not a movement lock. It only changes speed. A unit can
@@ -94,6 +95,7 @@ The FSM stores intent:
 
 - `gv_sCOBAFSM[8]`;
 - `gv_sCOBAAutoTarget[8]`;
+- `gv_sCOBAManualTarget[8]`;
 - `gv_sCOBAAutoOrder[8]`;
 - `gv_sCOBAManualOrder[8]`.
 
@@ -115,9 +117,11 @@ The FSM stores intent:
 | HOLD or ATTACK | stand off | auto on | CHASE | clear auto order |
 | CHASE | stand on | auto on | HOLD | cancel auto order, lock movement |
 | CHASE or HOLD | manual attack | any | MANUAL | cancel auto order, issue attack |
-| MANUAL | unit idle | any | IDLE | clear manual flag |
-| any | WASD start | any | MOVING | cancel auto order |
+| MANUAL | target dead | any | IDLE | clear manual target |
+| any | WASD start | any | MOVING | keep targets, remove root |
+| MOVING | attack tick | auto or manual target | MOVING | issue native attack while moving |
 | MOVING | WASD end | auto on | IDLE | next tick resumes |
+| MOVING | WASD end | manual target | MANUAL | reissue attack order |
 | any | order mode enter | any | MOVING | cancel auto order |
 | MOVING | order mode exit | auto on | IDLE | next tick resumes |
 | any | hero dead | any | IDLE | clear target and orders |
@@ -148,13 +152,49 @@ It does not clear `gv_unitTarget` on idle, Stop, or move completion.
 
 1. Read `lv_hero`.
 2. If invalid or dead, call `gf_CombatReset`.
-3. If state is `MANUAL` or `MOVING`, return.
-4. If order mode is on or any movement key is held, call
-   `gf_CombatCancelAuto`, set `MOVING`, return.
-5. If auto is off, call `gf_CombatCancelAuto`, set `IDLE`, return.
-6. Read stance.
-7. If stand, call `gf_CombatStand`.
-8. If walk, call `gf_CombatWalk`.
+3. If order mode is on, cancel auto and manual, call `gf_CombatBeginMove`, return.
+4. If any movement key is held, remove the root, set `MOVING`, return.
+   Movement loops own moving shots through `gf_CombatRunGunStep`.
+5. If state is `MOVING`, set `IDLE`.
+6. If a manual target is alive, reissue its attack order and return.
+7. If auto is off, call `gf_CombatCancelAuto`, set `IDLE`, return.
+8. Read stance.
+9. If stand, call `gf_CombatStand`.
+10. If walk, call `gf_CombatWalk`.
+
+### 6.1.1 Moving attack
+
+Weapon data is the native movement gate. Map overrides set
+`CWeaponLegacy AllowedMovement = Moving` on `Tosh`, `RazorTalons`, and
+`QueenOfBladesPsiBlast`. This is the same mechanism used by native air units
+that fire while moving.
+
+Movement loops own moving shots. They call `gf_CombatRunGunStep` before each
+move order. The helper synchronously holds the loop for one shot.
+
+`gf_CombatMovingTarget(int lp_player)`:
+
+1. Prefer a live manual target.
+2. Otherwise use the live auto target inside stance radius.
+3. Otherwise acquire the closest enemy inside stand keep radius or walk
+   chase radius.
+4. Clear and return null when no valid target exists.
+
+`gf_CombatRunGunStep(int lp_player)`:
+
+1. Return when auto is off and no manual target exists.
+2. Return when `gf_WeaponReady` is false.
+3. Get the target from `gf_CombatMovingTarget`.
+4. Return when the target is missing or out of weapon range.
+5. Issue exactly one native attack order.
+6. Wait until the weapon cooldown starts, or `c_SCOBA_RUNGUN_TIMEOUT`.
+7. Keep the movement loop blocked for at least `c_SCOBA_RUNGUN_HOLD`.
+
+The wait covers the weapon damage point and muzzle flash. The movement loop then
+issues the next move order. The combat tick never issues moving attacks.
+
+Stand moving attacks never chase. Walk moving attacks never replace movement.
+Attack-order spam is forbidden. One shot equals one attack order.
 
 ### 6.2 Stand
 
@@ -174,9 +214,9 @@ the hero. The hero never chases in Stand.
 The root depends on the Stand behavior only. Auto on and auto off do not change
 it. User-issued attack orders in Stand stay under the root and do not chase.
 
-Player movement removes the root. The next combat tick re-adds it while Stand is
-active. The root is also re-added before a manual attack. WASD therefore remains
-responsive.
+Player movement removes the root and runs moving attacks. The next stationary
+combat tick re-adds it while Stand is active. WASD therefore remains responsive
+and can fire on the move.
 
 `gf_CombatSyncRoot` is the single root enforcement point:
 
@@ -205,8 +245,9 @@ combat step calls it before the manual-order early return.
 6. Issue an attack order on the target and set `gv_sCOBAAutoOrder = true`,
    state `CHASE`.
 
-An attack order is the StarCraft II primitive that chases. No separate move
-order is used.
+An attack order is the StarCraft II primitive that chases when the hero is
+stationary. While a movement key is held, `gf_CombatMoveAttack` starts the shot
+and movement input keeps control of position.
 
 ### 6.4 Manual attack
 
@@ -215,16 +256,19 @@ order is used.
 1. Validate the target and the hero.
 2. Call `gf_CombatCancelAuto`.
 3. Call `gf_CombatSyncRoot`.
-4. Set `gv_sCOBAManualOrder = true`.
-5. Issue `OrderTargetingUnit(AbilityCommand("attack", 0), lp_target)` with
-   `c_orderQueueReplace`.
+4. Store `gv_sCOBAManualTarget = lp_target`.
+5. Set `gv_sCOBAManualOrder = true`.
 6. Set state `MANUAL`.
+7. Return when a movement key is held. The movement loop fires the shot.
+8. Issue `OrderTargetingUnit(AbilityCommand("attack", 0), lp_target)` with
+   `c_orderQueueReplace`.
 
-The root is present before the attack order when Stand is active. The attack
-stays in Stand and does not chase.
+The root is present before the attack order only while stationary in Stand.
+Movement removes the root and uses `gf_CombatRunGunStep`. The manual target
+persists until it dies or is cleared.
 
-`gf_CombatOnIdle(int lp_player)` clears `gv_sCOBAManualOrder`, clears the auto
-target, and sets state `IDLE`. The next combat tick resumes auto behavior.
+`gf_CombatOnIdle(int lp_player)` clears `gv_sCOBAManualOrder`, clears the manual
+target, clears the auto target, and sets state `IDLE`.
 
 ### 6.5 Auto off
 
@@ -423,12 +467,12 @@ FSM state or issues a combat order. Their implementation is specified in
 | `TriggerAddEventUnitBehaviorChange` | auto behavior | sync auto state, step or cancel |
 | `TriggerAddEventUnitBehaviorChange` | Stand behavior | sync root and stance |
 | `TriggerAddEventTimePeriodic` 0.5 | combat tick | `gf_CombatStep` |
-| `TriggerAddEventUnitStartedAttack2` | cooldown | measure outgoing attack and set cooldown |
+| `TriggerAddEventUnitStartedAttack2` | cooldown | clear fire pending, measure outgoing attack, set cooldown |
 | `TriggerAddEventUnitBecomesIdle` | FSM | clear manual, resume |
 | `TriggerAddEventMouseClicked` fire down | targeting | save press state |
 | `TriggerAddEventMouseClicked` fire up | targeting | run clean-click right command |
 | `TriggerAddEventMouseClicked` cursor down and up | targeting | left target and button state |
-| WASD key start and end | movement | cancel auto, set MOVING or resume |
+| WASD key start and end | movement | keep targets, remove root, run moving attack or resume |
 | order mode enter and exit | orders | cancel auto, set MOVING or resume |
 
 ## 8. Constants
@@ -440,6 +484,8 @@ FSM state or issues a combat order. Their implementation is specified in
 | `c_SCOBA_MIN_ATTACK_PERIOD` | 0.1 | Reject same-frame bursts |
 | `c_SCOBA_MAX_ATTACK_PERIOD` | 2.0 | Reject stale intervals |
 | `c_SCOBA_INITIAL_WEAPON_PERIOD` | 0.75 | First attack ring estimate |
+| `c_SCOBA_RUNGUN_HOLD` | 0.12 | One-shot movement-loop hold past damage point |
+| `c_SCOBA_RUNGUN_TIMEOUT` | 0.35 | Maximum wait for weapon cooldown start |
 
 Mouse constants live in
 [SPEC-MOUSE-CONTROLS](SPEC-MOUSE-CONTROLS.md).
@@ -458,6 +504,11 @@ distance. It records elapsed time for every sample.
 | Stand out of weapon range | 11.0 east | +1.0, +2.5 | root 1, move suppressed, no damage, displacement <= 1 |
 | Stand outside keep | 13.0 east | +2.0 | root 1, no attack order, displacement <= 1 |
 | Stand movement wake | none | held key, before and after `gf_CombatBeginMove`, release | root 1 then 0, move suppressed then clear, move order moves hero, root returns after release |
+| Stand move-and-shoot | 3.0 east | hold key +3.0 | displacement > 1, native attack event, damage, root 0, cooldown resets once |
+| Walk move-and-shoot | 3.0 east | hold key +3.0 | displacement > 1, native attack event, damage, root 0, cooldown resets once |
+| Manual move-and-shoot | 3.0 east | right-click enemy, hold key +3.0 | displacement > 1, manual target persists, native attack event, damage |
+| Moving shot hold | 3.0 east | snap during hold window | one attack order, movement loop paused, cooldown starts |
+| Moving shot resume | 3.0 east | snap after hold | movement resumes, cooldown positive, no repeated attack reset |
 | Stand auto off manual | 9.0 east | manual attack +2.0 | root 1, no displacement |
 | Stand repeated clicks | 9.0 east | 5 manual attacks | root stays, no displacement |
 | Right press resolve | 3.0 east | press, release | enemy returned from shared resolver |
@@ -487,11 +538,14 @@ command state only.
 ## 10. Invariants
 
 - Only one source of truth exists for auto and chase state.
-- Stand never issues a move or attack order toward the enemy.
-- Walk uses attack orders only.
+- Stand never chases when stationary.
+- Moving attacks use native `AllowedMovement` weapon data.
+- Moving attacks never replace movement input after the shot starts.
+- A pending shot issues one attack order and suspends move-order replacement.
+- Walk uses attack orders only when stationary.
 - Manual orders are never cancelled by auto off.
 - Cooldown uses outgoing attack events only.
-- The FSM step is the only place that issues automatic orders.
+- The FSM step is the only place that issues automatic moving attacks.
 - Control mode state lives only in `SCOBAActionModeBehavior`.
 - Control mode changes never alter combat state.
 - Action mode right hold never calls the combat controller.

@@ -81,7 +81,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|aim|motion|controls|pitch|aimfreeze) ;;
+        combat|aim|motion|controls|pitch|aimfreeze|rungun) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -121,7 +121,7 @@ case "$ACTION" in
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-and-check.sh"
         ;;
-    combat|aim|motion|controls|pitch|aimfreeze)
+    combat|aim|motion|controls|pitch|aimfreeze|rungun)
         run_profile "$ACTION"
         ;;
     build-profile)

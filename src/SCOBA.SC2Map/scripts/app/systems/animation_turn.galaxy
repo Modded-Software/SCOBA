@@ -39,6 +39,9 @@ void gf_AnimFacingTick (int lp_player) {
         return;
     }
     if (gv_aIMACTIVE[lp_player]) {
+        if (gf_MovementKeyHeld(lp_player)) {
+            return;
+        }
         lv_yaw = CameraGetYaw(lp_player);
         UnitSetFacing(lv_hero, lv_yaw, c_ANIM_AIM_TURN_DURATION);
         gv_animTurnTarget[lp_player] = lv_yaw;

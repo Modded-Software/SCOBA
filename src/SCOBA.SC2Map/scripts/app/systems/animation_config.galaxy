@@ -30,6 +30,8 @@ void gf_AnimConfigInit () {
             gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_AIM_MID, "Ready,Alternate,50", 0.0);
             gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_ATTACK, "Attack,Arm,Alternate", 0.0);
             gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_ATTACK_SPELL, "Spell,Arm,Alternate", 0.0);
+            gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_ATTACK_AIM, "Attack,Arm,Alternate,01", 0.0);
+            gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_ATTACK_SPELL_AIM, "Spell,Arm,Alternate,01", 0.0);
         }
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_IDLE, "Stand,Leg", true, 0.15, 0.0);
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_WALK, "Walk,Leg", true, 0.15, lv_walk_speed);

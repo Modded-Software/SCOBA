@@ -659,6 +659,10 @@
     <CUnit id="Zergling">
         <Radius value="0.75"/>
     </CUnit>
-    <CUnit id="ToshSCOBA" parent="Tosh"/>
-    <CUnit id="KerriganSCOBA" parent="Kerrigan"/>
+    <CUnit id="ToshSCOBA" parent="Tosh">
+        <DefaultAcquireLevel value="Defensive"/>
+    </CUnit>
+    <CUnit id="KerriganSCOBA" parent="Kerrigan">
+        <DefaultAcquireLevel value="Defensive"/>
+    </CUnit>
 </Catalog>

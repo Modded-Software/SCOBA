@@ -224,8 +224,8 @@ Implementation lives in
 | R-MC-119 | RPG hover MUST be set from the engine `UnitHighlight` event and cleared when that unit is no longer highlighted. |
 | R-MC-120 | RPG click points MUST come from the engine `EventMouseClickedPosXWorld` and `EventMouseClickedPosYWorld` values. |
 | R-MC-121 | Aim mode camera origin MUST translate slightly left of the hero, using `c_SCOBA_AIM_SHOULDER_ANGLE`. It MUST NOT rotate the camera away from hero heading and MUST NOT sit directly behind the hero. |
-| R-MC-122 | The reticle MUST use `cursor-target-none.dds` for neutral, `storm_ui_cursor_default_enemy.dds` for hostile, and `storm_ui_cursor_default_friendly.dds` for friendly. |
-| R-MC-123 | The reticle MUST resolve at `CameraGetTarget` every 0.01 s and show enemy, friendly, or neutral art. |
+| R-MC-122 | The reticle MUST use `cursor-target-none.dds` for every state. Neutral is white, hostile is red, friendly is blue, and hostile out of range is gray. It MUST NOT use the native `storm_ui_cursor_default_*` arrow cursors. |
+| R-MC-123 | The reticle MUST resolve at the aim crosshair point every 0.01 s and show enemy, friendly, or neutral art. |
 | R-MC-124 | The reticle MUST hide in RPG mode and while Alt shows the free UI cursor. |
 | R-MC-99 | Normal action movement MUST NOT use lateral strafe behavior. |
 

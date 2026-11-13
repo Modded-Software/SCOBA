@@ -1,0 +1,320 @@
+// Module: systems/aim_shooting
+
+bool gf_AimTargetInRange (int lp_player, unit lp_unit) {
+    unit lv_hero;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero) || !UnitIsValid(lp_unit)) {
+        return false;
+    }
+    return UnitInRangeAndAbleToAttackTarget(lv_hero, lp_unit);
+}
+
+string gf_AimWeaponName (int lp_player) {
+    unit lv_hero;
+    int lv_index;
+    int lv_count;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return "Attack";
+    }
+    lv_count = UnitWeaponCount(lv_hero);
+    for (lv_index = 1; lv_index <= lv_count; lv_index += 1) {
+        if (UnitWeaponIsEnabled(lv_hero, lv_index)) {
+            return UnitWeaponGet(lv_hero, lv_index);
+        }
+    }
+    return "Attack";
+}
+
+fixed gf_AimWeaponRange (int lp_player) {
+    unit lv_hero;
+    int lv_index;
+    int lv_count;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return 0.0;
+    }
+    lv_count = UnitWeaponCount(lv_hero);
+    for (lv_index = 1; lv_index <= lv_count; lv_index += 1) {
+        if (UnitWeaponIsEnabled(lv_hero, lv_index)) {
+            return UnitWeaponRange(lv_hero, lv_index);
+        }
+    }
+    return 0.0;
+}
+
+point gf_AimCrosshairPoint (int lp_player) {
+    unit lv_hero;
+    point lv_origin;
+    point lv_camera;
+    fixed lv_yaw;
+    fixed lv_pitch;
+    fixed lv_cos;
+    fixed lv_dx;
+    fixed lv_dy;
+    fixed lv_dz;
+    fixed lv_z;
+    fixed lv_plane;
+    fixed lv_range;
+    fixed lv_dist;
+    fixed lv_to_plane;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return CameraGetTarget(lp_player);
+    }
+    lv_origin = gf_AimProxyPoint(lp_player);
+    lv_camera = CameraGetTarget(lp_player);
+    lv_yaw = CameraGetYaw(lp_player);
+    lv_pitch = CameraGetPitch(lp_player);
+    if (lv_pitch > 180.0) {
+        lv_pitch = lv_pitch - 360.0;
+    }
+    lv_cos = Cos(lv_pitch);
+    lv_dx = Cos(lv_yaw) * lv_cos;
+    lv_dy = Sin(lv_yaw) * lv_cos;
+    lv_dz = -Sin(lv_pitch);
+    lv_z = UnitGetHeight(lv_hero) + c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT;
+    lv_range = gf_AimWeaponRange(lp_player);
+    if (lv_range <= 0.0) {
+        lv_range = 8.0;
+    }
+    lv_plane = PointGetHeight(lv_camera);
+    lv_dist = lv_range;
+    if (lv_dz < -0.0001) {
+        lv_to_plane = (lv_plane - lv_z) / lv_dz;
+        if (lv_to_plane > 0.0 && lv_to_plane < lv_dist) {
+            lv_dist = lv_to_plane;
+        }
+    }
+    if (lv_dist < c_SCOBA_CROSSHAIR_MIN_RANGE) {
+        lv_dist = c_SCOBA_CROSSHAIR_MIN_RANGE;
+    }
+    if (lv_dist > lv_range) {
+        lv_dist = lv_range;
+    }
+    return libNtve_gf_PointFromXYZ(
+        PointGetX(lv_origin) + (lv_dx * lv_dist),
+        PointGetY(lv_origin) + (lv_dy * lv_dist),
+        lv_z + (lv_dz * lv_dist)
+    );
+}
+
+unit gf_AimTargetAtCrosshair (int lp_player) {
+    point lv_point;
+    unit lv_target;
+
+    lv_point = gf_AimCrosshairPoint(lp_player);
+    lv_target = gf_UnitTargetAtPoint(lp_player, lv_point, true);
+    if (!gf_UnitTargetValid(lp_player, lv_target, true)) {
+        lv_target = gv_unitClickCandidate[lp_player];
+    }
+    if (!gf_UnitTargetValid(lp_player, lv_target, true)) {
+        lv_target = gv_unitPressHighlight[lp_player];
+    }
+    if (!gf_UnitTargetValid(lp_player, lv_target, true)) {
+        lv_target = null;
+    }
+    return lv_target;
+}
+
+unit gf_AimShotProxyCreate (int lp_player, point lp_point) {
+    unit lv_hero;
+    unit lv_proxy;
+    point lv_ground;
+    fixed lv_x;
+    fixed lv_y;
+    fixed lv_dx;
+    fixed lv_dy;
+    fixed lv_dist;
+    fixed lv_max;
+    fixed lv_z;
+    fixed lv_plane;
+
+    if (UnitIsValid(gv_aimShotProxy[lp_player])) {
+        return gv_aimShotProxy[lp_player];
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    lv_max = gf_AimWeaponRange(lp_player) - c_SCOBA_SHOT_PROXY_RANGE_MARGIN;
+    if (lv_max < c_SCOBA_SHOT_PROXY_MIN_RANGE) {
+        lv_max = c_SCOBA_SHOT_PROXY_MIN_RANGE;
+    }
+    lv_x = PointGetX(lp_point);
+    lv_y = PointGetY(lp_point);
+    lv_dx = lv_x - PointGetX(UnitGetPosition(lv_hero));
+    lv_dy = lv_y - PointGetY(UnitGetPosition(lv_hero));
+    lv_dist = SquareRoot((lv_dx * lv_dx) + (lv_dy * lv_dy));
+    if (lv_dist < c_SCOBA_SHOT_PROXY_MIN_RANGE) {
+        lv_dist = c_SCOBA_SHOT_PROXY_MIN_RANGE;
+        lv_dx = Cos(CameraGetYaw(lp_player)) * lv_dist;
+        lv_dy = Sin(CameraGetYaw(lp_player)) * lv_dist;
+        lv_x = PointGetX(UnitGetPosition(lv_hero)) + lv_dx;
+        lv_y = PointGetY(UnitGetPosition(lv_hero)) + lv_dy;
+    }
+    else if (lv_dist > lv_max) {
+        lv_dx = (lv_dx / lv_dist) * lv_max;
+        lv_dy = (lv_dy / lv_dist) * lv_max;
+        lv_x = PointGetX(UnitGetPosition(lv_hero)) + lv_dx;
+        lv_y = PointGetY(UnitGetPosition(lv_hero)) + lv_dy;
+    }
+    lv_z = PointGetHeight(lp_point);
+    lv_plane = PointGetHeight(CameraGetTarget(lp_player));
+    if (lv_z > lv_plane) {
+        lv_z = lv_plane;
+    }
+    lv_ground = libNtve_gf_PointFromXYZ(lv_x, lv_y, lv_z);
+    libNtve_gf_UnitCreateFacingPoint(1, "InvisibleTargetDummy", 0, c_SCOBA_SHOT_PROXY_PLAYER, lv_ground, lv_ground);
+    lv_proxy = UnitLastCreated();
+    UnitSetState(lv_proxy, c_unitStateSelectable, false);
+    UnitSetState(lv_proxy, c_unitStateHighlightable, false);
+    UnitSetState(lv_proxy, c_unitStateStatusBar, false);
+    UnitSetPropertyFixed(lv_proxy, c_unitPropLifeMax, c_SCOBA_SHOT_PROXY_LIFE);
+    UnitSetPropertyFixed(lv_proxy, c_unitPropLife, c_SCOBA_SHOT_PROXY_LIFE);
+    gv_aimShotProxy[lp_player] = lv_proxy;
+    return lv_proxy;
+}
+
+void gf_AimShotProxyClear (int lp_player) {
+    unit lv_proxy;
+
+    lv_proxy = gv_aimShotProxy[lp_player];
+    gv_aimShotProxy[lp_player] = null;
+    if (UnitIsValid(lv_proxy)) {
+        UnitRemove(lv_proxy);
+    }
+}
+
+bool gf_AimShotProxyIs (unit lp_unit) {
+    int lv_player;
+
+    if (!UnitIsValid(lp_unit)) {
+        return false;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (UnitIsValid(gv_aimShotProxy[lv_player]) && gv_aimShotProxy[lv_player] == lp_unit) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void gf_AimMissFloater (int lp_player, point lp_crosshair) {
+    fixed lv_x;
+    fixed lv_y;
+    fixed lv_z;
+
+    lv_x = PointGetX(lp_crosshair) + RandomFixed(-c_SCOBA_MISS_RADIUS, c_SCOBA_MISS_RADIUS);
+    lv_y = PointGetY(lp_crosshair) + RandomFixed(-c_SCOBA_MISS_RADIUS, c_SCOBA_MISS_RADIUS);
+    lv_z = PointGetHeight(lp_crosshair) + c_SCOBA_MISS_HEIGHT;
+    gf_FloaterCreate(lp_player, libNtve_gf_PointFromXYZ(lv_x, lv_y, lv_z), StringToText(c_SCOBA_MISS_TEXT), Color(70.0, 70.0, 70.0));
+}
+
+void gf_AimShotFire (int lp_player, unit lp_unit) {
+    unit lv_hero;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero) || !UnitIsValid(lp_unit)) {
+        return;
+    }
+    if (!gf_WeaponReady(lp_player)) {
+        return;
+    }
+    if (!gf_AimShotProxyIs(lp_unit) && !gf_AimTargetInRange(lp_player, lp_unit)) {
+        return;
+    }
+    UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lp_unit), c_orderQueueReplace);
+    if (!UnitOrderHasAbil(lv_hero, "attack")) {
+        return;
+    }
+    gv_aimShotHoldUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_SCOBA_AIM_SHOT_HOLD;
+    gv_aimShots[lp_player] += 1;
+}
+
+void gf_AimShotPress (int lp_player) {
+    unit lv_target;
+    unit lv_proxy;
+    point lv_point;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    if (!gv_aIMACTIVE[lp_player]) {
+        return;
+    }
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+    if (gf_AnimAimAttackActive(lp_player)) {
+        return;
+    }
+    if (!gf_WeaponReady(lp_player)) {
+        return;
+    }
+    lv_point = gf_AimCrosshairPoint(lp_player);
+    lv_target = gf_AimTargetAtCrosshair(lp_player);
+    gf_AnimAimAttackStart(lp_player, gf_AimWeaponName(lp_player));
+    gv_animAimAttackSuppressUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_SCOBA_AIM_ATTACK_SUPPRESS;
+    if (UnitIsValid(lv_target)) {
+        gf_UnitTargetSet(lp_player, lv_target);
+        if (gf_AimTargetInRange(lp_player, lv_target)) {
+            gf_AimShotFire(lp_player, lv_target);
+        }
+        else {
+            gv_aimOutOfRange[lp_player] += 1;
+            gf_FloaterCreate(lp_player, UnitGetPosition(lv_target), StringToText(c_SCOBA_OUT_OF_RANGE_TEXT), Color(70.0, 70.0, 70.0));
+        }
+        return;
+    }
+    gf_AimShotProxyClear(lp_player);
+    lv_proxy = gf_AimShotProxyCreate(lp_player, lv_point);
+    gf_AimShotFire(lp_player, lv_proxy);
+    gf_AimMissFloater(lp_player, lv_point);
+    gv_aimShotProxyUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_SCOBA_SHOT_PROXY_TIMEOUT;
+}
+
+bool gt_AimShotCleanup_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (!UnitIsValid(gv_aimShotProxy[lv_player])) {
+            continue;
+        }
+        if (TimerGetElapsed(gv_sCOBA_Clock) >= gv_aimShotProxyUntil[lv_player]) {
+            gf_AimShotProxyClear(lv_player);
+        }
+    }
+    return true;
+}
+
+bool gt_AimShootingInit_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gv_animAimAttackUntil[lv_player] = -1.0;
+        gv_animAimAttackSuppressUntil[lv_player] = -1.0;
+        gv_animTargetPitchStep[lv_player] = 0;
+        gv_animTargetPitchTime[lv_player] = -1.0;
+        gv_aimShotProxy[lv_player] = null;
+        gv_aimShotProxyUntil[lv_player] = -1.0;
+        gv_aimShotHoldUntil[lv_player] = -1.0;
+        gv_aimShots[lv_player] = 0;
+        gv_aimOutOfRange[lv_player] = 0;
+    }
+    return true;
+}
+
+void gt_AimShootingInit_Init () {
+    gt_AimShootingInit = TriggerCreate("gt_AimShootingInit_Func");
+    TriggerAddEventMapInit(gt_AimShootingInit);
+    gt_AimShotCleanup = TriggerCreate("gt_AimShotCleanup_Func");
+    TriggerAddEventTimePeriodic(gt_AimShotCleanup, 0.05, c_timeGame);
+}

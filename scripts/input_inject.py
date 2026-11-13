@@ -151,6 +151,4 @@ if len(sys.argv) > 1 and sys.argv[1] == "auto":
         click(x + w // 2, y + h // 2)
     time.sleep(0.5)
     key("space", 150)
-    time.sleep(0.5)
-    key("Return", 150)
     print("auto ok")
