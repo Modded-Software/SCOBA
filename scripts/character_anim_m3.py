@@ -401,6 +401,7 @@ def make_pitch_group(
     groups,
     name,
     upper_name,
+    upper_source,
     source_ms,
     pitch_bones,
     pitch_weights,
@@ -417,7 +418,6 @@ def make_pitch_group(
     if samples < 2:
         raise ValueError("pitch sample count must be at least two")
     upper_group = groups[upper_name]
-    upper_source = model.sequenceTransformationCollections[upper_group.stcIndices[0]]
 
     upper_stc = clone(upper_source)
     upper_stc.name = name + " Upper"

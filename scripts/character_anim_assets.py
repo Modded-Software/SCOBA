@@ -279,6 +279,15 @@ def generate_model(
             reverse,
             turn_anim_id,
         )
+    attack_source = model.sequenceTransformationCollections[groups["Attack"].stcIndices[0]]
+    pitch_source = clone(attack_source)
+    pitch_pairs = [
+        (anim_id, anim_ref)
+        for anim_id, anim_ref in zip(attack_source.animIds, attack_source.animRefs)
+        if anim_id in upper_ids
+    ]
+    pitch_source.animIds = [pair[0] for pair in pitch_pairs]
+    pitch_source.animRefs = [pair[1] for pair in pitch_pairs]
     for step in range(AIM_PITCH_STEPS):
         t = step / (AIM_PITCH_STEPS - 1)
         angle = AIM_PITCH_MIN_DEG + (AIM_PITCH_MAX_DEG - AIM_PITCH_MIN_DEG) * t
@@ -287,6 +296,7 @@ def generate_model(
             groups,
             f"{AIM_PITCH_GROUP} {step + 1:02d}",
             AIM_PITCH_SOURCE,
+            pitch_source,
             AIM_PITCH_SOURCE_MS,
             pitch_bones,
             pitch_weights,
