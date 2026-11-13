@@ -208,6 +208,12 @@ void gt_AttackEvent_Init () {
     TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_tPSUNIT[4]"), null);
     TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_tPSUNIT[5]"), null);
     TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_tPSUNIT[6]"), null);
+    TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_aimShooter[1]"), null);
+    TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_aimShooter[2]"), null);
+    TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_aimShooter[3]"), null);
+    TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_aimShooter[4]"), null);
+    TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_aimShooter[5]"), null);
+    TriggerAddEventUnitStartedAttack2(gt_CombatStartedAttack, UnitRefFromVariable("gv_aimShooter[6]"), null);
 
     gt_WeaponAttackCmd = TriggerCreate("gt_WeaponAttackCmd_Func");
     TriggerAddEventUnitAbility(gt_WeaponAttackCmd, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBAAutoAttackStatus", 0), c_unitAbilStageExecute, false);

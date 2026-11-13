@@ -65,8 +65,8 @@
 - Aim entry clears `SCOBAStandRoot`; otherwise walk plays without displacement.
 - Aim movement writes camera facing immediately before each move order.
 - `gf_AnimFacingTick` skips facing while a movement key is held.
-- Aim shots hold movement only until `gf_WeaponReady` becomes false, or `c_SCOBA_AIM_SHOT_HOLD` expires.
-- The aim shot hold prevents the movement loop from replacing the attack order before its damage point.
+- Aim shots never stop, pause, or restart hero locomotion. No aim shot hold.
+- Movement input owns hero position during aim shots.
 - RPG Stand ground right click stops and keeps the root.
 - RPG Walk ground right click moves and shows the move marker.
 - RPG right click never aims. Aim only starts on Action mode right hold.
@@ -88,7 +88,10 @@
 - Aim must not turn 180 degrees toward travel or show planted-feet twist.
 - Aim attack uses the root-excluded upper attack on `SCOBAAimAtk`; aim pitch stays on `SCOBAUp`.
 - Aim shots resolve from the crosshair point, not the mouse world point.
-- Every aim shot issues a native attack. Targetless shots use one invisible proxy at the crosshair.
+- Every aim shot issues a native attack from a hidden aim shooter, never from the hero.
+- The aim shooter is pinned to the hero position, faces camera yaw, and carries the hero weapon.
+- Targetless shots use one invisible attackable proxy at the crosshair, or at crosshair height for air.
+- Shooter cooldown mirrors to the hero weapon cooldown.
 - Aim shots are ignored until `UnitWeaponPeriodRemaining` reaches zero.
 - Native cooldown, muzzle flash, launch effect, and sound must run for enemy, ground, and air shots.
 - Select the attack clip from `EventUnitGetWeapon`: Tosh `Attack Arm Alternate 01`, Kerrigan `RazorTalons` `Attack Arm Alternate 01`, `QueenOfBladesPsiBlast` `Spell Arm Alternate 01`.
@@ -156,6 +159,7 @@
 - `gt_AimCursorTick` resolves `gf_AimCrosshairPoint` every 0.01 s.
 - Hide the reticle in RPG mode and while Alt shows the free UI cursor.
 - Unit Highlight is the hover ring. Unit Target is the boss-bar target. Unit Select is native selection.
+- Action mode shows the crosshair-hovered unit status bar override; clear it when hover leaves.
 - RPG clicks resolve Unit Target from `UnitClick`, then press-time Unit Highlight, then press-point geometry.
 - Register `UnitClick`, `UnitSelected`, and Unit Highlight separately per hero player.
 - Every unit type must clear `FlagArray[Unclickable]` and `FlagArray[Unhighlightable]`.

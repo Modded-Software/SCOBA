@@ -121,6 +121,129 @@ unit gf_AimTargetAtCrosshair (int lp_player) {
     return lv_target;
 }
 
+bool gf_AimShooterReady (int lp_player) {
+    unit lv_shooter;
+    int lv_index;
+    int lv_count;
+
+    lv_shooter = gv_aimShooter[lp_player];
+    if (!UnitIsValid(lv_shooter)) {
+        return false;
+    }
+    lv_count = UnitWeaponCount(lv_shooter);
+    for (lv_index = 1; lv_index <= lv_count; lv_index += 1) {
+        if (!UnitWeaponIsEnabled(lv_shooter, lv_index)) {
+            continue;
+        }
+        if (UnitWeaponPeriodRemaining(lv_shooter, lv_index) <= c_SCOBA_WEAPON_READY_EPSILON) {
+            return true;
+        }
+    }
+    return false;
+}
+
+int gf_AimShooterPlayer (unit lp_unit) {
+    int lv_player;
+
+    if (!UnitIsValid(lp_unit)) {
+        return -1;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (UnitIsValid(gv_aimShooter[lv_player]) && gv_aimShooter[lv_player] == lp_unit) {
+            return lv_player;
+        }
+    }
+    return -1;
+}
+
+bool gf_AimShooterIs (unit lp_unit) {
+    return gf_AimShooterPlayer(lp_unit) >= 0;
+}
+
+unit gf_AimShooterCreate (int lp_player) {
+    unit lv_hero;
+    unit lv_shooter;
+    actor lv_actor;
+    point lv_point;
+    string lv_type;
+    int lv_profile;
+
+    if (UnitIsValid(gv_aimShooter[lp_player])) {
+        return gv_aimShooter[lp_player];
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return null;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    if (lv_profile == c_ANIM_HERO_KERRIGAN) {
+        lv_type = c_SCOBA_AIM_SHOOTER_KERRIGAN;
+    }
+    else if (lv_profile == c_ANIM_HERO_TOSH) {
+        lv_type = c_SCOBA_AIM_SHOOTER_TOSH;
+    }
+    else {
+        return null;
+    }
+    lv_point = UnitGetPosition(lv_hero);
+    libNtve_gf_UnitCreateFacingPoint(1, lv_type, 0, lp_player, lv_point, lv_point);
+    lv_shooter = UnitLastCreated();
+    if (!UnitIsValid(lv_shooter) || UnitGetType(lv_shooter) != lv_type) {
+        return null;
+    }
+    UnitSetState(lv_shooter, c_unitStateSelectable, false);
+    UnitSetState(lv_shooter, c_unitStateHighlightable, false);
+    UnitSetState(lv_shooter, c_unitStateStatusBar, false);
+    lv_actor = libNtve_gf_MainActorofUnit(lv_shooter);
+    ActorSend(lv_actor, "SetOpacity 0.0 0");
+    ActorSend(ActorFromActor(lv_actor, "Model"), "SetOpacity 0.0 0");
+    gv_aimShooter[lp_player] = lv_shooter;
+    return lv_shooter;
+}
+
+void gf_AimShooterPin (int lp_player) {
+    unit lv_hero;
+    unit lv_shooter;
+    point lv_point;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    lv_shooter = gv_aimShooter[lp_player];
+    if (!UnitIsValid(lv_hero) || !UnitIsValid(lv_shooter)) {
+        return;
+    }
+    lv_point = UnitGetPosition(lv_hero);
+    UnitSetPosition(lv_shooter, lv_point, true);
+    UnitSetFacing(lv_shooter, CameraGetYaw(lp_player), c_ANIM_AIM_TURN_DURATION);
+}
+
+void gf_AimShooterPark (int lp_player) {
+    unit lv_shooter;
+
+    lv_shooter = gv_aimShooter[lp_player];
+    gv_aimShooter[lp_player] = null;
+    gv_aimShooterStopAt[lp_player] = -1.0;
+    if (UnitIsValid(lv_shooter)) {
+        UnitRemove(lv_shooter);
+    }
+}
+
+void gf_AimShooterMirrorCooldown (int lp_player) {
+    unit lv_hero;
+    unit lv_shooter;
+    int lv_index;
+    int lv_count;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    lv_shooter = gv_aimShooter[lp_player];
+    if (!UnitIsValid(lv_hero) || !UnitIsValid(lv_shooter)) {
+        return;
+    }
+    lv_count = UnitWeaponCount(lv_hero);
+    for (lv_index = 1; lv_index <= lv_count; lv_index += 1) {
+        UnitWeaponSetPeriodRemaining(lv_hero, lv_index, UnitWeaponPeriod(lv_shooter, lv_index));
+    }
+}
+
 unit gf_AimShotProxyCreate (int lp_player, point lp_point) {
     unit lv_hero;
     unit lv_proxy;
@@ -161,12 +284,12 @@ unit gf_AimShotProxyCreate (int lp_player, point lp_point) {
         lv_y = PointGetY(UnitGetPosition(lv_hero)) + lv_dy;
     }
     lv_z = PointGetHeight(lp_point);
-    lv_plane = PointGetHeight(CameraGetTarget(lp_player));
-    if (lv_z > lv_plane) {
+    lv_plane = WorldHeight(c_heightMapGround, Point(lv_x, lv_y));
+    if (lv_z <= lv_plane + c_SCOBA_AIR_PROXY_MIN_HEIGHT) {
         lv_z = lv_plane;
     }
     lv_ground = libNtve_gf_PointFromXYZ(lv_x, lv_y, lv_z);
-    libNtve_gf_UnitCreateFacingPoint(1, "InvisibleTargetDummy", 0, c_SCOBA_SHOT_PROXY_PLAYER, lv_ground, lv_ground);
+    libNtve_gf_UnitCreateFacingPoint(1, c_SCOBA_AIM_PROXY_GROUND, 0, c_SCOBA_SHOT_PROXY_PLAYER, lv_ground, lv_ground);
     lv_proxy = UnitLastCreated();
     UnitSetState(lv_proxy, c_unitStateSelectable, false);
     UnitSetState(lv_proxy, c_unitStateHighlightable, false);
@@ -214,22 +337,28 @@ void gf_AimMissFloater (int lp_player, point lp_crosshair) {
 
 void gf_AimShotFire (int lp_player, unit lp_unit) {
     unit lv_hero;
+    unit lv_shooter;
 
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero) || !UnitIsValid(lp_unit)) {
         return;
     }
-    if (!gf_WeaponReady(lp_player)) {
+    if (!gf_WeaponReady(lp_player) || !gf_AimShooterReady(lp_player)) {
         return;
     }
     if (!gf_AimShotProxyIs(lp_unit) && !gf_AimTargetInRange(lp_player, lp_unit)) {
         return;
     }
-    UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lp_unit), c_orderQueueReplace);
-    if (!UnitOrderHasAbil(lv_hero, "attack")) {
+    lv_shooter = gf_AimShooterCreate(lp_player);
+    if (!UnitIsValid(lv_shooter)) {
         return;
     }
-    gv_aimShotHoldUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_SCOBA_AIM_SHOT_HOLD;
+    gf_AimShooterPin(lp_player);
+    UnitIssueOrder(lv_shooter, OrderTargetingUnit(AbilityCommand("attack", 0), lp_unit), c_orderQueueReplace);
+    if (!UnitOrderHasAbil(lv_shooter, "attack")) {
+        return;
+    }
+    gv_aimShooterStopAt[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_SCOBA_AIM_SHOOTER_ORDER_HOLD;
     gv_aimShots[lp_player] += 1;
 }
 
@@ -250,7 +379,7 @@ void gf_AimShotPress (int lp_player) {
     if (gf_AnimAimAttackActive(lp_player)) {
         return;
     }
-    if (!gf_WeaponReady(lp_player)) {
+    if (!gf_WeaponReady(lp_player) || !gf_AimShooterReady(lp_player)) {
         return;
     }
     lv_point = gf_AimCrosshairPoint(lp_player);
@@ -289,6 +418,21 @@ bool gt_AimShotCleanup_Func (bool testConds, bool runActions) {
             gf_AimShotProxyClear(lv_player);
         }
     }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (!UnitIsValid(gv_aimShooter[lv_player])) {
+            continue;
+        }
+        if (gv_aimShooterStopAt[lv_player] < 0.0) {
+            continue;
+        }
+        if (TimerGetElapsed(gv_sCOBA_Clock) < gv_aimShooterStopAt[lv_player]) {
+            continue;
+        }
+        if (UnitOrderHasAbil(gv_aimShooter[lv_player], "attack")) {
+            UnitIssueOrder(gv_aimShooter[lv_player], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+        }
+        gv_aimShooterStopAt[lv_player] = -1.0;
+    }
     return true;
 }
 
@@ -305,7 +449,8 @@ bool gt_AimShootingInit_Func (bool testConds, bool runActions) {
         gv_animTargetPitchTime[lv_player] = -1.0;
         gv_aimShotProxy[lv_player] = null;
         gv_aimShotProxyUntil[lv_player] = -1.0;
-        gv_aimShotHoldUntil[lv_player] = -1.0;
+        gv_aimShooter[lv_player] = null;
+        gv_aimShooterStopAt[lv_player] = -1.0;
         gv_aimShots[lv_player] = 0;
         gv_aimOutOfRange[lv_player] = 0;
     }

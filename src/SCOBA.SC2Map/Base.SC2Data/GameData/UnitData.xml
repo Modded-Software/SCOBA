@@ -659,10 +659,33 @@
     <CUnit id="Zergling">
         <Radius value="0.75"/>
     </CUnit>
+    <CUnit id="SCOBAAimShotDummy" parent="InvisibleTargetDummy">
+        <FlagArray index="Invulnerable" value="0"/>
+        <FlagArray index="Untargetable" value="0"/>
+        <FlagArray index="IgnoreTerrainZInit" value="1"/>
+        <FlagArray index="Movable" value="0"/>
+        <PlaneArray index="Ground" value="1"/>
+        <PlaneArray index="Air" value="1"/>
+        <Radius value="0"/>
+    </CUnit>
     <CUnit id="ToshSCOBA" parent="Tosh">
         <DefaultAcquireLevel value="Defensive"/>
     </CUnit>
     <CUnit id="KerriganSCOBA" parent="Kerrigan">
         <DefaultAcquireLevel value="Defensive"/>
+    </CUnit>
+    <CUnit id="SCOBAAimShooterTosh" parent="ToshSCOBA">
+        <Radius value="0"/>
+        <Height value="0"/>
+        <DefaultAcquireLevel value="None"/>
+        <FlagArray index="Untargetable" value="1"/>
+        <FlagArray index="Invulnerable" value="1"/>
+    </CUnit>
+    <CUnit id="SCOBAAimShooterKerrigan" parent="KerriganSCOBA">
+        <Radius value="0"/>
+        <Height value="0"/>
+        <DefaultAcquireLevel value="None"/>
+        <FlagArray index="Untargetable" value="1"/>
+        <FlagArray index="Invulnerable" value="1"/>
     </CUnit>
 </Catalog>

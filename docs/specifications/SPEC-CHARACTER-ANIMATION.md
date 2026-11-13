@@ -34,7 +34,7 @@ Galaxy:
 - `systems/animation_fsm.galaxy`: splitbody aim selection, non-aim attack overlay, facing, and state.
 - `systems/animation_aim.galaxy`: direction selection and aim config tables.
 - `systems/aim.galaxy`: aim entry and exit.
-- `systems/combat_cooldown.galaxy`: starts the non-aim attack overlay on `UnitStartedAttack2`.
+- `systems/combat_cooldown.galaxy`: starts the non-aim attack overlay on hero or aim-shooter `UnitStartedAttack2`.
 - `systems/movement.galaxy`: native and aim movement.
 - `core/globals.galaxy`: per-player animation, attack, and aim group table.
 - `Base.SC2Data/GameData/ActorData.xml`: clean ToshSCOBAUnit and KerriganSCOBAUnit actors.

@@ -11,11 +11,15 @@ A left mouse press while aim is active is an aim shot.
 Release never fires a second shot.
 
 Every shot resolves from the crosshair, not the mouse.
-An in-range enemy gets one native attack order.
+An in-range enemy gets one native attack order from a hidden aim shooter.
+The hero never receives an attack order from an aim shot.
 An out-of-range enemy gets a gray `Out of range` floater and no order.
-A targetless shot spawns one hidden shot proxy at the crosshair, or at its
-ground projection for an air shot, attacks it natively, shows a random `Miss`
-at the crosshair, and removes the proxy.
+A targetless shot spawns one hidden attackable proxy at the crosshair, or at
+crosshair height for an air shot, attacks it from the shooter, shows a random
+`Miss` at the crosshair, and removes the proxy.
+
+The shooter is pinned to the hero position on every aim tick.
+Hero locomotion is never stopped, paused, or restarted by an aim shot.
 
 Aim shots do not use the combat controller.
 They preserve the combat FSM, auto-attack, stand, root, manual-order, and
@@ -31,7 +35,8 @@ It owns:
 - crosshair world-point computation;
 - crosshair target resolution;
 - range checks;
-- native shot execution;
+- hidden aim shooter lifecycle;
+- exact-target native shot execution through the shooter;
 - hidden targetless shot proxy;
 - targetless `Miss` feedback.
 
@@ -45,6 +50,9 @@ Changed modules:
 - `systems/animation_fsm.galaxy`: aim attack state, duplicate suppression.
 - `systems/animation_bracket.galaxy`: root-excluded attack instance.
 - `systems/animation_aim.galaxy`: pitch stays live during aim attack.
+- `systems/combat_cooldown.galaxy`: map shooter attack to hero cooldown.
+- `Base.SC2Data/GameData/UnitData.xml`: hidden shooter and attackable proxy types.
+- `Base.SC2Data/GameData/ActorData.xml`: hidden shooter actor.
 - `core/globals.galaxy`: new state globals.
 - `core/constants.galaxy`: new constants.
 - `header.galaxy`: new prototypes.
@@ -59,11 +67,16 @@ Add to `core/constants.galaxy`:
 | `c_SCOBA_MISS_RADIUS` | `0.75` | Random horizontal Miss offset |
 | `c_SCOBA_MISS_HEIGHT` | `1.5` | Miss height above crosshair point |
 | `c_SCOBA_AIM_ATTACK_SUPPRESS` | `0.25` | Ignore duplicate native attack event |
+| `c_SCOBA_AIM_SHOOTER_ORDER_HOLD` | `0.35` | Keep one shooter attack order alive per press |
 | `c_SCOBA_WEAPON_READY_EPSILON` | `0.05` | Weapon cooldown ready threshold |
 | `c_SCOBA_SHOT_PROXY_TIMEOUT` | `0.25` | Proxy removal timeout |
 | `c_SCOBA_SHOT_PROXY_MIN_RANGE` | `1.0` | Minimum proxy distance |
 | `c_SCOBA_SHOT_PROXY_RANGE_MARGIN` | `1.0` | Keep proxy inside weapon range |
 | `c_SCOBA_SHOT_PROXY_PLAYER` | `8` | Unused hostile Zerg owner |
+| `c_SCOBA_AIM_SHOOTER_TOSH` | `"SCOBAAimShooterTosh"` | Tosh hidden shooter type |
+| `c_SCOBA_AIM_SHOOTER_KERRIGAN` | `"SCOBAAimShooterKerrigan"` | Kerrigan hidden shooter type |
+| `c_SCOBA_AIR_PROXY_MIN_HEIGHT` | `0.5` | Air proxy height threshold |
+| `c_SCOBA_AIM_PROXY_GROUND` | `"SCOBAAimShotDummy"` | Ground and air shot proxy type |
 | `c_SCOBA_OUT_OF_RANGE_TEXT` | `"Out of range"` | Range floater text |
 | `c_SCOBA_MISS_TEXT` | `"Miss"` | Targetless floater text |
 
@@ -87,6 +100,8 @@ Add to `core/globals.galaxy`:
 | `gv_aimOutOfRange` | `int[8]` | Out-of-range feedback count |
 | `gv_aimShotProxy` | `unit[8]` | Active shot proxy |
 | `gv_aimShotProxyUntil` | `fixed[8]` | Shot proxy expiry time |
+| `gv_aimShooter` | `unit[8]` | Hidden aim shooter |
+| `gv_aimShooterStopAt` | `fixed[8]` | One-shot stop time for the shooter order |
 | `gv_animAimAttackUntil` | `fixed[8]` | Aim attack end time |
 | `gv_animAimAttackSuppressUntil` | `fixed[8]` | Ignore duplicate native start |
 | `gv_animTargetPitchStep` | `int[8]` | Non-aim target pitch key |
@@ -168,52 +183,88 @@ UnitClick and Unit Highlight are secondary sources only.
 3. Return when the hero is invalid or dead.
 4. Return when `gf_AnimAimAttackActive(player)` is true.
 5. Return when `gf_WeaponReady(player)` is false.
-7. `point = gf_AimCrosshairPoint(player)`.
-8. `target = gf_AimTargetAtCrosshair(player)`.
-9. Start the aim attack animation on press.
-10. Set `gv_animAimAttackSuppressUntil[player] = now + c_SCOBA_AIM_ATTACK_SUPPRESS`.
-11. When `target` is valid:
+6. `point = gf_AimCrosshairPoint(player)`.
+7. `target = gf_AimTargetAtCrosshair(player)`.
+8. Start the aim attack animation on press.
+9. Set `gv_animAimAttackSuppressUntil[player] = now + c_SCOBA_AIM_ATTACK_SUPPRESS`.
+10. When `target` is valid:
    1. Call `gf_UnitTargetSet(player, target)`.
    2. When in range, call `gf_AimShotFire(player, target)`.
    3. When out of range, increment `gv_aimOutOfRange` and show `Out of range` at the target.
    4. Return.
-12. Clear the previous proxy, then spawn a new proxy at `point`.
-13. Clamp the proxy inside weapon range and its Z to the camera-target ground plane.
-14. Call `gf_AimShotFire(player, proxy)`.
-15. Show `Miss` at `point`.
-16. Set the proxy expiry to `now + c_SCOBA_SHOT_PROXY_TIMEOUT`.
+11. Clear the previous proxy, then spawn a new proxy at `point`.
+12. Call `gf_AimShotFire(player, proxy)`.
+13. Show `Miss` at `point`.
+14. Set the proxy expiry to `now + c_SCOBA_SHOT_PROXY_TIMEOUT`.
 
 `gf_AimShotFire(int player, unit target)`:
 
 1. Return when the target is invalid, dead, or not hostile.
-2. Return when `gf_WeaponReady(player)` is false.
-3. Return when not in range.
-4. Issue one native attack order with `OrderTargetingUnit`.
-5. Return when the hero has no attack order after issuance.
-6. Increment `gv_aimShots`.
-7. Do not call `gf_CombatManualAttack`.
-8. Do not write FSM, root, auto, stand, selection, facing, camera, or control state.
+2. Return when `gf_WeaponReady(player)` or `gf_AimShooterReady(player)` is false.
+3. Return when not in range, except for the proxy.
+4. Read `gv_aimShooter[player]`.
+5. Return when the shooter is invalid.
+6. Pin the shooter to the hero position and camera yaw.
+7. Issue one native attack order on the shooter with `OrderTargetingUnit`.
+8. Return when the shooter has no attack order after issuance.
+9. Set `gv_aimShooterStopAt[player] = now + c_SCOBA_AIM_SHOOTER_ORDER_HOLD`.
+10. Do not issue an attack order on the hero.
+11. Do not call `gf_CombatManualAttack`.
+12. Do not write FSM, root, auto, stand, selection, hero facing, camera, or control state.
+
+`gt_AimShotCleanup` issues Stop to the shooter after the hold time so one
+press produces one shot.
 
 `gf_AimWeaponName(player)` returns the first enabled weapon name.
 It returns `"Attack"` when no weapon is enabled.
 The press animation uses this name.
 
-A native `UnitStartedAttack2` event inside the suppress window is ignored so
-the press animation is not restarted.
-Outside the window, the native event starts the aim attack normally.
+A shooter `UnitStartedAttack2` event maps to the hero player.
+It starts the hero aim attack and mirrors the shooter cooldown to the hero weapon.
 The native event is the cooldown, muzzle flash, launch effect, and sound source.
-Clicks before `UnitWeaponPeriodRemaining` reaches zero are ignored before the
+`gv_aimShots` increments when the shooter attack order is accepted.
+Clicks before either weapon cooldown reaches zero are ignored before the
 animation starts, so they cannot reset the native cooldown or jitter the attack.
 
-## 9. Targetless Shot Proxy
+## 9. Hidden Aim Shooter
+
+`gf_AimShooterCreate(int player)`:
+
+1. Pick `c_SCOBA_AIM_SHOOTER_TOSH` or `c_SCOBA_AIM_SHOOTER_KERRIGAN`
+   from the active hero profile.
+2. Create one shooter at the hero position for the hero player.
+3. Set the shooter unselectable, unhighlightable, and status-bar hidden.
+4. Set the shooter actor and model opacity to 0.
+5. Set radius 0 and attack acquire level none.
+6. Store `gv_aimShooter[player]`.
+7. Return the shooter.
+
+`gf_AimShooterPin(int player)`:
+
+1. Return when the shooter or hero is invalid.
+2. Read `UnitGetPosition(hero)`.
+3. `UnitSetPosition(shooter, point, true)`.
+4. `UnitSetFacing(shooter, CameraGetYaw(player), c_ANIM_AIM_TURN_DURATION)`.
+
+`gf_AimShooterPark(int player)`:
+
+1. Clear `gv_aimShooter[player]`.
+2. Remove the shooter unit.
+
+The shooter is pinned every camera tick and immediately before each shot.
+The shooter is removed on aim exit, hero switch, and animation reset.
+The shooter never auto-acquires. It attacks only from an explicit shot order.
+Shooter attacks map to the active hero player for cooldown, damage credit, and XP.
+
+## 10. Targetless Shot Proxy
 
 `gf_AimShotProxyCreate(int player, point where)`:
 
 1. Return the existing proxy when it is still valid.
 2. Clamp the horizontal spawn distance inside weapon range.
-3. Create one `InvisibleTargetDummy` at the clamped point for `c_SCOBA_SHOT_PROXY_PLAYER`.
-4. Set state selectable false.
-5. Set state status bar false.
+3. Create one `SCOBAAimShotDummy` at the terrain height under the crosshair point.
+4. Use crosshair height when the point is above terrain by `c_SCOBA_AIR_PROXY_MIN_HEIGHT`.
+5. Set state selectable false and status bar false.
 6. Set life to a high value.
 7. Store `gv_aimShotProxy[player]`.
 8. Return the proxy.
@@ -222,15 +273,16 @@ animation starts, so they cannot reset the native cooldown or jitter the attack.
 It reads `gv_aimShotProxyUntil[player]`.
 It clears `gv_aimShotProxy[player]` and removes the unit.
 
-The proxy is not a persistent dummy.
-It exists only long enough for `UnitStartedAttack2` to fire.
+The proxy is attackable by the shooter and not immune to damage.
+It is not a persistent dummy.
+It exists only long enough for the shooter `UnitStartedAttack2` to fire.
 It has no model, no status bar, no selection, no score, no food, and no collision.
 It must not create a damage floater, XP award, or kill credit.
 `gf_UnitTargetAtPoint`, `gf_UnitTargetValid`, `gf_UnitTargetSet`, and
 `gf_IsClickEnemy` MUST reject the proxy, so it never drives the reticle, Unit
 Target, boss bar, click candidate, or hover candidate.
 
-## 10. Targetless Miss
+## 11. Targetless Miss
 
 `gf_AimMissFloater(int player, point crosshair)`:
 
@@ -241,7 +293,7 @@ Target, boss bar, click candidate, or hover candidate.
 
 The Miss point comes from `gf_AimCrosshairPoint`, not `CameraGetTarget`.
 
-## 11. Reticle Range Color
+## 12. Reticle Range Color
 
 `gf_ReticleKindAt(player, point)` gains kind `3`:
 
@@ -270,7 +322,7 @@ desaturated when kind is `3`.
 Full red returns when kind is no longer `3`.
 Do not use the native arrow cursor textures.
 
-## 12. Floater Helper
+## 13. Floater Helper
 
 `damage_floaters.galaxy` exposes:
 
@@ -292,7 +344,7 @@ Damage uses red.
 Do not attach tags to units.
 Skip the shot proxy in the damage floater trigger.
 
-## 13. Aim Attack Animation
+## 14. Aim Attack Animation
 
 `gf_AnimAttackStart(player, weapon, target)` changes its aim branch:
 
@@ -331,22 +383,24 @@ The lower `SCOBALo` animation never stops.
 `gf_AnimReset` calls it.
 `gf_AimEnd` clears through `gf_AnimReset`.
 
-## 14. Combat Interaction
+## 15. Combat Interaction
 
 `gf_CombatStep` returns early while aim is active.
 Aim owns its own movement loop and shot orders.
 Combat stepping resumes after aim ends.
 No combat flag is written by the aim shot path.
-The native `UnitStartedAttack2` event still updates cooldown and weapon effects.
+The shooter `UnitStartedAttack2` event mirrors the hero weapon cooldown and runs
+the native weapon effects. It does not write the combat status cooldown.
 
-## 15. Reset And Cleanup
+## 16. Reset And Cleanup
 
 `gf_AimEnd` calls `gf_AnimReset`, which clears `SCOBAAimAtk`, the suppress
-window, target pitch state, and any active shot proxy.
+window, target pitch state, the hidden aim shooter, and any active shot proxy.
+`gf_AnimReset` recreates the shooter when aim is still active.
 `gf_HeroSwitchTo` calls `gf_AimEnd`.
 Control mode changes route through `gf_AimEnd`.
 
-## 16. Initialization
+## 17. Initialization
 
 Add `gt_AimShootingInit_Init()` to `main.galaxy`.
 `gt_AimShootingInit_Func` clears:
@@ -355,9 +409,10 @@ Add `gt_AimShootingInit_Init()` to `main.galaxy`.
 - `gv_animAimAttackSuppressUntil[player] = -1.0`;
 - `gv_aimShots[player] = 0`;
 - `gv_aimOutOfRange[player] = 0`;
-- `gv_aimShotProxy[player] = null`.
+- `gv_aimShotProxy[player] = null`;
+- `gv_aimShooter[player] = null`.
 
-## 17. Validation
+## 18. Validation
 
 `scripts/validate-map.py` MUST check:
 
@@ -367,7 +422,7 @@ Add `gt_AimShootingInit_Init()` to `main.galaxy`.
 4. Aim attack clips exist and omit the pitch root.
 5. Aim attack clip priority is 12.
 
-## 18. Test Matrix
+## 19. Test Matrix
 
 | ID | Setup | Action | Expected |
 | --- | --- | --- | --- |
@@ -386,8 +441,12 @@ Add `gt_AimShootingInit_Init()` to `main.galaxy`.
 | AIMSHOT-13 | Active hero, action mode, aim | crosshair over enemy at different camera yaw and pitch | target and reticle stay consistent |
 | AIMSHOT-14 | Active hero, action mode, aim | press left air | native attack, muzzle flash, `Miss` at crosshair |
 | AIMSHOT-15 | Active hero, action mode, aim | fast clicks during weapon cooldown | no extra shot, no animation restart, no cooldown reset |
+| AIMSHOT-16 | Active hero, action mode, aim | fire while moving | hero keeps moving, exact crosshair target hit, no step |
+| AIMSHOT-17 | Active hero, action mode, aim | fire at air crosshair | attackable air proxy, native muzzle and sound, `Miss` |
+| AIMSHOT-18 | Active hero, action mode, aim | kill with aim shot | kill credit and XP go to the hero player |
+| AIMSHOT-19 | Active hero, action mode, aim | enter and exit aim | shooter exists only during aim and adds no persistent unit |
 
-## 19. Verification
+## 20. Verification
 
 1. Run `scripts/playtest.sh build`.
 2. Run `uv run python -m unittest discover -s scripts/testkit/tests -t scripts`.

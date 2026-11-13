@@ -7,11 +7,16 @@ bool gt_CombatStartedAttack_Func (bool testConds, bool runActions) {
     fixed lv_now;
     fixed lv_delta;
     fixed lv_period;
+    bool lv_aim;
 
     if (!runActions) {
         return true;
     }
-    lv_player = gf_HeroPlayerFromUnit(EventUnit());
+    lv_player = gf_AimShooterPlayer(EventUnit());
+    lv_aim = lv_player >= 0;
+    if (!lv_aim) {
+        lv_player = gf_HeroPlayerFromUnit(EventUnit());
+    }
     if (lv_player < c_SCOBA_HERO_FIRST || lv_player > c_SCOBA_HERO_LAST) {
         return true;
     }
@@ -21,6 +26,10 @@ bool gt_CombatStartedAttack_Func (bool testConds, bool runActions) {
     }
     lv_target = EventUnitTarget();
     gf_AnimAttackStart(lv_player, EventUnitGetWeapon(), lv_target);
+    if (lv_aim) {
+        gf_AimShooterMirrorCooldown(lv_player);
+        return true;
+    }
     lv_now = TimerGetElapsed(gv_sCOBA_Clock);
     lv_delta = lv_now - gv_sCOBA_LastAttackAt[lv_player];
     if (gv_sCOBA_LastAttackAt[lv_player] > 0.0 && lv_delta >= c_SCOBA_MIN_ATTACK_PERIOD && lv_delta <= c_SCOBA_MAX_ATTACK_PERIOD) {

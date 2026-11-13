@@ -18,6 +18,9 @@ void gf_RungunSnap (string lp_tag) {
     BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "AimAttackActive", lv_aim_attack);
     BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "WeaponCount", UnitWeaponCount(lv_hero));
     BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "WeaponPeriodMs", FixedToInt(UnitWeaponPeriodRemaining(lv_hero, 1) * 1000.0));
+    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "ShooterValid", UnitIsValid(gv_aimShooter[1]));
+    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "HeroAttackOrder", UnitOrderHasAbil(lv_hero, "attack"));
+    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "ShooterAttackOrder", UnitIsValid(gv_aimShooter[1]) && UnitOrderHasAbil(gv_aimShooter[1], "attack"));
     BankSave(gv_dbgBank);
 }
 

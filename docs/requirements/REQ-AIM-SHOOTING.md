@@ -10,8 +10,9 @@ This contract binds left-click shooting while aim mode is active in action mode:
 - crosshair target selection;
 - in-range attack and out-of-range feedback;
 - crosshair range coloring;
-- native attack for every shot, including targetless ground and air shots;
+- native attack from a hidden aim shooter for every shot;
 - targetless attack and `Miss` feedback at the crosshair;
+- exact crosshair targeting with no hero movement interruption;
 - aim attack animation on mouse press;
 - combat-state isolation.
 
@@ -31,6 +32,8 @@ Implementation lives in
 - **In range**: `UnitInRangeAndAbleToAttackTarget(hero, target)` is true.
 - **Target resolution order**: crosshair geometry, then `UnitClick`, then
   press-time Unit Highlight.
+- **Aim shooter**: a hidden friendly unit pinned to the hero position.
+  It carries the hero weapon and receives the native aim attack order.
 - **Shot proxy**: an invisible, unselectable, non-status, non-scoring unit used
   for one native attack on a targetless shot.
 
@@ -50,15 +53,20 @@ Implementation lives in
 | R-AIMSHOT-8 | Aim shots MUST be registered per hero player. `EventPlayer` MUST NOT infer another player. |
 | R-AIMSHOT-8a | An aim shot MUST start the attack animation immediately on press. |
 | R-AIMSHOT-8b | An aim shot MUST be ignored while the previous aim attack animation is active. |
-| R-AIMSHOT-8c | An aim shot MUST be ignored while the current weapon is not ready. |
+| R-AIMSHOT-8c | An aim shot MUST be ignored while the hero weapon or hidden shooter weapon is not ready. |
 | R-AIMSHOT-8d | Fast repeated clicks MUST NOT restart the attack animation or reset the attack cooldown early. |
 
 ### 3.2 Range and reticle
 
 | ID | Requirement |
 | --- | --- |
-| R-AIMSHOT-9 | Every aim shot MUST issue one native attack order and start the native weapon event. |
-| R-AIMSHOT-9a | An in-range hostile target MUST receive the native attack order directly. |
+| R-AIMSHOT-9 | Every aim shot MUST issue one native attack order from the hidden aim shooter and start the native weapon event. |
+| R-AIMSHOT-9a | An in-range hostile target MUST receive the shooter attack order directly, with the hero as the logical owner. |
+| R-AIMSHOT-9b | The hero MUST NOT receive an attack order from an aim shot. |
+| R-AIMSHOT-9c | The aim shooter MUST be pinned to the hero position and camera yaw on every aim tick. |
+| R-AIMSHOT-9d | The aim shooter MUST be hidden, unselectable, untargetable, non-colliding, and non-scoring. |
+| R-AIMSHOT-9e | Native shooter cooldown MUST be mirrored to the hero weapon cooldown. |
+| R-AIMSHOT-9f | Moving aim shots MUST NOT stop, pause, or restart hero locomotion. |
 | R-AIMSHOT-10 | An out-of-range hostile target MUST NOT receive an attack order. |
 | R-AIMSHOT-11 | An out-of-range hostile target MUST show one gray `Out of range` floater at the target. |
 | R-AIMSHOT-12 | The aim reticle MUST stay hostile-colored for an in-range hostile unit. |
@@ -71,8 +79,10 @@ Implementation lives in
 | ID | Requirement |
 | --- | --- |
 | R-AIMSHOT-16 | An aim shot with no valid hostile target MUST play the aim attack animation. |
-| R-AIMSHOT-17 | A targetless aim shot MUST spawn one hidden shot proxy at the crosshair, or at its ground projection for an air shot, and issue one native attack against it. |
+| R-AIMSHOT-17 | A targetless aim shot MUST spawn one hidden attackable shot proxy at the crosshair point and issue one native shooter attack against it. |
+| R-AIMSHOT-17a | An air targetless shot MUST use an attackable air proxy at the crosshair height. |
 | R-AIMSHOT-18 | The shot proxy MUST be invisible, unselectable, untargetable by other units, non-scoring, and non-colliding. |
+| R-AIMSHOT-18a | The shot proxy MUST accept the shooter attack and MUST NOT be immune to damage. |
 | R-AIMSHOT-19 | The shot proxy MUST be removed after the native attack starts, with a short safety timeout. |
 | R-AIMSHOT-20 | A targetless aim shot MUST show one gray `Miss` floater at the crosshair point. |
 | R-AIMSHOT-21 | The `Miss` position MUST include a random horizontal component. |
@@ -82,7 +92,20 @@ Implementation lives in
 | R-AIMSHOT-22c | Native weapon cooldown, muzzle flash, launch effect, and sound MUST run for every shot. |
 | R-AIMSHOT-22d | The shot proxy MUST NOT become the Unit Target, boss bar target, reticle target, click candidate, or hover candidate. |
 
-### 3.4 Animation
+### 3.4 Hidden aim shooter
+
+| ID | Requirement |
+| --- | --- |
+| R-AIMSHOT-38 | The aim shooter MUST carry the same weapon as the active hero. |
+| R-AIMSHOT-39 | The aim shooter MUST originate at the hero position and use its own weapon hardpoint for native effects. |
+| R-AIMSHOT-40 | The aim shooter MUST use the exact crosshair target resolved by the hero. |
+| R-AIMSHOT-41 | The aim shooter MUST be created on aim entry and parked on aim exit. |
+| R-AIMSHOT-42 | The aim shooter MUST be teleported to the hero muzzle on every aim tick and before every shot. |
+| R-AIMSHOT-43 | The aim shooter MUST NOT auto-acquire targets outside an aim shot. |
+| R-AIMSHOT-44 | Shooter damage and kill credit MUST map to the active hero player. |
+| R-AIMSHOT-45 | The hero weapon cooldown MUST mirror the shooter cooldown after each shot. |
+
+### 3.5 Animation
 
 | ID | Requirement |
 | --- | --- |
@@ -97,7 +120,7 @@ Implementation lives in
 | R-AIMSHOT-31 | Aim attack MUST NOT pause, clear, or replace `SCOBAUp`. |
 | R-AIMSHOT-32 | Aim attack MUST play at 2x animation speed. |
 
-### 3.5 Combat isolation
+### 3.6 Combat isolation
 
 | ID | Requirement |
 | --- | --- |
@@ -128,3 +151,8 @@ Implementation lives in
 | AC-AIMSHOT-15 | Native cooldown, muzzle flash, launch effect, and sound run on enemy, ground, and air shots. |
 | AC-AIMSHOT-16 | Crosshair targeting is stable across camera yaw and pitch. |
 | AC-AIMSHOT-17 | Fast repeated clicks during cooldown produce no extra shot, no animation restart, and no cooldown reset. |
+| AC-AIMSHOT-18 | Moving aim shots do not stop, pause, or restart hero locomotion. |
+| AC-AIMSHOT-19 | Moving aim shots hit the exact crosshair target, not a nearest-neighbor target. |
+| AC-AIMSHOT-20 | The hero never receives an aim attack order. |
+| AC-AIMSHOT-21 | Shooter damage and kill credit go to the active hero player. |
+| AC-AIMSHOT-22 | The hero weapon cooldown mirrors the hidden shooter cooldown. |

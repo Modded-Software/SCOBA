@@ -42,7 +42,10 @@ bool gt_DamageFloater_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    lv_player = gf_HeroPlayerFromUnit(lv_source);
+    lv_player = gf_AimShooterPlayer(lv_source);
+    if (lv_player < 0) {
+        lv_player = gf_HeroPlayerFromUnit(lv_source);
+    }
     if (!gf_IsHeroPlayer(lv_player)) {
         return true;
     }

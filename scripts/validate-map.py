@@ -380,6 +380,15 @@ def check_animation_actors(map_dir: Path) -> None:
 def check_script(map_dir: Path) -> None:
     script = (map_dir / "MapScript.galaxy").read_text(encoding="utf-8", errors="replace")
     combined = galaxy_text(map_dir)
+    aim_text = (map_dir / "scripts/app/systems/aim_shooting.galaxy").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    unit_text = (map_dir / "Base.SC2Data/GameData/UnitData.xml").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    actor_text = (map_dir / "Base.SC2Data/GameData/ActorData.xml").read_text(
+        encoding="utf-8", errors="replace"
+    )
     if "RegionPlayableMapSet(RegionRect(0.0, 0.0, 254.0, 254.0));" not in combined:
         fail("MapScript.galaxy missing expanded playable region")
     if "CameraSetBounds(PlayerGroupAll(), RegionRect(0.0, 0.0, 254.0, 254.0), true);" not in combined:
@@ -404,6 +413,28 @@ def check_script(map_dir: Path) -> None:
         fail("scripts missing targetless shot proxy")
     if "gf_AimShotProxyIs" not in combined:
         fail("scripts missing shot proxy target filter")
+    if "gf_AimShooterCreate" not in combined or "gf_AimShooterPin" not in combined:
+        fail("scripts missing hidden aim shooter")
+    if "gf_AimShooterReady" not in combined or "gf_AimShooterMirrorCooldown" not in combined:
+        fail("scripts missing aim shooter cooldown")
+    if "UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand(\"attack\", 0), lp_unit)" in aim_text:
+        fail("aim shots must not issue hero attack orders")
+    if "UnitIssueOrder(lv_shooter, OrderTargetingUnit(AbilityCommand(\"attack\", 0), lp_unit)" not in aim_text:
+        fail("aim shots must issue shooter attack orders")
+    for parent, shooter in (
+        ("ToshSCOBA", "SCOBAAimShooterTosh"),
+        ("KerriganSCOBA", "SCOBAAimShooterKerrigan"),
+    ):
+        if f'id="{shooter}"' not in unit_text:
+            fail(f"UnitData missing {shooter}")
+        if unit_text.find(f'id="{parent}"') > unit_text.find(f'id="{shooter}"'):
+            fail(f"UnitData defines {shooter} before parent {parent}")
+        if f'unitName="{shooter}"' not in actor_text:
+            fail(f"ActorData missing {shooter} unit actor")
+    if 'id="SCOBAAimShotDummy"' not in unit_text:
+        fail("UnitData missing shot proxy")
+    if '<PlaneArray index="Air" value="1"/>' not in unit_text:
+        fail("shot proxy must accept air targets")
     if "storm_ui_cursor_default_enemy" in combined or "storm_ui_cursor_default_friendly" in combined:
         fail("reticle must use the crosshair texture, not arrow cursors")
     if combined.count("cursor-target-none.dds") < 3:

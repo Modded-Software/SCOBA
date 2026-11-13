@@ -467,7 +467,7 @@ FSM state or issues a combat order. Their implementation is specified in
 | `TriggerAddEventUnitBehaviorChange` | auto behavior | sync auto state, step or cancel |
 | `TriggerAddEventUnitBehaviorChange` | Stand behavior | sync root and stance |
 | `TriggerAddEventTimePeriodic` 0.5 | combat tick | `gf_CombatStep` |
-| `TriggerAddEventUnitStartedAttack2` | cooldown | clear fire pending, measure outgoing attack, set cooldown |
+| `TriggerAddEventUnitStartedAttack2` | cooldown | measure hero attack and set combat cooldown; mirror aim-shooter native cooldown to hero |
 | `TriggerAddEventUnitBecomesIdle` | FSM | clear manual, resume |
 | `TriggerAddEventMouseClicked` fire down | targeting | save press state |
 | `TriggerAddEventMouseClicked` fire up | targeting | run clean-click right command |
@@ -484,8 +484,8 @@ FSM state or issues a combat order. Their implementation is specified in
 | `c_SCOBA_MIN_ATTACK_PERIOD` | 0.1 | Reject same-frame bursts |
 | `c_SCOBA_MAX_ATTACK_PERIOD` | 2.0 | Reject stale intervals |
 | `c_SCOBA_INITIAL_WEAPON_PERIOD` | 0.75 | First attack ring estimate |
-| `c_SCOBA_RUNGUN_HOLD` | 0.12 | One-shot movement-loop hold past damage point |
-| `c_SCOBA_RUNGUN_TIMEOUT` | 0.35 | Maximum wait for weapon cooldown start |
+| `c_SCOBA_AIM_SHOOTER_TOSH` | `SCOBAAimShooterTosh` | Hidden Tosh aim shooter |
+| `c_SCOBA_AIM_SHOOTER_KERRIGAN` | `SCOBAAimShooterKerrigan` | Hidden Kerrigan aim shooter |
 
 Mouse constants live in
 [SPEC-MOUSE-CONTROLS](SPEC-MOUSE-CONTROLS.md).
@@ -507,8 +507,8 @@ distance. It records elapsed time for every sample.
 | Stand move-and-shoot | 3.0 east | hold key +3.0 | displacement > 1, native attack event, damage, root 0, cooldown resets once |
 | Walk move-and-shoot | 3.0 east | hold key +3.0 | displacement > 1, native attack event, damage, root 0, cooldown resets once |
 | Manual move-and-shoot | 3.0 east | right-click enemy, hold key +3.0 | displacement > 1, manual target persists, native attack event, damage |
-| Moving shot hold | 3.0 east | snap during hold window | one attack order, movement loop paused, cooldown starts |
-| Moving shot resume | 3.0 east | snap after hold | movement resumes, cooldown positive, no repeated attack reset |
+| Moving aim shot | 3.0 east | hold key, press aim shot | movement continues, hidden shooter attacks, hero has no attack order |
+| Aim shooter cooldown | 3.0 east | press aim shot | shooter cooldown starts and mirrors to the hero weapon |
 | Stand auto off manual | 9.0 east | manual attack +2.0 | root 1, no displacement |
 | Stand repeated clicks | 9.0 east | 5 manual attacks | root stays, no displacement |
 | Right press resolve | 3.0 east | press, release | enemy returned from shared resolver |

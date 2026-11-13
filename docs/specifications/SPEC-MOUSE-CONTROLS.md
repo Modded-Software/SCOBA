@@ -52,6 +52,7 @@ prevents right-click state races.
 | `gv_mOUSERIGHTPRESSY` | `fixed[8]` | Right press world Y |
 | `gv_unitClickCandidate` | `unit[8]` | Unit from the native `UnitClick` event for that player |
 | `gv_unitHighlight` | `unit[8]` | Current Unit Highlight for that player |
+| `gv_actionStatusUnit` | `unit[8]` | Action-mode crosshair status bar override unit |
 | `gv_unitPressHighlight` | `unit[8]` | Unit Highlight snapshotted at left press |
 | `gv_unitRightPressHighlight` | `unit[8]` | Unit Highlight snapshotted at right press |
 | `gv_unitTarget` | `unit[8]` | Current Unit Target for the boss bar |
@@ -465,6 +466,8 @@ RPG right-button input never calls `gf_AimBegin` or `gf_AimEnd`.
 14. The engine `TargetSmooth` path smooths the camera. Do not pan on top of follow.
 15. Show the native cursor with `UISetCursorVisible`.
 16. Do not write `c_cameraValueDistance`.
+17. Create and pin the hidden aim shooter from
+    [SPEC-AIM-SHOOTING](SPEC-AIM-SHOOTING.md).
 
 `gf_AimEnd`:
 
@@ -473,7 +476,7 @@ RPG right-button input never calls `gf_AimBegin` or `gf_AimEnd`.
 3. Set hero facing to camera yaw.
 4. Remove `SCOBAAimNoTurn`.
 5. Set `gv_aIMACTIVE[player] = false`.
-6. Clear the aim group and restore baseline animation.
+6. Clear the aim group, hidden shooter, active shot proxy, and restore baseline animation.
 7. Send `AnimBlendTimeRemove` to the main actor and model.
 8. Clear the `SCOBAUp` animation instance and reset its playback time.
 9. Set the field of view to `gv_cAMERAFOV[player]` once.
@@ -605,7 +608,14 @@ Each `gt_UnitHighlightOn[player]` handler stores `EventUnit()` under its
 hard-coded player.
 Each `gt_UnitHighlightOff[player]` handler clears the matching Unit Highlight
 under its hard-coded player.
-No custom mouse-position raycast writes hover.
+No custom mouse-position raycast writes RPG hover.
+
+Action mode hides the free cursor, so native highlight events do not drive hover.
+`gt_AimCursorTick` resolves the crosshair unit with `gf_UnitTargetAtPoint` and
+calls `gf_ActionStatusHover`.
+That function applies `c_unitStatusGroupAll` to the hovered unit and clears the
+previous override when the crosshair moves or the reticle hides.
+RPG mode keeps native hover events.
 
 RPG click points record `EventMouseClickedPosXWorld` and
 `EventMouseClickedPosYWorld` for ground commands and drag checks.

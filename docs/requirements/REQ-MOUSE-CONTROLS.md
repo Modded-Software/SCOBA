@@ -128,6 +128,7 @@ Implementation lives in
 | R-MC-140 | A new press MUST clear the old Unit Target candidate. A clean release MUST consume and clear the candidate so later ground clicks cannot reuse it. |
 | R-MC-141 | The click handler MUST immediately reselect the hero outside order mode. The hero reselect MUST NOT wait for the 0.1 s poll. |
 | R-MC-142 | Native unit selection flash from a click MUST last at most the current event tick. |
+| R-MC-143 | Action mode MUST show the crosshair-hovered unit status bar override and clear it when hover leaves or the reticle hides. |
 
 ### 3.6 Combat state
 
@@ -276,6 +277,7 @@ Implementation lives in
 | AC-MC-40 | Held button state is released even when targeting release runs late. |
 | AC-MC-58 | RPG hover follows the engine `UnitHighlight` event and shows the `PreSelection` ring. |
 | AC-MC-59 | RPG clicks resolve a Unit Target for the clicking player from `UnitClick`, press-time Unit Highlight, or press-point geometry. |
+| AC-MC-60 | Action mode shows the status bar of the crosshair-hovered unit and clears it when hover leaves. |
 | AC-MC-60 | Scroll zoom and collision distance changes animate instead of snapping. |
 | AC-MC-61 | Aim camera origin is translated slightly left of the hero without rotating the camera. |
 | AC-MC-52 | Ground right clicks do not clear the left-click target. |

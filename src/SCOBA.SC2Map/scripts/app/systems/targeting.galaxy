@@ -106,7 +106,7 @@ void gf_UnitTargetSet (int lp_player, unit lp_unit) {
     if (!gf_IsHeroPlayer(lp_player)) {
         return;
     }
-    if (gf_AimShotProxyIs(lp_unit)) {
+    if (gf_AimShotProxyIs(lp_unit) || gf_AimShooterIs(lp_unit)) {
         lp_unit = null;
     }
     if (UnitIsValid(lp_unit) && (lp_unit == gv_tPSUNIT[lp_player])) {
@@ -147,7 +147,7 @@ bool gf_IsClickEnemy (int lp_player, unit lp_unit) {
     if (!UnitIsValid(lp_unit) || !UnitIsAlive(lp_unit)) {
         return false;
     }
-    if (gf_AimShotProxyIs(lp_unit)) {
+    if (gf_AimShotProxyIs(lp_unit) || gf_AimShooterIs(lp_unit)) {
         return false;
     }
     return libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Ally) == false;
@@ -160,7 +160,7 @@ bool gf_UnitTargetValid (int lp_player, unit lp_unit, bool lp_enemyOnly) {
     if (lp_unit == gv_tPSUNIT[lp_player]) {
         return false;
     }
-    if (gf_AimShotProxyIs(lp_unit)) {
+    if (gf_AimShotProxyIs(lp_unit) || gf_AimShooterIs(lp_unit)) {
         return false;
     }
     if (lp_enemyOnly && !gf_IsClickEnemy(lp_player, lp_unit)) {
@@ -186,7 +186,7 @@ unit gf_UnitTargetAtPoint (int lp_player, point lp_point, bool lp_enemyOnly) {
         if (lv_unit == gv_tPSUNIT[lp_player] || !UnitIsValid(lv_unit) || !UnitIsAlive(lv_unit)) {
             continue;
         }
-        if (gf_AimShotProxyIs(lv_unit)) {
+        if (gf_AimShotProxyIs(lv_unit) || gf_AimShooterIs(lv_unit)) {
             continue;
         }
         if (lp_enemyOnly && !gf_IsClickEnemy(lp_player, lv_unit)) {

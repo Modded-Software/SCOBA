@@ -1,5 +1,23 @@
 // Module: systems/status_bar
 
+void gf_ActionStatusHover (int lp_player, unit lp_unit) {
+    unit lv_old;
+
+    if (lp_player < c_SCOBA_HERO_FIRST || lp_player > c_SCOBA_HERO_LAST) {
+        return;
+    }
+    lv_old = gv_actionStatusUnit[lp_player];
+    if (lv_old != lp_unit) {
+        if (UnitIsValid(lv_old)) {
+            UnitStatusBarOverride(lv_old, -1);
+        }
+        gv_actionStatusUnit[lp_player] = lp_unit;
+    }
+    if (UnitIsValid(lp_unit)) {
+        UnitStatusBarOverride(lp_unit, c_unitStatusGroupAll);
+    }
+}
+
 void gf_UnitHighlightOn (int lp_player, bool testConds, bool runActions) {
     if (!runActions) {
         return;

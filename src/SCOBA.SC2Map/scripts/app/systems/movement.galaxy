@@ -39,13 +39,8 @@ void gf_AimMoveStep (int lp_player, fixed lp_angle) {
     if (!UnitIsValid(lv_hero)) {
         return;
     }
-    if (TimerGetElapsed(gv_sCOBA_Clock) < gv_aimShotHoldUntil[lp_player]) {
-        if (gf_WeaponReady(lp_player)) {
-            return;
-        }
-        gv_aimShotHoldUntil[lp_player] = -1.0;
-    }
     gf_CombatSetRoot(lp_player, false);
+    gf_AimShooterPin(lp_player);
     lv_need = false;
     if (!gv_animHasMoveTarget[lp_player]) {
         lv_need = true;

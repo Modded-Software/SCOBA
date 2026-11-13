@@ -50,6 +50,9 @@ def check(ctx, data: dict, checks) -> None:
         checks.failures += 1
     period = checks.value("rungun", "shot", "WeaponPeriodMs")
     print(f"rungun shot WeaponPeriodMs: {period}")
+    checks.eq("rungun", "t0000", "ShooterValid", 1)
+    checks.eq("rungun", "t3000", "ShooterValid", 1)
+    checks.eq("rungun", "shot", "HeroAttackOrder", 0)
 
 
 def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> TestRunSpec:

@@ -14,6 +14,11 @@ void gf_AnimReset (int lp_player) {
     gv_animTargetPitchStep[lp_player] = 0;
     gv_animTargetPitchTime[lp_player] = -1.0;
     gf_AimShotProxyClear(lp_player);
+    gf_AimShooterPark(lp_player);
+    if (gv_aIMACTIVE[lp_player]) {
+        gf_AimShooterCreate(lp_player);
+        gf_AimShooterPin(lp_player);
+    }
     gv_animFullDir[lp_player] = -1;
     gv_animAimDir[lp_player] = c_ANIM_DIR_FORWARD;
     gv_animMoveHold[lp_player] = 0;
@@ -27,7 +32,6 @@ void gf_AnimReset (int lp_player) {
     gv_animAimPitchStep[lp_player] = 0;
     gf_AnimAimAttackClear(lp_player);
     gv_animAimAttackSuppressUntil[lp_player] = -1.0;
-    gv_aimShotHoldUntil[lp_player] = -1.0;
     gv_animAimPitchRest[lp_player] = c_ANIM_AIM_PITCH_REST;
     gv_animHasPos[lp_player] = false;
     if (UnitIsValid(gv_tPSUNIT[lp_player])) {
