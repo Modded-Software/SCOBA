@@ -1,0 +1,202 @@
+// Module: systems/hero_switch
+
+string gf_UnitActorId (unit lp_unit) {
+    string lv_type;
+
+    lv_type = UnitGetType(lp_unit);
+    if (lv_type == "ToshSCOBA") {
+        return "ToshSCOBAUnit";
+    }
+    if (lv_type == "KerriganSCOBA") {
+        return "KerriganSCOBAUnit";
+    }
+    return lv_type;
+}
+
+bool gf_HeroIsParked (unit lp_unit) {
+    if (!UnitIsValid(lp_unit)) {
+        return false;
+    }
+    if (!gv_heroSwitchReady || lp_unit == gv_heroActive) {
+        return false;
+    }
+    return lp_unit == gv_heroTosh || lp_unit == gv_heroKerrigan;
+}
+
+void gf_HeroPark (unit lp_unit) {
+    if (!UnitIsValid(lp_unit)) {
+        return;
+    }
+    UnitIssueOrder(lp_unit, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    libNtve_gf_PauseUnit(lp_unit, true);
+    UnitSetState(lp_unit, c_unitStateSelectable, false);
+    UnitSetState(lp_unit, c_unitStateHighlightable, false);
+    UnitSetState(lp_unit, c_unitStateHidden, true);
+    UnitSetPosition(lp_unit, gv_heroPark, true);
+}
+
+void gf_HeroReveal (unit lp_unit) {
+    if (!UnitIsValid(lp_unit)) {
+        return;
+    }
+    UnitSetState(lp_unit, c_unitStateHidden, false);
+    libNtve_gf_PauseUnit(lp_unit, false);
+    UnitSetState(lp_unit, c_unitStateSelectable, true);
+    UnitSetState(lp_unit, c_unitStateHighlightable, true);
+    UnitSetState(lp_unit, c_unitStateStatusBar, false);
+}
+
+void gf_HeroApplyToggles (unit lp_unit) {
+    if (!UnitIsValid(lp_unit)) {
+        return;
+    }
+    UnitAbilityEnable(lp_unit, "SCOBAAutoAttackStatus", true);
+    UnitAbilityShow(lp_unit, "SCOBAAutoAttackStatus", true);
+    UnitAbilityEnable(lp_unit, "SCOBAAutoAttackToggle", true);
+    UnitAbilityShow(lp_unit, "SCOBAAutoAttackToggle", true);
+    UnitAbilityEnable(lp_unit, "SCOBAActionModeToggle", true);
+    UnitAbilityShow(lp_unit, "SCOBAActionModeToggle", true);
+    UnitAbilityEnable(lp_unit, "SCOBARightClickToggle", true);
+    UnitAbilityShow(lp_unit, "SCOBARightClickToggle", true);
+}
+
+void gf_HeroApplyCamera (unit lp_unit) {
+    if (!UnitIsValid(lp_unit)) {
+        return;
+    }
+    if (UnitGetType(lp_unit) == "Tosh" || UnitGetType(lp_unit) == "ToshSCOBA") {
+        CameraSetValue(1, c_cameraValueDistance, 1.5, 0.5, -1, 10);
+        gv_cameraDistanceDesired[1] = 1.5;
+        CameraSetValue(1, c_cameraValueHeightOffset, 0.9, 0.5, -1, 10);
+        CameraUseHeightSmoothing(1, false);
+    }
+    else {
+        CameraSetValue(1, c_cameraValueDistance, 2.5, 0.5, -1, 10);
+        gv_cameraDistanceDesired[1] = 2.5;
+        CameraSetValue(1, c_cameraValueHeightOffset, 0.9, 0.5, -1, 10);
+        CameraUseHeightSmoothing(1, false);
+    }
+    CameraFollowUnitGroup(1, libNtve_gf_ConvertUnitToUnitGroup(lp_unit), true, false);
+}
+
+void gf_HeroSwitchTo (unit lp_target) {
+    unit lv_old;
+    point lv_pos;
+    fixed lv_facing;
+
+    if (!gv_heroSwitchReady) {
+        return;
+    }
+    if (!UnitIsValid(lp_target) || !UnitIsAlive(lp_target)) {
+        return;
+    }
+    if (lp_target == gv_heroActive) {
+        return;
+    }
+    lv_old = gv_heroActive;
+    if (!UnitIsValid(lv_old)) {
+        return;
+    }
+    gf_AimEnd(1);
+    if (gv_sCOBAOrderMode[1]) {
+        gf_OrderExit(1);
+    }
+    lv_pos = UnitGetPosition(lv_old);
+    lv_facing = UnitGetFacing(lv_old);
+    UnitClearSelection(1);
+    gv_unitTarget[1] = null;
+    gv_unitHighlight[1] = null;
+    UnitBehaviorRemove(lv_old, "UnitDirectControl", 1);
+    gf_CombatReset(1);
+    gf_AnimReset(1);
+    gf_HeroPark(lv_old);
+    UnitSetOwner(lp_target, 1, false);
+    UnitSetPosition(lp_target, lv_pos, true);
+    UnitSetFacing(lp_target, lv_facing, 0.0);
+    gf_HeroReveal(lp_target);
+    gv_heroActive = lp_target;
+    gv_tPSUNIT[1] = lp_target;
+    gf_CombatReset(1);
+    gf_AnimReset(1);
+    gf_HeroApplyToggles(lp_target);
+    UnitBehaviorAdd(lp_target, "UnitDirectControl", lp_target, 1);
+    UnitSetState(lp_target, c_unitStateStatusBar, false);
+    UnitXPGainEnable(lp_target, null, true);
+    gf_ControlApply(1);
+    gf_ActionModeEnsureRPG(1);
+    gf_HeroApplyCamera(lp_target);
+    UnitIssueOrder(lp_target, Order(AbilityCommand("SCOBARightClickToggle", 0)), c_orderQueueReplace);
+    UnitClearSelection(1);
+    UnitSelect(lp_target, 1, true);
+}
+
+void gf_HeroUnitsReplace () {
+    unit lv_oldTosh;
+    unit lv_oldKerrigan;
+    point lv_toshPos;
+    point lv_kerriganPos;
+    fixed lv_toshFacing;
+    fixed lv_kerriganFacing;
+    int lv_kerriganOwner;
+
+    lv_oldTosh = UnitFromId(622754155);
+    lv_oldKerrigan = UnitFromId(649131550);
+    if (!UnitIsValid(lv_oldTosh) || !UnitIsValid(lv_oldKerrigan)) {
+        return;
+    }
+    lv_toshPos = UnitGetPosition(lv_oldTosh);
+    lv_kerriganPos = UnitGetPosition(lv_oldKerrigan);
+    lv_toshFacing = UnitGetFacing(lv_oldTosh);
+    lv_kerriganFacing = UnitGetFacing(lv_oldKerrigan);
+    lv_kerriganOwner = UnitGetOwner(lv_oldKerrigan);
+    libNtve_gf_CreateUnitsAtPoint2(1, "ToshSCOBA", 0, 1, lv_toshPos);
+    gv_heroTosh = UnitLastCreated();
+    UnitSetFacing(gv_heroTosh, lv_toshFacing, 0.0);
+    libNtve_gf_CreateUnitsAtPoint2(1, "KerriganSCOBA", 0, lv_kerriganOwner, lv_kerriganPos);
+    gv_heroKerrigan = UnitLastCreated();
+    UnitSetFacing(gv_heroKerrigan, lv_kerriganFacing, 0.0);
+    UnitRemove(lv_oldTosh);
+    UnitRemove(lv_oldKerrigan);
+    UnitSelect(gv_heroTosh, 1, true);
+    UnitSelect(gv_heroKerrigan, 2, true);
+}
+
+void gf_HeroSwitchInit () {
+    gv_heroPark = Point(0.0, 0.0);
+    if (!UnitIsValid(gv_heroTosh)) {
+        gv_heroTosh = UnitFromId(622754155);
+    }
+    if (!UnitIsValid(gv_heroKerrigan)) {
+        gv_heroKerrigan = UnitFromId(649131550);
+    }
+    gv_heroActive = gv_heroTosh;
+    if (!UnitIsValid(gv_heroTosh) || !UnitIsValid(gv_heroKerrigan)) {
+        return;
+    }
+    gv_tPSUNIT[1] = gv_heroTosh;
+    gf_HeroPark(gv_heroKerrigan);
+    gv_heroSwitchReady = true;
+}
+
+bool gt_HeroSwitchTosh_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_HeroSwitchTo(gv_heroTosh);
+    return true;
+}
+
+bool gt_HeroSwitchKerrigan_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_HeroSwitchTo(gv_heroKerrigan);
+    return true;
+}
+
+void gt_HeroSwitch_Init () {
+    gt_HeroSwitchTosh = TriggerCreate("gt_HeroSwitchTosh_Func");
+    TriggerAddEventKeyPressed(gt_HeroSwitchTosh, 1, c_key1, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateRequire);
+    gt_HeroSwitchKerrigan = TriggerCreate("gt_HeroSwitchKerrigan_Func");
+    TriggerAddEventKeyPressed(gt_HeroSwitchKerrigan, 1, c_key2, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateRequire);
+}

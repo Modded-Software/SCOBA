@@ -359,7 +359,7 @@ fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {
         lv_tz = WorldHeight(c_heightMapGround, lv_target);
     }
     lv_offset = gv_iMMORTAL;
-    if (UnitGetType(gv_tPSUNIT[lp_player]) == "Tosh") {
+    if (UnitGetType(gv_tPSUNIT[lp_player]) == "Tosh" || UnitGetType(gv_tPSUNIT[lp_player]) == "ToshSCOBA") {
         lv_offset = gv_mARINE;
     }
     lv_ex = PointGetX(lv_eye);

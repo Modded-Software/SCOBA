@@ -107,8 +107,8 @@ bool gt_VisualTuning_Func (bool testConds, bool runActions) {
     gf_TripleDeathTime("Ultralisk");
     gf_TripleDeathTime("WarpPrismPhasing");
     gf_TripleDeathTime("Zergling");
-    gf_ScaleDeathTimePlayer(7, "MengskBC", 8.0);
-    gf_SetUnitLifePercent("MengskBC", 0.1);
+    gf_ScaleDeathTimePlayer(7, "MengskBC", 100.0);
+    gf_SetUnitLifePercent("MengskBC", 0.01);
     return true;
 }
 

@@ -21,6 +21,26 @@ GENERATED_MODELS = [
     Path("Assets") / "Units" / "Zerg" / "Kerrigan" / "KerriganSCOBA.m3",
 ]
 
+NATIVE_GROUPS = (
+    "Attack",
+    "Spell",
+    "Stand Work",
+    "Stand",
+    "Walk",
+    "Stand Left",
+    "Stand Right",
+)
+
+UPPER_GROUPS = (
+    "Attack Arm Alternate",
+    "Spell Arm Alternate",
+)
+
+GAMEPLAY_ACTORS = (
+    ("ToshSCOBAUnit", "ToshSCOBA", "ToshSCOBA"),
+    ("KerriganSCOBAUnit", "KerriganSCOBA", "KerriganSCOBA"),
+)
+
 ANIM_CONFIG_RE = re.compile(r'gf_AnimConfig(?:Upper|Lower)\([^,]+,[^,]+,\s*"([^"]+)"')
 HERO_CONFIG_RE = re.compile(
     r'gf_AnimConfig(?:Upper|Lower)\((c_ANIM_HERO_TOSH|c_ANIM_HERO_KERRIGAN),[^,]+,\s*"([^"]+)"'
@@ -37,6 +57,7 @@ REQUIRED = [
     "Regions",
     "ComponentList.SC2Components",
     "Base.SC2Data/GameData/UnitData.xml",
+    "Base.SC2Data/GameData/ActorData.xml",
     "Base.SC2Data/GameData/AbilData.xml",
     "Base.SC2Data/GameData/BehaviorData.xml",
     "Base.SC2Data/GameData/ButtonData.xml",
@@ -212,6 +233,16 @@ def check_catalogs(map_dir: Path) -> None:
         for ability in CUSTOM_ABILITIES:
             if ability not in links:
                 fail(f"{unit_id} missing AbilArray link: {ability}")
+    for unit_id, parent_id in (("ToshSCOBA", "Tosh"), ("KerriganSCOBA", "Kerrigan")):
+        unit = None
+        for candidate in unit_tree.getroot().iter("CUnit"):
+            if candidate.get("id") == unit_id:
+                unit = candidate
+                break
+        if unit is None:
+            fail(f"missing unit: {unit_id}")
+        if unit.get("parent") != parent_id:
+            fail(f"{unit_id} parent must be {parent_id}")
         
 
 
@@ -258,9 +289,12 @@ def check_animation_names(map_dir: Path) -> None:
                 groups.add(normalized_animation_name(group.name))
             except ValueError as exc:
                 fail(f"{relative}: {exc}")
-        for name in ("Stand Left", "Stand Right"):
+        for name in NATIVE_GROUPS:
             if normalized_animation_name(name) not in groups:
-                fail(f"{relative} missing native turn group {name!r}")
+                fail(f"{relative} missing native animation group {name!r}")
+        for name in UPPER_GROUPS:
+            if normalized_animation_name(name) not in groups:
+                fail(f"{relative} missing upper animation group {name!r}")
         for name in ("Turn Left", "Turn Right"):
             if normalized_animation_name(name) in groups:
                 fail(f"{relative} has upper turn group {name!r}")
@@ -274,6 +308,27 @@ def check_animation_names(map_dir: Path) -> None:
         for relative, groups in zip(GENERATED_MODELS, model_groups):
             if name not in groups:
                 fail(f"{profile} clip {clip!r} missing from {relative}")
+
+
+def check_animation_actors(map_dir: Path) -> None:
+    actor_root = ET.parse(map_dir / "Base.SC2Data" / "GameData" / "ActorData.xml").getroot()
+    for actor_id, unit_name, model_name in GAMEPLAY_ACTORS:
+        node = actor_root.find(f".//CActorUnit[@id='{actor_id}']")
+        if node is None:
+            fail(f"missing gameplay actor {actor_id}")
+        if node.get("parent") != "GenericUnitBase":
+            fail(f"{actor_id} parent must be GenericUnitBase")
+        if node.get("unitName") != unit_name:
+            fail(f"{actor_id} unitName must be {unit_name}")
+        model = node.find("Model")
+        if model is None or model.get("value") != model_name:
+            fail(f"{actor_id} model must be {model_name}")
+        events = [(on.get("Terms"), on.get("Send")) for on in node.findall("On")]
+        for terms, _ in events:
+            if terms is None:
+                continue
+            if terms.startswith("Abil.attack.") or terms.startswith("WeaponStart.") or terms.startswith("WeaponStop."):
+                fail(f"{actor_id} must not define native attack event {terms!r}")
 
 
 def check_script(map_dir: Path) -> None:
@@ -317,6 +372,8 @@ def main() -> int:
     check_dimensions(map_dir)
     check_catalogs(map_dir)
     check_control_icons(map_dir)
+    check_animation_names(map_dir)
+    check_animation_actors(map_dir)
     check_script(map_dir)
     check_animation_names(map_dir)
     check_stamp(map_dir)

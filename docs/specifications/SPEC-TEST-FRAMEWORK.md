@@ -1130,6 +1130,15 @@ Combat real input probe:
 
 The harness clears drag keys and displacement before the probe.
 
+Non-aim attack checks:
+
+1. Attack while stationary and record native lower frame IDs across two samples.
+2. Require the lower frame IDs to advance.
+3. Attack while moving and require the native Walk lower clip.
+4. Require no non-aim `SCOBALo` animation start.
+5. Require no duplicate actor for `Tosh` or `QueenOfBlades`.
+6. Require the upper attack clip to restart on a repeated `UnitStartedAttack2`.
+
 ### 13.2 Aim profile
 
 File: `testkit/profiles/aim.py`

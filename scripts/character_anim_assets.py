@@ -22,7 +22,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "17\n"
+MARKER_VERSION = "24\n"
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -56,22 +56,16 @@ SOURCE_MODELS = {
 }
 
 CLIP_JOBS = (
-    ("Attack", "Attack", "upper"),
-    ("Spell", "Spell", "upper"),
-    ("Stand Work", "Stand Work", "upper"),
-    ("Attack", "Attack Ready", "upper"),
+    ("Attack", "Attack Arm Alternate", "upper"),
+    ("Spell", "Spell Arm Alternate", "upper"),
     ("Stand", "Stand Leg", "lower"),
     ("Walk", "Walk Leg", "lower"),
     ("Stand Left", "Stand Left Leg", "lower"),
     ("Stand Right", "Stand Right Leg", "lower"),
 )
 
-HOLD_CLIP_MS = {
-    "Attack Ready": 1,
-}
-
-AIM_PITCH_GROUP = "Ready"
-AIM_PITCH_SOURCE = "Attack"
+AIM_PITCH_GROUP = "Ready Alternate"
+AIM_PITCH_SOURCE = "Attack Arm Alternate"
 AIM_PITCH_SOURCE_MS = 350
 AIM_PITCH_MIN_DEG = -95.0
 AIM_PITCH_MAX_DEG = 50.0
@@ -156,9 +150,6 @@ def make_clip(model, group, source_index: int, group_ids: set[int], name: str, b
             duration_ms = source_sequence.animEndInMS - source_sequence.animStartInMS
             scaled_ms = int(round(duration_ms * source_sequence.movementSpeed / (unit_speed * 100.0)))
             target_sequence.animEndInMS = target_sequence.animStartInMS + scaled_ms
-        hold_ms = HOLD_CLIP_MS.get(name)
-        if hold_ms is not None:
-            target_sequence.animEndInMS = target_sequence.animStartInMS + hold_ms
     stc = clone(source)
     debug_filter = os.environ.get("SCOBA_ANIM_UNFILTERED", "")
     if debug_filter in {"all", bone_group}:
@@ -179,6 +170,7 @@ def make_clip(model, group, source_index: int, group_ids: set[int], name: str, b
     stc.stsIndex = sts_index
     stc.stsIndexCopy = sts_index
     stc.priority = 10 if bone_group == "upper" else 0
+    stc.runsConcurrent = 1
     model.sequenceTransformationCollections.append(stc)
     stc_index = len(model.sequenceTransformationCollections) - 1
     group.stcIndices = [stc_index]

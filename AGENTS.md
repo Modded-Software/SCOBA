@@ -25,7 +25,7 @@
 - `scripts/props_expand.py` - 1.5× trees, 2× fluff, tree scale remapped to max 8 (idempotent, reversible, wired into the pipeline).
 - `scripts/spore_scale.py` - scale SporeCannon/SporeCrawler units 3× and projectile speed 1.5× (idempotent, reversible, wired into the pipeline).
 - `scripts/water_splashes.py` - add missing water terrain squibs to ground unit actors (idempotent, reversible, wired into the pipeline). Use `scripts/audit_water_splashes.py` to list missing and skipped actors.
-- `scripts/character_anim_assets.py` - generate splitbody aim groups for Tosh and Kerrigan while preserving full-body baseline Stand, Walk, Stand Left, and Stand Right (idempotent, reversible, wired into the pipeline). Each aim group has a frozen upper STC and one of eight directional lower STCs, including reversed backpedal. Generated animation group names and actor clip references must use allowed SC2 animation tokens; validation rejects unknown token names.
+- `scripts/character_anim_assets.py` - generate splitbody aim groups for Tosh and Kerrigan while preserving native full-body Stand, Walk, Stand Left, Stand Right, and Stand Work (idempotent, reversible, wired into the pipeline). Each aim group has a frozen upper STC and one of eight directional lower STCs, including reversed backpedal. It must add new upper-only clips `Attack Arm Alternate` and `Spell Arm Alternate`. Generated animation group names and actor clip references must use allowed SC2 animation tokens; validation rejects unknown token names.
 - `scripts/character_anim_m3.py` - M3 clone, freeze, reverse, and splitbody group helpers used by the asset generator.
 - `scripts/animation_tokens.py`: allowed SC2 animation tokens and clip name checks used by asset generation and `scripts/validate-map.py`.
 - `scripts/terrain/` - one-off terrain, heightmap, pathing, cell attribute, and sync inspection tools. These are not part of the build pipeline.
@@ -42,9 +42,12 @@
 - `docs/specifications/SPEC-MOUSE-CONTROLS.md` - mouse control implementation specification.
 - `docs/requirements/REQ-CHARACTER-ANIMATION.md` - binding character animation requirements.
 - `docs/specifications/SPEC-CHARACTER-ANIMATION.md` - character animation implementation specification.
+- `docs/requirements/REQ-HERO-SWITCH.md` - binding controlled hero switching requirements.
+- `docs/specifications/SPEC-HERO-SWITCH.md` - controlled hero switching implementation specification.
 - `docs/requirements/REQ-TEST-FRAMEWORK.md`: binding test framework requirements.
 - `docs/specifications/SPEC-TEST-FRAMEWORK.md`: test framework implementation specification.
 - `docs/AUDIT.md` - full audit of command-card and repository changes.
+- `docs/ATTACK-ANIMATION-AUDIT.md` - frozen lower-body root cause, duplicate-actor trap, and rejected attack designs.
 - `docs/REMEDIATION.md` - phased remediation plan and test matrix.
 - `docs/PIPELINE_AUDIT.md` - build, staging, cache, and launch audit.
 - `docs/PIPELINE_REMEDIATION.md` - pipeline remediation plan.
@@ -129,6 +132,10 @@
 - The Order button is the only lasting native selection change to a non-hero unit.
 - Never set any unit `Selectable=false`.
 - Aim must not change combat FSM state or issue combat orders.
+- `Alt+1` controls Tosh and `Alt+2` controls Kerrigan for player 1.
+- The inactive hero is stopped, hidden, unselectable, and parked off-screen.
+- Only the active hero is owned by player 1 and has `UnitDirectControl`.
+- Switching exits aim and order mode, resets combat and animation, and moves the new hero to the old hero position and facing.
 - `gf_ControlApply` is the only writer of mouse-relative and cursor visibility. It never enables camera input lock in RPG idle. Mouse press/release handlers own held button state. Targeting only reads it.
 - Screen-edge camera scroll is disabled in map camera data: `CCamera id="Dflt"` sets `BorderSizeX=0`, `BorderSizeY=0`, `MaxScrollRate Follow=0`, `MaxScrollDistance Follow=0`, and `FollowScrollLimit=0`. Do not re-add camera input lock hacks. Native follow stays smooth.
 - Control mode changes, Alt changes, aim entry/exit, and map init route through `gf_ControlApply`.
@@ -144,7 +151,17 @@
 - Aim backward movement uses reversed backpedal animations.
 - Aim must not turn 180 degrees toward travel or show a planted-feet torso twist.
 - Aim attack animation is deferred; do not add an aim attack overlay in this stage.
-- Non-aim A/D/S movement turns the hero toward the movement direction and uses the Walk lower clip.
+- Non-aim A/D/S movement turns the hero toward the movement direction and uses native Walk.
+- Non-aim lower body is native Stand, Walk, and turn. The map must not drive non-aim lower with `SCOBALo`.
+- Non-aim attack is an upper-only `SCOBAUp` animation instance. It must not touch the lower body.
+- Gameplay uses clean unit types `ToshSCOBA` and `KerriganSCOBA`.
+- Clean actors `ToshSCOBAUnit` and `KerriganSCOBAUnit` use `unitName` equal to the new unit type, parent `GenericUnitBase`, and the generated model.
+- Clean actors MUST define no `Abil.attack.*`, `WeaponStart.*`, `WeaponStop.*`, or `Abil.attack.ReadyStart` events.
+- Do not rely on stop timers, per-tick stop spam, empty native tracks, or token renaming to fight native attack events.
+- Native `Tosh` and `QueenOfBlades` unit types and actors stay untouched for campaign use.
+- Select the attack clip from `EventUnitGetWeapon`: Tosh `Attack Arm Alternate`, Kerrigan `RazorTalons` `Attack Arm Alternate`, `QueenOfBladesPsiBlast` `Spell Arm Alternate`.
+- Upper attack STCs MUST set `runsConcurrent=1`; otherwise they suspend the lower body. Upper priority stays 10.
+- Lower walk selection outside aim is native. Do not add displacement, hold-timer, or move-intent lower selection.
 - Normal action movement uses the RPG move-and-turn path. Only aim uses the aim movement path.
 - One aim movement loop owns travel. Per-key loops only set flags during aim.
 - Aim facing is independent of order issuance. Never require facing before a move order.
@@ -152,7 +169,7 @@
 - Aim adds `SCOBAAimNoTurn` (`SuppressTurning`) on entry and removes it on exit.
 - Do not disable `Turnable` or permanently zero turning rates.
 - Tosh and Kerrigan use high `StationaryTurningRate` and `TurningRate` so camera facing does not lag.
-- Aim uses two concurrent brackets: `SCOBAUp` for upper aim pitch and `SCOBALo` for lower locomotion.
+- Aim uses two concurrent animation instances: `SCOBAUp` for upper aim pitch and `SCOBALo` for lower locomotion. They are `AnimPlay` instance names, not bracket names.
 - Aim hold must not loop the attack swing. Non-spine upper tracks are held at one key across the clip duration.
 - Aim hold produces one upper pitch start event and no repeated upper start events.
 - Aim upper pitch follows camera pitch over the camera range: 80 degrees down and 60 degrees up. The clip sweeps -95..50 degrees with fixed rest -13.
@@ -165,7 +182,7 @@
 - On each pitch change, unpause `SCOBAUp`, send `AnimSetTime`, then pause `SCOBAUp`.
 - Freeze only after the camera-matched frame is applied. Never pause before setting the frame.
 - Do not use `AnimSetPaused` on `SCOBALo`.
-- The lower `SCOBALo` bracket must keep its Stand or Walk animation playing while the upper is held.
+- The lower `SCOBALo` animation instance must keep its Stand or Walk animation playing while the upper is held.
 - Aim idle uses `Attack,Stand`; aim in-place turn uses `Attack,Stand,Left` or `Attack,Stand,Right`.
 - Keep `c_ANIM_AIM_PITCH_REST` fixed. Never capture the aim-entry camera pitch as rest.
 - Drive pitch updates from `TriggerAddEventCameraMove` and a periodic timer.
@@ -195,7 +212,7 @@
 - Aim entry without a movement key issues Stop and restores native idle.
 - Reset animation state on aim entry, control mode change, and hero reassignment.
 - Clearing the aim group must reset the splitbody state and upper state in the same call.
-- Use movement intent plus a hold timer for lower walk and idle selection. Select the aim group from that lower state and direction.
+- Non-aim lower body uses native locomotion. Do not use movement intent plus a hold timer to select non-aim lower walk or idle. Use that selection only inside aim.
 - Controls tests must cover real clicks, target persistence, click radius, aim distance, movement tick, animation reset, immediate zoom, and collision clamp/restore.
 
 ## Resource tools

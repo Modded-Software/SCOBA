@@ -72,6 +72,12 @@
     <CModel id="MengskBC">
         <AnimSpeed value="0.100000"/>
     </CModel>
+    <CModel id="DukesRevengeDeath">
+        <AnimSpeed value="0.020000"/>
+    </CModel>
+    <CModel id="DukesRevengeDeathLow">
+        <AnimSpeed value="0.020000"/>
+    </CModel>
     <CModel id="Mothership">
         <AnimSpeed value="0.250000"/>
         <Occlusion value="None"/>

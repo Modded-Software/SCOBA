@@ -36,8 +36,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
     gv_xLOCATIONS[1] = RegionFromId(8);
     gv_xLOCATIONS[2] = RegionFromId(7);
     gv_xLOCATIONS[3] = RegionFromId(9);
-    UnitSelect(UnitFromId(622754155), 1, true);
-    UnitSelect(UnitFromId(649131550), 2, true);
+    gf_HeroUnitsReplace();
     Wait(0.5, c_timeReal);
     auto5832FA5B_ae = 6;
     auto5832FA5B_ai = 1;
@@ -121,14 +120,14 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             CameraSetValue(1, c_cameraValueShadowClip, 25.0, 0.0, -1, 10.0);
             CameraSetValue(1, c_cameraValueFarClip, 16000.0, 0.0, -1, 10.0);
             CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, 65.0, 4.0, -1, 10);
-            if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Tosh"))) {
+            if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Tosh") || (UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "ToshSCOBA"))) {
                 CameraSetValue(lv_localPlayer, c_cameraValueDistance, 1.5, 0.5, -1, 10);
                 gv_cameraDistanceDesired[lv_localPlayer] = 1.5;
                 CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, 0.9, 0.5, -1, 10);
                 CameraUseHeightSmoothing(lv_localPlayer, false);
             }
 
-            if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Kerrigan"))) {
+            if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Kerrigan") || (UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "KerriganSCOBA"))) {
                 CameraSetValue(lv_localPlayer, c_cameraValueDistance, 2.5, 0.5, -1, 10);
                 gv_cameraDistanceDesired[lv_localPlayer] = 2.5;
                 CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, 0.9, 0.5, -1, 10);
@@ -164,6 +163,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
     BankValueSetFromString(lv_bank, "Debug", "Build", c_SCOBA_BUILD_STAMP);
     BankSave(lv_bank);
     gt_ToggleCommands_Init();
+    gf_HeroSwitchInit();
     gt_AttackEvent_Init();
     for (lv_localPlayer = 1; lv_localPlayer <= 6; lv_localPlayer += 1) {
         if (UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {

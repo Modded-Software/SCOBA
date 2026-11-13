@@ -48,6 +48,7 @@ void gf_PlayerBarsUpdate () {
     int lv_width;
     unit lv_unit;
     string lv_icon;
+    string lv_actor;
 
     for (lv_player = 1; lv_player <= 6; lv_player += 1) {
         lv_unit = gv_tPSUNIT[lv_player];
@@ -55,8 +56,9 @@ void gf_PlayerBarsUpdate () {
             continue;
         }
         lv_icon = "";
-        if (CatalogEntryIsValid(c_gameCatalogActor, UnitGetType(lv_unit))) {
-            lv_icon = CatalogFieldValueGet(c_gameCatalogActor, UnitGetType(lv_unit), "UnitIcon", lv_player);
+        lv_actor = gf_UnitActorId(lv_unit);
+        if (CatalogEntryIsValid(c_gameCatalogActor, lv_actor)) {
+            lv_icon = CatalogFieldValueGet(c_gameCatalogActor, lv_actor, "UnitIcon", lv_player);
         }
         if ((lv_icon != "") && (lv_icon != gv_pbXpIconPath[lv_player])) {
             gv_pbXpIconPath[lv_player] = lv_icon;

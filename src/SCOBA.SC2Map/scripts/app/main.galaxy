@@ -28,6 +28,7 @@ include "scripts/app/systems/companion"
 include "scripts/app/systems/energy_bar"
 include "scripts/app/systems/gui_environment"
 include "scripts/app/systems/input"
+include "scripts/app/systems/hero_switch"
 include "scripts/app/systems/medic"
 include "scripts/app/systems/movement"
 include "scripts/app/systems/orders"
@@ -105,6 +106,7 @@ void main () {
     gt_ActionModeToggle_Init();
     gt_AnimInit_Init();
     gt_AnimTick_Init();
+    gt_HeroSwitch_Init();
     gt_AnimPitchTick_Init();
     gt_AnimProbe_Init();
     gt_AnimProbeLower_Init();

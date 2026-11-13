@@ -169,7 +169,7 @@
     <CActorUnit id="MengskBC">
         <Scale value="52.000000"/>
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.250000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.010000"/>
     </CActorUnit>
     <CActorUnit id="Mitosaurus">
         <Scale value="2.500000"/>
@@ -313,15 +313,67 @@
     <CActorModel id="KerriganSCOBA">
         <AnimBlendTime value="0.000000"/>
     </CActorModel>
-    <CActorUnit id="Tosh">
+    <CActorUnit id="ToshSCOBAUnit" parent="GenericUnitBase" unitName="ToshSCOBA">
+        <DeathArray index="Normal" ModelLink="ToshDeath" SoundLink="Tosh_Death"/>
+        <PortraitModel value="ToshPortrait"/>
         <Model value="ToshSCOBA"/>
         <Scale value="0.750000"/>
+        <WalkAnimMoveSpeed value="3"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
         <VarianceWindowWalk value="0.000000"/>
+        <BarWidth value="40"/>
+        <BarOffset value="40"/>
+        <UnitIcon value="Assets\Textures\BTN-Unit-Terran-Tosh.dds"/>
+        <HeroIcon value="Assets\Textures\ui-heroicon-tosh.dds"/>
+        <GroupIcon>
+            <Image value="Assets\Textures\Wireframe-Terran-Tosh.dds"/>
+        </GroupIcon>
+        <Wireframe>
+            <Image value="Assets\Textures\Wireframe-Terran-Tosh.dds"/>
+        </Wireframe>
+        <UnitBorderNormalColor value="150,150,150"/>
+        <UnitBorderSubgroupColor value="255,255,255"/>
+        <LifeArmorIcon value="Assets\Textures\btn-upgrade-terran-infantryarmorlevel0.dds"/>
+        <ShieldArmorIcon value="Assets\Textures\btn-ability-terran-defensivematrix.dds"/>
+        <UnitKillRank Text="UnitKillRank/Tosh"/>
+        <Aliases value="_UnitSmall"/>
+        <Macros value="TerrainSquibAnimations"/>
+        <TerrainSquibs>
+            <MovementDistance value="0.150000,0.150000"/>
+            <IdlePeriod value="0.100000,0.250000"/>
+            <RangeUp value="0.600000"/>
+            <RangeDown value="0.600000"/>
+            <AttachQuery Methods="AMFilterCenter"/>
+            <Visuals TerrainPhysicsMaterial="Water" ActorModel="TerrainSquibHarnessContinuous" ModelLink="WaterRippleSmall"/>
+        </TerrainSquibs>
     </CActorUnit>
-    <CActorUnit id="QueenOfBlades">
+    <CActorUnit id="KerriganSCOBAUnit" parent="GenericUnitBase" unitName="KerriganSCOBA">
+        <DeathArray index="Normal" SoundLink="Kerrigan_Death"/>
+        <PortraitModel value="KerriganPortrait"/>
         <Model value="KerriganSCOBA"/>
         <Scale value="0.750000"/>
+        <WalkAnimMoveSpeed value="1.1992"/>
+        <BarWidth value="78"/>
+        <BarOffset value="60"/>
+        <LifeArmorIcon value="Assets\Textures\btn-upgrade-zerg-groundcarapace-level0.dds"/>
+        <UnitIcon value="Assets\Textures\btn-unit-zerg-kerrigan.dds"/>
+        <GroupIcon>
+            <Image value="Assets\Textures\Wireframe-zerg-kerrigan.dds"/>
+        </GroupIcon>
+        <Wireframe>
+            <Image value="Assets\Textures\Wireframe-zerg-kerrigan.dds"/>
+        </Wireframe>
+        <UnitKillRank Text="UnitKillRank/Kerrigan"/>
+        <Aliases value="_UnitLarge"/>
+        <Macros value="TerrainSquibAnimations"/>
+        <TerrainSquibs>
+            <MovementDistance value="0.150000,0.150000"/>
+            <IdlePeriod value="0.100000,0.250000"/>
+            <RangeUp value="0.600000"/>
+            <RangeDown value="0.600000"/>
+            <AttachQuery Methods="AMFilterCenter"/>
+            <Visuals TerrainPhysicsMaterial="Water" ActorModel="TerrainSquibHarnessContinuous" ModelLink="WaterRippleSmall"/>
+        </TerrainSquibs>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Ultralisk ............................................................................. -->

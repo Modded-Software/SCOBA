@@ -8,6 +8,8 @@ void gf_AnimReset (int lp_player) {
     gv_animLowerState[lp_player] = c_ANIM_LOWER_NONE;
     gv_animUpperClipIndex[lp_player] = -1;
     gv_animLowerClipIndex[lp_player] = -1;
+    gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
+    gv_animAttackUntil[lp_player] = -1.0;
     gv_animFullDir[lp_player] = -1;
     gv_animAimDir[lp_player] = c_ANIM_DIR_FORWARD;
     gv_animMoveHold[lp_player] = 0;
@@ -41,8 +43,47 @@ bool gf_AnimMoveIntent (int lp_player) {
     }
     return false;
 }
+bool gf_AnimMoving (int lp_player) {
+    unit lv_hero;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero) || !gv_animHasPos[lp_player]) {
+        return false;
+    }
+    return DistanceBetweenPoints(gv_animLastPos[lp_player], UnitGetPosition(lv_hero)) > c_ANIM_MOVE_EPSILON;
+}
+bool gf_AnimAttackActive (int lp_player) {
+    if (gv_animAttackUntil[lp_player] < 0.0) {
+        return false;
+    }
+    return TimerGetElapsed(gv_sCOBA_Clock) < gv_animAttackUntil[lp_player];
+}
+void gf_AnimAttackStart (int lp_player, string lp_weapon) {
+    unit lv_hero;
+    int lv_profile;
+    int lv_state;
+
+    if (gv_aIMACTIVE[lp_player]) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    if (lv_profile != c_ANIM_HERO_TOSH && lv_profile != c_ANIM_HERO_KERRIGAN) {
+        return;
+    }
+    lv_state = c_ANIM_UPPER_ATTACK;
+    if ((UnitGetType(lv_hero) == "Kerrigan" || UnitGetType(lv_hero) == "KerriganSCOBA") && lp_weapon == "QueenOfBladesPsiBlast") {
+        lv_state = c_ANIM_UPPER_ATTACK_SPELL;
+    }
+    gv_animAttackState[lp_player] = lv_state;
+    gv_animAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_ANIM_ATTACK_DURATION;
+    gf_AnimUpperAttackStart(lp_player, lv_state);
+}
 int gf_AnimLowerState (int lp_player) {
-    if (!gf_AnimMoveIntent(lp_player)) {
+    if (!gf_AnimMoveIntent(lp_player) && !gf_AnimMoving(lp_player)) {
         if (gv_animMoveHold[lp_player] < c_ANIM_LOWER_HOLD_TICKS) {
             gv_animMoveHold[lp_player] += 1;
         }
@@ -63,13 +104,17 @@ void gf_AnimTick (int lp_player) {
     unit lv_hero;
     int lv_upper;
     int lv_lower;
+    bool lv_attacking;
 
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
         return;
     }
-    lv_lower = gf_AnimLowerState(lp_player);
+    lv_attacking = gf_AnimAttackActive(lp_player);
     if (gv_aIMACTIVE[lp_player]) {
+        lv_lower = gf_AnimLowerState(lp_player);
+        gv_animAttackUntil[lp_player] = -1.0;
+        gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
         gf_AnimUpdateAimTurn(lp_player);
         if (lv_lower == c_ANIM_LOWER_IDLE && gv_animAimTurn[lp_player] != 0) {
             lv_lower = gv_animAimTurn[lp_player];
@@ -81,9 +126,16 @@ void gf_AnimTick (int lp_player) {
         lv_upper = c_ANIM_UPPER_AIM_MID;
     }
     else {
+        lv_lower = c_ANIM_LOWER_NONE;
         gf_AnimFullSet(lp_player, c_ANIM_LOWER_NONE);
-        gf_AnimLowerSet(lp_player, lv_lower);
-        lv_upper = c_ANIM_UPPER_NONE;
+        if (lv_attacking) {
+            lv_upper = gv_animAttackState[lp_player];
+        }
+        else {
+            lv_upper = c_ANIM_UPPER_NONE;
+            gv_animAttackUntil[lp_player] = -1.0;
+            gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
+        }
         gf_AnimUpperSet(lp_player, lv_upper);
     }
     gv_animLowerState[lp_player] = lv_lower;
@@ -113,3 +165,4 @@ void gt_AnimTick_Init () {
     gt_AnimTick = TriggerCreate("gt_AnimTick_Func");
     TriggerAddEventTimePeriodic(gt_AnimTick, 0.05, c_timeGame);
 }
+

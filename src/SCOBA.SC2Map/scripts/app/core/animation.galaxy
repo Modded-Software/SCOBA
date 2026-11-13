@@ -6,7 +6,9 @@ const int c_ANIM_UPPER_READY = 2;
 const int c_ANIM_UPPER_AIM_DOWN = 3;
 const int c_ANIM_UPPER_AIM_MID = 4;
 const int c_ANIM_UPPER_AIM_UP = 5;
-const int c_ANIM_UPPER_COUNT = 6;
+const int c_ANIM_UPPER_ATTACK = 6;
+const int c_ANIM_UPPER_ATTACK_SPELL = 7;
+const int c_ANIM_UPPER_COUNT = 8;
 
 const int c_ANIM_LOWER_NONE = 0;
 const int c_ANIM_LOWER_IDLE = 1;
@@ -47,6 +49,8 @@ const fixed c_ANIM_TURN_DEADBAND = 3.0;
 const fixed c_ANIM_AIM_TURN_DEADBAND = 0.5;
 const int c_ANIM_LOWER_HOLD_TICKS = 3;
 const int c_ANIM_AIM_TURN_HOLD_TICKS = 3;
+const fixed c_ANIM_ATTACK_DURATION = 1.0;
+const fixed c_ANIM_MOVE_EPSILON = 0.05;
 
 const string c_ANIM_BRACKET_UPPER = "SCOBAUp";
 const string c_ANIM_BRACKET_LOWER = "SCOBALo";

@@ -99,6 +99,7 @@ void gt_ClearTarget_Init () {
 void gf_UnitTargetSet (int lp_player, unit lp_unit) {
     unit lv_old;
     string lv_portrait;
+    string lv_actor;
     bool lv_enemy;
     int lv_bar;
 
@@ -124,8 +125,9 @@ void gf_UnitTargetSet (int lp_player, unit lp_unit) {
     UnitStatusBarOverride(lp_unit, -1);
     lv_enemy = (libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Ally) == false);
     lv_portrait = "";
-    if (CatalogEntryIsValid(c_gameCatalogActor, UnitGetType(lp_unit))) {
-        lv_portrait = CatalogFieldValueGet(c_gameCatalogActor, UnitGetType(lp_unit), "UnitIcon", lp_player);
+    lv_actor = gf_UnitActorId(lp_unit);
+    if (CatalogEntryIsValid(c_gameCatalogActor, lv_actor)) {
+        lv_portrait = CatalogFieldValueGet(c_gameCatalogActor, lv_actor, "UnitIcon", lp_player);
     }
     if (lv_portrait == "") {
         lv_portrait = "Assets\\Textures\\btn-command-attack.dds";

@@ -475,7 +475,7 @@ RPG right-button input never calls `gf_AimBegin` or `gf_AimEnd`.
 5. Set `gv_aIMACTIVE[player] = false`.
 6. Clear the aim group and restore baseline animation.
 7. Send `AnimBlendTimeRemove` to the main actor and model.
-8. Set `SCOBAUp` time scale back to `1.0` on the main actor and model.
+8. Clear the `SCOBAUp` animation instance and reset its playback time.
 9. Set the field of view to `gv_cAMERAFOV[player]` once.
 10. Remove the proxy unit and follow the hero alone.
 11. Hide the native cursor.

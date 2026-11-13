@@ -659,4 +659,6 @@
     <CUnit id="Zergling">
         <Radius value="0.75"/>
     </CUnit>
+    <CUnit id="ToshSCOBA" parent="Tosh"/>
+    <CUnit id="KerriganSCOBA" parent="Kerrigan"/>
 </Catalog>

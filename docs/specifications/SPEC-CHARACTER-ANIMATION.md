@@ -2,6 +2,7 @@
 
 **Date:** 2026-11-10
 **Status:** Active implementation specification
+**Migration:** Dedicated gameplay actors and native lower-body playback are implemented.
 **Requirements:** [REQ-CHARACTER-ANIMATION](../requirements/REQ-CHARACTER-ANIMATION.md)
 
 ## 1. Approach
@@ -11,13 +12,13 @@
 
 Outside aim, the native unit baseline is authoritative for idle, walk, and turn.
 
-Inside aim, two animation brackets run concurrently on the same model:
+Inside aim, two animation instances run concurrently on the same model:
 
 - `SCOBAUp` plays one shared upper aim clip with dense keyframe-driven lower-back pitch.
 - `SCOBALo` plays the active lower-body direction group.
 
-These are animation brackets on one model, not separate render brackets.
-The map does not create a second model or a separate render actor during aim.
+These are `AnimPlay` animation instance names on one model, not bracket names.
+They are not separate render brackets, models, or actors.
 
 The upper clip contains the frozen aim pose plus a lower-back pitch sweep.
 Non-spine upper tracks stay held at one key across the clip duration.
@@ -28,11 +29,14 @@ The lower group contains one lower STC for the active state and direction.
 Galaxy:
 
 - `core/animation.galaxy`: state IDs, hero profiles, constants, config tables.
-- `systems/animation_fsm.galaxy`: splitbody aim selection, facing, and state.
+- `systems/animation_fsm.galaxy`: splitbody aim selection, non-aim attack overlay, facing, and state.
 - `systems/animation_aim.galaxy`: direction selection and aim config tables.
 - `systems/aim.galaxy`: aim entry and exit.
+- `systems/combat_cooldown.galaxy`: starts the non-aim attack overlay on `UnitStartedAttack2`.
 - `systems/movement.galaxy`: native and aim movement.
-- `core/globals.galaxy`: per-player animation state and aim group table.
+- `core/globals.galaxy`: per-player animation, attack, and aim group table.
+- `Base.SC2Data/GameData/ActorData.xml`: clean ToshSCOBAUnit and KerriganSCOBAUnit actors.
+- `Base.SC2Data/GameData/UnitData.xml`: clean ToshSCOBA and KerriganSCOBA unit types.
 
 Python:
 
@@ -45,10 +49,14 @@ Python:
 
 Each hero actor keeps its native Stand and Walk baseline outside aim.
 
-The generated models retain full-body Stand, Walk, Stand Left, and Stand Right clips.
+The generated models retain full-body Stand, Walk, Stand Left, Stand Right, Stand Work, Attack, and Spell clips.
 Baseline state drives idle, locomotion, and turning outside aim.
-Outside aim the map sends only lower-body track clips.
-The upper bracket stays clear.
+Outside aim the map does not send any lower-body animation.
+Gameplay uses clean unit types `ToshSCOBA` and `KerriganSCOBA`.
+Clean actors `ToshSCOBAUnit` and `KerriganSCOBAUnit` use `unitName` equal to the clean unit type.
+Clean actors parent `GenericUnitBase` and define no native attack events.
+Native `Tosh` and `QueenOfBlades` unit types and actors stay untouched.
+The upper attack overlay is the only non-aim animation the map writes.
 
 ## 4. Splitbody Aim Groups
 
@@ -103,23 +111,24 @@ The upper STC and lower STC names stay tied to the group name.
 
 In `gf_AnimTick`:
 
-1. Compute the lower-body state.
+1. While aim is active, compute the lower-body state.
 2. Compute movement heading relative to camera yaw.
 3. Snap to one of eight directions.
 4. Apply direction hysteresis.
-5. On aim, play the shared upper pitch clip on `SCOBAUp`.
-6. On aim, play the selected lower-only group on `SCOBALo`.
+5. Play the shared upper pitch clip on `SCOBAUp`.
+6. Play the selected lower-only group on `SCOBALo`.
 7. Apply camera pitch time to the SCOBAUp animation reference.
 8. Keep hero facing on camera yaw.
 9. Keep the lower direction on movement heading.
-10. Outside aim, clear both aim brackets and restore baseline playback.
+10. Outside aim, clear both aim animation instances and restore native playback.
+11. Outside aim, do not compute or write a lower-body animation state.
 
 `gf_AnimFullSet` records `gv_animFullState` and skips a repeated state write.
 `gf_AnimFullClear` clears the lower aim group and resets the splitbody state.
 `gf_AnimAimUpperClear` clears the upper aim clip and resets pitch time.
 
 Aim holds one upper clip while camera pitch changes its playback time.
-Aim exit clears both aim brackets and leaves the baseline visible.
+Aim exit clears both aim animation instances and leaves the baseline visible.
 Control mode change and hero reassignment also clear animation state.
 
 Turning uses no upper turn overlay.
@@ -135,7 +144,8 @@ Shoulder, arm, and elbow correction is deferred until visual validation.
 
 Asset generation creates one shared upper pitch clip per hero:
 
-- the Attack upper pose sampled at 350 ms is the base pose, where the gun is near horizontal.
+- the upper-only `Attack Arm Alternate` clip sampled at 350 ms is the base pose, where the gun is near horizontal.
+- the pitch source MUST be upper-only; a full-body source copies lower tracks into every `SCOBAUp` pitch clip and freezes the legs.
 - the lower-back rotation track sweeps from 95 degrees down to 50 degrees up.
 - keyframes are densely spaced so nearest-keyframe selection looks continuous.
 - all other upper position, rotation, and scale tracks stay held at one key
@@ -154,14 +164,14 @@ Runtime pitch:
 5. Unpause `SCOBAUp` on the main actor.
 6. Send `AnimSetTime SCOBAUp` with the exact target time.
 7. Pause `SCOBAUp` after the frame is applied.
-8. Do not pause the upper bracket before the first frame is applied.
+8. Do not pause the upper animation instance before the first frame is applied.
 9. The rest pitch stays fixed at `c_ANIM_AIM_PITCH_REST`; aim entry never
    captures the current camera pitch as rest.
 10. Drive the tick from `TriggerAddEventCameraMove` and a periodic timer.
 11. Send `AnimBlendTimeRemove` on aim exit so engine blend defaults return.
 12. Set model actor `AnimBlendTime` to 0 for Tosh and Kerrigan.
 13. Unpause `SCOBAUp` and clear it on aim exit.
-14. Keep the lower `SCOBALo` bracket playing its Stand or Walk animation while
+14. Keep the lower `SCOBALo` animation instance playing its Stand or Walk animation while
     the upper body is held. Aim idle uses `Attack,Stand`; aim in-place turn
     uses `Attack,Stand,Left` or `Attack,Stand,Right`; aim walk uses
     `Attack,Walk,<direction>`.
@@ -172,10 +182,98 @@ before the first frame. Do not blend or add to the prior idle upper pose.
 Pitch uses local bone rotation. The local pitch axis and sign are per-hero
 configuration values validated in game.
 
+## 5B. Non-Aim Attack Overlay
+
+Non-aim attack is an upper-body overlay on the `SCOBAUp` animation instance.
+It never writes `SCOBALo`, native lower animation, movement orders, facing, camera, or control state.
+
+The overlay must not rely on native actor attack events.
+Clean actors define no native attack events.
+
+Attack state:
+
+| State | Clip | Duration |
+| --- | --- | --- |
+| `c_ANIM_UPPER_ATTACK` | `Attack Arm Alternate` | Native Attack clip |
+| `c_ANIM_UPPER_ATTACK_SPELL` | `Spell Arm Alternate` | Native Spell clip |
+
+`UnitStartedAttack2` starts the overlay:
+
+1. Ignore the event while aim is active.
+2. Read `EventUnitGetWeapon()`.
+3. Tosh uses `Attack Arm Alternate`.
+4. Kerrigan `RazorTalons` uses `Attack Arm Alternate`.
+5. Kerrigan `QueenOfBladesPsiBlast` uses `Spell Arm Alternate`.
+6. Clear and restart `SCOBAUp` with `FullMatch | NonLooping`.
+7. Clear on animation completion or weapon stop.
+8. A fixed timer may exist only as a safety cap.
+
+`gv_animAttackState` stores the active attack state.
+`gv_animAttackUntil` stores the safety-cap end time.
+
+`gf_AnimTick` outside aim:
+
+1. Do not select or play any lower-body animation.
+2. Select the attack upper state while the attack is active.
+3. Otherwise select no upper state.
+4. Clear the upper state when the attack ends.
+
+The upper attack state is one-shot. It must not use `PlayForever`.
+The attack state is reset by `gf_AnimReset`.
+
+### Rejected actor design
+
+The previous designs fought the native attack events:
+
+| Attempt | Result |
+| --- | --- |
+| `<On index="N" removed="1"/>` on Tosh/QueenOfBlades | Unverified. Native attack events still ran. |
+| Upper-only replacement of the model `Attack` group | Native attack froze the lower body at its last frame. |
+| Runtime `AnimBracketStop Attack` with or without timers | Not deterministic. Native state outlived the map state. |
+| Dedicated actors using the native `unitName` | SC2 creates both actors and renders the model twice. |
+| Empty native tracks or renamed native tokens | Either froze the lower body or dropped all animations. |
+| Custom non-aim lower on `SCOBALo` | Redundant with native locomotion and lost to the native bracket. |
+
+Do not restore any of these patterns.
+
+### Clean actor setup
+
+Tosh:
+
+- unit type `ToshSCOBA`, parent `Tosh`;
+- actor ID `ToshSCOBAUnit`;
+- `unitName="ToshSCOBA"`;
+- `Model="ToshSCOBA"`;
+- `Scale=0.75`;
+- no native attack, work, or ready animation events.
+
+Kerrigan:
+
+- unit type `KerriganSCOBA`, parent `Kerrigan`;
+- actor ID `KerriganSCOBAUnit`;
+- `unitName="KerriganSCOBA"`;
+- `Model="KerriganSCOBA"`;
+- `Scale=0.75`;
+- no native attack, work, or ready animation events.
+
+Map init replaces the placed native Tosh and Kerrigan with these unit types at the same position and facing.
+Native `Tosh` and `QueenOfBlades` unit types and actors stay untouched.
+Do not add stop timers, periodic native stop messages, empty native tracks, or renamed native tokens.
+
+### Native lower body
+
+Non-aim lower animation is native Stand, Walk, and turn.
+The map must not select non-aim lower clips.
+Do not add displacement checks, hold timers, move-intent state, or custom lower playback outside aim.
+
+Native movement keeps the Walk clip during attack-chase orders.
+Attacking while stationary keeps the Stand clip advancing.
+
 ## 6. Attack While Aiming
 
 Aim attack animation is DEFERRED to a later stage.
-This stage must not add an attack overlay or attack STC.
+This stage must not add an aim attack overlay or attack STC.
+The non-aim attack overlay is suppressed while aim is active.
 The lower body must not depend on an aim attack feature.
 
 ## 7. States and Config
@@ -191,13 +289,16 @@ To add an aim lower state:
 5. Run the normal build validation.
 
 The lower states are none, idle, walk, and walk back.
+The upper states include none, aim down, aim mid, aim up, attack, and attack spell.
 The config tables are the only per-state and per-direction aim data.
 Tosh and Kerrigan use generated splitbody aim groups.
 Firebat uses its shipped model and baseline animation.
 
 Actor clip references use comma-separated props.
 Use existing animation names and the token validator.
-Do not invent custom sequence names.
+Generated upper-only clips use unique names `Attack Arm Alternate` and `Spell Arm Alternate`.
+Pitch groups use `Ready Alternate NN`.
+Clean actors have no native attack events.
 
 ## 8. Facing and Motion
 
@@ -234,18 +335,25 @@ Aim entry without a movement key issues Stop and restores the idle aim group.
 Normal action movement uses the RPG move-and-turn path.
 
 Baseline movement selects walk and restores idle.
+Walk selection uses movement keys, move orders, and actual displacement.
+Actual displacement keeps attack-chase orders on the Walk lower clip.
 Combat state is untouched.
+Non-aim attack changes only the upper animation layer.
 
 ## 9. Model Assets
 
 Use the existing generator for Tosh and Kerrigan.
 It reads source models, writes models into the built map, and updates model data.
+It keeps native Stand, Walk, Stand Left, Stand Right, and Stand Work groups intact.
+It adds upper-only `Attack Arm Alternate` and `Spell Arm Alternate` clips.
+Upper attack clips set `runsConcurrent=1` and priority 10 so they layer over native lower locomotion.
+Actor messages use the unique clip names.
+Token form uses commas only where needed. Do not use spaces in actor messages.
 It generates one shared upper pitch clip per hero.
 It generates lower-only groups for idle and eight movement directions,
 including reversed backpedal clips.
 Spine pitch bones, weights, axis, sign, and sample count are per-hero
 configuration values.
-It keeps full-body Stand, Walk, Stand Left, and Stand Right clips.
 
 Keep generated asset output out of hand edits.
 Keep generation deterministic, idempotent, and reversible.
@@ -277,6 +385,29 @@ Aim tests must prove:
 11. Camera pitch up and down changes upper clip time and the spine pose.
 12. Pitch reaches 80 degrees down and 60 degrees up.
 13. Pitch changes no lower frame and no model root rotation.
+
+Non-aim attack tests must prove:
+
+1. Tosh and Kerrigan attacks keep native lower frame IDs advancing.
+2. Attack-chase movement keeps the native Walk lower clip.
+3. Repeated attacks restart the upper attack clip.
+4. Kerrigan `RazorTalons` uses `Attack Arm Alternate` and `QueenOfBladesPsiBlast` uses `Spell Arm Alternate`.
+5. Actor logs show no duplicate actor for Tosh or Kerrigan.
+6. RPG and Action attacks use the same overlay.
+7. Aim never shows the non-aim attack overlay.
+8. Attack stops when the clip completes or the weapon stops.
+9. The map sends no non-aim lower animation on `SCOBALo`.
+10. The map never sends `SCOBAUp` or `SCOBALo` to an `AnimBracket*` message.
+
+Asset and actor tests must prove:
+
+1. Generated models keep Stand, Walk, Stand Left, Stand Right, and Stand Work groups and add `Attack Arm Alternate`/`Spell Arm Alternate`.
+2. Generated models add distinct upper-only Attack and Spell clips.
+3. Every configured clip name exists in the generated M3.
+4. `ToshSCOBAUnit` and `KerriganSCOBAUnit` use the clean unit names.
+5. Clean actors define no native attack events.
+6. `ToshSCOBA` and `KerriganSCOBA` unit types parent the native heroes.
+7. Runtime logs contain no invalid actor message for `SCOBAUp` or `SCOBALo`.
 
 ## 11. Change Rule
 

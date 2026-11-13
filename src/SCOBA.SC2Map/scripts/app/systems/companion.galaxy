@@ -15,7 +15,7 @@ bool gt_SummonCompanion_Func (bool testConds, bool runActions) {
     if ((PlayerRace(EventPlayer()) == "Terr")) {
         if ((TechTreeUnitCount(lv_localPlayer, "Predator", c_techCountQueuedOrBetter) == 0)) {
             libNtve_gf_UnitCreateFacingPoint(1, "Predator", 0, lv_localPlayer, UnitGetPosition(EventUnit()), UnitGetPosition(EventUnit()));
-            UnitIssueOrder(UnitLastCreated(), OrderTargetingUnit(AbilityCommand("move", 0), UnitFromId(622754155)), c_orderQueueReplace);
+            UnitIssueOrder(UnitLastCreated(), OrderTargetingUnit(AbilityCommand("move", 0), gv_tPSUNIT[lv_localPlayer]), c_orderQueueReplace);
         }
         else {
             UIDisplayMessage(PlayerGroupSingle(lv_localPlayer), c_messageAreaError, StringExternal("Param/Value/131984B8"));
@@ -24,7 +24,7 @@ bool gt_SummonCompanion_Func (bool testConds, bool runActions) {
     else {
         if ((TechTreeUnitCount(lv_localPlayer, "HunterKiller", c_techCountQueuedOrBetter) == 0)) {
             libNtve_gf_UnitCreateFacingPoint(1, "HunterKiller", 0, lv_localPlayer, UnitGetPosition(EventUnit()), UnitGetPosition(EventUnit()));
-            UnitIssueOrder(UnitLastCreated(), OrderTargetingUnit(AbilityCommand("move", 0), UnitFromId(622754155)), c_orderQueueReplace);
+            UnitIssueOrder(UnitLastCreated(), OrderTargetingUnit(AbilityCommand("move", 0), gv_tPSUNIT[lv_localPlayer]), c_orderQueueReplace);
         }
         else {
             UIDisplayMessage(PlayerGroupSingle(lv_localPlayer), c_messageAreaError, StringExternal("Param/Value/20269F38"));

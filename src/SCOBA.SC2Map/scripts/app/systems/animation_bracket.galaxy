@@ -7,10 +7,10 @@ int gf_AnimHeroProfile (unit lp_unit) {
         return c_ANIM_HERO_GENERIC;
     }
     lv_type = UnitGetType(lp_unit);
-    if (lv_type == "Tosh") {
+    if (lv_type == "Tosh" || lv_type == "ToshSCOBA") {
         return c_ANIM_HERO_TOSH;
     }
-    if (lv_type == "Kerrigan") {
+    if (lv_type == "Kerrigan" || lv_type == "KerriganSCOBA") {
         return c_ANIM_HERO_KERRIGAN;
     }
     if (lv_type == "Firebat") {
@@ -29,8 +29,10 @@ void gf_AnimUpperClear (int lp_player) {
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     gf_AnimEvent(lp_player, "upper_stop", "", 0);
     gf_ProbeEvent(lp_player, "upper_stop", "", 0);
-    ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
-    ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_UPPER);
+    if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE || gv_animAimUpperOn[lp_player]) {
+        ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
+        ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_UPPER);
+    }
     gv_animUpperState[lp_player] = c_ANIM_UPPER_NONE;
     gv_animUpperClipIndex[lp_player] = -1;
     gf_ProbeClearUpperClip(lp_player);
@@ -46,7 +48,9 @@ void gf_AnimLowerClear (int lp_player) {
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     gf_AnimEvent(lp_player, "lower_stop", "", 0);
     gf_ProbeEvent(lp_player, "lower_stop", "", 0);
-    ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_LOWER);
+    if (gv_animLowerState[lp_player] != c_ANIM_LOWER_NONE) {
+        ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_LOWER);
+    }
     gv_animLowerState[lp_player] = c_ANIM_LOWER_NONE;
     gv_animLowerClipIndex[lp_player] = -1;
     gf_ProbeClearLowerClip(lp_player);
@@ -98,6 +102,37 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
     if (!gv_aIMACTIVE[lp_player]) {
         gf_ProbeSetUpperClip(lp_player, lv_clip);
     }
+}
+void gf_AnimUpperAttackStart (int lp_player, int lp_state) {
+    unit lv_hero;
+    actor lv_actor;
+    int lv_profile;
+    int lv_flags;
+    string lv_clip;
+
+    if (lp_state == c_ANIM_UPPER_NONE) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    lv_clip = gv_animUpperClip[lv_profile][lp_state];
+    if (lv_clip == "") {
+        gf_AnimUpperClear(lp_player);
+        return;
+    }
+    lv_flags = c_animFlagFullMatch | c_animFlagNonLooping;
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    gv_animUpperStarts[lp_player] += 1;
+    gf_AnimEvent(lp_player, "upper_start", lv_clip, lv_flags);
+    gf_ProbeEvent(lp_player, "upper_start", lv_clip, lv_flags);
+    ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, lv_flags, 0.0, 0.0, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    gv_animUpperState[lp_player] = lp_state;
+    gv_animUpperClipIndex[lp_player] = lp_state;
+    gf_ProbeSetUpperClip(lp_player, lv_clip);
 }
 void gf_AnimLowerSet (int lp_player, int lp_state) {
     unit lv_hero;
@@ -162,7 +197,9 @@ void gf_AnimFullClear (int lp_player) {
         return;
     }
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
-    ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_LOWER);
+    if (gv_animFullState[lp_player] != c_ANIM_LOWER_NONE || gv_animFullDir[lp_player] != -1) {
+        ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_LOWER);
+    }
     gv_animFullState[lp_player] = c_ANIM_LOWER_NONE;
     gv_animFullDir[lp_player] = -1;
 }

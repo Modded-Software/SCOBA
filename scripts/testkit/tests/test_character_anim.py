@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from character_anim_assets import AIM_DIRECTIONS
+from character_anim_assets import AIM_DIRECTIONS, AIM_PITCH_SOURCE
+
+
+class AimPitchSourceTest(unittest.TestCase):
+    def test_pitch_source_is_upper_only(self) -> None:
+        self.assertEqual(AIM_PITCH_SOURCE, "Attack Arm Alternate")
 
 
 class AimDirectionsTest(unittest.TestCase):

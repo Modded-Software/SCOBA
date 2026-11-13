@@ -173,7 +173,7 @@ string gf_AnimAimPitchNum (int lp_value) {
     return IntToString(lp_value);
 }
 string gf_AnimAimPitchClip (int lp_step) {
-    return "Ready," + gf_AnimAimPitchNum(lp_step);
+    return "Ready,Alternate," + gf_AnimAimPitchNum(lp_step);
 }
 void gf_AnimAimPitchTick (int lp_player) {
     unit lv_hero;

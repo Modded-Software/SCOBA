@@ -25,6 +25,9 @@ bool gt_UnitSelection_Func (bool testConds, bool runActions) {
 
     UnitGroupLoopBegin(UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0));
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (gf_HeroIsParked(UnitGroupLoopCurrent())) {
+            continue;
+        }
         gf_EnableClickEventsUnit(UnitGroupLoopCurrent());
         UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
         UnitSetState(UnitGroupLoopCurrent(), c_unitStateSelectable, true);
@@ -47,6 +50,9 @@ bool gt_NewUnitSelection_Func (bool testConds, bool runActions) {
 
     UnitGroupLoopBegin(UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0));
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (gf_HeroIsParked(UnitGroupLoopCurrent())) {
+            continue;
+        }
         if (true) {
             gf_EnableClickEventsUnit(UnitGroupLoopCurrent());
             UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
@@ -67,10 +73,15 @@ unit gf_HeroUnit (int lp_player) {
     unit lv_hero;
 
     if (lp_player == 1) {
-        lv_hero = UnitFromId(622754155);
+        if (gv_heroSwitchReady && UnitIsValid(gv_heroActive)) {
+            lv_hero = gv_heroActive;
+        }
+        else {
+            lv_hero = gv_heroTosh;
+        }
     }
     else if (lp_player == 2) {
-        lv_hero = UnitFromId(649131550);
+        lv_hero = gv_heroKerrigan;
     }
     else {
         lv_hero = gv_tPSUNIT[lp_player];

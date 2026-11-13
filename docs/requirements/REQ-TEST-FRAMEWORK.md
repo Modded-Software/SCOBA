@@ -129,6 +129,8 @@ Implementation lives in
 | R-TF-69 | The aim profile MUST prove aim movement issues no per-key orders and writes no facing. |
 | R-TF-70 | The aim profile MUST prove facing and movement remain smooth while camera yaw rotates. |
 | R-TF-71 | The pitch profile MUST prove camera pitch changes `SCOBAUp` time and the spine pose using the `SCOBAUp` animation reference. |
+| R-TF-91 | The combat profile MUST prove non-aim attack keeps native lower frame IDs advancing and uses no non-aim `SCOBALo` animation. |
+| R-TF-92 | Build checks MUST prove clean `ToshSCOBA`/`KerriganSCOBA` units and actors exist, clean actors have no native attack events, and configured clip names exist in the generated M3. |
 | R-TF-72 | The pitch profile MUST prove pitch reaches the 60 degree up and 80 degree down camera limits. |
 | R-TF-73 | The pitch profile MUST prove pitch changes no lower-body frame and no model root rotation. |
 | R-TF-74 | The pitch profile MUST normalize wrapped camera pitch above 180 degrees before checking pitch time. |
@@ -227,3 +229,4 @@ Implementation lives in
 | AC-TF-20 | A direct wrapper call rebuilds fresh through `scripts/playtest.sh`. |
 | AC-TF-21 | Target clicks, hover rings, and Order button cases report pass or fail. |
 | AC-TF-22 | Hero selection persistence and order-unit selection cases report pass or fail. |
+| AC-TF-24 | Non-aim attack cases prove native lower frame IDs advance and clean actors define no native attack events. |
