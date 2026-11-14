@@ -1,0 +1,121 @@
+// Module: systems/ui_floaters
+// Shot outcome text on the UI layer near the crosshair (R-TPS-70 to 76).
+// It is not tied to a world point, so it shows when aiming at the sky.
+
+text gf_UiFloaterText (int lp_kind) {
+    if (lp_kind == c_TPS_SHOT_OUT_OF_RANGE) {
+        return StringToText(c_SCOBA_OUT_OF_RANGE_TEXT);
+    }
+    if (lp_kind == c_TPS_SHOT_FRIENDLY) {
+        return StringToText(c_SCOBA_FRIENDLY_FIRE_TEXT);
+    }
+    return StringToText(c_SCOBA_MISS_TEXT);
+}
+
+// Gray, or yellow for friendly fire (R-TPS-76).
+color gf_UiFloaterColor (int lp_kind) {
+    if (lp_kind == c_TPS_SHOT_FRIENDLY) {
+        return Color(100.0, 90.0, 10.0);
+    }
+    return Color(70.0, 70.0, 70.0);
+}
+
+// The free slot, or the oldest one when all are shown.
+int gf_UiFloaterSlot (int lp_player) {
+    int lv_slot;
+    int lv_oldest;
+
+    lv_oldest = 0;
+    for (lv_slot = 0; lv_slot < c_UI_FLOATER_POOL; lv_slot += 1) {
+        if (!gv_uiFloaterOn[lp_player][lv_slot]) {
+            return lv_slot;
+        }
+        if (gv_uiFloaterAt[lp_player][lv_slot] < gv_uiFloaterAt[lp_player][lv_oldest]) {
+            lv_oldest = lv_slot;
+        }
+    }
+    return lv_oldest;
+}
+
+// One executed shot shows one text. A hit shows none: its damage floats at
+// the enemy.
+void gf_UiFloaterShow (int lp_player, int lp_kind) {
+    playergroup lv_group;
+    int lv_slot;
+    int lv_label;
+
+    if (lp_kind != c_TPS_SHOT_OUT_OF_RANGE && lp_kind != c_TPS_SHOT_MISS && lp_kind != c_TPS_SHOT_FRIENDLY) {
+        return;
+    }
+    gv_tpsFloaterCount[lp_kind] += 1;
+    lv_group = PlayerGroupSingle(lp_player);
+    if (gv_uiFloaterDialog[lp_player] == c_invalidDialogId) {
+        // The dialog's lower edge is c_UI_FLOATER_CLEAR above the crosshair.
+        DialogCreate(c_UI_FLOATER_WIDTH + (2 * c_UI_FLOATER_JITTER_X), c_UI_FLOATER_DIALOG_HEIGHT, c_anchorCenter, 0, 0 - c_UI_FLOATER_CLEAR - (c_UI_FLOATER_DIALOG_HEIGHT / 2), false);
+        gv_uiFloaterDialog[lp_player] = DialogLastCreated();
+        DialogSetImageVisible(gv_uiFloaterDialog[lp_player], false);
+        DialogSetVisible(gv_uiFloaterDialog[lp_player], lv_group, true);
+    }
+    lv_slot = gf_UiFloaterSlot(lp_player);
+    if (gv_uiFloaterLabel[lp_player][lv_slot] == c_invalidDialogControlId) {
+        libNtve_gf_CreateDialogItemLabel(gv_uiFloaterDialog[lp_player], c_UI_FLOATER_WIDTH, c_UI_FLOATER_LABEL_HEIGHT, c_anchorBottom, 0, 0, gf_UiFloaterText(lp_kind), gf_UiFloaterColor(lp_kind), false, 2.0);
+        gv_uiFloaterLabel[lp_player][lv_slot] = DialogControlLastCreated();
+        libNtve_gf_SetDialogItemStyle(gv_uiFloaterLabel[lp_player][lv_slot], c_UI_FLOATER_STYLE, lv_group);
+    }
+    lv_label = gv_uiFloaterLabel[lp_player][lv_slot];
+    libNtve_gf_SetDialogItemText(lv_label, gf_UiFloaterText(lp_kind), lv_group);
+    libNtve_gf_SetDialogItemColor(lv_label, gf_UiFloaterColor(lp_kind), lv_group);
+    gv_uiFloaterX[lp_player][lv_slot] = RandomInt(0 - c_UI_FLOATER_JITTER_X, c_UI_FLOATER_JITTER_X);
+    gv_uiFloaterY[lp_player][lv_slot] = RandomInt(0, c_UI_FLOATER_JITTER_Y);
+    DialogControlSetPosition(lv_label, lv_group, c_anchorBottom, gv_uiFloaterX[lp_player][lv_slot], gv_uiFloaterY[lp_player][lv_slot]);
+    DialogControlFadeTransparency(lv_label, lv_group, 0.0, 0.0);
+    DialogControlSetVisible(lv_label, lv_group, true);
+    DialogControlFadeTransparency(lv_label, lv_group, c_UI_FLOATER_DURATION, 100.0);
+    gv_uiFloaterOn[lp_player][lv_slot] = true;
+    gv_uiFloaterAt[lp_player][lv_slot] = GameGetMissionTime();
+}
+
+void gf_UiFloaterHide (int lp_player) {
+    int lv_slot;
+
+    for (lv_slot = 0; lv_slot < c_UI_FLOATER_POOL; lv_slot += 1) {
+        if (gv_uiFloaterOn[lp_player][lv_slot]) {
+            DialogControlSetVisible(gv_uiFloaterLabel[lp_player][lv_slot], PlayerGroupSingle(lp_player), false);
+            gv_uiFloaterOn[lp_player][lv_slot] = false;
+        }
+    }
+}
+
+// Moves the shown texts up and hides them at the end.
+bool gt_UiFloaterTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+    int lv_slot;
+    fixed lv_age;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (!gf_IsHeroPlayer(lv_player)) {
+            continue;
+        }
+        for (lv_slot = 0; lv_slot < c_UI_FLOATER_POOL; lv_slot += 1) {
+            if (!gv_uiFloaterOn[lv_player][lv_slot]) {
+                continue;
+            }
+            lv_age = GameGetMissionTime() - gv_uiFloaterAt[lv_player][lv_slot];
+            if (lv_age >= c_UI_FLOATER_DURATION) {
+                DialogControlSetVisible(gv_uiFloaterLabel[lv_player][lv_slot], PlayerGroupSingle(lv_player), false);
+                gv_uiFloaterOn[lv_player][lv_slot] = false;
+                continue;
+            }
+            DialogControlSetPosition(gv_uiFloaterLabel[lv_player][lv_slot], PlayerGroupSingle(lv_player), c_anchorBottom, gv_uiFloaterX[lv_player][lv_slot], gv_uiFloaterY[lv_player][lv_slot] + FixedToInt((lv_age / c_UI_FLOATER_DURATION) * c_UI_FLOATER_RISE));
+        }
+    }
+    return true;
+}
+
+void gt_UiFloaterTick_Init () {
+    gt_UiFloaterTick = TriggerCreate("gt_UiFloaterTick_Func");
+    TriggerAddEventTimePeriodic(gt_UiFloaterTick, 0.03, c_timeGame);
+}

@@ -12,24 +12,25 @@ SYSTEMS = Path("scripts") / "app" / "systems"
 ATTACK_COOLDOWN_LINK = "SCOBA/Attack"
 STATUS_ABILITY = "SCOBAAutoAttackStatus"
 HERO_WEAPONS = ("Tosh", "RazorTalons", "QueenOfBladesPsiBlast")
+FRIENDLY_FIRE_BEHAVIOR = "SCOBAFriendlyFireBlock"
 
-# Aim-shot ability -> (effect, cooldown TimeUse).
-AIM_SHOT_ABILITIES = {
-    "SCOBAAimShotTosh": ("ToshU", 1.0),
-    "SCOBAAimShotToshPoint": ("SCOBAToshShotPoint", 1.0),
-    "SCOBAAimShotTalons": ("SCOBATalonsShot", 1.5),
-    "SCOBAAimShotPsiBlast": ("PsiBlastLaunchMissile", 1.0),
-    "SCOBAAimShotPsiBlastPoint": ("SCOBAPsiBlastLaunchPoint", 1.0),
-}
+HERO_UNITS = ("ToshSCOBA", "KerriganSCOBA")
 
-AIM_SHOT_UNITS = {
-    "ToshSCOBA": ("SCOBAAimShotTosh", "SCOBAAimShotToshPoint"),
-    "KerriganSCOBA": ("SCOBAAimShotTalons", "SCOBAAimShotPsiBlast", "SCOBAAimShotPsiBlastPoint"),
-}
+# The Tosh shot that ends in the air (R-TPS-62).
+AIR_EFFECT = "SCOBAToshAirU"
+AIR_SHOT = "SCOBAToshAirShot"
+AIR_ACTOR = "SCOBAToshAirAttack"
 
-AIM_SHOT_EFFECTS = ("SCOBAToshShotPoint", "SCOBATalonsShot", "SCOBAPsiBlastLaunchPoint")
-
-AIM_SHOT_ACTORS = ("SCOBAToshPointAttack", "SCOBAPsiBlastPointAttack")
+# The aim shot runs the hero weapon's effect (R-TPS-1, R-TPS-3). The aim-shot
+# abilities, their effects, and their actors are gone and must stay gone.
+REMOVED_AIM_SHOT_IDS = (
+    "SCOBAAimShot",
+    "SCOBAToshShotPoint",
+    "SCOBATalonsShot",
+    "SCOBAPsiBlastLaunchPoint",
+    "SCOBAToshPointAttack",
+    "SCOBAPsiBlastPointAttack",
+)
 
 REMOVED_SHOOTER_NAMES = (
     "SCOBAAimShooter",
@@ -84,19 +85,6 @@ def check_aim_shot_data(map_dir: Path) -> None:
         fail(f"{STATUS_ABILITY} cooldown must be its own ability cooldown")
     if button.get("TimeUse") != "1":
         fail(f"{STATUS_ABILITY} cooldown TimeUse must be 1")
-    for ability_id, (effect_id, period) in AIM_SHOT_ABILITIES.items():
-        ability = abilities.get(ability_id)
-        if ability is None:
-            fail(f"missing aim-shot ability: {ability_id}")
-        effect = ability.find("Effect")
-        if effect is None or effect.get("value") != effect_id:
-            fail(f"{ability_id} effect must be {effect_id}")
-        transient = ability.find("Flags[@index='Transient']")
-        if transient is None or transient.get("value") != "1":
-            fail(f"{ability_id} must be Transient")
-        cooldown = check_link(ability.find("Cost/Cooldown"), ability_id)
-        if float(cooldown.get("TimeUse", "0")) != period:
-            fail(f"{ability_id} cooldown TimeUse must be {period}")
 
     weapons = {
         weapon.get("id"): weapon
@@ -108,24 +96,39 @@ def check_aim_shot_data(map_dir: Path) -> None:
             fail(f"missing weapon override: {weapon_id}")
         check_link(weapon.find("Cost/Cooldown"), weapon_id)
 
-    units = {unit.get("id"): unit for unit in ET.parse(gamedata / "UnitData.xml").getroot().iter("CUnit")}
-    for unit_id, wanted in AIM_SHOT_UNITS.items():
-        unit = units.get(unit_id)
-        if unit is None:
-            fail(f"missing unit: {unit_id}")
-        links = [element.get("Link") for element in unit.findall("AbilArray")]
-        for ability_id in wanted:
-            if ability_id not in links:
-                fail(f"{unit_id} missing AbilArray link: {ability_id}")
+    for name in ("AbilData.xml", "EffectData.xml", "ActorData.xml", "UnitData.xml"):
+        text = read(gamedata / name)
+        for removed in REMOVED_AIM_SHOT_IDS:
+            if removed in text:
+                fail(f"{name} still has the removed aim-shot data: {removed}")
+    check_air_shot_data(gamedata)
 
-    effect_text = read(gamedata / "EffectData.xml")
-    for effect_id in AIM_SHOT_EFFECTS:
-        if f'id="{effect_id}"' not in effect_text:
-            fail(f"missing aim-shot effect: {effect_id}")
-    actor_text = read(gamedata / "ActorData.xml")
-    for actor_id in AIM_SHOT_ACTORS:
-        if f'id="{actor_id}"' not in actor_text:
-            fail(f"missing aim-shot actor: {actor_id}")
+
+def check_air_shot_data(gamedata: Path) -> None:
+    """A shot that ends in the air launches like the weapon and has no hit."""
+    effects = ET.parse(gamedata / "EffectData.xml").getroot()
+    air = effects.find(f"CEffectDamage[@id='{AIR_EFFECT}']")
+    if air is None or air.get("parent") != "ToshU":
+        fail(f"{AIR_EFFECT} must be a CEffectDamage child of ToshU")
+    amount = air.find("Amount")
+    if amount is None or amount.get("value") != "0":
+        fail(f"{AIR_EFFECT} must deal no damage")
+    shot = effects.find(f"CEffectSet[@id='{AIR_SHOT}']")
+    if shot is None:
+        fail(f"missing effect set: {AIR_SHOT}")
+    parts = [element.get("value") for element in shot.findall("EffectArray")]
+    if parts != [AIR_EFFECT, "SCOBAAttackCooldown10"]:
+        fail(f"{AIR_SHOT} must run {AIR_EFFECT} and the Tosh button clock, got {parts}")
+    actors = ET.parse(gamedata / "ActorData.xml").getroot()
+    actor = actors.find(f"CActorAction[@id='{AIR_ACTOR}']")
+    if actor is None or actor.get("parent") != "GenericAttack" or actor.get("effectAttack") != AIR_EFFECT:
+        fail(f"{AIR_ACTOR} must be a GenericAttack on {AIR_EFFECT}")
+    launch = actor.find("LaunchAssets")
+    if launch is None or launch.get("Model") != "ToshAttackLaunch" or launch.get("Sound") != "Tosh_AttackLaunch":
+        fail(f"{AIR_ACTOR} must launch with the Tosh attack model and sound")
+    impact = actor.find("ImpactMap[@index='None']")
+    if impact is None or impact.get("Model") != "" or impact.get("Sound") != "":
+        fail(f"{AIR_ACTOR} must have no impact model and no impact sound")
 
 
 def check_aim_shot_script(map_dir: Path, combined: str) -> None:
@@ -133,24 +136,55 @@ def check_aim_shot_script(map_dir: Path, combined: str) -> None:
     handler_text = read(map_dir / SYSTEMS / "combat_cooldown.galaxy")
     unit_text = read(map_dir / GAMEDATA / "UnitData.xml")
     actor_text = read(map_dir / GAMEDATA / "ActorData.xml")
-    for name in REMOVED_SHOOTER_NAMES:
+    for name in REMOVED_SHOOTER_NAMES + REMOVED_AIM_SHOT_IDS:
         if name in combined or name in unit_text or name in actor_text:
             fail(f"removed shooter design name still present: {name}")
     if (map_dir / SYSTEMS / "aim_shooter.galaxy").exists():
         fail("aim_shooter.galaxy must not exist")
-    if "gf_AimShotFireUnit" not in aim_text or "gf_AimShotFirePoint" not in aim_text:
-        fail("scripts missing aim shot order functions")
-    if 'AbilityCommand("attack"' in aim_text:
-        fail("aim shots must not issue attack orders")
+    # The aim shot runs the weapon's effect once and holds no order, so it
+    # cannot stop a walking hero (R-TPS-61).
+    # Product scripts only: a test map also carries its harness.
+    app_text = "\n".join(read(path) for path in sorted((map_dir / "scripts" / "app").rglob("*.galaxy")))
+    if app_text.count("UnitCreateEffectUnit(") != 1 or "UnitCreateEffectUnit(lv_hero, lv_effect, lv_target);" not in aim_text:
+        fail("the aim shot must run the weapon effect once, in aim_shooting.galaxy")
+    if "UnitIssueOrder(" in aim_text or "gf_AttackOrder(" in aim_text:
+        fail("aim shooting must not issue an order")
+    if 'CatalogFieldValueGet(c_gameCatalogWeapon, lp_weapon, "Effect", lp_player)' not in aim_text:
+        fail("the aim shot effect must be read from the weapon data")
+    if app_text.count("UnitAddCooldown(") != 1 or '"Cost.Cooldown.TimeUse"' not in aim_text:
+        fail("the aim shot must start the attack cooldown once, with the weapon's own cooldown time")
+    if "c_TPS_PROXY_AIR_HEIGHT" not in aim_text or "c_SCOBA_SHOT_TOSH_AIR" not in aim_text:
+        fail("a shot at the proxy in the air must run the air effect")
+    for name in ("strafe.galaxy", "combat_fsm.galaxy"):
+        if "gv_tpsShotKind" in read(map_dir / SYSTEMS / name):
+            fail(f"{name} must not hold the hero for a pending aim shot")
+    if "gv_controlCameraLock[lp_player] = gf_TpsActive(lp_player) && gv_mOUSEMIDDLE[lp_player];" not in combined:
+        fail("a TPS middle hold must lock the engine camera input")
+    if app_text.count("CameraLockInput(") != 1:
+        fail("the engine camera input lock must be set in one place")
     if "gf_AnimAttackStart" in aim_text or "gf_AnimAimAttackStart" in aim_text:
         fail("an aim press must not start the attack animation")
-    if aim_text.count("UnitIssueOrder(") != 2:
-        fail("aim shooting must issue exactly one unit order and one point order")
-    if "if (gf_AimShotFirePoint(lp_player, lv_point))" not in aim_text:
-        fail("Miss floater must depend on the accepted point order")
+    if "gf_UnitTargetSet" in aim_text:
+        fail("an aim click must not set the UI target")
+    # Shot text comes from the fired weapon effect, never from the press.
+    if combined.count("gf_UiFloaterShow(lp_player, lv_kind);") != 1 or "gf_TpsShotFired(lv_player" not in handler_text:
+        fail("shot text must be created once, from the weapon effect event")
+    behaviors = ET.parse(map_dir / GAMEDATA / "BehaviorData.xml").getroot()
+    response = behaviors.find(f"CBehaviorBuff[@id='{FRIENDLY_FIRE_BEHAVIOR}']/DamageResponse")
+    if response is None:
+        fail(f"missing {FRIENDLY_FIRE_BEHAVIOR} damage response")
+    wanted = {"Chance": "1", "Location": "Attacker", "ModifyFraction": "0", "TargetFilters": "-;Neutral,Enemy"}
+    for key, value in wanted.items():
+        if response.get(key) != value:
+            fail(f"{FRIENDLY_FIRE_BEHAVIOR} DamageResponse {key} must be {value}")
+    units = {unit.get("id"): unit for unit in ET.fromstring(unit_text).iter("CUnit")}
+    for unit_id in HERO_UNITS:
+        links = [element.get("Link") for element in units[unit_id].findall("BehaviorArray")]
+        if FRIENDLY_FIRE_BEHAVIOR not in links:
+            fail(f"{unit_id} missing BehaviorArray link: {FRIENDLY_FIRE_BEHAVIOR}")
     if "gt_CombatAttackEffect_Func" not in handler_text or "gf_AnimAttackStart" not in handler_text:
         fail("effect handler must start the attack animation")
     if "EventPlayerEffectUsedUnit(c_effectUnitCaster)" not in handler_text:
         fail("effect handler must read the effect caster")
-    if combined.count("TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect") != 6:
-        fail("effect handler must register the six weapon effects")
+    if combined.count("TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect") != 4:
+        fail("effect handler must register the three hero weapon effects and the air shot")

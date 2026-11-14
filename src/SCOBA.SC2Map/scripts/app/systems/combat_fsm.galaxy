@@ -31,11 +31,22 @@ void gf_CombatSetRoot (int lp_player, bool lp_root) {
 }
 
 void gf_CombatSyncRoot (int lp_player) {
-    if (gv_sCOBAOrderMode[lp_player] || gv_aIMACTIVE[lp_player] || gf_MovementKeyHeld(lp_player)) {
+    if (gv_sCOBAOrderMode[lp_player] || gf_MovementKeyHeld(lp_player)) {
+        gf_CombatSetRoot(lp_player, false);
+        return;
+    }
+    if (gv_aIMACTIVE[lp_player]) {
         gf_CombatSetRoot(lp_player, false);
         return;
     }
     gf_CombatSetRoot(lp_player, gf_CombatStandOn(lp_player));
+}
+
+// One attack order on a unit. lp_single ends it after one shot.
+// It does not touch the UI target.
+bool gf_AttackOrder (int lp_player, unit lp_unit, bool lp_single) {
+    gv_pncSingleShot[lp_player] = lp_single;
+    return UnitIssueOrder(gv_tPSUNIT[lp_player], OrderTargetingUnit(AbilityCommand("attack", 0), lp_unit), c_orderQueueReplace);
 }
 
 void gf_PncAttack (int lp_player, unit lp_unit) {
@@ -48,11 +59,10 @@ void gf_PncAttack (int lp_player, unit lp_unit) {
     gf_UnitTargetSet(lp_player, lp_unit);
     gf_CombatSyncRoot(lp_player);
     if (gf_CombatStandOn(lp_player) && !UnitInRangeAndAbleToAttackTarget(lv_hero, lp_unit)) {
-        gf_FloaterCreate(lp_player, UnitGetPosition(lp_unit), StringToText(c_SCOBA_OUT_OF_RANGE_TEXT), Color(70.0, 70.0, 70.0));
+        gf_FloaterCreate(lp_player, UnitGetPosition(lp_unit), StringToText(c_SCOBA_OUT_OF_RANGE_TEXT), Color(70.0, 70.0, 70.0), c_FLOATER_SIZE_BASE);
         return;
     }
-    gv_pncSingleShot[lp_player] = !gf_CombatAutoOn(lp_player);
-    UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lp_unit), c_orderQueueReplace);
+    gf_AttackOrder(lp_player, lp_unit, !gf_CombatAutoOn(lp_player));
 }
 
 // Ends the current attack with the stock hold-fire pattern: the attack

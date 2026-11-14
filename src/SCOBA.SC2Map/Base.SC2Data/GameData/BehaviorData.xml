@@ -578,7 +578,7 @@
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
     </CBehaviorBuff>
-    <CBehaviorBuff id="SCOBAActionModeBehavior">
+    <CBehaviorBuff id="SCOBATPSBehavior">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
@@ -604,12 +604,12 @@
             <ModifyFlags index="SuppressTurning" value="1"/>
         </Modification>
     </CBehaviorBuff>
-    <CBehaviorBuff id="SCOBAAimNoAttack">
+    <!-- TPS friendly fire: on the hero. Its damage to own and allied units is
+         zero. Same form as stock ImmuneToFriendlySplash and InfightLowDamage. -->
+    <CBehaviorBuff id="SCOBAFriendlyFireBlock">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification>
-            <StateFlags index="SuppressAttack" value="1"/>
-        </Modification>
+        <DamageResponse Chance="1" Location="Attacker" ModifyFraction="0" TargetFilters="-;Neutral,Enemy"/>
     </CBehaviorBuff>
 </Catalog>

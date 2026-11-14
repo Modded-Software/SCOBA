@@ -64,8 +64,8 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", true);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAActionModeToggle", true);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAActionModeToggle", true);
+            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBATPSToggle", true);
+            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBATPSToggle", true);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", false);
@@ -170,7 +170,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             // Defaults: Attack single, Chase stand. Set through the toggle commands.
             gf_AttackSingleSet(gv_tPSUNIT[lv_localPlayer], true);
             gf_ChaseStandSet(gv_tPSUNIT[lv_localPlayer], true);
-            gf_ActionModeEnsureRPG(lv_localPlayer);
+            gf_PncEnsure(lv_localPlayer);
         }
     }
     return true;

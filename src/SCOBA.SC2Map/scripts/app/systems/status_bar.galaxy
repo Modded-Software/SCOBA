@@ -1,29 +1,29 @@
 // Module: systems/status_bar
 
-void gf_ActionStatusHover (int lp_player, unit lp_unit) {
+void gf_TpsStatusHover (int lp_player, unit lp_unit) {
     unit lv_old;
 
     if (lp_player < c_SCOBA_HERO_FIRST || lp_player > c_SCOBA_HERO_LAST) {
         return;
     }
-    lv_old = gv_actionStatusUnit[lp_player];
+    lv_old = gv_tpsStatusUnit[lp_player];
     if (lv_old == lp_unit) {
         return;
     }
-    if (UnitIsValid(lv_old) && (gf_ActionModeActive(lp_player) || lv_old != gv_unitHighlight[lp_player])) {
+    if (UnitIsValid(lv_old) && (gf_TpsActive(lp_player) || lv_old != gv_unitHighlight[lp_player])) {
         UnitStatusBarOverride(lv_old, -1);
     }
-    gv_actionStatusUnit[lp_player] = lp_unit;
+    gv_tpsStatusUnit[lp_player] = lp_unit;
     if (UnitIsValid(lp_unit)) {
         UnitStatusBarOverride(lp_unit, c_unitStatusGroupAll);
     }
 }
 
-bool gf_ActionStatusIs (int lp_player, unit lp_unit) {
+bool gf_TpsStatusIs (int lp_player, unit lp_unit) {
     if (!UnitIsValid(lp_unit)) {
         return false;
     }
-    return gv_actionStatusUnit[lp_player] == lp_unit;
+    return gv_tpsStatusUnit[lp_player] == lp_unit;
 }
 
 void gf_UnitHighlightOn (int lp_player, bool testConds, bool runActions) {
@@ -38,7 +38,7 @@ void gf_UnitHighlightOff (int lp_player, bool testConds, bool runActions) {
     if (!runActions) {
         return;
     }
-    if (!(gf_ActionModeActive(lp_player) && gf_ActionStatusIs(lp_player, EventUnit()))) {
+    if (!(gf_TpsActive(lp_player) && gf_TpsStatusIs(lp_player, EventUnit()))) {
         UnitStatusBarOverride(EventUnit(), -1);
     }
     if (gv_unitHighlight[lp_player] == EventUnit()) {

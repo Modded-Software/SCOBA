@@ -10,22 +10,33 @@ bool gf_AimTargetInRange (int lp_player, unit lp_unit) {
     return UnitInRangeAndAbleToAttackTarget(lv_hero, lp_unit);
 }
 
-fixed gf_AimWeaponRange (int lp_player) {
+// The first enabled weapon of the hero, or 0.
+int gf_AimWeaponIndex (int lp_player) {
     unit lv_hero;
     int lv_index;
     int lv_count;
 
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
-        return 0.0;
+        return 0;
     }
     lv_count = UnitWeaponCount(lv_hero);
     for (lv_index = 1; lv_index <= lv_count; lv_index += 1) {
         if (UnitWeaponIsEnabled(lv_hero, lv_index)) {
-            return UnitWeaponRange(lv_hero, lv_index);
+            return lv_index;
         }
     }
-    return 0.0;
+    return 0;
+}
+
+fixed gf_AimWeaponRange (int lp_player) {
+    int lv_index;
+
+    lv_index = gf_AimWeaponIndex(lp_player);
+    if (lv_index <= 0) {
+        return 0.0;
+    }
+    return UnitWeaponRange(gv_tPSUNIT[lp_player], lv_index);
 }
 
 point gf_AimCrosshairPoint (int lp_player) {
@@ -153,209 +164,166 @@ unit gf_AimTargetAtCrosshair (int lp_player) {
     return gf_AimUnitAtCrosshair(lp_player, true);
 }
 
-void gf_AimNoAttackApply (int lp_player, bool lp_on) {
+// The shot proxy: one neutral unit per player. It stands on the aim ray,
+// inside weapon range, at the ray's height (R-TPS-53, 54, 59). The stock
+// unit is unselectable, uncommandable, and immune to damage.
+unit gf_TpsProxyPlace (int lp_player) {
     unit lv_hero;
-    int lv_count;
-
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return;
-    }
-    lv_count = UnitBehaviorCount(lv_hero, c_SCOBA_AIM_NO_ATTACK_BEHAVIOR);
-    if (lp_on) {
-        if (lv_count <= 0) {
-            UnitBehaviorAdd(lv_hero, c_SCOBA_AIM_NO_ATTACK_BEHAVIOR, lv_hero, 1);
-        }
-    }
-    else if (lv_count > 0) {
-        UnitBehaviorRemove(lv_hero, c_SCOBA_AIM_NO_ATTACK_BEHAVIOR, lv_count);
-    }
-}
-
-bool gf_AimTalonsInRange (unit lp_hero, unit lp_target) {
-    int lv_index;
-    int lv_count;
-    fixed lv_gap;
-
-    if (!UnitFilterMatch(lp_target, UnitGetOwner(lp_hero), UnitFilter((1 << c_targetFilterGround), 0, 0, 0))) {
-        return false;
-    }
-    lv_gap = DistanceBetweenPoints(UnitGetPosition(lp_hero), UnitGetPosition(lp_target));
-    lv_gap = lv_gap - UnitGetPropertyFixed(lp_hero, c_unitPropRadius, c_unitPropNormal);
-    lv_gap = lv_gap - UnitGetPropertyFixed(lp_target, c_unitPropRadius, c_unitPropNormal);
-    lv_count = UnitWeaponCount(lp_hero);
-    for (lv_index = 1; lv_index <= lv_count; lv_index += 1) {
-        if (UnitWeaponGet(lp_hero, lv_index) == c_SCOBA_WEAPON_TALONS) {
-            return lv_gap <= UnitWeaponRange(lp_hero, lv_index);
-        }
-    }
-    return false;
-}
-
-string gf_AimShotAbilUnit (int lp_player, unit lp_target) {
-    unit lv_hero;
-    int lv_profile;
-
-    lv_hero = gv_tPSUNIT[lp_player];
-    lv_profile = gf_AnimHeroProfile(lv_hero);
-    if (lv_profile == c_ANIM_HERO_TOSH) {
-        return c_SCOBA_AIM_SHOT_TOSH;
-    }
-    if (lv_profile == c_ANIM_HERO_KERRIGAN) {
-        if (gf_AimTalonsInRange(lv_hero, lp_target)) {
-            return c_SCOBA_AIM_SHOT_TALONS;
-        }
-        return c_SCOBA_AIM_SHOT_PSIBLAST;
-    }
-    return "";
-}
-
-string gf_AimShotAbilPoint (int lp_player) {
-    int lv_profile;
-
-    lv_profile = gf_AnimHeroProfile(gv_tPSUNIT[lp_player]);
-    if (lv_profile == c_ANIM_HERO_TOSH) {
-        return c_SCOBA_AIM_SHOT_TOSH_POINT;
-    }
-    if (lv_profile == c_ANIM_HERO_KERRIGAN) {
-        return c_SCOBA_AIM_SHOT_PSIBLAST_POINT;
-    }
-    return "";
-}
-
-point gf_AimShotOrderPoint (int lp_player, point lp_crosshair) {
-    point lv_origin;
-    fixed lv_dx;
-    fixed lv_dy;
-    fixed lv_dist;
+    int lv_weapon;
+    point lv_from;
+    point lv_aim;
+    point lv_at;
+    fixed lv_min;
     fixed lv_max;
-
-    lv_origin = UnitGetPosition(gv_tPSUNIT[lp_player]);
-    lv_max = gf_AimWeaponRange(lp_player) - c_SCOBA_AIM_POINT_RANGE_MARGIN;
-    if (lv_max < c_SCOBA_AIM_POINT_MIN_RANGE) {
-        lv_max = c_SCOBA_AIM_POINT_MIN_RANGE;
-    }
-    lv_dx = PointGetX(lp_crosshair) - PointGetX(lv_origin);
-    lv_dy = PointGetY(lp_crosshair) - PointGetY(lv_origin);
-    lv_dist = SquareRoot((lv_dx * lv_dx) + (lv_dy * lv_dy));
-    if (lv_dist < c_SCOBA_AIM_POINT_MIN_RANGE) {
-        lv_dx = Cos(CameraGetYaw(lp_player)) * c_SCOBA_AIM_POINT_MIN_RANGE;
-        lv_dy = Sin(CameraGetYaw(lp_player)) * c_SCOBA_AIM_POINT_MIN_RANGE;
-    }
-    else if (lv_dist > lv_max) {
-        lv_dx = (lv_dx / lv_dist) * lv_max;
-        lv_dy = (lv_dy / lv_dist) * lv_max;
-    }
-    return Point(PointGetX(lv_origin) + lv_dx, PointGetY(lv_origin) + lv_dy);
-}
-
-void gf_AimMissFloater (int lp_player, point lp_crosshair) {
-    fixed lv_x;
-    fixed lv_y;
-    fixed lv_z;
-
-    lv_x = PointGetX(lp_crosshair) + RandomFixed(-c_SCOBA_MISS_RADIUS, c_SCOBA_MISS_RADIUS);
-    lv_y = PointGetY(lp_crosshair) + RandomFixed(-c_SCOBA_MISS_RADIUS, c_SCOBA_MISS_RADIUS);
-    lv_z = PointGetHeight(lp_crosshair) + c_SCOBA_MISS_HEIGHT;
-    gf_FloaterCreate(lp_player, libNtve_gf_PointFromXYZ(lv_x, lv_y, lv_z), StringToText(c_SCOBA_MISS_TEXT), Color(70.0, 70.0, 70.0));
-}
-
-// Diagnostic trace. Writes the last aim shot to the SCOBA bank, section AimShot.
-void gf_AimShotTrace (int lp_player, string lp_kind, string lp_abil, order lp_order, bool lp_issued) {
-    bank lv_bank;
-    unit lv_hero;
-    abilcmd lv_cmd;
+    fixed lv_dist;
+    fixed lv_shot;
+    fixed lv_angle;
+    fixed lv_eye;
+    fixed lv_height;
 
     lv_hero = gv_tPSUNIT[lp_player];
-    lv_cmd = AbilityCommand(lp_abil, 0);
-    lv_bank = BankLoad("SCOBA", 1);
-    BankSectionCreate(lv_bank, "AimShot");
-    BankValueSetFromString(lv_bank, "AimShot", lp_kind + "Abil", lp_abil);
-    BankValueSetFromString(lv_bank, "AimShot", lp_kind + "HeroType", UnitGetType(lv_hero));
-    BankValueSetFromFlag(lv_bank, "AimShot", lp_kind + "Issued", lp_issued);
-    BankValueSetFromFlag(lv_bank, "AimShot", lp_kind + "OrderValid", UnitOrderIsValid(lv_hero, lp_order));
-    BankValueSetFromFlag(lv_bank, "AimShot", lp_kind + "AbilExists", UnitAbilityExists(lv_hero, lp_abil));
-    BankValueSetFromFlag(lv_bank, "AimShot", lp_kind + "AbilEnabled", UnitAbilityCheck(lv_hero, lp_abil, true));
-    BankValueSetFromFlag(lv_bank, "AimShot", lp_kind + "CmdDisabled", UnitCheckAbilCmdState(lv_hero, lv_cmd, c_cmdStateDisabled));
-    BankValueSetFromFlag(lv_bank, "AimShot", lp_kind + "CmdCooldown", UnitCheckAbilCmdState(lv_hero, lv_cmd, c_cmdStateCooldown));
-    BankValueSetFromFlag(lv_bank, "AimShot", lp_kind + "CmdHidden", UnitCheckAbilCmdState(lv_hero, lv_cmd, c_cmdStateHidden));
-    BankValueSetFromFixed(lv_bank, "AimShot", lp_kind + "Cooldown", UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN));
-    BankValueSetFromFixed(lv_bank, "AimShot", lp_kind + "WeaponRange", gf_AimWeaponRange(lp_player));
-    BankValueSetFromInt(lv_bank, "AimShot", lp_kind + "Shots", gv_aimShots[lp_player]);
-    BankValueSetFromInt(lv_bank, "AimShot", "Presses", gv_aimShotPresses);
-    BankValueSetFromInt(lv_bank, "AimShot", "EffectEvents", gv_aimShotEffectEvents);
-    BankValueSetFromInt(lv_bank, "AimShot", lp_kind + "OutOfRange", gv_aimOutOfRange[lp_player]);
-    BankSave(lv_bank);
-}
-
-bool gf_AimShotFireUnit (int lp_player, unit lp_target) {
-    string lv_abil;
-    order lv_order;
-    bool lv_issued;
-
-    lv_abil = gf_AimShotAbilUnit(lp_player, lp_target);
-    if (lv_abil == "") {
-        return false;
+    lv_weapon = gf_AimWeaponIndex(lp_player);
+    lv_from = UnitGetPosition(lv_hero);
+    lv_aim = gf_AimCrosshairPoint(lp_player);
+    lv_min = StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, UnitWeaponGet(lv_hero, lv_weapon), "MinimumRange", lp_player)) + c_SCOBA_AIM_POINT_RANGE_MARGIN;
+    lv_max = UnitWeaponRange(lv_hero, lv_weapon) - c_SCOBA_AIM_POINT_RANGE_MARGIN;
+    if (lv_max < lv_min) {
+        lv_max = lv_min;
     }
-    lv_order = OrderTargetingUnit(AbilityCommand(lv_abil, 0), lp_target);
-    lv_issued = UnitIssueOrder(gv_tPSUNIT[lp_player], lv_order, c_orderQueueReplace);
-    gf_AimShotTrace(lp_player, "Unit", lv_abil, lv_order, lv_issued);
-    return lv_issued;
-}
-
-bool gf_AimShotFirePoint (int lp_player, point lp_crosshair) {
-    string lv_abil;
-    order lv_order;
-    bool lv_issued;
-
-    lv_abil = gf_AimShotAbilPoint(lp_player);
-    if (lv_abil == "") {
-        return false;
+    lv_dist = DistanceBetweenPoints(lv_from, lv_aim);
+    lv_angle = CameraGetYaw(lp_player);
+    if (lv_dist >= c_SCOBA_CROSSHAIR_MIN_RANGE) {
+        lv_angle = AngleBetweenPoints(lv_from, lv_aim);
     }
-    lv_order = OrderTargetingPoint(AbilityCommand(lv_abil, 0), gf_AimShotOrderPoint(lp_player, lp_crosshair));
-    lv_issued = UnitIssueOrder(gv_tPSUNIT[lp_player], lv_order, c_orderQueueReplace);
-    gf_AimShotTrace(lp_player, "Point", lv_abil, lv_order, lv_issued);
-    return lv_issued;
+    lv_shot = MaxF(lv_min, MinF(lv_max, lv_dist));
+    lv_at = PointWithOffsetPolar(lv_from, lv_shot, lv_angle);
+    // The ray height at the shot distance, above the ground there.
+    lv_eye = PointGetHeight(lv_from) + c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT;
+    lv_height = 0.0;
+    if (lv_dist >= c_SCOBA_CROSSHAIR_MIN_RANGE) {
+        lv_height = lv_eye + ((PointGetHeight(lv_aim) - lv_eye) * (lv_shot / lv_dist)) - WorldHeight(c_heightMapGround, lv_at);
+    }
+    lv_height = MaxF(0.0, lv_height);
+    if (!UnitIsValid(gv_tpsProxy[lp_player])) {
+        libNtve_gf_CreateUnitsAtPoint2(1, c_SCOBA_TPS_PROXY_UNIT, 0, 0, lv_at);
+        gv_tpsProxy[lp_player] = UnitLastCreated();
+        UnitSetState(gv_tpsProxy[lp_player], c_unitStateSelectable, false);
+        UnitSetState(gv_tpsProxy[lp_player], c_unitStateStatusBar, false);
+    }
+    UnitSetPosition(gv_tpsProxy[lp_player], lv_at, false);
+    UnitSetHeight(gv_tpsProxy[lp_player], lv_height, 0.0);
+    gv_tpsProxyHeight[lp_player] = lv_height;
+    return gv_tpsProxy[lp_player];
 }
 
+void gf_TpsProxyRemove (int lp_player) {
+    if (UnitIsValid(gv_tpsProxy[lp_player])) {
+        UnitRemove(gv_tpsProxy[lp_player]);
+    }
+    gv_tpsProxy[lp_player] = null;
+}
+
+void gf_TpsShotClear (int lp_player) {
+    gv_tpsShotKind[lp_player] = c_TPS_SHOT_NONE;
+    gv_tpsShotTarget[lp_player] = null;
+}
+
+// The effect one aim shot runs: the weapon's own effect. A shot that ends
+// at the proxy in the air hits nothing, so it runs the weapon's air effect:
+// the same launch, no hit. A weapon without an air effect keeps its effect.
+string gf_AimShotEffect (int lp_player, string lp_weapon, unit lp_target) {
+    if (lp_weapon == c_SCOBA_WEAPON_TOSH && lp_target == gv_tpsProxy[lp_player] && gv_tpsProxyHeight[lp_player] > c_TPS_PROXY_AIR_HEIGHT) {
+        return c_SCOBA_SHOT_TOSH_AIR;
+    }
+    return CatalogFieldValueGet(c_gameCatalogWeapon, lp_weapon, "Effect", lp_player);
+}
+
+// The engine fired a hero weapon. If it is the pending aim shot, its text
+// floats now (R-TPS-70 to 72). Nothing else creates these floaters.
+void gf_TpsShotFired (int lp_player, unit lp_target) {
+    int lv_kind;
+
+    lv_kind = gv_tpsShotKind[lp_player];
+    if (lv_kind == c_TPS_SHOT_NONE || lp_target != gv_tpsShotTarget[lp_player]) {
+        return;
+    }
+    if (lv_kind == c_TPS_SHOT_OUT_OF_RANGE) {
+        gv_aimOutOfRange[lp_player] += 1;
+    }
+    gf_UiFloaterShow(lp_player, lv_kind);
+    gf_TpsShotClear(lp_player);
+}
+
+// A pending shot whose weapon effect event did not come within
+// c_TPS_SHOT_TIMEOUT is dropped. It leaves no text and does not block the
+// next click.
+void gf_TpsShotExpire (int lp_player) {
+    if (gv_tpsShotKind[lp_player] == c_TPS_SHOT_NONE) {
+        return;
+    }
+    if ((GameGetMissionTime() - gv_tpsShotAt[lp_player]) < c_TPS_SHOT_TIMEOUT) {
+        return;
+    }
+    gf_TpsShotClear(lp_player);
+}
+
+// The aim click: exactly one hero shot (R-TPS-50). The engine runs the
+// weapon's effect from the hero at the target: damage, launch, sound, and
+// the button clock are the weapon's own data. The shot holds no order, so a
+// walking hero keeps walking (R-TPS-61). The weapon's cooldown is started
+// with the time the weapon data states. It never sets the UI target
+// (R-TPS-82).
 void gf_AimShotPress (int lp_player) {
+    unit lv_hero;
+    unit lv_unit;
     unit lv_target;
-    unit lv_friendly;
-    point lv_point;
+    int lv_kind;
+    int lv_index;
+    string lv_weapon;
+    string lv_effect;
 
-    if (!gf_IsHeroPlayer(lp_player)) {
+    if (!gf_IsHeroPlayer(lp_player) || !gv_aIMACTIVE[lp_player]) {
         return;
     }
-    if (!gv_aIMACTIVE[lp_player]) {
-        return;
-    }
-    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
         return;
     }
     gv_aimShotPresses += 1;
-    lv_point = gf_AimCrosshairPoint(lp_player);
-    lv_target = gf_AimTargetAtCrosshair(lp_player);
-    if (!UnitIsValid(lv_target)) {
-        lv_friendly = gf_AimUnitAtCrosshair(lp_player, false);
-        if (UnitIsValid(lv_friendly) && !gf_IsClickEnemy(lp_player, lv_friendly)) {
-            gf_UnitTargetSet(lp_player, lv_friendly);
-            gf_SelectHeroForce(lp_player);
-            return;
-        }
-    }
-    if (UnitIsValid(lv_target)) {
-        gf_UnitTargetSet(lp_player, lv_target);
-        if (!gf_AimTargetInRange(lp_player, lv_target)) {
-            gv_aimOutOfRange[lp_player] += 1;
-            gf_FloaterCreate(lp_player, UnitGetPosition(lv_target), StringToText(c_SCOBA_OUT_OF_RANGE_TEXT), Color(70.0, 70.0, 70.0));
-            return;
-        }
-        gf_AimShotFireUnit(lp_player, lv_target);
+    // On cooldown or with a shot under way: no shot, no text (R-TPS-58).
+    if (UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) > 0.0 || gv_tpsShotKind[lp_player] != c_TPS_SHOT_NONE) {
         return;
     }
-    if (gf_AimShotFirePoint(lp_player, lv_point)) {
-        gf_AimMissFloater(lp_player, lv_point);
+    lv_index = gf_AimWeaponIndex(lp_player);
+    if (lv_index <= 0) {
+        return;
     }
+    lv_unit = gf_AimUnitAtCrosshair(lp_player, false);
+    lv_kind = c_TPS_SHOT_MISS;
+    lv_target = null;
+    if (UnitIsValid(lv_unit)) {
+        lv_kind = c_TPS_SHOT_HIT;
+        if (gf_IsClickFriendly(lp_player, lv_unit)) {
+            lv_kind = c_TPS_SHOT_FRIENDLY;
+        }
+        if (gf_AimTargetInRange(lp_player, lv_unit)) {
+            lv_target = lv_unit;
+        }
+        else if (lv_kind == c_TPS_SHOT_HIT) {
+            lv_kind = c_TPS_SHOT_OUT_OF_RANGE;
+        }
+    }
+    if (lv_target == null) {
+        lv_target = gf_TpsProxyPlace(lp_player);
+    }
+    lv_weapon = UnitWeaponGet(lv_hero, lv_index);
+    lv_effect = gf_AimShotEffect(lp_player, lv_weapon, lv_target);
+    gv_tpsShotKind[lp_player] = lv_kind;
+    gv_tpsShotTarget[lp_player] = lv_target;
+    gv_tpsShotAt[lp_player] = GameGetMissionTime();
+    gv_tpsShotEffect[lp_player] = lv_effect;
+    UnitCreateEffectUnit(lv_hero, lv_effect, lv_target);
+    UnitAddCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN, StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, lv_weapon, "Cost.Cooldown.TimeUse", lp_player)));
 }
 
 bool gt_AimShootingInit_Func (bool testConds, bool runActions) {

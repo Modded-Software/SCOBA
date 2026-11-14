@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 CONTROL_ICONS = [
-    "SCOBAModeRPG.dds",
-    "SCOBAModeActions.dds",
+    "SCOBAModePNC.dds",
+    "SCOBAModeTPS.dds",
 ]
 
 

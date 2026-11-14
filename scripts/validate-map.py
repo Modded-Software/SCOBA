@@ -17,6 +17,7 @@ import m3
 from animation_tokens import normalized_animation_name, validate_animation_name
 from validate_aim_shot import check_aim_shot_data, check_aim_shot_script
 from validate_assets import check_control_icons, check_stamp
+from validate_slow_deaths import check_slow_deaths
 
 GENERATED_MODELS = [
     Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3",
@@ -90,14 +91,14 @@ XML_FILES = [
 CUSTOM_ABILITIES = [
     "SCOBAAutoAttackToggle",
     "SCOBARightClickToggle",
-    "SCOBAActionModeToggle",
+    "SCOBATPSToggle",
     "SCOBAAutoAttackStatus",
 ]
 
 CUSTOM_BEHAVIORS = [
     "SCOBAAttackSingle",
     "SCOBARightClickStandBehavior",
-    "SCOBAActionModeBehavior",
+    "SCOBATPSBehavior",
     "SCOBAStandRoot",
 ]
 
@@ -106,8 +107,8 @@ CUSTOM_BUTTONS = [
     "SCOBAAutoAttackOff",
     "SCOBARightClickMove",
     "SCOBARightClickStand",
-    "SCOBAActionModeRPG",
-    "SCOBAActionModeActions",
+    "SCOBAControlPNC",
+    "SCOBAControlTPS",
     "SCOBAAutoAttackStatus",
 ]
 
@@ -178,8 +179,8 @@ def check_catalogs(map_dir: Path) -> None:
 
     button_tree = ET.parse(gamedata / "ButtonData.xml")
     button_icons = {
-        'SCOBAActionModeRPG': r'Assets\Textures\SCOBAModeRPG.dds',
-        'SCOBAActionModeActions': r'Assets\Textures\SCOBAModeActions.dds',
+        'SCOBAControlPNC': r'Assets\Textures\SCOBAModePNC.dds',
+        'SCOBAControlTPS': r'Assets\Textures\SCOBAModeTPS.dds',
     }
     for button_id, icon_path in button_icons.items():
         button = None
@@ -291,6 +292,12 @@ def check_catalogs(map_dir: Path) -> None:
         if f'<WeaponDisableArray value="{auto_id}"/>' not in single_behavior:
             fail(f"SCOBAAttackSingle must disable weapon: {auto_id}")
 
+    # Ranged hero weapons: twice the stock in-game range, less the +2 of
+    # UnitDirectControl. The auto twins inherit.
+    for weapon_id, hero_range in (("Tosh", "12"), ("QueenOfBladesPsiBlast", "10"), ("RazorTalons", None)):
+        own, twin = (weapon_tree.getroot().find(f"CWeaponLegacy[@id='{w}']/Range") for w in (weapon_id, f"{weapon_id}Auto"))
+        if (None if own is None else own.get("value")) != hero_range or twin is not None:
+            fail(f"{weapon_id} range must be {hero_range} and its auto twin must inherit it")
     # Cooldown clock: every hero weapon shot sets the Weapon Attack button
     # cooldown to the weapon period, in data.
     effects = ET.parse(gamedata / "EffectData.xml").getroot()
@@ -353,6 +360,13 @@ def check_animation_names(map_dir: Path) -> None:
         for name in ("Turn Left", "Turn Right"):
             if normalized_animation_name(name) in groups:
                 fail(f"{relative} has upper turn group {name!r}")
+        # Head tilt clips (R-TPS-13): one per step the script can ask for.
+        head_steps = int(re.search(r"c_ANIM_HEAD_STEPS = (\d+);", text).group(1))
+        for step in range(1, head_steps + 1):
+            if normalized_animation_name(f"Ready Cover {step:02d}") not in groups:
+                fail(f"{relative} missing head tilt group Ready Cover {step:02d}")
+        if normalized_animation_name(f"Ready Cover {head_steps + 1:02d}") in groups:
+            fail(f"{relative} has more head tilt groups than c_ANIM_HEAD_STEPS")
         pitch_bone = AIM_ATTACK_PITCH.get(relative)
         if pitch_bone is not None:
             pitch_ids = set()
@@ -436,20 +450,24 @@ def check_script(map_dir: Path) -> None:
         fail("scripts missing aim UI selection gate")
     if "gf_AimSelectBlock" in combined or "gf_AimSelectClear" in combined:
         fail("aim must not change per-unit Selectable state")
-    if "gf_AimNoAttackApply" not in combined:
-        fail("scripts missing aim no-attack behavior control")
-    if "gf_SelectHeroForce" not in combined or "gf_ActionStatusIs" not in combined:
+    if "gf_AimNoAttackApply" in combined or "SCOBAAimNoAttack" in combined or "SCOBAAimNoAttack" in behavior_text:
+        fail("aiming must not suppress the hero attack: the aim shot is a hero attack")
+    if "gf_SelectHeroForce" not in combined or "gf_TpsStatusIs" not in combined:
         fail("scripts missing selection and action status helpers")
-    if 'id="SCOBAAimNoAttack"' not in behavior_text or '<StateFlags index="SuppressAttack" value="1"/>' not in behavior_text:
-        fail("BehaviorData missing SCOBAAimNoAttack SuppressAttack")
     if "storm_ui_cursor_default_enemy" in combined or "storm_ui_cursor_default_friendly" in combined:
         fail("reticle must use the crosshair texture, not arrow cursors")
-    if combined.count("cursor-target-none.dds") < 3:
-        fail("reticle must use the crosshair texture for every state")
-    if "gf_AimMissFloater" not in combined:
-        fail("scripts missing aim miss floater")
+    if "cursor-target-none.dds" not in combined or "gf_ReticleColor" not in combined:
+        fail("reticle must be the crosshair texture, tinted per state")
+    if "gf_UiFloaterShow" not in combined or "gf_AimMissFloater" in combined:
+        fail("shot outcome text must be the UI-layer floater")
+    styles = ET.parse(map_dir / "Base.SC2Data" / "UI" / "FontStyles.SC2Style").getroot()
+    floater = [style for style in styles.iter("Style") if style.get("name") == "SCOBAFloaterText"]
+    if len(floater) != 1 or int(floater[0].get("height", "0")) < 28:
+        fail("SCOBAFloaterText font style missing or smaller than 28")
+    if 'c_UI_FLOATER_STYLE = "SCOBAFloaterText"' not in combined or "c_UI_FLOATER_STYLE, lv_group" not in combined:
+        fail("UI floater labels must use the SCOBAFloaterText font style")
     if "gf_AnimTargetPitchTick" not in combined:
-        fail("scripts missing RPG target pitch")
+        fail("scripts missing PNC target pitch")
     if "gf_PncAttack" not in combined or "gf_PncCancel" not in combined:
         fail("scripts missing point and click attack and cancel")
     if 'AbilityCommand("move", 3)' in combined or "gf_CombatStep" in combined:
@@ -481,6 +499,7 @@ def main() -> int:
     check_control_icons(map_dir)
     check_animation_names(map_dir)
     check_animation_actors(map_dir)
+    check_slow_deaths(map_dir)
     check_script(map_dir)
     check_animation_names(map_dir)
     check_stamp(map_dir)

@@ -73,11 +73,9 @@ bool gt_WeaponAttackCmd_Func (bool testConds, bool runActions) {
 void gt_AttackEvent_Init () {
     gt_CombatAttackEffect = TriggerCreate("gt_CombatAttackEffect_Func");
     TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect, c_playerAny, c_SCOBA_EFFECT_TOSH);
-    TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect, c_playerAny, c_SCOBA_EFFECT_TOSH_POINT);
+    TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect, c_playerAny, c_SCOBA_EFFECT_TOSH_AIR);
     TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect, c_playerAny, c_SCOBA_EFFECT_TALONS);
-    TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect, c_playerAny, c_SCOBA_EFFECT_TALONS_SHOT);
     TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect, c_playerAny, c_SCOBA_EFFECT_PSIBLAST);
-    TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect, c_playerAny, c_SCOBA_EFFECT_PSIBLAST_POINT);
 
     gt_WeaponAttackCmd = TriggerCreate("gt_WeaponAttackCmd_Func");
     TriggerAddEventUnitAbility(gt_WeaponAttackCmd, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBAAutoAttackStatus", 0), c_unitAbilStageExecute, false);

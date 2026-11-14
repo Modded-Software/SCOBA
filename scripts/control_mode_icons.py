@@ -11,8 +11,8 @@ from PIL import Image, ImageDraw, ImageFont
 MARKER = ".control_mode_icons"
 ICON_DIR = Path("Assets") / "Textures"
 ICONS = {
-    "SCOBAModeRPG.dds": ("RPG", (20, 62, 116), (114, 208, 255)),
-    "SCOBAModeActions.dds": ("ACT", (124, 40, 24), (255, 184, 96)),
+    "SCOBAModePNC.dds": ("PNC", (20, 62, 116), (114, 208, 255)),
+    "SCOBAModeTPS.dds": ("TPS", (124, 40, 24), (255, 184, 96)),
 }
 
 
@@ -21,7 +21,7 @@ def draw_icon(label: str, background: tuple[int, int, int], accent: tuple[int, i
     draw = ImageDraw.Draw(image)
     draw.rectangle((1, 1, 62, 62), outline=accent + (255,), width=3)
     draw.rectangle((6, 6, 57, 57), outline=accent + (128,), width=1)
-    if label == "RPG":
+    if label == "PNC":
         draw.line((12, 48, 20, 38, 28, 48), fill=accent + (255,), width=4)
         draw.line((36, 48, 44, 38, 52, 48), fill=accent + (255,), width=4)
         draw.ellipse((26, 18, 38, 30), outline=accent + (255,), width=3)

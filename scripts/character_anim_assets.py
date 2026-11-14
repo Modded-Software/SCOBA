@@ -22,7 +22,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "32\n"
+MARKER_VERSION = "34\n"
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -43,6 +43,8 @@ SOURCE_MODELS = {
         "Y",
         -1.0,
         12.0,
+        # The head bone: the parent of the Ref_Head attachment on this model.
+        "BoneHead",
     ),
     "kerrigan": (
         r"mods\liberty.sc2mod\base.sc2assets\assets\units\zerg\kerrigan\kerrigan.m3",
@@ -62,6 +64,9 @@ SOURCE_MODELS = {
         "Y",
         -1.0,
         12.0,
+        # The head bone. This model has no Ref_Head attachment; Bone29 is
+        # taken from the attack roots above. Unproven: operator check.
+        "Bone29",
     ),
 }
 
@@ -87,6 +92,15 @@ AIM_PITCH_MAX_DEG = 50.0
 AIM_PITCH_FRAME_MS = 100
 AIM_PITCH_STEPS = 99
 
+# Head tilt outside aiming (R-TPS-13): static head-only clips. They sit under
+# the upper-body clips, which own the head while they play.
+HEAD_TILT_GROUP = "Ready Cover"
+HEAD_TILT_SOURCE = "Stand"
+HEAD_TILT_MAX_DEG = 15.0
+HEAD_TILT_STEPS = 9
+HEAD_TILT_FRAME_MS = 100
+HEAD_TILT_PRIORITY = 5
+
 AIM_DIRECTIONS = (
     ("Forward", 0.0, False),
     ("Forward Left", 45.0, False),
@@ -99,16 +113,57 @@ AIM_DIRECTIONS = (
 )
 
 
-
-
-
-
 def bone_anim_ids(bone) -> list[int]:
     return [
         bone.location.header.animId,
         bone.rotation.header.animId,
         bone.scale.header.animId,
     ]
+
+
+def bone_chain(model, name: str) -> str:
+    """The bone and its parents, for the build log."""
+    names = {bone.name: index for index, bone in enumerate(model.bones)}
+    index = names[name]
+    chain = []
+    while index >= 0 and len(chain) < 8:
+        chain.append(model.bones[index].name)
+        index = model.bones[index].parent
+    return ">".join(chain)
+
+
+def make_head_groups(model, groups, pitch_axis: str, pitch_sign: float, head: str) -> str:
+    """One head-only clip per tilt step, from the stand pose."""
+    if not any(bone.name == head for bone in model.bones):
+        raise KeyError(f"head bone {head} not in the model")
+    head_id = next(bone.rotation.header.animId for bone in model.bones if bone.name == head)
+    stand_source = model.sequenceTransformationCollections[groups[HEAD_TILT_SOURCE].stcIndices[0]]
+    pairs = [pair for pair in zip(stand_source.animIds, stand_source.animRefs) if pair[0] == head_id]
+    if not pairs:
+        raise ValueError(f"{HEAD_TILT_SOURCE} does not animate the head bone {head}")
+    head_source = clone(stand_source)
+    head_source.animIds = [pair[0] for pair in pairs]
+    head_source.animRefs = [pair[1] for pair in pairs]
+    for step in range(HEAD_TILT_STEPS):
+        angle = HEAD_TILT_MAX_DEG * ((2.0 * step / (HEAD_TILT_STEPS - 1)) - 1.0)
+        make_pitch_group(
+            model,
+            groups,
+            f"{HEAD_TILT_GROUP} {step + 1:02d}",
+            HEAD_TILT_SOURCE,
+            head_source,
+            0,
+            (head,),
+            (1.0,),
+            pitch_axis,
+            pitch_sign,
+            angle,
+            angle,
+            HEAD_TILT_FRAME_MS,
+            2,
+            HEAD_TILT_PRIORITY,
+        )
+    return head
 
 
 def classify_bones(model, upper_roots: tuple[str, ...], lower_roots: tuple[str, ...]) -> tuple[set[int], set[int]]:
@@ -213,6 +268,7 @@ def generate_model(
     kick_axis: str,
     kick_sign: float,
     kick_degrees: float,
+    head_bone: str,
 ) -> None:
     model = m3.loadModel(str(source))
     upper_ids, lower_ids = classify_bones(model, upper_roots, lower_roots)
@@ -308,7 +364,8 @@ def generate_model(
             AIM_PITCH_FRAME_MS,
             2,
         )
-    print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)}")
+    head = make_head_groups(model, groups, pitch_axis, pitch_sign, head_bone)
+    print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)} head={bone_chain(model, head)}")
     target.parent.mkdir(parents=True, exist_ok=True)
     m3.saveAndInvalidateModel(model, str(target))
 
@@ -392,6 +449,7 @@ def generate(root: Path, force: bool) -> None:
             kick_axis,
             kick_sign,
             kick_degrees,
+            head_bone,
         ) in SOURCE_MODELS.values():
             source = extract_model(entry, temp_root)
             generate_model(
@@ -410,6 +468,7 @@ def generate(root: Path, force: bool) -> None:
                 kick_axis,
                 kick_sign,
                 kick_degrees,
+                head_bone,
             )
             entries.append((model_id, model_value))
         (root / MODEL_DATA).write_text(model_data_text(root, entries))

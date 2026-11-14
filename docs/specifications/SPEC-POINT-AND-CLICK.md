@@ -76,7 +76,7 @@ passed in that run unless another run is named.
 | R-PNC-42, 45 | [tested] | `single_shot`, `weapon_button`. |
 | R-PNC-43 | [tested] | `auto_to_single`. |
 | R-PNC-44 | [tested] | `switch_single_stand`, `switch_auto_move`, hero state and button state. |
-| R-PNC-46, 49 | [tested] | The button cooldown runs after every shot path and stays 0 after a press with no shot: `single_shot`, `weapon_button`, `button_out`, `auto_click`, `auto_stand_in`, `talons_single`, `psiblast_single`, `talons_auto`. The clock overlay is [operator]. |
+| R-PNC-46 | [tested] | The button cooldown runs after every shot path: `single_shot`, `weapon_button`, `auto_click`, `auto_stand_in`, `talons_single`, `psiblast_single`, `talons_auto`. The clock overlay is [operator]. |
 | R-PNC-47 | [tested] | `startup`, hero state and button state. |
 | R-PNC-48 | [tested] | `toggle buttons match hero state` over every snapshot; `auto_to_single`; both switch scenarios. |
 | R-PNC-50, 53 | [tested] | `wasd_stand`, `auto_stand_out`. |
@@ -209,7 +209,7 @@ mode. In order mode Ctrl + C exits order mode and does nothing else.
 Right hold [tested]:
 
 - `gv_holdStrafe[player]` is true during a PNC right hold with no middle
-  hold. `gf_StrafeHoldSync` sets it on the camera turn tick. Action mode and
+  hold. `gf_StrafeHoldSync` sets it on the camera turn tick. TPS and
   order mode clear it.
 - While it is set the hero carries `SCOBAAimNoTurn` (`SuppressTurning`), as
   in aim. The facing follows the camera yaw.
@@ -242,15 +242,17 @@ Right hold matches middle hold (R-PNC-68):
 - The button is `SCOBAAutoAttackStatus`. Its handler calls `gf_PncAttack`.
   [tested] `weapon_button`
 - The clock is drawn by the engine from the button ability's own cooldown:
-  `<Cooldown Link="Abil/SCOBAAutoAttackStatus" Location="Ability" TimeUse="0"/>`.
+  `<Cooldown Link="Abil/SCOBAAutoAttackStatus" Location="Ability" TimeUse="1"/>`.
 - Data starts it on every shot (F14). `SCOBAAttackCooldown10` and
   `SCOBAAttackCooldown15` set it to 1 s and 1.5 s. [tested]
   - `Tosh` fires the set `SCOBAToshShot`: `ToshU`, then the cooldown effect.
   - `RazorTalonsPersistent` runs it as `InitialEffect`.
   - `PsiBlastLaunchMissile` runs it as `LaunchEffect`.
 - The auto weapons are children of the stock weapons and run the same effects.
-- `TimeUse` is `0`, so a press that fires no shot starts no clock. [tested]
-  `button_out`
+- `TimeUse` is `1`: the engine draws the clock only when it is above 0. The
+  ability therefore starts a 1 s clock whenever it executes, also on an
+  enemy out of weapon range in Chase `stand`, where no shot fires. Accepted
+  by the operator; R-PNC-49 was dropped.
 - Script never sets, reads, or times the cooldown.
 - The weapons keep the unit link `SCOBA/Attack`. The button no longer uses it.
 - Whether the clock draws is [operator].
@@ -259,7 +261,7 @@ Right hold matches middle hold (R-PNC-68):
 
 `ButtonData.xml` [built]:
 
-- `SCOBAActionModeRPG`: `Controls: WASD / Point & Click`.
+- `SCOBAControlPNC`: `Controls: WASD / Point & Click`.
 - `SCOBAAutoAttackOn` / `Off`: `Attack: Auto` / `Attack: Single`.
 - `SCOBARightClickMove` / `Stand`: `Chase: Move` / `Chase: Stand`.
 - The `Weapon Attack` tooltip says the button is disabled while the weapon
@@ -278,7 +280,7 @@ Ability ids keep their names. New code uses `Pnc`.
 | Shared | `systems/mouse_input.galaxy` | Raw button and hold state. Dispatches to the active mode. |
 | Shared | `systems/orders.galaxy` | Order mode. Unchanged. |
 | Mode | `modes/pnc.galaxy` | PNC click, hold, attack, and cancel actions. |
-| Mode | `modes/action.galaxy` | Action mode click and aim entry. Moved as is. |
+| Mode | `modes/tps.galaxy` | TPS click and aim entry. Moved as is. |
 
 `mouse_input` calls exactly one mode module per event. Mode modules call
 shared modules. Shared modules never test the mode. A mode switch calls
@@ -289,9 +291,10 @@ Today the PNC functions live in `systems/combat_fsm.galaxy`
 sync) and the handlers in `systems/targeting.galaxy`, `camera.galaxy`,
 `combat_attack.galaxy`.
 
-## 7. Aim-Shot Work (Action Mode)
+## 7. Aim-Shot Work (TPS)
 
-Decision: parked, not reverted. The next phase builds on it.
+Decision: parked, not reverted. The TPS phase replaces it; see
+[SPEC-TPS](SPEC-TPS.md) section 5.5.
 
 - Its script (`aim_shooting.galaxy`, the trace) stays untouched. PNC code does
   not call it.

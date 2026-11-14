@@ -10,7 +10,7 @@ import shutil
 import struct
 from pathlib import Path
 
-from aim_shot_ability import apply as apply_aim_shot
+from attack_cooldown_link import apply as apply_attack_cooldown_link
 from bootstrap_galaxy import write_bootstrap
 from character_anim_assets import generate as generate_character_anim
 from control_mode_icons import generate as generate_control_icons
@@ -18,6 +18,7 @@ from doodad_occlusion import disable_doodad_occlusion
 from expand_helpers import clone_cells, read, upsample_grid, write
 from project_root import project_root
 from props_expand import expand_props
+from slow_death_assets import generate as generate_slow_deaths
 from spore_scale import scale_spores
 from strip_gui_triggers import strip_triggers
 from water_splashes import apply as apply_water_splashes
@@ -473,9 +474,9 @@ def main() -> int:
     disable_doodad_occlusion(dst)
     if os.environ.get("SC2_NO_WATER_SPLASHES") != "1":
         apply_water_splashes(dst)
-    if os.environ.get("SC2_NO_AIM_SHOT") != "1":
-        apply_aim_shot(dst)
+    apply_attack_cooldown_link(dst)
     generate_character_anim(dst, False)
+    generate_slow_deaths(dst, False)
     generate_control_icons(dst, False)
     if os.environ.get("SC2_NO_PROPS") != "1":
         expand_props(dst)

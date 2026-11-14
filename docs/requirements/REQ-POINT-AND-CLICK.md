@@ -17,10 +17,11 @@ In scope:
 - WASD movement and attacking while moving;
 - mouse holds: camera orbit and character direction;
 - order mode;
-- separation from Action mode.
+- separation from TPS.
 
-Out of scope, next phase: Action mode (`WASD / TPS`), aim, aim shots. This
-phase MUST NOT remove or break the code that phase builds on.
+Out of scope: `WASD / TPS` (TPS), aim, aim shots. Their contract is
+[REQ-TPS](REQ-TPS.md). The Point & Click
+phase MUST NOT remove or break the code TPS builds on.
 
 Implementation lives in
 [SPEC-POINT-AND-CLICK](../specifications/SPEC-POINT-AND-CLICK.md).
@@ -99,7 +100,6 @@ Implementation lives in
 | R-PNC-46 | The `Weapon Attack` button MUST show the hero attack cooldown as the cooldown clock. The clock MUST start with every shot, however the shot was started, and MUST end when the weapon is ready. It MUST be driven by game data. Script MUST NOT set or time it. |
 | R-PNC-47 | At map start the Attack toggle MUST be `single` and the Chase toggle MUST be `stand`. |
 | R-PNC-48 | Each toggle button MUST show the current state of its toggle. The button and the hero MUST agree at map start, after every toggle, after a hero switch, and after a mode switch. |
-| R-PNC-49 | A press of `Weapon Attack` that fires no shot MUST NOT start the cooldown clock. |
 
 ### 3.6 Chase toggle and movement
 
@@ -131,7 +131,7 @@ Implementation lives in
 
 | ID | Requirement |
 | --- | --- |
-| R-PNC-70 | PNC and Action mode MUST have separate mouse handlers. One mode's handler MUST NOT run in the other mode. |
+| R-PNC-70 | PNC and TPS MUST have separate mouse handlers. One mode's handler MUST NOT run in the other mode. |
 | R-PNC-71 | Behavior both modes need MUST exist once and be called by both: UI target, toggles, attack cooldown, WASD key state, floaters. |
 | R-PNC-72 | Switching modes MUST leave no input state from the previous mode active. |
 | R-PNC-73 | Every player-visible `RPG` label MUST read `WASD / Point & Click`. |
@@ -169,10 +169,9 @@ Implementation lives in
 | AC-PNC-25 | Press `Weapon Attack`, click an enemy: the hero attacks as for a right click, in both Attack states. |
 | AC-PNC-26 | Shots started by right click, by `Weapon Attack`, and by engine acquisition, with each hero weapon: the cooldown clock on the button starts with each shot and ends when the weapon is ready. |
 | AC-PNC-27 | The mode button and its tooltips show `WASD / Point & Click`. No `RPG` text is visible. The toggles read as in R-PNC-74. |
-| AC-PNC-28 | Switch to Action mode and back during a hold: no orbit, movement, or target state is left stuck. |
+| AC-PNC-28 | Switch to TPS and back during a hold: no orbit, movement, or target state is left stuck. |
 | AC-PNC-29 | Switch hero with Attack `single` and Chase `stand`: both stay set. |
 | AC-PNC-30 | Enter order mode, command an owned unit, exit: the hero controls work as before. |
 | AC-PNC-31 | Start the map: the buttons read `Attack: Single` and `Chase: Stand`. An enemy in range is not attacked. |
 | AC-PNC-32 | Press the Attack toggle: the button reads `Attack: Auto` and the hero attacks an enemy in range. Press it again: it reads `Attack: Single` and the attack stops. |
 | AC-PNC-33 | Switch hero with Attack `auto` and Chase `move`: both buttons still read `Attack: Auto` and `Chase: Move`, and the new hero behaves that way. |
-| AC-PNC-34 | Chase `stand`, press `Weapon Attack` on an out-of-range enemy: no shot and no cooldown clock. |

@@ -62,6 +62,15 @@ const string c_ANIM_BRACKET_LOWER = "SCOBALo";
 const string c_ANIM_BRACKET_ATTACK = "SCOBAAimAtk";
 const string c_ANIM_BRACKET_AIM_ATTACK = "SCOBAAimAtk";
 
+// Head tilt outside aiming (R-TPS-13). Steps and range match HEAD_TILT_* in
+// scripts/character_anim_assets.py. The head is level at the level pitch.
+const string c_ANIM_BRACKET_HEAD = "SCOBAHead";
+const int c_ANIM_HEAD_STEPS = 9;
+const fixed c_ANIM_HEAD_MAX = 15.0;
+const fixed c_ANIM_HEAD_SCALE = 0.4;
+const fixed c_ANIM_HEAD_LEVEL_PITCH = 20.0;
+const fixed c_ANIM_HEAD_BLEND = 0.15;
+
 const int c_PROBE_ATTACHMENT_COUNT = 6;
 const int c_PROBE_BUFFER_ROWS = 64;
 const fixed c_PROBE_FLUSH_INTERVAL = 0.25;

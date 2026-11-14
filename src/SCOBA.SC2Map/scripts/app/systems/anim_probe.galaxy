@@ -387,8 +387,8 @@ void gf_ProbePlayer (int lp_player) {
     lv_text = lv_text + " pitch=" + IntToString(FixedToInt(CameraGetPitch(lp_player)));
     lv_text = lv_text + " dist=" + IntToString(FixedToInt(CameraGetDistance(lp_player)));
     lv_text = lv_text + " aim=" + gf_AnimFlag(gv_aIMACTIVE[lp_player]);
-    lv_text = lv_text + " action=" + gf_AnimFlag(gf_ActionModeActive(lp_player));
-    lv_text = lv_text + " alt=" + gf_AnimFlag(gv_aCTIONALT[lp_player]);
+    lv_text = lv_text + " action=" + gf_AnimFlag(gf_TpsActive(lp_player));
+    lv_text = lv_text + " middle=" + gf_AnimFlag(gv_mOUSEMIDDLE[lp_player]);
     lv_text = lv_text + " hold=" + IntToString(gv_animMoveHold[lp_player]);
     lv_text = lv_text + " resets=" + IntToString(gv_animResets[lp_player]);
     lv_text = lv_text + " fwd=" + gf_AnimFlag(gv_fORWARD[lp_player]);

@@ -212,7 +212,7 @@ void gf_ProbeButton (string lp_section, int lp_method) {
     gf_DbgReset(lp_section, false, true);
     lv_hero = gv_tPSUNIT[1];
     if (lp_method == 3) {
-        gf_DbgSpawnOne(lp_section, 11.0, 500.0);
+        gf_DbgSpawnOne(lp_section, 18.0, 500.0);
     }
     else {
         gf_DbgSpawnOne(lp_section, 3.0, 500.0);
@@ -236,6 +236,200 @@ void gf_ProbeButton (string lp_section, int lp_method) {
     gf_DbgCooldownRaw(lp_section, "end");
 }
 
+// TPS shot probes. lp_method: 0 attack Towards at a point, 1 attack Barrage
+// at a point, 2 attack Execute on a Marine of player lp_owner, 3 attack
+// Execute on a neutral InvisibleTargetDummy raised to lp_height.
+// lp_kerrigan: run on Kerrigan. lp_dx: point or unit distance ahead.
+void gf_ProbeTpsShot (string lp_section, int lp_method, bool lp_kerrigan, fixed lp_dx, fixed lp_height, int lp_owner, bool lp_once) {
+    unit lv_hero;
+    unit lv_ally;
+    point lv_point;
+    order lv_order;
+    int lv_shots;
+    int lv_i;
+
+    gf_DbgReset(lp_section, false, true);
+    if (lp_kerrigan) {
+        gf_HeroSwitchTo(gv_heroKerrigan);
+        Wait(0.5, c_timeGame);
+    }
+    lv_hero = gv_tPSUNIT[1];
+    UnitSetFacing(lv_hero, 0.0, 0.0);
+    Wait(0.2, c_timeGame);
+    lv_point = PointWithOffset(gv_dbgAnchor, lp_dx, 0.0);
+    if (lp_height > 0.0) {
+        PointSetHeight(lv_point, lp_height);
+    }
+    if (lp_method == 3) {
+        libNtve_gf_CreateUnitsAtPoint2(1, "InvisibleTargetDummy", 0, 0, lv_point);
+        lv_ally = UnitLastCreated();
+        UnitSetState(lv_ally, c_unitStateSelectable, false);
+        UnitSetState(lv_ally, c_unitStateStatusBar, false);
+        UnitSetHeight(lv_ally, lp_height, 0.0);
+        Wait(0.1, c_timeGame);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "proxyZ100", FixedToInt(UnitGetHeight(lv_ally) * 100.0));
+        lv_order = OrderTargetingUnit(AbilityCommand("attack", 0), lv_ally);
+    }
+    else if (lp_method == 2) {
+        libNtve_gf_CreateUnitsAtPoint2(1, "Marine", 0, lp_owner, lv_point);
+        lv_ally = UnitLastCreated();
+        UnitSetState(lv_ally, c_unitStateStunned, true);
+        lv_order = OrderTargetingUnit(AbilityCommand("attack", 0), lv_ally);
+    }
+    else {
+        lv_order = OrderTargetingPoint(AbilityCommand("attack", lp_method + 1), lv_point);
+    }
+    if (lp_method >= 2) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, "allyDist10", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_ally)) * 10.0));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "range10", FixedToInt(UnitWeaponRange(lv_hero, 1) * 10.0));
+    BankValueSetFromString(gv_dbgBank, lp_section, "weapon", UnitWeaponGet(lv_hero, 1));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "orderValid", UnitOrderIsValid(lv_hero, lv_order));
+    gf_DbgCooldownRaw(lp_section, "pre");
+    gf_DbgSnap(lp_section, "t0000");
+    lv_shots = gv_aimShotEffectEvents;
+    gv_pncSingleShot[1] = lp_once;
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "issued", UnitIssueOrder(lv_hero, lv_order, c_orderQueueReplace));
+    if (UnitOrderCount(lv_hero) > 0 && OrderGetTargetType(UnitOrder(lv_hero, 0)) == c_orderTargetPoint) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, "orderZ100", FixedToInt(PointGetHeight(OrderGetTargetPoint(UnitOrder(lv_hero, 0))) * 100.0));
+    }
+    gf_ProbeOrders(lp_section, "t0000");
+    BankValueSetFromInt(gv_dbgBank, lp_section, "firstShotTick", -1);
+    for (lv_i = 0; lv_i < 48; lv_i += 1) {
+        Wait(0.0625, c_timeGame);
+        if (lv_i == 4) {
+            gf_ProbeOrders(lp_section, "t0250");
+            gf_DbgCooldownRaw(lp_section, "t0250");
+        }
+        if (lv_i == 4 || lv_i == 8 || lv_i == 47) {
+            // Raw: live missile units at 0.31 s, 0.56 s, 3.0 s.
+            BankValueSetFromInt(gv_dbgBank, lp_section, "missiles" + IntToString(lv_i), UnitGroupCount(UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter((1 << c_targetFilterMissile), 0, 0, 0), 0), c_unitCountAlive));
+        }
+        if (gv_aimShotEffectEvents > lv_shots) {
+            BankValueSetFromInt(gv_dbgBank, lp_section, "firstShotTick", lv_i);
+            lv_shots = 1000000;
+        }
+    }
+    gf_ProbeOrders(lp_section, "tend");
+    gf_DbgSnap(lp_section, "tend");
+    if (lp_method >= 2) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, "allyHp", FixedToInt(UnitGetPropertyFixed(lv_ally, c_unitPropLife, c_unitPropCurrent)));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "allyHpMax", FixedToInt(UnitGetPropertyFixed(lv_ally, c_unitPropLifeMax, c_unitPropCurrent)));
+        UnitRemove(lv_ally);
+    }
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    BankSave(gv_dbgBank);
+}
+
+// A shot while walking. The hero walks down the map on one move order. At
+// 0.5 s the variant acts. Raw: path walked, shots, life, orders.
+// 0 no shot. 1 attack order, move again after the shot. 2 auto weapon on,
+// attack order and move in one frame. 3 auto weapon on, attack order, one
+// tick, move. 4 as 3 at a neutral proxy. 5 as 3 with a nearer enemy decoy.
+// 6 the weapon effect created by script. 7 auto weapon on, proxy, no order.
+void gf_ProbeWalkShot (string lp_section, int lp_variant) {
+    unit lv_hero;
+    unit lv_target;
+    unit lv_decoy;
+    order lv_move;
+    int lv_shots;
+    int lv_i;
+    bool lv_moved;
+
+    gf_DbgReset(lp_section, false, false);
+    lv_hero = gv_tPSUNIT[1];
+    lv_decoy = null;
+    if (lp_variant == 4 || lp_variant == 7) {
+        libNtve_gf_CreateUnitsAtPoint2(1, "InvisibleTargetDummy", 0, 0, PointWithOffset(gv_dbgAnchor, 6.0, 0.0));
+        lv_target = UnitLastCreated();
+    }
+    else {
+        lv_target = gf_DbgSpawnOne(lp_section, 6.0, 500.0);
+    }
+    lv_move = OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, 0.0, -12.0));
+    UnitIssueOrder(lv_hero, lv_move, c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "y10_t00", FixedToInt(PointGetY(UnitGetPosition(lv_hero)) * 10.0));
+    lv_shots = gv_aimShotEffectEvents;
+    lv_moved = true;
+    if (lp_variant == 5) {
+        libNtve_gf_CreateUnitsAtPoint2(1, "Zergling", 0, 4, PointWithOffset(UnitGetPosition(lv_hero), 3.0, 0.0));
+        lv_decoy = UnitLastCreated();
+        UnitSetState(lv_decoy, c_unitStateStunned, true);
+    }
+    if (lp_variant == 2 || lp_variant == 3 || lp_variant == 4 || lp_variant == 5 || lp_variant == 7) {
+        gf_AttackSingleSet(lv_hero, false);
+    }
+    if (lp_variant == 1 || lp_variant == 3 || lp_variant == 4 || lp_variant == 5) {
+        UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
+        lv_moved = false;
+    }
+    if (lp_variant == 2) {
+        UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
+        UnitIssueOrder(lv_hero, lv_move, c_orderQueueReplace);
+    }
+    if (lp_variant == 7) {
+        UnitIssueOrder(lv_hero, lv_move, c_orderQueueReplace);
+    }
+    if (lp_variant == 6) {
+        UnitCreateEffectUnit(lv_hero, "SCOBAToshShot", lv_target);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "firstShotTick", -1);
+    for (lv_i = 1; lv_i <= 32; lv_i += 1) {
+        Wait(0.0625, c_timeGame);
+        if (gv_aimShotEffectEvents > lv_shots && BankValueGetAsInt(gv_dbgBank, lp_section, "firstShotTick") < 0) {
+            BankValueSetFromInt(gv_dbgBank, lp_section, "firstShotTick", lv_i);
+        }
+        if (!lv_moved && (lp_variant != 1 || gv_aimShotEffectEvents > lv_shots || lv_i >= 24)) {
+            UnitIssueOrder(lv_hero, lv_move, c_orderQueueReplace);
+            lv_moved = true;
+            BankValueSetFromInt(gv_dbgBank, lp_section, "moveTick", lv_i);
+        }
+        if (lv_i == 1 || lv_i == 2 || lv_i == 4) {
+            gf_ProbeOrders(lp_section, "t" + IntToString(lv_i));
+        }
+        if (lv_i == 4) {
+            BankValueSetFromInt(gv_dbgBank, lp_section, "cdLinkMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+            BankValueSetFromInt(gv_dbgBank, lp_section, "cdButtonMs", FixedToInt(UnitAbilityGetCooldown(lv_hero, "SCOBAAutoAttackStatus", c_DBG_BUTTON_COOLDOWN) * 1000.0));
+        }
+        if (lv_i == 4 || lv_i == 8 || lv_i == 16 || lv_i == 32) {
+            BankValueSetFromInt(gv_dbgBank, lp_section, "y10_t" + IntToString(lv_i), FixedToInt(PointGetY(UnitGetPosition(lv_hero)) * 10.0));
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "shots", gv_aimShotEffectEvents - lv_shots);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "targetHp", FixedToInt(UnitGetPropertyFixed(lv_target, c_unitPropLife, c_unitPropCurrent)));
+    if (UnitIsValid(lv_decoy)) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, "decoyHp", FixedToInt(UnitGetPropertyFixed(lv_decoy, c_unitPropLife, c_unitPropCurrent)));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "decoyHpMax", FixedToInt(UnitGetPropertyFixed(lv_decoy, c_unitPropLifeMax, c_unitPropCurrent)));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "targetDist10", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_target)) * 10.0));
+    gf_DbgSnap(lp_section, "tend");
+    gf_AttackSingleSet(lv_hero, true);
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    if (lp_variant == 4 || lp_variant == 7) {
+        UnitRemove(lv_target);
+    }
+    BankSave(gv_dbgBank);
+}
+
+// Where gf_DbgSpawnOne really places a unit, per requested dx. The engine
+// moves a spawn off a blocked point. Raw values only.
+void gf_ProbeSpawnScan (string lp_section) {
+    int lv_i;
+    fixed lv_dx;
+    unit lv_unit;
+
+    gf_DbgReset(lp_section, false, true);
+    for (lv_i = 0; lv_i <= 16; lv_i += 1) {
+        lv_dx = 12.0 + (IntToFixed(lv_i) * 0.5);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "pass_" + IntToString(lv_i), PointPathingPassable(PointWithOffset(gv_dbgAnchor, lv_dx, 0.0)));
+        lv_unit = gf_DbgSpawnOne(lp_section, lv_dx, 500.0);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "dist10_" + IntToString(lv_i), FixedToInt(DistanceBetweenPoints(gv_dbgAnchor, UnitGetPosition(lv_unit)) * 10.0));
+        Wait(0.0625, c_timeGame);
+    }
+    BankSave(gv_dbgBank);
+}
+
 bool gt_PncProbe_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
@@ -246,9 +440,22 @@ bool gt_PncProbe_Func (bool testConds, bool runActions) {
     gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
     BankSave(gv_dbgBank);
     gf_DbgProbeInit();
-
-
-
+    gf_ProbeSpawnScan("spawn_scan");
+    gf_ProbeTpsShot("tps_ff_own_tosh", 2, false, 4.0, 0.0, 1, false);
+    gf_ProbeTpsShot("tps_ff_enemy_tosh", 2, false, 4.0, 0.0, 4, false);
+    gf_ProbeTpsShot("tps_ff_own_kerr", 2, true, 3.0, 0.0, 1, false);
+    gf_ProbeTpsShot("tps_ff_enemy_kerr", 2, true, 3.0, 0.0, 4, false);
+    gf_ProbeTpsShot("tps_ff_own_talons", 2, true, 0.8, 0.0, 1, false);
+    gf_ProbeTpsShot("tps_rng_kerr_05", 2, true, 5.0, 0.0, 4, false);
+    gf_ProbeTpsShot("tps_rng_tosh_11", 2, false, 11.0, 0.0, 4, false);
+    gf_ProbeWalkShot("walk_none", 0);
+    gf_ProbeWalkShot("walk_order", 1);
+    gf_ProbeWalkShot("walk_auto_frame", 2);
+    gf_ProbeWalkShot("walk_auto_tick", 3);
+    gf_ProbeWalkShot("walk_auto_proxy", 4);
+    gf_ProbeWalkShot("walk_auto_decoy", 5);
+    gf_ProbeWalkShot("walk_effect", 6);
+    gf_ProbeWalkShot("walk_auto_idle", 7);
     gf_DbgReset("done", false, true);
     gf_DbgSnap("done", "tend");
     BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);

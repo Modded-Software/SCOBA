@@ -2,10 +2,10 @@
 
 void gf_AnimReset (int lp_player) {
     gv_animResets[lp_player] += 1;
-    gf_AimNoAttackApply(lp_player, gv_aIMACTIVE[lp_player]);
-    gf_ActionStatusHover(lp_player, null);
+    gf_TpsStatusHover(lp_player, null);
     gf_AnimUpperClear(lp_player);
     gf_AnimLowerClear(lp_player);
+    gf_AnimHeadClear(lp_player);
     gv_animUpperState[lp_player] = c_ANIM_UPPER_NONE;
     gv_animLowerState[lp_player] = c_ANIM_LOWER_NONE;
     gv_animUpperClipIndex[lp_player] = -1;

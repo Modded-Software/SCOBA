@@ -77,7 +77,7 @@ bool gt_CameraDebug_Func (bool testConds, bool runActions) {
     BankSectionCreate(lv_bank, "state");
     lv_text = "lock=" + gf_AnimFlag(gv_eDGEBLOCK[1]);
     lv_text = lv_text + " rel=" + gf_AnimFlag(gv_cONTROLRELATIVE[1]);
-    lv_text = lv_text + " action=" + gf_AnimFlag(gf_ActionModeActive(1));
+    lv_text = lv_text + " action=" + gf_AnimFlag(gf_TpsActive(1));
     lv_text = lv_text + " aim=" + gf_AnimFlag(gv_aIMACTIVE[1]);
     lv_text = lv_text + " count=" + IntToString(gv_cAMDBGCOUNT[1]);
     lv_text = lv_text + " last=" + IntToString(gv_cAMDBGLAST[1]);
@@ -180,10 +180,8 @@ bool gt_CursorStart_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if (gf_ActionModeActive(lv_localPlayer)) {
-        if ((EventMouseClickedButton() == gv_fIRE) && !gv_aCTIONALT[lv_localPlayer]) {
-            gf_AimBegin(lv_localPlayer);
-        }
+    if (gf_TpsActive(lv_localPlayer)) {
+        gf_TpsMouseDown(lv_localPlayer, EventMouseClickedButton());
         return true;
     }
 
@@ -229,10 +227,8 @@ bool gt_CursorEnd_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if (gf_ActionModeActive(lv_localPlayer)) {
-        if (EventMouseClickedButton() == gv_fIRE) {
-            gf_AimEnd(lv_localPlayer);
-        }
+    if (gf_TpsActive(lv_localPlayer)) {
+        gf_TpsMouseUp(lv_localPlayer, EventMouseClickedButton());
         return true;
     }
 
@@ -436,10 +432,10 @@ bool gt_CameraTurnTick_Func (bool testConds, bool runActions) {
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
         gf_StrafeHoldSync(lv_player);
-        if (!gf_StrafeHoldMoving(lv_player) && !gf_ActionModeActive(lv_player) && (gv_rOTATEUNIT[lv_player] == true) && UnitIsValid(gv_tPSUNIT[lv_player])) {
+        if (!gf_StrafeHoldMoving(lv_player) && (gv_holdStrafe[lv_player] || (!gf_TpsActive(lv_player) && gv_rOTATEUNIT[lv_player])) && UnitIsValid(gv_tPSUNIT[lv_player])) {
             gf_TurnToYaw(lv_player, CameraGetYaw(lv_player));
         }
-        else if (!gf_ActionModeActive(lv_player) && !gv_aIMACTIVE[lv_player]) {
+        else if (!gf_TpsActive(lv_player) && !gv_aIMACTIVE[lv_player]) {
             gv_animHasTurnTarget[lv_player] = false;
         }
     }

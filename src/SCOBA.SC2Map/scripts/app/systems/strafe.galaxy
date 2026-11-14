@@ -33,12 +33,16 @@ void gf_StrafeHoldSet (int lp_player, bool lp_on) {
 }
 
 // A right hold in point and click turns strafe movement on. A middle hold
-// steers instead and wins when both are held.
+// steers instead and wins when both are held. TPS strafes always, except
+// during a middle hold (R-TPS-10, R-TPS-11, R-TPS-30).
 void gf_StrafeHoldSync (int lp_player) {
     bool lv_on;
 
     lv_on = gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player] && !gv_mOUSEMIDDLE[lp_player];
-    if (gf_ActionModeActive(lp_player) || gv_sCOBAOrderMode[lp_player]) {
+    if (gf_TpsActive(lp_player)) {
+        lv_on = !gv_mOUSEMIDDLE[lp_player];
+    }
+    if (gv_sCOBAOrderMode[lp_player]) {
         lv_on = false;
     }
     gf_StrafeHoldSet(lp_player, lv_on);

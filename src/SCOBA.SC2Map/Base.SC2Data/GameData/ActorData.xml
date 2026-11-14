@@ -28,7 +28,7 @@
     <!--                                                                                         -->
     <CActorUnit id="Armory">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="1.500000,1.500000,2.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
@@ -36,18 +36,18 @@
     <!--                                                                                         -->
     <CActorUnit id="AutoTurret">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorUnit id="Banshee">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="3.500000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Battlecruiser                                                                           -->
     <!--                                                                                         -->
     <CActorUnit id="Battlecruiser">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="16.000000"/>
         <WalkAnimMoveSpeed value="1"/>
     </CActorUnit>
@@ -55,19 +55,21 @@
     <!-- Primal King                                                                          -->
     <!--                                                                                         -->
     <CActorUnit id="Brakk">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.200000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Colossus .............................................................................. -->
     <!--                                                                                         -->
     <CActorUnit id="Colossus">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="3.000000"/>
     </CActorUnit>
     <!-- Decals and Clan flags -->
     <!-- Terran -->
     <CActorUnit id="CommandCenter">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="3.000000,3.000000,3.500000"/>
     </CActorUnit>
     <!--                                                                                         -->
@@ -75,11 +77,11 @@
     <!--                                                                                         -->
     <CActorUnit id="EngineeringBay">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="1.500000,1.500000,2.000000"/>
     </CActorUnit>
     <CActorUnit id="Firebat">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <WalkAnimMoveSpeed value="2.812500"/>
     </CActorUnit>
     <CActorModel id="FirebatAttackModel">
@@ -92,6 +94,7 @@
     <!-- Greater Nydus Worm ........................................................................... -->
     <!--                                                                                         -->
     <CActorUnit id="GreaterNydusWorm">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorDoodad id="HavenTree">
@@ -101,23 +104,26 @@
     <!-- Hellion ............................................................................... -->
     <!--                                                                                         -->
     <CActorUnit id="Hellion">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorSquib id="HeroNukeExplode">
         <Map index="None" Scale="2.000000"/>
     </CActorSquib>
     <CActorUnit id="Hive">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="3.000000"/>
     </CActorUnit>
     <CActorUnit id="Immortal">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="3.000000"/>
     </CActorUnit>
     <CActorUnit id="InfestedColonistShip">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorUnit id="InfestedSiegeBreakerSieged">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorAction id="InfestedSiegeBreakerSiegedAttackDirected">
@@ -130,11 +136,13 @@
     <!-- Korhal Palace Turret ........................................................................ -->
     <!--                                                                                         -->
     <CActorUnit id="KorhalPalaceTurret">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Kraith -->
     <CActorUnit id="Kraith">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorModel id="KraithSpineVolleyAttackImpact">
@@ -144,12 +152,14 @@
     <!-- Drakken Laser Drill.................................................................... -->
     <!--                                                                                         -->
     <CActorUnit id="LaserDrillTripod">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="3.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Lurker ................................................................................ -->
     <!--                                                                                         -->
     <CActorUnit id="LurkerMP">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorModel id="LurkerMPAttackSpikes6">
@@ -159,43 +169,48 @@
     <!-- Marauder                                                                                -->
     <!--                                                                                         -->
     <CActorUnit id="Marauder">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="1.250000"/>
     </CActorUnit>
     <CActorUnit id="Marine">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="1.250000"/>
     </CActorUnit>
     <CActorUnit id="MengskBC">
         <Scale value="52.000000"/>
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.250000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.010000"/>
+        <!-- Death speed lives in the model: a unit-actor time scale never reaches the death model. -->
+        <DeathArray index="Normal" ModelLink="BattlecruiserLokiDeathSlow" SoundLink=""/>
     </CActorUnit>
     <CActorUnit id="Mitosaurus">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.500000"/>
     </CActorUnit>
     <CActorUnit id="MitosaurusB">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.500000"/>
     </CActorUnit>
     <CActorUnit id="MitosaurusC">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.500000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Mothership ............................................................................ -->
     <!--                                                                                         -->
     <CActorUnit id="Mothership">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="68.000000"/>
         <Baselines index="Walk" AnimProps="Default"/>
     </CActorUnit>
     <CActorUnit id="NydusCanal">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Overlord .............................................................................. -->
     <!--                                                                                         -->
     <CActorUnit id="Overlord">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="20.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
@@ -203,7 +218,7 @@
     <!--                                                                                         -->
     <CActorUnit id="PerditionTurret">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="1.500000"/>
     </CActorUnit>
     <!--                                                                                         -->
@@ -211,14 +226,14 @@
     <!--                                                                                         -->
     <CActorUnit id="Predator">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="0.800000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Queen ................................................................................. -->
     <!--                                                                                         -->
     <CActorUnit id="Queen">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.500000"/>
     </CActorUnit>
     <CActorDoodad id="RainEmitterLarge">
@@ -229,12 +244,13 @@
     <!-- Roach                                                                                -->
     <!--                                                                                         -->
     <CActorUnit id="Roach">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <!-- Roach->Corpser ................................................................................. -->
     <!--                                                                                         -->
     <CActorUnit id="RoachCorpser">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
@@ -242,7 +258,7 @@
     <!--                                                                                         -->
     <CActorUnit id="SensorTower">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="4.000000,4.000000,6.000000"/>
     </CActorUnit>
     <CActorAction id="SiegeBreakerSiegedAttack">
@@ -252,6 +268,7 @@
     <!-- Siege Tank ............................................................................ -->
     <!--                                                                                         -->
     <CActorUnit id="SiegeTank">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.500000"/>
     </CActorUnit>
     <!--                                                                                         -->
@@ -259,7 +276,7 @@
     <!--                                                                                         -->
     <CActorUnit id="SporeCannon">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorAction id="SporeCannonFire">
@@ -278,7 +295,7 @@
     </CActorMissile>
     <CActorUnit id="SporeCrawler">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="1.500000"/>
     </CActorUnit>
     <!--                                                                                         -->
@@ -286,11 +303,12 @@
         <Scale value="4.000000"/>
     </CActorMissile>
     <CActorUnit id="Stalker">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="1.500000"/>
     </CActorUnit>
     <CActorUnit id="SupplyDepot">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.500000,2.500000,3.500000"/>
         <!--DeathArray index="Normal" SoundLink=""/-->
     </CActorUnit>
@@ -298,10 +316,11 @@
     <!-- Terran Drop Pod (Art) ................................................................. -->
     <!--                                                                                         -->
     <CActorUnit id="TerranDropPod">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="4.500000"/>
     </CActorUnit>
     <CActorUnit id="Thor">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="3.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
@@ -310,6 +329,12 @@
     <CActorModel id="ToshSCOBA">
         <AnimBlendTime value="0.000000"/>
     </CActorModel>
+    <!-- The Tosh shot that ends in the air: the launch of ToshAttack, no hit. -->
+    <CActorAction id="SCOBAToshAirAttack" parent="GenericAttack" effectAttack="SCOBAToshAirU">
+        <LaunchAssets Model="ToshAttackLaunch" Sound="Tosh_AttackLaunch"/>
+        <ImpactMap index="None" Model="" Sound="" ModelReaction=""/>
+        <ImpactMap index="Shield" Sound="" ModelReaction=""/>
+    </CActorAction>
     <CActorModel id="KerriganSCOBA">
         <AnimBlendTime value="0.000000"/>
     </CActorModel>
@@ -319,7 +344,7 @@
         <Model value="ToshSCOBA"/>
         <Scale value="0.750000"/>
         <WalkAnimMoveSpeed value="3"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <VarianceWindowWalk value="0.000000"/>
         <BarWidth value="40"/>
         <BarOffset value="40"/>
@@ -348,6 +373,7 @@
         </TerrainSquibs>
     </CActorUnit>
     <CActorUnit id="KerriganSCOBAUnit" parent="GenericUnitBase" unitName="KerriganSCOBA">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <DeathArray index="Normal" SoundLink="Kerrigan_Death"/>
         <PortraitModel value="KerriganPortrait"/>
         <Model value="KerriganSCOBA"/>
@@ -379,42 +405,46 @@
     <!-- Ultralisk ............................................................................. -->
     <!--                                                                                         -->
     <CActorUnit id="Ultralisk">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.000000"/>
     </CActorUnit>
     <CActorUnit id="VikingAssault">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="3.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Viking ................................................................................ -->
     <!--                                                                                         -->
     <CActorUnit id="VikingFighter">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="3.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Vulture ............................................................................... -->
     <!--                                                                                         -->
     <CActorUnit id="Vulture">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="1.500000"/>
     </CActorUnit>
     <CActorSimple id="WalkBackwards">
         <EditorCategories value=""/>
     </CActorSimple>
     <CActorUnit id="WarpPrismPhasing">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="12.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Zerg Drop Pod (Art) ................................................................... -->
     <!--                                                                                         -->
     <CActorUnit id="ZergDropPod">
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="3.000000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Zergling .............................................................................. -->
     <!--                                                                                         -->
     <CActorUnit id="Zergling">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="1.250000"/>
     </CActorUnit>
     <CActorDoodad id="ZerusTree">
@@ -423,56 +453,56 @@
     </CActorDoodad>
     <CActorUnit id="Barracks">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="BarracksTechLab">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="Bunker">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="DukesRevenge">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <DeathArray index="Normal" ModelLink="BattlecruiserLokiDeathSlow" SoundLink=""/>
     </CActorUnit>
     <CActorUnit id="Factory">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="FactoryTechLab">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="Goliath">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="InfestedAbomination">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="InfestedCivilian">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="InfestedTerranCampaign">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="Infestor">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="Medic">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="MercCompound">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="Overseer">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="SCV">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="SpineCrawler">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
 </Catalog>

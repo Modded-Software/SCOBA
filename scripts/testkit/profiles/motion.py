@@ -1,4 +1,4 @@
-"""Action mode motion test profile."""
+"""TPS motion test profile."""
 
 from __future__ import annotations
 
@@ -65,8 +65,8 @@ def check(ctx, data: dict, checks) -> None:
 
     checks.eq("meta", "", "done", 1)
     checks.eq("meta", "", "profile", "motion")
-    checks.eq("motion_start", "t0000", "ActionMode", 1)
-    checks.eq("motion_move", "t15000", "ActionMode", 1)
+    checks.eq("motion_start", "t0000", "TpsMode", 1)
+    checks.eq("motion_move", "t15000", "TpsMode", 1)
     checks.eq("motion_start", "t0000", "AimActive", 1)
     checks.eq("motion_move", "t15000", "AimActive", 1)
     move_dx = (checks.value("motion_move", "t15000", "HeroX") or 0) - (checks.value("motion_start", "t0000", "HeroX") or 0)

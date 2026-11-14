@@ -1,0 +1,432 @@
+// WASD / TPS test profile.
+trigger gt_TpsTest;
+unit gv_dbgAlly;
+void gf_DbgTpsLook (unit lp_unit, fixed lp_extraYaw);
+
+// How far a point lies to the right of the hero, seen along the camera yaw.
+fixed gf_DbgTpsRight (point lp_point) {
+    point lv_hero;
+    fixed lv_yaw;
+
+    lv_hero = UnitGetPosition(gv_tPSUNIT[1]);
+    lv_yaw = CameraGetYaw(1) - 90.0;
+    return ((PointGetX(lp_point) - PointGetX(lv_hero)) * Cos(lv_yaw)) + ((PointGetY(lp_point) - PointGetY(lv_hero)) * Sin(lv_yaw));
+}
+
+// The real toggle order: command 0 enters TPS, command 1 returns to PNC.
+void gf_DbgTpsSet (bool lp_on) {
+    if (gf_TpsActive(1) == lp_on) {
+        return;
+    }
+    if (lp_on) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    }
+    else {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    }
+    Wait(0.5, c_timeGame);
+}
+
+// Every scenario starts in PNC with all state reset.
+void gf_DbgTpsReset (string lp_section) {
+    gf_DbgTpsSet(false);
+    gf_DbgReset(lp_section, false, true);
+}
+
+// The range of every hero weapon, keyed by weapon id.
+void gf_DbgTpsRanges (string lp_section, string lp_tag) {
+    unit lv_hero;
+    int lv_i;
+
+    lv_hero = gv_tPSUNIT[1];
+    for (lv_i = 1; lv_i <= UnitWeaponCount(lv_hero); lv_i += 1) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Range10_" + UnitWeaponGet(lv_hero, lv_i), FixedToInt(UnitWeaponRange(lv_hero, lv_i) * 10.0));
+    }
+}
+
+void gf_DbgTpsExtra (string lp_section, string lp_tag) {
+    gf_DbgTpsRanges(lp_section, lp_tag);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "TpsMode", gf_TpsActive(1));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "AimActive", gv_aIMACTIVE[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "MiddleHold", gv_mOUSEMIDDLE[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CursorVisible", gv_controlCursor[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CameraLock", gv_controlCameraLock[1]);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "ShotEffect", gv_tpsShotEffect[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ControlRelative", gv_cONTROLRELATIVE[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Crosshair", DialogIsVisible(gv_reticleDialog[1], 1));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CrossEnemy", UnitIsValid(gv_dbgEnemy) && (gf_AimUnitAtCrosshair(1, false) == gv_dbgEnemy));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamPitch", FixedToInt(CameraGetPitch(1)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamDist100", FixedToInt(CameraGetDistance(1) * 100.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "AnchorValid", UnitIsValid(gv_aimCameraProxy[1]));
+    if (UnitIsValid(gv_aimCameraProxy[1])) {
+        // The anchor offset from the hero along the camera's right-hand side.
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AnchorRight100", FixedToInt(gf_DbgTpsRight(UnitGetPosition(gv_aimCameraProxy[1])) * 100.0));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadStep", gv_animHeadStep[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadSends", gv_animHeadSends[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "PitchStep", gv_animAimPitchStep[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ShotKind", gv_tpsShotKind[1]);
+    // Raw values: which unit the crosshair is on.
+    if (UnitIsValid(gf_AimUnitAtCrosshair(1, false))) {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "CrossType", UnitGetType(gf_AimUnitAtCrosshair(1, false)));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CrossOwner", UnitGetOwner(gf_AimUnitAtCrosshair(1, false)));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CrossDist10", FixedToInt(DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), UnitGetPosition(gf_AimUnitAtCrosshair(1, false))) * 10.0));
+    }
+    else {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "CrossType", "none");
+    }
+    // Raw values for the pending-shot expiry.
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ShotAgeMs", FixedToInt((GameGetMissionTime() - gv_tpsShotAt[1]) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "MissionMs", FixedToInt(GameGetMissionTime() * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AimWeapon", gf_AimWeaponIndex(1));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AimPeriodMs", FixedToInt(UnitWeaponPeriod(gv_tPSUNIT[1], gf_AimWeaponIndex(1)) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ReticleKind", gv_reticleKind[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Presses", gv_aimShotPresses);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "FloatRange", gv_tpsFloaterCount[c_TPS_SHOT_OUT_OF_RANGE]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "FloatMiss", gv_tpsFloaterCount[c_TPS_SHOT_MISS]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "FloatFriendly", gv_tpsFloaterCount[c_TPS_SHOT_FRIENDLY]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "WeaponRange10", FixedToInt(gf_AimWeaponRange(1) * 10.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ProxyValid", UnitIsValid(gv_tpsProxy[1]));
+    if (UnitIsValid(gv_tpsProxy[1])) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ProxyZ100", FixedToInt(UnitGetHeight(gv_tpsProxy[1]) * 100.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ProxyDist10", FixedToInt(DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), UnitGetPosition(gv_tpsProxy[1])) * 10.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ProxyHp", FixedToInt(UnitGetPropertyFixed(gv_tpsProxy[1], c_unitPropLife, c_unitPropCurrent)));
+    }
+    if (UnitIsValid(gv_dbgAlly)) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AllyHp", FixedToInt(UnitGetPropertyFixed(gv_dbgAlly, c_unitPropLife, c_unitPropCurrent)));
+        BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CrossAlly", gf_AimUnitAtCrosshair(1, false) == gv_dbgAlly);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "AllyInRange", UnitInRangeAndAbleToAttackTarget(gv_tPSUNIT[1], gv_dbgAlly));
+    }
+    else {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AllyHp", -1);
+    }
+    BankSave(gv_dbgBank);
+}
+
+void gf_DbgTpsSnap (string lp_section, string lp_tag) {
+    gf_DbgSnap(lp_section, lp_tag);
+    gf_DbgTpsExtra(lp_section, lp_tag);
+}
+
+void gf_DbgTpsAllyClear () {
+    if (UnitIsValid(gv_dbgAlly)) {
+        UnitRemove(gv_dbgAlly);
+    }
+    gv_dbgAlly = null;
+}
+
+// Sets the camera yaw and pitch. A positive pitch looks down.
+void gf_DbgTpsCamera (fixed lp_yaw, fixed lp_pitch) {
+    CameraSetValue(1, c_cameraValueYaw, lp_yaw, 0.0, -1, 10);
+    CameraSetValue(1, c_cameraValuePitch, lp_pitch, 0.0, -1, 10);
+    Wait(0.4, c_timeGame);
+}
+
+// Aim shot cases (R-TPS-50 to 60, 70 to 76).
+const int c_DBG_SHOT_ENEMY = 0;
+const int c_DBG_SHOT_FAR_ENEMY = 1;
+const int c_DBG_SHOT_GROUND = 2;
+const int c_DBG_SHOT_SKY = 3;
+const int c_DBG_SHOT_FRIENDLY = 4;
+const int c_DBG_SHOT_NO_AIM = 5;
+
+// One scenario: arrange the case, aim, click, click again on cooldown.
+void gf_DbgTpsShot (string lp_section, int lp_case, bool lp_kerrigan, fixed lp_dx) {
+    gf_DbgTpsReset(lp_section);
+    gf_DbgTpsAllyClear();
+    if (lp_kerrigan) {
+        gf_HeroSwitchTo(gv_heroKerrigan);
+        Wait(0.5, c_timeGame);
+    }
+    if (lp_case == c_DBG_SHOT_ENEMY || lp_case == c_DBG_SHOT_FAR_ENEMY || lp_case == c_DBG_SHOT_NO_AIM) {
+        gf_DbgSpawnOne(lp_section, lp_dx, 500.0);
+    }
+    if (lp_case == c_DBG_SHOT_FRIENDLY) {
+        libNtve_gf_CreateUnitsAtPoint2(1, "Marine", 0, 1, PointWithOffset(gv_dbgAnchor, lp_dx, 0.0));
+        gv_dbgAlly = UnitLastCreated();
+        UnitSetState(gv_dbgAlly, c_unitStateStunned, true);
+    }
+    gf_DbgTpsSet(true);
+    if (UnitIsValid(gv_dbgEnemy)) {
+        gf_DbgTpsLook(gv_dbgEnemy, 0.0);
+    }
+    else if (UnitIsValid(gv_dbgAlly)) {
+        gf_DbgTpsLook(gv_dbgAlly, 0.0);
+    }
+    else if (lp_case == c_DBG_SHOT_SKY) {
+        gf_DbgTpsCamera(0.0, -25.0);
+    }
+    else {
+        gf_DbgTpsCamera(0.0, 30.0);
+    }
+    gf_DbgTpsSnap(lp_section, "t0000");
+    if (lp_case != c_DBG_SHOT_NO_AIM) {
+        gf_TpsMouseDown(1, gv_fIRE);
+        Wait(0.4, c_timeGame);
+    }
+    gf_DbgTpsSnap(lp_section, "taim");
+    gf_AimShotPress(1);
+    gf_DbgSnapAfterShot(lp_section, "tshot");
+    gf_DbgTpsExtra(lp_section, "tshot");
+    // A second click on cooldown: no shot, no text (R-TPS-58).
+    gf_AimShotPress(1);
+    Wait(1.6, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tend");
+    // A missile needs flight time at long range. Damage is read here.
+    Wait(2.0, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tlate");
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_DbgTpsSet(false);
+    gf_DbgTpsAllyClear();
+}
+
+// R-TPS-61: a click while walking fires and the walk does not slow. The hero
+// walks forward, aims at the ground, clicks once, and keeps the key held.
+// The path walked in the second after the click is compared with the path
+// walked in the second before it.
+void gf_DbgTpsShotWalk (string lp_section) {
+    point lv_before;
+    point lv_click;
+
+    gf_DbgTpsReset(lp_section);
+    gf_DbgTpsAllyClear();
+    gf_DbgTpsSet(true);
+    gf_DbgTpsCamera(270.0, 30.0);
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "t0000");
+    gv_fORWARD[1] = true;
+    Wait(0.5, c_timeGame);
+    lv_before = UnitGetPosition(gv_tPSUNIT[1]);
+    Wait(1.0, c_timeGame);
+    lv_click = UnitGetPosition(gv_tPSUNIT[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "BasePath1000", FixedToInt(DistanceBetweenPoints(lv_before, lv_click) * 1000.0));
+    gf_DbgTpsSnap(lp_section, "taim");
+    gf_AimShotPress(1);
+    gf_DbgTpsSnap(lp_section, "tpress");
+    Wait(0.25, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tshot");
+    Wait(0.75, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "ShotPath1000", FixedToInt(DistanceBetweenPoints(lv_click, UnitGetPosition(gv_tPSUNIT[1])) * 1000.0));
+    gf_DbgTpsSnap(lp_section, "tend");
+    gv_fORWARD[1] = false;
+    Wait(0.4, c_timeGame);
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_DbgTpsSet(false);
+}
+
+// A stop order right after the click cannot cancel the shot: the shot holds
+// no order. The next click after the cooldown fires again.
+void gf_DbgTpsShotStop (string lp_section) {
+    gf_DbgTpsReset(lp_section);
+    gf_DbgTpsAllyClear();
+    gf_DbgTpsSet(true);
+    // The sky: no map unit can stand on the aim ray.
+    gf_DbgTpsCamera(0.0, -25.0);
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "taim");
+    gf_AimShotPress(1);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    gf_DbgTpsSnap(lp_section, "tpress");
+    Wait(0.5, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tstop");
+    Wait(1.6, c_timeGame);
+    gf_AimShotPress(1);
+    gf_DbgSnapAfterShot(lp_section, "tshot");
+    gf_DbgTpsExtra(lp_section, "tshot");
+    Wait(0.5, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tend");
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_DbgTpsSet(false);
+}
+
+// Turns the camera so the crosshair ray passes through the unit, plus an
+// extra yaw. An extra yaw of 90 points the crosshair at empty ground.
+void gf_DbgTpsLook (unit lp_unit, fixed lp_extraYaw) {
+    point lv_from;
+    point lv_to;
+
+    lv_from = UnitGetPosition(gv_tPSUNIT[1]);
+    lv_to = UnitGetPosition(lp_unit);
+    CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to) + lp_extraYaw, 0.0, -1, 10);
+    CameraSetValue(1, c_cameraValuePitch, ATan2(c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
+    Wait(0.4, c_timeGame);
+}
+
+// R-TPS-30 to 35: cursor, mouse look, crosshair, and aim across a middle hold.
+void gf_DbgTpsCursor (string lp_section) {
+    gf_DbgTpsReset(lp_section);
+    gf_DbgTpsSnap(lp_section, "t0000");
+    gf_DbgTpsSet(true);
+    gf_DbgTpsSnap(lp_section, "ttps");
+    gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tmid");
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.3, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tmidaim");
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_TpsMouseUp(1, gv_aBILITYCAMERA);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "trel");
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.3, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "taim");
+    gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "taimmid");
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_TpsMouseUp(1, gv_aBILITYCAMERA);
+    Wait(0.3, c_timeGame);
+    gf_DbgTpsSet(false);
+    gf_DbgTpsSnap(lp_section, "tend");
+}
+
+// R-TPS-80, R-TPS-51: a click while not aiming targets like PNC and never
+// attacks. A click while aiming leaves the UI target alone.
+void gf_DbgTpsTarget (string lp_section) {
+    unit lv_enemy;
+
+    gf_DbgTpsReset(lp_section);
+    lv_enemy = gf_DbgSpawnOne(lp_section, 5.0, 500.0);
+    gf_DbgTpsSet(true);
+    gf_DbgTpsLook(lv_enemy, 0.0);
+    gf_DbgTpsSnap(lp_section, "tlook");
+    gf_TpsLeftClick(1);
+    Wait(0.5, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tclick");
+    gf_DbgTpsLook(lv_enemy, 90.0);
+    gf_DbgTpsSnap(lp_section, "taway");
+    gf_TpsLeftClick(1);
+    Wait(0.3, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tground");
+    gf_DbgTpsLook(lv_enemy, 0.0);
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "taim");
+    gf_TpsLeftClick(1);
+    gf_AimShotPress(1);
+    Wait(0.5, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "taimclick");
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_DbgTpsSet(false);
+    gf_DbgTpsSnap(lp_section, "tend");
+}
+
+// TPS with one movement key. The hero starts turned away from the camera
+// yaw, so the torso lock is visible in the facing. Then the camera turns
+// while the hero stands. Then TPS is left.
+void gf_DbgTpsMove (string lp_section, bool lp_back, bool lp_left) {
+    gf_DbgTpsReset(lp_section);
+    UnitSetFacing(gv_tPSUNIT[1], CameraGetYaw(1) + 120.0, 0.0);
+    Wait(0.2, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "t0000");
+    gf_DbgTpsSet(true);
+    gf_DbgTpsSnap(lp_section, "ttps");
+    gv_bACKWARD[1] = lp_back;
+    gv_lEFT[1] = lp_left;
+    Wait(1.5, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tmove");
+    gv_bACKWARD[1] = false;
+    gv_lEFT[1] = false;
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tstop");
+    CameraSetValue(1, c_cameraValueYaw, CameraGetYaw(1) + 90.0, 0.0, -1, 10);
+    Wait(0.6, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tturn");
+    gf_DbgTpsSet(false);
+    gf_DbgTpsSnap(lp_section, "tend");
+}
+
+bool gt_TpsTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBATPSTEST", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    BankSave(gv_dbgBank);
+    gf_DbgProbeInit();
+
+    if (gf_DbgGroup("move")) {
+        // R-TPS-10: S backpedals, A strafes. R-TPS-11: torso on camera yaw.
+        gf_DbgTpsMove("tps_back", true, false);
+        gf_DbgTpsMove("tps_left", false, true);
+    }
+    if (gf_DbgGroup("cursor")) {
+        gf_DbgTpsCursor("tps_cursor");
+    }
+    if (gf_DbgGroup("target")) {
+        gf_DbgTpsTarget("tps_target");
+    }
+    if (gf_DbgGroup("aim")) {
+        // R-TPS-40 to 44: a right hold aims; release restores the camera.
+        gf_DbgTpsReset("tps_aim");
+        gf_DbgTpsSet(true);
+        Wait(1.0, c_timeGame);
+        gf_DbgTpsSnap("tps_aim", "ttps");
+        gf_TpsMouseDown(1, gv_fIRE);
+        Wait(1.5, c_timeGame);
+        gf_DbgTpsSnap("tps_aim", "taim");
+        gf_TpsMouseUp(1, gv_fIRE);
+        Wait(1.5, c_timeGame);
+        gf_DbgTpsSnap("tps_aim", "trel");
+        gf_DbgTpsSet(false);
+        gf_DbgTpsSnap("tps_aim", "tend");
+    }
+    if (gf_DbgGroup("head")) {
+        // R-TPS-12 to 14: the head follows the camera pitch only outside aiming.
+        gf_DbgTpsReset("tps_head");
+        gf_DbgTpsCamera(CameraGetYaw(1), 20.0);
+        gf_DbgTpsSnap("tps_head", "t0000");
+        gf_DbgTpsSet(true);
+        gf_DbgTpsCamera(CameraGetYaw(1), 20.0);
+        gf_DbgTpsSnap("tps_head", "tlevel");
+        gf_DbgTpsCamera(CameraGetYaw(1), 60.0);
+        gf_DbgTpsSnap("tps_head", "tdown");
+        gf_DbgTpsCamera(CameraGetYaw(1), -25.0);
+        gf_DbgTpsSnap("tps_head", "tup");
+        gf_TpsMouseDown(1, gv_fIRE);
+        Wait(0.5, c_timeGame);
+        gf_DbgTpsSnap("tps_head", "taim");
+        gf_TpsMouseUp(1, gv_fIRE);
+        Wait(0.5, c_timeGame);
+        gf_DbgTpsSnap("tps_head", "trel");
+        gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+        Wait(0.4, c_timeGame);
+        gf_DbgTpsSnap("tps_head", "tmid");
+        gf_TpsMouseUp(1, gv_aBILITYCAMERA);
+        gf_DbgTpsSet(false);
+        gf_DbgTpsSnap("tps_head", "tend");
+    }
+    if (gf_DbgGroup("shot")) {
+        gf_DbgTpsShot("tps_shot_enemy", c_DBG_SHOT_ENEMY, false, 12.0);
+        gf_DbgTpsShot("tps_shot_far", c_DBG_SHOT_FAR_ENEMY, false, 17.0);
+        gf_DbgTpsShot("tps_shot_ground", c_DBG_SHOT_GROUND, false, 0.0);
+        gf_DbgTpsShot("tps_shot_sky", c_DBG_SHOT_SKY, false, 0.0);
+        gf_DbgTpsShot("tps_shot_friendly", c_DBG_SHOT_FRIENDLY, false, 4.0);
+        gf_DbgTpsShot("tps_shot_noaim", c_DBG_SHOT_NO_AIM, false, 5.0);
+        gf_DbgTpsShotWalk("tps_shot_walk");
+        gf_DbgTpsShotStop("tps_shot_stop");
+    }
+    if (gf_DbgGroup("kerrigan")) {
+        gf_DbgTpsShot("tps_kerr_enemy", c_DBG_SHOT_ENEMY, true, 12.0);
+        gf_DbgTpsShot("tps_kerr_far", c_DBG_SHOT_FAR_ENEMY, true, 17.0);
+        gf_DbgTpsShot("tps_kerr_sky", c_DBG_SHOT_SKY, true, 0.0);
+        gf_DbgTpsShot("tps_kerr_friendly", c_DBG_SHOT_FRIENDLY, true, 3.5);
+    }
+
+    gf_DbgTpsReset("done");
+    gf_DbgTpsSnap("done", "tend");
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_TpsTest_Init () {
+    gt_TpsTest = TriggerCreate("gt_TpsTest_Func");
+    TriggerAddEventMapInit(gt_TpsTest);
+}

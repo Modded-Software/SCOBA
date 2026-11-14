@@ -57,8 +57,6 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("rungun", "t0000", "CooldownRingMs", 0)
     checks.eq("rungun", "shot", "HeroAttackOrder", 0)
     checks.eq("rungun", "shot", "HeroMoveOrder", 1)
-    checks.eq("rungun", "t0000", "AimNoAttack", 1)
-    checks.eq("rungun", "t3000", "AimNoAttack", 1)
 
 
 def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> TestRunSpec:

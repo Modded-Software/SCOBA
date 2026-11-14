@@ -52,10 +52,22 @@
         <EffectArray value="ToshU"/>
         <EffectArray value="SCOBAAttackCooldown10"/>
     </CEffectSet>
+    <!-- TPS aim shot that ends in the air: the Tosh shot with no hit. It
+         launches as ToshU does and deals nothing. Its actor
+         SCOBAToshAirAttack has no impact model and no impact sound. -->
+    <CEffectDamage id="SCOBAToshAirU" parent="ToshU">
+        <Amount value="0"/>
+    </CEffectDamage>
+    <CEffectSet id="SCOBAToshAirShot">
+        <EffectArray value="SCOBAToshAirU"/>
+        <EffectArray value="SCOBAAttackCooldown10"/>
+    </CEffectSet>
     <CEffectCreatePersistent id="RazorTalonsPersistent">
         <InitialEffect value="SCOBAAttackCooldown15"/>
+        <WhichLocation Value="TargetUnitOrPoint"/>
     </CEffectCreatePersistent>
     <CEffectLaunchMissile id="PsiBlastLaunchMissile">
         <LaunchEffect value="SCOBAAttackCooldown10"/>
+        <ImpactLocation Value="TargetUnitOrPoint"/>
     </CEffectLaunchMissile>
 </Catalog>

@@ -38,10 +38,14 @@ and its tooling. Work in progress:
 - Two heroes, hero switch, order mode, HUD, and the character animation layer.
 - A deterministic map build and an in-game test kit.
 
-The current phase is `WASD / Point & Click`. Its contract and state are in:
+Two control modes have a contract and a state document:
 
-- [REQ-POINT-AND-CLICK](docs/requirements/REQ-POINT-AND-CLICK.md)
-- [SPEC-POINT-AND-CLICK](docs/specifications/SPEC-POINT-AND-CLICK.md)
+- `WASD / Point & Click`:
+  [REQ-POINT-AND-CLICK](docs/requirements/REQ-POINT-AND-CLICK.md),
+  [SPEC-POINT-AND-CLICK](docs/specifications/SPEC-POINT-AND-CLICK.md)
+- `WASD / TPS`, current phase, design only:
+  [REQ-TPS](docs/requirements/REQ-TPS.md),
+  [SPEC-TPS](docs/specifications/SPEC-TPS.md)
 
 ## Layout
 
@@ -63,6 +67,7 @@ first.
 | Command | Does |
 | --- | --- |
 | `scripts/playtest.sh build` | Rebuild and validate `out/SCOBA256.SC2Map`. |
+| `scripts/playtest.sh host-tests` | Rebuild, then run the Python `unittest` suite for the tooling. |
 | `scripts/playtest.sh launch` | Rebuild, then launch the map. |
 | `scripts/playtest.sh combat` | Run the full Point & Click suite, about three minutes. |
 | `scripts/playtest.sh combat <group>` | Run one group, about one minute. Groups: `idle`, `single`, `auto`, `cancel`, `wasd`, `hold`, `button`, `switch`, `kerrigan`. |

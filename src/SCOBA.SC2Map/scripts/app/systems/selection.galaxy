@@ -151,7 +151,7 @@ bool gf_HeroReselectEvent (int lp_player, bool testConds, bool runActions) {
     if (EventUnit() == gf_HeroUnit(lp_player)) {
         return true;
     }
-    if (gf_ActionModeActive(lp_player)) {
+    if (gf_TpsActive(lp_player)) {
         gf_SelectHeroForce(lp_player);
         return true;
     }
@@ -170,7 +170,7 @@ bool gf_UnitClickEvent (int lp_player, bool testConds, bool runActions) {
     if (UnitIsValid(gv_unitClickCandidate[lp_player])) {
         gf_DbgInputLog("unitClick", UnitGetType(gv_unitClickCandidate[lp_player]));
     }
-    if (gf_ActionModeActive(lp_player)) {
+    if (gf_TpsActive(lp_player)) {
         gf_SelectHeroForce(lp_player);
         return true;
     }

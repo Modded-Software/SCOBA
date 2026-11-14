@@ -1,6 +1,6 @@
 // Module: systems/controls
 
-bool gf_ActionModeActive (int lp_player) {
+bool gf_TpsActive (int lp_player) {
     unit lv_hero;
 
     if (!gf_IsHeroPlayer(lp_player)) {
@@ -10,7 +10,7 @@ bool gf_ActionModeActive (int lp_player) {
     if (!UnitIsValid(lv_hero)) {
         return false;
     }
-    return UnitBehaviorCount(lv_hero, c_SCOBA_ACTION_BEHAVIOR) > 0;
+    return UnitBehaviorCount(lv_hero, c_SCOBA_TPS_BEHAVIOR) > 0;
 }
 
 void gf_SelectionUIApply (int lp_player) {
@@ -37,25 +37,27 @@ void gf_ControlApply (int lp_player) {
     }
     gv_rOTATEUNIT[lp_player] = (gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player]) || gv_mOUSEMIDDLE[lp_player];
     gv_rOTATECAMERA[lp_player] = gv_lEFTORBIT[lp_player];
-    if (gf_ActionModeActive(lp_player)) {
-        lv_relative = !gv_aCTIONALT[lp_player];
+    if (gf_TpsActive(lp_player)) {
+        lv_relative = !gv_mOUSEMIDDLE[lp_player];
     }
     else {
         lv_relative = (gv_lEFTORBIT[lp_player] || (gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player]) || gv_mOUSEMIDDLE[lp_player]);
-    }
-    if (gv_aIMACTIVE[lp_player]) {
-        lv_relative = true;
     }
     gv_cONTROLRELATIVE[lp_player] = lv_relative;
     CameraSetMouseRotates(lp_player, lv_relative);
     CameraForceMouseRelative(lp_player, lv_relative);
     lv_group = PlayerGroupSingle(lp_player);
-    UISetCursorVisible(lv_group, true);
+    gv_controlCursor[lp_player] = !gf_TpsActive(lp_player) || gv_mOUSEMIDDLE[lp_player];
+    // A TPS middle hold frees the cursor (R-TPS-31). The engine's own camera
+    // input, the middle-button drag scroll, is locked for its duration.
+    gv_controlCameraLock[lp_player] = gf_TpsActive(lp_player) && gv_mOUSEMIDDLE[lp_player];
+    CameraLockInput(lp_player, gv_controlCameraLock[lp_player]);
+    UISetCursorVisible(lv_group, gv_controlCursor[lp_player]);
     UISetCursorAutoHide(lv_group, false, 0.0);
     gf_SelectionUIApply(lp_player);
 }
 
-void gf_ActionModeRestoreRPG (int lp_player) {
+void gf_PncRestore (int lp_player) {
     fixed lv_fov;
 
     if (gv_aIMACTIVE[lp_player]) {
@@ -73,11 +75,14 @@ void gf_ActionModeRestoreRPG (int lp_player) {
     gv_lEFTORBIT[lp_player] = false;
     gv_rIGHTORBIT[lp_player] = false;
     gv_mOUSEFORWARD[lp_player] = false;
-    gf_ActionStatusHover(lp_player, null);
+    gf_TpsStatusHover(lp_player, null);
+    gf_TpsShotClear(lp_player);
+    gf_TpsProxyRemove(lp_player);
+    gf_UiFloaterHide(lp_player);
     gf_ControlApply(lp_player);
 }
 
-void gf_ActionModeApply (int lp_player) {
+void gf_ControlModeApply (int lp_player) {
     unit lv_hero;
 
     if (!gf_IsHeroPlayer(lp_player)) {
@@ -87,8 +92,7 @@ void gf_ActionModeApply (int lp_player) {
     if (!UnitIsValid(lv_hero)) {
         return;
     }
-    gv_aCTIONPRESSED[lp_player] = false;
-    gv_aCTIONALT[lp_player] = false;
+    gv_tpsPressed[lp_player] = false;
     gv_mOUSERIGHTCANCEL[lp_player] = false;
     gv_mOUSELEFTCANCEL[lp_player] = false;
     gv_mOUSERIGHT[lp_player] = false;
@@ -96,17 +100,17 @@ void gf_ActionModeApply (int lp_player) {
     gv_lEFTORBIT[lp_player] = false;
     gv_rIGHTORBIT[lp_player] = false;
     gv_mOUSEMIDDLE[lp_player] = false;
-    gf_ActionStatusHover(lp_player, null);
+    gf_TpsStatusHover(lp_player, null);
     gf_AnimReset(lp_player);
-    if (gf_ActionModeActive(lp_player)) {
+    if (gf_TpsActive(lp_player)) {
         gf_ControlApply(lp_player);
     }
     else {
-        gf_ActionModeRestoreRPG(lp_player);
+        gf_PncRestore(lp_player);
     }
 }
 
-void gf_ActionModeEnsureRPG (int lp_player) {
+void gf_PncEnsure (int lp_player) {
     unit lv_hero;
 
     if (!gf_IsHeroPlayer(lp_player)) {
@@ -116,78 +120,47 @@ void gf_ActionModeEnsureRPG (int lp_player) {
     if (!UnitIsValid(lv_hero)) {
         return;
     }
-    UnitBehaviorRemove(lv_hero, c_SCOBA_ACTION_BEHAVIOR, 1);
-    gf_ActionModeApply(lp_player);
+    UnitBehaviorRemove(lv_hero, c_SCOBA_TPS_BEHAVIOR, 1);
+    gf_ControlModeApply(lp_player);
 }
 
-void gf_ActionModeAltApply (int lp_player) {
-    unit lv_hero;
-
-    if (!gf_IsHeroPlayer(lp_player)) {
-        return;
+// TPS mouse buttons. A middle hold frees the cursor and stops mouse look
+// (R-TPS-30 to 35). A right hold aims, except during a middle hold.
+void gf_TpsMouseDown (int lp_player, int lp_button) {
+    if (lp_button == gv_aBILITYCAMERA) {
+        gv_mOUSEMIDDLE[lp_player] = true;
+        if (gv_aIMACTIVE[lp_player]) {
+            gf_AimEnd(lp_player);
+        }
+        gf_ControlApply(lp_player);
     }
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return;
+    else if ((lp_button == gv_fIRE) && !gv_mOUSEMIDDLE[lp_player]) {
+        gf_AimBegin(lp_player);
     }
-    if (!gf_ActionModeActive(lp_player)) {
-        return;
-    }
-    gf_ControlApply(lp_player);
 }
 
-bool gt_ActionAltStart_Func (bool testConds, bool runActions) {
+void gf_TpsMouseUp (int lp_player, int lp_button) {
+    if (lp_button == gv_aBILITYCAMERA) {
+        gv_mOUSEMIDDLE[lp_player] = false;
+        gf_ControlApply(lp_player);
+    }
+    else if (lp_button == gv_fIRE) {
+        gf_AimEnd(lp_player);
+    }
+}
+
+bool gt_TpsOn_Func (bool testConds, bool runActions) {
     int lv_player;
 
     if (!runActions) {
         return true;
     }
     lv_player = EventPlayer();
-    if (!gf_ActionModeActive(lv_player)) {
-        return true;
-    }
-    gv_aCTIONALT[lv_player] = true;
-    gf_ActionModeAltApply(lv_player);
+    gf_ControlModeApply(lv_player);
     return true;
 }
 
-void gt_ActionAltStart_Init () {
-    gt_ActionAltStart = TriggerCreate("gt_ActionAltStart_Func");
-    TriggerAddEventKeyPressed(gt_ActionAltStart, c_playerAny, c_keyAlt, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
-}
-
-bool gt_ActionAltEnd_Func (bool testConds, bool runActions) {
-    int lv_player;
-
-    if (!runActions) {
-        return true;
-    }
-    lv_player = EventPlayer();
-    if (!gf_ActionModeActive(lv_player)) {
-        return true;
-    }
-    gv_aCTIONALT[lv_player] = false;
-    gf_ActionModeAltApply(lv_player);
-    return true;
-}
-
-void gt_ActionAltEnd_Init () {
-    gt_ActionAltEnd = TriggerCreate("gt_ActionAltEnd_Func");
-    TriggerAddEventKeyPressed(gt_ActionAltEnd, c_playerAny, c_keyAlt, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
-}
-
-bool gt_ActionModeOn_Func (bool testConds, bool runActions) {
-    int lv_player;
-
-    if (!runActions) {
-        return true;
-    }
-    lv_player = EventPlayer();
-    gf_ActionModeApply(lv_player);
-    return true;
-}
-
-bool gt_ActionModeOff_Func (bool testConds, bool runActions) {
+bool gt_TpsOff_Func (bool testConds, bool runActions) {
     int lv_player;
 
     if (!runActions) {
@@ -197,24 +170,24 @@ bool gt_ActionModeOff_Func (bool testConds, bool runActions) {
     if (gv_aIMACTIVE[lv_player]) {
         gf_AimEnd(lv_player);
     }
-    gf_ActionModeApply(lv_player);
+    gf_ControlModeApply(lv_player);
     return true;
 }
 
-void gt_ActionModeToggle_Init () {
-    gt_ActionModeOn = TriggerCreate("gt_ActionModeOn_Func");
-    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOn, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBAActionModeToggle", 0), c_unitAbilStageComplete, false);
+void gt_TpsToggle_Init () {
+    gt_TpsOn = TriggerCreate("gt_TpsOn_Func");
+    TriggerAddEventUnitAbility(gt_TpsOn, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBATPSToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOn, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBATPSToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOn, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBATPSToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOn, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBATPSToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOn, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBATPSToggle", 0), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOn, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBATPSToggle", 0), c_unitAbilStageComplete, false);
 
-    gt_ActionModeOff = TriggerCreate("gt_ActionModeOff_Func");
-    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
-    TriggerAddEventUnitAbility(gt_ActionModeOff, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBAActionModeToggle", 1), c_unitAbilStageComplete, false);
+    gt_TpsOff = TriggerCreate("gt_TpsOff_Func");
+    TriggerAddEventUnitAbility(gt_TpsOff, UnitRefFromVariable("gv_tPSUNIT[1]"), AbilityCommand("SCOBATPSToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOff, UnitRefFromVariable("gv_tPSUNIT[2]"), AbilityCommand("SCOBATPSToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOff, UnitRefFromVariable("gv_tPSUNIT[3]"), AbilityCommand("SCOBATPSToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOff, UnitRefFromVariable("gv_tPSUNIT[4]"), AbilityCommand("SCOBATPSToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOff, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBATPSToggle", 1), c_unitAbilStageComplete, false);
+    TriggerAddEventUnitAbility(gt_TpsOff, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBATPSToggle", 1), c_unitAbilStageComplete, false);
 }

@@ -313,6 +313,55 @@ void gf_AnimTargetPitchClear (int lp_player) {
     gv_animTargetPitchTime[lp_player] = -1.0;
 }
 
+void gf_AnimHeadClear (int lp_player) {
+    if (gv_animHeadStep[lp_player] == 0) {
+        return;
+    }
+    gv_animHeadStep[lp_player] = 0;
+    if (UnitIsValid(gv_tPSUNIT[lp_player])) {
+        ActorSend(libNtve_gf_MainActorofUnit(gv_tPSUNIT[lp_player]), "AnimClear " + c_ANIM_BRACKET_HEAD);
+    }
+}
+
+// The head step for a camera pitch: 1 is fully down, the last is fully up.
+int gf_AnimHeadStep (fixed lp_cameraPitch) {
+    fixed lv_tilt;
+
+    if (lp_cameraPitch > 180.0) {
+        lp_cameraPitch = lp_cameraPitch - 360.0;
+    }
+    lv_tilt = (c_ANIM_HEAD_LEVEL_PITCH - lp_cameraPitch) * c_ANIM_HEAD_SCALE;
+    lv_tilt = MaxF(-c_ANIM_HEAD_MAX, MinF(c_ANIM_HEAD_MAX, lv_tilt));
+    return FixedToInt(Round(((lv_tilt + c_ANIM_HEAD_MAX) / (2.0 * c_ANIM_HEAD_MAX)) * (c_ANIM_HEAD_STEPS - 1))) + 1;
+}
+
+// TPS, not aiming: the head tilts slightly toward the camera pitch
+// (R-TPS-13). Aiming pitches the whole torso instead (R-TPS-14). A middle
+// hold turns it off with the rest of the TPS body rules.
+void gf_AnimHeadTick (int lp_player) {
+    unit lv_hero;
+    int lv_profile;
+    int lv_step;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        gv_animHeadStep[lp_player] = 0;
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    if (!gf_TpsActive(lp_player) || gv_aIMACTIVE[lp_player] || gv_mOUSEMIDDLE[lp_player] || (lv_profile != c_ANIM_HERO_TOSH && lv_profile != c_ANIM_HERO_KERRIGAN)) {
+        gf_AnimHeadClear(lp_player);
+        return;
+    }
+    lv_step = gf_AnimHeadStep(CameraGetPitch(lp_player));
+    if (lv_step == gv_animHeadStep[lp_player]) {
+        return;
+    }
+    ActorSend(libNtve_gf_MainActorofUnit(lv_hero), MakeMsgAnimPlay(c_ANIM_BRACKET_HEAD, "Ready,Cover," + gf_AnimAimPitchNum(lv_step), c_animFlagPlayForever, c_ANIM_HEAD_BLEND, c_ANIM_HEAD_BLEND, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    gv_animHeadStep[lp_player] = lv_step;
+    gv_animHeadSends[lp_player] += 1;
+}
+
 bool gt_AnimPitchTick_Func (bool testConds, bool runActions) {
     int lv_player;
 
@@ -320,6 +369,7 @@ bool gt_AnimPitchTick_Func (bool testConds, bool runActions) {
         return true;
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_AnimHeadTick(lv_player);
         gf_AnimAimPitchTick(lv_player);
     }
     return true;

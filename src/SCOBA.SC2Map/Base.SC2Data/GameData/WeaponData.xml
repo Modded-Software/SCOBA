@@ -16,7 +16,13 @@
     <CWeaponLegacy id="KraithSpineVolley">
         <TargetFilters value="-;Missile,Stasis,Dead,Invulnerable"/>
     </CWeaponLegacy>
+    <!-- Ranged hero weapons reach twice as far in game as stock. The hero
+         behavior UnitDirectControl adds 2 to every weapon range, so stock
+         Tosh 5 + 2 = 7 becomes 12 + 2 = 14 and stock Psi Blast 4 + 2 = 6
+         becomes 10 + 2 = 12. The Auto child weapons inherit the range.
+         Razor Talons is melee and unchanged. -->
     <CWeaponLegacy id="QueenOfBladesPsiBlast">
+        <Range value="10"/>
         <Period value="1"/>
         <Cost>
             <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1"/>
@@ -28,6 +34,7 @@
         </Cost>
     </CWeaponLegacy>
     <CWeaponLegacy id="Tosh">
+        <Range value="12"/>
         <Effect value="SCOBAToshShot"/>
         <Cost>
             <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1"/>

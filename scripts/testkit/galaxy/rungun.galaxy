@@ -1,4 +1,4 @@
-// Fast Action/aim moving-fire test profile
+// TPS aim shot while walking test profile
 
 trigger gt_RungunTest;
 
@@ -17,7 +17,6 @@ void gf_RungunSnap (string lp_tag) {
     BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "WeaponPeriodMs", FixedToInt(UnitWeaponPeriodRemaining(lv_hero, 1) * 1000.0));
     BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "HeroAttackOrder", UnitOrderHasAbil(lv_hero, "attack"));
     BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "HeroMoveOrder", UnitOrderHasAbil(lv_hero, "move"));
-    BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "AimNoAttack", UnitBehaviorCount(lv_hero, "SCOBAAimNoAttack"));
     BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "CooldownRingMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
     BankSave(gv_dbgBank);
 }

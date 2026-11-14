@@ -1,9 +1,20 @@
 // Module: systems/damage_floaters
 
-void gf_FloaterCreate (int lp_player, point lp_point, text lp_text, color lp_color) {
-    int lv_tag;
+// The font size of a damage number: the base size at 0 damage, the largest
+// size from c_FLOATER_DAMAGE_FULL up.
+int gf_FloaterDamageSize (fixed lp_damage) {
+    fixed lv_share;
 
-    TextTagCreate(lp_text, 24, lp_point, 1.6, true, false, PlayerGroupSingle(lp_player));
+    lv_share = MinF(MaxF(lp_damage, 0.0) / c_FLOATER_DAMAGE_FULL, 1.0);
+    return c_FLOATER_SIZE_BASE + FixedToInt(Round(lv_share * IntToFixed(c_FLOATER_SIZE_MAX - c_FLOATER_SIZE_BASE)));
+}
+
+void gf_FloaterCreate (int lp_player, point lp_point, text lp_text, color lp_color, int lp_size) {
+    int lv_tag;
+    point lv_point;
+
+    lv_point = PointWithOffset(lp_point, RandomFixed(0.0 - c_FLOATER_JITTER, c_FLOATER_JITTER), RandomFixed(0.0 - c_FLOATER_JITTER, c_FLOATER_JITTER));
+    TextTagCreate(lp_text, lp_size, lv_point, 1.6, true, false, PlayerGroupSingle(lp_player));
     lv_tag = TextTagLastCreated();
     TextTagSetColor(lv_tag, c_textTagColorText, lp_color);
     TextTagSetVelocity(lv_tag, 0.35, 90.0);
@@ -46,7 +57,7 @@ bool gt_DamageFloater_Func (bool testConds, bool runActions) {
 
     lv_amount = FixedToInt(Round(lv_damage));
     lv_text = StringToText(IntToString(lv_amount));
-    gf_FloaterCreate(lv_player, UnitGetPosition(lv_victim), lv_text, Color(100.0, 25.0, 25.0));
+    gf_FloaterCreate(lv_player, UnitGetPosition(lv_victim), lv_text, Color(100.0, 25.0, 25.0), gf_FloaterDamageSize(lv_damage));
     return true;
 }
 

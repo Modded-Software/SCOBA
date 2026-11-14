@@ -1,21 +1,11 @@
 // Module: systems/aim
 
-point gf_AimShoulderPoint (int lp_player) {
-    unit lv_hero;
-    point lv_pos;
-    fixed lv_yaw;
-    fixed lv_x;
-    fixed lv_y;
-
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return Point(0.0, 0.0);
+// The yaw offset from the camera yaw to the aim camera side (R-TPS-42).
+fixed gf_AimSideAngle () {
+    if (c_SCOBA_AIM_SIDE == "left") {
+        return c_SCOBA_AIM_SHOULDER_ANGLE;
     }
-    lv_pos = UnitGetPosition(lv_hero);
-    lv_yaw = CameraGetYaw(lp_player) + c_SCOBA_AIM_SHOULDER_ANGLE;
-    lv_x = PointGetX(lv_pos) + (Cos(lv_yaw) * c_SCOBA_AIM_SHOULDER_OFFSET);
-    lv_y = PointGetY(lv_pos) + (Sin(lv_yaw) * c_SCOBA_AIM_SHOULDER_OFFSET);
-    return Point(lv_x, lv_y);
+    return -c_SCOBA_AIM_SHOULDER_ANGLE;
 }
 
 point gf_AimProxyPoint (int lp_player) {
@@ -31,7 +21,7 @@ point gf_AimProxyPoint (int lp_player) {
         return Point(0.0, 0.0);
     }
     lv_pos = UnitGetPosition(lv_hero);
-    lv_yaw = CameraGetYaw(lp_player) + c_SCOBA_AIM_SHOULDER_ANGLE;
+    lv_yaw = CameraGetYaw(lp_player) + gf_AimSideAngle();
     lv_offset = c_SCOBA_AIM_SHOULDER_OFFSET;
     lv_x = PointGetX(lv_pos) + (Cos(lv_yaw) * lv_offset);
     lv_y = PointGetY(lv_pos) + (Sin(lv_yaw) * lv_offset);
@@ -129,7 +119,6 @@ void gf_AimBegin (int lp_player) {
     gv_unitPressHighlight[lp_player] = null;
     gv_unitRightPressHighlight[lp_player] = null;
     gf_CombatSetRoot(lp_player, false);
-    UnitBehaviorAdd(gv_tPSUNIT[lp_player], c_SCOBA_NO_TURN_BEHAVIOR, gv_tPSUNIT[lp_player], 1);
     if (!gf_MovementKeyHeld(lp_player)) {
         gf_AimMoveStop(lp_player);
     }
@@ -166,7 +155,6 @@ void gf_AimEnd (int lp_player) {
     }
     if (UnitIsValid(gv_tPSUNIT[lp_player])) {
         UnitSetFacing(gv_tPSUNIT[lp_player], CameraGetYaw(lp_player), c_ANIM_AIM_TURN_DURATION);
-        UnitBehaviorRemove(gv_tPSUNIT[lp_player], c_SCOBA_NO_TURN_BEHAVIOR, 1);
     }
     gv_aIMACTIVE[lp_player] = false;
     gv_unitClickCandidate[lp_player] = null;
@@ -216,56 +204,52 @@ void gt_AimInit_Init () {
     TriggerAddEventMapInit(gt_AimInit);
 }
 
-int gf_ReticleKindAt (int lp_player) {
+// What is under the crosshair (R-TPS-23 to 26).
+int gf_ReticleKind (int lp_player) {
     unit lv_unit;
 
     if (!gf_IsHeroPlayer(lp_player)) {
-        return 0;
+        return c_RETICLE_NORMAL;
     }
     lv_unit = gf_AimUnitAtCrosshair(lp_player, false);
     if (!UnitIsValid(lv_unit)) {
-        return 0;
+        return c_RETICLE_NORMAL;
     }
-    if (gf_IsClickEnemy(lp_player, lv_unit)) {
-        if (UnitIsValid(gv_tPSUNIT[lp_player]) && !gf_AimTargetInRange(lp_player, lv_unit)) {
-            return 3;
-        }
-        return 1;
+    if (gf_IsClickFriendly(lp_player, lv_unit)) {
+        return c_RETICLE_FRIENDLY;
     }
-    if (UnitGetOwner(lv_unit) == lp_player) {
-        return 2;
+    if (gf_AimTargetInRange(lp_player, lv_unit)) {
+        return c_RETICLE_ENEMY;
     }
-    return 0;
+    return c_RETICLE_ENEMY_FAR;
 }
 
-int gf_ReticleKind (int lp_player) {
-    if (!gf_IsHeroPlayer(lp_player)) {
-        return 0;
+// Green on an enemy in range, gray on one out of range, yellow on a
+// friendly unit, white otherwise.
+color gf_ReticleColor (int lp_kind) {
+    if (lp_kind == c_RETICLE_ENEMY) {
+        return Color(15.0, 100.0, 15.0);
     }
-    return gf_ReticleKindAt(lp_player);
+    if (lp_kind == c_RETICLE_ENEMY_FAR) {
+        return Color(50.0, 50.0, 50.0);
+    }
+    if (lp_kind == c_RETICLE_FRIENDLY) {
+        return Color(100.0, 90.0, 10.0);
+    }
+    return Color(100.0, 100.0, 100.0);
 }
 
 void gf_ReticleCreate (int lp_player) {
-    playergroup lv_group;
-
     if (gv_reticleDialog[lp_player] != c_invalidDialogId) {
         return;
     }
-    lv_group = PlayerGroupSingle(lp_player);
     DialogCreate(32, 32, c_anchorCenter, 0, 0, false);
     gv_reticleDialog[lp_player] = DialogLastCreated();
     DialogSetImageVisible(gv_reticleDialog[lp_player], false);
-    libNtve_gf_CreateDialogItemImage(gv_reticleDialog[lp_player], 32, 32, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\cursor-target-none.dds", c_triggerImageTypeNormal, false, Color(255,255,255), c_triggerBlendModeNormal);
-    gv_reticleBase[lp_player] = DialogControlLastCreated();
-    libNtve_gf_CreateDialogItemImage(gv_reticleDialog[lp_player], 32, 32, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\cursor-target-none.dds", c_triggerImageTypeNormal, false, Color(255,60,60), c_triggerBlendModeNormal);
-    gv_reticleEnemy[lp_player] = DialogControlLastCreated();
-    libNtve_gf_SetDialogItemDesaturationColor(gv_reticleEnemy[lp_player], Color(70.0, 70.0, 70.0), lv_group);
-    libNtve_gf_CreateDialogItemImage(gv_reticleDialog[lp_player], 32, 32, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\cursor-target-none.dds", c_triggerImageTypeNormal, false, Color(80,180,255), c_triggerBlendModeNormal);
-    gv_reticleFriendly[lp_player] = DialogControlLastCreated();
-    DialogControlSetVisible(gv_reticleBase[lp_player], lv_group, true);
-    DialogControlSetVisible(gv_reticleEnemy[lp_player], lv_group, false);
-    DialogControlSetVisible(gv_reticleFriendly[lp_player], lv_group, false);
-    DialogSetVisible(gv_reticleDialog[lp_player], lv_group, false);
+    libNtve_gf_CreateDialogItemImage(gv_reticleDialog[lp_player], 32, 32, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\cursor-target-none.dds", c_triggerImageTypeNormal, false, gf_ReticleColor(c_RETICLE_NORMAL), c_triggerBlendModeNormal);
+    gv_reticleImage[lp_player] = DialogControlLastCreated();
+    gv_reticleKind[lp_player] = c_RETICLE_NORMAL;
+    DialogSetVisible(gv_reticleDialog[lp_player], PlayerGroupSingle(lp_player), false);
 }
 
 bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
@@ -283,18 +267,18 @@ bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
         }
         gf_ReticleCreate(lv_player);
         lv_group = PlayerGroupSingle(lv_player);
-        lv_visible = gf_ActionModeActive(lv_player) && !gv_aCTIONALT[lv_player];
+        lv_visible = gf_TpsActive(lv_player) && !gv_mOUSEMIDDLE[lv_player];
         DialogSetVisible(gv_reticleDialog[lv_player], lv_group, lv_visible);
         if (!lv_visible) {
-            gf_ActionStatusHover(lv_player, null);
+            gf_TpsStatusHover(lv_player, null);
             continue;
         }
-        gf_ActionStatusHover(lv_player, gf_AimUnitAtCrosshair(lv_player, false));
+        gf_TpsStatusHover(lv_player, gf_AimUnitAtCrosshair(lv_player, false));
         lv_kind = gf_ReticleKind(lv_player);
-        DialogControlSetVisible(gv_reticleBase[lv_player], lv_group, lv_kind == 0);
-        DialogControlSetVisible(gv_reticleEnemy[lv_player], lv_group, (lv_kind == 1) || (lv_kind == 3));
-        libNtve_gf_SetDialogItemDesaturated(gv_reticleEnemy[lv_player], lv_kind == 3, lv_group);
-        DialogControlSetVisible(gv_reticleFriendly[lv_player], lv_group, lv_kind == 2);
+        if (lv_kind != gv_reticleKind[lv_player]) {
+            gv_reticleKind[lv_player] = lv_kind;
+            libNtve_gf_SetDialogItemColor(gv_reticleImage[lv_player], gf_ReticleColor(lv_kind), lv_group);
+        }
     }
     return true;
 }
@@ -315,6 +299,7 @@ bool gt_AimCameraTick_Func (bool testConds, bool runActions) {
             continue;
         }
         gf_AimCameraTick(lv_player);
+        gf_TpsShotExpire(lv_player);
     }
     return true;
 }

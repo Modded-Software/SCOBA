@@ -42,9 +42,9 @@ def on_ready(ctx, data: dict) -> None:
 
 def _check_icons(checks) -> None:
     icon_dir = PROFILE_OUTPUTS["controls"] / "Assets" / "Textures"
-    rpg = (icon_dir / "SCOBAModeRPG.dds").read_bytes()
-    actions = (icon_dir / "SCOBAModeActions.dds").read_bytes()
-    if rpg == actions:
+    pnc = (icon_dir / "SCOBAModePNC.dds").read_bytes()
+    tps = (icon_dir / "SCOBAModeTPS.dds").read_bytes()
+    if pnc == tps:
         print("controls_icons: icon files match FAIL")
         checks.failures += 1
     else:
@@ -52,8 +52,8 @@ def _check_icons(checks) -> None:
     button_path = PROFILE_OUTPUTS["controls"] / "Base.SC2Data" / "GameData" / "ButtonData.xml"
     buttons = {element.get("id"): element for element in ET.parse(button_path).getroot().iter("CButton")}
     expected = {
-        "SCOBAActionModeRPG": r"Assets\Textures\SCOBAModeRPG.dds",
-        "SCOBAActionModeActions": r"Assets\Textures\SCOBAModeActions.dds",
+        "SCOBAControlPNC": r"Assets\Textures\SCOBAModePNC.dds",
+        "SCOBAControlTPS": r"Assets\Textures\SCOBAModeTPS.dds",
     }
     for button_id, icon_path in expected.items():
         icon = buttons[button_id].find("Icon")
@@ -73,64 +73,66 @@ def check(ctx, data: dict, checks) -> None:
 
     checks.eq("meta", "", "done", 1)
     checks.eq("meta", "", "profile", "controls")
-    checks.eq("controls_default", "t0000", "ActionMode", 0)
+    checks.eq("controls_default", "t0000", "TpsMode", 0)
     checks.eq("controls_default", "t0000", "ControlRelative", 0)
     checks.eq("controls_default", "t0000", "RotateUnit", 0)
     checks.eq("controls_default", "t0000", "RotateCamera", 0)
     # Synthetic pointer warps do not emit mouse-moved events; hover is checked live.
-    checks.eq("controls_rpg_hold", "t0800", "AimActive", 0)
-    checks.eq("controls_rpg_hold", "t0800", "Fov", checks.value("controls_default", "t0000", "Fov"))
-    move_dx = (checks.value("controls_rpg_move", "t1500", "HeroX") or 0) - (checks.value("controls_rpg_hold", "t0800", "HeroX") or 0)
-    move_dy = (checks.value("controls_rpg_move", "t1500", "HeroY") or 0) - (checks.value("controls_rpg_hold", "t0800", "HeroY") or 0)
+    checks.eq("controls_pnc_hold", "t0800", "AimActive", 0)
+    checks.eq("controls_pnc_hold", "t0800", "Fov", checks.value("controls_default", "t0000", "Fov"))
+    move_dx = (checks.value("controls_pnc_move", "t1500", "HeroX") or 0) - (checks.value("controls_pnc_hold", "t0800", "HeroX") or 0)
+    move_dy = (checks.value("controls_pnc_move", "t1500", "HeroY") or 0) - (checks.value("controls_pnc_hold", "t0800", "HeroY") or 0)
     if abs(move_dx) + abs(move_dy) >= 1:
-        print("controls_rpg_move displacement: PASS")
+        print("controls_pnc_move displacement: PASS")
     else:
-        print("controls_rpg_move displacement: FAIL")
+        print("controls_pnc_move displacement: FAIL")
         checks.failures += 1
-    checks.eq("controls_rpg_move", "t1500", "LowerState", 2)
-    checks.eq("controls_rpg_stop", "t3000", "LowerState", 1)
-    checks.eq("controls_rpg_select", "t0100", "TargetType", "hostile")
-    checks.eq("controls_rpg_target_idle", "t0300", "TargetType", "hostile")
-    checks.eq("controls_rpg_stale", "t0100", "TargetType", "hostile")
-    checks.false("controls_rpg_stale", "t0100", "AttackOrder")
-    checks.eq("controls_action", "t0500", "ActionMode", 1)
-    checks.eq("controls_cursor", "t0000", "CursorVisible", 1)
-    checks.eq("controls_cursor", "t0000", "CursorCentered", 1)
-    checks.eq("controls_alt", "t0000", "AltPaused", 1)
-    checks.eq("controls_alt", "t0000", "CursorVisible", 1)
-    checks.eq("controls_alt_release", "t0000", "AltPaused", 0)
+    # SPEC-PNC 5.8: without a right hold the script sets no lower clip, so the
+    # engine plays its stock walk and stand. Negative case: no script clip.
+    checks.eq("controls_pnc_move", "t1500", "LowerState", 0)
+    checks.eq("controls_pnc_stop", "t3000", "LowerState", 0)
+    checks.eq("controls_pnc_select", "t0100", "TargetType", "hostile")
+    checks.eq("controls_pnc_target_idle", "t0300", "TargetType", "hostile")
+    # R-PNC-28: a right click on the ground cancels. The UI target clears.
+    checks.eq("controls_pnc_cancel", "t0100", "TargetType", "none")
+    checks.false("controls_pnc_cancel", "t0100", "AttackOrder")
+    checks.eq("controls_tps", "t0500", "TpsMode", 1)
+    checks.false("controls_cursor", "t0000", "CursorVisible")
+    checks.false("controls_cursor", "t0000", "MiddleHold")
+    checks.eq("controls_cursor", "t0000", "ControlRelative", 1)
+    checks.true("controls_middle", "t0000", "MiddleHold")
+    checks.true("controls_middle", "t0000", "CursorVisible")
+    checks.eq("controls_middle", "t0000", "ControlRelative", 0)
+    checks.false("controls_middle_release", "t0000", "MiddleHold")
+    checks.false("controls_middle_release", "t0000", "CursorVisible")
     checks.eq("controls_aim", "t0200", "AimActive", 1)
-    checks.eq("controls_aim", "t0200", "AttackOrder", checks.value("controls_action", "t0500", "AttackOrder"))
-    checks.eq("controls_aim", "t0200", "Distance", checks.value("controls_action", "t0500", "Distance"))
+    checks.eq("controls_aim", "t0200", "AttackOrder", checks.value("controls_tps", "t0500", "AttackOrder"))
+    checks.eq("controls_aim", "t0200", "Distance", checks.value("controls_tps", "t0500", "Distance"))
     checks.eq("controls_aim", "t0200", "MoveTarget", 3000)
     checks.eq("controls_aim", "t0200", "MoveRetarget", 200)
     checks.eq("controls_aim", "t0200", "MoveTick", 15)
-    aim_dx = ((checks.value("controls_aim", "t0200", "CamTargetXM") or 0) - (checks.value("controls_aim", "t0200", "HeroXM") or 0)) / 1000.0
-    aim_dy = ((checks.value("controls_aim", "t0200", "CamTargetYM") or 0) - (checks.value("controls_aim", "t0200", "HeroYM") or 0)) / 1000.0
-    if abs(aim_dx) + abs(aim_dy) >= 0.5:
-        print(f"controls_aim target offset: PASS ({aim_dx:.2f},{aim_dy:.2f})")
-    else:
-        print(f"controls_aim target offset: got=({aim_dx:.2f},{aim_dy:.2f}) want>=0.5 FAIL")
-        checks.failures += 1
-    stable_dx = ((checks.value("controls_aim", "t1200", "CamTargetXM") or 0) - (checks.value("controls_aim", "t0200", "CamTargetXM") or 0)) / 1000.0
-    stable_dy = ((checks.value("controls_aim", "t1200", "CamTargetYM") or 0) - (checks.value("controls_aim", "t0200", "CamTargetYM") or 0)) / 1000.0
-    if abs(stable_dx) + abs(stable_dy) <= 1:
-        print("controls_aim target stable: PASS")
-    else:
-        print(f"controls_aim target stable: got=({stable_dx},{stable_dy}) want<=1 FAIL")
-        checks.failures += 1
-    checks.eq("controls_attack", "t0100", "TargetType", "hostile")
-    checks.eq("controls_attack", "t0100", "AttackOrder", True)
+    # The aim camera offset is asserted in the tps profile (tps_aim
+    # AnchorRight100). CameraGetTarget is not used here: it read (12, 8) in
+    # every snapshot of controls/20261114-210626 while the hero stood near
+    # (184, 192), so it does not follow the hero camera.
+    # R-PNC-45 with R-TPS-81: during a middle hold the attack command acts as
+    # in PNC. One shot lands on the in-range enemy.
+    checks.true("controls_attack", "t0000", "MiddleHold")
+    checks.true("controls_attack", "t0000", "InRange")
+    checks.eq("controls_attack", "t0000", "EnemyHp", 500)
+    checks.eq("controls_attack", "tshot", "TargetType", "hostile")
+    checks.true("controls_attack", "tshot", "ShotSeen")
+    checks.lt("controls_attack", "tshot", "EnemyHp", 500)
     checks.eq("controls_ground", "t0000", "TargetType", checks.value("controls_ground", "t0100", "TargetType"))
     checks.eq("controls_ground", "t0000", "AttackOrder", checks.value("controls_ground", "t0100", "AttackOrder"))
-    checks.eq("controls_alt_click", "t0000", "TargetType", checks.value("controls_alt_click", "t0100", "TargetType"))
-    checks.eq("controls_alt_click", "t0000", "AttackOrder", checks.value("controls_alt_click", "t0100", "AttackOrder"))
-    checks.eq("controls_rpg", "t0500", "ActionMode", 0)
-    checks.eq("controls_rpg", "t0500", "AimActive", 0)
-    checks.eq("controls_rpg", "t0500", "Fov", checks.value("controls_default", "t0000", "Fov"))
-    checks.eq("controls_rpg", "t0500", "UpperState", 0)
-    checks.eq("controls_rpg", "t0500", "LowerState", 1)
-    checks.eq("controls_action", "t0500", "CooldownMs", checks.value("controls_default", "t0000", "CooldownMs"))
+    checks.eq("controls_middle_click", "t0000", "TargetType", checks.value("controls_middle_click", "t0100", "TargetType"))
+    checks.eq("controls_middle_click", "t0000", "AttackOrder", checks.value("controls_middle_click", "t0100", "AttackOrder"))
+    checks.eq("controls_pnc", "t0500", "TpsMode", 0)
+    checks.eq("controls_pnc", "t0500", "AimActive", 0)
+    checks.eq("controls_pnc", "t0500", "Fov", checks.value("controls_default", "t0000", "Fov"))
+    checks.eq("controls_pnc", "t0500", "UpperState", 0)
+    checks.eq("controls_pnc", "t0500", "LowerState", 0)
+    checks.eq("controls_tps", "t0500", "CooldownMs", checks.value("controls_default", "t0000", "CooldownMs"))
     base_distance = checks.value("controls_default", "t0000", "Distance") or 0
     zoom_distance = checks.value("controls_zoom", "t0100", "Distance") or 0
     if zoom_distance - base_distance >= 1:
@@ -175,14 +177,17 @@ def check(ctx, data: dict, checks) -> None:
     else:
         print(f"controls_turn upper_start count: got={turn_starts} want=0 FAIL")
         checks.failures += 1
-    turn_frames = 0
+    # Upper state 6 is c_ANIM_UPPER_ATTACK. The one shot in controls_attack is
+    # the only attack in this profile, so the state shows up, and only briefly.
+    # Script state only: the look of the attack clip is an operator check.
+    attack_frames = 0
     for text in ctx.frame_data.get("frames", {}).values():
-        if " up=6 " in str(text) or " up=7 " in str(text):
-            turn_frames += 1
-    if turn_frames == 0:
-        print("controls_turn upper frame count: PASS")
+        if " up=6 " in str(text):
+            attack_frames += 1
+    if 0 < attack_frames <= 40:
+        print(f"controls_attack upper attack frames: {attack_frames} PASS")
     else:
-        print(f"controls_turn upper frame count: got={turn_frames} want=0 FAIL")
+        print(f"controls_attack upper attack frames: got={attack_frames} want=1..40 FAIL")
         checks.failures += 1
     checks.displacement("controls_move", "t0000", "t0600", 2)
     move_yaw = checks.value("controls_move", "t0600", "CameraYaw")

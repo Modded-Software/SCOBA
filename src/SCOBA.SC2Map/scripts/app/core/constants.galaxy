@@ -41,13 +41,11 @@ const fixed c_SCOBA_CLICK_SCAN_RADIUS = 8.0;
 const fixed c_SCOBA_CLICK_MARGIN = 0.75;
 const fixed c_SCOBA_AIM_FOV = 45.0;
 const fixed c_SCOBA_AIM_SHOULDER_OFFSET = 0.5;
-const fixed c_SCOBA_AIM_SHOULDER_ANGLE = -90.0;
+const fixed c_SCOBA_AIM_SHOULDER_ANGLE = 90.0;
+// The aim camera side (R-TPS-42): "right" or "left".
+const string c_SCOBA_AIM_SIDE = "right";
 const fixed c_SCOBA_AIM_ARM_SCALE = 0.7;
-const fixed c_SCOBA_MISS_RADIUS = 0.75;
-const fixed c_SCOBA_MISS_HEIGHT = 1.5;
-const fixed c_SCOBA_AIM_POINT_MIN_RANGE = 1.0;
 const fixed c_SCOBA_AIM_POINT_RANGE_MARGIN = 1.0;
-const string c_SCOBA_AIM_NO_ATTACK_BEHAVIOR = "SCOBAAimNoAttack";
 const string c_SCOBA_NO_TURN_BEHAVIOR = "SCOBAAimNoTurn";
 const string c_SCOBA_ATTACK_COOLDOWN = "SCOBA/Attack";
 const string c_SCOBA_SINGLE_BEHAVIOR = "SCOBAAttackSingle";
@@ -55,26 +53,63 @@ const string c_SCOBA_ATTACK_END_BEHAVIOR = "SCOBAAttackEnd";
 const string c_SCOBA_STAND_BEHAVIOR = "SCOBARightClickStandBehavior";
 const string c_SCOBA_ATTACK_TOGGLE = "SCOBAAutoAttackToggle";
 const string c_SCOBA_CHASE_TOGGLE = "SCOBARightClickToggle";
-const string c_SCOBA_AIM_SHOT_TOSH = "SCOBAAimShotTosh";
-const string c_SCOBA_AIM_SHOT_TOSH_POINT = "SCOBAAimShotToshPoint";
-const string c_SCOBA_AIM_SHOT_TALONS = "SCOBAAimShotTalons";
-const string c_SCOBA_AIM_SHOT_PSIBLAST = "SCOBAAimShotPsiBlast";
-const string c_SCOBA_AIM_SHOT_PSIBLAST_POINT = "SCOBAAimShotPsiBlastPoint";
 const string c_SCOBA_WEAPON_TOSH = "Tosh";
 const string c_SCOBA_WEAPON_TALONS = "RazorTalons";
 const string c_SCOBA_WEAPON_PSIBLAST = "QueenOfBladesPsiBlast";
 const string c_SCOBA_EFFECT_TOSH = "ToshU";
-const string c_SCOBA_EFFECT_TOSH_POINT = "SCOBAToshShotPoint";
 const string c_SCOBA_EFFECT_TALONS = "RazorTalonsPersistent";
-const string c_SCOBA_EFFECT_TALONS_SHOT = "SCOBATalonsShot";
 const string c_SCOBA_EFFECT_PSIBLAST = "PsiBlastLaunchMissile";
-const string c_SCOBA_EFFECT_PSIBLAST_POINT = "SCOBAPsiBlastLaunchPoint";
+// The Tosh shot that ends in the air: the effect the handler sees, and the
+// effect set an aim shot runs.
+const string c_SCOBA_EFFECT_TOSH_AIR = "SCOBAToshAirU";
+const string c_SCOBA_SHOT_TOSH_AIR = "SCOBAToshAirShot";
 const fixed c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT = 1.5;
 const fixed c_SCOBA_CROSSHAIR_MIN_RANGE = 0.5;
 const fixed c_SCOBA_CROSSHAIR_MAX_RANGE = 20.0;
 const fixed c_SCOBA_CROSSHAIR_STEP = 0.5;
 const string c_SCOBA_OUT_OF_RANGE_TEXT = "Out of range";
 const string c_SCOBA_MISS_TEXT = "Miss";
+const string c_SCOBA_FRIENDLY_FIRE_TEXT = "Friendly Fire Disabled";
+// What the crosshair is on (R-TPS-23 to 26).
+const int c_RETICLE_NORMAL = 0;
+const int c_RETICLE_ENEMY = 1;
+const int c_RETICLE_FRIENDLY = 2;
+const int c_RETICLE_ENEMY_FAR = 3;
+// TPS aim shot outcomes (R-TPS-52 to 55).
+const int c_TPS_SHOT_NONE = 0;
+const int c_TPS_SHOT_HIT = 1;
+const int c_TPS_SHOT_OUT_OF_RANGE = 2;
+const int c_TPS_SHOT_MISS = 3;
+const int c_TPS_SHOT_FRIENDLY = 4;
+const string c_SCOBA_TPS_PROXY_UNIT = "InvisibleTargetDummy";
+// A proxy higher than this above the ground is in the air: no hit effect.
+const fixed c_TPS_PROXY_AIR_HEIGHT = 0.1;
+// Seconds a pending aim shot may wait for its weapon effect.
+const fixed c_TPS_SHOT_TIMEOUT = 2.0;
+// UI-layer shot floaters (R-TPS-73).
+const int c_UI_FLOATER_POOL = 4;
+const fixed c_UI_FLOATER_DURATION = 1.2;
+const fixed c_UI_FLOATER_RISE = 60.0;
+// The texts sit above the crosshair, never on it: the lowest text edge is
+// c_UI_FLOATER_CLEAR pixels above the screen center. Each text starts at a
+// random offset inside the jitter, then rises. The dialog is tall enough for
+// label height + jitter + rise.
+const int c_UI_FLOATER_CLEAR = 40;
+const int c_UI_FLOATER_DIALOG_HEIGHT = 200;
+const int c_UI_FLOATER_JITTER_X = 80;
+const int c_UI_FLOATER_JITTER_Y = 30;
+// The font style lives in Base.SC2Data/UI/FontStyles.SC2Style. The label
+// box is wide and tall enough for the longest text at that font height.
+const string c_UI_FLOATER_STYLE = "SCOBAFloaterText";
+const int c_UI_FLOATER_WIDTH = 700;
+const int c_UI_FLOATER_LABEL_HEIGHT = 48;
+// World floaters. A damage number grows with the damage, in a straight line
+// from the base size at 0 to the largest size at c_FLOATER_DAMAGE_FULL.
+const int c_FLOATER_SIZE_BASE = 32;
+const int c_FLOATER_SIZE_MAX = 72;
+// Each world floater starts at a random x and y offset inside this distance.
+const fixed c_FLOATER_JITTER = 0.5;
+const fixed c_FLOATER_DAMAGE_FULL = 1000.0;
 const fixed c_SCOBA_ZOOM_BLEND = 0.18;
 const fixed c_SCOBA_COLLISION_CLAMP_BLEND = 0.06;
 const fixed c_SCOBA_COLLISION_RESTORE_BLEND = 0.28;
@@ -85,6 +120,6 @@ const fixed c_ANIM_MOVE_TICK = 0.015;
 const fixed c_ANIM_MOVE_TURN_DURATION = 0.01;
 
 
-const string c_SCOBA_ACTION_BEHAVIOR = "SCOBAActionModeBehavior";
+const string c_SCOBA_TPS_BEHAVIOR = "SCOBATPSBehavior";
 const fixed c_SCOBA_REST_FOV = 65.0;
 const fixed c_SCOBA_ZOOM_FOV = 25.0;

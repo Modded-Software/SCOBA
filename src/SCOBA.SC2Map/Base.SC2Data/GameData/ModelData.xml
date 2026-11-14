@@ -72,11 +72,11 @@
     <CModel id="MengskBC">
         <AnimSpeed value="0.100000"/>
     </CModel>
-    <CModel id="DukesRevengeDeath">
-        <AnimSpeed value="0.020000"/>
-    </CModel>
-    <CModel id="DukesRevengeDeathLow">
-        <AnimSpeed value="0.020000"/>
+    <!-- Slow copy of DukesRevengeDeath, built by scripts/slow_death_assets.py. -->
+    <!-- The slowdown is inside the m3. No AnimSpeed, no sound events, no low model. -->
+    <CModel id="BattlecruiserLokiDeathSlow" parent="UnitDeath">
+        <Model value="Assets\Units\Terran\BattlecruiserLokiDeath\BattlecruiserLokiDeathSlow.m3"/>
+        <EditorCategories value="Race:Terran"/>
     </CModel>
     <CModel id="Mothership">
         <AnimSpeed value="0.250000"/>

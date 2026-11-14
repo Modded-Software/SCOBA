@@ -40,11 +40,14 @@ usage: scripts/playtest.sh <action> [group]
 
 actions:
   build                  rebuild out/SCOBA256.SC2Map and stop
+  host-tests             rebuild, then run the Python unittest suite for the tooling
   launch                 rebuild, then launch the fresh map
   launch-check           rebuild, launch, and check runtime logs
   combat [group]         rebuild, build combat test map, run one scenario group
                          (idle, single, auto, cancel, wasd, hold, button, switch,
                          kerrigan) or the full suite when no group is given
+  tps [group]            rebuild, build tps test map, run one scenario group
+                         (move, cursor, aim, head, target, shot, kerrigan) or the full suite when no group is given
   aim                    rebuild, build aim test map, run aim profile
   motion                 rebuild, build motion test map, run motion profile
   controls               rebuild, build controls test map, run controls profile
@@ -63,7 +66,7 @@ profile_timeout() {
     case "$1" in
         aim) printf '%s\n' "${SC2_CASE_TIMEOUT:-150}" ;;
         pncprobe) printf '%s\n' "${SC2_CASE_TIMEOUT:-180}" ;;
-        combat)
+        combat|tps)
             if [ "${SC2_TEST_GROUP:-all}" = all ]; then
                 printf '%s\n' "${SC2_CASE_TIMEOUT:-420}"
             else
@@ -91,7 +94,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe) ;;
+        combat|tps|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -123,6 +126,10 @@ fresh_build
 case "$ACTION" in
     build)
         ;;
+    host-tests)
+        PYTHONPATH="$ROOT_DIR/scripts" run_python -m unittest discover \
+            -s "$ROOT_DIR/scripts/testkit/tests" -t "$ROOT_DIR/scripts" -v
+        ;;
     launch)
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-scoba.sh"
@@ -131,9 +138,9 @@ case "$ACTION" in
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-and-check.sh"
         ;;
-    combat)
+    combat|tps)
         export SC2_TEST_GROUP="${1:-all}"
-        run_profile combat
+        run_profile "$ACTION"
         ;;
     aim|motion|controls|pitch|aimfreeze|rungun|pncprobe)
         run_profile "$ACTION"

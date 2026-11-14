@@ -39,6 +39,7 @@ include "scripts/app/systems/selection"
 include "scripts/app/systems/spawns"
 include "scripts/app/systems/status_bar"
 include "scripts/app/systems/targeting"
+include "scripts/app/systems/ui_floaters"
 include "scripts/app/systems/visual_tuning"
 include "scripts/app/systems/xp"
 include "scripts/app/ui/abilities_dialog"
@@ -106,7 +107,7 @@ void main () {
     gt_AimCameraTick_Init();
     gt_AimCursorTick_Init();
     gt_AimMoveTick_Init();
-    gt_ActionModeToggle_Init();
+    gt_TpsToggle_Init();
     gt_AnimInit_Init();
     gt_AnimTick_Init();
     gt_HeroSwitch_Init();
@@ -114,8 +115,6 @@ void main () {
     gt_AnimProbe_Init();
     gt_AnimProbeLower_Init();
     gt_AnimProbeToggle_Init();
-    gt_ActionAltStart_Init();
-    gt_ActionAltEnd_Init();
     gt_Target_Init();
     gt_ZerusSpawn_Init();
     gt_TerranSpawn_Init();
@@ -134,4 +133,5 @@ void main () {
     gt_DeathAward_Init();
     gt_DamageCleanup_Init();
     gt_DamageFloater_Init();
+    gt_UiFloaterTick_Init();
 }

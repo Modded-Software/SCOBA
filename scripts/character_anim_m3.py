@@ -411,6 +411,7 @@ def make_pitch_group(
     max_degrees,
     duration_ms,
     samples,
+    priority=11,
 ):
     validate_animation_name(name)
     if len(pitch_bones) != len(pitch_weights):
@@ -461,7 +462,7 @@ def make_pitch_group(
         block.fend = duration_ms
         block.flags = flags
 
-    upper_index = append_stc(model, upper_stc, 11)
+    upper_index = append_stc(model, upper_stc, priority)
     group = clone(upper_group)
     group.name = name
     group.stcIndices = [upper_index]

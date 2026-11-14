@@ -360,7 +360,7 @@ def _check_hold(checks) -> None:
 
 
 def _check_button(checks) -> None:
-    checks.eq("done", "tend", "StatusExecs", 2)
+    checks.eq("done", "tend", "StatusExecs", 1)
     # R-PNC-45, R-PNC-46: Weapon Attack button.
     _shots(checks, "weapon_button", "t0000", "tend", 1)
     checks.damage("weapon_button", "t0000", "tend")
@@ -369,14 +369,6 @@ def _check_button(checks) -> None:
     checks.gt("weapon_button", "t0500", "CooldownMs", 0)
     checks.eq("weapon_button", "tend", "CooldownMs", 0)
     checks.false("weapon_button", "tend", "AttackOrder")
-
-    # R-PNC-49: a press that fires no shot starts no cooldown.
-    checks.false("button_out", "t0000", "InRange")
-    _shots(checks, "button_out", "t0000", "tend", 0)
-    _no_damage(checks, "button_out", "t0000", "tend")
-    checks.eq("button_out", "tend", "ButtonCdMs", 0)
-    checks.true("button_out", "tend", "TargetEnemy")
-    _still(checks, "button_out", "t0000", "tend")
 
 
 def _check_switch(checks) -> None:

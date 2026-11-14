@@ -54,8 +54,8 @@ void gf_HeroApplyToggles (unit lp_unit) {
     UnitAbilityShow(lp_unit, "SCOBAAutoAttackStatus", true);
     UnitAbilityEnable(lp_unit, "SCOBAAutoAttackToggle", true);
     UnitAbilityShow(lp_unit, "SCOBAAutoAttackToggle", true);
-    UnitAbilityEnable(lp_unit, "SCOBAActionModeToggle", true);
-    UnitAbilityShow(lp_unit, "SCOBAActionModeToggle", true);
+    UnitAbilityEnable(lp_unit, "SCOBATPSToggle", true);
+    UnitAbilityShow(lp_unit, "SCOBATPSToggle", true);
     UnitAbilityEnable(lp_unit, "SCOBARightClickToggle", true);
     UnitAbilityShow(lp_unit, "SCOBARightClickToggle", true);
 }
@@ -109,6 +109,8 @@ void gf_HeroSwitchTo (unit lp_target) {
     gv_unitHighlight[1] = null;
     UnitBehaviorRemove(lv_old, "UnitDirectControl", 1);
     gv_pncSingleShot[1] = false;
+    gv_tpsShotKind[1] = c_TPS_SHOT_NONE;
+    gv_tpsShotTarget[1] = null;
     gf_AnimReset(1);
     gf_HeroPark(lv_old);
     UnitSetOwner(lp_target, 1, false);
@@ -126,7 +128,7 @@ void gf_HeroSwitchTo (unit lp_target) {
     UnitSetState(lp_target, c_unitStateStatusBar, false);
     UnitXPGainEnable(lp_target, null, true);
     gf_ControlApply(1);
-    gf_ActionModeEnsureRPG(1);
+    gf_PncEnsure(1);
     gf_HeroApplyCamera(lp_target);
     UnitClearSelection(1);
     UnitSelect(lp_target, 1, true);

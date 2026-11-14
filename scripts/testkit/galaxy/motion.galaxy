@@ -3,11 +3,11 @@
 trigger gt_MotionTest;
 
 void gf_MotionModeKey (string lp_section, string lp_tag) {
-    if (gf_ActionModeActive(1)) {
-        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ActionMode", 1);
+    if (gf_TpsActive(1)) {
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "TpsMode", 1);
     }
     else {
-        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ActionMode", 0);
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "TpsMode", 0);
     }
     if (gv_aIMACTIVE[1]) {
         BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AimActive", 1);
@@ -47,7 +47,7 @@ bool gt_MotionTest_Func (bool testConds, bool runActions) {
             UnitSetPosition(gv_tPSUNIT[lv_player], PointWithOffset(gv_dbgAnchor, 80.0 + lv_player * 4.0, 80.0 + lv_player * 4.0), false);
         }
     }
-    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBAActionModeToggle", 0)), c_orderQueueReplace);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
     Wait(0.5, c_timeGame);
     lv_center = Point(128.0, 128.0);
     lv_angle = AngleBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), lv_center);
