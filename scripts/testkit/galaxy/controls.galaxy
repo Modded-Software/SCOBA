@@ -65,7 +65,7 @@ void gf_ControlsSnap (string lp_section, string lp_tag) {
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroXM", FixedToInt(PointGetX(UnitGetPosition(lv_hero)) * 1000.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroYM", FixedToInt(PointGetY(UnitGetPosition(lv_hero)) * 1000.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UnitFacing", FixedToInt(UnitGetFacing(lv_hero)));
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CombatState", gv_sCOBAFSM[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "AttackOrder", UnitOrderHasAbil(lv_hero, "attack"));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Fov", FixedToInt(gv_cAMERAFOV[1]));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Distance", FixedToInt(CameraGetDistance(1)));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UpperState", gv_animUpperState[1]);
@@ -196,7 +196,7 @@ bool gt_ControlsTest_Func (bool testConds, bool runActions) {
     lv_enemy = gf_DbgSpawnOne("controls_attack", 0.0, 500.0);
     UnitSetPosition(lv_enemy, CameraGetTarget(1), false);
     gf_UnitTargetSet(1, lv_enemy);
-    gf_CombatManualAttack(1, lv_enemy);
+    gf_PncAttack(1, lv_enemy);
     Wait(0.1, c_timeGame);
     gf_ControlsSnap("controls_attack", "t0100");
 

@@ -435,7 +435,8 @@ bool gt_CameraTurnTick_Func (bool testConds, bool runActions) {
         return true;
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
-        if (!gf_ActionModeActive(lv_player) && (gv_rOTATEUNIT[lv_player] == true) && UnitIsValid(gv_tPSUNIT[lv_player])) {
+        gf_StrafeHoldSync(lv_player);
+        if (!gf_StrafeHoldMoving(lv_player) && !gf_ActionModeActive(lv_player) && (gv_rOTATEUNIT[lv_player] == true) && UnitIsValid(gv_tPSUNIT[lv_player])) {
             gf_TurnToYaw(lv_player, CameraGetYaw(lv_player));
         }
         else if (!gf_ActionModeActive(lv_player) && !gv_aIMACTIVE[lv_player]) {

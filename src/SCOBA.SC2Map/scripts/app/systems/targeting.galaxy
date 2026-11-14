@@ -1,5 +1,4 @@
 // Module: systems/targeting
-
 void gf_DbgInputLog (string lp_key, string lp_value) {
     bank lv_bank;
 
@@ -11,44 +10,29 @@ void gf_DbgInputLog (string lp_key, string lp_value) {
     BankValueSetFromString(lv_bank, "input", lp_key, lp_value);
     BankSave(lv_bank);
 }
-
+// An enemy that attacks the hero becomes the UI target.
+// In the attacked event the unit is the victim and the target is the attacker.
 bool gt_Target_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    unit lv_triggeringUnit;
-    unit lv_targetUnit;
-    int lv_localPlayer;
-    int lv_localBar;
+    unit lv_victim;
+    unit lv_attacker;
+    int lv_player;
 
-    // Variable Initialization
-    lv_triggeringUnit = EventUnit();
-    lv_targetUnit = EventUnitTarget();
-    lv_localPlayer = -1;
-    if (UnitIsValid(lv_targetUnit)) {
-        lv_localPlayer = UnitGetOwner(lv_targetUnit);
+    lv_victim = EventUnit();
+    lv_attacker = EventUnitTarget();
+    if (!UnitIsValid(lv_victim) || !UnitIsValid(lv_attacker)) {
+        return false;
     }
-    lv_localBar = gf_BossBarId(lv_localPlayer, 4);
-
-    // Conditions
-    if (testConds) {
-        if (lv_localPlayer < 1 || lv_localPlayer > 6) {
-            return false;
-        }
-
-        if (!UnitIsValid(lv_triggeringUnit) || !UnitIsValid(lv_targetUnit) || !UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {
-            return false;
-        }
-
-        if (!((lv_targetUnit == gv_tPSUNIT[lv_localPlayer]))) {
-            return false;
-        }
+    lv_player = gf_HeroPlayerFromUnit(lv_victim);
+    if (lv_player < 1 || lv_player > 6) {
+        return false;
     }
-
-    // Actions
+    if (!libNtve_gf_PlayerIsEnemy(lv_player, UnitGetOwner(lv_attacker), libNtve_ge_PlayerRelation_Enemy)) {
+        return false;
+    }
     if (!runActions) {
         return true;
     }
-
-    gf_UnitTargetSet(lv_localPlayer, lv_triggeringUnit);
+    gf_UnitTargetSet(lv_player, lv_attacker);
     return true;
 }
 
@@ -106,16 +90,13 @@ void gf_UnitTargetSet (int lp_player, unit lp_unit) {
     if (!gf_IsHeroPlayer(lp_player)) {
         return;
     }
-    if (gf_AimShotProxyIs(lp_unit) || gf_AimShooterIs(lp_unit)) {
-        lp_unit = null;
-    }
     if (UnitIsValid(lp_unit) && (lp_unit == gv_tPSUNIT[lp_player])) {
         lp_unit = null;
     }
     lv_bar = gf_BossBarId(lp_player, 4);
     lv_old = gv_unitTarget[lp_player];
     if (lv_old != lp_unit) {
-        if (UnitIsValid(lv_old)) {
+        if (UnitIsValid(lv_old) && !gf_ActionStatusIs(lp_player, lv_old)) {
             UnitStatusBarOverride(lv_old, -1);
         }
     }
@@ -125,7 +106,9 @@ void gf_UnitTargetSet (int lp_player, unit lp_unit) {
         libNtve_gf_ShowHideBossBar(false, lv_bar);
         return;
     }
-    UnitStatusBarOverride(lp_unit, -1);
+    if (!gf_ActionStatusIs(lp_player, lp_unit)) {
+        UnitStatusBarOverride(lp_unit, -1);
+    }
     lv_enemy = (libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Ally) == false);
     lv_portrait = "";
     lv_actor = gf_UnitActorId(lp_unit);
@@ -147,9 +130,6 @@ bool gf_IsClickEnemy (int lp_player, unit lp_unit) {
     if (!UnitIsValid(lp_unit) || !UnitIsAlive(lp_unit)) {
         return false;
     }
-    if (gf_AimShotProxyIs(lp_unit) || gf_AimShooterIs(lp_unit)) {
-        return false;
-    }
     return libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Ally) == false;
 }
 
@@ -158,9 +138,6 @@ bool gf_UnitTargetValid (int lp_player, unit lp_unit, bool lp_enemyOnly) {
         return false;
     }
     if (lp_unit == gv_tPSUNIT[lp_player]) {
-        return false;
-    }
-    if (gf_AimShotProxyIs(lp_unit) || gf_AimShooterIs(lp_unit)) {
         return false;
     }
     if (lp_enemyOnly && !gf_IsClickEnemy(lp_player, lp_unit)) {
@@ -184,9 +161,6 @@ unit gf_UnitTargetAtPoint (int lp_player, point lp_point, bool lp_enemyOnly) {
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
         lv_unit = UnitGroupLoopCurrent();
         if (lv_unit == gv_tPSUNIT[lp_player] || !UnitIsValid(lv_unit) || !UnitIsAlive(lv_unit)) {
-            continue;
-        }
-        if (gf_AimShotProxyIs(lv_unit) || gf_AimShooterIs(lv_unit)) {
             continue;
         }
         if (lp_enemyOnly && !gf_IsClickEnemy(lp_player, lv_unit)) {
@@ -224,20 +198,13 @@ void gf_RightClickExecute (int lp_player, point lp_point, unit lp_pressUnit) {
 
     lv_unit = lp_pressUnit;
     if (gf_UnitTargetValid(lp_player, lv_unit, true)) {
-        gf_UnitTargetSet(lp_player, lv_unit);
-        gf_CombatManualAttack(lp_player, lv_unit);
+        gf_PncAttack(lp_player, lv_unit);
         return;
     }
-    gf_CombatCancelAuto(lp_player);
-    gv_sCOBAManualOrder[lp_player] = false;
+    gf_PncCancel(lp_player);
     gf_CombatSyncRoot(lp_player);
-    if (gf_CombatStandOn(lp_player)) {
-        UnitIssueOrder(gv_tPSUNIT[lp_player], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
-    }
-    else {
+    if (!gf_CombatStandOn(lp_player)) {
         UnitIssueOrder(gv_tPSUNIT[lp_player], OrderTargetingPoint(AbilityCommand("move", 0), lp_point), c_orderQueueReplace);
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_MOVING;
         gf_ShowMoveMarker(lp_player, lp_point);
     }
 }
@@ -382,9 +349,10 @@ bool gt_TargetRelease_Func (bool testConds, bool runActions) {
                 lv_unit = gf_UnitTargetAtPoint(lv_player, CameraGetTarget(lv_player), true);
                 if (UnitIsValid(lv_unit)) {
                     gf_UnitTargetSet(lv_player, lv_unit);
-                    gf_CombatManualAttack(lv_player, lv_unit);
+                    UnitIssueOrder(gv_tPSUNIT[lv_player], OrderTargetingUnit(AbilityCommand("attack", 0), lv_unit), c_orderQueueReplace);
                 }
             }
+            gf_SelectHeroForce(lv_player);
         }
         return true;
     }
@@ -413,7 +381,12 @@ bool gt_TargetRelease_Func (bool testConds, bool runActions) {
             else {
                 gf_DbgInputLog("leftTarget", "none");
             }
-            gf_UnitTargetSet(lv_player, lv_unit);
+            if (UnitIsValid(lv_unit)) {
+                gf_UnitTargetSet(lv_player, lv_unit);
+            }
+            else {
+                gf_PncCancel(lv_player);
+            }
             gf_SelectHero(lv_player);
         }
         gv_mOUSELEFTCANCEL[lv_player] = false;
@@ -439,21 +412,6 @@ void gt_TargetClick_Init () {
     gt_TargetRelease = TriggerCreate("gt_TargetRelease_Func");
     TriggerAddEventMouseClicked(gt_TargetRelease, c_playerAny, gv_mOUSECURSOR, false);
     TriggerAddEventMouseClicked(gt_TargetRelease, c_playerAny, gv_fIRE, false);
-}
-
-bool gf_UnitClickEvent (int lp_player, bool testConds, bool runActions) {
-    if (!runActions) {
-        return true;
-    }
-    if (!gf_IsHeroPlayer(lp_player)) {
-        return true;
-    }
-    gv_unitClickCandidate[lp_player] = EventUnit();
-    if (UnitIsValid(gv_unitClickCandidate[lp_player])) {
-        gf_DbgInputLog("unitClick", UnitGetType(gv_unitClickCandidate[lp_player]));
-    }
-    gf_SelectHero(lp_player);
-    return true;
 }
 
 void gt_UnitClick_Init () {

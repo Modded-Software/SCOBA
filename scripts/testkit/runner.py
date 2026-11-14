@@ -67,13 +67,19 @@ def _sc2_pids() -> list[int]:
 
 
 def kill_sc2() -> None:
-    for pid in _sc2_pids():
+    pids = _sc2_pids()
+    if not pids:
+        return
+    for pid in pids:
         try:
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError as exc:
             print(f"SC2 process {pid} already exited during SIGTERM: {exc}", file=sys.stderr)
             continue
-    time.sleep(3)
+    # Leave as soon as the game is gone. Force it after three seconds.
+    deadline = time.time() + 3
+    while time.time() < deadline and _sc2_pids():
+        time.sleep(0.1)
     for pid in _sc2_pids():
         try:
             os.kill(pid, signal.SIGKILL)

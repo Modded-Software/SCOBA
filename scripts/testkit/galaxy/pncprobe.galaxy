@@ -1,0 +1,263 @@
+// Engine probes for WASD / Point & Click.
+// Each scenario records raw engine values. The profile prints them.
+trigger gt_PncProbe;
+
+void gf_ProbeOrders (string lp_section, string lp_tag) {
+    unit lv_hero;
+    int lv_i;
+    int lv_count;
+    string lv_list;
+    abilcmd lv_cmd;
+
+    lv_hero = gv_tPSUNIT[1];
+    lv_count = UnitOrderCount(lv_hero);
+    lv_list = "";
+    for (lv_i = 0; lv_i < lv_count && lv_i < 4; lv_i += 1) {
+        lv_cmd = OrderGetAbilityCommand(UnitOrder(lv_hero, lv_i));
+        lv_list = lv_list + AbilityCommandGetAbility(lv_cmd) + ":" + IntToString(AbilityCommandGetCommand(lv_cmd));
+        if (UnitOrderIsAcquired(lv_hero, lv_i)) {
+            lv_list = lv_list + ":acquired";
+        }
+        lv_list = lv_list + " ";
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "OrderCount", lv_count);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Orders", lv_list);
+    BankSave(gv_dbgBank);
+}
+
+// Order an attack and wait for the first shot. Returns false on timeout.
+bool gf_ProbeFirstShot () {
+    int lv_i;
+    int lv_shots;
+
+    lv_shots = gv_aimShotEffectEvents;
+    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingUnit(AbilityCommand("attack", 0), gv_dbgEnemy), c_orderQueueReplace);
+    for (lv_i = 0; lv_i < 64; lv_i += 1) {
+        if (gv_aimShotEffectEvents > lv_shots) {
+            return true;
+        }
+        Wait(0.0625, c_timeGame);
+    }
+    return false;
+}
+
+// lp_method: 0 stop, 1 stop command 1, 2 move to own position,
+// 3 attack-disable behavior, 4 attack-disable behavior then stop,
+// 5 move away then attack-disable, 6 attack-disable, one tick, move away.
+void gf_ProbeEnd (string lp_section, bool lp_auto, bool lp_stand, int lp_method) {
+    unit lv_hero;
+    order lv_stop;
+
+    gf_DbgReset(lp_section, lp_auto, lp_stand);
+    lv_hero = gv_tPSUNIT[1];
+    gf_DbgSpawnOne(lp_section, 3.0, 500.0);
+    gf_DbgCooldownRaw(lp_section, "pre");
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "firstShot", gf_ProbeFirstShot());
+    gf_ProbeOrders(lp_section, "shot");
+    gf_DbgSnap(lp_section, "shot");
+    lv_stop = Order(AbilityCommand("stop", 0));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "stopAbilExists", UnitAbilityExists(lv_hero, "stop"));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "stopOrderValid", UnitOrderIsValid(lv_hero, lv_stop));
+    if (lp_method == 0) {
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "issued", UnitIssueOrder(lv_hero, lv_stop, c_orderQueueReplace));
+    }
+    else if (lp_method == 1) {
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "issued", UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 1)), c_orderQueueReplace));
+    }
+    else if (lp_method == 2) {
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "issued", UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), UnitGetPosition(lv_hero)), c_orderQueueReplace));
+    }
+    else if (lp_method == 5) {
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "issued", UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, -2.0, 0.0)), c_orderQueueReplace));
+        UnitBehaviorAdd(lv_hero, "SCOBAAttackEnd", lv_hero, 1);
+    }
+    else if (lp_method == 6) {
+        UnitBehaviorAdd(lv_hero, "SCOBAAttackEnd", lv_hero, 1);
+        Wait(0.0625, c_timeGame);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "issued", UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, -2.0, 0.0)), c_orderQueueReplace));
+    }
+    else if (lp_method == 3) {
+        UnitBehaviorAdd(lv_hero, "SCOBAAttackEnd", lv_hero, 1);
+    }
+    else {
+        UnitBehaviorAdd(lv_hero, "SCOBAAttackEnd", lv_hero, 1);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "issued", UnitIssueOrder(lv_hero, lv_stop, c_orderQueueReplace));
+    }
+    gf_ProbeOrders(lp_section, "t0000");
+    Wait(0.25, c_timeGame);
+    gf_ProbeOrders(lp_section, "t0250");
+    gf_DbgCooldownRaw(lp_section, "t0250");
+    BankValueSetFromInt(gv_dbgBank, lp_section, "t0250CdWeaponSlashMs", FixedToInt(UnitGetCooldown(lv_hero, "Weapon/Tosh") * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "t0250CdWeaponIdMs", FixedToInt(UnitGetCooldown(lv_hero, "Tosh") * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "t0250CdAbilAttackMs", FixedToInt(UnitGetCooldown(lv_hero, "Abil/attack") * 1000.0));
+    Wait(2.75, c_timeGame);
+    gf_ProbeOrders(lp_section, "tend");
+    gf_DbgCooldownRaw(lp_section, "tend");
+    gf_DbgSnap(lp_section, "tend");
+}
+
+// lp_method: 0 one long move, 1 short moves every 1/16 s,
+// 2 product step with facing, 3 one long acquire-move.
+void gf_ProbeMoveFire (string lp_section, int lp_method, fixed lp_enemyDx, fixed lp_angle) {
+    unit lv_hero;
+    int lv_i;
+
+    gf_DbgReset(lp_section, true, false);
+    lv_hero = gv_tPSUNIT[1];
+    gf_AttackSingleSet(lv_hero, true);
+    gf_DbgSpawnOne(lp_section, lp_enemyDx, 500.0);
+    Wait(0.3, c_timeGame);
+    gv_fORWARD[1] = true;
+    gf_AttackSingleSet(lv_hero, false);
+    gf_DbgSnap(lp_section, "t0000");
+    if (lp_method == 0) {
+        UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(gv_dbgAnchor, 5.0, lp_angle)), c_orderQueueReplace);
+    }
+    if (lp_method == 3) {
+        UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 3), PointWithOffsetPolar(gv_dbgAnchor, 5.0, lp_angle)), c_orderQueueReplace);
+    }
+    for (lv_i = 0; lv_i < 32; lv_i += 1) {
+        if (lp_method == 1) {
+            UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(lv_hero), 0.5, lp_angle)), c_orderQueueReplace);
+        }
+        if (lp_method == 2) {
+            gf_CombatMoveStep(1, lp_angle);
+            UnitSetFacing(lv_hero, lp_angle, 0.01);
+        }
+        if (lv_i == 8) {
+            gf_ProbeOrders(lp_section, "t0500");
+            BankValueSetFromInt(gv_dbgBank, lp_section, "t0500Facing", FixedToInt(UnitGetFacing(lv_hero)));
+        }
+        Wait(0.0625, c_timeGame);
+    }
+    gv_fORWARD[1] = false;
+    gf_DbgSnap(lp_section, "tend");
+}
+
+// Counts shots, damage, and ticks with any order over the next 3 s.
+void gf_ProbeTail (string lp_section) {
+    unit lv_hero;
+    int lv_i;
+    int lv_ticks;
+
+    lv_hero = gv_tPSUNIT[1];
+    Wait(0.25, c_timeGame);
+    gf_DbgSnap(lp_section, "t0000");
+    lv_ticks = 0;
+    for (lv_i = 0; lv_i < 48; lv_i += 1) {
+        Wait(0.0625, c_timeGame);
+        if (UnitOrderCount(lv_hero) > 0) {
+            if (lv_ticks == 0) {
+                gf_ProbeOrders(lp_section, "tfirst");
+            }
+            lv_ticks += 1;
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "orderTicks", lv_ticks);
+    gf_DbgSnap(lp_section, "tend");
+}
+
+// Auto with an engine-acquired target, then a switch to single.
+// 0 toggle order only, 4 attack end held 0.25 s, 5 attack end held 1.25 s,
+// 6 product attack command on the same target after the switch.
+void gf_ProbeToSingle (string lp_section, int lp_method) {
+    unit lv_hero;
+    int lv_i;
+
+    gf_DbgReset(lp_section, true, true);
+    lv_hero = gv_tPSUNIT[1];
+    gf_DbgSpawnOne(lp_section, 3.0, 500.0);
+    Wait(1.5, c_timeGame);
+    gf_ProbeOrders(lp_section, "t0000");
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBAAutoAttackToggle", 0)), c_orderQueueReplace);
+    Wait(0.25, c_timeGame);
+    if (lp_method == 4) {
+        for (lv_i = 0; lv_i < 4; lv_i += 1) {
+            gf_PncAttackEnd(1);
+            Wait(0.0625, c_timeGame);
+        }
+    }
+    if (lp_method == 5) {
+        for (lv_i = 0; lv_i < 20; lv_i += 1) {
+            gf_PncAttackEnd(1);
+            Wait(0.0625, c_timeGame);
+        }
+    }
+    if (lp_method == 6) {
+        gf_PncAttack(1, gv_dbgEnemy);
+        Wait(1.5, c_timeGame);
+    }
+    gf_ProbeTail(lp_section);
+}
+
+// Single with a commanded attack that keeps firing. The attack end comes
+// late, between shots, not inside the weapon effect event.
+void gf_ProbeLateEnd (string lp_section) {
+    gf_DbgReset(lp_section, false, true);
+    gf_DbgSpawnOne(lp_section, 3.0, 500.0);
+    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingUnit(AbilityCommand("attack", 0), gv_dbgEnemy), c_orderQueueReplace);
+    Wait(2.3, c_timeGame);
+    gf_ProbeOrders(lp_section, "t0000");
+    gf_PncAttackEnd(1);
+    gf_ProbeTail(lp_section);
+}
+
+// What starts the Weapon Attack button cooldown, and does the command state
+// report it. 0 script ability call (the method of the last commit, clock
+// seen by the operator), 1 the data effect alone, 2 a weapon shot,
+// 3 a button press that fires no shot (Chase stand, out of range).
+void gf_ProbeButton (string lp_section, int lp_method) {
+    unit lv_hero;
+
+    gf_DbgReset(lp_section, false, true);
+    lv_hero = gv_tPSUNIT[1];
+    if (lp_method == 3) {
+        gf_DbgSpawnOne(lp_section, 11.0, 500.0);
+    }
+    else {
+        gf_DbgSpawnOne(lp_section, 3.0, 500.0);
+    }
+    gf_DbgCooldownRaw(lp_section, "pre");
+    if (lp_method == 0) {
+        UnitAbilityAddCooldown(lv_hero, "SCOBAAutoAttackStatus", c_DBG_BUTTON_COOLDOWN, 1.0);
+    }
+    else if (lp_method == 1) {
+        UnitCreateEffectUnit(lv_hero, "SCOBAAttackCooldown10", lv_hero);
+    }
+    else if (lp_method == 2) {
+        gf_PncAttack(1, gv_dbgEnemy);
+    }
+    else {
+        UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("SCOBAAutoAttackStatus", 0), gv_dbgEnemy), c_orderQueueReplace);
+    }
+    Wait(0.375, c_timeGame);
+    gf_DbgCooldownRaw(lp_section, "mid");
+    Wait(2.0, c_timeGame);
+    gf_DbgCooldownRaw(lp_section, "end");
+}
+
+bool gt_PncProbe_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAPNCPROBE", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    BankSave(gv_dbgBank);
+    gf_DbgProbeInit();
+
+
+
+    gf_DbgReset("done", false, true);
+    gf_DbgSnap("done", "tend");
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_PncProbe_Init () {
+    gt_PncProbe = TriggerCreate("gt_PncProbe_Func");
+    TriggerAddEventMapInit(gt_PncProbe);
+}

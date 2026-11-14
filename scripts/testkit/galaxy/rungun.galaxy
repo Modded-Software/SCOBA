@@ -4,23 +4,21 @@ trigger gt_RungunTest;
 
 void gf_RungunSnap (string lp_tag) {
     unit lv_hero;
-    bool lv_ready;
     bool lv_aim_attack;
 
     lv_hero = gv_tPSUNIT[1];
-    lv_ready = gf_WeaponReady(1);
     lv_aim_attack = gf_AnimAimAttackActive(1);
     gf_DbgSnap("rungun", lp_tag);
     BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "AimShots", gv_aimShots[1]);
     BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "AimOut", gv_aimOutOfRange[1]);
     BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "AimActive", gv_aIMACTIVE[1]);
-    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "WeaponReady", lv_ready);
     BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "AimAttackActive", lv_aim_attack);
     BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "WeaponCount", UnitWeaponCount(lv_hero));
     BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "WeaponPeriodMs", FixedToInt(UnitWeaponPeriodRemaining(lv_hero, 1) * 1000.0));
-    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "ShooterValid", UnitIsValid(gv_aimShooter[1]));
     BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "HeroAttackOrder", UnitOrderHasAbil(lv_hero, "attack"));
-    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "ShooterAttackOrder", UnitIsValid(gv_aimShooter[1]) && UnitOrderHasAbil(gv_aimShooter[1], "attack"));
+    BankValueSetFromFlag(gv_dbgBank, "rungun", lp_tag + "HeroMoveOrder", UnitOrderHasAbil(lv_hero, "move"));
+    BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "AimNoAttack", UnitBehaviorCount(lv_hero, "SCOBAAimNoAttack"));
+    BankValueSetFromInt(gv_dbgBank, "rungun", lp_tag + "CooldownRingMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
     BankSave(gv_dbgBank);
 }
 

@@ -3,6 +3,97 @@ bank gv_dbgBank;
 point gv_dbgAnchor;
 unit gv_dbgEnemy;
 fixed gv_dbgSpawnAt;
+int gv_dbgRealClicks;
+int gv_dbgStatusExecs;
+bool gv_dbgProbeStop;
+bool gv_dbgProbeDisable;
+string gv_dbgProbeSection;
+string gv_dbgGroup = "all";
+const string c_DBG_BUTTON_COOLDOWN = "Abil/SCOBAAutoAttackStatus";
+
+// A profile map runs one scenario group, or all of them.
+bool gf_DbgGroup (string lp_name) {
+    return gv_dbgGroup == "all" || gv_dbgGroup == lp_name;
+}
+trigger gt_DbgRealClick;
+trigger gt_DbgStatusExec;
+trigger gt_DbgProbeEffect;
+
+// Real mouse input during a run makes the run invalid. Count it.
+bool gt_DbgRealClick_Func (bool testConds, bool runActions) {
+    gv_dbgRealClicks += 1;
+    return true;
+}
+
+bool gt_DbgStatusExec_Func (bool testConds, bool runActions) {
+    gv_dbgStatusExecs += 1;
+    return true;
+}
+
+// Probe: issue stop from inside the weapon effect event. Record what the engine does.
+bool gt_DbgProbeEffect_Func (bool testConds, bool runActions) {
+    unit lv_hero;
+
+    if (!gv_dbgProbeStop) {
+        return true;
+    }
+    gv_dbgProbeStop = false;
+    lv_hero = gv_tPSUNIT[1];
+    BankValueSetFromFlag(gv_dbgBank, gv_dbgProbeSection, "evCasterIsHero", EventPlayerEffectUsedUnit(c_effectUnitCaster) == lv_hero);
+    BankValueSetFromInt(gv_dbgBank, gv_dbgProbeSection, "evOrdersBefore", UnitOrderCount(lv_hero));
+    if (gv_dbgProbeDisable) {
+        UnitBehaviorAdd(lv_hero, "SCOBAAttackEnd", lv_hero, 1);
+    }
+    else {
+        BankValueSetFromFlag(gv_dbgBank, gv_dbgProbeSection, "evStopIssued", UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace));
+    }
+    BankValueSetFromInt(gv_dbgBank, gv_dbgProbeSection, "evOrdersAfter", UnitOrderCount(lv_hero));
+    BankValueSetFromFlag(gv_dbgBank, gv_dbgProbeSection, "evAttackAfter", UnitOrderHasAbil(lv_hero, "attack"));
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gf_DbgProbeInit () {
+    gt_DbgRealClick = TriggerCreate("gt_DbgRealClick_Func");
+    TriggerAddEventMouseClicked(gt_DbgRealClick, c_playerAny, c_mouseButtonLeft, true);
+    TriggerAddEventMouseClicked(gt_DbgRealClick, c_playerAny, c_mouseButtonRight, true);
+    TriggerAddEventMouseClicked(gt_DbgRealClick, c_playerAny, c_mouseButtonMiddle, true);
+    gt_DbgStatusExec = TriggerCreate("gt_DbgStatusExec_Func");
+    TriggerAddEventUnitAbility(gt_DbgStatusExec, null, AbilityCommand("SCOBAAutoAttackStatus", 0), c_unitAbilStageExecute, false);
+    gt_DbgProbeEffect = TriggerCreate("gt_DbgProbeEffect_Func");
+    TriggerAddEventPlayerEffectUsed(gt_DbgProbeEffect, c_playerAny, c_SCOBA_EFFECT_TOSH);
+}
+
+// Raw cooldown and weapon values. Recorded so a failure shows what the engine did.
+void gf_DbgCooldownRaw (string lp_section, string lp_tag) {
+    unit lv_hero;
+    abilcmd lv_cmd;
+    int lv_bit;
+    int lv_mask;
+
+    lv_hero = gv_tPSUNIT[1];
+    lv_cmd = AbilityCommand("SCOBAAutoAttackStatus", 0);
+    lv_mask = 0;
+    for (lv_bit = 0; lv_bit < 20; lv_bit += 1) {
+        if (UnitCheckAbilCmdState(lv_hero, lv_cmd, 1 << lv_bit)) {
+            lv_mask = lv_mask | (1 << lv_bit);
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CmdStateMask", lv_mask);
+    if (UnitIsValid(gv_dbgEnemy)) {
+        BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ButtonOrderValid", UnitOrderIsValid(lv_hero, OrderTargetingUnit(lv_cmd, gv_dbgEnemy)));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CdUnitLinkMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CdStatusAbilMs", FixedToInt(UnitAbilityGetCooldown(lv_hero, "SCOBAAutoAttackStatus", c_DBG_BUTTON_COOLDOWN) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CdAttackAbilMs", FixedToInt(UnitAbilityGetCooldown(lv_hero, "attack", c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Weapon1RemainMs", FixedToInt(UnitWeaponPeriodRemaining(lv_hero, 1) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Weapon2RemainMs", FixedToInt(UnitWeaponPeriodRemaining(lv_hero, 2) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "WeaponCount", UnitWeaponCount(lv_hero));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Weapon1", UnitWeaponGet(lv_hero, 1));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Weapon1Range10", FixedToInt(UnitWeaponRange(lv_hero, 1) * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Weapon1PeriodMs", FixedToInt(UnitWeaponPeriod(lv_hero, 1) * 1000.0));
+    BankSave(gv_dbgBank);
+}
 
 void gf_DbgClearEnemies () {
     int lv_i;
@@ -23,8 +114,16 @@ void gf_DbgClearEnemies () {
     gv_dbgEnemy = null;
 }
 
+// Sets the mouse hold state the way the orbit handlers do.
+void gf_DbgHold (bool lp_right, bool lp_middle) {
+    gv_mOUSERIGHT[1] = lp_right;
+    gv_rIGHTORBIT[1] = lp_right;
+    gv_mOUSEMIDDLE[1] = lp_middle;
+    gv_rOTATEUNIT[1] = lp_right || lp_middle;
+}
+
+// lp_auto: Attack toggle is auto. lp_stand: Chase toggle is stand.
 void gf_DbgReset (string lp_section, bool lp_auto, bool lp_stand) {
-    int lv_order;
     unit lv_hero;
 
     gv_mOUSELEFT[1] = false;
@@ -32,36 +131,40 @@ void gf_DbgReset (string lp_section, bool lp_auto, bool lp_stand) {
     gv_mOUSEMIDDLE[1] = false;
     gv_mOUSEFORWARD[1] = false;
     gv_rOTATEUNIT[1] = false;
+    gv_rIGHTORBIT[1] = false;
+    gf_StrafeHoldSet(1, false);
     gv_rOTATECAMERA[1] = false;
     gv_kEYFORWARD[1] = false;
     gv_mOUSERIGHTCANCEL[1] = false;
     gv_mOUSELEFTCANCEL[1] = false;
     gv_unitHighlight[1] = null;
-    gv_unitTarget[1] = null;
     gv_fORWARD[1] = false;
+    gv_bACKWARD[1] = false;
+    gv_lEFT[1] = false;
+    gv_rIGHT[1] = false;
+    gv_pncSingleShot[1] = false;
+    gv_dbgProbeStop = false;
+    if (gv_heroActive != gv_heroTosh) {
+        gf_HeroSwitchTo(gv_heroTosh);
+        Wait(0.3, c_timeGame);
+    }
     lv_hero = gv_tPSUNIT[1];
-    UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBAAutoAttackToggle", 1)), c_orderQueueReplace);
-    UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBARightClickToggle", 1)), c_orderQueueReplace);
+    gf_AttackSingleSet(lv_hero, true);
+    gf_UnitTargetSet(1, null);
+    gf_DbgClearEnemies();
     UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    gf_CombatSetRoot(1, false);
     Wait(0.2, c_timeGame);
     UnitSetPosition(lv_hero, gv_dbgAnchor, false);
-    gf_DbgClearEnemies();
-    Wait(0.8, c_timeGame);
-    if (lp_stand) {
-        lv_order = 0;
-    }
-    else {
-        lv_order = 1;
-    }
-    UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBARightClickToggle", lv_order)), c_orderQueueReplace);
-    Wait(0.5, c_timeGame);
-    if (lp_auto) {
-        UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBAAutoAttackToggle", 0)), c_orderQueueReplace);
-        Wait(0.8, c_timeGame);
-    }
+    UnitSetPropertyFixed(lv_hero, c_unitPropLifePercent, 100.0);
+    Wait(1.6, c_timeGame);
+    gf_ChaseStandSet(lv_hero, lp_stand);
+    gf_AttackSingleSet(lv_hero, !lp_auto);
+    gf_CombatSyncRoot(1);
+    Wait(0.2, c_timeGame);
     gv_dbgSpawnAt = TimerGetElapsed(gv_sCOBA_Clock);
-    BankValueSetFromInt(gv_dbgBank, lp_section, "auto", UnitBehaviorCount(lv_hero, "SCOBAAutoAttackBehavior"));
-    BankValueSetFromInt(gv_dbgBank, lp_section, "stand", UnitBehaviorCount(lv_hero, "SCOBARightClickStandBehavior"));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "auto", gf_CombatAutoOn(1));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "stand", UnitBehaviorCount(lv_hero, c_SCOBA_STAND_BEHAVIOR));
     BankValueSetFromInt(gv_dbgBank, lp_section, "root", UnitBehaviorCount(lv_hero, "SCOBAStandRoot"));
     BankValueSetFromFlag(gv_dbgBank, lp_section, "moveSuppressed", UnitTestState(lv_hero, c_unitStateMoveSuppressed));
     BankValueSetFromInt(gv_dbgBank, lp_section, "heroX", FixedToInt(PointGetX(UnitGetPosition(lv_hero))));
@@ -98,26 +201,67 @@ void gf_DbgSnap (string lp_section, string lp_tag) {
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AtMs", FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_dbgSpawnAt) * 1000.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroX", FixedToInt(PointGetX(UnitGetPosition(lv_hero))));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroY", FixedToInt(PointGetY(UnitGetPosition(lv_hero))));
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Auto", UnitBehaviorCount(lv_hero, "SCOBAAutoAttackBehavior"));
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Stand", UnitBehaviorCount(lv_hero, "SCOBARightClickStandBehavior"));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroHp", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropLife, c_unitPropCurrent)));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Auto", gf_CombatAutoOn(1));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Stand", UnitBehaviorCount(lv_hero, c_SCOBA_STAND_BEHAVIOR));
+    // Command 0 hidden means the button shows the Off face: Single, Stand.
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "AttackBtnSingle", UnitCheckAbilCmdState(lv_hero, AbilityCommand(c_SCOBA_ATTACK_TOGGLE, 0), c_cmdStateHidden));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ChaseBtnStand", UnitCheckAbilCmdState(lv_hero, AbilityCommand(c_SCOBA_CHASE_TOGGLE, 0), c_cmdStateHidden));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Root", UnitBehaviorCount(lv_hero, "SCOBAStandRoot"));
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "MoveSuppressed", UnitTestState(lv_hero, c_unitStateMoveSuppressed));
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "AttackOrder", UnitOrderHasAbil(lv_hero, "attack"));
-    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "TargetEnemy", gv_unitTarget[1] == lv_enemy);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "MoveOrder", UnitOrderHasAbil(lv_hero, "move"));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "TargetEnemy", UnitIsValid(lv_enemy) && gv_unitTarget[1] == lv_enemy);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "TargetNone", gv_unitTarget[1] == null);
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Forward", gv_fORWARD[1]);
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "RunGunShots", gv_sCOBARunGunShots[1]);
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CooldownMs", FixedToInt(UnitAbilityGetCooldown(lv_hero, "SCOBAAutoAttackStatus", "Abil/SCOBAAutoAttackStatus") * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroX10", FixedToInt(PointGetX(UnitGetPosition(lv_hero)) * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroY10", FixedToInt(PointGetY(UnitGetPosition(lv_hero)) * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Facing", FixedToInt(UnitGetFacing(lv_hero)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamYaw", FixedToInt(CameraGetYaw(1)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "NoTurn", UnitBehaviorCount(lv_hero, c_SCOBA_NO_TURN_BEHAVIOR));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "HoldStrafe", gv_holdStrafe[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LowerState", gv_animLowerState[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AimDir", gv_animAimDir[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "FullState", gv_animFullState[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "WalkScale1000", FixedToInt(gv_animFullScale[1] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UnitSpeed1000", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "WalkAnim1000", FixedToInt(gv_animWalkMoveSpeed[gf_AnimHeroProfile(lv_hero)] * 1000.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "SinglePending", gv_pncSingleShot[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Shots", gv_aimShotEffectEvents);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "StatusExecs", gv_dbgStatusExecs);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "HeroIsTosh", gv_heroActive == gv_heroTosh);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CooldownMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ButtonCdMs", FixedToInt(UnitAbilityGetCooldown(lv_hero, "SCOBAAutoAttackStatus", c_DBG_BUTTON_COOLDOWN) * 1000.0));
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CmdCooldown", UnitCheckAbilCmdState(lv_hero, AbilityCommand("SCOBAAutoAttackStatus", 0), c_cmdStateCooldown));
     if (UnitIsValid(lv_enemy)) {
         BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "EnemyValid", true);
         BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EnemyHp", FixedToInt(UnitGetPropertyFixed(lv_enemy, c_unitPropLife, c_unitPropCurrent)));
-        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Distance", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_enemy))));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Distance", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_enemy)) * 10.0));
+        BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "InRange", UnitInRangeAndAbleToAttackTarget(lv_hero, lv_enemy));
     }
     else {
         BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "EnemyValid", false);
         BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EnemyHp", 0);
         BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Distance", -1);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "InRange", false);
     }
     BankSave(gv_dbgBank);
 }
 
+// Waits up to 2 s for the next hero shot, then snapshots 0.25 s after it.
+void gf_DbgSnapAfterShot (string lp_section, string lp_tag) {
+    int lv_i;
+    int lv_shots;
+
+    lv_shots = gv_aimShotEffectEvents;
+    for (lv_i = 0; lv_i < 32; lv_i += 1) {
+        if (gv_aimShotEffectEvents > lv_shots) {
+            break;
+        }
+        Wait(0.0625, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ShotSeen", gv_aimShotEffectEvents > lv_shots);
+    Wait(0.25, c_timeGame);
+    gf_DbgSnap(lp_section, lp_tag);
+}

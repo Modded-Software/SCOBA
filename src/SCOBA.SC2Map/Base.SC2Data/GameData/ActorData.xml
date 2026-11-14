@@ -375,14 +375,6 @@
             <Visuals TerrainPhysicsMaterial="Water" ActorModel="TerrainSquibHarnessContinuous" ModelLink="WaterRippleSmall"/>
         </TerrainSquibs>
     </CActorUnit>
-    <CActorUnit id="SCOBAAimShooterToshUnit" parent="GenericUnitBase" unitName="SCOBAAimShooterTosh">
-        <Model value="ToshSCOBA"/>
-        <Scale value="0.750000"/>
-    </CActorUnit>
-    <CActorUnit id="SCOBAAimShooterKerriganUnit" parent="GenericUnitBase" unitName="SCOBAAimShooterKerrigan">
-        <Model value="KerriganSCOBA"/>
-        <Scale value="0.750000"/>
-    </CActorUnit>
     <!--                                                                                         -->
     <!-- Ultralisk ............................................................................. -->
     <!--                                                                                         -->

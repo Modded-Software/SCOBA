@@ -20,16 +20,16 @@
         <AlertIcon value="Assets\Textures\btn-upgrade-terran-hisecautotracking.dds"/>
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
-        <Name value="Auto-attack: ON"/>
-        <Tooltip value="Attacks enemies in range automatically. Cancel: Ctrl+C, deselect target, or move with WASD. Click to turn off."/>
+        <Name value="Attack: Auto"/>
+        <Tooltip value="The hero attacks the closest enemy on its own and keeps attacking a clicked enemy. Click to switch to Single."/>
     </CButton>
     <CButton id="SCOBAAutoAttackOff">
         <Icon value="Assets\Textures\btn-command-cancel.dds"/>
         <AlertIcon value="Assets\Textures\btn-command-cancel.dds"/>
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
-        <Name value="Auto-attack: OFF"/>
-        <Tooltip value="Auto-attack disabled. Click to enable automatic attacks on nearby enemies."/>
+        <Name value="Attack: Single"/>
+        <Tooltip value="The hero fires one shot per right click or Weapon Attack and never attacks on its own. Click to switch to Auto."/>
     </CButton>
     <CButton id="SCOBARightClickStand">
         <Icon value="Assets\Textures\btn-command-holdposition.dds"/>
@@ -37,23 +37,23 @@
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
         <Name value="Chase: Stand"/>
-        <Tooltip value="Hero holds position and attacks only enemies in range. Click to switch to Walk."/>
+        <Tooltip value="The hero holds its ground and attacks only enemies in range. WASD still moves it. Click to switch to Move."/>
     </CButton>
     <CButton id="SCOBARightClickMove">
         <Icon value="Assets\Textures\btn-command-move.dds"/>
         <AlertIcon value="Assets\Textures\btn-command-move.dds"/>
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
-        <Name value="Chase: Walk"/>
-        <Tooltip value="Hero chases enemies to attack them. Click to switch to Stand."/>
+        <Name value="Chase: Move"/>
+        <Tooltip value="The hero walks into range to attack, and right click on the ground moves it. Click to switch to Stand."/>
     </CButton>
     <CButton id="SCOBAActionModeRPG">
         <Icon value="Assets\Textures\SCOBAModeRPG.dds"/>
         <AlertIcon value="Assets\Textures\SCOBAModeRPG.dds"/>
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
-        <Name value="Controls: RPG"/>
-        <Tooltip value="RPG controls: right and middle button turn the character, right click commands, left click selects. Click to switch to Actions."/>
+        <Name value="Controls: WASD / Point &amp; Click"/>
+        <Tooltip value="WASD / Point &amp; Click: left click targets, right click attacks or moves, hold a mouse button to orbit the camera. Click to switch to Actions."/>
     </CButton>
     <CButton id="SCOBAActionModeActions">
         <Icon value="Assets\Textures\SCOBAModeActions.dds"/>
@@ -61,7 +61,7 @@
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
         <Name value="Controls: Actions"/>
-        <Tooltip value="Action controls: mouse look, right hold aims, left click attacks, Alt shows the cursor. Click to switch to RPG."/>
+        <Tooltip value="Action controls: mouse look, right hold aims, left click attacks, Alt shows the cursor. Click to switch to WASD / Point &amp; Click."/>
     </CButton>
     <CButton id="SCOBAAutoAttackStatus">
         <Icon value="Assets\Textures\btn-command-attack.dds"/>

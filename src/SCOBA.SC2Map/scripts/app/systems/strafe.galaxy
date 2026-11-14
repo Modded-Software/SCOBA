@@ -1,0 +1,149 @@
+// Module: systems/strafe
+
+// Strafe movement: the facing stays on the camera yaw and WASD moves the hero
+// relative to it. Aim uses it. So does a point-and-click right hold.
+bool gf_StrafeMoveActive (int lp_player) {
+    return gv_aIMACTIVE[lp_player] || gv_holdStrafe[lp_player];
+}
+
+// While true the strafe move step is the only facing writer.
+bool gf_StrafeHoldMoving (int lp_player) {
+    return gv_holdStrafe[lp_player] && gf_MovementKeyHeld(lp_player);
+}
+
+// The engine keeps the facing through SuppressTurning, as it does for aim.
+void gf_StrafeHoldSet (int lp_player, bool lp_on) {
+    unit lv_hero;
+
+    if (lp_on == gv_holdStrafe[lp_player]) {
+        return;
+    }
+    gv_holdStrafe[lp_player] = lp_on;
+    gv_animHasMoveTarget[lp_player] = false;
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    if (lp_on) {
+        UnitBehaviorAdd(lv_hero, c_SCOBA_NO_TURN_BEHAVIOR, lv_hero, 1);
+    }
+    else {
+        UnitBehaviorRemove(lv_hero, c_SCOBA_NO_TURN_BEHAVIOR, 1);
+    }
+}
+
+// A right hold in point and click turns strafe movement on. A middle hold
+// steers instead and wins when both are held.
+void gf_StrafeHoldSync (int lp_player) {
+    bool lv_on;
+
+    lv_on = gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player] && !gv_mOUSEMIDDLE[lp_player];
+    if (gf_ActionModeActive(lp_player) || gv_sCOBAOrderMode[lp_player]) {
+        lv_on = false;
+    }
+    gf_StrafeHoldSet(lp_player, lv_on);
+}
+
+void gf_AimMoveStep (int lp_player, fixed lp_angle) {
+    unit lv_hero;
+    point lv_next;
+    fixed lv_dist;
+    bool lv_need;
+
+    if (!gf_StrafeMoveActive(lp_player)) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    gf_CombatSetRoot(lp_player, false);
+    lv_need = false;
+    if (!gv_animHasMoveTarget[lp_player]) {
+        lv_need = true;
+    }
+    if (!lv_need && !UnitOrderHasAbil(lv_hero, "move")) {
+        lv_need = true;
+    }
+    if (!lv_need && DistanceBetweenPoints(UnitGetPosition(lv_hero), gv_animMoveTarget[lp_player]) <= c_ANIM_MOVE_RETARGET) {
+        lv_need = true;
+    }
+    if (!lv_need && AbsF(gf_AnimYawDelta(gv_animMoveHeading[lp_player], lp_angle)) >= c_ANIM_MOVE_HEADING) {
+        lv_need = true;
+    }
+    // A right hold turns with the same call as a middle hold.
+    if (gv_holdStrafe[lp_player]) {
+        UnitSetFacing(lv_hero, CameraGetYaw(lp_player), c_ANIM_MOVE_TURN_DURATION);
+    }
+    else {
+        UnitSetFacing(lv_hero, CameraGetYaw(lp_player), c_ANIM_AIM_TURN_DURATION);
+    }
+    if (lv_need) {
+        lv_dist = c_ANIM_MOVE_TARGET;
+        while (lv_dist >= (c_ANIM_MOVE_RETARGET * 3.0)) {
+            lv_next = PointWithOffsetPolar(UnitGetPosition(lv_hero), lv_dist, lp_angle);
+            if (PointPathingPassable(lv_next) && UnitPathableToPoint(lv_hero, lv_next, 0.0, lv_dist)) {
+                break;
+            }
+            lv_dist = lv_dist - c_ANIM_MOVE_RETARGET;
+        }
+        if (lv_dist >= (c_ANIM_MOVE_RETARGET * 3.0)) {
+            UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), lv_next), c_orderQueueReplace);
+            gv_animMoveTarget[lp_player] = lv_next;
+            gv_animMoveHeading[lp_player] = lp_angle;
+            gv_animHasMoveTarget[lp_player] = true;
+        }
+    }
+}
+
+// One WASD loop pass during strafe movement. A right hold steps here, in the
+// thread and at the rate a middle hold steps.
+void gf_StrafeLoopStep (int lp_player) {
+    if (gv_holdStrafe[lp_player]) {
+        gf_AimMoveStep(lp_player, gf_AnimInputHeading(lp_player));
+        Wait(0.01, c_timeGame);
+        return;
+    }
+    Wait(c_ANIM_MOVE_TICK, c_timeGame);
+}
+
+bool gt_AimMoveTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (!gf_StrafeMoveActive(lv_player)) {
+            continue;
+        }
+        if (!gf_MovementKeyHeld(lv_player)) {
+            continue;
+        }
+        gf_AimMoveStep(lv_player, gf_AnimInputHeading(lv_player));
+    }
+    return true;
+}
+
+void gt_AimMoveTick_Init () {
+    gt_AimMoveTick = TriggerCreate("gt_AimMoveTick_Func");
+    TriggerAddEventTimePeriodic(gt_AimMoveTick, c_ANIM_MOVE_TICK, c_timeGame);
+}
+
+void gf_AimMoveStop (int lp_player) {
+    unit lv_hero;
+
+    if (gf_StrafeMoveActive(lp_player) && gf_MovementKeyHeld(lp_player)) {
+        return;
+    }
+    gv_animHasMoveTarget[lp_player] = false;
+    if (!gf_StrafeMoveActive(lp_player)) {
+        return;
+    }
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+}
+

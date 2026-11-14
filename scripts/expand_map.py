@@ -10,6 +10,7 @@ import shutil
 import struct
 from pathlib import Path
 
+from aim_shot_ability import apply as apply_aim_shot
 from bootstrap_galaxy import write_bootstrap
 from character_anim_assets import generate as generate_character_anim
 from control_mode_icons import generate as generate_control_icons
@@ -472,6 +473,8 @@ def main() -> int:
     disable_doodad_occlusion(dst)
     if os.environ.get("SC2_NO_WATER_SPLASHES") != "1":
         apply_water_splashes(dst)
+    if os.environ.get("SC2_NO_AIM_SHOT") != "1":
+        apply_aim_shot(dst)
     generate_character_anim(dst, False)
     generate_control_icons(dst, False)
     if os.environ.get("SC2_NO_PROPS") != "1":

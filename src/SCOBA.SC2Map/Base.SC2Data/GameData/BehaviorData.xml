@@ -559,7 +559,21 @@
             </Cost>
         </DamageResponse>
     </CBehaviorBuff>
-    <CBehaviorBuff id="SCOBAAutoAttackBehavior">
+    <CBehaviorBuff id="SCOBAAttackEnd">
+        <Modification>
+            <AbilClassDisableArray index="CAbilAttack" value="1"/>
+        </Modification>
+        <Duration value="0.07"/>
+        <InfoFlags index="Hidden" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="SCOBAAttackSingle">
+        <Modification>
+            <StateFlags index="Passive" value="1"/>
+            <WeaponDisableArray value="ToshAuto"/>
+            <WeaponDisableArray value="QueenOfBladesPsiBlastAuto"/>
+            <WeaponDisableArray value="RazorTalonsAuto"/>
+        </Modification>
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
@@ -588,6 +602,14 @@
         <EditorCategories value="AbilityorEffectType:Units"/>
         <Modification>
             <ModifyFlags index="SuppressTurning" value="1"/>
+        </Modification>
+    </CBehaviorBuff>
+    <CBehaviorBuff id="SCOBAAimNoAttack">
+        <InfoFlags index="Hidden" value="1"/>
+        <BehaviorCategories index="Permanent" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Modification>
+            <StateFlags index="SuppressAttack" value="1"/>
         </Modification>
     </CBehaviorBuff>
 </Catalog>

@@ -1,9 +1,5 @@
 // Module: systems/movement
 
-bool gf_AimMoveActive (int lp_player) {
-    return gv_aIMACTIVE[lp_player];
-}
-
 void gf_CombatMoveStep (int lp_player, fixed lp_angle) {
     unit lv_hero;
     point lv_next;
@@ -12,107 +8,8 @@ void gf_CombatMoveStep (int lp_player, fixed lp_angle) {
     if (!UnitIsValid(lv_hero)) {
         return;
     }
-    if (!gf_CombatRunGunActive(lp_player)) {
-        gv_sCOBARunGunMode[lp_player] = false;
-        UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(lv_hero), 0.5, lp_angle)), c_orderQueueReplace);
-        return;
-    }
-    if (gv_sCOBARunGunMode[lp_player] && UnitOrderHasAbil(lv_hero, "move") && AbsF(gf_AnimYawDelta(gv_sCOBARunGunHeading[lp_player], lp_angle)) < c_SCOBA_RUNGUN_HEADING) {
-        return;
-    }
-    lv_next = PointWithOffsetPolar(UnitGetPosition(lv_hero), c_SCOBA_RUNGUN_TARGET, lp_angle);
-    UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 3), lv_next), c_orderQueueReplace);
-    gv_sCOBARunGunMode[lp_player] = true;
-    gv_sCOBARunGunHeading[lp_player] = lp_angle;
-}
-
-void gf_AimMoveStep (int lp_player, fixed lp_angle) {
-    unit lv_hero;
-    point lv_next;
-    fixed lv_dist;
-    bool lv_need;
-
-    if (!gf_AimMoveActive(lp_player)) {
-        return;
-    }
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return;
-    }
-    gf_CombatSetRoot(lp_player, false);
-    gf_AimShooterPin(lp_player);
-    lv_need = false;
-    if (!gv_animHasMoveTarget[lp_player]) {
-        lv_need = true;
-    }
-    if (!lv_need && !UnitOrderHasAbil(lv_hero, "move")) {
-        lv_need = true;
-    }
-    if (!lv_need && DistanceBetweenPoints(UnitGetPosition(lv_hero), gv_animMoveTarget[lp_player]) <= c_ANIM_MOVE_RETARGET) {
-        lv_need = true;
-    }
-    if (!lv_need && AbsF(gf_AnimYawDelta(gv_animMoveHeading[lp_player], lp_angle)) >= c_ANIM_MOVE_HEADING) {
-        lv_need = true;
-    }
-    if (lv_need) {
-        UnitSetFacing(lv_hero, CameraGetYaw(lp_player), c_ANIM_AIM_TURN_DURATION);
-        lv_dist = c_ANIM_MOVE_TARGET;
-        while (lv_dist >= (c_ANIM_MOVE_RETARGET * 3.0)) {
-            lv_next = PointWithOffsetPolar(UnitGetPosition(lv_hero), lv_dist, lp_angle);
-            if (PointPathingPassable(lv_next) && UnitPathableToPoint(lv_hero, lv_next, 0.0, lv_dist)) {
-                break;
-            }
-            lv_dist = lv_dist - c_ANIM_MOVE_RETARGET;
-        }
-        if (lv_dist >= (c_ANIM_MOVE_RETARGET * 3.0)) {
-            UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), lv_next), c_orderQueueReplace);
-            gv_animMoveTarget[lp_player] = lv_next;
-            gv_animMoveHeading[lp_player] = lp_angle;
-            gv_animHasMoveTarget[lp_player] = true;
-        }
-    }
-}
-
-
-bool gt_AimMoveTick_Func (bool testConds, bool runActions) {
-    int lv_player;
-
-    if (!runActions) {
-        return true;
-    }
-    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
-        if (!gf_AimMoveActive(lv_player)) {
-            continue;
-        }
-        if (!gf_MovementKeyHeld(lv_player)) {
-            continue;
-        }
-        gf_AimMoveStep(lv_player, gf_AnimInputHeading(lv_player));
-    }
-    return true;
-}
-
-void gt_AimMoveTick_Init () {
-    gt_AimMoveTick = TriggerCreate("gt_AimMoveTick_Func");
-    TriggerAddEventTimePeriodic(gt_AimMoveTick, c_ANIM_MOVE_TICK, c_timeGame);
-}
-
-void gf_AimMoveStop (int lp_player) {
-    unit lv_hero;
-
-    if (gf_AimMoveActive(lp_player) && gf_MovementKeyHeld(lp_player)) {
-        return;
-    }
-    gv_animHasMoveTarget[lp_player] = false;
-    if (!gf_AimMoveActive(lp_player)) {
-        return;
-    }
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return;
-    }
-    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
-    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
+    lv_next = PointWithOffsetPolar(UnitGetPosition(lv_hero), 0.5, lp_angle);
+    UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), lv_next), c_orderQueueReplace);
 }
 
 bool gt_DisableClickMove_Func (bool testConds, bool runActions) {
@@ -150,7 +47,7 @@ void gf_ForwardBegin (int lp_player) {
         return;
     }
     gv_fORWARD[lp_player] = true;
-    gf_CombatBeginMove(lp_player);
+    gf_CombatSetRoot(lp_player, false);
     while ((gv_fORWARD[lp_player] == true) && (gv_bACKWARD[lp_player] == false)) {
         if (((gv_rOTATEUNIT[lp_player] == true) || (gv_rOTATECAMERA[lp_player] == false))) {
             lv_angle = CameraGetYaw(lp_player);
@@ -166,12 +63,12 @@ void gf_ForwardBegin (int lp_player) {
             lv_angle = (lv_angle - 45.0);
         }
 
-        if (gf_AimMoveActive(lp_player)) {
-            Wait(c_ANIM_MOVE_TICK, c_timeGame);
+        if (gf_StrafeMoveActive(lp_player)) {
+            gf_StrafeLoopStep(lp_player);
         }
         else {
             gf_CombatMoveStep(lp_player, lv_angle);
-            UnitSetFacing(gv_tPSUNIT[lp_player], lv_angle, 0.01);
+            UnitSetFacing(gv_tPSUNIT[lp_player], lv_angle, c_ANIM_MOVE_TURN_DURATION);
             Wait(0.01, c_timeGame);
         }
     }
@@ -197,7 +94,7 @@ void gf_MouseForwardStop (int lp_player) {
     }
     if (!gf_MovementKeyHeld(lp_player)) {
         gf_AimMoveStop(lp_player);
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
+        gf_CombatSyncRoot(lp_player);
     }
 }
 
@@ -247,7 +144,7 @@ bool gt_ForwardEnd_Func (bool testConds, bool runActions) {
     }
     if (!gf_MovementKeyHeld(lv_localPlayer)) {
         gf_AimMoveStop(lv_localPlayer);
-        gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
+        gf_CombatSyncRoot(lv_localPlayer);
     }
     return true;
 }
@@ -279,7 +176,7 @@ bool gt_BackwardStart_Func (bool testConds, bool runActions) {
     }
 
     gv_bACKWARD[lv_localPlayer] = true;
-    gf_CombatBeginMove(lv_localPlayer);
+    gf_CombatSetRoot(lv_localPlayer, false);
     while ((gv_bACKWARD[lv_localPlayer] == true) && (gv_fORWARD[lv_localPlayer] == false)) {
         if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
             lv_angle = (CameraGetYaw(lv_localPlayer) + 180.0);
@@ -295,12 +192,12 @@ bool gt_BackwardStart_Func (bool testConds, bool runActions) {
             lv_angle = (lv_angle + 45.0);
         }
 
-        if (gf_AimMoveActive(lv_localPlayer)) {
-            Wait(c_ANIM_MOVE_TICK, c_timeGame);
+        if (gf_StrafeMoveActive(lv_localPlayer)) {
+            gf_StrafeLoopStep(lv_localPlayer);
         }
         else {
             gf_CombatMoveStep(lv_localPlayer, lv_angle);
-            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
+            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, c_ANIM_MOVE_TURN_DURATION);
             Wait(0.01, c_timeGame);
         }
     }
@@ -328,7 +225,7 @@ bool gt_BackwardEnd_Func (bool testConds, bool runActions) {
     UnitBehaviorRemove(gv_tPSUNIT[lv_localPlayer], "VileAcidSlowEffectsLevel2", 1);
     if (!gf_MovementKeyHeld(lv_localPlayer)) {
         gf_AimMoveStop(lv_localPlayer);
-        gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
+        gf_CombatSyncRoot(lv_localPlayer);
     }
     return true;
 }
@@ -356,7 +253,7 @@ bool gt_LeftStart_Func (bool testConds, bool runActions) {
     }
 
     gv_lEFT[lv_localPlayer] = true;
-    gf_CombatBeginMove(lv_localPlayer);
+    gf_CombatSetRoot(lv_localPlayer, false);
     while ((gv_lEFT[lv_localPlayer] == true)) {
         if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
             lv_angle = (CameraGetYaw(lv_localPlayer) + 90.0);
@@ -372,12 +269,12 @@ bool gt_LeftStart_Func (bool testConds, bool runActions) {
             lv_angle = (lv_angle + 45.0);
         }
 
-        if (gf_AimMoveActive(lv_localPlayer)) {
-            Wait(c_ANIM_MOVE_TICK, c_timeGame);
+        if (gf_StrafeMoveActive(lv_localPlayer)) {
+            gf_StrafeLoopStep(lv_localPlayer);
         }
         else {
             gf_CombatMoveStep(lv_localPlayer, lv_angle);
-            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
+            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, c_ANIM_MOVE_TURN_DURATION);
             Wait(0.01, c_timeGame);
         }
     }
@@ -404,7 +301,7 @@ bool gt_LeftEnd_Func (bool testConds, bool runActions) {
     gv_lEFT[lv_localPlayer] = false;
     if (!gf_MovementKeyHeld(lv_localPlayer)) {
         gf_AimMoveStop(lv_localPlayer);
-        gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
+        gf_CombatSyncRoot(lv_localPlayer);
     }
     return true;
 }
@@ -432,7 +329,7 @@ bool gt_RightStart_Func (bool testConds, bool runActions) {
     }
 
     gv_rIGHT[lv_localPlayer] = true;
-    gf_CombatBeginMove(lv_localPlayer);
+    gf_CombatSetRoot(lv_localPlayer, false);
     while ((gv_rIGHT[lv_localPlayer] == true)) {
         if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
             lv_angle = (CameraGetYaw(lv_localPlayer) - 90.0);
@@ -448,12 +345,12 @@ bool gt_RightStart_Func (bool testConds, bool runActions) {
             lv_angle = (lv_angle - 45.0);
         }
 
-        if (gf_AimMoveActive(lv_localPlayer)) {
-            Wait(c_ANIM_MOVE_TICK, c_timeGame);
+        if (gf_StrafeMoveActive(lv_localPlayer)) {
+            gf_StrafeLoopStep(lv_localPlayer);
         }
         else {
             gf_CombatMoveStep(lv_localPlayer, lv_angle);
-            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, 0.01);
+            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, c_ANIM_MOVE_TURN_DURATION);
             Wait(0.01, c_timeGame);
         }
     }
@@ -480,7 +377,7 @@ bool gt_RightEnd_Func (bool testConds, bool runActions) {
     gv_rIGHT[lv_localPlayer] = false;
     if (!gf_MovementKeyHeld(lv_localPlayer)) {
         gf_AimMoveStop(lv_localPlayer);
-        gv_sCOBAFSM[lv_localPlayer] = c_SCOBA_FSM_IDLE;
+        gf_CombatSyncRoot(lv_localPlayer);
     }
     return true;
 }

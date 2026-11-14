@@ -97,7 +97,7 @@ fixed gf_AnimInputHeading (int lp_player) {
 void gf_AnimUpdateAimDir (int lp_player) {
     fixed lv_delta;
 
-    if (!gv_aIMACTIVE[lp_player]) {
+    if (!gf_StrafeMoveActive(lp_player)) {
         return;
     }
     if (!gf_MovementKeyHeld(lp_player)) {

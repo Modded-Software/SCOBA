@@ -118,6 +118,9 @@ void gf_AnimAimAttackStart (int lp_player, string lp_weapon) {
     int lv_flags;
     string lv_clip;
 
+    if (gf_AnimAimAttackActive(lp_player)) {
+        return;
+    }
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
         return;
@@ -261,11 +264,25 @@ void gf_AnimFullClear (int lp_player) {
     gv_animFullState[lp_player] = c_ANIM_LOWER_NONE;
     gv_animFullDir[lp_player] = -1;
 }
+// Walk clips play at the rate the engine gives the stock walk.
+fixed gf_AnimWalkScale (unit lp_hero, int lp_state) {
+    fixed lv_walk;
+
+    if (lp_state != c_ANIM_LOWER_WALK && lp_state != c_ANIM_LOWER_WALK_BACK) {
+        return 1.0;
+    }
+    lv_walk = gv_animWalkMoveSpeed[gf_AnimHeroProfile(lp_hero)];
+    if (lv_walk <= 0.0) {
+        return 1.0;
+    }
+    return UnitGetPropertyFixed(lp_hero, c_unitPropMovementSpeed, c_unitPropCurrent) / lv_walk;
+}
 void gf_AnimFullSet (int lp_player, int lp_state) {
     unit lv_hero;
     actor lv_actor;
     int lv_profile;
     int lv_dir;
+    fixed lv_scale;
     string lv_clip;
 
     if (lp_state == c_ANIM_LOWER_NONE) {
@@ -278,7 +295,13 @@ void gf_AnimFullSet (int lp_player, int lp_state) {
     }
     lv_profile = gf_AnimHeroProfile(lv_hero);
     lv_dir = gv_animAimDir[lp_player];
+    lv_scale = gf_AnimWalkScale(lv_hero, lp_state);
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     if (gv_animFullState[lp_player] == lp_state && gv_animFullDir[lp_player] == lv_dir) {
+        if (AbsF(lv_scale - gv_animFullScale[lp_player]) > 0.01) {
+            ActorSend(lv_actor, "AnimSetTimeScale " + c_ANIM_BRACKET_LOWER + " " + FixedToString(lv_scale, 3));
+            gv_animFullScale[lp_player] = lv_scale;
+        }
         return;
     }
     lv_clip = gv_animAimClip[lv_profile][lp_state][lv_dir];
@@ -286,9 +309,9 @@ void gf_AnimFullSet (int lp_player, int lp_state) {
         gf_AnimFullClear(lp_player);
         return;
     }
-    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
-    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, 0.15, 0.15, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, 0.15, 0.15, lv_scale, c_animTimeVariantAsTimeScale));
     gv_animFullState[lp_player] = lp_state;
     gv_animFullDir[lp_player] = lv_dir;
+    gv_animFullScale[lp_player] = lv_scale;
     gf_ProbeSetLowerClip(lp_player, lv_clip);
 }

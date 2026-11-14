@@ -1,11 +1,14 @@
 // Module: systems/combat_fsm
+// The engine owns acquisition, chase, and firing.
+// This module reads the two toggles, keeps the stand root, and issues
+// the attack and cancel orders.
 
 bool gf_CombatAutoOn (int lp_player) {
-    return UnitBehaviorCount(gv_tPSUNIT[lp_player], "SCOBAAutoAttackBehavior") > 0;
+    return UnitBehaviorCount(gv_tPSUNIT[lp_player], c_SCOBA_SINGLE_BEHAVIOR) <= 0;
 }
 
 bool gf_CombatStandOn (int lp_player) {
-    return UnitBehaviorCount(gv_tPSUNIT[lp_player], "SCOBARightClickStandBehavior") > 0;
+    return UnitBehaviorCount(gv_tPSUNIT[lp_player], c_SCOBA_STAND_BEHAVIOR) > 0;
 }
 
 void gf_CombatSetRoot (int lp_player, bool lp_root) {
@@ -28,292 +31,77 @@ void gf_CombatSetRoot (int lp_player, bool lp_root) {
 }
 
 void gf_CombatSyncRoot (int lp_player) {
-    if (gv_sCOBAOrderMode[lp_player] || gf_MovementKeyHeld(lp_player)) {
+    if (gv_sCOBAOrderMode[lp_player] || gv_aIMACTIVE[lp_player] || gf_MovementKeyHeld(lp_player)) {
         gf_CombatSetRoot(lp_player, false);
         return;
     }
     gf_CombatSetRoot(lp_player, gf_CombatStandOn(lp_player));
 }
 
-void gf_CombatReset (int lp_player) {
-    gf_CombatSetRoot(lp_player, false);
-    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
-    gv_sCOBAAutoTarget[lp_player] = null;
-    gv_sCOBAManualTarget[lp_player] = null;
-    gv_sCOBAAutoOrder[lp_player] = false;
-    gv_sCOBAManualOrder[lp_player] = false;
-}
-
-void gf_CombatCancelAuto (int lp_player) {
-    unit lv_hero;
-
-    lv_hero = gv_tPSUNIT[lp_player];
-    gv_sCOBAAutoTarget[lp_player] = null;
-    if (gv_sCOBAAutoOrder[lp_player] && gv_sCOBAManualOrder[lp_player] == false && UnitIsValid(lv_hero) && UnitIsAlive(lv_hero)) {
-        UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
-    }
-    gv_sCOBAAutoOrder[lp_player] = false;
-}
-
-void gf_CombatBeginMove (int lp_player) {
-    gf_CombatSetRoot(lp_player, false);
-    gv_sCOBAAutoOrder[lp_player] = false;
-    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_MOVING;
-}
-
-void gf_CombatSetStance (int lp_player, bool lp_stand) {
-    unit lv_hero;
-
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return;
-    }
-    gf_CombatCancelAuto(lp_player);
-    gv_sCOBAManualTarget[lp_player] = null;
-    gv_sCOBAManualOrder[lp_player] = false;
-    gf_CombatSyncRoot(lp_player);
-    if (!gf_CombatAutoOn(lp_player)) {
-        if (gf_CombatStandOn(lp_player)) {
-            UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
-        }
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
-        return;
-    }
-    gf_CombatStep(lp_player);
-}
-
-void gf_CombatManualAttack (int lp_player, unit lp_unit) {
+void gf_PncAttack (int lp_player, unit lp_unit) {
     unit lv_hero;
 
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero) || !UnitIsValid(lp_unit) || !UnitIsAlive(lp_unit)) {
         return;
     }
-    gf_CombatCancelAuto(lp_player);
+    gf_UnitTargetSet(lp_player, lp_unit);
     gf_CombatSyncRoot(lp_player);
-    gv_sCOBAManualTarget[lp_player] = lp_unit;
-    gv_sCOBAManualOrder[lp_player] = true;
-    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_MANUAL;
-    if (gf_MovementKeyHeld(lp_player)) {
+    if (gf_CombatStandOn(lp_player) && !UnitInRangeAndAbleToAttackTarget(lv_hero, lp_unit)) {
+        gf_FloaterCreate(lp_player, UnitGetPosition(lp_unit), StringToText(c_SCOBA_OUT_OF_RANGE_TEXT), Color(70.0, 70.0, 70.0));
         return;
     }
+    gv_pncSingleShot[lp_player] = !gf_CombatAutoOn(lp_player);
     UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lp_unit), c_orderQueueReplace);
 }
 
-bool gf_WeaponReady (int lp_player) {
+// Ends the current attack with the stock hold-fire pattern: the attack
+// ability is disabled for 0.07 s. A stop order does not end it.
+void gf_PncAttackEnd (int lp_player) {
     unit lv_hero;
-    int lv_index;
-    int lv_count;
 
     lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return false;
+    if (UnitIsValid(lv_hero)) {
+        UnitBehaviorAdd(lv_hero, c_SCOBA_ATTACK_END_BEHAVIOR, lv_hero, 1);
     }
-    lv_count = UnitWeaponCount(lv_hero);
-    for (lv_index = 1; lv_index <= lv_count; lv_index += 1) {
-        if (!UnitWeaponIsEnabled(lv_hero, lv_index)) {
-            continue;
-        }
-        if (UnitWeaponPeriodRemaining(lv_hero, lv_index) <= c_SCOBA_WEAPON_READY_EPSILON) {
-            return true;
-        }
-    }
-    return false;
 }
 
-unit gf_CombatMovingTarget (int lp_player) {
-    unit lv_hero;
-    unit lv_target;
-    unitgroup lv_group;
-    fixed lv_radius;
-
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
-        return null;
+void gf_PncShotFired (int lp_player) {
+    if (!gv_pncSingleShot[lp_player]) {
+        return;
     }
-    if (gv_sCOBAManualOrder[lp_player]) {
-        lv_target = gv_sCOBAManualTarget[lp_player];
-        if (UnitIsValid(lv_target) && UnitIsAlive(lv_target)) {
-            return lv_target;
-        }
-        gv_sCOBAManualTarget[lp_player] = null;
-        gv_sCOBAManualOrder[lp_player] = false;
-    }
-    if (!gf_CombatAutoOn(lp_player)) {
-        return null;
-    }
-    lv_radius = c_SCOBA_CHASE_RADIUS;
-    if (gf_CombatStandOn(lp_player)) {
-        lv_radius = c_SCOBA_KEEP_RADIUS;
-    }
-    lv_target = gv_sCOBAAutoTarget[lp_player];
-    if (UnitIsValid(lv_target) && UnitIsAlive(lv_target)) {
-        if (DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_target)) <= lv_radius) {
-            return lv_target;
-        }
-    }
-    gv_sCOBAAutoTarget[lp_player] = null;
-    lv_group = UnitGroupAlliance(lp_player, c_unitAllianceEnemy, RegionCircle(UnitGetPosition(lv_hero), lv_radius), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0);
-    if (UnitGroupCount(lv_group, c_unitCountAlive) <= 0) {
-        return null;
-    }
-    lv_target = UnitGroupClosestToPoint(lv_group, UnitGetPosition(lv_hero));
-    if (UnitIsValid(lv_target)) {
-        gv_sCOBAAutoTarget[lp_player] = lv_target;
-    }
-    return lv_target;
+    gv_pncSingleShot[lp_player] = false;
+    gf_PncAttackEnd(lp_player);
 }
 
-bool gf_CombatRunGunActive (int lp_player) {
-    unit lv_hero;
-    unit lv_target;
-
-    if (!gf_CombatAutoOn(lp_player) && !gv_sCOBAManualOrder[lp_player]) {
-        return false;
-    }
-    lv_hero = gv_tPSUNIT[lp_player];
-    lv_target = gf_CombatMovingTarget(lp_player);
-    if (!UnitIsValid(lv_hero) || !UnitIsValid(lv_target) || !UnitIsAlive(lv_target)) {
-        return false;
-    }
-    if (!UnitInRangeAndAbleToAttackTarget(lv_hero, lv_target)) {
-        return false;
-    }
-    gv_sCOBARunGunShots[lp_player] += 1;
-    return true;
+void gf_PncCancel (int lp_player) {
+    gf_UnitTargetSet(lp_player, null);
+    gv_pncSingleShot[lp_player] = false;
+    gf_PncAttackEnd(lp_player);
 }
 
-void gf_CombatStand (int lp_player) {
-    unit lv_hero;
-    unit lv_target;
-    unitgroup lv_group;
-
-    gf_CombatSetRoot(lp_player, true);
-    lv_hero = gv_tPSUNIT[lp_player];
-    lv_group = UnitGroupAlliance(lp_player, c_unitAllianceEnemy, RegionCircle(UnitGetPosition(lv_hero), c_SCOBA_KEEP_RADIUS), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0);
-    if (UnitGroupCount(lv_group, c_unitCountAlive) == 0) {
-        gv_sCOBAAutoTarget[lp_player] = null;
-        if (gv_sCOBAAutoOrder[lp_player]) {
-            UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
-            gv_sCOBAAutoOrder[lp_player] = false;
-        }
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_HOLD;
+// A toggle is a behavior switched by its toggle ability: command 0 turns it
+// on, command 1 turns it off. The command-card button follows the ability,
+// not the behavior, so the behavior is never added or removed directly.
+void gf_ToggleSet (unit lp_unit, string lp_abil, string lp_behavior, bool lp_on) {
+    if (!UnitIsValid(lp_unit)) {
         return;
     }
-    lv_target = UnitGroupClosestToPoint(lv_group, UnitGetPosition(lv_hero));
-    if (!UnitIsValid(lv_target)) {
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_HOLD;
+    if ((UnitBehaviorCount(lp_unit, lp_behavior) > 0) == lp_on) {
         return;
     }
-    gv_sCOBAAutoTarget[lp_player] = lv_target;
-    if (UnitOrderCount(lv_hero) == 0 || UnitOrderHasAbil(lv_hero, "attack") == false || OrderGetTargetUnit(UnitOrder(lv_hero, 0)) != lv_target) {
-        UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
-        gv_sCOBAAutoOrder[lp_player] = true;
-    }
-    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_ATTACK;
-}
-
-void gf_CombatWalk (int lp_player) {
-    unit lv_hero;
-    unit lv_target;
-    unitgroup lv_group;
-    bool lv_chasing;
-
-    gf_CombatSetRoot(lp_player, false);
-    lv_hero = gv_tPSUNIT[lp_player];
-    lv_target = gv_sCOBAAutoTarget[lp_player];
-    lv_chasing = lv_target != null && UnitIsValid(lv_target) && UnitIsAlive(lv_target) && (DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_target)) <= c_SCOBA_KEEP_RADIUS);
-    if (lv_chasing) {
-        if (UnitOrderCount(lv_hero) == 0 || UnitOrderHasAbil(lv_hero, "attack") == false || OrderGetTargetUnit(UnitOrder(lv_hero, 0)) != lv_target) {
-            UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
-            gv_sCOBAAutoOrder[lp_player] = true;
-        }
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_CHASE;
-        return;
-    }
-    lv_chasing = lv_target != null && UnitIsValid(lv_target) && UnitIsAlive(lv_target) && (DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_target)) <= c_SCOBA_CHASE_RADIUS);
-    if (lv_chasing) {
-        if (UnitOrderCount(lv_hero) == 0 || UnitOrderHasAbil(lv_hero, "attack") == false || OrderGetTargetUnit(UnitOrder(lv_hero, 0)) != lv_target) {
-            UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
-            gv_sCOBAAutoOrder[lp_player] = true;
-        }
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_CHASE;
-        return;
-    }
-    gv_sCOBAAutoTarget[lp_player] = null;
-    lv_group = UnitGroupAlliance(lp_player, c_unitAllianceEnemy, RegionCircle(UnitGetPosition(lv_hero), c_SCOBA_CHASE_RADIUS), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0);
-    if (UnitGroupCount(lv_group, c_unitCountAlive) == 0) {
-        if (gv_sCOBAAutoOrder[lp_player]) {
-            UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
-            gv_sCOBAAutoOrder[lp_player] = false;
-        }
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
-        return;
-    }
-    lv_target = UnitGroupClosestToPoint(lv_group, UnitGetPosition(lv_hero));
-    if (!UnitIsValid(lv_target)) {
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
-        return;
-    }
-    UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
-    gv_sCOBAAutoTarget[lp_player] = lv_target;
-    gv_sCOBAAutoOrder[lp_player] = true;
-    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_CHASE;
-}
-
-void gf_CombatStep (int lp_player) {
-    unit lv_hero;
-
-    if (lp_player < c_SCOBA_HERO_FIRST || lp_player > c_SCOBA_HERO_LAST) {
-        return;
-    }
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
-        gf_CombatReset(lp_player);
-        return;
-    }
-    if (gv_aIMACTIVE[lp_player]) {
-        return;
-    }
-    if (gv_sCOBAOrderMode[lp_player]) {
-        gf_CombatCancelAuto(lp_player);
-        gv_sCOBAManualTarget[lp_player] = null;
-        gv_sCOBAManualOrder[lp_player] = false;
-        gf_CombatBeginMove(lp_player);
-        return;
-    }
-    if (gf_MovementKeyHeld(lp_player)) {
-        gf_CombatSetRoot(lp_player, false);
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_MOVING;
-        return;
-    }
-    if (gv_sCOBAFSM[lp_player] == c_SCOBA_FSM_MOVING) {
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
-    }
-    gf_CombatSyncRoot(lp_player);
-    if (gv_sCOBAManualOrder[lp_player]) {
-        if (UnitIsValid(gv_sCOBAManualTarget[lp_player]) && UnitIsAlive(gv_sCOBAManualTarget[lp_player])) {
-            if (UnitOrderCount(lv_hero) > 0 && UnitOrderHasAbil(lv_hero, "attack") && OrderGetTargetUnit(UnitOrder(lv_hero, 0)) == gv_sCOBAManualTarget[lp_player]) {
-                gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_MANUAL;
-                return;
-            }
-            UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand("attack", 0), gv_sCOBAManualTarget[lp_player]), c_orderQueueReplace);
-            gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_MANUAL;
-            return;
-        }
-        gv_sCOBAManualTarget[lp_player] = null;
-        gv_sCOBAManualOrder[lp_player] = false;
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
-    }
-    if (!gf_CombatAutoOn(lp_player)) {
-        gf_CombatCancelAuto(lp_player);
-        gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
-        return;
-    }
-    if (gf_CombatStandOn(lp_player)) {
-        gf_CombatStand(lp_player);
+    if (lp_on) {
+        UnitIssueOrder(lp_unit, Order(AbilityCommand(lp_abil, 0)), c_orderQueueReplace);
     }
     else {
-        gf_CombatWalk(lp_player);
+        UnitIssueOrder(lp_unit, Order(AbilityCommand(lp_abil, 1)), c_orderQueueReplace);
     }
+}
+
+void gf_AttackSingleSet (unit lp_unit, bool lp_single) {
+    gf_ToggleSet(lp_unit, c_SCOBA_ATTACK_TOGGLE, c_SCOBA_SINGLE_BEHAVIOR, lp_single);
+}
+
+void gf_ChaseStandSet (unit lp_unit, bool lp_stand) {
+    gf_ToggleSet(lp_unit, c_SCOBA_CHASE_TOGGLE, c_SCOBA_STAND_BEHAVIOR, lp_stand);
 }

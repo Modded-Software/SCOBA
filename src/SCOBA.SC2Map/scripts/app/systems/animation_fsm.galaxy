@@ -2,6 +2,8 @@
 
 void gf_AnimReset (int lp_player) {
     gv_animResets[lp_player] += 1;
+    gf_AimNoAttackApply(lp_player, gv_aIMACTIVE[lp_player]);
+    gf_ActionStatusHover(lp_player, null);
     gf_AnimUpperClear(lp_player);
     gf_AnimLowerClear(lp_player);
     gv_animUpperState[lp_player] = c_ANIM_UPPER_NONE;
@@ -13,12 +15,6 @@ void gf_AnimReset (int lp_player) {
     gv_animAttackTarget[lp_player] = null;
     gv_animTargetPitchStep[lp_player] = 0;
     gv_animTargetPitchTime[lp_player] = -1.0;
-    gf_AimShotProxyClear(lp_player);
-    gf_AimShooterPark(lp_player);
-    if (gv_aIMACTIVE[lp_player]) {
-        gf_AimShooterCreate(lp_player);
-        gf_AimShooterPin(lp_player);
-    }
     gv_animFullDir[lp_player] = -1;
     gv_animAimDir[lp_player] = c_ANIM_DIR_FORWARD;
     gv_animMoveHold[lp_player] = 0;
@@ -31,7 +27,6 @@ void gf_AnimReset (int lp_player) {
     gv_animAimPitchTime[lp_player] = -1.0;
     gv_animAimPitchStep[lp_player] = 0;
     gf_AnimAimAttackClear(lp_player);
-    gv_animAimAttackSuppressUntil[lp_player] = -1.0;
     gv_animAimPitchRest[lp_player] = c_ANIM_AIM_PITCH_REST;
     gv_animHasPos[lp_player] = false;
     if (UnitIsValid(gv_tPSUNIT[lp_player])) {
@@ -46,7 +41,7 @@ bool gf_AnimMoveIntent (int lp_player) {
     if (!UnitIsValid(lv_hero)) {
         return false;
     }
-    if (gf_AimMoveActive(lp_player)) {
+    if (gf_StrafeMoveActive(lp_player)) {
         return gf_MovementKeyHeld(lp_player);
     }
     if (UnitOrderCount(lv_hero) > 0 && UnitOrderHasAbil(lv_hero, "move")) {
@@ -81,9 +76,6 @@ void gf_AnimAttackStart (int lp_player, string lp_weapon, unit lp_target) {
     int lv_state;
 
     if (gv_aIMACTIVE[lp_player]) {
-        if (TimerGetElapsed(gv_sCOBA_Clock) < gv_animAimAttackSuppressUntil[lp_player]) {
-            return;
-        }
         gf_AnimAimAttackStart(lp_player, lp_weapon);
         return;
     }
@@ -153,7 +145,19 @@ void gf_AnimTick (int lp_player) {
     }
     else {
         lv_lower = c_ANIM_LOWER_NONE;
-        gf_AnimFullSet(lp_player, c_ANIM_LOWER_NONE);
+        // Right hold: directional walk clips. Standing keeps the stock clip.
+        if (gv_holdStrafe[lp_player]) {
+            gf_AnimUpdateAimDir(lp_player);
+            lv_lower = gf_AnimLowerState(lp_player);
+            if (lv_lower != c_ANIM_LOWER_WALK && lv_lower != c_ANIM_LOWER_WALK_BACK) {
+                lv_lower = c_ANIM_LOWER_NONE;
+            }
+            // Forward plays the stock walk, the clip a middle hold plays.
+            if (gv_animAimDir[lp_player] == c_ANIM_DIR_FORWARD) {
+                lv_lower = c_ANIM_LOWER_NONE;
+            }
+        }
+        gf_AnimFullSet(lp_player, lv_lower);
         if (lv_attacking) {
             lv_upper = gv_animAttackState[lp_player];
         }
@@ -172,7 +176,7 @@ void gf_AnimTick (int lp_player) {
     gv_animLowerClipIndex[lp_player] = lv_lower;
     gv_animUpperState[lp_player] = lv_upper;
     gv_animUpperClipIndex[lp_player] = lv_upper;
-    if (gf_AimMoveActive(lp_player) && !gf_MovementKeyHeld(lp_player) && gv_animHasMoveTarget[lp_player]) {
+    if (gf_StrafeMoveActive(lp_player) && !gf_MovementKeyHeld(lp_player) && gv_animHasMoveTarget[lp_player]) {
         gf_AimMoveStop(lp_player);
     }
     gf_AnimFacingTick(lp_player);

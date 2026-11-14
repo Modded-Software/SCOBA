@@ -15,6 +15,8 @@ sys.path.insert(0, str(SCRIPT_DIR / "vendor" / "m3addon"))
 
 import m3
 from animation_tokens import normalized_animation_name, validate_animation_name
+from validate_aim_shot import check_aim_shot_data, check_aim_shot_script
+from validate_assets import check_control_icons, check_stamp
 
 GENERATED_MODELS = [
     Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3",
@@ -68,7 +70,10 @@ REQUIRED = [
     "Base.SC2Data/GameData/AbilData.xml",
     "Base.SC2Data/GameData/BehaviorData.xml",
     "Base.SC2Data/GameData/ButtonData.xml",
+    "Base.SC2Data/GameData/EffectData.xml",
+    "Base.SC2Data/GameData/WeaponData.xml",
     "scripts/app/systems/aim_shooting.galaxy",
+    "scripts/app/systems/combat_cooldown.galaxy",
 ]
 
 XML_FILES = [
@@ -90,7 +95,7 @@ CUSTOM_ABILITIES = [
 ]
 
 CUSTOM_BEHAVIORS = [
-    "SCOBAAutoAttackBehavior",
+    "SCOBAAttackSingle",
     "SCOBARightClickStandBehavior",
     "SCOBAActionModeBehavior",
     "SCOBAStandRoot",
@@ -105,12 +110,6 @@ CUSTOM_BUTTONS = [
     "SCOBAActionModeActions",
     "SCOBAAutoAttackStatus",
 ]
-
-CONTROL_ICONS = [
-    "SCOBAModeRPG.dds",
-    "SCOBAModeActions.dds",
-]
-
 
 def fail(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr)
@@ -211,22 +210,7 @@ def check_catalogs(map_dir: Path) -> None:
     if modification.find("MoveSpeedMultiplier") is not None:
         fail("SCOBAStandRoot must not use MoveSpeedMultiplier")
 
-    ability_tree = ET.parse(gamedata / "AbilData.xml")
-    weapon_ability = None
-    for candidate in ability_tree.getroot().iter("CAbilEffectTarget"):
-        if candidate.get("id") == "SCOBAAutoAttackStatus":
-            weapon_ability = candidate
-            break
-    if weapon_ability is None:
-        fail("SCOBAAutoAttackStatus must be CAbilEffectTarget")
-    cooldown = weapon_ability.find("Cost/Cooldown")
-    if cooldown is None:
-        fail("SCOBAAutoAttackStatus missing Cost/Cooldown")
-    if cooldown.get("Location") != "Ability":
-        fail("SCOBAAutoAttackStatus cooldown Location must be Ability")
-    time_use = cooldown.get("TimeUse")
-    if time_use is None or float(time_use) <= 0.0:
-        fail("SCOBAAutoAttackStatus cooldown TimeUse must be positive")
+    check_aim_shot_data(map_dir)
 
     unit_tree = ET.parse(gamedata / "UnitData.xml")
     for unit_id in ("Kerrigan", "Tosh"):
@@ -251,39 +235,85 @@ def check_catalogs(map_dir: Path) -> None:
             fail(f"missing unit: {unit_id}")
         if unit.get("parent") != parent_id:
             fail(f"{unit_id} parent must be {parent_id}")
+        # A toggle behavior on the unit leaves its button out of step.
+        for element in unit.findall("BehaviorArray"):
+            if element.get("Link") in ("SCOBAAttackSingle", "SCOBARightClickStandBehavior"):
+                fail(f"{unit_id} must not carry a toggle behavior: {element.get('Link')}")
+
+    # The card layout face overrides the ability face. Each toggle face must
+    # name the state the hero is in while that command is shown.
+    faces = {
+        "SCOBAAutoAttackToggle,On": "SCOBAAutoAttackOn",
+        "SCOBAAutoAttackToggle,Off": "SCOBAAutoAttackOff",
+        "SCOBARightClickToggle,On": "SCOBARightClickMove",
+        "SCOBARightClickToggle,Off": "SCOBARightClickStand",
+    }
+    seen = 0
+    for button in unit_tree.getroot().iter("LayoutButtons"):
+        want = faces.get(button.get("AbilCmd", ""))
+        if want is None:
+            continue
+        seen += 1
+        if button.get("Face") != want:
+            fail(f"card layout face for {button.get('AbilCmd')} must be {want}")
+    if seen < len(faces) * 2:
+        fail("card layout missing toggle buttons")
 
     weapon_tree = ET.parse(gamedata / "WeaponData.xml")
+    behavior_text = (gamedata / "BehaviorData.xml").read_text(encoding="utf-8")
+    start = behavior_text.find('<CBehaviorBuff id="SCOBAAttackSingle">')
+    if start < 0:
+        fail("missing behavior: SCOBAAttackSingle")
+    single_behavior = behavior_text[start : behavior_text.find("</CBehaviorBuff>", start)]
     for weapon_id in ("Tosh", "RazorTalons", "QueenOfBladesPsiBlast"):
-        weapon = None
-        for candidate in weapon_tree.getroot().iter("CWeaponLegacy"):
-            if candidate.get("id") == weapon_id:
-                weapon = candidate
-                break
+        # The stock weapon is order-bound and serves Attack `single`.
+        weapon = weapon_tree.getroot().find(f"CWeaponLegacy[@id='{weapon_id}']")
         if weapon is None:
             fail(f"missing weapon override: {weapon_id}")
-        allowed = weapon.find("AllowedMovement")
+        if weapon.findall("Options") or weapon.find("AllowedMovement") is not None:
+            fail(f"{weapon_id} must keep the stock order-bound options")
+        # The auto twin fires outside attack orders. `single` disables it.
+        auto_id = f"{weapon_id}Auto"
+        auto = weapon_tree.getroot().find(f"CWeaponLegacy[@id='{auto_id}']")
+        if auto is None or auto.get("parent") != weapon_id:
+            fail(f"missing auto weapon: {auto_id}")
+        allowed = auto.find("AllowedMovement")
         if allowed is None or allowed.get("value") != "Moving":
-            fail(f"{weapon_id} must allow moving fire")
-        options = {o.get("index"): o.get("value") for o in weapon.findall("Options")}
+            fail(f"{auto_id} must allow moving fire")
+        arc = auto.find("Arc")
+        if arc is None or arc.get("value") != "360":
+            fail(f"{auto_id} must fire at any facing")
+        options = {o.get("index"): o.get("value") for o in auto.findall("Options")}
         if options.get("OnlyFireWhileInAttackOrder") != "0":
-            fail(f"{weapon_id} must fire outside attack orders")
+            fail(f"{auto_id} must fire outside attack orders")
         if options.get("OnlyFireAtAttackOrderTarget") != "0":
-            fail(f"{weapon_id} must fire outside attack-order targets")
+            fail(f"{auto_id} must fire outside attack-order targets")
+        if f'<WeaponDisableArray value="{auto_id}"/>' not in single_behavior:
+            fail(f"SCOBAAttackSingle must disable weapon: {auto_id}")
 
-
-def check_control_icons(map_dir: Path) -> None:
-    icon_dir = map_dir / "Assets" / "Textures"
-    hashes = []
-    for name in CONTROL_ICONS:
-        path = icon_dir / name
-        if not path.is_file():
-            fail(f"missing control icon: {name}")
-        data = path.read_bytes()
-        if len(data) < 128 or data[:4] != b"DDS ":
-            fail(f"invalid control icon: {name}")
-        hashes.append(data)
-    if hashes[0] == hashes[1]:
-        fail("control mode icons must differ")
+    # Cooldown clock: every hero weapon shot sets the Weapon Attack button
+    # cooldown to the weapon period, in data.
+    effects = ET.parse(gamedata / "EffectData.xml").getroot()
+    for effect_id, period in (("SCOBAAttackCooldown10", "1"), ("SCOBAAttackCooldown15", "1.5")):
+        cost = effects.find(f"CEffectModifyUnit[@id='{effect_id}']/Cost")
+        if cost is None:
+            fail(f"missing cooldown effect: {effect_id}")
+        if cost.get("Abil") != "SCOBAAutoAttackStatus,Execute" or cost.get("CooldownOperation") != "Set":
+            fail(f"{effect_id} must set the Weapon Attack button cooldown")
+        if cost.get("CooldownTimeUse") != period:
+            fail(f"{effect_id} must set the cooldown to {period}")
+    tosh_effect = weapon_tree.getroot().find("CWeaponLegacy[@id='Tosh']/Effect")
+    if tosh_effect is None or tosh_effect.get("value") != "SCOBAToshShot":
+        fail("Tosh weapon must fire SCOBAToshShot")
+    tosh_set = [e.get("value") for e in effects.findall("CEffectSet[@id='SCOBAToshShot']/EffectArray")]
+    if tosh_set != ["ToshU", "SCOBAAttackCooldown10"]:
+        fail("SCOBAToshShot must run ToshU and SCOBAAttackCooldown10")
+    talons = effects.find("CEffectCreatePersistent[@id='RazorTalonsPersistent']/InitialEffect")
+    if talons is None or talons.get("value") != "SCOBAAttackCooldown15":
+        fail("RazorTalonsPersistent must start SCOBAAttackCooldown15")
+    psi = effects.find("CEffectLaunchMissile[@id='PsiBlastLaunchMissile']/LaunchEffect")
+    if psi is None or psi.get("value") != "SCOBAAttackCooldown10":
+        fail("PsiBlastLaunchMissile must start SCOBAAttackCooldown10")
 
 
 def galaxy_text(map_dir: Path) -> str:
@@ -380,13 +410,7 @@ def check_animation_actors(map_dir: Path) -> None:
 def check_script(map_dir: Path) -> None:
     script = (map_dir / "MapScript.galaxy").read_text(encoding="utf-8", errors="replace")
     combined = galaxy_text(map_dir)
-    aim_text = (map_dir / "scripts/app/systems/aim_shooting.galaxy").read_text(
-        encoding="utf-8", errors="replace"
-    )
-    unit_text = (map_dir / "Base.SC2Data/GameData/UnitData.xml").read_text(
-        encoding="utf-8", errors="replace"
-    )
-    actor_text = (map_dir / "Base.SC2Data/GameData/ActorData.xml").read_text(
+    behavior_text = (map_dir / "Base.SC2Data/GameData/BehaviorData.xml").read_text(
         encoding="utf-8", errors="replace"
     )
     if "RegionPlayableMapSet(RegionRect(0.0, 0.0, 254.0, 254.0));" not in combined:
@@ -395,46 +419,29 @@ def check_script(map_dir: Path) -> None:
         fail("MapScript.galaxy missing expanded camera bounds")
     if "void InitTriggers ()" not in script:
         fail("MapScript.galaxy missing InitTriggers")
-    if "gt_CombatTick_Init();" not in combined:
-        fail("scripts missing combat tick init")
     if "gt_ToggleCommands_Init();" not in combined:
         fail("scripts missing toggle command init")
-    if 'UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], Order(AbilityCommand("SCOBARightClickToggle", 0))' not in combined:
-        fail("scripts missing default stand behavior")
+    if "gf_ChaseStandSet(gv_tPSUNIT[lv_localPlayer], true);" not in combined:
+        fail("scripts missing default Chase stand")
+    if "gf_AttackSingleSet(gv_tPSUNIT[lv_localPlayer], true);" not in combined:
+        fail("scripts missing default Attack single")
     if "UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTextTag, true);" not in combined:
         fail("scripts must keep the text tag frame visible")
     if "gf_AimShotPress" not in combined:
         fail("scripts missing aim shot press handler")
     if "gf_AimCrosshairPoint" not in combined:
         fail("scripts missing aim crosshair point")
-    if "gf_WeaponReady" not in combined or "UnitWeaponPeriodRemaining" not in combined:
-        fail("scripts missing weapon cooldown gate")
-    if "gf_AimShotProxyCreate" not in combined:
-        fail("scripts missing targetless shot proxy")
-    if "gf_AimShotProxyIs" not in combined:
-        fail("scripts missing shot proxy target filter")
-    if "gf_AimShooterCreate" not in combined or "gf_AimShooterPin" not in combined:
-        fail("scripts missing hidden aim shooter")
-    if "gf_AimShooterReady" not in combined or "gf_AimShooterMirrorCooldown" not in combined:
-        fail("scripts missing aim shooter cooldown")
-    if "UnitIssueOrder(lv_hero, OrderTargetingUnit(AbilityCommand(\"attack\", 0), lp_unit)" in aim_text:
-        fail("aim shots must not issue hero attack orders")
-    if "UnitIssueOrder(lv_shooter, OrderTargetingUnit(AbilityCommand(\"attack\", 0), lp_unit)" not in aim_text:
-        fail("aim shots must issue shooter attack orders")
-    for parent, shooter in (
-        ("ToshSCOBA", "SCOBAAimShooterTosh"),
-        ("KerriganSCOBA", "SCOBAAimShooterKerrigan"),
-    ):
-        if f'id="{shooter}"' not in unit_text:
-            fail(f"UnitData missing {shooter}")
-        if unit_text.find(f'id="{parent}"') > unit_text.find(f'id="{shooter}"'):
-            fail(f"UnitData defines {shooter} before parent {parent}")
-        if f'unitName="{shooter}"' not in actor_text:
-            fail(f"ActorData missing {shooter} unit actor")
-    if 'id="SCOBAAimShotDummy"' not in unit_text:
-        fail("UnitData missing shot proxy")
-    if '<PlaneArray index="Air" value="1"/>' not in unit_text:
-        fail("shot proxy must accept air targets")
+    check_aim_shot_script(map_dir, combined)
+    if "gf_SelectionUIApply" not in combined or "UISetSelectionTypeEnabled" not in combined:
+        fail("scripts missing aim UI selection gate")
+    if "gf_AimSelectBlock" in combined or "gf_AimSelectClear" in combined:
+        fail("aim must not change per-unit Selectable state")
+    if "gf_AimNoAttackApply" not in combined:
+        fail("scripts missing aim no-attack behavior control")
+    if "gf_SelectHeroForce" not in combined or "gf_ActionStatusIs" not in combined:
+        fail("scripts missing selection and action status helpers")
+    if 'id="SCOBAAimNoAttack"' not in behavior_text or '<StateFlags index="SuppressAttack" value="1"/>' not in behavior_text:
+        fail("BehaviorData missing SCOBAAimNoAttack SuppressAttack")
     if "storm_ui_cursor_default_enemy" in combined or "storm_ui_cursor_default_friendly" in combined:
         fail("reticle must use the crosshair texture, not arrow cursors")
     if combined.count("cursor-target-none.dds") < 3:
@@ -443,27 +450,21 @@ def check_script(map_dir: Path) -> None:
         fail("scripts missing aim miss floater")
     if "gf_AnimTargetPitchTick" not in combined:
         fail("scripts missing RPG target pitch")
-    if "gf_CombatRunGunActive" not in combined or "gv_sCOBAManualTarget" not in combined:
-        fail("scripts missing combat run-and-gun")
-    if 'AbilityCommand("move", 3)' not in combined:
-        fail("scripts missing run-and-gun acquire move")
+    if "gf_PncAttack" not in combined or "gf_PncCancel" not in combined:
+        fail("scripts missing point and click attack and cancel")
+    if 'AbilityCommand("move", 3)' in combined or "gf_CombatStep" in combined:
+        fail("scripts must not run a script combat loop or acquire-move")
+    # Toggles change through their toggle commands only (gf_ToggleSet).
+    for constant in ("c_SCOBA_SINGLE_BEHAVIOR", "c_SCOBA_STAND_BEHAVIOR"):
+        if re.search(rf"UnitBehavior(Add|Remove)\s*\([^;]*{constant}", combined):
+            fail(f"scripts must not add or remove a toggle behavior directly: {constant}")
+    if "gf_AttackSingleSet" not in combined or "gf_ChaseStandSet" not in combined:
+        fail("scripts missing toggle setters")
     if "c_ANIM_ATTACK_START_TIME" not in combined or combined.count("AnimSetTime ") < 2:
         fail("scripts missing attack windup skip")
     
     if "gf_FloaterCreate" not in combined:
         fail("scripts missing shared floater helper")
-
-
-def check_stamp(map_dir: Path) -> None:
-    stamp_path = map_dir / "BuildStamp.txt"
-    if not stamp_path.is_file():
-        fail("missing BuildStamp.txt")
-    stamp = stamp_path.read_text(encoding="utf-8").strip()
-    if not stamp:
-        fail("empty BuildStamp.txt")
-    stamp_file = (map_dir / "scripts" / "app" / "core" / "build_stamp.galaxy").read_text(encoding="utf-8", errors="replace")
-    if f'const string c_SCOBA_BUILD_STAMP = "{stamp}";' not in stamp_file:
-        fail("build_stamp.galaxy build stamp does not match BuildStamp.txt")
 
 
 def main() -> int:

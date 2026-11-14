@@ -34,18 +34,12 @@ bool gt_DamageFloater_Func (bool testConds, bool runActions) {
     if (lv_victim == lv_source) {
         return true;
     }
-    if (gf_AimShotProxyIs(lv_victim)) {
-        return true;
-    }
     
     if (lv_damage <= 0.0) {
         return true;
     }
 
-    lv_player = gf_AimShooterPlayer(lv_source);
-    if (lv_player < 0) {
-        lv_player = gf_HeroPlayerFromUnit(lv_source);
-    }
+    lv_player = gf_HeroPlayerFromUnit(lv_source);
     if (!gf_IsHeroPlayer(lv_player)) {
         return true;
     }

@@ -90,7 +90,6 @@ void gf_AimCameraTick (int lp_player) {
     gv_aimDbgLastY[lp_player] = PointGetY(lv_target);
     gv_aimDbgTicks[lp_player] += 1;
     UnitSetPosition(gv_aimCameraProxy[lp_player], lv_target, true);
-    gf_AimShooterPin(lp_player);
 }
 
 void gf_AimCameraSet (int lp_player, bool lp_aim) {
@@ -126,14 +125,15 @@ void gf_AimBegin (int lp_player) {
         return;
     }
     gv_aIMACTIVE[lp_player] = true;
+    gv_unitClickCandidate[lp_player] = null;
+    gv_unitPressHighlight[lp_player] = null;
+    gv_unitRightPressHighlight[lp_player] = null;
     gf_CombatSetRoot(lp_player, false);
-    UnitBehaviorAdd(gv_tPSUNIT[lp_player], "SCOBAAimNoTurn", gv_tPSUNIT[lp_player], 1);
+    UnitBehaviorAdd(gv_tPSUNIT[lp_player], c_SCOBA_NO_TURN_BEHAVIOR, gv_tPSUNIT[lp_player], 1);
     if (!gf_MovementKeyHeld(lp_player)) {
         gf_AimMoveStop(lp_player);
     }
     gf_AnimReset(lp_player);
-    gf_AimShooterCreate(lp_player);
-    gf_AimShooterPin(lp_player);
     CameraSetValue(lp_player, c_cameraValueFieldOfView, c_SCOBA_AIM_FOV, 0.2, -1, 10);
     if (gv_cameraDistanceDesired[lp_player] <= 0.0) {
         gv_cameraDistanceDesired[lp_player] = CameraGetDistance(lp_player);
@@ -166,9 +166,12 @@ void gf_AimEnd (int lp_player) {
     }
     if (UnitIsValid(gv_tPSUNIT[lp_player])) {
         UnitSetFacing(gv_tPSUNIT[lp_player], CameraGetYaw(lp_player), c_ANIM_AIM_TURN_DURATION);
-        UnitBehaviorRemove(gv_tPSUNIT[lp_player], "SCOBAAimNoTurn", 1);
+        UnitBehaviorRemove(gv_tPSUNIT[lp_player], c_SCOBA_NO_TURN_BEHAVIOR, 1);
     }
     gv_aIMACTIVE[lp_player] = false;
+    gv_unitClickCandidate[lp_player] = null;
+    gv_unitPressHighlight[lp_player] = null;
+    gv_unitRightPressHighlight[lp_player] = null;
     gf_CombatSyncRoot(lp_player);
     gf_AimDebugDump(lp_player);
     gv_animAimUpperOn[lp_player] = false;
@@ -213,13 +216,13 @@ void gt_AimInit_Init () {
     TriggerAddEventMapInit(gt_AimInit);
 }
 
-int gf_ReticleKindAt (int lp_player, point lp_point) {
+int gf_ReticleKindAt (int lp_player) {
     unit lv_unit;
 
     if (!gf_IsHeroPlayer(lp_player)) {
         return 0;
     }
-    lv_unit = gf_UnitTargetAtPoint(lp_player, lp_point, false);
+    lv_unit = gf_AimUnitAtCrosshair(lp_player, false);
     if (!UnitIsValid(lv_unit)) {
         return 0;
     }
@@ -239,7 +242,7 @@ int gf_ReticleKind (int lp_player) {
     if (!gf_IsHeroPlayer(lp_player)) {
         return 0;
     }
-    return gf_ReticleKindAt(lp_player, gf_AimCrosshairPoint(lp_player));
+    return gf_ReticleKindAt(lp_player);
 }
 
 void gf_ReticleCreate (int lp_player) {
@@ -286,7 +289,7 @@ bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
             gf_ActionStatusHover(lv_player, null);
             continue;
         }
-        gf_ActionStatusHover(lv_player, gf_UnitTargetAtPoint(lv_player, gf_AimCrosshairPoint(lv_player), false));
+        gf_ActionStatusHover(lv_player, gf_AimUnitAtCrosshair(lv_player, false));
         lv_kind = gf_ReticleKind(lv_player);
         DialogControlSetVisible(gv_reticleBase[lv_player], lv_group, lv_kind == 0);
         DialogControlSetVisible(gv_reticleEnemy[lv_player], lv_group, (lv_kind == 1) || (lv_kind == 3));

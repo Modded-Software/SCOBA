@@ -36,13 +36,15 @@ fail() {
 
 usage() {
     cat <<'EOF'
-usage: scripts/playtest.sh <action>
+usage: scripts/playtest.sh <action> [group]
 
 actions:
   build                  rebuild out/SCOBA256.SC2Map and stop
   launch                 rebuild, then launch the fresh map
   launch-check           rebuild, launch, and check runtime logs
-  combat                 rebuild, build combat test map, run combat profile
+  combat [group]         rebuild, build combat test map, run one scenario group
+                         (idle, single, auto, cancel, wasd, hold, button, switch,
+                         kerrigan) or the full suite when no group is given
   aim                    rebuild, build aim test map, run aim profile
   motion                 rebuild, build motion test map, run motion profile
   controls               rebuild, build controls test map, run controls profile
@@ -60,6 +62,14 @@ run_python() {
 profile_timeout() {
     case "$1" in
         aim) printf '%s\n' "${SC2_CASE_TIMEOUT:-150}" ;;
+        pncprobe) printf '%s\n' "${SC2_CASE_TIMEOUT:-180}" ;;
+        combat)
+            if [ "${SC2_TEST_GROUP:-all}" = all ]; then
+                printf '%s\n' "${SC2_CASE_TIMEOUT:-420}"
+            else
+                printf '%s\n' "${SC2_CASE_TIMEOUT:-90}"
+            fi
+            ;;
         motion) printf '%s\n' "${SC2_CASE_TIMEOUT:-80}" ;;
         pitch) printf '%s\n' "${SC2_CASE_TIMEOUT:-30}" ;;
         aimfreeze) printf '%s\n' "${SC2_CASE_TIMEOUT:-20}" ;;
@@ -81,7 +91,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|aim|motion|controls|pitch|aimfreeze|rungun) ;;
+        combat|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -121,7 +131,11 @@ case "$ACTION" in
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-and-check.sh"
         ;;
-    combat|aim|motion|controls|pitch|aimfreeze|rungun)
+    combat)
+        export SC2_TEST_GROUP="${1:-all}"
+        run_profile combat
+        ;;
+    aim|motion|controls|pitch|aimfreeze|rungun|pncprobe)
         run_profile "$ACTION"
         ;;
     build-profile)

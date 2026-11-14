@@ -36,15 +36,15 @@
     </CAbilEffectInstant>
     <CAbilBehavior id="SCOBAAutoAttackToggle">
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <CmdButtonArray index="On" DefaultButtonFace="SCOBAAutoAttackOff">
+        <CmdButtonArray index="On" DefaultButtonFace="SCOBAAutoAttackOn">
             <Flags index="ToSelection" value="1"/>
         </CmdButtonArray>
-        <CmdButtonArray index="Off" DefaultButtonFace="SCOBAAutoAttackOn">
+        <CmdButtonArray index="Off" DefaultButtonFace="SCOBAAutoAttackOff">
             <Flags index="ToSelection" value="1"/>
         </CmdButtonArray>
         <Flags index="Toggle" value="1"/>
         <Flags index="Transient" value="1"/>
-        <BehaviorArray value="SCOBAAutoAttackBehavior"/>
+        <BehaviorArray value="SCOBAAttackSingle"/>
     </CAbilBehavior>
     <CAbilBehavior id="SCOBARightClickToggle">
         <EditorCategories value="AbilityorEffectType:Units"/>
@@ -75,7 +75,7 @@
         <TargetFilters value="Visible;Self,Ally,Neutral,Missile,Dead,Hidden,Invulnerable"/>
         <Range value="500"/>
         <Cost index="0">
-            <Cooldown Link="Abil/SCOBAAutoAttackStatus" Location="Ability" TimeUse="2.0"/>
+            <Cooldown Link="Abil/SCOBAAutoAttackStatus" Location="Ability" TimeUse="1"/>
         </Cost>
         <EditorCategories value="AbilityorEffectType:Units"/>
         <CmdButtonArray index="Execute" DefaultButtonFace="SCOBAAutoAttackStatus"/>

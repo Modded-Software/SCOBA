@@ -7,15 +7,23 @@ void gf_ActionStatusHover (int lp_player, unit lp_unit) {
         return;
     }
     lv_old = gv_actionStatusUnit[lp_player];
-    if (lv_old != lp_unit) {
-        if (UnitIsValid(lv_old)) {
-            UnitStatusBarOverride(lv_old, -1);
-        }
-        gv_actionStatusUnit[lp_player] = lp_unit;
+    if (lv_old == lp_unit) {
+        return;
     }
+    if (UnitIsValid(lv_old) && (gf_ActionModeActive(lp_player) || lv_old != gv_unitHighlight[lp_player])) {
+        UnitStatusBarOverride(lv_old, -1);
+    }
+    gv_actionStatusUnit[lp_player] = lp_unit;
     if (UnitIsValid(lp_unit)) {
         UnitStatusBarOverride(lp_unit, c_unitStatusGroupAll);
     }
+}
+
+bool gf_ActionStatusIs (int lp_player, unit lp_unit) {
+    if (!UnitIsValid(lp_unit)) {
+        return false;
+    }
+    return gv_actionStatusUnit[lp_player] == lp_unit;
 }
 
 void gf_UnitHighlightOn (int lp_player, bool testConds, bool runActions) {
@@ -30,7 +38,9 @@ void gf_UnitHighlightOff (int lp_player, bool testConds, bool runActions) {
     if (!runActions) {
         return;
     }
-    UnitStatusBarOverride(EventUnit(), -1);
+    if (!(gf_ActionModeActive(lp_player) && gf_ActionStatusIs(lp_player, EventUnit()))) {
+        UnitStatusBarOverride(EventUnit(), -1);
+    }
     if (gv_unitHighlight[lp_player] == EventUnit()) {
         gv_unitHighlight[lp_player] = null;
     }

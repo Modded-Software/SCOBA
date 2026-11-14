@@ -38,4 +38,24 @@
         <Death value="Normal"/>
     </CEffectDamage>
     <CEffectSet id="SCOBAWeaponAttackDummy"/>
+    <!-- Cooldown clock on the Weapon Attack button. Each hero weapon shot
+         sets the button cooldown to the weapon period. -->
+    <CEffectModifyUnit id="SCOBAAttackCooldown10">
+        <ImpactUnit Value="Caster"/>
+        <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="1"/>
+    </CEffectModifyUnit>
+    <CEffectModifyUnit id="SCOBAAttackCooldown15">
+        <ImpactUnit Value="Caster"/>
+        <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="1.5"/>
+    </CEffectModifyUnit>
+    <CEffectSet id="SCOBAToshShot">
+        <EffectArray value="ToshU"/>
+        <EffectArray value="SCOBAAttackCooldown10"/>
+    </CEffectSet>
+    <CEffectCreatePersistent id="RazorTalonsPersistent">
+        <InitialEffect value="SCOBAAttackCooldown15"/>
+    </CEffectCreatePersistent>
+    <CEffectLaunchMissile id="PsiBlastLaunchMissile">
+        <LaunchEffect value="SCOBAAttackCooldown10"/>
+    </CEffectLaunchMissile>
 </Catalog>

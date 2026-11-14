@@ -1,22 +1,30 @@
 // Module: systems/combat_cooldown
+// Data sets the Weapon Attack button cooldown on each shot.
+// This module only reacts to the fired weapon effect.
 
-bool gt_CombatStartedAttack_Func (bool testConds, bool runActions) {
+string gf_AttackEffectWeapon (string lp_effect) {
+    if (lp_effect == c_SCOBA_EFFECT_TOSH || lp_effect == c_SCOBA_EFFECT_TOSH_POINT) {
+        return c_SCOBA_WEAPON_TOSH;
+    }
+    if (lp_effect == c_SCOBA_EFFECT_TALONS || lp_effect == c_SCOBA_EFFECT_TALONS_SHOT) {
+        return c_SCOBA_WEAPON_TALONS;
+    }
+    if (lp_effect == c_SCOBA_EFFECT_PSIBLAST || lp_effect == c_SCOBA_EFFECT_PSIBLAST_POINT) {
+        return c_SCOBA_WEAPON_PSIBLAST;
+    }
+    return "";
+}
+
+bool gt_CombatAttackEffect_Func (bool testConds, bool runActions) {
     int lv_player;
     unit lv_hero;
-    unit lv_target;
-    fixed lv_now;
-    fixed lv_delta;
-    fixed lv_period;
-    bool lv_aim;
+    string lv_weapon;
 
     if (!runActions) {
         return true;
     }
-    lv_player = gf_AimShooterPlayer(EventUnit());
-    lv_aim = lv_player >= 0;
-    if (!lv_aim) {
-        lv_player = gf_HeroPlayerFromUnit(EventUnit());
-    }
+    gv_aimShotEffectEvents += 1;
+    lv_player = gf_HeroPlayerFromUnit(EventPlayerEffectUsedUnit(c_effectUnitCaster));
     if (lv_player < c_SCOBA_HERO_FIRST || lv_player > c_SCOBA_HERO_LAST) {
         return true;
     }
@@ -24,23 +32,14 @@ bool gt_CombatStartedAttack_Func (bool testConds, bool runActions) {
     if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
         return true;
     }
-    lv_target = EventUnitTarget();
-    gf_AnimAttackStart(lv_player, EventUnitGetWeapon(), lv_target);
-    if (lv_aim) {
-        gf_AimShooterMirrorCooldown(lv_player);
+    lv_weapon = gf_AttackEffectWeapon(EventPlayerEffectUsed());
+    if (lv_weapon == "") {
         return true;
     }
-    lv_now = TimerGetElapsed(gv_sCOBA_Clock);
-    lv_delta = lv_now - gv_sCOBA_LastAttackAt[lv_player];
-    if (gv_sCOBA_LastAttackAt[lv_player] > 0.0 && lv_delta >= c_SCOBA_MIN_ATTACK_PERIOD && lv_delta <= c_SCOBA_MAX_ATTACK_PERIOD) {
-        gv_sCOBA_AttackPeriod[lv_player] = lv_delta;
+    if (gv_aIMACTIVE[lv_player]) {
+        gv_aimShots[lv_player] += 1;
     }
-    gv_sCOBA_LastAttackAt[lv_player] = lv_now;
-    lv_period = gv_sCOBA_AttackPeriod[lv_player];
-    if (lv_period <= 0.0) {
-        lv_period = c_SCOBA_INITIAL_WEAPON_PERIOD;
-    }
-    UnitAbilityReset(lv_hero, AbilityCommand("SCOBAAutoAttackStatus", 0), c_spendLocationAbility);
-    UnitAbilityAddCooldown(lv_hero, "SCOBAAutoAttackStatus", "Abil/SCOBAAutoAttackStatus", lv_period);
+    gf_AnimAttackStart(lv_player, lv_weapon, EventPlayerEffectUsedUnit(c_effectUnitTarget));
+    gf_PncShotFired(lv_player);
     return true;
 }

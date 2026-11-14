@@ -18,17 +18,37 @@
     </CWeaponLegacy>
     <CWeaponLegacy id="QueenOfBladesPsiBlast">
         <Period value="1"/>
-        <AllowedMovement value="Moving"/>
-        <Options index="OnlyFireWhileInAttackOrder" value="0"/>
-        <Options index="OnlyFireAtAttackOrderTarget" value="0"/>
+        <Cost>
+            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1"/>
+        </Cost>
     </CWeaponLegacy>
     <CWeaponLegacy id="RazorTalons">
+        <Cost>
+            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1.5"/>
+        </Cost>
+    </CWeaponLegacy>
+    <CWeaponLegacy id="Tosh">
+        <Effect value="SCOBAToshShot"/>
+        <Cost>
+            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1"/>
+        </Cost>
+    </CWeaponLegacy>
+    <!-- Attack auto: fires outside attack orders, while moving, at any facing. -->
+    <CWeaponLegacy id="QueenOfBladesPsiBlastAuto" parent="QueenOfBladesPsiBlast">
         <AllowedMovement value="Moving"/>
+        <Arc value="360"/>
         <Options index="OnlyFireWhileInAttackOrder" value="0"/>
         <Options index="OnlyFireAtAttackOrderTarget" value="0"/>
     </CWeaponLegacy>
-    <CWeaponLegacy id="Tosh">
+    <CWeaponLegacy id="RazorTalonsAuto" parent="RazorTalons">
         <AllowedMovement value="Moving"/>
+        <Arc value="360"/>
+        <Options index="OnlyFireWhileInAttackOrder" value="0"/>
+        <Options index="OnlyFireAtAttackOrderTarget" value="0"/>
+    </CWeaponLegacy>
+    <CWeaponLegacy id="ToshAuto" parent="Tosh">
+        <AllowedMovement value="Moving"/>
+        <Arc value="360"/>
         <Options index="OnlyFireWhileInAttackOrder" value="0"/>
         <Options index="OnlyFireAtAttackOrderTarget" value="0"/>
     </CWeaponLegacy>

@@ -1,8 +1,146 @@
-// Combat test profile
+// WASD / Point & Click combat profile.
+// Every value is written to the bank. Nothing here needs visual inspection.
 trigger gt_DbgTest;
+
+void gf_DbgWalk (int lp_steps, fixed lp_angle) {
+    int lv_i;
+
+    gv_fORWARD[1] = true;
+    gf_CombatSetRoot(1, false);
+    for (lv_i = 0; lv_i < lp_steps; lv_i += 1) {
+        gf_CombatMoveStep(1, lp_angle);
+        Wait(0.0625, c_timeGame);
+    }
+    gv_fORWARD[1] = false;
+    gf_CombatSyncRoot(1);
+}
+
+void gf_DbgSingleShots (string lp_section, fixed lp_dx) {
+    gf_DbgSpawnOne(lp_section, lp_dx, 500.0);
+    gf_DbgSnap(lp_section, "t0000");
+    gf_PncAttack(1, gv_dbgEnemy);
+    Wait(0.1, c_timeGame);
+    gf_DbgSnap(lp_section, "t0100");
+    Wait(0.4, c_timeGame);
+    gf_DbgSnap(lp_section, "t0500");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lp_section, "t1500");
+    Wait(2.5, c_timeGame);
+    gf_DbgSnap(lp_section, "t4000");
+    gf_PncAttack(1, gv_dbgEnemy);
+    Wait(2.0, c_timeGame);
+    gf_PncAttack(1, gv_dbgEnemy);
+    Wait(2.0, c_timeGame);
+    gf_DbgSnap(lp_section, "t8000");
+}
+
+void gf_DbgAutoRun (string lp_section, fixed lp_dx, fixed lp_wait) {
+    gf_DbgSpawnOne(lp_section, lp_dx, 500.0);
+    gf_DbgSnap(lp_section, "t0000");
+    Wait(lp_wait, c_timeGame);
+    gf_DbgSnap(lp_section, "tend");
+}
+
+// Switch to Kerrigan after a reset. The switch copies both toggles.
+void gf_DbgUseKerrigan () {
+    gf_HeroSwitchTo(gv_heroKerrigan);
+    Wait(0.5, c_timeGame);
+}
+
+// One right hold with one movement key. The hero starts turned away from
+// the camera yaw, so the lock is visible in the facing.
+void gf_DbgHoldMove (string lp_section, bool lp_back, bool lp_left) {
+    gf_DbgReset(lp_section, false, true);
+    UnitSetFacing(gv_tPSUNIT[1], CameraGetYaw(1) + 120.0, 0.0);
+    Wait(0.2, c_timeGame);
+    gf_DbgSnap(lp_section, "t0000");
+    gf_DbgHold(true, false);
+    Wait(0.5, c_timeGame);
+    gf_DbgSnap(lp_section, "thold");
+    gv_bACKWARD[1] = lp_back;
+    gv_lEFT[1] = lp_left;
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap(lp_section, "tmove");
+    gv_bACKWARD[1] = false;
+    gv_lEFT[1] = false;
+    Wait(0.4, c_timeGame);
+    gf_CombatSyncRoot(1);
+    gf_DbgSnap(lp_section, "tstop");
+    gf_DbgHold(false, false);
+    Wait(0.3, c_timeGame);
+    gf_DbgSnap(lp_section, "tend");
+}
+
+// Runs the real W key loop beside the test thread.
+trigger gt_DbgForward;
+bool gt_DbgForward_Func (bool testConds, bool runActions) {
+    gf_ForwardBegin(1);
+    return true;
+}
+
+// A hold walking while the camera turns 90 degrees in small steps. Forward
+// uses the W loop, else A strafes. Records the straight distance, the worst
+// facing lag and the smallest position step.
+void gf_DbgHoldTurn (string lp_section, bool lp_right, bool lp_forward) {
+    int lv_i;
+    fixed lv_yaw;
+    fixed lv_start;
+    fixed lv_off;
+    fixed lv_step;
+    fixed lv_maxOff;
+    fixed lv_minStep;
+    point lv_last;
+
+    gf_DbgReset(lp_section, false, true);
+    gf_DbgHold(lp_right, !lp_right);
+    Wait(0.3, c_timeGame);
+    if (lp_forward) {
+        TriggerExecute(gt_DbgForward, false, false);
+    }
+    else {
+        gv_lEFT[1] = true;
+    }
+    Wait(0.5, c_timeGame);
+    lv_last = UnitGetPosition(gv_tPSUNIT[1]);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "Dist1000", FixedToInt(DistanceBetweenPoints(lv_last, UnitGetPosition(gv_tPSUNIT[1])) * 1000.0));
+    gf_DbgSnap(lp_section, "t0000");
+    lv_start = CameraGetYaw(1);
+    lv_yaw = lv_start;
+    lv_minStep = 100.0;
+    lv_last = UnitGetPosition(gv_tPSUNIT[1]);
+    for (lv_i = 0; lv_i < 30; lv_i += 1) {
+        lv_yaw = lv_yaw + 3.0;
+        CameraSetValue(1, c_cameraValueYaw, lv_yaw, 0.0, -1, 10);
+        Wait(0.0625, c_timeGame);
+        lv_off = AbsF(gf_AnimYawDelta(UnitGetFacing(gv_tPSUNIT[1]), CameraGetYaw(1)));
+        lv_step = DistanceBetweenPoints(lv_last, UnitGetPosition(gv_tPSUNIT[1]));
+        lv_last = UnitGetPosition(gv_tPSUNIT[1]);
+        if (lv_off > lv_maxOff) {
+            lv_maxOff = lv_off;
+        }
+        if (lv_step < lv_minStep) {
+            lv_minStep = lv_step;
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "MaxOff10", FixedToInt(lv_maxOff * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "MinStep1000", FixedToInt(lv_minStep * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "YawTurned", FixedToInt(AbsF(gf_AnimYawDelta(lv_start, CameraGetYaw(1)))));
+    gf_DbgSnap(lp_section, "tturn");
+    gv_lEFT[1] = false;
+    gv_fORWARD[1] = false;
+    Wait(0.1, c_timeGame);
+    gf_AimMoveStop(1);
+    gf_CombatSyncRoot(1);
+    CameraSetValue(1, c_cameraValueYaw, lv_start, 0.0, -1, 10);
+    gf_DbgHold(false, false);
+    Wait(0.3, c_timeGame);
+    gf_DbgSnap(lp_section, "tend");
+}
 
 bool gt_DbgTest_Func (bool testConds, bool runActions) {
     int lv_i;
+    int lv_seen;
 
     if (!runActions) {
         return true;
@@ -12,272 +150,217 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
     gv_bINPUTLOG = true;
     BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
     gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
-    BankValueSetFromInt(gv_dbgBank, "meta", "anchorX", FixedToInt(PointGetX(gv_dbgAnchor)));
-    BankValueSetFromInt(gv_dbgBank, "meta", "anchorY", FixedToInt(PointGetY(gv_dbgAnchor)));
+    gf_DbgProbeInit();
     BankSave(gv_dbgBank);
 
-    gf_DbgReset("startup", false, true);
+    // Defaults at map start.
     gf_DbgSnap("startup", "t0000");
 
-    gf_DbgReset("auto_off", false, true);
-    gf_DbgSpawnOne("auto_off", 3.0, 500.0);
-    gf_DbgSnap("auto_off", "t0000");
-    Wait(3.0, c_timeGame);
-    gf_DbgSnap("auto_off", "t3000");
+    if (gf_DbgGroup("idle")) {
+        // Single: no acquisition of an idle enemy in range.
+        gf_DbgReset("single_idle", false, true);
+        gf_DbgAutoRun("single_idle", 3.0, 3.0);
 
-    gf_DbgReset("stand_in", true, true);
-    gf_DbgSpawnOne("stand_in", 3.0, 500.0);
-    gf_DbgSnap("stand_in", "t0000");
-    Wait(0.5, c_timeGame);
-    gf_DbgSnap("stand_in", "t0500");
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("stand_in", "t1500");
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("stand_in", "t2500");
-
-    gf_DbgReset("stand_out", true, true);
-    gf_DbgSpawnOne("stand_out", 11.0, 500.0);
-    gf_DbgSnap("stand_out", "t0000");
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("stand_out", "t1000");
-    Wait(1.5, c_timeGame);
-    gf_DbgSnap("stand_out", "t2500");
-
-    gf_DbgReset("stand_outside", true, true);
-    gf_DbgSpawnOne("stand_outside", 13.0, 500.0);
-    gf_DbgSnap("stand_outside", "t0000");
-    Wait(2.0, c_timeGame);
-    gf_DbgSnap("stand_outside", "t2000");
-
-    gf_DbgReset("stand_auto_off", false, true);
-    gf_DbgSpawnOne("stand_auto_off", 9.0, 500.0);
-    gf_DbgSnap("stand_auto_off", "t0000");
-    for (lv_i = 0; lv_i < 5; lv_i += 1) {
-        gf_CombatManualAttack(1, gv_dbgEnemy);
-        Wait(0.2, c_timeGame);
+        // Single: no retaliation. The attacker becomes the UI target.
+        gf_DbgReset("single_attacked", false, false);
+        gf_DbgSpawnOne("single_attacked", 1.0, 500.0);
+        UnitSetState(gv_dbgEnemy, c_unitStateStunned, false);
+        UnitIssueOrder(gv_dbgEnemy, OrderTargetingUnit(AbilityCommand("attack", 0), gv_tPSUNIT[1]), c_orderQueueReplace);
+        gf_DbgSnap("single_attacked", "t0000");
+        Wait(3.0, c_timeGame);
+        gf_DbgSnap("single_attacked", "tend");
     }
-    gf_DbgSnap("stand_auto_off", "t1000");
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("stand_auto_off", "t2000");
+    if (gf_DbgGroup("single")) {
+        // Single: one shot per command, three commands give three shots.
+        gf_DbgReset("single_shot", false, true);
+        gf_DbgSingleShots("single_shot", 3.0);
 
-    gf_DbgReset("stand_wake_manual", true, true);
-    gf_DbgSpawnOne("stand_wake_manual", 9.0, 500.0);
-    gf_DbgSnap("stand_wake_manual", "t0000");
-    gv_fORWARD[1] = true;
-    gf_CombatBeginMove(1);
-    Wait(0.2, c_timeGame);
-    gf_DbgSnap("stand_wake_manual", "t0200");
-    gv_fORWARD[1] = false;
-    Wait(0.8, c_timeGame);
-    gf_DbgSnap("stand_wake_manual", "t1000");
-    gf_CombatManualAttack(1, gv_dbgEnemy);
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("stand_wake_manual", "t2000");
+        // Single, stand, out of range: no order and no movement.
+        gf_DbgReset("single_out_stand", false, true);
+        gf_DbgSpawnOne("single_out_stand", 11.0, 500.0);
+        gf_DbgSnap("single_out_stand", "t0000");
+        gf_PncAttack(1, gv_dbgEnemy);
+        Wait(1.5, c_timeGame);
+        gf_DbgSnap("single_out_stand", "tend");
 
-    gf_DbgReset("stand_run_gun", true, true);
-    gf_DbgSpawnOne("stand_run_gun", 3.0, 500.0);
-    gv_fORWARD[1] = true;
-    gf_CombatBeginMove(1);
-    gf_DbgSnap("stand_run_gun", "t0000");
-    for (lv_i = 0; lv_i < 80; lv_i += 1) {
-        if (gf_CombatRunGunActive(1)) {
-            UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 0.5, 270.0)), c_orderQueueReplace);
-        }
-        else {
-            UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 0.5, 270.0)), c_orderQueueReplace);
-        }
-        UnitSetFacing(gv_tPSUNIT[1], 270.0, 0.01);
-        Wait(0.01, c_timeGame);
+        // Single, move, out of range: walk in, one shot, then idle.
+        gf_DbgReset("single_out_move", false, false);
+        gf_DbgSpawnOne("single_out_move", 10.0, 500.0);
+        gf_DbgSnap("single_out_move", "t0000");
+        gf_PncAttack(1, gv_dbgEnemy);
+        Wait(5.0, c_timeGame);
+        gf_DbgSnap("single_out_move", "t5000");
+        Wait(2.5, c_timeGame);
+        gf_DbgSnap("single_out_move", "tend");
     }
-    gv_fORWARD[1] = false;
-    gf_DbgSnap("stand_run_gun", "t0800");
+    if (gf_DbgGroup("auto")) {
+        // Auto: a commanded attack repeats.
+        gf_DbgReset("auto_click", true, true);
+        gf_DbgSpawnOne("auto_click", 3.0, 500.0);
+        gf_DbgSnap("auto_click", "t0000");
+        gf_PncAttack(1, gv_dbgEnemy);
+        Wait(4.0, c_timeGame);
+        gf_DbgSnap("auto_click", "tend");
+        gf_DbgSnapAfterShot("auto_click", "tshot");
 
-    gf_DbgReset("walk_run_gun", true, false);
-    gf_DbgSpawnOne("walk_run_gun", 3.0, 500.0);
-    gv_fORWARD[1] = true;
-    gf_CombatBeginMove(1);
-    gf_DbgSnap("walk_run_gun", "t0000");
-    for (lv_i = 0; lv_i < 80; lv_i += 1) {
-        if (gf_CombatRunGunActive(1)) {
-            UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 3), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 0.5, 270.0)), c_orderQueueReplace);
+        // Auto, stand: engine acquires in range, never moves.
+        gf_DbgReset("auto_stand_in", true, true);
+        gf_DbgAutoRun("auto_stand_in", 3.0, 3.0);
+        gf_DbgSnapAfterShot("auto_stand_in", "tshot");
+        gf_DbgReset("auto_stand_out", true, true);
+        gf_DbgAutoRun("auto_stand_out", 11.0, 3.0);
+
+        // Auto, move: engine walks into range and attacks.
+        gf_DbgReset("auto_move_near", true, false);
+        gf_DbgAutoRun("auto_move_near", 9.0, 5.0);
+        gf_DbgReset("auto_move_far", true, false);
+        gf_DbgAutoRun("auto_move_far", 12.0, 5.0);
+
+        // Auto to single through the toggle ability stops the attack.
+        gf_DbgReset("auto_to_single", true, true);
+        gf_DbgSpawnOne("auto_to_single", 3.0, 500.0);
+        Wait(1.5, c_timeGame);
+        gf_DbgSnap("auto_to_single", "t0000");
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBAAutoAttackToggle", 0)), c_orderQueueReplace);
+        // Raw: ticks in which the attack-end behavior is on the hero.
+        lv_seen = 0;
+        for (lv_i = 0; lv_i < 4; lv_i += 1) {
+            Wait(0.0625, c_timeGame);
+            lv_seen += UnitBehaviorCount(gv_tPSUNIT[1], c_SCOBA_ATTACK_END_BEHAVIOR);
         }
-        else {
-            UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 0.5, 270.0)), c_orderQueueReplace);
-        }
-        UnitSetFacing(gv_tPSUNIT[1], 270.0, 0.01);
-        Wait(0.01, c_timeGame);
+        BankValueSetFromInt(gv_dbgBank, "auto_to_single", "endSeenTicks", lv_seen);
+        BankValueSetFromInt(gv_dbgBank, "auto_to_single", "endOrderCount", UnitOrderCount(gv_tPSUNIT[1]));
+        Wait(0.75, c_timeGame);
+        gf_DbgSnap("auto_to_single", "t1000");
+        Wait(2.5, c_timeGame);
+        gf_DbgSnap("auto_to_single", "tend");
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBAAutoAttackToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        gf_DbgSnap("auto_to_single", "tback");
     }
-    gv_fORWARD[1] = false;
-    gf_DbgSnap("walk_run_gun", "t0800");
+    if (gf_DbgGroup("cancel")) {
+        // Cancel clears the UI target and the pending attack.
+        gf_DbgReset("cancel", false, false);
+        gf_DbgSpawnOne("cancel", 9.0, 500.0);
+        gf_PncAttack(1, gv_dbgEnemy);
+        Wait(0.3, c_timeGame);
+        gf_DbgSnap("cancel", "t0000");
+        gf_PncCancel(1);
+        Wait(2.5, c_timeGame);
+        gf_DbgSnap("cancel", "tend");
 
-    gf_DbgReset("right_click", false, true);
-    gf_DbgSpawnOne("right_click", 3.0, 500.0);
-    gv_unitHighlight[1] = gv_dbgEnemy;
-    gf_MousePressRight(1, 100, 100, PointGetX(UnitGetPosition(gv_dbgEnemy)), PointGetY(UnitGetPosition(gv_dbgEnemy)));
-    BankValueSetFromFlag(gv_dbgBank, "right_click", "ran", gf_MouseReleaseRight(1, 100, 100));
-    BankSave(gv_dbgBank);
-    Wait(0.2, c_timeGame);
-    gf_DbgSnap("right_click", "t0200");
+        // Right click on the ground: cancel, then move in Chase move only.
+        gf_DbgReset("ground_move", false, false);
+        gf_DbgSpawnOne("ground_move", 9.0, 500.0);
+        gf_UnitTargetSet(1, gv_dbgEnemy);
+        gf_DbgSnap("ground_move", "t0000");
+        gf_RightClickExecute(1, PointWithOffset(gv_dbgAnchor, -5.0, 0.0), null);
+        Wait(1.0, c_timeGame);
+        gf_DbgSnap("ground_move", "tend");
+        gf_DbgReset("ground_stand", false, true);
+        gf_DbgSpawnOne("ground_stand", 9.0, 500.0);
+        gf_UnitTargetSet(1, gv_dbgEnemy);
+        gf_DbgSnap("ground_stand", "t0000");
+        gf_RightClickExecute(1, PointWithOffset(gv_dbgAnchor, -5.0, 0.0), null);
+        Wait(1.0, c_timeGame);
+        gf_DbgSnap("ground_stand", "tend");
+    }
+    if (gf_DbgGroup("wasd")) {
+        // WASD: moves in stand, restores the root on release.
+        gf_DbgReset("wasd_stand", false, true);
+        gf_DbgSnap("wasd_stand", "t0000");
+        gf_DbgWalk(16, 270.0);
+        Wait(0.3, c_timeGame);
+        gf_DbgSnap("wasd_stand", "tend");
 
-    gf_DbgReset("right_drag", false, true);
-    gf_DbgSpawnOne("right_drag", 3.0, 500.0);
-    gv_unitHighlight[1] = gv_dbgEnemy;
-    gf_MousePressRight(1, 100, 100, PointGetX(UnitGetPosition(gv_dbgEnemy)), PointGetY(UnitGetPosition(gv_dbgEnemy)));
-    BankValueSetFromFlag(gv_dbgBank, "right_drag", "ran", gf_MouseReleaseRight(1, 110, 100));
-    BankSave(gv_dbgBank);
-    gf_DbgSnap("right_drag", "t0000");
-    Wait(0.5, c_timeGame);
-    gf_DbgSnap("right_drag", "t0500");
+        // Auto: the weapon fires while WASD moves the hero.
+        gf_DbgReset("move_fire_auto", true, false);
+        gf_DbgSpawnOne("move_fire_auto", 3.0, 500.0);
+        gf_DbgSnap("move_fire_auto", "t0000");
+        gf_DbgWalk(32, 270.0);
+        gf_DbgSnap("move_fire_auto", "tend");
 
-    gf_DbgReset("right_point", false, false);
-    gf_DbgSpawnOne("right_point", 3.0, 500.0);
-    BankValueSetFromFlag(gv_dbgBank, "right_point", "pickValid", UnitIsValid(gf_UnitTargetAtPoint(1, UnitGetPosition(gv_dbgEnemy), true)));
-    BankSave(gv_dbgBank);
+        // Single: no fire while WASD moves the hero.
+        gf_DbgReset("move_fire_single", false, false);
+        gf_DbgSpawnOne("move_fire_single", 3.0, 500.0);
+        gf_DbgSnap("move_fire_single", "t0000");
+        gf_DbgWalk(32, 270.0);
+        gf_DbgSnap("move_fire_single", "tend");
+    }
+    if (gf_DbgGroup("hold")) {
+        // Right hold: facing locked to the camera yaw. S backpedals.
+        gf_DbgHoldMove("hold_right_back", true, false);
+        // Right hold: A strafes left.
+        gf_DbgHoldMove("hold_right_left", false, true);
+        gf_DbgHoldTurn("hold_right_turn", true, false);
+        // The same forward walk under each hold. The suite compares them.
+        gf_DbgHoldTurn("hold_middle_fwd", false, true);
+        gf_DbgHoldTurn("hold_right_fwd", true, true);
 
-    gf_DbgReset("right_null_resolve", false, false);
-    gf_DbgSpawnOne("right_null_resolve", 3.0, 500.0);
-    gv_unitHighlight[1] = null;
-    gf_RightClickExecute(1, UnitGetPosition(gv_dbgEnemy), null);
-    Wait(0.1, c_timeGame);
-    gf_DbgSnap("right_null_resolve", "t0100");
+        // Middle hold steers. It is not a strafe hold, alone or with right.
+        gf_DbgReset("hold_middle", false, true);
+        gf_DbgHold(false, true);
+        Wait(0.3, c_timeGame);
+        gf_DbgSnap("hold_middle", "tmiddle");
+        gf_DbgHold(true, true);
+        Wait(0.3, c_timeGame);
+        gf_DbgSnap("hold_middle", "tboth");
+        gf_DbgHold(false, false);
+        Wait(0.3, c_timeGame);
+        gf_DbgSnap("hold_middle", "tend");
+    }
+    if (gf_DbgGroup("button")) {
+        // Weapon Attack button: attacks like a right click and shows the cooldown.
+        gf_DbgReset("weapon_button", false, true);
+        gf_DbgSpawnOne("weapon_button", 3.0, 500.0);
+        gf_DbgSnap("weapon_button", "t0000");
+        UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingUnit(AbilityCommand("SCOBAAutoAttackStatus", 0), gv_dbgEnemy), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        gf_DbgSnap("weapon_button", "t0500");
+        Wait(2.5, c_timeGame);
+        gf_DbgSnap("weapon_button", "tend");
 
-    gf_DbgReset("left_null_resolve", false, false);
-    gf_DbgSpawnOne("left_null_resolve", 3.0, 500.0);
-    gf_UnitTargetSet(1, gf_UnitTargetAtPoint(1, UnitGetPosition(gv_dbgEnemy), false));
-    gf_DbgSnap("left_null_resolve", "t0000");
+        // A press that fires no shot starts no cooldown.
+        gf_DbgReset("button_out", false, true);
+        gf_DbgSpawnOne("button_out", 11.0, 500.0);
+        gf_DbgSnap("button_out", "t0000");
+        UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingUnit(AbilityCommand("SCOBAAutoAttackStatus", 0), gv_dbgEnemy), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        gf_DbgSnap("button_out", "tend");
+    }
+    if (gf_DbgGroup("switch")) {
+        // Hero switch keeps both toggles.
+        gf_DbgReset("switch_single_stand", false, true);
+        gf_DbgUseKerrigan();
+        gf_DbgSnap("switch_single_stand", "tend");
+        gf_DbgReset("switch_auto_move", true, false);
+        gf_DbgUseKerrigan();
+        gf_DbgSnap("switch_auto_move", "tend");
+    }
+    if (gf_DbgGroup("kerrigan")) {
+        // Kerrigan weapons: one full shot per command.
+        gf_DbgReset("talons_single", false, true);
+        gf_DbgUseKerrigan();
+        gf_DbgSingleShots("talons_single", 1.2);
+        gf_DbgReset("talons_auto", true, true);
+        gf_DbgUseKerrigan();
+        gf_DbgAutoRun("talons_auto", 1.2, 4.0);
+        gf_DbgSnapAfterShot("talons_auto", "tshot");
+        gf_DbgReset("psiblast_single", false, true);
+        gf_DbgUseKerrigan();
+        gf_DbgSingleShots("psiblast_single", 3.0);
+    }
 
-    gf_DbgReset("left_stale_resolve", false, false);
-    gf_DbgSpawnOne("left_stale_resolve", 3.0, 500.0);
-    BankValueSetFromFlag(gv_dbgBank, "left_stale_resolve", "pickValid", UnitIsValid(gf_UnitTargetAtPoint(1, PointWithOffset(gv_dbgAnchor, 20.0, 0.0), false)));
-    BankSave(gv_dbgBank);
-
-    gf_DbgReset("right_ground_walk", false, false);
-    gf_MousePressRight(1, 100, 100, PointGetX(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), PointGetY(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)));
-    BankValueSetFromFlag(gv_dbgBank, "right_ground_walk", "ran", gf_MouseReleaseRight(1, 100, 100));
-    BankSave(gv_dbgBank);
-    gf_DbgSnap("right_ground_walk", "t0000");
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("right_ground_walk", "t1000");
-
-    gf_DbgReset("right_ground_stand", false, true);
-    gf_MousePressRight(1, 100, 100, PointGetX(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), PointGetY(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)));
-    BankValueSetFromFlag(gv_dbgBank, "right_ground_stand", "ran", gf_MouseReleaseRight(1, 100, 100));
-    BankSave(gv_dbgBank);
-    gf_DbgSnap("right_ground_stand", "t0000");
-    Wait(0.5, c_timeGame);
-    gf_DbgSnap("right_ground_stand", "t0500");
-
-    gf_DbgReset("right_target_kept", false, false);
-    gf_DbgSpawnOne("right_target_kept", 3.0, 500.0);
-    gf_UnitTargetSet(1, gv_dbgEnemy);
-    gv_unitHighlight[1] = null;
-    gf_MousePressRight(1, 100, 100, PointGetX(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), PointGetY(PointWithOffset(gv_dbgAnchor, -5.0, 0.0)));
-    gf_MouseReleaseRight(1, 100, 100);
-    Wait(0.2, c_timeGame);
-    gf_DbgSnap("right_target_kept", "t0200");
-
-    gf_DbgReset("both_forward", false, false);
-    gv_mOUSELEFT[1] = true;
-    gv_mOUSERIGHT[1] = true;
-    gv_mOUSEFORWARD[1] = true;
-    gv_kEYFORWARD[1] = true;
-    gv_fORWARD[1] = true;
-    gf_MouseForwardStop(1);
-    gf_DbgSnap("both_forward", "tkey");
-    gv_mOUSEFORWARD[1] = true;
-    gv_kEYFORWARD[1] = false;
-    gv_fORWARD[1] = true;
-    gf_MouseForwardStop(1);
-    gf_DbgSnap("both_forward", "tmouse");
-
-    gf_DbgReset("walk_ground", true, false);
-    gf_DbgSnap("walk_ground", "t0000");
-    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), c_orderQueueReplace);
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("walk_ground", "t1000");
-
-    gf_DbgReset("stand_ground", true, true);
-    gf_DbgSnap("stand_ground", "t0000");
-    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, -5.0, 0.0)), c_orderQueueReplace);
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("stand_ground", "t1000");
-
-    gf_DbgReset("move_wake", true, true);
-    gf_DbgSnap("move_wake", "t0000");
-    gv_fORWARD[1] = true;
-    gf_CombatBeginMove(1);
-    Wait(0.2, c_timeGame);
-    gf_DbgSnap("move_wake", "t0200");
-    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, 5.0, 0.0)), c_orderQueueReplace);
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("move_wake", "t1200");
-    gv_fORWARD[1] = false;
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("move_wake", "t2200");
-
-    gf_DbgReset("walk_chase", true, false);
-    gf_DbgSpawnOne("walk_chase", 9.0, 500.0);
-    gf_DbgSnap("walk_chase", "t0000");
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap("walk_chase", "t1000");
-    Wait(2.0, c_timeGame);
-    gf_DbgSnap("walk_chase", "t3000");
-
-    gf_DbgReset("walk_idle", true, false);
-    gf_DbgSpawnOne("walk_idle", 13.0, 500.0);
-    gf_DbgSnap("walk_idle", "t0000");
-    Wait(2.0, c_timeGame);
-    gf_DbgSnap("walk_idle", "t2000");
-
-    gf_DbgReset("weapon", false, false);
-    gf_DbgSpawnOne("weapon", 3.0, 500.0);
-    gf_DbgSnap("weapon", "t0000");
-    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingUnit(AbilityCommand("SCOBAAutoAttackStatus", 0), gv_dbgEnemy), c_orderQueueReplace);
-    Wait(0.1, c_timeGame);
-    gf_DbgSnap("weapon", "t0100");
-    Wait(0.1, c_timeGame);
-    gf_DbgSnap("weapon", "t0200");
-    Wait(0.3, c_timeGame);
-    gf_DbgSnap("weapon", "t0500");
-    Wait(0.5, c_timeGame);
-    gf_DbgSnap("weapon", "t1000");
-
-    gf_DbgReset("camera_heading", false, false);
-    CameraSetValue(1, c_cameraValueYaw, 90.0, 0.0, -1, 10);
-    gv_rOTATEUNIT[1] = true;
-    gt_CameraTurnTick_Func(true, true);
-    Wait(0.1, c_timeGame);
-    BankValueSetFromInt(gv_dbgBank, "camera_heading", "facing", FixedToInt(UnitGetFacing(gv_tPSUNIT[1])));
-    gv_rOTATEUNIT[1] = false;
-    BankSave(gv_dbgBank);
-
-    gf_DbgReset("real_input", false, false);
-    gv_bINPUTLOG = true;
-    gf_DbgInputLog("target", "none");
-    gf_DbgInputLog("right", "none");
-    gf_DbgInputLog("rightRan", "no");
-    gf_DbgInputLog("leftDrag", "no");
-    gf_DbgInputLog("leftDx", "0");
-    gf_DbgInputLog("leftDy", "0");
-    gf_DbgInputLog("leftCancel", "no");
-    gf_DbgInputLog("rightDrag", "no");
-    gf_DbgInputLog("rightDx", "0");
-    gf_DbgInputLog("rightDy", "0");
-    gf_DbgInputLog("rightCancel", "no");
-    gf_DbgInputLog("hover", "none");
-    gf_DbgSpawnOne("real_input", 3.0, 500.0);
-    gf_DbgSnap("real_input", "t0000");
-    BankValueSetFromInt(gv_dbgBank, "real_input", "ready", 1);
-    BankSave(gv_dbgBank);
-    Wait(60.0, c_timeGame);
-    gf_DbgSnap("real_input", "after");
-
+    gf_DbgReset("done", false, true);
+    gf_DbgSnap("done", "tend");
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
     BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
     BankSave(gv_dbgBank);
     return true;
 }
 
 void gt_DbgTest_Init () {
+    gt_DbgForward = TriggerCreate("gt_DbgForward_Func");
     gt_DbgTest = TriggerCreate("gt_DbgTest_Func");
     TriggerAddEventMapInit(gt_DbgTest);
 }

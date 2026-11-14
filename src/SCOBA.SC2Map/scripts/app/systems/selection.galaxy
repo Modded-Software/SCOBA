@@ -94,6 +94,20 @@ void gf_SelectHero (int lp_player) {
     }
 }
 
+void gf_SelectHeroForce (int lp_player) {
+    unit lv_hero;
+
+    if (gv_sCOBAOrderMode[lp_player] == true) {
+        return;
+    }
+    lv_hero = gf_HeroUnit(lp_player);
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    UnitClearSelection(lp_player);
+    UnitSelect(lv_hero, lp_player, true);
+}
+
 bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
     int lv_player;
     unit lv_hero;
@@ -135,6 +149,29 @@ bool gf_HeroReselectEvent (int lp_player, bool testConds, bool runActions) {
         return true;
     }
     if (EventUnit() == gf_HeroUnit(lp_player)) {
+        return true;
+    }
+    if (gf_ActionModeActive(lp_player)) {
+        gf_SelectHeroForce(lp_player);
+        return true;
+    }
+    gf_SelectHero(lp_player);
+    return true;
+}
+
+bool gf_UnitClickEvent (int lp_player, bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return true;
+    }
+    gv_unitClickCandidate[lp_player] = EventUnit();
+    if (UnitIsValid(gv_unitClickCandidate[lp_player])) {
+        gf_DbgInputLog("unitClick", UnitGetType(gv_unitClickCandidate[lp_player]));
+    }
+    if (gf_ActionModeActive(lp_player)) {
+        gf_SelectHeroForce(lp_player);
         return true;
     }
     gf_SelectHero(lp_player);

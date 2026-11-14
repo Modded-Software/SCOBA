@@ -3,20 +3,3 @@
 bool gf_MovementKeyHeld (int lp_player) {
     return gv_fORWARD[lp_player] || gv_bACKWARD[lp_player] || gv_lEFT[lp_player] || gv_rIGHT[lp_player];
 }
-
-bool gt_AutoAttackTick_Func (bool testConds, bool runActions) {
-    int lv_player;
-
-    if (!runActions) {
-        return true;
-    }
-    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
-        gf_CombatStep(lv_player);
-    }
-    return true;
-}
-
-void gt_CombatTick_Init () {
-    gt_AutoAttackTick = TriggerCreate("gt_AutoAttackTick_Func");
-    TriggerAddEventTimePeriodic(gt_AutoAttackTick, 0.5, c_timeGame);
-}

@@ -21,15 +21,14 @@ void gf_OrderEnter (int lp_player) {
     if (UnitGetOwner(lv_unit) != lp_player) {
         return;
     }
-    gf_CombatCancelAuto(lp_player);
-    gf_CombatBeginMove(lp_player);
     gv_sCOBAOrderMode[lp_player] = true;
+    gf_CombatSyncRoot(lp_player);
+    gf_SelectionUIApply(lp_player);
     gv_fORWARD[lp_player] = false;
     gv_bACKWARD[lp_player] = false;
     gv_lEFT[lp_player] = false;
     gv_rIGHT[lp_player] = false;
     gv_sCOBAOrderUnit[lp_player] = lv_unit;
-    UnitSetState(lv_unit, c_unitStateSelectable, true);
     UnitClearSelection(lp_player);
     UnitSelect(lv_unit, lp_player, true);
     libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, true, PlayerGroupSingle(lp_player));
@@ -39,10 +38,11 @@ void gf_OrderEnter (int lp_player) {
 void gf_OrderExit (int lp_player) {
     gv_sCOBAOrderMode[lp_player] = false;
     gv_sCOBAOrderUnit[lp_player] = null;
-    gv_sCOBAManualOrder[lp_player] = false;
-    gv_sCOBAFSM[lp_player] = c_SCOBA_FSM_IDLE;
+    gf_CombatSyncRoot(lp_player);
     libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, false, PlayerGroupSingle(lp_player));
     UnitClearSelection(lp_player);
+    gf_SelectHeroForce(lp_player);
+    gf_SelectionUIApply(lp_player);
 }
 
 void gf_OrderToggle (int lp_player) {

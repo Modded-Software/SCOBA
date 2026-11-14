@@ -13,6 +13,21 @@ bool gf_ActionModeActive (int lp_player) {
     return UnitBehaviorCount(lv_hero, c_SCOBA_ACTION_BEHAVIOR) > 0;
 }
 
+void gf_SelectionUIApply (int lp_player) {
+    playergroup lv_group;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    lv_group = PlayerGroupSingle(lp_player);
+    if (gv_aIMACTIVE[lp_player] && !gv_sCOBAOrderMode[lp_player]) {
+        UISetSelectionTypeEnabled(lv_group, c_localSelectionTypeUnknown, false);
+    }
+    else {
+        UISetSelectionTypeEnabled(lv_group, c_localSelectionTypeUnknown, true);
+    }
+}
+
 void gf_ControlApply (int lp_player) {
     bool lv_relative;
     playergroup lv_group;
@@ -37,6 +52,7 @@ void gf_ControlApply (int lp_player) {
     lv_group = PlayerGroupSingle(lp_player);
     UISetCursorVisible(lv_group, true);
     UISetCursorAutoHide(lv_group, false, 0.0);
+    gf_SelectionUIApply(lp_player);
 }
 
 void gf_ActionModeRestoreRPG (int lp_player) {
@@ -57,6 +73,7 @@ void gf_ActionModeRestoreRPG (int lp_player) {
     gv_lEFTORBIT[lp_player] = false;
     gv_rIGHTORBIT[lp_player] = false;
     gv_mOUSEFORWARD[lp_player] = false;
+    gf_ActionStatusHover(lp_player, null);
     gf_ControlApply(lp_player);
 }
 
@@ -79,6 +96,7 @@ void gf_ActionModeApply (int lp_player) {
     gv_lEFTORBIT[lp_player] = false;
     gv_rIGHTORBIT[lp_player] = false;
     gv_mOUSEMIDDLE[lp_player] = false;
+    gf_ActionStatusHover(lp_player, null);
     gf_AnimReset(lp_player);
     if (gf_ActionModeActive(lp_player)) {
         gf_ControlApply(lp_player);

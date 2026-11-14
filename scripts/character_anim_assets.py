@@ -22,7 +22,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "30\n"
+MARKER_VERSION = "32\n"
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -161,10 +161,6 @@ def make_clip(model, group, source_index: int, group_ids: set[int], name: str, b
         target_sequence.movementSpeed = source_sequence.movementSpeed
         target_sequence.frequency = source_sequence.frequency
         target_sequence.flags = source_sequence.flags
-        if name == "Walk Leg" and source_sequence.movementSpeed > 0.0 and unit_speed > 0.0:
-            duration_ms = source_sequence.animEndInMS - source_sequence.animStartInMS
-            scaled_ms = int(round(duration_ms * source_sequence.movementSpeed / (unit_speed * 100.0)))
-            target_sequence.animEndInMS = target_sequence.animStartInMS + scaled_ms
     stc = clone(source)
     debug_filter = os.environ.get("SCOBA_ANIM_UNFILTERED", "")
     if debug_filter in {"all", bone_group}:
@@ -279,6 +275,11 @@ def generate_model(
             reverse,
             turn_anim_id,
         )
+    # A walk clip shorter than the stock walk cuts the stride and hitches on every loop.
+    lengths = {sequence.name: sequence.animEndInMS - sequence.animStartInMS for sequence in model.sequences}
+    for direction_name, _, _ in AIM_DIRECTIONS:
+        if lengths["Attack Walk " + direction_name] != lengths["Walk"]:
+            raise ValueError(f"Attack Walk {direction_name} length differs from Walk")
     attack_source = model.sequenceTransformationCollections[groups["Attack"].stcIndices[0]]
     pitch_source = clone(attack_source)
     pitch_pairs = [

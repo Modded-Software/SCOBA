@@ -30,6 +30,9 @@ bool gt_OrderCancel_Func (bool testConds, bool runActions) {
     if (gv_sCOBAOrderMode[lv_player] == true) {
         gf_OrderExit(lv_player);
     }
+    else if (gf_IsHeroPlayer(lv_player) && !gf_ActionModeActive(lv_player)) {
+        gf_PncCancel(lv_player);
+    }
     return true;
 }
 

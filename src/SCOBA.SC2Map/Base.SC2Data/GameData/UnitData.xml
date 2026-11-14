@@ -302,8 +302,8 @@
         <AbilArray Link="SCOBAActionModeToggle"/>
         <CardLayouts index="0">
             <LayoutButtons index="50" Face="SCOBAAutoAttackStatus" Type="AbilCmd" AbilCmd="SCOBAAutoAttackStatus,Execute" Row="0" Column="0"/>
-            <LayoutButtons index="51" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,On" Row="0" Column="3"/>
-            <LayoutButtons index="52" Face="SCOBAAutoAttackOn" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
+            <LayoutButtons index="51" Face="SCOBAAutoAttackOn" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,On" Row="0" Column="3"/>
+            <LayoutButtons index="52" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
             <LayoutButtons index="53" Face="SCOBARightClickMove" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,On" Row="0" Column="4"/>
             <LayoutButtons index="54" Face="SCOBARightClickStand" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,Off" Row="0" Column="4"/>
             <LayoutButtons index="55" Face="SCOBAActionModeRPG" Type="AbilCmd" AbilCmd="SCOBAActionModeToggle,On" Row="0" Column="2"/>
@@ -612,8 +612,8 @@
         <AbilArray Link="SCOBAActionModeToggle"/>
         <CardLayouts index="0">
             <LayoutButtons index="50" Face="SCOBAAutoAttackStatus" Type="AbilCmd" AbilCmd="SCOBAAutoAttackStatus,Execute" Row="0" Column="0"/>
-            <LayoutButtons index="51" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,On" Row="0" Column="3"/>
-            <LayoutButtons index="52" Face="SCOBAAutoAttackOn" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
+            <LayoutButtons index="51" Face="SCOBAAutoAttackOn" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,On" Row="0" Column="3"/>
+            <LayoutButtons index="52" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
             <LayoutButtons index="53" Face="SCOBARightClickMove" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,On" Row="0" Column="4"/>
             <LayoutButtons index="54" Face="SCOBARightClickStand" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,Off" Row="0" Column="4"/>
             <LayoutButtons index="55" Face="SCOBAActionModeRPG" Type="AbilCmd" AbilCmd="SCOBAActionModeToggle,On" Row="0" Column="2"/>
@@ -659,33 +659,13 @@
     <CUnit id="Zergling">
         <Radius value="0.75"/>
     </CUnit>
-    <CUnit id="SCOBAAimShotDummy" parent="InvisibleTargetDummy">
-        <FlagArray index="Invulnerable" value="0"/>
-        <FlagArray index="Untargetable" value="0"/>
-        <FlagArray index="IgnoreTerrainZInit" value="1"/>
-        <FlagArray index="Movable" value="0"/>
-        <PlaneArray index="Ground" value="1"/>
-        <PlaneArray index="Air" value="1"/>
-        <Radius value="0"/>
-    </CUnit>
     <CUnit id="ToshSCOBA" parent="Tosh">
-        <DefaultAcquireLevel value="Defensive"/>
+        <DefaultAcquireLevel value="Offensive"/>
+        <WeaponArray Link="ToshAuto"/>
     </CUnit>
     <CUnit id="KerriganSCOBA" parent="Kerrigan">
-        <DefaultAcquireLevel value="Defensive"/>
-    </CUnit>
-    <CUnit id="SCOBAAimShooterTosh" parent="ToshSCOBA">
-        <Radius value="0"/>
-        <Height value="0"/>
-        <DefaultAcquireLevel value="None"/>
-        <FlagArray index="Untargetable" value="1"/>
-        <FlagArray index="Invulnerable" value="1"/>
-    </CUnit>
-    <CUnit id="SCOBAAimShooterKerrigan" parent="KerriganSCOBA">
-        <Radius value="0"/>
-        <Height value="0"/>
-        <DefaultAcquireLevel value="None"/>
-        <FlagArray index="Untargetable" value="1"/>
-        <FlagArray index="Invulnerable" value="1"/>
+        <DefaultAcquireLevel value="Offensive"/>
+        <WeaponArray Link="QueenOfBladesPsiBlastAuto"/>
+        <WeaponArray Link="RazorTalonsAuto"/>
     </CUnit>
 </Catalog>

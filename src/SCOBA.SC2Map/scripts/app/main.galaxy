@@ -33,6 +33,7 @@ include "scripts/app/systems/input"
 include "scripts/app/systems/hero_switch"
 include "scripts/app/systems/medic"
 include "scripts/app/systems/movement"
+include "scripts/app/systems/strafe"
 include "scripts/app/systems/orders"
 include "scripts/app/systems/selection"
 include "scripts/app/systems/spawns"
@@ -72,7 +73,6 @@ void main () {
     gt_OrderKey_Init();
     gt_OrderButton_Init();
     gt_OrderCancel_Init();
-    gt_CombatTick_Init();
     gt_MedicSpawn_Init();
     gt_VisualTuning_Init();
     gt_TargetRing_Init();

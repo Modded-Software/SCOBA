@@ -98,6 +98,7 @@ void gf_HeroSwitchTo (unit lp_target) {
         return;
     }
     gf_AimEnd(1);
+    gf_StrafeHoldSet(1, false);
     if (gv_sCOBAOrderMode[1]) {
         gf_OrderExit(1);
     }
@@ -107,7 +108,7 @@ void gf_HeroSwitchTo (unit lp_target) {
     gv_unitTarget[1] = null;
     gv_unitHighlight[1] = null;
     UnitBehaviorRemove(lv_old, "UnitDirectControl", 1);
-    gf_CombatReset(1);
+    gv_pncSingleShot[1] = false;
     gf_AnimReset(1);
     gf_HeroPark(lv_old);
     UnitSetOwner(lp_target, 1, false);
@@ -116,16 +117,17 @@ void gf_HeroSwitchTo (unit lp_target) {
     gf_HeroReveal(lp_target);
     gv_heroActive = lp_target;
     gv_tPSUNIT[1] = lp_target;
-    gf_CombatReset(1);
+    gf_CombatSyncRoot(1);
     gf_AnimReset(1);
     gf_HeroApplyToggles(lp_target);
+    gf_AttackSingleSet(lp_target, UnitBehaviorCount(lv_old, c_SCOBA_SINGLE_BEHAVIOR) > 0);
+    gf_ChaseStandSet(lp_target, UnitBehaviorCount(lv_old, c_SCOBA_STAND_BEHAVIOR) > 0);
     UnitBehaviorAdd(lp_target, "UnitDirectControl", lp_target, 1);
     UnitSetState(lp_target, c_unitStateStatusBar, false);
     UnitXPGainEnable(lp_target, null, true);
     gf_ControlApply(1);
     gf_ActionModeEnsureRPG(1);
     gf_HeroApplyCamera(lp_target);
-    UnitIssueOrder(lp_target, Order(AbilityCommand("SCOBARightClickToggle", 0)), c_orderQueueReplace);
     UnitClearSelection(1);
     UnitSelect(lp_target, 1, true);
 }

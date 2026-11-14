@@ -167,7 +167,9 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
     gt_AttackEvent_Init();
     for (lv_localPlayer = 1; lv_localPlayer <= 6; lv_localPlayer += 1) {
         if (UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {
-            UnitIssueOrder(gv_tPSUNIT[lv_localPlayer], Order(AbilityCommand("SCOBARightClickToggle", 0)), c_orderQueueReplace);
+            // Defaults: Attack single, Chase stand. Set through the toggle commands.
+            gf_AttackSingleSet(gv_tPSUNIT[lv_localPlayer], true);
+            gf_ChaseStandSet(gv_tPSUNIT[lv_localPlayer], true);
             gf_ActionModeEnsureRPG(lv_localPlayer);
         }
     }
