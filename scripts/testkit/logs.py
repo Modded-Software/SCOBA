@@ -37,10 +37,23 @@ def latest_script_error(logs: Path, started_at: float) -> Path | None:
     return max(candidates, key=lambda p: p.stat().st_mtime) if candidates else None
 
 
+def texture_warning_lines(text: str) -> list[str]:
+    """Graphics log lines where the game doubts a texture file.
+
+    The game writes one when a file does not fit its texture size table,
+    as in "WARNING: Texture DB does not match file info or file is corrupt".
+    """
+    return [line.strip() for line in text.splitlines() if "WARNING" in line and "texture" in line.lower()]
+
+
 def collect_new_logs(logs: Path, started_at: float) -> dict:
-    result = {"script_errors": [], "error_dirs": [], "alerts": []}
+    result = {"script_errors": [], "error_dirs": [], "alerts": [], "texture_warnings": []}
     if not logs.is_dir():
         return result
+    for path in sorted(logs.glob("*Graphics.txt")):
+        if path.stat().st_mtime >= started_at:
+            lines = texture_warning_lines(path.read_text(errors="replace"))
+            result["texture_warnings"].extend(f"{path.name}: {line}" for line in lines)
     result["script_errors"] = sorted(
         p for p in logs.glob("*ScriptError.txt") if p.stat().st_mtime >= started_at
     )
@@ -81,6 +94,9 @@ def report_logs(logs: Path, started_at: float) -> tuple[int, dict]:
         failures += 1
     if data["error_dirs"]:
         print_red("CONSOLE ERROR FOLDERS", [str(p) for p in data["error_dirs"]])
+        failures += 1
+    if data["texture_warnings"]:
+        print_red("TEXTURE WARNINGS", data["texture_warnings"])
         failures += 1
     if data["alerts"]:
         error_alerts = [

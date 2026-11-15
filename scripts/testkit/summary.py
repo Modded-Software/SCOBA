@@ -27,6 +27,7 @@ def write_summary(
         "script_errors": [str(p) for p in log_data.get("script_errors", [])],
         "error_folders": [str(p) for p in log_data.get("error_dirs", [])],
         "alerts": list(log_data.get("alerts", [])),
+        "texture_warnings": list(log_data.get("texture_warnings", [])),
         "artifacts": artifacts,
     }
     (run_dir / "summary.json").write_text(json.dumps(payload, indent=2) + "\n")

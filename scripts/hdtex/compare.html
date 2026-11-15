@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Textures: original and upscaled variants</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; background: #1b1d21; color: #d8dade; font: 14px/1.4 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; background: #25282e; border-bottom: 1px solid #3a3e46; }
+  header label { display: flex; gap: 5px; align-items: center; }
+  select, button { font: inherit; color: inherit; background: #33373f; border: 1px solid #4a4f59; border-radius: 4px; padding: 3px 8px; }
+  button { cursor: pointer; }
+  button:hover, select:hover { background: #3d424b; }
+  #info { padding: 6px 12px; background: #202328; border-bottom: 1px solid #3a3e46; color: #aeb2b9; min-height: 31px; }
+  #info b { color: #d8dade; font-weight: 600; }
+  #view { position: relative; flex: 1; overflow: hidden; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; background: #111; }
+  #view.panning { cursor: grabbing; }
+  .layer { position: absolute; inset: 0; background-color: #111; }
+  .divider { position: absolute; top: 0; bottom: 0; width: 21px; margin-left: -10px; cursor: ew-resize; }
+  .divider::before { content: ""; position: absolute; left: 10px; top: 0; bottom: 0; width: 1px; background: #fff; box-shadow: 0 0 0 1px #000; }
+  /* --knob moves the handle up or down, so two lines at one place show two handles. */
+  .divider::after { content: "\2194"; position: absolute; left: 0; top: 50%; width: 21px; height: 21px; margin-top: calc(-10px + var(--knob, 0px)); border-radius: 50%; background: #fff; color: #000; text-align: center; line-height: 21px; }
+  .tag { position: absolute; top: 8px; padding: 1px 8px; border-radius: 3px; background: rgba(0, 0, 0, 0.7); color: #fff; white-space: nowrap; pointer-events: none; }
+  #tag-before { left: 8px; }
+  #status { position: absolute; left: 8px; bottom: 8px; padding: 1px 8px; border-radius: 3px; background: rgba(0, 0, 0, 0.7); color: #fff; pointer-events: none; }
+</style>
+</head>
+<body>
+<header>
+  <label>Texture <select id="pick"></select></label>
+  <button id="previous" title="Left arrow">Previous</button>
+  <button id="next" title="Right arrow">Next</button>
+  <button id="fit" title="F">Fit</button>
+  <button id="actual" title="1">1:1</button>
+  <label><input type="checkbox" id="tile"> Tile</label>
+  <label><input type="checkbox" id="smooth"> Smooth original</label>
+  <span>Wheel zooms. Drag pans. Drag a line to wipe.</span>
+</header>
+<div id="info"></div>
+<div id="view">
+  <div class="layer" id="before"></div>
+  <div class="tag" id="tag-before">Original</div>
+  <div id="status"></div>
+</div>
+<script>
+"use strict";
+const PAIRS = /*PAIRS*/[];
+
+const view = document.getElementById("view");
+const before = document.getElementById("before");
+const tagBefore = document.getElementById("tag-before");
+const pick = document.getElementById("pick");
+const info = document.getElementById("info");
+const status = document.getElementById("status");
+const tile = document.getElementById("tile");
+const smooth = document.getElementById("smooth");
+
+// One layer, one line, and one tag per variant, in the order of the data.
+// Line i is the left edge of layer i. The original shows left of line 0.
+const COUNT = PAIRS.length ? PAIRS[0].layers.length : 0;
+const TAG_ROOM = 90; // screen pixels a side needs to show its tag
+const layers = [];
+const dividers = [];
+const tags = [];
+for (const [list, className] of [[layers, "layer"], [dividers, "divider"], [tags, "tag"]]) {
+  for (let i = 0; i < COUNT; i += 1) {
+    const element = document.createElement("div");
+    element.className = className;
+    view.insertBefore(element, tagBefore);
+    list.push(element);
+  }
+}
+dividers.forEach((divider, i) => divider.style.setProperty("--knob", `${(i - (COUNT - 1) / 2) * 34}px`));
+tags.forEach((tag, i) => { tag.textContent = PAIRS[0].layers[i].variant; });
+
+// size: screen pixels the whole texture covers. x, y: its top left corner in the view.
+// splits: where each line is, as a part of the view width. They never cross.
+const state = { index: 0, size: 0, x: 0, y: 0, splits: dividers.map((_, i) => (i + 1) / (COUNT + 1)) };
+
+function pair() { return PAIRS[state.index]; }
+
+// Screen pixels the texture covers when one pixel of its largest layer is one screen pixel.
+function actualSize() { return Math.max(...pair().layers.map((layer) => layer.size[0])) / window.devicePixelRatio; }
+
+function draw() {
+  const current = pair();
+  const height = state.size * current.before_size[1] / current.before_size[0];
+  const sides = [[before, current.before_size[0], !smooth.checked]];
+  current.layers.forEach((layer, i) => sides.push([layers[i], layer.size[0], true]));
+  for (const [element, natural, pixels] of sides) {
+    element.style.backgroundSize = `${state.size}px ${height}px`;
+    element.style.backgroundPosition = `${state.x}px ${state.y}px`;
+    element.style.backgroundRepeat = tile.checked ? "repeat" : "no-repeat";
+    // Show true pixels when enlarged. When shrunk, let the browser average.
+    const enlarged = state.size * window.devicePixelRatio >= natural;
+    element.style.imageRendering = pixels && enlarged ? "pixelated" : "auto";
+  }
+  const width = view.getBoundingClientRect().width;
+  tagBefore.style.display = state.splits[0] * width < TAG_ROOM ? "none" : "";
+  for (let i = 0; i < COUNT; i += 1) {
+    const start = state.splits[i];
+    const end = i + 1 < COUNT ? state.splits[i + 1] : 1;
+    layers[i].style.clipPath = `inset(0 0 0 ${start * 100}%)`;
+    dividers[i].style.left = `${start * 100}%`;
+    tags[i].style.left = `calc(${start * 100}% + 14px)`;
+    tags[i].style.display = (end - start) * width < TAG_ROOM ? "none" : "";
+  }
+  status.textContent = `${Math.round((state.size / actualSize()) * 100)}%`;
+}
+
+// Line `index` goes to `value`. It stops at the line left of it and pushes the lines right of it.
+function moveSplit(index, value) {
+  const low = index > 0 ? state.splits[index - 1] : 0;
+  state.splits[index] = Math.min(1, Math.max(low, value));
+  for (let i = index + 1; i < COUNT; i += 1) {
+    state.splits[i] = Math.max(state.splits[i], state.splits[index]);
+  }
+}
+
+function fit() {
+  const box = view.getBoundingClientRect();
+  state.size = Math.min(box.width, box.height);
+  state.x = (box.width - state.size) / 2;
+  state.y = (box.height - state.size) / 2;
+  draw();
+}
+
+function zoomTo(size, originX, originY) {
+  const factor = size / state.size;
+  state.x = originX - (originX - state.x) * factor;
+  state.y = originY - (originY - state.y) * factor;
+  state.size = size;
+  draw();
+}
+
+function actual() {
+  const box = view.getBoundingClientRect();
+  zoomTo(actualSize(), box.width / 2, box.height / 2);
+}
+
+function number(value, digits) { return value === null ? "n/a" : value.toFixed(digits); }
+
+function describe() {
+  const current = pair();
+  const first = [
+    `<b>${current.texture}</b> ${current.plane}`,
+    `<b>Original</b> ${current.before_size.join("x")}`,
+    `seam ${number(current.seam_source, 2)}`,
+  ];
+  if (current.note) { first.push(current.note); }
+  const lines = [first.join(" &middot; ")];
+  for (const layer of current.layers) {
+    lines.push([
+      `<b>${layer.variant}</b> ${layer.size.join("x")}`,
+      `model <b>${layer.model}</b>`,
+      `encode ${number(layer.encode_psnr, 1)} dB`,
+      `correlation ${number(layer.correlation, 2)}`,
+      `coarse RMSE ${number(layer.coarse_rmse, 2)}`,
+      `seam ${number(layer.seam, 2)}`,
+    ].join(" &middot; "));
+  }
+  info.innerHTML = lines.join("<br>");
+}
+
+function show(index, keepView) {
+  state.index = (index + PAIRS.length) % PAIRS.length;
+  const current = pair();
+  pick.value = current.id;
+  history.replaceState(null, "", `#${current.id}`);
+  describe();
+  before.style.backgroundImage = `url("${current.before}")`;
+  status.textContent = "loading";
+  let waiting = current.layers.length;
+  current.layers.forEach((layer, i) => {
+    layers[i].style.backgroundImage = `url("${layer.image}")`;
+    const loader = new Image();
+    loader.onload = () => { waiting -= 1; if (waiting === 0 && pair() === current) { draw(); } };
+    loader.onerror = () => { status.textContent = `cannot load ${layer.image}`; };
+    loader.src = layer.image;
+  });
+  if (!keepView) { fit(); }
+}
+
+function start() {
+  if (!PAIRS.length) { info.textContent = "The cache holds no textures."; return; }
+  let group = null;
+  for (const item of PAIRS) {
+    if (!group || group.label !== item.texture) {
+      group = document.createElement("optgroup");
+      group.label = item.texture;
+      pick.append(group);
+    }
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = `${item.texture} ${item.plane}`;
+    group.append(option);
+  }
+  const wanted = PAIRS.findIndex((item) => item.id === decodeURIComponent(location.hash.slice(1)));
+  show(Math.max(0, wanted), false);
+}
+
+pick.addEventListener("change", () => show(PAIRS.findIndex((item) => item.id === pick.value), true));
+document.getElementById("previous").addEventListener("click", () => show(state.index - 1, true));
+document.getElementById("next").addEventListener("click", () => show(state.index + 1, true));
+document.getElementById("fit").addEventListener("click", fit);
+document.getElementById("actual").addEventListener("click", actual);
+tile.addEventListener("change", draw);
+smooth.addEventListener("change", draw);
+window.addEventListener("resize", draw);
+
+window.addEventListener("keydown", (event) => {
+  if (event.target === pick) { return; }
+  if (event.key === "ArrowLeft") { show(state.index - 1, true); }
+  if (event.key === "ArrowRight") { show(state.index + 1, true); }
+  if (event.key === "f") { fit(); }
+  if (event.key === "1") { actual(); }
+  if (event.key === "t") { tile.checked = !tile.checked; draw(); }
+});
+
+view.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  const box = view.getBoundingClientRect();
+  const size = state.size * (event.deltaY < 0 ? 1.25 : 0.8);
+  // From a sixteenth of the view up to 32 screen pixels per texture pixel.
+  const limited = Math.min(Math.max(size, Math.min(box.width, box.height) / 16), actualSize() * 32);
+  zoomTo(limited, event.clientX - box.left, event.clientY - box.top);
+}, { passive: false });
+
+let drag = null;
+// A selection in the view makes the browser start its own drag after a few
+// pixels, which cancels the pointer. Nothing here may be selected or dragged.
+view.addEventListener("dragstart", (event) => event.preventDefault());
+view.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) { return; }
+  event.preventDefault();
+  // grabbed: the line under the pointer, or -1. line: the line that moves, picked on the first move.
+  drag = { grabbed: dividers.indexOf(event.target), line: -1, x: event.clientX, y: event.clientY };
+  view.setPointerCapture(event.pointerId);
+  view.classList.toggle("panning", drag.grabbed < 0);
+});
+view.addEventListener("pointermove", (event) => {
+  if (!drag) { return; }
+  if (drag.grabbed >= 0) {
+    const box = view.getBoundingClientRect();
+    if (drag.line < 0) {
+      if (event.clientX === drag.x) { return; }
+      // Lines at the same place lie on top of each other. Moving left takes
+      // the leftmost of them, moving right the rightmost, so none gets stuck.
+      const place = state.splits[drag.grabbed];
+      const together = dividers.map((_, i) => i).filter((i) => Math.abs(state.splits[i] - place) * box.width < 1);
+      drag.line = event.clientX < drag.x ? together[0] : together[together.length - 1];
+    }
+    moveSplit(drag.line, (event.clientX - box.left) / box.width);
+  } else {
+    state.x += event.clientX - drag.x;
+    state.y += event.clientY - drag.y;
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+  }
+  draw();
+});
+for (const name of ["pointerup", "pointercancel"]) {
+  view.addEventListener(name, () => { drag = null; view.classList.remove("panning"); });
+}
+
+start();
+</script>
+</body>
+</html>

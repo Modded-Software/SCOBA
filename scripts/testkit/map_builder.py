@@ -6,7 +6,7 @@ import shutil
 import struct
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping, NamedTuple
+from typing import Callable, Mapping, NamedTuple, Optional
 
 from .profiles.registry import PROFILE_OUTPUTS
 from .profiles.registry import PROFILE_BANKS
@@ -21,6 +21,8 @@ class TestMapSpec(NamedTuple):
     galaxy_includes: tuple[str, ...]
     init_calls: tuple[str, ...]
     options: Mapping[str, bool] = MappingProxyType({})
+    # Edits the copied profile map before the harness goes in. Test data only.
+    patch: Optional[Callable[[Path], None]] = None
 
 
 def _read_cstr(data: bytes, pos: int) -> tuple[bytes, int]:
@@ -168,6 +170,8 @@ def build_instrumented_map(spec: TestMapSpec) -> Path:
         shutil.rmtree(spec.output)
     shutil.copytree(spec.source, spec.output)
     patch_map_options(spec.output, spec.options)
+    if spec.patch is not None:
+        spec.patch(spec.output)
     patch_mapinfo(spec.output / "MapInfo")
     patch_banklist(spec.output / "BankList.xml", spec.bank_names + ("SCOBACLIPMETRICS",))
     harness_root = spec.output / "scripts" / "test" / spec.profile

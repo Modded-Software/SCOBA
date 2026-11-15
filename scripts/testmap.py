@@ -36,6 +36,7 @@ def build(profile: str, output: Path | None) -> int:
             galaxy_includes=spec.galaxy_includes,
             init_calls=spec.init_calls,
             options=spec.options,
+            patch=spec.patch,
         )
     path = build_instrumented_map(spec)
     print(path)

@@ -14,6 +14,8 @@ PROFILE_OUTPUTS = {
     "rungun": ROOT / "out" / "SCOBA256_runguntest.SC2Map",
     "pncprobe": ROOT / "out" / "SCOBA256_pncprobe.SC2Map",
     "tps": ROOT / "out" / "SCOBA256_tpstest.SC2Map",
+    "treepath": ROOT / "out" / "SCOBA256_treepath.SC2Map",
+    "fprot": ROOT / "out" / "SCOBA256_fprot.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -26,6 +28,8 @@ PROFILE_BANKS = {
     "rungun": ("SCOBARUNGUNTEST",),
     "pncprobe": ("SCOBAPNCPROBE",),
     "tps": ("SCOBATPSTEST",),
+    "treepath": ("SCOBATREEPATH",),
+    "fprot": ("SCOBAFPROT",),
 }
 
 
@@ -57,4 +61,10 @@ def profile_module(name):
     if name == "tps":
         from . import tps
         return tps
+    if name == "treepath":
+        from . import treepath
+        return treepath
+    if name == "fprot":
+        from . import fprot
+        return fprot
     raise SystemExit(f"unknown test profile: {name}")

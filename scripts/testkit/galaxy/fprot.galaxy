@@ -1,0 +1,64 @@
+// Footprint rotation probe. Spots come from the generated fprot_spots.galaxy.
+
+trigger gt_FpRot;
+const fixed c_FPROT_HALF = 4.0;
+const fixed c_FPROT_STEP = 0.5;
+
+void gf_FpRotSpots ();
+
+// Rows from +y to -y; columns from -x to +x. '#' blocked, '.' open.
+void gf_FpRotCase (string lp_section, fixed lp_x, fixed lp_y, int lp_rotation) {
+    int lv_i;
+    int lv_j;
+    int lv_n;
+    string lv_row;
+    fixed lv_px;
+    fixed lv_py;
+
+    lv_n = FixedToInt(c_FPROT_HALF * 2.0 / c_FPROT_STEP);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "rotation", lp_rotation);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "x10", FixedToInt(lp_x * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "y10", FixedToInt(lp_y * 10.0));
+    for (lv_j = 0; lv_j <= lv_n; lv_j += 1) {
+        lv_row = "";
+        lv_py = lp_y + c_FPROT_HALF - IntToFixed(lv_j) * c_FPROT_STEP;
+        for (lv_i = 0; lv_i <= lv_n; lv_i += 1) {
+            lv_px = lp_x - c_FPROT_HALF + IntToFixed(lv_i) * c_FPROT_STEP;
+            if (PointPathingPassable(Point(lv_px, lv_py))) {
+                lv_row = lv_row + ".";
+            }
+            else {
+                lv_row = lv_row + "#";
+            }
+        }
+        if (lv_j < 10) {
+            BankValueSetFromString(gv_dbgBank, lp_section, "row0" + IntToString(lv_j), lv_row);
+        }
+        else {
+            BankValueSetFromString(gv_dbgBank, lp_section, "row" + IntToString(lv_j), lv_row);
+        }
+    }
+    BankSave(gv_dbgBank);
+}
+
+bool gt_FpRot_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAFPROT", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_FpRotSpots();
+    BankValueSetFromInt(gv_dbgBank, "meta", "realClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_FpRot_Init () {
+    gt_FpRot = TriggerCreate("gt_FpRot_Func");
+    TriggerAddEventMapInit(gt_FpRot);
+}

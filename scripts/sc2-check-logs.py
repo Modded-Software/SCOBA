@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from project_root import project_root
+from testkit.logs import texture_warning_lines
 
 ROOT = Path(os.environ.get("SC2_PROJECT_ROOT", project_root()))
 DOCS = Path(
@@ -68,6 +69,8 @@ for path in candidates:
             if "scripterror" in low or "script error" in low:
                 errors.append((path, line))
                 break
+    if "Graphics" in name and texture_warning_lines(text):
+        errors.append((path, "\n".join(texture_warning_lines(text))))
     if "TextError" in name:
         for line in text.splitlines():
             if "TextError" in line:

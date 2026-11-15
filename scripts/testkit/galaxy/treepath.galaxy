@@ -1,0 +1,104 @@
+// Tree and spore pathing blocker test profile.
+// Targets and probe points come from the generated treepath_targets.galaxy.
+
+trigger gt_TreePath;
+const int c_TP_PATH_MAX = 400;
+
+void gf_TreePathTargets ();
+
+// Moves the other heroes away and stops the test hero at lp_at.
+void gf_TpReset (point lp_at) {
+    int lv_player;
+    unit lv_hero;
+
+    for (lv_player = 2; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (UnitIsValid(gv_tPSUNIT[lv_player])) {
+            UnitSetPosition(gv_tPSUNIT[lv_player], Point(8.0 + IntToFixed(lv_player) * 2.0, 8.0), false);
+        }
+    }
+    lv_hero = gv_tPSUNIT[1];
+    gf_UnitTargetSet(1, null);
+    // Chase stand stops click moves (gt_DisableClickMove); the walk needs chase.
+    gf_ChaseStandSet(lv_hero, false);
+    gf_CombatSetRoot(1, false);
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(0.1, c_timeGame);
+    UnitSetPosition(lv_hero, lp_at, false);
+    UnitSetPropertyFixed(lv_hero, c_unitPropLifePercent, 100.0);
+    Wait(0.5, c_timeGame);
+}
+
+void gf_TpBegin (string lp_section, string lp_ident) {
+    BankValueSetFromString(gv_dbgBank, lp_section, "ident", lp_ident);
+    BankSave(gv_dbgBank);
+}
+
+string gf_TpIndex (int lp_i) {
+    if (lp_i < 10) {
+        return "00" + IntToString(lp_i);
+    }
+    if (lp_i < 100) {
+        return "0" + IntToString(lp_i);
+    }
+    return IntToString(lp_i);
+}
+
+void gf_TpProbe (string lp_section, string lp_kind, int lp_i, fixed lp_x, fixed lp_y) {
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_kind + "_" + gf_TpIndex(lp_i), PointPathingPassable(Point(lp_x, lp_y)));
+}
+
+void gf_TpWalk (string lp_section, fixed lp_sx, fixed lp_sy, fixed lp_ex, fixed lp_ey) {
+    point lv_end;
+    point lv_at;
+    unit lv_hero;
+    int lv_i;
+    fixed lv_now;
+
+    lv_hero = gv_tPSUNIT[1];
+    lv_end = Point(lp_ex, lp_ey);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "startPass", PointPathingPassable(Point(lp_sx, lp_sy)));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "endPass", PointPathingPassable(lv_end));
+    gf_TpReset(Point(lp_sx, lp_sy));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "moveIssued", UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), lv_end), c_orderQueueReplace));
+    lv_now = TimerGetElapsed(gv_sCOBA_Clock);
+    for (lv_i = 0; lv_i < c_TP_PATH_MAX; lv_i += 1) {
+        lv_at = UnitGetPosition(lv_hero);
+        BankValueSetFromString(gv_dbgBank, lp_section, "path" + gf_TpIndex(lv_i), IntToString(FixedToInt(PointGetX(lv_at) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(lv_at) * 100.0)));
+        if (DistanceBetweenPoints(lv_at, lv_end) < 0.5) {
+            lv_i += 1;
+            break;
+        }
+        Wait(0.0625, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "pathCount", lv_i);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "walkMs", FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - lv_now) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endDist10", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), lv_end) * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "realClicks", gv_dbgRealClicks);
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    BankSave(gv_dbgBank);
+}
+
+bool gt_TreePath_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBATREEPATH", 1);
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "treepath");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_TreePathTargets();
+    gf_TpReset(gv_dbgAnchor);
+    BankValueSetFromInt(gv_dbgBank, "meta", "realClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_TreePath_Init () {
+    gt_TreePath = TriggerCreate("gt_TreePath_Func");
+    TriggerAddEventMapInit(gt_TreePath);
+}

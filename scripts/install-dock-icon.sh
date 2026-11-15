@@ -44,14 +44,50 @@ fi
 mkdir -p "$ICON_DIR" "$APPS_DIR"
 cp -f "$ICON_SOURCE" "$ICON_DIR/$ICON_NAME.png"
 
-printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=env UV_BIN="%s" SC2_PROJECT_ROOT="%s" SC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s/scripts/playtest.sh" launch\nPath=%s\nIcon=%s\nTerminal=false\nType=Application\nCategories=Game;StrategyGame;\nStartupNotify=true\nStartupWMClass=StarCraft II.exe\n' \
-    "$APP_NAME" \
-    "Launch the SCOBA StarCraft II custom map" \
-    "$UV_BIN" \
-    "$ROOT_DIR" \
-    "$ROOT_DIR" \
-    "$ROOT_DIR" \
-    "$ICON_NAME" > "$DESKTOP_FILE"
+# The launch command. $1 is the SC2_HD_TEXTURES value of the build; empty
+# leaves it unset, so the build picks its default (Upscale 4x, or the
+# built-in textures without a cache).
+launch_exec() {
+    local textures=""
+    [ -z "$1" ] || textures="SC2_HD_TEXTURES=\"$1\" "
+    printf 'env UV_BIN="%s" SC2_PROJECT_ROOT="%s" %sSC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s/scripts/playtest.sh" launch' \
+        "$UV_BIN" "$ROOT_DIR" "$textures" "$ROOT_DIR"
+}
+
+# Right-click entries of the dock icon: action id, name, SC2_HD_TEXTURES value.
+ACTIONS=(
+    "original|Original Textures|off"
+    "upscaled|Upscaled Textures|upscale"
+    "hd|HD Textures|generative"
+)
+
+action_ids=""
+action_names=""
+for action in "${ACTIONS[@]}"; do
+    action_ids="$action_ids${action%%|*};"
+    IFS='|' read -r _id action_name _textures <<<"$action"
+    action_names="${action_names:+$action_names, }$action_name"
+done
+
+# GNOME Shell keeps its cached app object while the name, comment, command,
+# icon, and file stay the same (app_is_stale in shell-app-system.c). It does
+# not compare Actions, so a change of the menu alone never shows. The
+# comment names the menu entries, so a new menu makes the cache stale.
+COMMENT="Launch the SCOBA StarCraft II custom map. Right-click: $action_names"
+
+{
+    printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=%s\nPath=%s\nIcon=%s\nTerminal=false\nType=Application\nCategories=Game;StrategyGame;\nStartupNotify=true\nStartupWMClass=StarCraft II.exe\nActions=%s\n' \
+        "$APP_NAME" \
+        "$COMMENT" \
+        "$(launch_exec "")" \
+        "$ROOT_DIR" \
+        "$ICON_NAME" \
+        "$action_ids"
+    for action in "${ACTIONS[@]}"; do
+        IFS='|' read -r action_id action_name textures <<<"$action"
+        printf '\n[Desktop Action %s]\nName=%s\nExec=%s\n' "$action_id" "$action_name" "$(launch_exec "$textures")"
+    done
+} > "$DESKTOP_FILE"
 
 chmod +x "$DESKTOP_FILE"
 if command -v desktop-file-validate; then

@@ -37,6 +37,10 @@ and its tooling. Work in progress:
   `WASD / TPS`.
 - Two heroes, hero switch, order mode, HUD, and the character animation layer.
 - A deterministic map build and an in-game test kit.
+- Terrain textures upscaled four times per side, in two variants, `Upscale 4x`
+  and `Generative 4x`. The map build applies one of them:
+  [REQ-HD-TEXTURES](docs/requirements/REQ-HD-TEXTURES.md),
+  [SPEC-HD-TEXTURES](docs/specifications/SPEC-HD-TEXTURES.md)
 
 Two control modes have a contract and a state document:
 
@@ -55,6 +59,8 @@ Two control modes have a contract and a state document:
 | `src/SCOBA.SC2Map/scripts/app/` | Galaxy modules. |
 | `scripts/` | Build, validation, launch, and test tooling. |
 | `scripts/testkit/` | In-game test harness and profiles. |
+| `scripts/hdtex/`, `scripts/hd_textures.py` | Texture upscaling: extract, upscale, encode, inject. |
+| `build/hdtex/` | Cache of upscaled textures, one folder per variant. Not in git. |
 | `original/` | The untouched source map. |
 | `out/` | Build output and test runs. Never edited by hand. |
 | `docs/` | Requirements and specifications. |
@@ -72,6 +78,21 @@ first.
 | `scripts/playtest.sh combat` | Run the full Point & Click suite, about three minutes. |
 | `scripts/playtest.sh combat <group>` | Run one group, about one minute. Groups: `idle`, `single`, `auto`, `cancel`, `wasd`, `hold`, `button`, `switch`, `kerrigan`. |
 | `scripts/playtest.sh pncprobe` | Run the engine probes. |
+| `scripts/playtest.sh launch-check` | Rebuild, launch the map, and check the game logs. |
+| `uv run python scripts/hd_textures.py build --gpu 1` | Fill the cache of the `Upscale 4x` textures. Needs `../upscale-on-arc` and a GPU. Run once; the map build applies the cache. |
+| `uv run python scripts/hd_textures.py --variant generative build --gpu 1` | Fill the cache of the `Generative 4x` textures. Its input is the `Upscale 4x` colour at 2048, so build `Upscale 4x` first. |
+| `uv run python scripts/hd_textures.py compare` | Write a web page that shows every texture as original, upscaled, and generative: `build/hdtex/compare/terrain/index.html`. |
+
+`SC2_HD_TEXTURES` picks the terrain textures of a build:
+
+| Value | The map gets |
+| --- | --- |
+| not set | `Upscale 4x`. Without its cache, the built-in textures. |
+| `upscale` | `Upscale 4x`. The build fails without its cache. |
+| `generative` | `Generative 4x`. The build fails without its cache. |
+| `off` | The built-in textures. |
+
+For example: `SC2_HD_TEXTURES=generative scripts/playtest.sh build`.
 
 A test run stops any running StarCraft II process. Do not click in the game
 window during a run: real mouse input makes the run invalid.

@@ -16,8 +16,10 @@ from character_anim_assets import generate as generate_character_anim
 from control_mode_icons import generate as generate_control_icons
 from doodad_occlusion import disable_doodad_occlusion
 from expand_helpers import clone_cells, read, upsample_grid, write
+from hdtex.inject import apply_hd_textures
 from project_root import project_root
 from props_expand import expand_props
+from footprints.build import apply_scaled_footprints
 from slow_death_assets import generate as generate_slow_deaths
 from spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
 from strip_gui_triggers import strip_triggers
@@ -482,8 +484,10 @@ def main() -> int:
         expand_props(dst)
     if os.environ.get("SC2_NO_SPORES") != "1":
         scale_spores(dst)
+    apply_scaled_footprints(dst)
     scale_psi_destroyer(dst)
     slow_psi_destroyer_animations(dst)
+    apply_hd_textures(dst)
     if args.out is None:
         old = root / "out" / ".build-old"
         if old.exists():
