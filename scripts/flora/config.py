@@ -71,7 +71,7 @@ FAMILIES: dict[str, Family] = {
     "ZerusSwampPlantsLarge": Family(5.0, 60, (0.9, 1.2), 5),
     "ZerusSwampPlants": Family(2.5, 250, (0.9, 1.2), 7),
     "ZerusGroundVines": Family(4.0, 200, (0.95, 1.15), 4),
-    "ZerusBrambles": Family(3.0, 400, (0.9, 1.2), 3),
+    "ZerusBrambles": Family(3.0, 400, (0.9, 3.0), 3),
     "ZerusTallGrassCluster": Family(3.5, 300, (0.9, 1.2), 2),
     "ZerusDeadlyPlant": Family(5.0, 16, (1.0, 1.2), 1),
     "ZerusPlant": Family(3.0, 250, (0.9, 1.1), 20),  # also replaces dry-ground reeds

@@ -1,0 +1,229 @@
+// Pick log (R-TPS-84). The operator plays the map and points at units. The
+// log records what the engine and the script see, into the probe bank,
+// section `picklog`, one key per entry.
+//
+// The log changes no game state, with one exception the operator asks for:
+// key L forces the cursor visible in TPS mouse look. That is the one state
+// the product does not have. It shows where the engine keeps the cursor and
+// whether the engine highlights a unit there. L again restores the product.
+const int c_PICKLOG_MAX = 3000;
+const int c_PICKLOG_PLAYER = 1;
+const int c_PICKLOG_KEY = c_keyL;
+const string c_PICKLOG_SECTION = "picklog";
+
+int gv_pickLogSeq;
+int gv_pickLogPoll;
+int gv_pickLogMoves;
+int gv_pickLogMouseX;
+int gv_pickLogMouseY;
+fixed gv_pickLogWorldX;
+fixed gv_pickLogWorldY;
+fixed gv_pickLogWorldZ;
+string gv_pickLogMode = "";
+unit gv_pickLogPick;
+bool gv_pickLogForceCursor;
+trigger gt_PickLogOn;
+trigger gt_PickLogOff;
+trigger gt_PickLogMove;
+trigger gt_PickLogDown;
+trigger gt_PickLogUp;
+trigger gt_PickLogClick;
+trigger gt_PickLogSelect;
+trigger gt_PickLogKey;
+trigger gt_PickLogPoll;
+
+string gf_PickLogFlag (bool lp_value) {
+    if (lp_value) {
+        return "1";
+    }
+    return "0";
+}
+
+// Type, tag, owner, position, distance to the hero, and the engine's own
+// highlight state of the unit.
+string gf_PickLogUnit (unit lp_unit) {
+    point lv_pos;
+    string lv_text;
+
+    if (!UnitIsValid(lp_unit)) {
+        return "none";
+    }
+    lv_pos = UnitGetPosition(lp_unit);
+    lv_text = UnitGetType(lp_unit) + "#" + IntToString(UnitGetTag(lp_unit));
+    lv_text = lv_text + "[owner=" + IntToString(UnitGetOwner(lp_unit));
+    lv_text = lv_text + ",pos=" + FixedToString(PointGetX(lv_pos), 1) + ";" + FixedToString(PointGetY(lv_pos), 1);
+    lv_text = lv_text + ",heroDist=" + FixedToString(DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[c_PICKLOG_PLAYER]), lv_pos), 1);
+    lv_text = lv_text + ",engineHl=" + gf_PickLogFlag(UnitTestState(lp_unit, c_unitStateHighlighted)) + "]";
+    return lv_text;
+}
+
+// The mouse mode. `cursor` and `relative` are what the script asked for.
+string gf_PickLogMode () {
+    string lv_text;
+
+    lv_text = "tps=" + gf_PickLogFlag(gf_TpsActive(c_PICKLOG_PLAYER));
+    lv_text = lv_text + " free=" + gf_PickLogFlag(gv_mOUSEMIDDLE[c_PICKLOG_PLAYER]);
+    lv_text = lv_text + " cursor=" + gf_PickLogFlag(gv_controlCursor[c_PICKLOG_PLAYER]);
+    lv_text = lv_text + " relative=" + gf_PickLogFlag(gv_cONTROLRELATIVE[c_PICKLOG_PLAYER]);
+    lv_text = lv_text + " aim=" + gf_PickLogFlag(gv_aIMACTIVE[c_PICKLOG_PLAYER]);
+    lv_text = lv_text + " forceCursor=" + gf_PickLogFlag(gv_pickLogForceCursor);
+    return lv_text;
+}
+
+string gf_PickLogDetail () {
+    point lv_hero;
+    string lv_text;
+
+    lv_hero = UnitGetPosition(gv_tPSUNIT[c_PICKLOG_PLAYER]);
+    lv_text = " engineHover=" + gf_PickLogUnit(gv_unitHighlight[c_PICKLOG_PLAYER]);
+    lv_text = lv_text + " scriptPick=" + gf_PickLogUnit(gv_pickLogPick);
+    lv_text = lv_text + " statusUnit=" + gf_PickLogUnit(gv_tpsStatusUnit[c_PICKLOG_PLAYER]);
+    lv_text = lv_text + " mouseMoves=" + IntToString(gv_pickLogMoves);
+    lv_text = lv_text + " mouseUI=" + IntToString(gv_pickLogMouseX) + ";" + IntToString(gv_pickLogMouseY);
+    lv_text = lv_text + " mouseWorld=" + FixedToString(gv_pickLogWorldX, 1) + ";" + FixedToString(gv_pickLogWorldY, 1) + ";" + FixedToString(gv_pickLogWorldZ, 1);
+    lv_text = lv_text + " camYaw=" + FixedToString(CameraGetYaw(c_PICKLOG_PLAYER), 1);
+    lv_text = lv_text + " camPitch=" + FixedToString(CameraGetPitch(c_PICKLOG_PLAYER), 1);
+    lv_text = lv_text + " camDist=" + FixedToString(CameraGetDistance(c_PICKLOG_PLAYER), 1);
+    lv_text = lv_text + " hero=" + FixedToString(PointGetX(lv_hero), 1) + ";" + FixedToString(PointGetY(lv_hero), 1);
+    return lv_text;
+}
+
+void gf_PickLogWrite (string lp_kind, string lp_text) {
+    if (gv_pickLogSeq >= c_PICKLOG_MAX) {
+        return;
+    }
+    gv_pickLogSeq += 1;
+    BankValueSetFromString(gv_dbgBank, c_PICKLOG_SECTION, "e" + IntToString(100000 + gv_pickLogSeq), "ms=" + IntToString(FixedToInt(GameGetMissionTime() * 1000.0)) + " " + lp_kind + " " + lp_text);
+    BankSave(gv_dbgBank);
+}
+
+void gf_PickLogSay (string lp_text) {
+    UIDisplayMessage(PlayerGroupSingle(c_PICKLOG_PLAYER), c_messageAreaSubtitle, StringToText(lp_text));
+}
+
+bool gt_PickLogOn_Func (bool testConds, bool runActions) {
+    gf_PickLogWrite("hoverOn", "unit=" + gf_PickLogUnit(EventUnit()) + " " + gf_PickLogMode() + gf_PickLogDetail());
+    return true;
+}
+
+bool gt_PickLogOff_Func (bool testConds, bool runActions) {
+    gf_PickLogWrite("hoverOff", "unit=" + gf_PickLogUnit(EventUnit()) + " " + gf_PickLogMode() + gf_PickLogDetail());
+    return true;
+}
+
+bool gt_PickLogMove_Func (bool testConds, bool runActions) {
+    gv_pickLogMoves += 1;
+    gv_pickLogMouseX = EventMouseMovedPosXUI();
+    gv_pickLogMouseY = EventMouseMovedPosYUI();
+    gv_pickLogWorldX = EventMouseMovedPosXWorld();
+    gv_pickLogWorldY = EventMouseMovedPosYWorld();
+    gv_pickLogWorldZ = EventMouseMovedPosZWorld();
+    return true;
+}
+
+bool gt_PickLogDown_Func (bool testConds, bool runActions) {
+    string lv_text;
+
+    lv_text = "button=" + IntToString(EventMouseClickedButton());
+    lv_text = lv_text + " clickUI=" + IntToString(EventMouseClickedPosXUI()) + ";" + IntToString(EventMouseClickedPosYUI());
+    lv_text = lv_text + " clickWorld=" + FixedToString(EventMouseClickedPosXWorld(), 1) + ";" + FixedToString(EventMouseClickedPosYWorld(), 1) + ";" + FixedToString(EventMouseClickedPosZWorld(), 1);
+    gf_PickLogWrite("mouseDown", lv_text + " " + gf_PickLogMode() + gf_PickLogDetail());
+    return true;
+}
+
+bool gt_PickLogUp_Func (bool testConds, bool runActions) {
+    string lv_text;
+
+    lv_text = "button=" + IntToString(EventMouseClickedButton());
+    lv_text = lv_text + " clickUI=" + IntToString(EventMouseClickedPosXUI()) + ";" + IntToString(EventMouseClickedPosYUI());
+    lv_text = lv_text + " clickWorld=" + FixedToString(EventMouseClickedPosXWorld(), 1) + ";" + FixedToString(EventMouseClickedPosYWorld(), 1) + ";" + FixedToString(EventMouseClickedPosZWorld(), 1);
+    gf_PickLogWrite("mouseUp", lv_text + " " + gf_PickLogMode() + gf_PickLogDetail());
+    return true;
+}
+
+// The engine's own click pick and selection.
+bool gt_PickLogClick_Func (bool testConds, bool runActions) {
+    gf_PickLogWrite("unitClick", "unit=" + gf_PickLogUnit(EventUnit()) + " " + gf_PickLogMode() + gf_PickLogDetail());
+    return true;
+}
+
+bool gt_PickLogSelect_Func (bool testConds, bool runActions) {
+    gf_PickLogWrite("unitSelected", "unit=" + gf_PickLogUnit(EventUnit()) + " " + gf_PickLogMode() + gf_PickLogDetail());
+    return true;
+}
+
+bool gt_PickLogKey_Func (bool testConds, bool runActions) {
+    gv_pickLogForceCursor = !gv_pickLogForceCursor;
+    if (gv_pickLogForceCursor) {
+        gf_PickLogSay("PICK LOG: cursor forced VISIBLE in mouse look. L restores.");
+    }
+    else {
+        // The product puts its own cursor state back.
+        gf_ControlApply(c_PICKLOG_PLAYER);
+        gf_PickLogSay("PICK LOG: product cursor state restored.");
+    }
+    gf_PickLogWrite("force", gf_PickLogMode() + gf_PickLogDetail());
+    return true;
+}
+
+bool gt_PickLogPoll_Func (bool testConds, bool runActions) {
+    string lv_mode;
+    unit lv_pick;
+    bool lv_tps;
+
+    if (!UnitIsValid(gv_tPSUNIT[c_PICKLOG_PLAYER])) {
+        return true;
+    }
+    lv_tps = gf_TpsActive(c_PICKLOG_PLAYER);
+    lv_pick = null;
+    if (lv_tps) {
+        lv_pick = gf_AimUnitAtCrosshair(c_PICKLOG_PLAYER, false);
+    }
+    // The product hides the cursor on every mode change; keep the forced state.
+    if (gv_pickLogForceCursor && lv_tps && !gv_mOUSEMIDDLE[c_PICKLOG_PLAYER]) {
+        UISetCursorVisible(PlayerGroupSingle(c_PICKLOG_PLAYER), true);
+    }
+    lv_mode = gf_PickLogMode();
+    if (lv_mode != gv_pickLogMode) {
+        gv_pickLogMode = lv_mode;
+        gv_pickLogPick = lv_pick;
+        gf_PickLogWrite("mode", lv_mode + gf_PickLogDetail());
+    }
+    if (lv_pick != gv_pickLogPick) {
+        gv_pickLogPick = lv_pick;
+        gf_PickLogWrite("scriptPick", lv_mode + gf_PickLogDetail());
+    }
+    gv_pickLogPoll += 1;
+    if (lv_tps && ((gv_pickLogPoll % 10) == 0)) {
+        gf_PickLogWrite("tick", lv_mode + gf_PickLogDetail());
+    }
+    return true;
+}
+
+void gf_PickLogStart () {
+    BankSectionRemove(gv_dbgBank, c_PICKLOG_SECTION);
+    gt_PickLogOn = TriggerCreate("gt_PickLogOn_Func");
+    TriggerAddEventUnitHighlight(gt_PickLogOn, null, c_PICKLOG_PLAYER, true);
+    gt_PickLogOff = TriggerCreate("gt_PickLogOff_Func");
+    TriggerAddEventUnitHighlight(gt_PickLogOff, null, c_PICKLOG_PLAYER, false);
+    gt_PickLogMove = TriggerCreate("gt_PickLogMove_Func");
+    TriggerAddEventMouseMoved(gt_PickLogMove, c_PICKLOG_PLAYER);
+    gt_PickLogDown = TriggerCreate("gt_PickLogDown_Func");
+    TriggerAddEventMouseClicked(gt_PickLogDown, c_PICKLOG_PLAYER, c_mouseButtonLeft, true);
+    TriggerAddEventMouseClicked(gt_PickLogDown, c_PICKLOG_PLAYER, c_mouseButtonRight, true);
+    TriggerAddEventMouseClicked(gt_PickLogDown, c_PICKLOG_PLAYER, c_mouseButtonMiddle, true);
+    gt_PickLogUp = TriggerCreate("gt_PickLogUp_Func");
+    TriggerAddEventMouseClicked(gt_PickLogUp, c_PICKLOG_PLAYER, c_mouseButtonLeft, false);
+    TriggerAddEventMouseClicked(gt_PickLogUp, c_PICKLOG_PLAYER, c_mouseButtonRight, false);
+    TriggerAddEventMouseClicked(gt_PickLogUp, c_PICKLOG_PLAYER, c_mouseButtonMiddle, false);
+    gt_PickLogClick = TriggerCreate("gt_PickLogClick_Func");
+    TriggerAddEventUnitClick(gt_PickLogClick, null, c_PICKLOG_PLAYER);
+    gt_PickLogSelect = TriggerCreate("gt_PickLogSelect_Func");
+    TriggerAddEventUnitSelected(gt_PickLogSelect, null, c_PICKLOG_PLAYER, true);
+    gt_PickLogKey = TriggerCreate("gt_PickLogKey_Func");
+    TriggerAddEventKeyPressed(gt_PickLogKey, c_PICKLOG_PLAYER, c_PICKLOG_KEY, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_PickLogPoll = TriggerCreate("gt_PickLogPoll_Func");
+    TriggerAddEventTimePeriodic(gt_PickLogPoll, 0.1, c_timeGame);
+    gf_PickLogWrite("start", gf_PickLogMode() + gf_PickLogDetail());
+    gf_PickLogSay("PICK LOG running. Play as usual. L shows the cursor in TPS mouse look.");
+}

@@ -58,7 +58,7 @@ def profile_module(name):
         from . import rungun
         return rungun
     if name == "pncprobe":
-        from . import pncprobe
+        from .pncprobe import spec as pncprobe
         return pncprobe
     if name == "tps":
         from . import tps

@@ -1,0 +1,131 @@
+// Recentre probe (R-TPS-84).
+// Question: does any native move the engine's cursor to the screen centre?
+// The pointer rests on the left. Each case: mouse look (relative on), the
+// candidate call, relative off. `Ticks`: game loops until the centred unit
+// is highlighted (-1: never in 2 s). Then the host tool nudges the pointer
+// 4 px on `<tag>Nudge` and the next mouse-moved event shows where the
+// cursor is. `none` is the negative case. No clicks.
+// Raw values only; the profile prints them.
+const int c_PROBE_RECENTRE_CASES = 8;
+
+string gf_ProbeRecentreTag (int lp_case) {
+    if (lp_case == 0) {
+        return "none";
+    }
+    if (lp_case == 1) {
+        return "lock";
+    }
+    if (lp_case == 2) {
+        return "letterbox";
+    }
+    if (lp_case == 3) {
+        return "console";
+    }
+    if (lp_case == 4) {
+        return "cinematic";
+    }
+    if (lp_case == 5) {
+        return "world";
+    }
+    if (lp_case == 6) {
+        return "cursor";
+    }
+    return "lockfree";
+}
+
+// The candidate call, made while relative mode is on.
+void gf_ProbeRecentreCall (int lp_case) {
+    playergroup lv_group;
+
+    lv_group = PlayerGroupSingle(1);
+    if (lp_case == 1) {
+        CameraLockInput(1, true);
+        Wait(0.25, c_timeGame);
+        CameraLockInput(1, false);
+    }
+    else if (lp_case == 2) {
+        UISetMode(lv_group, c_uiModeLetterboxed, 0.0);
+        Wait(0.25, c_timeGame);
+        UISetMode(lv_group, c_uiModeConsole, 0.0);
+    }
+    else if (lp_case == 3) {
+        UISetMode(lv_group, c_uiModeFullscreen, 0.0);
+        Wait(0.25, c_timeGame);
+        UISetMode(lv_group, c_uiModeConsole, 0.0);
+    }
+    else if (lp_case == 4) {
+        CinematicMode(lv_group, true, 0.0);
+        Wait(0.25, c_timeGame);
+        CinematicMode(lv_group, false, 0.0);
+    }
+    else if (lp_case == 5) {
+        UISetWorldVisible(lv_group, false);
+        Wait(0.25, c_timeGame);
+        UISetWorldVisible(lv_group, true);
+    }
+    else if (lp_case == 6) {
+        UISetCursorVisible(lv_group, true);
+        Wait(0.25, c_timeGame);
+        UISetCursorVisible(lv_group, false);
+    }
+    else if (lp_case == 7) {
+        // Lock held while relative mode goes off.
+        CameraLockInput(1, true);
+    }
+    Wait(0.25, c_timeGame);
+}
+
+void gf_ProbeRecentreCase (string lp_section, int lp_case, unit lp_unit) {
+    string lv_tag;
+    int lv_moves;
+    int lv_i;
+
+    lv_tag = gf_ProbeRecentreTag(lp_case);
+    gv_mOUSEMIDDLE[1] = false;
+    gf_ControlApply(1);
+    gf_ProbeHoverAim(lp_unit);
+    Wait(0.75, c_timeGame);
+    gf_ProbeRecentreCall(lp_case);
+    gf_ProbeHoverAim(lp_unit);
+    CameraForceMouseRelative(1, false);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lv_tag + "Ticks", gf_ProbeHoverTicks(lp_unit, true));
+    gf_ProbeHoverSnap(lp_section, lv_tag, lp_unit);
+    lv_moves = gv_probeMouseMoves;
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lv_tag + "Nudge", true);
+    BankSave(gv_dbgBank);
+    for (lv_i = 0; (lv_i < 40) && (gv_probeMouseMoves == lv_moves); lv_i += 1) {
+        Wait(0.25, c_timeGame);
+    }
+    Wait(0.5, c_timeGame);
+    gf_ProbeHoverSnap(lp_section, lv_tag + "nudged", lp_unit);
+    CameraLockInput(1, false);
+    // Back to the free cursor, then the host tool parks it on the left.
+    gv_mOUSEMIDDLE[1] = true;
+    gf_ControlApply(1);
+    UISetCursorVisible(PlayerGroupSingle(1), false);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lv_tag + "Park", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeHoverPark("RECENTRE PROBE: parking. Do not touch the mouse.", 20, gv_probeMouseMoves + 3);
+}
+
+void gf_ProbeRecentre (string lp_section) {
+    unit lv_unit;
+    int lv_c;
+
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Ultralisk", c_PROBE_RECENTER_DX, c_PROBE_RECENTER_AIM_HEIGHT);
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        for (lv_c = 0; lv_c < c_PROBE_RECENTRE_CASES; lv_c += 1) {
+            gf_ProbeRecentreCase(lp_section, lv_c, lv_unit);
+        }
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("RECENTRE PROBE done.");
+    UnitRemove(lv_unit);
+    gv_dbgEnemy = null;
+}

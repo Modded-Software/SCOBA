@@ -48,7 +48,10 @@ guard; `tps` and `combat` assert `RealClicks` 0.
 | T3 | `SCOBAAttackEnd` ends an attack order after one shot. | [pnc] F2 |
 | T4 | The weapon effects start the `Weapon Attack` button cooldown on every shot. | [pnc] F14 |
 | T5 | `UISetCursorVisible(group, false)` hides the cursor. Galaxy has no getter for it. | [stock] natives |
-| T13 | The camera center ray gives the unit and point under the crosshair. | `gf_AimUnitAtCrosshair`, `gf_AimCrosshairPoint` |
+| T13 | The screen-centre ray passes through the point the camera follows at the camera height offset (0.9), along the camera yaw and pitch: the hero at rest, the shoulder proxy while aiming. Engine hover and script pick on a Zergling at 3, 5, 8, 12 agree within 0.1 to 0.8 degrees in pitch and yaw, at rest and in aim. The camera distance does not move the ray. | [probe] `pncprobe/20261115-224549` (measure), `pncprobe/20261115-231002` (match) |
+| T33 | The engine hover is dead while `CameraForceMouseRelative` is on. A hidden free cursor still picks. | [probe] earlier `pncprobe` hover runs |
+| T34 | Mouse down raises `CameraGetPitch`: positive pitch looks down. | [probe] `pncprobe/20261115-223159` |
+| T35 | A unit position has no height; `UnitGetHeight` gives it (Overseer 7.0). | [probe] `tps/20261115-213703` |
 | T14 | All three hero weapons exclude `Hidden` and `Invulnerable` targets. `RazorTalons` requires `Ground`. Psi Blast has `MinimumRange` 2. | [stock] weapon data |
 | T15 | Stock `InvisibleTargetDummy` is unselectable, uncommandable, 1000 life, and carries `ImmuneToDamage`. | [stock] swarm unit data |
 | T19 | `attack` command 0 on an own unit is valid for both heroes. Without a block the unit takes full damage. | [probe] `pncprobe/20261114-185541`, `tps_ally_*` |
@@ -107,7 +110,7 @@ not repeated here.
 | R-TPS-73 to 76 | [built], look [operator] | |
 | R-TPS-77, 78 | [built], look [operator] | No test run. 5.6 |
 | R-TPS-85 | [tested] frames hooked up, no dialog (build check). That the cursor picks a unit behind the overlay is [operator]: the harness has no real mouse. | `tps/20261115-010604`: `CrosshairHooked`, `TextHooked` |
-| R-TPS-84 | Not built. Red test: `tps_pick_marine thigh CrossEnemy: got=False want=True`. | `tps/20261115-005001`, group `pick` |
+| R-TPS-84 | [tested] script ray equals the engine screen-centre ray (`pncprobe` group `point`). [built] hit volumes on the new ray: group `pick` passed on the old ray only (`tps/20261115-222609`); its rerun produced no bank. Operator reported "looks better" live; no case named. | `pncprobe/20261115-231002`, 5.8 |
 | R-TPS-80 | [tested] | `tps` group `target` |
 | R-TPS-81 | [tested] attack command in the free-cursor state. A cursor left click in the free-cursor state is [built]. | `controls_attack` |
 | R-TPS-82 | [tested] | `tps` group `target` |
@@ -266,6 +269,26 @@ not repeated here.
 - `gf_PncRestore` ends aiming, clears the pending shot, removes the proxy,
   and hides the UI floaters.
 
+### 5.8 Crosshair pick (R-TPS-84)
+
+- One ray for the reticle, the status bar, the shot and the crosshair ground
+  point: `gf_AimPickRay`. Origin `gf_AimCameraFocus` (hero, or the shoulder
+  proxy while aiming) at hero height + `c_SCOBA_CAMERA_HEIGHT_OFFSET` (0.9);
+  direction from the camera yaw and pitch (T13). The old origin, 0.5 aside
+  and 1.5 high, never hit a Zergling the engine hovered.
+- The ray starts inside the hero; the pick skips the player's own hero.
+- Each unit is tested against its hit volume: spheres, capsules and boxes
+  from the rest-pose m3 hit-test shapes, with actor `Scale` x model
+  `ScaleMax` baked in. No radius, no margin. Model facing is model -y
+  (`c_HV_MODEL_YAW` 90).
+- Data: `scripts/hitvolumes/` measures `scripts/data/hit_volumes.json`
+  (70 units) and generates `scripts/app/data/hit_volumes_*.galaxy`
+  (63 types). `validate_aim_shot.py` fails on stale data.
+- Near types: scanned in a circle of range + `c_HV_NEAR_REACH`. Far types
+  (reach above 20): scanned per type on the whole map.
+- A type without a volume is not pickable and is recorded once
+  (`gv_hvMissing`).
+
 ## 6. Module Structure
 
 | Module | Role |
@@ -273,7 +296,9 @@ not repeated here.
 | `systems/strafe.galaxy` | Strafe for all of TPS. The walk step does not know about shots. |
 | `systems/controls.galaxy` | Mode switch, middle and right button handlers, cursor state. |
 | `systems/aim.galaxy` | Aim camera, aim side, crosshair kind and color. |
-| `systems/aim_shooting.galaxy` | Crosshair ray, proxy, pending shot, `gf_AimShotEffect`, `gf_AimShotPress`. |
+| `systems/aim_shooting.galaxy` | Crosshair ray (`gf_AimCameraFocus`, `gf_AimPickRay`), pick, proxy, pending shot, `gf_AimShotEffect`, `gf_AimShotPress`. |
+| `systems/hit_volumes.galaxy`, `data/hit_volumes_*.galaxy` | Hit-volume ray tests and generated volume data. |
+| `scripts/hitvolumes/` | Volume measurement, Galaxy generator, host ray reference. |
 | `systems/ui_floaters.galaxy` | UI-layer floaters. |
 | `systems/combat_fsm.galaxy` | `gf_AttackOrder` (Point & Click), root rules. |
 | `systems/combat_cooldown.galaxy` | Weapon effect event: animation, pending shot, single shot. |
@@ -286,7 +311,14 @@ not repeated here.
 ## 7. Tests
 
 - Entry point: `scripts/playtest.sh tps [group]`. Groups: `move`, `cursor`,
-  `aim`, `head`, `target`, `shot`, `kerrigan`.
+  `aim`, `head`, `target`, `shot`, `kerrigan`, `pick`.
+- `SC2_TEST_GROUP=point scripts/playtest.sh pncprobe`, with the host pointer
+  injector parking the hidden cursor at the window centre: engine hover
+  against script pick (R-TPS-84). The start Medic (`gt_MedicSpawn`) and all
+  other units near the lane are parked first.
+- Host: `test_hit_volumes.py` checks shapes, scale, the generator, the
+  `pick` cases, and the measured engine bands against the new and the old
+  ray origin.
 - The harness sets mode, hold flags, camera yaw and pitch, and spawns units on
   the aim ray. It calls the handlers the mouse events call. It does not send
   real mouse or key events.
@@ -305,6 +337,8 @@ not repeated here.
 | `target` | Not aiming: the click sets the UI target. | The click never attacks. Aiming: the UI target is unchanged. |
 | `shot` | Per outcome: shots +1, life, proxy, effect name, cooldown, hero position, one text of the right kind. Walking: one shot, the walk keeps its speed. Weapon ranges. | Click on cooldown, click when not aiming: no shot, no text. Walking: never an attack order. Air proxy: not the hit effect. No late damage 2 s after a miss. |
 | `kerrigan` | The shot cases with Kerrigan. | As `shot`. |
+| `pick` | Medic head, Marine thigh and middle, Ultralisk front, Zergling at 18.5, Overseer body, Hive top, Marine before Hive, Thor chest with aim held (reticle, status bar, shot). | Above the Medic, beside the Marine and Zergling, behind the Ultralisk, under the Overseer, north of the Hive. |
+| `pncprobe point` | Engine and script band centres within 2 degrees, pitch at 3, 5, 8, 12 and yaw at 5, rest and aim. Nothing but hero and target near the lane; Medic parked. | No script pick 4 degrees outside the engine band. |
 
 Floater checks read script counters. They do not prove the text is visible.
 
@@ -341,6 +375,7 @@ Floater checks read script counters. They do not prove the text is visible.
 - The free-cursor state after a middle click: the cursor moves freely and
   hovers and clicks units; the camera does not turn or scroll.
 - Aim camera side and field of view.
+- Crosshair pick on large units live (Thor chest, head, arm; Hive top).
 
 ## 10. Not Tested
 
@@ -353,6 +388,10 @@ Floater checks read script counters. They do not prove the text is visible.
 - A walking shot with Kerrigan (R-TPS-61).
 - A real middle click with a real cursor (R-TPS-31, 36).
 - A real middle press and drag (R-TPS-37).
+- The `pick` group, full `tps`, `combat`, `controls`, `rungun` on the new
+  crosshair ray (R-TPS-84).
+- The baked scale rule (actor x model) in game. Marine volumes reach 0.93
+  high against model bounds of 3.42; not checked.
 
 ## 11. Open Points
 
@@ -385,6 +424,20 @@ Other runs:
 - `pncprobe/20261114-235342`: `spawn_scan`. A harness spawn 12 to 20 east of
   the anchor lands at 9.5 to 11.8 or at 18.3 to 20.4, never between. The
   `combat` case `auto_move_near` moves the hero instead of the spawn.
+
+Crosshair pick (R-TPS-84):
+
+- `tps/20261115-222609`: group `pick`, 0 failures, hit volumes on the old ray.
+- `tps/20261115-215132`: full `tps`, 1 failure (`tps_kerr_enemy tlate
+  EnemyHp`, section 8), old ray.
+- `pncprobe/20261115-222935`: Thor pitch sweep; engine and script bands
+  differ by about 20 degrees on the old ray.
+- `pncprobe/20261115-224549`: Zergling sweep, engine ray measured (T13).
+- `pncprobe/20261115-230450`: aim yaw off by 0.25 with a hero-proxy midpoint
+  origin, 3 failures.
+- `pncprobe/20261115-231002`: group `point`, 0 failures, `RealClicks` 0.
+- A `tps pick` rerun on the new ray ended with `no tps test bank produced`.
+- Host tests: 277 OK.
 
 Only the harness files of `combat` and `pncprobe` changed after
 `tps/20261114-234256`.

@@ -8,6 +8,7 @@ import struct
 import subprocess
 import sys
 
+from flora.treevary import vary_objects
 from project_root import project_root
 
 ROOT = project_root()
@@ -118,8 +119,15 @@ def expand_props(map_dir: Path, force: bool = False) -> bool:
         return False
     rng = random.Random(SEED)
     trees = expand_objects(map_dir / "Objects", rng)
+    objects = map_dir / "Objects"
+    text, before, changed, after = vary_objects(objects.read_text(encoding="utf-8"))
+    if after:
+        raise ValueError(f"tree variety: {after} look-alike neighbour pairs remain")
+    objects.write_text(text, encoding="utf-8")
     fluff = expand_fluff(map_dir / "t3FluffDoodad", rng)
-    marker.write_text(f"trees_added={trees} fluff_added={fluff}\n", encoding="utf-8")
+    marker.write_text(
+        f"trees_added={trees} fluff_added={fluff} lookalike_pairs={before} trees_varied={changed}\n", encoding="utf-8"
+    )
     return True
 
 

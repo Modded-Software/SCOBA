@@ -2,6 +2,8 @@
 trigger gt_TpsTest;
 unit gv_dbgAlly;
 void gf_DbgTpsLook (unit lp_unit, fixed lp_extraYaw);
+// In tpspick.galaxy (R-TPS-84).
+void gf_DbgTpsPickRun ();
 
 // How far a point lies to the right of the hero, seen along the camera yaw.
 fixed gf_DbgTpsRight (point lp_point) {
@@ -98,6 +100,12 @@ void gf_DbgTpsExtra (string lp_section, string lp_tag) {
     else {
         BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "CrossType", "none");
     }
+    // Raw values: the pick ray and its test against the enemy's volume.
+    if (UnitIsValid(gv_dbgEnemy) && gf_HvTypeIndex(UnitGetType(gv_dbgEnemy)) >= 0) {
+        gf_AimPickRay(1);
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EnemyRayT100", FixedToInt(100.0 * gf_HvRayUnit(gv_dbgEnemy, gf_HvTypeIndex(UnitGetType(gv_dbgEnemy)), gv_aimPickOx, gv_aimPickOy, gv_aimPickOz, gv_aimPickDx, gv_aimPickDy, gv_aimPickDz)));
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "PickRay", FixedToString(gv_aimPickOx, 2) + ";" + FixedToString(gv_aimPickOy, 2) + ";" + FixedToString(gv_aimPickOz, 2) + " d " + FixedToString(gv_aimPickDx, 3) + ";" + FixedToString(gv_aimPickDy, 3) + ";" + FixedToString(gv_aimPickDz, 3) + " enemy " + FixedToString(PointGetX(UnitGetPosition(gv_dbgEnemy)), 2) + ";" + FixedToString(PointGetY(UnitGetPosition(gv_dbgEnemy)), 2) + " facing " + FixedToString(UnitGetFacing(gv_dbgEnemy), 1));
+    }
     // Raw value: the unit the engine's own cursor pick reports.
     if (UnitIsValid(gv_unitHighlight[1])) {
         BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "HighlightType", UnitGetType(gv_unitHighlight[1]));
@@ -193,6 +201,14 @@ void gf_DbgTpsShot (string lp_section, int lp_case, bool lp_kerrigan, fixed lp_d
     if (lp_case != c_DBG_SHOT_NO_AIM) {
         gf_TpsMouseDown(1, gv_fIRE);
         Wait(0.4, c_timeGame);
+        // Aiming moves the ray origin to the aim shoulder anchor: the
+        // crosshair is put back on the unit, as a player aims.
+        if (UnitIsValid(gv_dbgEnemy)) {
+            gf_DbgTpsLook(gv_dbgEnemy, 0.0);
+        }
+        else if (UnitIsValid(gv_dbgAlly)) {
+            gf_DbgTpsLook(gv_dbgAlly, 0.0);
+        }
     }
     gf_DbgTpsSnap(lp_section, "taim");
     gf_AimShotPress(1);
@@ -271,17 +287,24 @@ void gf_DbgTpsShotStop (string lp_section) {
     gf_DbgTpsSet(false);
 }
 
-// Turns the camera so the crosshair ray passes through the unit, plus an
-// extra yaw. An extra yaw of 90 points the crosshair at empty ground.
+// Turns the camera so the crosshair ray passes through the unit's body,
+// c_DBG_TPS_LOOK_HEIGHT above its base, plus an extra yaw. The ray starts
+// at the camera focus, which moves with the yaw, so the aim is set three
+// times. An extra yaw of 90 points the crosshair at empty ground.
+const fixed c_DBG_TPS_LOOK_HEIGHT = 0.5;
 void gf_DbgTpsLook (unit lp_unit, fixed lp_extraYaw) {
     point lv_from;
     point lv_to;
+    int lv_i;
 
-    lv_from = UnitGetPosition(gv_tPSUNIT[1]);
     lv_to = UnitGetPosition(lp_unit);
-    CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to) + lp_extraYaw, 0.0, -1, 10);
-    CameraSetValue(1, c_cameraValuePitch, ATan2(c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
-    Wait(0.4, c_timeGame);
+    for (lv_i = 0; lv_i < 3; lv_i += 1) {
+        lv_from = gf_AimCameraFocus(1);
+        CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to) + lp_extraYaw, 0.0, -1, 10);
+        CameraSetValue(1, c_cameraValuePitch, ATan2(c_SCOBA_CAMERA_HEIGHT_OFFSET - c_DBG_TPS_LOOK_HEIGHT, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
+        Wait(0.15, c_timeGame);
+    }
+    Wait(0.25, c_timeGame);
 }
 
 // R-TPS-30 to 35: a middle click toggles the free cursor. The state holds
@@ -373,47 +396,6 @@ void gf_DbgTpsMove (string lp_section, bool lp_back, bool lp_left) {
     gf_DbgTpsSnap(lp_section, "tend");
 }
 
-// Turns the camera so the crosshair ray passes the unit at lp_height above
-// its base, then snapshots.
-void gf_DbgTpsPickAt (string lp_section, string lp_tag, unit lp_unit, fixed lp_height) {
-    point lv_from;
-    point lv_to;
-
-    lv_from = UnitGetPosition(gv_tPSUNIT[1]);
-    lv_to = UnitGetPosition(lp_unit);
-    CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to), 0.0, -1, 10);
-    CameraSetValue(1, c_cameraValuePitch, ATan2(c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT - lp_height, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
-    Wait(0.4, c_timeGame);
-    gf_DbgTpsSnap(lp_section, lp_tag);
-}
-
-// R-TPS-84: the crosshair picks a unit along its whole body and not above
-// it. lp_top is a height inside the visible body near its top; lp_above is
-// clear above the model.
-void gf_DbgTpsPick (string lp_section, string lp_type, fixed lp_dx, fixed lp_top, fixed lp_above) {
-    unit lv_unit;
-
-    gf_DbgTpsReset(lp_section);
-    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, 0, 4, PointWithOffset(gv_dbgAnchor, lp_dx, 0.0));
-    lv_unit = UnitLastCreated();
-    UnitSetState(lv_unit, c_unitStateStunned, true);
-    gv_dbgEnemy = lv_unit;
-    Wait(0.5, c_timeGame);
-    BankValueSetFromInt(gv_dbgBank, lp_section, "Radius100", FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropRadius, c_unitPropNormal) * 100.0));
-    BankValueSetFromInt(gv_dbgBank, lp_section, "Dist100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), UnitGetPosition(lv_unit)) * 100.0));
-    gf_DbgTpsSet(true);
-    gf_DbgTpsPickAt(lp_section, "tbase", lv_unit, 0.0);
-    gf_DbgTpsPickAt(lp_section, "thigh", lv_unit, lp_top);
-    // Negative case: the ray passes clear above the unit.
-    gf_DbgTpsPickAt(lp_section, "tabove", lv_unit, lp_above);
-    gf_DbgTpsPickAt(lp_section, "tmid", lv_unit, lp_top * 0.5);
-    gf_TpsLeftClick(1);
-    Wait(0.3, c_timeGame);
-    gf_DbgTpsSnap(lp_section, "tclick");
-    gf_DbgTpsSet(false);
-    gf_DbgTpsSnap(lp_section, "tend");
-}
-
 bool gt_TpsTest_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
@@ -437,8 +419,7 @@ bool gt_TpsTest_Func (bool testConds, bool runActions) {
         gf_DbgTpsTarget("tps_target");
     }
     if (gf_DbgGroup("pick")) {
-        gf_DbgTpsPick("tps_pick_marine", "Marine", 5.0, 1.4, 5.0);
-        gf_DbgTpsPick("tps_pick_barracks", "Barracks", 9.0, 2.5, 9.0);
+        gf_DbgTpsPickRun();
     }
     if (gf_DbgGroup("aim")) {
         // R-TPS-40 to 44: a right hold aims; release restores the camera.

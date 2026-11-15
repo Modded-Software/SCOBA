@@ -56,6 +56,8 @@ actions:
   treepath               rebuild, build tree and spore pathing test map, run it
   fprot                  rebuild, build footprint rotation probe map, run it
   flora                  rebuild, build flora and lane hazard test map, run it
+  picklog                rebuild, build the pick log map, launch it for manual play;
+                         the log goes to the SCOBAPNCPROBE bank, section picklog
   build-profile <name>   rebuild, build one profile map, stop
   run-profile <name>     rebuild, build one profile map, run it
 EOF
@@ -149,6 +151,12 @@ case "$ACTION" in
         ;;
     aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora)
         run_profile "$ACTION"
+        ;;
+    picklog)
+        export SC2_TEST_GROUP=picklog
+        build_profile pncprobe
+        export SC2_MAP_SOURCE="$OUT_DIR/SCOBA256_pncprobe.SC2Map"
+        exec bash "$ROOT_DIR/scripts/launch-scoba.sh"
         ;;
     build-profile)
         [ $# -ge 1 ] || fail "build-profile needs a profile"

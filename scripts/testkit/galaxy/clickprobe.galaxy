@@ -1,0 +1,223 @@
+// Engine click pick in mouse look (R-TPS-84).
+// Questions: does a left click in mouse look fire the engine's unit-click
+// event for the unit on the crosshair? Does a targeting order resolve its
+// target with the engine pick? Does a cursor parked at the screen centre
+// before mouse look pick there after it?
+// A host tool parks the pointer and presses the left button inside the game
+// window on each `<tag>Go` key. Raw values only; the profile prints them.
+// The operator approved injected clicks for this probe group only.
+
+int gv_probeClickDowns;
+int gv_probeClickUnits;
+int gv_probeClickSelects;
+string gv_probeClickPos = "";
+string gv_probeClickUnit = "";
+string gv_probeClickSelect = "";
+trigger gt_ProbeClickDown;
+trigger gt_ProbeClickUnit;
+trigger gt_ProbeClickSelect;
+
+bool gt_ProbeClickDown_Func (bool testConds, bool runActions) {
+    gv_probeClickDowns += 1;
+    gv_probeClickPos = IntToString(EventMouseClickedPosXUI()) + ";" + IntToString(EventMouseClickedPosYUI());
+    gv_probeClickPos = gv_probeClickPos + " world=" + FixedToString(EventMouseClickedPosXWorld(), 1) + ";" + FixedToString(EventMouseClickedPosYWorld(), 1) + ";" + FixedToString(EventMouseClickedPosZWorld(), 1);
+    return true;
+}
+
+bool gt_ProbeClickUnit_Func (bool testConds, bool runActions) {
+    gv_probeClickUnits += 1;
+    gv_probeClickUnit = UnitGetType(EventUnit());
+    return true;
+}
+
+bool gt_ProbeClickSelect_Func (bool testConds, bool runActions) {
+    gv_probeClickSelects += 1;
+    gv_probeClickSelect = UnitGetType(EventUnit());
+    return true;
+}
+
+string gf_ProbeClickOrder (unit lp_hero) {
+    order lv_order;
+
+    if (UnitOrderCount(lp_hero) == 0) {
+        return "none";
+    }
+    lv_order = UnitOrder(lp_hero, 0);
+    if (UnitIsValid(OrderGetTargetUnit(lv_order))) {
+        return "unit " + UnitGetType(OrderGetTargetUnit(lv_order));
+    }
+    return "point";
+}
+
+string gf_ProbeClickTarget () {
+    if (!UnitIsValid(gv_unitTarget[1])) {
+        return "none";
+    }
+    return UnitGetType(gv_unitTarget[1]);
+}
+
+// One click. The state is set by the caller. `lp_turn` turns the camera off
+// the unit: the negative case.
+void gf_ProbeClickCase (string lp_section, string lp_tag, unit lp_unit, fixed lp_turn, bool lp_targeting) {
+    int lv_i;
+    int lv_downs;
+    unit lv_hero;
+
+    lv_hero = gv_tPSUNIT[1];
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    gf_UnitTargetSet(1, null);
+    // A yaw set after a turn in mouse look did not stick (run
+    // pncprobe/20261115-194523), so the cases turn once and never back.
+    if (lp_turn == 0.0) {
+        gf_ProbeHoverAim(lp_unit);
+    }
+    else {
+        CameraSetValue(1, c_cameraValueYaw, CameraGetYaw(1) + lp_turn, 0.0, -1, 10);
+    }
+    Wait(0.5, c_timeGame);
+    if (lp_targeting) {
+        UISetTargetingOrder(PlayerGroupSingle(1), UnitGroup(null, 1, RegionCircle(UnitGetPosition(lv_hero), 0.5), UnitFilter(0, 0, 0, 0), 1), Order(AbilityCommand("attack", 0)), false);
+        Wait(0.25, c_timeGame);
+    }
+    gv_probeClickUnits = 0;
+    gv_probeClickSelects = 0;
+    gv_probeClickUnit = "";
+    gv_probeClickSelect = "";
+    gv_probeClickPos = "";
+    gf_ProbeHoverSnap(lp_section, lp_tag + "before", lp_unit);
+    lv_downs = gv_probeClickDowns;
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Go", true);
+    BankSave(gv_dbgBank);
+    for (lv_i = 0; (lv_i < 60) && (gv_probeClickDowns == lv_downs); lv_i += 1) {
+        Wait(0.25, c_timeGame);
+    }
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Downs", gv_probeClickDowns - lv_downs);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Pos", gv_probeClickPos);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UnitClicks", gv_probeClickUnits);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "UnitClick", gv_probeClickUnit);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Selects", gv_probeClickSelects);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Select", gv_probeClickSelect);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Order", gf_ProbeClickOrder(lv_hero));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "UiTarget", gf_ProbeClickTarget());
+    gf_ProbeHoverSnap(lp_section, lp_tag, lp_unit);
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+}
+
+void gf_ProbeClickMouseLook () {
+    gv_mOUSEMIDDLE[1] = false;
+    gf_ControlApply(1);
+}
+
+void gf_ProbeWarpKey (string lp_section, string lp_key) {
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_key, true);
+    BankSave(gv_dbgBank);
+}
+
+// Does mouse motion during mouse look bring the cursor to the centre?
+// The pointer rests on the left. `still`: mouse look without motion, then
+// relative mode off (negative case). `moved`: the same with motion from the
+// host tool during mouse look. `Ticks` until the centred unit is highlighted.
+void gf_ProbeWarp (string lp_section) {
+    unit lv_unit;
+    playergroup lv_group;
+
+    lv_group = PlayerGroupSingle(1);
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Ultralisk", c_PROBE_RECENTER_DX, c_PROBE_RECENTER_AIM_HEIGHT);
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        UISetCursorVisible(lv_group, false);
+        gf_ProbeHoverAim(lv_unit);
+        Wait(1.0, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "wleft", lv_unit);
+        // Still.
+        gf_ProbeClickMouseLook();
+        gf_ProbeHoverAim(lv_unit);
+        Wait(1.5, c_timeGame);
+        CameraForceMouseRelative(1, false);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "stillTicks", gf_ProbeHoverTicks(lv_unit, true));
+        gf_ProbeHoverSnap(lp_section, "still", lv_unit);
+        // Moved: the host tool moves the mouse during mouse look.
+        gf_ProbeClickMouseLook();
+        gf_ProbeHoverAim(lv_unit);
+        Wait(0.5, c_timeGame);
+        gf_ProbeWarpKey(lp_section, "wiggleGo");
+        Wait(3.0, c_timeGame);
+        gf_ProbeHoverAim(lv_unit);
+        Wait(0.5, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "movedlook", lv_unit);
+        CameraForceMouseRelative(1, false);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "movedTicks", gf_ProbeHoverTicks(lv_unit, true));
+        gf_ProbeHoverSnap(lp_section, "moved", lv_unit);
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    gf_ProbeWarpKey(lp_section, "hoverDone");
+    gf_ProbeSay("WARP PROBE done.");
+    UnitRemove(lv_unit);
+    gv_dbgEnemy = null;
+}
+
+void gf_ProbeClick (string lp_section) {
+    unit lv_unit;
+    playergroup lv_group;
+
+    lv_group = PlayerGroupSingle(1);
+    gt_ProbeClickDown = TriggerCreate("gt_ProbeClickDown_Func");
+    TriggerAddEventMouseClicked(gt_ProbeClickDown, 1, c_mouseButtonLeft, true);
+    gt_ProbeClickUnit = TriggerCreate("gt_ProbeClickUnit_Func");
+    TriggerAddEventUnitClick(gt_ProbeClickUnit, null, 1);
+    gt_ProbeClickSelect = TriggerCreate("gt_ProbeClickSelect_Func");
+    TriggerAddEventUnitSelected(gt_ProbeClickSelect, null, 1, true);
+    // The flattest east lane of the built map, as in the recenter probe.
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Ultralisk", c_PROBE_RECENTER_DX, c_PROBE_RECENTER_AIM_HEIGHT);
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        // The host tool parks the pointer on the window centre.
+        gf_ProbeHoverAim(lv_unit);
+        Wait(0.5, c_timeGame);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "centreGo", true);
+        BankSave(gv_dbgBank);
+        gf_ProbeHoverPark("CLICK PROBE: parking at the centre. Do not touch the mouse.", 25, gv_probeMouseMoves + 5);
+        // Point and click: positive control for the unit-click event.
+        gf_ProbeClickCase(lp_section, "pnc", lv_unit, 0.0, false);
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        // Centre: cursor free and hidden. Positive control for the hover pick.
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        UISetCursorVisible(lv_group, false);
+        gf_ProbeHoverAim(lv_unit);
+        Wait(0.75, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "centrefree", lv_unit);
+        // Mouse look with the pointer at the centre, then relative mode off.
+        gf_ProbeClickMouseLook();
+        gf_ProbeHoverAim(lv_unit);
+        Wait(1.0, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "centrelook", lv_unit);
+        CameraForceMouseRelative(1, false);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "centreTicks", gf_ProbeHoverTicks(lv_unit, true));
+        gf_ProbeHoverSnap(lp_section, "centreafter", lv_unit);
+        // Click with the free cursor at the centre: positive control.
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        gf_ProbeClickCase(lp_section, "free", lv_unit, 0.0, false);
+        // Clicks in mouse look.
+        gf_ProbeClickMouseLook();
+        gf_ProbeClickCase(lp_section, "look", lv_unit, 0.0, false);
+        gf_ProbeClickCase(lp_section, "target", lv_unit, 0.0, true);
+        gf_ProbeClickCase(lp_section, "lookaway", lv_unit, 60.0, false);
+        gf_ProbeClickCase(lp_section, "targetaway", lv_unit, 0.0001, true);
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("CLICK PROBE done.");
+    UnitRemove(lv_unit);
+    gv_dbgEnemy = null;
+}

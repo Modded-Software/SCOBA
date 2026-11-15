@@ -1,0 +1,339 @@
+// Module: systems/hit_volumes
+// The TPS pick volumes (R-TPS-84, SPEC-TPS 5.8): the m3 fuzzy hit-test
+// shapes of each unit type at rest, scale baked in, generated into
+// scripts/app/data by scripts/hitvolumes. A ray test returns the distance
+// along the ray where it enters the volume, 0 when it starts inside, or
+// c_HV_MISS. Shapes are in model space: z up, the unit's facing along -y.
+
+const int c_HV_SPHERE = 1;
+const int c_HV_CAPSULE = 2;
+const int c_HV_BOX = 3;
+const fixed c_HV_MISS = -1.0;
+// Model -y is the unit's facing: model space turns by facing + 90.
+const fixed c_HV_MODEL_YAW = 90.0;
+// Below this, a ray counts as parallel to a capsule axis or a box face.
+const fixed c_HV_PARALLEL = 0.001;
+const fixed c_HV_SLAB_FAR = 100000.0;
+
+int[c_HV_SHAPES] gv_hvKind;
+fixed[c_HV_SHAPES] gv_hvPx;
+fixed[c_HV_SHAPES] gv_hvPy;
+fixed[c_HV_SHAPES] gv_hvPz;
+fixed[c_HV_SHAPES][9] gv_hvU;
+fixed[c_HV_SHAPES][3] gv_hvH;
+fixed[c_HV_SHAPES] gv_hvR;
+string[c_HV_TYPES] gv_hvTypeName;
+int[c_HV_TYPES] gv_hvFirst;
+int[c_HV_TYPES] gv_hvCount;
+fixed[c_HV_TYPES] gv_hvBound;
+bool[c_HV_TYPES] gv_hvFar;
+int[c_HV_FAR_TYPES] gv_hvFarType;
+int gv_hvFarCount;
+int gv_hvTypeTotal;
+int gv_hvShapeTotal;
+// Unit types the pick met without a volume. Each one is reported once.
+int gv_hvMissing;
+// The ray in the model space of the unit under test.
+fixed gv_hvOx;
+fixed gv_hvOy;
+fixed gv_hvOz;
+fixed gv_hvDx;
+fixed gv_hvDy;
+fixed gv_hvDz;
+
+void gf_HvType (string lp_name, fixed lp_bound, bool lp_far) {
+    int lv_t;
+
+    lv_t = gv_hvTypeTotal;
+    gv_hvTypeName[lv_t] = lp_name;
+    gv_hvFirst[lv_t] = gv_hvShapeTotal;
+    gv_hvCount[lv_t] = 0;
+    gv_hvBound[lv_t] = lp_bound;
+    gv_hvFar[lv_t] = lp_far;
+    if (lp_far) {
+        gv_hvFarType[gv_hvFarCount] = lv_t;
+        gv_hvFarCount += 1;
+    }
+    DataTableSetInt(true, "HV_" + lp_name, lv_t);
+    gv_hvTypeTotal += 1;
+}
+
+int gf_HvShapeAdd (int lp_kind, fixed lp_x, fixed lp_y, fixed lp_z, fixed lp_r) {
+    int lv_s;
+
+    lv_s = gv_hvShapeTotal;
+    gv_hvKind[lv_s] = lp_kind;
+    gv_hvPx[lv_s] = lp_x;
+    gv_hvPy[lv_s] = lp_y;
+    gv_hvPz[lv_s] = lp_z;
+    gv_hvR[lv_s] = lp_r;
+    gv_hvCount[gv_hvTypeTotal - 1] += 1;
+    gv_hvShapeTotal += 1;
+    return lv_s;
+}
+
+void gf_HvSphere (fixed lp_x, fixed lp_y, fixed lp_z, fixed lp_r) {
+    gf_HvShapeAdd(c_HV_SPHERE, lp_x, lp_y, lp_z, lp_r);
+}
+
+// End A, unit axis from A to B, length A to B, radius.
+void gf_HvCapsule (fixed lp_x, fixed lp_y, fixed lp_z, fixed lp_nx, fixed lp_ny, fixed lp_nz, fixed lp_len, fixed lp_r) {
+    int lv_s;
+
+    lv_s = gf_HvShapeAdd(c_HV_CAPSULE, lp_x, lp_y, lp_z, lp_r);
+    gv_hvU[lv_s][0] = lp_nx;
+    gv_hvU[lv_s][1] = lp_ny;
+    gv_hvU[lv_s][2] = lp_nz;
+    gv_hvH[lv_s][0] = lp_len;
+}
+
+// Centre, three unit axes, half sizes along them.
+void gf_HvBox (fixed lp_x, fixed lp_y, fixed lp_z, fixed lp_ax, fixed lp_ay, fixed lp_az, fixed lp_bx, fixed lp_by, fixed lp_bz, fixed lp_cx, fixed lp_cy, fixed lp_cz, fixed lp_h0, fixed lp_h1, fixed lp_h2) {
+    int lv_s;
+
+    lv_s = gf_HvShapeAdd(c_HV_BOX, lp_x, lp_y, lp_z, 0.0);
+    gv_hvU[lv_s][0] = lp_ax;
+    gv_hvU[lv_s][1] = lp_ay;
+    gv_hvU[lv_s][2] = lp_az;
+    gv_hvU[lv_s][3] = lp_bx;
+    gv_hvU[lv_s][4] = lp_by;
+    gv_hvU[lv_s][5] = lp_bz;
+    gv_hvU[lv_s][6] = lp_cx;
+    gv_hvU[lv_s][7] = lp_cy;
+    gv_hvU[lv_s][8] = lp_cz;
+    gv_hvH[lv_s][0] = lp_h0;
+    gv_hvH[lv_s][1] = lp_h1;
+    gv_hvH[lv_s][2] = lp_h2;
+}
+
+fixed gf_HvRaySphere (fixed lp_x, fixed lp_y, fixed lp_z, fixed lp_r) {
+    fixed lv_lx;
+    fixed lv_ly;
+    fixed lv_lz;
+    fixed lv_ll;
+    fixed lv_rr;
+    fixed lv_t;
+    fixed lv_pp;
+
+    lv_lx = lp_x - gv_hvOx;
+    lv_ly = lp_y - gv_hvOy;
+    lv_lz = lp_z - gv_hvOz;
+    lv_ll = (lv_lx * lv_lx) + (lv_ly * lv_ly) + (lv_lz * lv_lz);
+    lv_rr = lp_r * lp_r;
+    if (lv_ll <= lv_rr) {
+        return 0.0;
+    }
+    lv_t = (lv_lx * gv_hvDx) + (lv_ly * gv_hvDy) + (lv_lz * gv_hvDz);
+    if (lv_t < 0.0) {
+        return c_HV_MISS;
+    }
+    lv_pp = lv_ll - (lv_t * lv_t);
+    if (lv_pp > lv_rr) {
+        return c_HV_MISS;
+    }
+    return lv_t - SquareRoot(lv_rr - lv_pp);
+}
+
+fixed gf_HvNearer (fixed lp_a, fixed lp_b) {
+    if (lp_a < 0.0) {
+        return lp_b;
+    }
+    if (lp_b < 0.0) {
+        return lp_a;
+    }
+    return MinF(lp_a, lp_b);
+}
+
+// Cylinder with two end spheres; the cylinder test runs on the unit axis.
+fixed gf_HvRayCapsule (int lp_s) {
+    fixed lv_nx;
+    fixed lv_ny;
+    fixed lv_nz;
+    fixed lv_len;
+    fixed lv_r;
+    fixed lv_ox;
+    fixed lv_oy;
+    fixed lv_oz;
+    fixed lv_nd;
+    fixed lv_no;
+    fixed lv_do;
+    fixed lv_a;
+    fixed lv_b;
+    fixed lv_c;
+    fixed lv_h;
+    fixed lv_t;
+    fixed lv_y;
+    fixed lv_q;
+
+    lv_nx = gv_hvU[lp_s][0];
+    lv_ny = gv_hvU[lp_s][1];
+    lv_nz = gv_hvU[lp_s][2];
+    lv_len = gv_hvH[lp_s][0];
+    lv_r = gv_hvR[lp_s];
+    lv_ox = gv_hvOx - gv_hvPx[lp_s];
+    lv_oy = gv_hvOy - gv_hvPy[lp_s];
+    lv_oz = gv_hvOz - gv_hvPz[lp_s];
+    lv_no = (lv_nx * lv_ox) + (lv_ny * lv_oy) + (lv_nz * lv_oz);
+    // Inside: the origin lies within the radius of the segment.
+    lv_q = MinF(lv_len, MaxF(0.0, lv_no));
+    lv_a = lv_ox - (lv_nx * lv_q);
+    lv_b = lv_oy - (lv_ny * lv_q);
+    lv_c = lv_oz - (lv_nz * lv_q);
+    if (((lv_a * lv_a) + (lv_b * lv_b) + (lv_c * lv_c)) <= (lv_r * lv_r)) {
+        return 0.0;
+    }
+    lv_nd = (lv_nx * gv_hvDx) + (lv_ny * gv_hvDy) + (lv_nz * gv_hvDz);
+    lv_do = (gv_hvDx * lv_ox) + (gv_hvDy * lv_oy) + (gv_hvDz * lv_oz);
+    lv_a = 1.0 - (lv_nd * lv_nd);
+    if (lv_a < c_HV_PARALLEL) {
+        return gf_HvNearer(
+            gf_HvRaySphere(gv_hvPx[lp_s], gv_hvPy[lp_s], gv_hvPz[lp_s], lv_r),
+            gf_HvRaySphere(gv_hvPx[lp_s] + (lv_nx * lv_len), gv_hvPy[lp_s] + (lv_ny * lv_len), gv_hvPz[lp_s] + (lv_nz * lv_len), lv_r)
+        );
+    }
+    lv_b = lv_do - (lv_no * lv_nd);
+    lv_c = (lv_ox * lv_ox) + (lv_oy * lv_oy) + (lv_oz * lv_oz) - (lv_no * lv_no) - (lv_r * lv_r);
+    lv_h = (lv_b * lv_b) - (lv_a * lv_c);
+    if (lv_h < 0.0) {
+        return c_HV_MISS;
+    }
+    lv_t = (-lv_b - SquareRoot(lv_h)) / lv_a;
+    lv_y = lv_no + (lv_t * lv_nd);
+    if (lv_y > 0.0 && lv_y < lv_len) {
+        if (lv_t < 0.0) {
+            return c_HV_MISS;
+        }
+        return lv_t;
+    }
+    if (lv_y <= 0.0) {
+        return gf_HvRaySphere(gv_hvPx[lp_s], gv_hvPy[lp_s], gv_hvPz[lp_s], lv_r);
+    }
+    return gf_HvRaySphere(gv_hvPx[lp_s] + (lv_nx * lv_len), gv_hvPy[lp_s] + (lv_ny * lv_len), gv_hvPz[lp_s] + (lv_nz * lv_len), lv_r);
+}
+
+// Slab test on the box's own axes.
+fixed gf_HvRayBox (int lp_s) {
+    int lv_i;
+    fixed lv_e;
+    fixed lv_f;
+    fixed lv_h;
+    fixed lv_t1;
+    fixed lv_t2;
+    fixed lv_swap;
+    fixed lv_min;
+    fixed lv_max;
+    fixed lv_lx;
+    fixed lv_ly;
+    fixed lv_lz;
+
+    lv_lx = gv_hvPx[lp_s] - gv_hvOx;
+    lv_ly = gv_hvPy[lp_s] - gv_hvOy;
+    lv_lz = gv_hvPz[lp_s] - gv_hvOz;
+    lv_min = -c_HV_SLAB_FAR;
+    lv_max = c_HV_SLAB_FAR;
+    for (lv_i = 0; lv_i < 3; lv_i += 1) {
+        lv_e = (gv_hvU[lp_s][lv_i * 3] * lv_lx) + (gv_hvU[lp_s][(lv_i * 3) + 1] * lv_ly) + (gv_hvU[lp_s][(lv_i * 3) + 2] * lv_lz);
+        lv_f = (gv_hvU[lp_s][lv_i * 3] * gv_hvDx) + (gv_hvU[lp_s][(lv_i * 3) + 1] * gv_hvDy) + (gv_hvU[lp_s][(lv_i * 3) + 2] * gv_hvDz);
+        lv_h = gv_hvH[lp_s][lv_i];
+        if (AbsF(lv_f) > c_HV_PARALLEL) {
+            lv_t1 = (lv_e + lv_h) / lv_f;
+            lv_t2 = (lv_e - lv_h) / lv_f;
+            if (lv_t1 > lv_t2) {
+                lv_swap = lv_t1;
+                lv_t1 = lv_t2;
+                lv_t2 = lv_swap;
+            }
+            lv_min = MaxF(lv_min, lv_t1);
+            lv_max = MinF(lv_max, lv_t2);
+        }
+        else if ((lv_e + lv_h) < 0.0 || (lv_e - lv_h) > 0.0) {
+            return c_HV_MISS;
+        }
+    }
+    if (lv_max < 0.0 || lv_min > lv_max) {
+        return c_HV_MISS;
+    }
+    return MaxF(lv_min, 0.0);
+}
+
+// The volume index of a unit type, or -1. A type without a volume is
+// counted and reported once.
+int gf_HvTypeIndex (string lp_type) {
+    if (DataTableValueExists(true, "HV_" + lp_type)) {
+        return DataTableGetInt(true, "HV_" + lp_type);
+    }
+    if (!DataTableValueExists(true, "HV_MISS_" + lp_type)) {
+        DataTableSetBool(true, "HV_MISS_" + lp_type, true);
+        gv_hvMissing += 1;
+        TriggerDebugOutput(1, StringToText("TPS pick: no hit volume for unit type " + lp_type), false);
+    }
+    return -1;
+}
+
+// Where a world ray (origin, unit direction) enters the unit's volume, or
+// c_HV_MISS. The unit stands at its position and height, turned by its
+// facing.
+fixed gf_HvRayUnit (unit lp_unit, int lp_type, fixed lp_ox, fixed lp_oy, fixed lp_oz, fixed lp_dx, fixed lp_dy, fixed lp_dz) {
+    point lv_at;
+    fixed lv_rx;
+    fixed lv_ry;
+    fixed lv_rz;
+    fixed lv_t;
+    fixed lv_bound;
+    fixed lv_skip;
+    fixed lv_cos;
+    fixed lv_sin;
+    fixed lv_best;
+    int lv_s;
+    int lv_end;
+
+    lv_at = UnitGetPosition(lp_unit);
+    lv_rx = lp_ox - PointGetX(lv_at);
+    lv_ry = lp_oy - PointGetY(lv_at);
+    // A unit position carries no height: a flyer's height is UnitGetHeight
+    // (MengskBC 180, pointZ 0; tps 20261115-213459).
+    lv_rz = lp_oz - (PointGetHeight(lv_at) + UnitGetHeight(lp_unit));
+    // The ray misses the sphere that holds the whole volume.
+    lv_bound = gv_hvBound[lp_type];
+    lv_t = -((lv_rx * lp_dx) + (lv_ry * lp_dy) + (lv_rz * lp_dz));
+    if ((lv_t + lv_bound) < 0.0) {
+        return c_HV_MISS;
+    }
+    // Fixed point keeps 12 fraction bits: at range, |r|^2 - t^2 loses more
+    // than a small radius squared (tps 20261115-214852). The ray starts
+    // again just before the bound sphere, so every product stays small.
+    lv_skip = MaxF(0.0, lv_t - lv_bound);
+    lv_rx = lv_rx + (lp_dx * lv_skip);
+    lv_ry = lv_ry + (lp_dy * lv_skip);
+    lv_rz = lv_rz + (lp_dz * lv_skip);
+    lv_t = -((lv_rx * lp_dx) + (lv_ry * lp_dy) + (lv_rz * lp_dz));
+    if (((lv_rx * lv_rx) + (lv_ry * lv_ry) + (lv_rz * lv_rz) - (lv_t * lv_t)) > (lv_bound * lv_bound)) {
+        return c_HV_MISS;
+    }
+    lv_cos = Cos(UnitGetFacing(lp_unit) + c_HV_MODEL_YAW);
+    lv_sin = Sin(UnitGetFacing(lp_unit) + c_HV_MODEL_YAW);
+    gv_hvOx = (lv_rx * lv_cos) + (lv_ry * lv_sin);
+    gv_hvOy = (lv_ry * lv_cos) - (lv_rx * lv_sin);
+    gv_hvOz = lv_rz;
+    gv_hvDx = (lp_dx * lv_cos) + (lp_dy * lv_sin);
+    gv_hvDy = (lp_dy * lv_cos) - (lp_dx * lv_sin);
+    gv_hvDz = lp_dz;
+    lv_best = c_HV_MISS;
+    lv_end = gv_hvFirst[lp_type] + gv_hvCount[lp_type];
+    for (lv_s = gv_hvFirst[lp_type]; lv_s < lv_end; lv_s += 1) {
+        if (gv_hvKind[lv_s] == c_HV_SPHERE) {
+            lv_t = gf_HvRaySphere(gv_hvPx[lv_s], gv_hvPy[lv_s], gv_hvPz[lv_s], gv_hvR[lv_s]);
+        }
+        else if (gv_hvKind[lv_s] == c_HV_CAPSULE) {
+            lv_t = gf_HvRayCapsule(lv_s);
+        }
+        else {
+            lv_t = gf_HvRayBox(lv_s);
+        }
+        lv_best = gf_HvNearer(lv_best, lv_t);
+    }
+    if (lv_best < 0.0) {
+        return c_HV_MISS;
+    }
+    return lv_skip + lv_best;
+}

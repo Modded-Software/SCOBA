@@ -64,6 +64,9 @@ const string c_SCOBA_EFFECT_PSIBLAST = "PsiBlastLaunchMissile";
 const string c_SCOBA_EFFECT_TOSH_AIR = "SCOBAToshAirU";
 const string c_SCOBA_SHOT_TOSH_AIR = "SCOBAToshAirShot";
 const fixed c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT = 1.5;
+// The TPS camera height offset above the followed point. The screen-centre
+// ray passes through that point (pncprobe 20261115-224549, R-TPS-84).
+const fixed c_SCOBA_CAMERA_HEIGHT_OFFSET = 0.9;
 const fixed c_SCOBA_CROSSHAIR_MIN_RANGE = 0.5;
 const fixed c_SCOBA_CROSSHAIR_MAX_RANGE = 20.0;
 const fixed c_SCOBA_CROSSHAIR_STEP = 0.5;

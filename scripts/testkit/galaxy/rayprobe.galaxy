@@ -1,0 +1,65 @@
+// Ray probe (R-TPS-84): is the script pick ray the screen-centre ray?
+// Flat lane, a Thor 8 east. TPS free cursor, hidden, parked by the host
+// tool on the window centre. The camera pitch is swept; each step records
+// the engine's own pick at the centre (highlight) and the script pick.
+// Raw values only; the profile prints them.
+
+void gf_ProbeRaySweep (string lp_section, string lp_tag, unit lp_unit, fixed lp_yaw, fixed lp_start, fixed lp_step, int lp_count) {
+    int lv_i;
+    fixed lv_pitch;
+    point lv_t;
+    string lv_row;
+
+    for (lv_i = 0; lv_i < lp_count; lv_i += 1) {
+        lv_pitch = lp_start + (lv_i * lp_step);
+        CameraSetValue(1, c_cameraValueYaw, lp_yaw, 0.0, -1, 10);
+        CameraSetValue(1, c_cameraValuePitch, lv_pitch, 0.0, -1, 10);
+        Wait(0.3, c_timeGame);
+        lv_t = CameraGetTarget(1);
+        lv_row = "pitch " + FixedToString(CameraGetPitch(1), 1) + " yaw " + FixedToString(CameraGetYaw(1), 1);
+        lv_row = lv_row + " engine " + IntToString(BoolToInt(gv_unitHighlight[1] == lp_unit));
+        lv_row = lv_row + " script " + IntToString(BoolToInt(gf_AimUnitAtCrosshair(1, false) == lp_unit));
+        lv_row = lv_row + " target " + FixedToString(PointGetX(lv_t), 2) + ";" + FixedToString(PointGetY(lv_t), 2) + ";" + FixedToString(PointGetHeight(lv_t), 2);
+        lv_row = lv_row + " dist " + FixedToString(CameraGetDistance(1), 2);
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + IntToString(100 + lv_i), lv_row);
+    }
+    BankSave(gv_dbgBank);
+}
+
+void gf_ProbeRay (string lp_section) {
+    unit lv_unit;
+    point lv_hero;
+    bool lv_parked;
+
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Thor", 8.0, 1.5);
+    UnitSetFacing(lv_unit, 180.0, 0.0);
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        UISetCursorVisible(PlayerGroupSingle(1), false);
+        gf_ProbeScaleClearAllies();
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "centreGo", true);
+        BankSave(gv_dbgBank);
+        lv_parked = gf_ProbeHoverPark("RAY PROBE: centring the pointer. Do not touch the mouse.", 30, gv_probeMouseMoves + 3);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "centred", lv_parked);
+        lv_hero = UnitGetPosition(gv_tPSUNIT[1]);
+        BankValueSetFromString(gv_dbgBank, lp_section, "geom", "hero " + FixedToString(PointGetX(lv_hero), 2) + ";" + FixedToString(PointGetY(lv_hero), 2) + " thor " + FixedToString(PointGetX(UnitGetPosition(lv_unit)), 2) + ";" + FixedToString(PointGetY(UnitGetPosition(lv_unit)), 2) + " mouse " + IntToString(gv_probeMouseX) + ";" + IntToString(gv_probeMouseY));
+        // The hero sits under the screen centre: hidden, the engine can only
+        // pick the Thor (pncprobe 20261115-222107 picked the hero).
+        libNtve_gf_ShowHideUnit(gv_tPSUNIT[1], false);
+        gf_ProbeRaySweep(lp_section, "row", lv_unit, AngleBetweenPoints(lv_hero, UnitGetPosition(lv_unit)), -70.0, 2.0, 56);
+        UnitSetPosition(lv_unit, PointWithOffset(lv_hero, 14.0, 0.0), false);
+        Wait(0.5, c_timeGame);
+        BankValueSetFromString(gv_dbgBank, lp_section, "geom2", "thor " + FixedToString(PointGetX(UnitGetPosition(lv_unit)), 2) + ";" + FixedToString(PointGetY(UnitGetPosition(lv_unit)), 2));
+        gf_ProbeRaySweep(lp_section, "far", lv_unit, AngleBetweenPoints(lv_hero, UnitGetPosition(lv_unit)), -70.0, 2.0, 56);
+        libNtve_gf_ShowHideUnit(gv_tPSUNIT[1], true);
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("RAY PROBE done.");
+}

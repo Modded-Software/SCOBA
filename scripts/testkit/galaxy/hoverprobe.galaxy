@@ -1,0 +1,286 @@
+// Engine hover probe (R-TPS-84).
+// Question: in which mouse mode does the engine highlight the unit under the
+// cursor, and where is the engine's cursor right after mouse look ends?
+// The probe needs real pointer input. A host tool parks the pointer on the
+// left of the game window and sweeps it across on each `<stage>Go` bank key.
+// It never clicks. Raw values only; the profile prints them.
+const fixed c_PROBE_HOVER_DX = 20.0;
+// The height on the Hive the camera centre is aimed at.
+fixed gv_probeHoverAimHeight = 2.3;
+const int c_PROBE_CURSOR_IDS = 4;
+const int c_PROBE_HOVER_EVENT_MAX = 40;
+const int c_PROBE_PULSES = 5;
+const int c_PROBE_PULSE_TICKS = 32;
+
+int gv_probeHoverOn;
+int gv_probeHoverOff;
+int gv_probeMouseMoves;
+int gv_probeMouseX;
+int gv_probeMouseY;
+fixed gv_probeWorldX;
+fixed gv_probeWorldY;
+fixed gv_probeWorldZ;
+string gv_probeHoverSection = "";
+string gv_probeHoverStage = "";
+int gv_probeHoverEvents;
+trigger gt_ProbeHoverOn;
+trigger gt_ProbeHoverOff;
+trigger gt_ProbeMouseMove;
+
+// One bank entry per highlight event of the running stage: the unit the
+// engine names, and where the mouse was at its last move.
+void gf_ProbeHoverEvent (string lp_kind) {
+    string lv_text;
+
+    if ((gv_probeHoverStage == "") || (gv_probeHoverEvents >= c_PROBE_HOVER_EVENT_MAX)) {
+        return;
+    }
+    gv_probeHoverEvents += 1;
+    lv_text = lp_kind + " " + UnitGetType(EventUnit());
+    lv_text = lv_text + " ui=" + IntToString(gv_probeMouseX) + ";" + IntToString(gv_probeMouseY);
+    lv_text = lv_text + " world=" + FixedToString(gv_probeWorldX, 1) + ";" + FixedToString(gv_probeWorldY, 1) + ";" + FixedToString(gv_probeWorldZ, 1);
+    lv_text = lv_text + " moves=" + IntToString(gv_probeMouseMoves);
+    lv_text = lv_text + " yaw=" + FixedToString(CameraGetYaw(1), 1);
+    BankValueSetFromString(gv_dbgBank, gv_probeHoverSection, gv_probeHoverStage + "ev" + IntToString(100 + gv_probeHoverEvents), lv_text);
+    BankSave(gv_dbgBank);
+}
+
+bool gt_ProbeHoverOn_Func (bool testConds, bool runActions) {
+    gv_probeHoverOn += 1;
+    gf_ProbeHoverEvent("on");
+    return true;
+}
+
+bool gt_ProbeHoverOff_Func (bool testConds, bool runActions) {
+    gv_probeHoverOff += 1;
+    gf_ProbeHoverEvent("off");
+    return true;
+}
+
+bool gt_ProbeMouseMove_Func (bool testConds, bool runActions) {
+    gv_probeMouseMoves += 1;
+    gv_probeMouseX = EventMouseMovedPosXUI();
+    gv_probeMouseY = EventMouseMovedPosYUI();
+    gv_probeWorldX = EventMouseMovedPosXWorld();
+    gv_probeWorldY = EventMouseMovedPosYWorld();
+    gv_probeWorldZ = EventMouseMovedPosZWorld();
+    return true;
+}
+
+void gf_ProbeSay (string lp_text) {
+    UIDisplayMessage(PlayerGroupSingle(1), c_messageAreaSubtitle, StringToText(lp_text));
+}
+
+// Puts the unit on the camera centre line, where the TPS crosshair is.
+void gf_ProbeHoverAim (unit lp_unit) {
+    point lv_from;
+    point lv_to;
+
+    lv_from = UnitGetPosition(gv_tPSUNIT[1]);
+    lv_to = UnitGetPosition(lp_unit);
+    CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to), 0.0, -1, 10);
+    CameraSetValue(1, c_cameraValuePitch, ATan2(c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT - gv_probeHoverAimHeight, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
+}
+
+void gf_ProbeHoverSnap (string lp_section, string lp_tag, unit lp_unit) {
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "UnitHighlighted", UnitTestState(lp_unit, c_unitStateHighlighted));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "HeroHighlighted", UnitTestState(gv_tPSUNIT[1], c_unitStateHighlighted));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "On", gv_probeHoverOn);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Off", gv_probeHoverOff);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Moves", gv_probeMouseMoves);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "MouseX", gv_probeMouseX);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "MouseY", gv_probeMouseY);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Cam", FixedToString(CameraGetYaw(1), 1) + ";" + FixedToString(CameraGetPitch(1), 1) + ";" + FixedToString(CameraGetDistance(1), 1));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "TpsMode", gf_TpsActive(1));
+    BankSave(gv_dbgBank);
+}
+
+// Waits until the mouse moved at least lp_minMoves times and then rested
+// for 2 s in a row. Repeats the text on screen.
+bool gf_ProbeHoverPark (string lp_text, int lp_seconds, int lp_minMoves) {
+    int lv_i;
+    int lv_held;
+    int lv_last;
+
+    lv_held = 0;
+    lv_last = gv_probeMouseMoves;
+    for (lv_i = 0; lv_i < (lp_seconds * 4); lv_i += 1) {
+        if ((lv_i % 12) == 0) {
+            gf_ProbeSay(lp_text);
+        }
+        if ((gv_probeMouseMoves >= lp_minMoves) && (gv_probeMouseMoves == lv_last)) {
+            lv_held += 1;
+        }
+        else {
+            lv_held = 0;
+        }
+        lv_last = gv_probeMouseMoves;
+        if (lv_held >= 8) {
+            return true;
+        }
+        Wait(0.25, c_timeGame);
+    }
+    return false;
+}
+
+// One mouse mode, set by the caller. The pointer rests on the left.
+// `clear`: the unit hidden. `pre`: the unit shown, no pointer move since
+// the mode change. Then the sweep: every highlight event is logged.
+void gf_ProbeHoverStage (string lp_section, string lp_tag, unit lp_unit) {
+    bool lv_swept;
+
+    gf_ProbeHoverAim(lp_unit);
+    libNtve_gf_ShowHideUnit(lp_unit, false);
+    Wait(0.75, c_timeGame);
+    gf_ProbeHoverSnap(lp_section, lp_tag + "clear", lp_unit);
+    libNtve_gf_ShowHideUnit(lp_unit, true);
+    Wait(0.75, c_timeGame);
+    gf_ProbeHoverSnap(lp_section, lp_tag + "pre", lp_unit);
+    gv_probeHoverStage = lp_tag;
+    gv_probeHoverEvents = 0;
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Go", true);
+    BankSave(gv_dbgBank);
+    lv_swept = gf_ProbeHoverPark("HOVER PROBE " + lp_tag + ": sweeping. Do not touch the mouse.", 25, gv_probeMouseMoves + 5);
+    gv_probeHoverStage = "";
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Swept", lv_swept);
+    gf_ProbeHoverSnap(lp_section, lp_tag + "post", lp_unit);
+}
+
+// Mouse look with the pointer untouched. Relative mode goes off for a
+// moment and on again. Counts the game loops until the highlight follows.
+int gf_ProbeHoverTicks (unit lp_unit, bool lp_want) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < c_PROBE_PULSE_TICKS; lv_i += 1) {
+        if (UnitTestState(lp_unit, c_unitStateHighlighted) == lp_want) {
+            return lv_i;
+        }
+        Wait(0.0625, c_timeGame);
+    }
+    return -1;
+}
+
+void gf_ProbeHoverPulse (string lp_section, unit lp_unit) {
+    int lv_i;
+
+    gf_ProbeHoverAim(lp_unit);
+    Wait(0.75, c_timeGame);
+    gf_ProbeHoverSnap(lp_section, "pulsepre", lp_unit);
+    for (lv_i = 0; lv_i < c_PROBE_PULSES; lv_i += 1) {
+        CameraForceMouseRelative(1, false);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pulse" + IntToString(lv_i) + "OnTicks", gf_ProbeHoverTicks(lp_unit, true));
+        CameraForceMouseRelative(1, true);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pulse" + IntToString(lv_i) + "OffTicks", gf_ProbeHoverTicks(lp_unit, false));
+        BankSave(gv_dbgBank);
+        Wait(0.5, c_timeGame);
+    }
+    gf_ProbeHoverSnap(lp_section, "pulsepost", lp_unit);
+}
+
+string gf_ProbeCursorId (int lp_index) {
+    if (lp_index == 0) {
+        return "Arrow";
+    }
+    if (lp_index == 1) {
+        return "Arrow_Terr";
+    }
+    if (lp_index == 2) {
+        return "Arrow_Prot";
+    }
+    return "Arrow_Zerg";
+}
+
+// Cursor sprite: what the cursor catalog holds. A run-time write of the
+// `Texture` field is denied by the engine (run pncprobe/20261115-174020:
+// "Catalog field 'Texture' could not be written"), so the probe only reads.
+void gf_ProbeCursorSprite (string lp_section) {
+    int lv_i;
+    string lv_id;
+
+    for (lv_i = 0; lv_i < c_PROBE_CURSOR_IDS; lv_i += 1) {
+        lv_id = gf_ProbeCursorId(lv_i);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "cursor" + lv_id + "Exists", CatalogEntryIsValid(c_gameCatalogCursor, lv_id));
+        BankValueSetFromString(gv_dbgBank, lp_section, "cursor" + lv_id + "Texture", CatalogFieldValueGet(c_gameCatalogCursor, lv_id, "Texture", 1));
+    }
+    BankSave(gv_dbgBank);
+}
+
+// The triggers, the target unit, and the wait for the parked pointer.
+unit gf_ProbeHoverInit (string lp_section, string lp_type, fixed lp_dx, fixed lp_aimHeight) {
+    unit lv_unit;
+    bool lv_ready;
+
+    gv_probeHoverSection = lp_section;
+    gv_probeHoverAimHeight = lp_aimHeight;
+    gt_ProbeHoverOn = TriggerCreate("gt_ProbeHoverOn_Func");
+    TriggerAddEventUnitHighlight(gt_ProbeHoverOn, null, 1, true);
+    gt_ProbeHoverOff = TriggerCreate("gt_ProbeHoverOff_Func");
+    TriggerAddEventUnitHighlight(gt_ProbeHoverOff, null, 1, false);
+    gt_ProbeMouseMove = TriggerCreate("gt_ProbeMouseMove_Func");
+    TriggerAddEventMouseMoved(gt_ProbeMouseMove, 1);
+    gf_DbgReset(lp_section, false, true);
+    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, 0, 4, PointWithOffset(gv_dbgAnchor, lp_dx, 0.0));
+    lv_unit = UnitLastCreated();
+    UnitSetState(lv_unit, c_unitStateStunned, true);
+    // The hero auto-attacks it; long probes must keep it alive (run
+    // pncprobe recentre 2026-11-15 20.31.17: target died, script errors).
+    UnitSetState(lv_unit, c_unitStateInvulnerable, true);
+    gv_dbgEnemy = lv_unit;
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "Dist10", FixedToInt(DistanceBetweenPoints(gv_dbgAnchor, UnitGetPosition(lv_unit)) * 10.0));
+    BankValueSetFromString(gv_dbgBank, lp_section, "heroAt", FixedToString(PointGetX(UnitGetPosition(gv_tPSUNIT[1])), 1) + ";" + FixedToString(PointGetY(UnitGetPosition(gv_tPSUNIT[1])), 1));
+    BankValueSetFromString(gv_dbgBank, lp_section, "groundHero", FixedToString(WorldHeight(c_heightMapGround, UnitGetPosition(gv_tPSUNIT[1])), 2));
+    BankValueSetFromString(gv_dbgBank, lp_section, "groundUnit", FixedToString(WorldHeight(c_heightMapGround, UnitGetPosition(lv_unit)), 2));
+    // The host tool starts on this key.
+    BankSave(gv_dbgBank);
+    gf_ProbeHoverAim(lv_unit);
+    lv_ready = gf_ProbeHoverPark("HOVER PROBE: the pointer is parked by the test. Do not touch the mouse.", 60, 1);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "parkReady", lv_ready);
+    BankSave(gv_dbgBank);
+    return lv_unit;
+}
+
+void gf_ProbeHover (string lp_section) {
+    unit lv_unit;
+    bool lv_ready;
+    playergroup lv_group;
+
+    lv_group = PlayerGroupSingle(1);
+    // The catalog part needs no mouse.
+    gf_ProbeCursorSprite(lp_section);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Hive", c_PROBE_HOVER_DX, 2.3);
+    lv_ready = BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady");
+    if (lv_ready) {
+        // Point and click: cursor free and shown.
+        gf_ProbeHoverStage(lp_section, "pnc", lv_unit);
+        // The product's TPS free-cursor state: cursor free and shown.
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        gf_ProbeHoverStage(lp_section, "free", lv_unit);
+        // The same state with the cursor hidden.
+        UISetCursorVisible(lv_group, false);
+        gf_ProbeHoverStage(lp_section, "freehid", lv_unit);
+        // The product's mouse look, then relative mode off, cursor hidden.
+        // The pointer has not moved: `pre` shows where the engine's cursor is.
+        gv_mOUSEMIDDLE[1] = false;
+        gf_ControlApply(1);
+        gf_ProbeHoverAim(lv_unit);
+        Wait(1.5, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "lookmid", lv_unit);
+        CameraForceMouseRelative(1, false);
+        gf_ProbeHoverStage(lp_section, "look2hid", lv_unit);
+        // Mouse look again, then short pulses of relative mode off.
+        gf_ControlApply(1);
+        gf_ProbeHoverPulse(lp_section, lv_unit);
+        // Back to point and click. The mode switch restores every setting.
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("HOVER PROBE done.");
+    UnitRemove(lv_unit);
+    gv_dbgEnemy = null;
+}

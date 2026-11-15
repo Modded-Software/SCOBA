@@ -1,0 +1,212 @@
+// TPS pick tests (R-TPS-84): the crosshair ray against the hit volumes.
+// Flat lane: ground range 0.28 over 25 units east of the anchor. Each case
+// aims the ray at a point in the target's model space (z up, facing -y,
+// scale baked in, as scripts/data/hit_volumes.json) and records the unit
+// the pick returns. The points are checked against the host reference
+// scripts/hitvolumes/ray.py (test_hit_volumes.py, InGameCaseTests).
+
+const fixed c_TPSPICK_X = 102.5;
+const fixed c_TPSPICK_Y = 213.5;
+unitgroup gv_tpsPickParked;
+
+// Player 1 units other than the hero (the companion) leave the lane, so no
+// friendly volume stands on a test ray.
+void gf_TpsPickClearAllies () {
+    unitgroup lv_group;
+
+    lv_group = UnitGroup(null, 1, RegionCircle(gv_dbgAnchor, 40.0), UnitFilter(0, 0, 0, 0), 0);
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (UnitGroupLoopCurrent() != gv_tPSUNIT[1]) {
+            UnitSetPosition(UnitGroupLoopCurrent(), Point(20.0, 20.0), false);
+            UnitGroupAdd(gv_tpsPickParked, UnitGroupLoopCurrent());
+        }
+    }
+    UnitGroupLoopEnd();
+}
+
+// The parked units return beside the hero.
+void gf_TpsPickRestoreAllies () {
+    UnitGroupLoopBegin(gv_tpsPickParked);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        UnitSetPosition(UnitGroupLoopCurrent(), PointWithOffset(UnitGetPosition(gv_tPSUNIT[1]), -2.0, 0.0), false);
+    }
+    UnitGroupLoopEnd();
+}
+
+unit gf_TpsPickSpawn (string lp_section, string lp_tag, string lp_type, fixed lp_dx, fixed lp_facing) {
+    unit lv_unit;
+
+    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, 0, 4, PointWithOffset(gv_dbgAnchor, lp_dx, 0.0));
+    lv_unit = UnitLastCreated();
+    UnitSetState(lv_unit, c_unitStateStunned, true);
+    UnitSetState(lv_unit, c_unitStateInvulnerable, true);
+    UnitSetFacing(lv_unit, lp_facing, 0.0);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Dist100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), UnitGetPosition(lv_unit)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Facing", FixedToInt(UnitGetFacing(lv_unit)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Z100", FixedToInt(PointGetHeight(UnitGetPosition(lv_unit)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Height100", FixedToInt(UnitGetHeight(lv_unit) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Ground100", FixedToInt(WorldHeight(c_heightMapGround, UnitGetPosition(lv_unit)) * 100.0));
+    return lv_unit;
+}
+
+// Aims the crosshair ray through the model-space point of lp_unit, then
+// records the pick. The ray origin follows the camera yaw, so the aim is
+// set three times.
+void gf_TpsPickAim (string lp_section, string lp_tag, unit lp_unit, fixed lp_mx, fixed lp_my, fixed lp_mz) {
+    point lv_at;
+    point lv_to;
+    point lv_from;
+    fixed lv_a;
+    fixed lv_z;
+    fixed lv_eye;
+    int lv_i;
+    unit lv_pick;
+
+    lv_at = UnitGetPosition(lp_unit);
+    lv_a = UnitGetFacing(lp_unit) + c_HV_MODEL_YAW;
+    lv_to = Point(PointGetX(lv_at) + (lp_mx * Cos(lv_a)) - (lp_my * Sin(lv_a)), PointGetY(lv_at) + (lp_mx * Sin(lv_a)) + (lp_my * Cos(lv_a)));
+    lv_z = PointGetHeight(lv_at) + UnitGetHeight(lp_unit) + lp_mz;
+    for (lv_i = 0; lv_i < 3; lv_i += 1) {
+        lv_from = gf_AimCameraFocus(1);
+        lv_eye = PointGetHeight(UnitGetPosition(gv_tPSUNIT[1])) + c_SCOBA_CAMERA_HEIGHT_OFFSET;
+        CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to), 0.0, -1, 10);
+        CameraSetValue(1, c_cameraValuePitch, ATan2(lv_eye - lv_z, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
+        Wait(0.2, c_timeGame);
+    }
+    lv_pick = gf_AimUnitAtCrosshair(1, false);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "PickIsUnit", lv_pick == lp_unit);
+    if (UnitIsValid(lv_pick)) {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Pick", UnitGetType(lv_pick));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "PickT100", FixedToInt(gv_aimPickBestT * 100.0));
+    }
+    else {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Pick", "none");
+    }
+    // Raw values: the ray as set and as read back, and the engine's pick.
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Ray", FixedToString(AngleBetweenPoints(lv_from, lv_to), 1) + ";" + FixedToString(ATan2(lv_eye - lv_z, DistanceBetweenPoints(lv_from, lv_to)), 1) + " cam " + FixedToString(CameraGetYaw(1), 1) + ";" + FixedToString(CameraGetPitch(1), 1));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Aim", FixedToString(PointGetX(lv_to), 2) + ";" + FixedToString(PointGetY(lv_to), 2) + ";" + FixedToString(lv_z, 2) + " eye " + FixedToString(lv_eye, 2));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Missing", gv_hvMissing);
+    BankSave(gv_dbgBank);
+}
+
+unit gf_TpsPickBegin (string lp_section, string lp_type, fixed lp_dx, fixed lp_facing) {
+    unit lv_unit;
+
+    gf_DbgTpsReset(lp_section);
+    gf_TpsPickClearAllies();
+    lv_unit = gf_TpsPickSpawn(lp_section, "", lp_type, lp_dx, lp_facing);
+    gv_dbgEnemy = lv_unit;
+    gf_DbgTpsSet(true);
+    return lv_unit;
+}
+
+void gf_TpsPickEnd (string lp_section, unit lp_unit) {
+    gf_DbgTpsSet(false);
+    UnitRemove(lp_unit);
+    gv_dbgEnemy = null;
+    Wait(0.3, c_timeGame);
+}
+
+// Raw values: where the script sees the placed sky units. Their volumes
+// stand at the unit's position and height.
+void gf_TpsPickSky (string lp_type) {
+    unit lv_unit;
+    point lv_at;
+
+    lv_unit = UnitGroupUnit(UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), 1);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_sky", lp_type + "Valid", UnitIsValid(lv_unit));
+    if (!UnitIsValid(lv_unit)) {
+        return;
+    }
+    lv_at = UnitGetPosition(lv_unit);
+    BankValueSetFromString(gv_dbgBank, "tps_pick_sky", lp_type, "at " + FixedToString(PointGetX(lv_at), 1) + ";" + FixedToString(PointGetY(lv_at), 1) + " pointZ " + FixedToString(PointGetHeight(lv_at), 2) + " unitHeight " + FixedToString(UnitGetHeight(lv_unit), 2) + " ground " + FixedToString(WorldHeight(c_heightMapGround, lv_at), 2) + " air " + FixedToString(WorldHeight(c_heightMapAir, lv_at), 2) + " facing " + FixedToString(UnitGetFacing(lv_unit), 1) + " dist " + FixedToString(DistanceBetweenPoints(lv_at, Point(c_TPSPICK_X, c_TPSPICK_Y)), 1));
+}
+
+void gf_DbgTpsPickRun () {
+    unit lv_unit;
+    unit lv_marine;
+    point lv_anchor;
+    fixed lv_yaw;
+    fixed lv_pitch;
+
+    lv_anchor = gv_dbgAnchor;
+    lv_yaw = CameraGetYaw(1);
+    lv_pitch = CameraGetPitch(1);
+    gv_dbgAnchor = Point(c_TPSPICK_X, c_TPSPICK_Y);
+    gv_tpsPickParked = UnitGroupEmpty();
+    gf_TpsPickSky("MengskBC");
+    gf_TpsPickSky("Mothership");
+    gf_TpsPickSky("Overlord");
+    gf_TpsPickSky("Battlecruiser");
+    BankValueSetFromString(gv_dbgBank, "tps_pick_sky", "lane", "ground " + FixedToString(WorldHeight(c_heightMapGround, gv_dbgAnchor), 2) + " heroZ " + FixedToString(PointGetHeight(UnitGetPosition(gv_tPSUNIT[1])), 2));
+    // The Medic: head in, clear above out.
+    lv_unit = gf_TpsPickBegin("tps_pick_medic", "Medic", 6.0, 0.0);
+    gf_TpsPickAim("tps_pick_medic", "thead", lv_unit, 0.0, 0.0, 0.85);
+    gf_TpsPickAim("tps_pick_medic", "tabove", lv_unit, 0.0, 0.0, 1.35);
+    gf_TpsPickEnd("tps_pick_medic", lv_unit);
+    // The Marine: thigh in; either side of the body out (model x).
+    lv_unit = gf_TpsPickBegin("tps_pick_marine", "Marine", 6.0, 0.0);
+    gf_TpsPickAim("tps_pick_marine", "tthigh", lv_unit, 0.0, 0.0, 0.35);
+    gf_TpsPickAim("tps_pick_marine", "tside", lv_unit, 1.3, 0.0, 0.6);
+    gf_TpsPickAim("tps_pick_marine", "tside2", lv_unit, -1.1, 0.0, 0.6);
+    // A click on the body sets the UI target.
+    gf_TpsPickAim("tps_pick_marine", "tmid", lv_unit, 0.0, 0.0, 0.6);
+    gf_TpsLeftClick(1);
+    Wait(0.3, c_timeGame);
+    gf_DbgTpsSnap("tps_pick_marine", "tclick");
+    gf_TpsPickEnd("tps_pick_marine", lv_unit);
+    // The Ultralisk side-on: the blades ahead of it in, the same point
+    // behind it out. Fails if the model's facing axis is wrong.
+    lv_unit = gf_TpsPickBegin("tps_pick_ultra", "Ultralisk", 12.0, 90.0);
+    gf_TpsPickAim("tps_pick_ultra", "tfront", lv_unit, 1.4, -4.0, 2.1);
+    gf_TpsPickAim("tps_pick_ultra", "tback", lv_unit, 1.4, 4.0, 2.1);
+    gf_TpsPickEnd("tps_pick_ultra", lv_unit);
+    // A Zergling near the end of the range: a small volume, far away. Fails
+    // when fixed point loses the radius (tps 20261115-214852).
+    lv_unit = gf_TpsPickBegin("tps_pick_far", "Zergling", 18.5, 0.0);
+    gf_TpsPickAim("tps_pick_far", "tbody", lv_unit, 0.0, 0.0, 0.4);
+    gf_TpsPickAim("tps_pick_far", "tside", lv_unit, 0.7, 0.0, 0.4);
+    gf_TpsPickEnd("tps_pick_far", lv_unit);
+    // The operator's case: a Thor, aim held, the crosshair on its chest.
+    // The reticle, the status bar, and the shot all name the Thor.
+    lv_unit = gf_TpsPickBegin("tps_pick_thor", "Thor", 8.0, 180.0);
+    // Attackable: an invulnerable unit is never in weapon range.
+    UnitSetState(lv_unit, c_unitStateInvulnerable, false);
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.5, c_timeGame);
+    gf_TpsPickAim("tps_pick_thor", "tchest", lv_unit, 0.0, 0.0, 4.0);
+    Wait(0.2, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_thor", "tchestReticle", gv_reticleKind[1]);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_thor", "tchestStatus", gv_tpsStatusUnit[1] == lv_unit);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_thor", "tchestAim", gv_aIMACTIVE[1]);
+    gf_AimShotPress(1);
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_thor", "tchestShotKind", gv_tpsShotKind[1]);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_thor", "tchestShotThor", gv_tpsShotTarget[1] == lv_unit);
+    BankSave(gv_dbgBank);
+    Wait(1.5, c_timeGame);
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_TpsPickEnd("tps_pick_thor", lv_unit);
+    // The Overseer, a flyer: its body at its height in; the ray under it
+    // out. Fails if the volume stands on the ground.
+    lv_unit = gf_TpsPickBegin("tps_pick_flyer", "Overseer", 8.0, 0.0);
+    gf_TpsPickAim("tps_pick_flyer", "tbody", lv_unit, 0.0, 0.0, 0.0);
+    gf_TpsPickAim("tps_pick_flyer", "tunder", lv_unit, 0.0, 0.0, -2.0);
+    gf_TpsPickEnd("tps_pick_flyer", lv_unit);
+    // The Hive, a far type: its top in; a ray past its side out.
+    lv_unit = gf_TpsPickBegin("tps_pick_hive", "Hive", 30.0, 0.0);
+    gf_TpsPickAim("tps_pick_hive", "ttop", lv_unit, 0.0, 0.0, 28.0);
+    gf_TpsPickAim("tps_pick_hive", "tnorth", lv_unit, 30.0, 30.0, 1.5);
+    // Nearest first: a Marine in front of the Hive is picked, not the Hive.
+    lv_marine = gf_TpsPickSpawn("tps_pick_hive", "m", "Marine", 3.0, 0.0);
+    gf_TpsPickAim("tps_pick_hive", "tmarine", lv_marine, 0.0, 0.0, 0.6);
+    gf_TpsPickAim("tps_pick_hive", "tover", lv_unit, 0.0, 0.0, 28.0);
+    UnitRemove(lv_marine);
+    gf_TpsPickEnd("tps_pick_hive", lv_unit);
+    // The group leaves no state behind: the anchor and the camera return.
+    gv_dbgAnchor = lv_anchor;
+    gf_DbgTpsReset("tps_pick_done");
+    gf_TpsPickRestoreAllies();
+    gf_DbgTpsCamera(lv_yaw, lv_pitch);
+}

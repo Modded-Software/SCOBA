@@ -39,42 +39,65 @@ fixed gf_AimWeaponRange (int lp_player) {
     return UnitWeaponRange(gv_tPSUNIT[lp_player], lv_index);
 }
 
-point gf_AimCrosshairPoint (int lp_player) {
-    unit lv_hero;
+// The pick ray of the TPS crosshair, set by gf_AimPickRay.
+fixed gv_aimPickOx;
+fixed gv_aimPickOy;
+fixed gv_aimPickOz;
+fixed gv_aimPickDx;
+fixed gv_aimPickDy;
+fixed gv_aimPickDz;
+unit gv_aimPickBest;
+fixed gv_aimPickBestT;
+
+// The point the screen-centre ray passes through: the hero, or in aim the
+// shoulder proxy (engine yaw band 0.5 aside, pncprobe 20261115-230450).
+point gf_AimCameraFocus (int lp_player) {
+    if (!gv_aIMACTIVE[lp_player] || !UnitIsValid(gv_aimCameraProxy[lp_player])) {
+        return UnitGetPosition(gv_tPSUNIT[lp_player]);
+    }
+    return UnitGetPosition(gv_aimCameraProxy[lp_player]);
+}
+
+// The screen-centre ray: through the camera focus at the camera height
+// offset, along the camera yaw and pitch (pncprobe 20261115-224549).
+void gf_AimPickRay (int lp_player) {
     point lv_origin;
     fixed lv_yaw;
     fixed lv_pitch;
     fixed lv_cos;
-    fixed lv_dx;
-    fixed lv_dy;
-    fixed lv_dz;
-    fixed lv_x;
-    fixed lv_y;
-    fixed lv_z;
-    fixed lv_ray_z;
-    fixed lv_ground;
-    fixed lv_dist;
 
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return CameraGetTarget(lp_player);
-    }
-    lv_origin = gf_AimProxyPoint(lp_player);
+    lv_origin = gf_AimCameraFocus(lp_player);
+    gv_aimPickOx = PointGetX(lv_origin);
+    gv_aimPickOy = PointGetY(lv_origin);
+    gv_aimPickOz = PointGetHeight(UnitGetPosition(gv_tPSUNIT[lp_player])) + c_SCOBA_CAMERA_HEIGHT_OFFSET;
     lv_yaw = CameraGetYaw(lp_player);
     lv_pitch = CameraGetPitch(lp_player);
     if (lv_pitch > 180.0) {
         lv_pitch = lv_pitch - 360.0;
     }
     lv_cos = Cos(lv_pitch);
-    lv_dx = Cos(lv_yaw) * lv_cos;
-    lv_dy = Sin(lv_yaw) * lv_cos;
-    lv_dz = -Sin(lv_pitch);
-    lv_z = PointGetHeight(UnitGetPosition(lv_hero)) + c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT;
+    gv_aimPickDx = Cos(lv_yaw) * lv_cos;
+    gv_aimPickDy = Sin(lv_yaw) * lv_cos;
+    gv_aimPickDz = -Sin(lv_pitch);
+}
+
+// Where the screen-centre ray meets the ground, or its end at max range.
+point gf_AimCrosshairPoint (int lp_player) {
+    fixed lv_x;
+    fixed lv_y;
+    fixed lv_ray_z;
+    fixed lv_ground;
+    fixed lv_dist;
+
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return CameraGetTarget(lp_player);
+    }
+    gf_AimPickRay(lp_player);
     lv_dist = c_SCOBA_CROSSHAIR_MIN_RANGE;
     while (lv_dist <= c_SCOBA_CROSSHAIR_MAX_RANGE) {
-        lv_x = PointGetX(lv_origin) + (lv_dx * lv_dist);
-        lv_y = PointGetY(lv_origin) + (lv_dy * lv_dist);
-        lv_ray_z = lv_z + (lv_dz * lv_dist);
+        lv_x = gv_aimPickOx + (gv_aimPickDx * lv_dist);
+        lv_y = gv_aimPickOy + (gv_aimPickDy * lv_dist);
+        lv_ray_z = gv_aimPickOz + (gv_aimPickDz * lv_dist);
         lv_ground = WorldHeight(c_heightMapGround, Point(lv_x, lv_y));
         if (lv_ray_z <= lv_ground) {
             return libNtve_gf_PointFromXYZ(lv_x, lv_y, lv_ground);
@@ -82,82 +105,63 @@ point gf_AimCrosshairPoint (int lp_player) {
         lv_dist = lv_dist + c_SCOBA_CROSSHAIR_STEP;
     }
     return libNtve_gf_PointFromXYZ(
-        PointGetX(lv_origin) + (lv_dx * c_SCOBA_CROSSHAIR_MAX_RANGE),
-        PointGetY(lv_origin) + (lv_dy * c_SCOBA_CROSSHAIR_MAX_RANGE),
-        lv_z + (lv_dz * c_SCOBA_CROSSHAIR_MAX_RANGE)
+        gv_aimPickOx + (gv_aimPickDx * c_SCOBA_CROSSHAIR_MAX_RANGE),
+        gv_aimPickOy + (gv_aimPickDy * c_SCOBA_CROSSHAIR_MAX_RANGE),
+        gv_aimPickOz + (gv_aimPickDz * c_SCOBA_CROSSHAIR_MAX_RANGE)
     );
 }
 
-unit gf_AimUnitAtCrosshair (int lp_player, bool lp_enemyOnly) {
-    unit lv_hero;
+// Tests every unit of the group against the ray. `lp_far` picks the units
+// of far types only, else the units of near types only (R-TPS-84).
+void gf_AimPickScan (int lp_player, bool lp_enemyOnly, unitgroup lp_group, bool lp_far) {
     unit lv_unit;
-    unit lv_best;
-    unitgroup lv_group;
-    point lv_originPoint;
-    point lv_unitPoint;
-    fixed lv_yaw;
-    fixed lv_pitch;
-    fixed lv_cos;
-    fixed lv_dx;
-    fixed lv_dy;
-    fixed lv_dz;
-    fixed lv_ox;
-    fixed lv_oy;
-    fixed lv_oz;
-    fixed lv_ux;
-    fixed lv_uy;
-    fixed lv_uz;
+    int lv_type;
     fixed lv_t;
-    fixed lv_perp;
-    fixed lv_bestPerp;
-    fixed lv_radius;
 
-    lv_hero = gv_tPSUNIT[lp_player];
-    if (!UnitIsValid(lv_hero)) {
-        return null;
-    }
-    lv_originPoint = gf_AimProxyPoint(lp_player);
-    lv_ox = PointGetX(lv_originPoint);
-    lv_oy = PointGetY(lv_originPoint);
-    lv_oz = PointGetHeight(UnitGetPosition(lv_hero)) + c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT;
-    lv_yaw = CameraGetYaw(lp_player);
-    lv_pitch = CameraGetPitch(lp_player);
-    if (lv_pitch > 180.0) {
-        lv_pitch = lv_pitch - 360.0;
-    }
-    lv_cos = Cos(lv_pitch);
-    lv_dx = Cos(lv_yaw) * lv_cos;
-    lv_dy = Sin(lv_yaw) * lv_cos;
-    lv_dz = -Sin(lv_pitch);
-    lv_group = UnitGroup(null, c_playerAny, RegionCircle(lv_originPoint, c_SCOBA_CROSSHAIR_MAX_RANGE), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0);
-    lv_best = null;
-    lv_bestPerp = c_SCOBA_CROSSHAIR_MAX_RANGE * c_SCOBA_CROSSHAIR_MAX_RANGE;
-    UnitGroupLoopBegin(lv_group);
+    UnitGroupLoopBegin(lp_group);
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
         lv_unit = UnitGroupLoopCurrent();
+        // The ray starts inside the hero (camera focus); never pick it.
+        if (lv_unit == gv_tPSUNIT[lp_player]) {
+            continue;
+        }
         if (!gf_UnitTargetValid(lp_player, lv_unit, lp_enemyOnly) || !UnitIsAlive(lv_unit)) {
             continue;
         }
-        lv_unitPoint = UnitGetPosition(lv_unit);
-        lv_ux = PointGetX(lv_unitPoint) - lv_ox;
-        lv_uy = PointGetY(lv_unitPoint) - lv_oy;
-        lv_uz = PointGetHeight(lv_unitPoint) - lv_oz;
-        lv_t = (lv_ux * lv_dx) + (lv_uy * lv_dy) + (lv_uz * lv_dz);
-        if (lv_t < c_SCOBA_CROSSHAIR_MIN_RANGE || lv_t > c_SCOBA_CROSSHAIR_MAX_RANGE) {
+        lv_type = gf_HvTypeIndex(UnitGetType(lv_unit));
+        if (lv_type < 0 || gv_hvFar[lv_type] != lp_far) {
             continue;
         }
-        lv_perp = (lv_ux * lv_ux) + (lv_uy * lv_uy) + (lv_uz * lv_uz) - (lv_t * lv_t);
-        lv_radius = UnitGetPropertyFixed(lv_unit, c_unitPropRadius, c_unitPropNormal) + c_SCOBA_CLICK_MARGIN;
-        if (lv_perp > (lv_radius * lv_radius)) {
+        lv_t = gf_HvRayUnit(lv_unit, lv_type, gv_aimPickOx, gv_aimPickOy, gv_aimPickOz, gv_aimPickDx, gv_aimPickDy, gv_aimPickDz);
+        if (lv_t < 0.0 || lv_t > c_SCOBA_CROSSHAIR_MAX_RANGE) {
             continue;
         }
-        if (lv_perp < lv_bestPerp) {
-            lv_best = lv_unit;
-            lv_bestPerp = lv_perp;
+        if (lv_t < gv_aimPickBestT) {
+            gv_aimPickBest = lv_unit;
+            gv_aimPickBestT = lv_t;
         }
     }
     UnitGroupLoopEnd();
-    return lv_best;
+}
+
+// The unit the crosshair ray meets first, through the unit's hit volume
+// (R-TPS-84, SPEC-TPS 5.8). No margin: the volume is the unit's shape.
+unit gf_AimUnitAtCrosshair (int lp_player, bool lp_enemyOnly) {
+    unitfilter lv_filter;
+    int lv_i;
+
+    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return null;
+    }
+    gf_AimPickRay(lp_player);
+    gv_aimPickBest = null;
+    gv_aimPickBestT = c_SCOBA_CROSSHAIR_MAX_RANGE + 1.0;
+    lv_filter = UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32)));
+    gf_AimPickScan(lp_player, lp_enemyOnly, UnitGroup(null, c_playerAny, RegionCircle(Point(gv_aimPickOx, gv_aimPickOy), c_SCOBA_CROSSHAIR_MAX_RANGE + c_HV_NEAR_REACH), lv_filter, 0), false);
+    for (lv_i = 0; lv_i < gv_hvFarCount; lv_i += 1) {
+        gf_AimPickScan(lp_player, lp_enemyOnly, UnitGroup(gv_hvTypeName[gv_hvFarType[lv_i]], c_playerAny, RegionEntireMap(), lv_filter, 0), true);
+    }
+    return gv_aimPickBest;
 }
 
 unit gf_AimTargetAtCrosshair (int lp_player) {

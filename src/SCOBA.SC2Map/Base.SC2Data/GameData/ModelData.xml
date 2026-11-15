@@ -55,8 +55,8 @@
         <ScaleMin value="3.000000,3.000000,3.000000"/>
     </CModel>
     <CModel id="HybridUltraliskShackled">
-        <ScaleMax value="1.200000,1.200000,1.200000"/>
-        <ScaleMin value="1.200000,1.200000,1.200000"/>
+        <ScaleMax value="1.800000,1.800000,1.800000"/>
+        <ScaleMin value="1.800000,1.800000,1.800000"/>
     </CModel>
     <CModel id="InfestedSiegeBreaker">
         <ScaleMax value="2.000000,2.000000,2.000000"/>

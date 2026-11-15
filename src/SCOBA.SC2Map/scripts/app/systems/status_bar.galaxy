@@ -26,20 +26,10 @@ bool gf_TpsStatusIs (int lp_player, unit lp_unit) {
     return gv_tpsStatusUnit[lp_player] == lp_unit;
 }
 
-// TEMPORARY PROBE (R-TPS-84): shows whether the engine highlights the unit at
-// the screen centre in TPS mouse look. Remove after the operator check.
-void gf_TpsHighlightProbe (int lp_player, string lp_state) {
-    if (!gf_TpsActive(lp_player)) {
-        return;
-    }
-    UIDisplayMessage(PlayerGroupSingle(lp_player), c_messageAreaSubtitle, StringToText("PROBE engine highlight " + lp_state + ": " + UnitGetType(EventUnit())));
-}
-
 void gf_UnitHighlightOn (int lp_player, bool testConds, bool runActions) {
     if (!runActions) {
         return;
     }
-    gf_TpsHighlightProbe(lp_player, "ON");
     UnitStatusBarOverride(EventUnit(), c_unitStatusGroupAll);
     gv_unitHighlight[lp_player] = EventUnit();
 }
@@ -48,7 +38,6 @@ void gf_UnitHighlightOff (int lp_player, bool testConds, bool runActions) {
     if (!runActions) {
         return;
     }
-    gf_TpsHighlightProbe(lp_player, "OFF");
     if (!(gf_TpsActive(lp_player) && gf_TpsStatusIs(lp_player, EventUnit()))) {
         UnitStatusBarOverride(EventUnit(), -1);
     }

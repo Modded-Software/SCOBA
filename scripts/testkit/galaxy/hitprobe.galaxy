@@ -1,0 +1,194 @@
+// Bone hitbox probe (R-TPS-84).
+// Question: can a script find where an actor attached to a model's
+// attachment point is, while the model animates?
+// Method: a small model is attached to the Ultralisk's `Ref_Head`. A grid of
+// small script regions is swept around the unit. Each region sends a
+// `RefSet` actor message to the actors whose centre is inside it. A cell is
+// a hit when the global ref then names the head actor. The grid is sampled
+// in the stand pose and at several points of the attack animation.
+// Raw values only; the profile prints them. No mouse input.
+const int c_PROBE_HIT_GRID = 13;
+const fixed c_PROBE_HIT_STEP = 0.5;
+const fixed c_PROBE_HIT_CELL = 0.3;
+const int c_PROBE_HIT_SAMPLES = 6;
+
+actor gv_probeHitHead;
+// The read-back channel that passed its direct control; 0 when none did.
+int gv_probeHitChannel;
+const int c_PROBE_HIT_CHANNELS = 4;
+
+// Read-back channels. Each one: a message that sets a ref on the actor that
+// receives it, and the script read of that ref.
+// `::user` refs are rejected as "Invalid actor msg" (run 2026-11-15 20.15.56).
+string gf_ProbeHitMsg (int lp_channel, string lp_ref) {
+    if (lp_channel == 1) {
+        return "RefSet ::global." + lp_ref + " ::Main";
+    }
+    if (lp_channel == 2) {
+        return "RefSet ::global." + lp_ref + " ::Host";
+    }
+    if (lp_channel == 3) {
+        return "RefSet ::global." + lp_ref + " ::Self";
+    }
+    return "AliasAdd " + lp_ref;
+}
+
+// ActorFrom never returns null for an unset ref (run pncprobe/20261115-201653:
+// "before=True" on every `!= null` channel), so reads compare to the actor
+// the ref must name: ::Main and ::Host of the head are the unit's actor.
+actor gv_probeHitMain;
+
+bool gf_ProbeHitRead (int lp_channel, string lp_ref) {
+    if (lp_channel <= 2) {
+        return ActorFrom("::global." + lp_ref) == gv_probeHitMain;
+    }
+    if (lp_channel == 3) {
+        return ActorFrom("::global." + lp_ref) == gv_probeHitHead;
+    }
+    return ActorFromActor(gv_probeHitHead, lp_ref) == gv_probeHitHead;
+}
+
+// Sends the channel message to the actors with their centre in a circle;
+// true when the head actor received it.
+bool gf_ProbeHitCell (point lp_at, string lp_ref) {
+    actor lv_region;
+
+    ActorRegionCreate(null, "TriggerRegion", RegionCircle(lp_at, c_PROBE_HIT_CELL));
+    lv_region = ActorFrom("::LastCreated");
+    ActorRegionSend(lv_region, c_actorIntersectAgainstCenter, gf_ProbeHitMsg(gv_probeHitChannel, lp_ref), null, null);
+    ActorSend(lv_region, "Destroy");
+    return gf_ProbeHitRead(gv_probeHitChannel, lp_ref);
+}
+
+// Direct control per channel: before (must be false) and after a direct send.
+void gf_ProbeHitChannels (string lp_section) {
+    int lv_c;
+    string lv_ref;
+    bool lv_before;
+    bool lv_after;
+
+    // Is actor equality meaningful at all? Same actor fetched twice, the
+    // head's host against the unit's actor, and two different actors.
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "eqMainTwice", libNtve_gf_MainActorofUnit(gv_dbgEnemy) == gv_probeHitMain);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "eqHostMain", ActorRefGet(gv_probeHitHead, "::Host") == gv_probeHitMain);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "eqHeadSelf", gv_probeHitHead == gv_probeHitHead);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "eqHeadMain", gv_probeHitHead == gv_probeHitMain);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "nullUnset", ActorFrom("::global.ProbeNeverSet") == null);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "nullHead", gv_probeHitHead == null);
+    gv_probeHitChannel = 0;
+    for (lv_c = 1; lv_c <= c_PROBE_HIT_CHANNELS; lv_c += 1) {
+        lv_ref = "ProbeDirect" + IntToString(lv_c);
+        lv_before = gf_ProbeHitRead(lv_c, lv_ref);
+        ActorSend(gv_probeHitHead, gf_ProbeHitMsg(lv_c, lv_ref));
+        lv_after = gf_ProbeHitRead(lv_c, lv_ref);
+        BankValueSetFromString(gv_dbgBank, lp_section, "channel" + IntToString(lv_c), "before=" + libNtve_gf_ConvertBooleanToString(lv_before) + " after=" + libNtve_gf_ConvertBooleanToString(lv_after));
+        if (!lv_before && lv_after && gv_probeHitChannel == 0) {
+            gv_probeHitChannel = lv_c;
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "channel", gv_probeHitChannel);
+    BankSave(gv_dbgBank);
+}
+
+// The game-side value for comparison: null when the model has no .m3h.
+string gf_ProbeHitStatic (unit lp_unit) {
+    point lv_p;
+
+    lv_p = UnitGetAttachmentPoint(lp_unit, "Ref_Head");
+    if (lv_p == null) {
+        return "null";
+    }
+    return FixedToString(PointGetX(lv_p) - PointGetX(UnitGetPosition(lp_unit)), 2) + ";" + FixedToString(PointGetY(lv_p) - PointGetY(UnitGetPosition(lp_unit)), 2);
+}
+
+// One grid sample: the hit cells as "dx;dy" offsets from the unit, in tenths.
+void gf_ProbeHitGrid (string lp_section, string lp_tag, unit lp_unit, int lp_n) {
+    int lv_x;
+    int lv_y;
+    int lv_hits;
+    fixed lv_dx;
+    fixed lv_dy;
+    string lv_cells;
+    string lv_ref;
+    point lv_origin;
+
+    lv_origin = UnitGetPosition(lp_unit);
+    lv_cells = "";
+    lv_hits = 0;
+    for (lv_x = 0; lv_x < c_PROBE_HIT_GRID; lv_x += 1) {
+        for (lv_y = 0; lv_y < c_PROBE_HIT_GRID; lv_y += 1) {
+            lv_dx = (IntToFixed(lv_x) - IntToFixed(c_PROBE_HIT_GRID / 2)) * c_PROBE_HIT_STEP;
+            lv_dy = (IntToFixed(lv_y) - IntToFixed(c_PROBE_HIT_GRID / 2)) * c_PROBE_HIT_STEP;
+            lv_ref = "ProbeHit" + lp_tag + IntToString(lp_n) + "x" + IntToString(lv_x) + "y" + IntToString(lv_y);
+            if (gf_ProbeHitCell(PointWithOffset(lv_origin, lv_dx, lv_dy), lv_ref)) {
+                lv_hits += 1;
+                lv_cells = lv_cells + " " + FixedToString(lv_dx, 1) + ";" + FixedToString(lv_dy, 1);
+            }
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + IntToString(lp_n) + "Hits", lv_hits);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + IntToString(lp_n) + "Cells", lv_cells);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + IntToString(lp_n) + "Static", gf_ProbeHitStatic(lp_unit));
+    BankSave(gv_dbgBank);
+}
+
+void gf_ProbeHitSeries (string lp_section, string lp_tag, unit lp_unit, fixed lp_gap) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < c_PROBE_HIT_SAMPLES; lv_i += 1) {
+        gf_ProbeHitGrid(lp_section, lp_tag, lp_unit, lv_i);
+        Wait(lp_gap, c_timeGame);
+    }
+}
+
+void gf_ProbeHit (string lp_section) {
+    unit lv_unit;
+    unit lv_bare;
+    actor lv_main;
+
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    gf_DbgReset(lp_section, false, true);
+    libNtve_gf_CreateUnitsAtPoint2(1, "Ultralisk", 0, 4, PointWithOffset(gv_dbgAnchor, c_PROBE_RECENTER_DX, 0.0));
+    lv_unit = UnitLastCreated();
+    UnitSetState(lv_unit, c_unitStateStunned, true);
+    UnitSetFacing(lv_unit, 0.0, 0.0);
+    gv_dbgEnemy = lv_unit;
+    // Control: the same unit type without an attached actor.
+    libNtve_gf_CreateUnitsAtPoint2(1, "Ultralisk", 0, 4, PointWithOffset(gv_dbgAnchor, c_PROBE_RECENTER_DX, 8.0));
+    lv_bare = UnitLastCreated();
+    UnitSetState(lv_bare, c_unitStateStunned, true);
+    UnitSetFacing(lv_bare, 0.0, 0.0);
+    gv_probeHitHead = libNtve_gf_AttachModelToUnit(lv_unit, "Marine", "Ref_Head");
+    ActorSend(gv_probeHitHead, "SetScale 0.1");
+    gv_probeHitMain = libNtve_gf_MainActorofUnit(lv_unit);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "headValid", gv_probeHitHead != null);
+    gf_ProbeHitChannels(lp_section);
+    if (gv_probeHitChannel == 0) {
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "hitDone", true);
+        BankSave(gv_dbgBank);
+        UnitRemove(lv_unit);
+        UnitRemove(lv_bare);
+        gv_dbgEnemy = null;
+        return;
+    }
+    // Stand pose.
+    gf_ProbeHitSeries(lp_section, "stand", lv_unit, 0.25);
+    // Negative: the bare unit has no head actor; no cell may answer with it.
+    gf_ProbeHitGrid(lp_section, "bare", lv_bare, 0);
+    // Attack animation, looping. Samples spread over the swing.
+    lv_main = libNtve_gf_MainActorofUnit(lv_unit);
+    libNtve_gf_PlayAnimation(lv_main, c_animNameDefault, "Attack", c_animFlagPlayForever, 0.0);
+    Wait(0.1, c_timeGame);
+    gf_ProbeHitSeries(lp_section, "attack", lv_unit, 0.15);
+    libNtve_gf_PlayAnimation(lv_main, c_animNameDefault, "Stand", c_animFlagPlayForever, 0.0);
+    // Scale: the unit at 200%.
+    UnitSetScale(lv_unit, 200.0, 200.0, 200.0);
+    Wait(1.0, c_timeGame);
+    gf_ProbeHitSeries(lp_section, "scale", lv_unit, 0.25);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hitDone", true);
+    BankSave(gv_dbgBank);
+    UnitRemove(lv_unit);
+    UnitRemove(lv_bare);
+    gv_dbgEnemy = null;
+}

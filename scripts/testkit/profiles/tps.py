@@ -15,6 +15,7 @@ from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .combat import _delta, _report, _walk_scale, _yaw_off
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .tps_pick import check_pick
 
 ROOT = project_root()
 
@@ -35,10 +36,12 @@ def map_spec() -> TestMapSpec:
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tps.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "tpspick.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/tps/common",
             "scripts/test/tps/tps",
+            "scripts/test/tps/tpspick",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_TpsTest_Init();"),
     )
@@ -207,6 +210,9 @@ def _air_rule(checks, section: str) -> None:
 
 
 def _shot_cases(checks, prefix: str) -> None:
+    for name in ("enemy", "far"):
+        raw = {key: checks.value(f"{prefix}_{name}", "taim", key) for key in ("EnemyRayT100", "PickRay", "CrossType", "CamPitch")}
+        print(f"{prefix}_{name} raw pick {raw}")
     section = f"{prefix}_enemy"
     checks.true(section, "taim", "CrossEnemy")
     checks.true(section, "taim", "InRange")
@@ -401,31 +407,10 @@ def _check_head(checks) -> None:
     checks.gt(section, "taim", "PitchStep", 0)
 
 
-def _check_pick(checks) -> None:
-    """R-TPS-84: the crosshair picks a unit along its whole body."""
-    for section in ("tps_pick_marine", "tps_pick_barracks"):
-        raw = {key: checks.value(section, "", key) for key in ("Radius100", "Dist100")}
-        for tag in ("tbase", "thigh", "tabove", "tmid"):
-            raw[tag] = (
-                checks.value(section, tag, "CrossType"),
-                checks.value(section, tag, "HighlightType"),
-                checks.value(section, tag, "CamPitch"),
-            )
-        print(f"{section} raw (cross, engine highlight, pitch) {raw}")
-        for tag in ("tbase", "thigh", "tmid"):
-            checks.true(section, tag, "CrossEnemy")
-        # Negative case: a ray clear above the unit picks nothing.
-        checks.false(section, "tabove", "CrossEnemy")
-        checks.eq(section, "tabove", "CrossType", "none")
-        # The click on the body sets the UI target.
-        checks.true(section, "tmid", "TargetNone")
-        checks.true(section, "tclick", "TargetEnemy")
-
-
 GROUPS = ("move", "cursor", "aim", "head", "target", "pick", "shot", "kerrigan")
 
 GROUP_CHECKS = {
-    "pick": _check_pick,
+    "pick": check_pick,
     "head": _check_head,
     "aim": _check_aim,
     "move": _check_move,

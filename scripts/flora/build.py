@@ -21,7 +21,7 @@ from typing import NamedTuple
 
 from footprints.catalog import append_catalog
 
-from . import config, scene as scene_mod, terrain as terrain_mod
+from . import config, scene as scene_mod, terrain as terrain_mod, treevary
 from .grid import distance_to
 from .lanes import Lane, Placed, find_lanes, hazard_cells, place_hazards, settle
 from .rules import context
@@ -208,6 +208,9 @@ def check_flora(map_dir: Path) -> list[str]:
         to_lane = min(math.hypot(x - lx, y - ly) for lx, ly in lane_points)
         if to_wet[int(y), int(x)] <= config.BRAMBLE_WATER_CLEAR or to_lane <= config.BRAMBLE_LANE_CLEAR - 1:
             problems.append(f"bramble at ({x:.1f},{y:.1f}) is near water or on a lane (lane {to_lane:.1f})")
+    lookalikes = treevary.conflicts([t for _m, t in treevary.parse((map_dir / "Objects").read_text(encoding="utf-8"))])
+    if lookalikes:
+        problems.append(f"{len(lookalikes)} neighbouring tree pairs look alike (scale, rotation and variation)")
     # Placed flora must never fade: doodad_occlusion sets Occlusion None; it must run after apply_flora.
     for kind in sorted({k for k, *_ in placed}):
         block = re.search(r'<CModel id="' + kind + r'">(.*?)</CModel>', models, re.S)

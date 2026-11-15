@@ -1,0 +1,44 @@
+// Rotate-only probe (R-TPS-84).
+// Question: with CameraSetMouseRotates on and CameraForceMouseRelative off,
+// does mouse motion turn the camera, where does the cursor go, and does the
+// engine still pick? Flat lane; the host tool parks the pointer on the left
+// and sweeps it right and back on each `<stage>Go` key. No clicks.
+// Stages: `relhid` is the product mouse look (relative on), the reference.
+// `rot` rotate on, relative off, cursor shown. `rothid` the same, hidden.
+// Raw values only; the profile prints them.
+
+void gf_ProbeRotateSet (bool lp_rotates, bool lp_relative, bool lp_visible) {
+    CameraSetMouseRotates(1, lp_rotates);
+    CameraForceMouseRelative(1, lp_relative);
+    UISetCursorVisible(PlayerGroupSingle(1), lp_visible);
+}
+
+void gf_ProbeRotate (string lp_section) {
+    unit lv_unit;
+
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Ultralisk", c_PROBE_RECENTER_DX, c_PROBE_RECENTER_AIM_HEIGHT);
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        // The free-cursor state keeps the product from forcing relative mode.
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        gf_ProbeRotateSet(true, true, false);
+        gf_ProbeHoverStage(lp_section, "relhid", lv_unit);
+        gf_ProbeRotateSet(true, false, true);
+        gf_ProbeHoverStage(lp_section, "rot", lv_unit);
+        gf_ProbeRotateSet(true, false, false);
+        gf_ProbeHoverStage(lp_section, "rothid", lv_unit);
+        // Control: rotate off, relative off, hidden (the free-cursor state).
+        gf_ProbeRotateSet(false, false, false);
+        gf_ProbeHoverStage(lp_section, "free", lv_unit);
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("ROTATE PROBE done.");
+    UnitRemove(lv_unit);
+    gv_dbgEnemy = null;
+}

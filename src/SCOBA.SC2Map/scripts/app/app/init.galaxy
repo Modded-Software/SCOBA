@@ -123,14 +123,14 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Tosh") || (UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "ToshSCOBA"))) {
                 CameraSetValue(lv_localPlayer, c_cameraValueDistance, 1.5, 0.5, -1, 10);
                 gv_cameraDistanceDesired[lv_localPlayer] = 1.5;
-                CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, 0.9, 0.5, -1, 10);
+                CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, c_SCOBA_CAMERA_HEIGHT_OFFSET, 0.5, -1, 10);
                 CameraUseHeightSmoothing(lv_localPlayer, false);
             }
 
             if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Kerrigan") || (UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "KerriganSCOBA"))) {
                 CameraSetValue(lv_localPlayer, c_cameraValueDistance, 2.5, 0.5, -1, 10);
                 gv_cameraDistanceDesired[lv_localPlayer] = 2.5;
-                CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, 0.9, 0.5, -1, 10);
+                CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, c_SCOBA_CAMERA_HEIGHT_OFFSET, 0.5, -1, 10);
             }
             else {
                 CameraUseHeightSmoothing(lv_localPlayer, false);

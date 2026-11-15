@@ -6,6 +6,8 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from hitvolumes.galaxy import check_map as check_hit_volumes
+
 GAMEDATA = Path("Base.SC2Data") / "GameData"
 SYSTEMS = Path("scripts") / "app" / "systems"
 
@@ -196,3 +198,10 @@ def check_aim_shot_script(map_dir: Path, combined: str) -> None:
         fail("effect handler must read the effect caster")
     if combined.count("TriggerAddEventPlayerEffectUsed(gt_CombatAttackEffect") != 4:
         fail("effect handler must register the three hero weapon effects and the air shot")
+    # The TPS pick uses the generated hit volumes, without a margin (R-TPS-84).
+    for problem in check_hit_volumes(map_dir):
+        fail(problem)
+    if "c_unitPropRadius" in aim_text or "c_SCOBA_CLICK_MARGIN" in aim_text:
+        fail("the TPS pick must use the hit volumes, not the unit radius and a margin")
+    if "gf_HvRayUnit(" not in aim_text:
+        fail("the TPS pick must test the ray against the hit volumes")

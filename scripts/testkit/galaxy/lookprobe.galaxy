@@ -1,0 +1,41 @@
+// Look probe (R-TPS-84): does the script's camera pitch and yaw follow a
+// real mouse-look turn? TPS mouse look as a player has it. The host tool
+// moves the mouse down (lookdown) and then right (lookright). Each stage
+// records CameraGetPitch / CameraGetYaw over time. Raw values only.
+
+void gf_ProbeLookRecord (string lp_section, string lp_tag) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < 12; lv_i += 1) {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + IntToString(100 + lv_i), "pitch " + FixedToString(CameraGetPitch(1), 2) + " yaw " + FixedToString(CameraGetYaw(1), 2) + " moves " + IntToString(gv_probeMouseMoves) + " relative " + IntToString(BoolToInt(gv_cONTROLRELATIVE[1])) + " tps " + IntToString(BoolToInt(gf_TpsActive(1))));
+        Wait(0.25, c_timeGame);
+    }
+    BankSave(gv_dbgBank);
+}
+
+void gf_ProbeLook (string lp_section) {
+    unit lv_unit;
+
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Thor", 8.0, 1.5);
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(1.0, c_timeGame);
+        gf_ProbeLookRecord(lp_section, "rest");
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "downGo", true);
+        BankSave(gv_dbgBank);
+        gf_ProbeLookRecord(lp_section, "down");
+        Wait(1.0, c_timeGame);
+        gf_ProbeLookRecord(lp_section, "after");
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "rightGo", true);
+        BankSave(gv_dbgBank);
+        gf_ProbeLookRecord(lp_section, "right");
+        Wait(1.0, c_timeGame);
+        gf_ProbeLookRecord(lp_section, "end");
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("LOOK PROBE done.");
+}

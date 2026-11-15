@@ -1,0 +1,114 @@
+// Engine cursor after mouse look (R-TPS-84).
+// Questions: where is the engine's cursor when relative mode goes off, and
+// what makes the engine pick again while the pointer rests?
+// The target is small and sits on the camera centre line. The pointer is
+// parked on the left of the window, away from it. A highlight of the target
+// with the pointer there means the engine picks at the screen centre.
+// Raw values only; the profile prints them. `Ticks` is the count of game
+// loops until the target is highlighted, -1 for never in 2 s.
+const fixed c_PROBE_RECENTER_DX = 10.0;
+const fixed c_PROBE_RECENTER_AIM_HEIGHT = 1.2;
+const fixed c_PROBE_RECENTER_X = 102.5;
+const fixed c_PROBE_RECENTER_Y = 213.5;
+
+// The product's mouse look for one second, then relative mode off. The
+// cursor stays hidden.
+void gf_ProbeRecenterLeaveLook (string lp_section, string lp_tag, unit lp_unit) {
+    gv_mOUSEMIDDLE[1] = false;
+    gf_ControlApply(1);
+    gf_ProbeHoverAim(lp_unit);
+    Wait(1.0, c_timeGame);
+    gf_ProbeHoverSnap(lp_section, lp_tag + "look", lp_unit);
+    CameraForceMouseRelative(1, false);
+}
+
+void gf_ProbeRecenterResult (string lp_section, string lp_tag, unit lp_unit) {
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Ticks", gf_ProbeHoverTicks(lp_unit, true));
+    gf_ProbeHoverSnap(lp_section, lp_tag, lp_unit);
+}
+
+void gf_ProbeRecenterBlink (unit lp_unit) {
+    libNtve_gf_ShowHideUnit(lp_unit, false);
+    Wait(0.5, c_timeGame);
+    libNtve_gf_ShowHideUnit(lp_unit, true);
+}
+
+void gf_ProbeRecenter (string lp_section) {
+    unit lv_unit;
+    point lv_pos;
+    int lv_i;
+    int lv_moves;
+    playergroup lv_group;
+
+    lv_group = PlayerGroupSingle(1);
+    // The flattest 25-unit east lane of the built map: height range 0.28
+    // (heightmap scan of out/SCOBA256.SC2Map). The anchor lane rises 2.7.
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Ultralisk", c_PROBE_RECENTER_DX, c_PROBE_RECENTER_AIM_HEIGHT);
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        lv_pos = UnitGetPosition(lv_unit);
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        // Base: cursor free and hidden, pointer on the left. `pre` is the
+        // negative case. The sweep shows where the target is on screen.
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        UISetCursorVisible(lv_group, false);
+        gf_ProbeHoverStage(lp_section, "base", lv_unit);
+        // A: the unit hidden and shown.
+        gf_ProbeRecenterLeaveLook(lp_section, "a", lv_unit);
+        gf_ProbeRecenterBlink(lv_unit);
+        gf_ProbeRecenterResult(lp_section, "a", lv_unit);
+        // B: nothing changes.
+        gf_ProbeRecenterLeaveLook(lp_section, "b", lv_unit);
+        gf_ProbeRecenterResult(lp_section, "b", lv_unit);
+        // C: the camera set to the values it has.
+        gf_ProbeRecenterLeaveLook(lp_section, "c", lv_unit);
+        Wait(0.25, c_timeGame);
+        gf_ProbeHoverAim(lv_unit);
+        gf_ProbeRecenterResult(lp_section, "c", lv_unit);
+        // D: the camera turned away and back.
+        gf_ProbeRecenterLeaveLook(lp_section, "d", lv_unit);
+        Wait(0.25, c_timeGame);
+        CameraSetValue(1, c_cameraValueYaw, CameraGetYaw(1) + 15.0, 0.0, -1, 10);
+        Wait(0.25, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "dturn", lv_unit);
+        gf_ProbeHoverAim(lv_unit);
+        gf_ProbeRecenterResult(lp_section, "d", lv_unit);
+        // E: the unit moved aside and back.
+        gf_ProbeRecenterLeaveLook(lp_section, "e", lv_unit);
+        Wait(0.25, c_timeGame);
+        UnitSetPosition(lv_unit, PointWithOffset(lv_pos, 0.0, 3.0), false);
+        Wait(0.25, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "emove", lv_unit);
+        UnitSetPosition(lv_unit, lv_pos, false);
+        gf_ProbeRecenterResult(lp_section, "e", lv_unit);
+        // F: the pointer nudged by the host tool. Where does the cursor go?
+        gf_ProbeRecenterLeaveLook(lp_section, "f", lv_unit);
+        gf_ProbeRecenterBlink(lv_unit);
+        Wait(0.5, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "fbefore", lv_unit);
+        lv_moves = gv_probeMouseMoves;
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "nudgeGo", true);
+        BankSave(gv_dbgBank);
+        for (lv_i = 0; (lv_i < 60) && (gv_probeMouseMoves == lv_moves); lv_i += 1) {
+            Wait(0.25, c_timeGame);
+        }
+        Wait(0.5, c_timeGame);
+        gf_ProbeHoverSnap(lp_section, "f", lv_unit);
+        // G: after the nudge, relative mode on for two loops and off again.
+        CameraForceMouseRelative(1, true);
+        Wait(0.125, c_timeGame);
+        CameraForceMouseRelative(1, false);
+        gf_ProbeRecenterBlink(lv_unit);
+        gf_ProbeRecenterResult(lp_section, "g", lv_unit);
+        // Back to point and click. The mode switch restores every setting.
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("HOVER PROBE done.");
+    UnitRemove(lv_unit);
+    gv_dbgEnemy = null;
+}

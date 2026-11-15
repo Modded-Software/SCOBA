@@ -1,0 +1,69 @@
+// Scale probe (R-TPS-84).
+// Question: how wide does the engine's own pick find each unit on screen?
+// The widths tell how the engine composes the actor Scale and the model
+// ScaleMax (Hive: both 3), and calibrate the hit volume table.
+// Flat lane; TPS free cursor, hidden; the camera centre on the unit at
+// `lp_aim` height. The host tool sweeps the pointer across the middle row
+// on each `<tag>Go` key. The companion Medic is moved away. No clicks.
+// Raw values only; the profile prints them.
+
+void gf_ProbeScaleClearAllies () {
+    unitgroup lv_group;
+
+    lv_group = UnitGroup(null, 1, RegionCircle(gv_dbgAnchor, 40.0), UnitFilter(0, 0, 0, 0), 0);
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (UnitGroupLoopCurrent() != gv_tPSUNIT[1]) {
+            UnitSetPosition(UnitGroupLoopCurrent(), Point(20.0, 20.0), false);
+        }
+    }
+    UnitGroupLoopEnd();
+}
+
+void gf_ProbeScaleUnit (string lp_section, string lp_tag, string lp_type, fixed lp_dx, fixed lp_aim) {
+    unit lv_unit;
+
+    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, 0, 4, PointWithOffset(gv_dbgAnchor, lp_dx, 0.0));
+    lv_unit = UnitLastCreated();
+    UnitSetState(lv_unit, c_unitStateStunned, true);
+    UnitSetState(lv_unit, c_unitStateInvulnerable, true);
+    UnitSetFacing(lv_unit, 90.0, 0.0);
+    gv_dbgEnemy = lv_unit;
+    gv_probeHoverAimHeight = lp_aim;
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Dist100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), UnitGetPosition(lv_unit)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Z100", FixedToInt(UnitGetHeight(lv_unit) * 100.0));
+    gf_ProbeHoverStage(lp_section, lp_tag, lv_unit);
+    UnitRemove(lv_unit);
+    gv_dbgEnemy = null;
+    Wait(0.5, c_timeGame);
+}
+
+void gf_ProbeScale (string lp_section) {
+    unit lv_unit;
+    playergroup lv_group;
+
+    lv_group = PlayerGroupSingle(1);
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    // gf_ProbeHoverInit spawns a first Medic and parks the pointer.
+    lv_unit = gf_ProbeHoverInit(lp_section, "Medic", 10.0, 0.5);
+    UnitRemove(lv_unit);
+    gv_dbgEnemy = null;
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        UISetCursorVisible(lv_group, false);
+        gf_ProbeScaleClearAllies();
+        gf_ProbeScaleUnit(lp_section, "medic", "Medic", 10.0, 0.5);
+        gf_ProbeScaleUnit(lp_section, "marine", "Marine", 10.0, 0.6);
+        gf_ProbeScaleUnit(lp_section, "ultra", "Ultralisk", 16.0, 2.0);
+        gf_ProbeScaleUnit(lp_section, "hive", "Hive", 30.0, 3.0);
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("SCALE PROBE done.");
+}

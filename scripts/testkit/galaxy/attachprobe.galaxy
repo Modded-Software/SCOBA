@@ -1,0 +1,101 @@
+// Live unit geometry probe (R-TPS-84).
+// Question: what can Galaxy read from a live unit that follows its scale?
+// Per unit: attachment points, radius and height, at 100% scale and again
+// after UnitSetScale to 200%. Raw values only; the profile prints them.
+// A missing attachment raises a trigger error. That is a result too: the
+// error text names the attachment and the unit.
+const int c_PROBE_ATTACH_NAMES = 10;
+const int c_PROBE_ATTACH_UNITS = 4;
+const fixed c_PROBE_ATTACH_SCALE = 200.0;
+
+string gf_ProbeAttachName (int lp_index) {
+    if (lp_index == 0) { return "Ref_Origin"; }
+    if (lp_index == 1) { return "Ref_Center"; }
+    if (lp_index == 2) { return "Ref_Overhead"; }
+    if (lp_index == 3) { return "Ref_Head"; }
+    if (lp_index == 4) { return "Ref_Target"; }
+    if (lp_index == 5) { return "Origin"; }
+    if (lp_index == 6) { return "Center"; }
+    if (lp_index == 7) { return "Overhead"; }
+    if (lp_index == 8) { return "Head"; }
+    return "Target";
+}
+
+string gf_ProbeAttachUnitType (int lp_index) {
+    if (lp_index == 0) { return "Marine"; }
+    if (lp_index == 1) { return "Zergling"; }
+    if (lp_index == 2) { return "Hive"; }
+    return "Mutalisk";
+}
+
+string gf_ProbeAttachPoint (point lp_point) {
+    if (lp_point == null) {
+        return "null";
+    }
+    return FixedToString(PointGetX(lp_point), 2) + ";" + FixedToString(PointGetY(lp_point), 2) + ";" + FixedToString(PointGetHeight(lp_point), 2);
+}
+
+void gf_ProbeAttachSnap (string lp_section, string lp_tag, unit lp_unit) {
+    int lv_i;
+    point lv_pos;
+
+    lv_pos = UnitGetPosition(lp_unit);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Pos", gf_ProbeAttachPoint(lv_pos));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Ground", FixedToString(WorldHeight(c_heightMapGround, lv_pos), 2));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "UnitHeight", FixedToString(UnitGetHeight(lp_unit), 2));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "PropHeight", FixedToString(UnitGetPropertyFixed(lp_unit, c_unitPropHeight, c_unitPropCurrent), 2));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "RadiusCurrent", FixedToString(UnitGetPropertyFixed(lp_unit, c_unitPropRadius, c_unitPropCurrent), 3));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "RadiusNormal", FixedToString(UnitGetPropertyFixed(lp_unit, c_unitPropRadius, c_unitPropNormal), 3));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Facing", FixedToString(UnitGetFacing(lp_unit), 1));
+    BankSave(gv_dbgBank);
+    for (lv_i = 0; lv_i < c_PROBE_ATTACH_NAMES; lv_i += 1) {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + gf_ProbeAttachName(lv_i), gf_ProbeAttachPoint(UnitGetAttachmentPoint(lp_unit, gf_ProbeAttachName(lv_i))));
+        BankSave(gv_dbgBank);
+    }
+}
+
+void gf_ProbeAttachUnit (string lp_section, string lp_name, unit lp_unit) {
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_name + "Type", UnitGetType(lp_unit));
+    gf_ProbeAttachSnap(lp_section, lp_name + "s100", lp_unit);
+    UnitSetScale(lp_unit, c_PROBE_ATTACH_SCALE, c_PROBE_ATTACH_SCALE, c_PROBE_ATTACH_SCALE);
+    Wait(1.0, c_timeGame);
+    gf_ProbeAttachSnap(lp_section, lp_name + "s200", lp_unit);
+    UnitSetScale(lp_unit, 100.0, 100.0, 100.0);
+    Wait(0.5, c_timeGame);
+}
+
+// The camera eye: what the natives give.
+void gf_ProbeAttachCamera (string lp_section, string lp_tag) {
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "CamTarget", gf_ProbeAttachPoint(CameraGetTarget(1)));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "CamYaw", FixedToString(CameraGetYaw(1), 2));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "CamPitch", FixedToString(CameraGetPitch(1), 2));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "CamDist", FixedToString(CameraGetDistance(1), 2));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "HeroPos", gf_ProbeAttachPoint(UnitGetPosition(gv_tPSUNIT[1])));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "HeroHeight", FixedToString(UnitGetHeight(gv_tPSUNIT[1]), 2));
+    BankSave(gv_dbgBank);
+}
+
+void gf_ProbeAttach (string lp_section) {
+    int lv_i;
+    unit lv_unit;
+
+    gf_DbgReset(lp_section, false, true);
+    gf_ProbeAttachCamera(lp_section, "pnc");
+    for (lv_i = 0; lv_i < c_PROBE_ATTACH_UNITS; lv_i += 1) {
+        libNtve_gf_CreateUnitsAtPoint2(1, gf_ProbeAttachUnitType(lv_i), 0, 1, PointWithOffset(gv_dbgAnchor, 4.0, 0.0));
+        lv_unit = UnitLastCreated();
+        Wait(1.0, c_timeGame);
+        gf_ProbeAttachUnit(lp_section, "u" + IntToString(lv_i), lv_unit);
+        UnitRemove(lv_unit);
+        Wait(0.25, c_timeGame);
+    }
+    // The hero: a custom model, in view by definition.
+    gf_ProbeAttachUnit(lp_section, "hero", gv_tPSUNIT[1]);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    Wait(1.0, c_timeGame);
+    gf_ProbeAttachCamera(lp_section, "tps");
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "attachDone", true);
+    BankSave(gv_dbgBank);
+}

@@ -1,0 +1,147 @@
+// Point probe (R-TPS-84): does the script pick ray match the engine
+// screen-centre ray? A small Zergling at 3, 5, 8 and 12 east of the hero.
+// Pitch sweeps (1 degree) at yaw 0, and a yaw sweep at 5 east, at rest and
+// in aim. Each row records the engine hover and the script pick. The profile
+// compares the bands. Run pncprobe 20261115-224549 measured the engine ray.
+
+void gf_ProbeYawSweep (string lp_section, string lp_tag, unit lp_unit, fixed lp_pitch) {
+    int lv_i;
+    fixed lv_yaw;
+    string lv_row;
+
+    for (lv_i = 0; lv_i < 41; lv_i += 1) {
+        lv_yaw = -10.0 + (lv_i * 0.5);
+        CameraSetValue(1, c_cameraValuePitch, lp_pitch, 0.0, -1, 10);
+        CameraSetValue(1, c_cameraValueYaw, lv_yaw, 0.0, -1, 10);
+        Wait(0.3, c_timeGame);
+        lv_row = "yaw " + FixedToString(lv_yaw, 1) + " engine " + IntToString(BoolToInt(gv_unitHighlight[1] == lp_unit));
+        lv_row = lv_row + " script " + IntToString(BoolToInt(gf_AimUnitAtCrosshair(1, false) == lp_unit));
+        lv_row = lv_row + " cam " + FixedToString(CameraGetPitch(1), 2) + ";" + FixedToString(CameraGetYaw(1), 2);
+        lv_row = lv_row + " O " + FixedToString(gv_aimPickOx, 2) + ";" + FixedToString(gv_aimPickOy, 2) + ";" + FixedToString(gv_aimPickOz, 2);
+        lv_row = lv_row + " D " + FixedToString(gv_aimPickDx, 3) + ";" + FixedToString(gv_aimPickDy, 3) + ";" + FixedToString(gv_aimPickDz, 3);
+        lv_row = lv_row + " U " + FixedToString(PointGetX(UnitGetPosition(lp_unit)), 2) + ";" + FixedToString(PointGetY(UnitGetPosition(lp_unit)), 2);
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + IntToString(100 + lv_i), lv_row);
+    }
+    BankSave(gv_dbgBank);
+}
+
+// Every unit of any player near the lane except the hero and the target is
+// stopped, stunned and parked away, so nothing follows the hero into the ray
+// (the start Medic did). Records what is left within 30.
+void gf_ProbePointClear (string lp_section, unit lp_keep) {
+    unitgroup lv_group;
+    unit lv_u;
+    int lv_left;
+
+    lv_group = UnitGroup(null, c_playerAny, RegionCircle(gv_dbgAnchor, 60.0), UnitFilter(0, 0, 0, 0), 0);
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        if (lv_u != gv_tPSUNIT[1] && lv_u != lp_keep) {
+            UnitIssueOrder(lv_u, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+            UnitSetState(lv_u, c_unitStateStunned, true);
+            UnitSetPosition(lv_u, Point(20.0, 20.0), false);
+        }
+    }
+    UnitGroupLoopEnd();
+    Wait(0.5, c_timeGame);
+    lv_left = 0;
+    lv_group = UnitGroup(null, c_playerAny, RegionCircle(gv_dbgAnchor, 30.0), UnitFilter(0, 0, 0, 0), 0);
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        if (lv_u != gv_tPSUNIT[1] && lv_u != lp_keep) {
+            lv_left += 1;
+            BankValueSetFromString(gv_dbgBank, lp_section, "left" + IntToString(lv_left), UnitGetType(lv_u) + " p" + IntToString(UnitGetOwner(lv_u)));
+        }
+    }
+    UnitGroupLoopEnd();
+    BankValueSetFromInt(gv_dbgBank, lp_section, "leftCount", lv_left);
+    BankSave(gv_dbgBank);
+}
+
+// gt_MedicSpawn (medic.galaxy) creates gv_sCOBAMedic[1] 2.0 game seconds
+// after map init, at hero + (2, 2), with a move order on the hero (follow).
+// Wait for it, then stop, stun and park it off the lane.
+void gf_ProbePointParkMedic (string lp_section) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < 40 && !UnitIsValid(gv_sCOBAMedic[1]); lv_i += 1) {
+        Wait(0.25, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "medicSeen", UnitIsValid(gv_sCOBAMedic[1]));
+    if (UnitIsValid(gv_sCOBAMedic[1])) {
+        UnitIssueOrder(gv_sCOBAMedic[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+        UnitSetState(gv_sCOBAMedic[1], c_unitStateStunned, true);
+        UnitSetPosition(gv_sCOBAMedic[1], Point(20.0, 20.0), false);
+        Wait(0.25, c_timeGame);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "medicDist", FixedToInt(DistanceBetweenPoints(UnitGetPosition(gv_sCOBAMedic[1]), UnitGetPosition(gv_tPSUNIT[1]))));
+    }
+    BankSave(gv_dbgBank);
+}
+
+void gf_ProbePointPass (string lp_section, string lp_mode, unit lp_unit, point lp_hero, fixed lp_yaw, fixed lp_shift) {
+    int lv_k;
+    fixed[4] lv_dist;
+    fixed[4] lv_start;
+
+    lv_dist[0] = 3.0;
+    lv_dist[1] = 5.0;
+    lv_dist[2] = 8.0;
+    lv_dist[3] = 12.0;
+    lv_start[0] = 0.0;
+    lv_start[1] = -5.0;
+    lv_start[2] = -10.0;
+    lv_start[3] = -10.0;
+    for (lv_k = 0; lv_k < 4; lv_k += 1) {
+        UnitSetPosition(lp_unit, PointWithOffset(lp_hero, lv_dist[lv_k], 0.0), false);
+        Wait(0.5, c_timeGame);
+        gf_ProbeRaySweep(lp_section, lp_mode + "p" + IntToString(lv_k) + "_", lp_unit, lp_yaw * ATan2(c_SCOBA_AIM_SHOULDER_OFFSET, lv_dist[lv_k]), lv_start[lv_k] - lp_shift, 0.5, 31 + FixedToInt(lp_shift * 2.0) + 31);
+    }
+    UnitSetPosition(lp_unit, PointWithOffset(lp_hero, 5.0, 0.0), false);
+    Wait(0.5, c_timeGame);
+    gf_ProbeYawSweep(lp_section, lp_mode + "y_", lp_unit, 8.0);
+}
+
+void gf_ProbePoint (string lp_section) {
+    unit lv_unit;
+    point lv_hero;
+    bool lv_parked;
+
+    gv_dbgAnchor = Point(c_PROBE_RECENTER_X, c_PROBE_RECENTER_Y);
+    gf_ProbePointParkMedic(lp_section);
+    gf_ProbePointClear(lp_section, null);
+    lv_unit = gf_ProbeHoverInit(lp_section, "Zergling", 3.0, 0.3);
+    gf_ProbePointClear(lp_section, lv_unit);
+    UnitSetFacing(lv_unit, 180.0, 0.0);
+    if (BankValueGetAsFlag(gv_dbgBank, lp_section, "parkReady")) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+        gv_mOUSEMIDDLE[1] = true;
+        gf_ControlApply(1);
+        UISetCursorVisible(PlayerGroupSingle(1), false);
+        gf_ProbePointClear(lp_section, lv_unit);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "centreGo", true);
+        BankSave(gv_dbgBank);
+        lv_parked = gf_ProbeHoverPark("POINT PROBE: centring the pointer. Do not touch the mouse.", 30, gv_probeMouseMoves + 3);
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "centred", lv_parked);
+        lv_hero = UnitGetPosition(gv_tPSUNIT[1]);
+        BankValueSetFromString(gv_dbgBank, lp_section, "geom", "hero " + FixedToString(PointGetX(lv_hero), 2) + ";" + FixedToString(PointGetY(lv_hero), 2) + " heroZ " + FixedToString(UnitGetHeight(gv_tPSUNIT[1]), 2) + " mouse " + IntToString(gv_probeMouseX) + ";" + IntToString(gv_probeMouseY));
+        libNtve_gf_ShowHideUnit(gv_tPSUNIT[1], false);
+        gf_ProbePointPass(lp_section, "r", lv_unit, lv_hero, 0.0, 0.0);
+        // Aim: the camera follows the hero and the shoulder proxy.
+        gf_AimBegin(1);
+        gf_ControlApply(1);
+        UISetCursorVisible(PlayerGroupSingle(1), false);
+        Wait(1.0, c_timeGame);
+        BankValueSetFromString(gv_dbgBank, lp_section, "aimState", "aim " + IntToString(BoolToInt(gv_aIMACTIVE[1])) + " proxy " + IntToString(BoolToInt(UnitIsValid(gv_aimCameraProxy[1]))) + " relative " + IntToString(BoolToInt(gv_cONTROLRELATIVE[1])) + " dist " + FixedToString(CameraGetDistance(1), 2));
+        gf_ProbePointPass(lp_section, "a", lv_unit, lv_hero, 1.0, 12.0);
+        gf_AimEnd(1);
+        libNtve_gf_ShowHideUnit(gv_tPSUNIT[1], true);
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "hoverDone", true);
+    BankSave(gv_dbgBank);
+    gf_ProbeSay("POINT PROBE done.");
+}
