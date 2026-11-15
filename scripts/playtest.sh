@@ -56,6 +56,7 @@ actions:
   treepath               rebuild, build tree and spore pathing test map, run it
   fprot                  rebuild, build footprint rotation probe map, run it
   flora                  rebuild, build flora and lane hazard test map, run it
+  crushtest              rebuild, build the grass crush test map, run it
   picklog                rebuild, build the pick log map, launch it for manual play;
                          the log goes to the SCOBAPNCPROBE bank, section picklog
   build-profile <name>   rebuild, build one profile map, stop
@@ -73,6 +74,7 @@ profile_timeout() {
         pncprobe) printf '%s\n' "${SC2_CASE_TIMEOUT:-180}" ;;
         treepath) printf '%s\n' "${SC2_CASE_TIMEOUT:-240}" ;;
         flora) printf '%s\n' "${SC2_CASE_TIMEOUT:-300}" ;;
+        crushtest) printf '%s\n' "${SC2_CASE_TIMEOUT:-240}" ;;
         combat|tps)
             if [ "${SC2_TEST_GROUP:-all}" = all ]; then
                 printf '%s\n' "${SC2_CASE_TIMEOUT:-420}"
@@ -101,7 +103,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora) ;;
+        combat|tps|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -149,7 +151,7 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora)
+    aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest)
         run_profile "$ACTION"
         ;;
     picklog)

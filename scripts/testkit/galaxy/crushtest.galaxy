@@ -1,0 +1,65 @@
+// Crush test: a Marine walks through grass (nothing may be removed), then a
+// Goliath and a Queen walk through grass (each target must be removed).
+// Targets come from the generated crushtest_targets.galaxy.
+
+trigger gt_CrushTest;
+const fixed c_CT_SPEED = 6.0;
+const fixed c_CT_TIMEOUT = 15.0;
+
+void gf_CrushTestTargets ();
+
+unit gf_CtSpawn (string lp_type, fixed lp_x, fixed lp_y) {
+    UnitCreate(1, lp_type, 0, 1, Point(lp_x, lp_y), 0.0);
+    UnitSetPropertyFixed(UnitLastCreated(), c_unitPropMovementSpeed, c_CT_SPEED);
+    UnitSetState(UnitLastCreated(), c_unitStateInvulnerable, true);
+    return UnitLastCreated();
+}
+
+// Walks lp_u onto plant lp_i; records arrival and the plant's removed flag.
+void gf_CtWalk (string lp_section, string lp_key, unit lp_u, int lp_i) {
+    point lv_at = Point(gv_crushX[lp_i], gv_crushY[lp_i]);
+    fixed lv_t = 0.0;
+
+    UnitIssueOrder(lp_u, OrderTargetingPoint(AbilityCommand("move", 0), lv_at), c_orderQueueReplace);
+    while (lv_t < c_CT_TIMEOUT && DistanceBetweenPoints(UnitGetPosition(lp_u), lv_at) > 0.5) {
+        Wait(0.125, c_timeGame);
+        lv_t += 0.125;
+    }
+    Wait(c_CRUSH_PERIOD * 2.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_key + "Arrived", DistanceBetweenPoints(UnitGetPosition(lp_u), lv_at) <= 0.5);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_key + "Gone", gv_crushGone[lp_i]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "Index", lp_i);
+}
+
+void gf_CtEnd (string lp_section, unit lp_u) {
+    BankValueSetFromInt(gv_dbgBank, lp_section, "removed", gv_crushRemoved);
+    UnitRemove(lp_u);
+    BankSave(gv_dbgBank);
+}
+
+bool gt_CrushTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBACRUSH", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    BankValueSetFromInt(gv_dbgBank, "meta", "count", c_CRUSH_COUNT);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    TriggerEnable(gt_XCenterUnitOrders, false);
+    TriggerEnable(gt_XTopUnitOrders, false);
+    TriggerEnable(gt_XBottomUnitOrders, false);
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_CrushTestTargets();
+    BankValueSetFromInt(gv_dbgBank, "meta", "realClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_CrushTest_Init () {
+    gt_CrushTest = TriggerCreate("gt_CrushTest_Func");
+    TriggerAddEventMapInit(gt_CrushTest);
+}

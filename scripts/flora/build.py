@@ -21,7 +21,7 @@ from typing import NamedTuple
 
 from footprints.catalog import append_catalog
 
-from . import config, scene as scene_mod, terrain as terrain_mod, treevary
+from . import config, crush, scene as scene_mod, terrain as terrain_mod, treevary
 from .grid import distance_to
 from .lanes import Lane, Placed, find_lanes, hazard_cells, place_hazards, settle
 from .rules import context
@@ -149,6 +149,7 @@ def apply_flora(map_dir: Path) -> bool:
     data = map_dir / "Base.SC2Data" / "GameData"
     append_catalog(data / "FootprintData.xml", none_footprint_xml())
     append_catalog(data / "ActorData.xml", plant_actors_xml())
+    (map_dir / crush.DATA_FILE).write_text(crush.galaxy(crush_rows(p, terrain_mod.load(map_dir))), encoding="utf-8")
     variations = {k: f.variations for k, f in config.FAMILIES.items()} | config.HAZARD_VARIATIONS
     add_preload(map_dir / "Preload.xml", sorted({h.kind for h in p.hazards} | {pl.kind for pl in p.plants}), variations)
     marker.write_text(f"plants={len(p.plants)} hazards={len(p.hazards)} lanes={len(p.lanes)}\n", encoding="utf-8")
@@ -208,6 +209,10 @@ def check_flora(map_dir: Path) -> list[str]:
         to_lane = min(math.hypot(x - lx, y - ly) for lx, ly in lane_points)
         if to_wet[int(y), int(x)] <= config.BRAMBLE_WATER_CLEAR or to_lane <= config.BRAMBLE_LANE_CLEAR - 1:
             problems.append(f"bramble at ({x:.1f},{y:.1f}) is near water or on a lane (lane {to_lane:.1f})")
+    for h in p.hazards:
+        clear = config.HAZARD_WATER_CLEAR.get(h.kind, 0.0)
+        if clear > 0.0 and to_wet[int(h.y), int(h.x)] < config.HAZARD_HALF[h.kind] + clear - 1.0:
+            problems.append(f"{h.kind} at ({h.x:.1f},{h.y:.1f}) is {to_wet[int(h.y), int(h.x)]:.1f} from water")
     wet = terrain.depth > 0
     in_river = sum(1 for _k, x, y, _z, _a in placed if wet[int(y), int(x)])
     if 100 * in_river < config.RIVER_MIN_PER_100 * int(wet.sum()):
@@ -217,6 +222,11 @@ def check_flora(map_dir: Path) -> list[str]:
     for k, x, y, _z, _a in placed:
         if k in ("ZerusTallGrassCluster", "ZerusWaterPlant") and min(math.hypot(x - lx, y - ly) for lx, ly in lane_points) <= config.GRASS_LANE_CLEAR - 1:
             problems.append(f"{k} at ({x:.1f},{y:.1f}) is on a lane")
+    want_crush = crush.galaxy(crush_rows(p, terrain))
+    crush_path = map_dir / crush.DATA_FILE
+    have_crush = crush_path.read_text(encoding="utf-8").replace("\r\n", "\n") if crush_path.exists() else ""
+    if have_crush != want_crush:
+        problems.append(f"{crush.DATA_FILE} does not match the placed crushable flora")
     lookalikes = treevary.conflicts([t for _m, t in treevary.parse((map_dir / "Objects").read_text(encoding="utf-8"))])
     if lookalikes:
         problems.append(f"{len(lookalikes)} neighbouring tree pairs look alike (scale, rotation and variation)")
@@ -227,3 +237,8 @@ def check_flora(map_dir: Path) -> list[str]:
             problems.append(f"model {kind} can fade (no Occlusion None)")
     problems.extend(f"lane {i} detour {d:.2f} over {config.LANE_DETOUR_MAX}" for i, d in enumerate(p.detour) if d > config.LANE_DETOUR_MAX or not math.isfinite(d))
     return problems
+
+
+def crush_rows(p: Plan, terrain: terrain_mod.Terrain) -> list[tuple[str, float, float, float, float]]:
+    """(kind, x, y, z, scale) per plant; z is the placed doodad height."""
+    return [(pl.kind, pl.x, pl.y, round(terrain_mod.ground_z(terrain, pl.x, pl.y) + config.GROUND_LIFT, 3), pl.scale) for pl in p.plants]

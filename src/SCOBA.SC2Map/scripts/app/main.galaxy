@@ -12,6 +12,8 @@ include "scripts/app/app/init"
 include "scripts/app/app/alliances"
 include "scripts/app/systems/hit_volumes"
 include "scripts/app/data/hit_volumes_load"
+include "scripts/app/data/flora_crush"
+include "scripts/app/systems/crush"
 include "scripts/app/systems/aim"
 include "scripts/app/systems/aim_shooting"
 include "scripts/app/systems/camera"
@@ -138,4 +140,5 @@ void main () {
     gt_DamageCleanup_Init();
     gt_DamageFloater_Init();
     gt_UiFloaterTick_Init();
+    gt_CrushTick_Init();
 }

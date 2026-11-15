@@ -114,7 +114,7 @@ def _at(lane: Lane, distance: float, direction: int) -> tuple[int, float, float,
     return None
 
 
-def blocker(x: float, y: float, half: float, terrain: Terrain, scene: Scene) -> str:
+def blocker(x: float, y: float, half: float, terrain: Terrain, scene: Scene, kind: str = "") -> str:
     """Why a hazard cannot stand here, or "" when it can."""
     n = terrain.height.shape[0]
     rows, cols = disk_cells(x, y, half + 0.5, (n, n))
@@ -129,6 +129,11 @@ def blocker(x: float, y: float, half: float, terrain: Terrain, scene: Scene) -> 
         return "tree"
     if (terrain.slope[rows, cols] > config.WALL_SLOPE).any():
         return "wall"
+    clear = config.HAZARD_WATER_CLEAR.get(kind, 0.0)
+    if clear > 0.0:
+        wr, wc = disk_cells(x, y, half + clear, (n, n))
+        if terrain.wet[wr, wc].any():
+            return "near water"
     return ""
 
 
@@ -164,7 +169,7 @@ def place_hazards(lanes: list[Lane], terrain: Terrain, scene: Scene) -> tuple[li
                     if not spots:
                         why = "lane too short"
                         continue
-                    reasons = [blocker(x, y, half, terrain, scene) for _, x, y, _ in spots]
+                    reasons = [blocker(x, y, half, terrain, scene, hazard.kind) for _, x, y, _ in spots]
                     if not any(reasons):
                         chosen, along = spots, hazard.distance + shift
                         break

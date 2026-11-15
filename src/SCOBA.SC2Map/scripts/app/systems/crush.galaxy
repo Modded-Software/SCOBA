@@ -1,0 +1,161 @@
+// Crushable flora: Goliaths and Queens remove the generated flora they walk into.
+// The table (data/flora_crush) lists the placed crushable doodads by bucket.
+// Each removed plant gets a debris model; models are destroyed after
+// c_CRUSH_DEBRIS_LIFE. Counters are read by the crush test profile.
+
+const fixed c_CRUSH_PERIOD = 0.25;
+const fixed c_CRUSH_REACH = 2.5;  // walker centre to plant centre
+const fixed c_CRUSH_PICK = 0.3;  // removal circle around one plant
+// Operator pick (2026-11-16): three clips together, sized by gv_crushS.
+const string c_CRUSH_DEBRIS = "PhysicsImpactDustMassive";
+const string c_CRUSH_DEBRIS2 = "JumpLandDust";
+const string c_CRUSH_DEBRIS3 = "PhysicsImpactRockMassive";
+const fixed c_CRUSH_JITTER_LO = 1.5;  // operator: 50 % to 100 % bigger
+const fixed c_CRUSH_JITTER_HI = 2.0;
+const fixed c_CRUSH_OFFSET = 0.6;  // each clip's origin jitters this far in x and y
+const fixed c_CRUSH_ANIM_SPEED = 0.25;  // operator: quarter speed, clips linger
+const fixed c_CRUSH_DEBRIS_LIFE = 16.0;  // 4 s clips at quarter speed
+const int c_CRUSH_RING = 384;  // 3 clips x 128 plants within one life
+
+trigger gt_CrushTick;
+int gv_crushRemoved;
+actor[c_CRUSH_RING] gv_crushDebris;
+fixed[c_CRUSH_RING] gv_crushDebrisEnd;
+int gv_crushDebrisNext;
+const fixed c_CRUSH_DELAY_LO = 0.1;
+const fixed c_CRUSH_DELAY_HI = 0.3;
+const fixed c_CRUSH_LATE_PERIOD = 0.0625;
+const int c_CRUSH_LATE = 64;
+trigger gt_CrushLate;
+string[c_CRUSH_LATE] gv_crushLateModel;
+point[c_CRUSH_LATE] gv_crushLateAt;
+fixed[c_CRUSH_LATE] gv_crushLateScale;
+fixed[c_CRUSH_LATE] gv_crushLateDue;
+int gv_crushLateNext;
+
+void gf_CrushDebrisSweep () {
+    int lv_i;
+    fixed lv_now = GameGetMissionTime();
+
+    for (lv_i = 0; lv_i < c_CRUSH_RING; lv_i += 1) {
+        if (gv_crushDebris[lv_i] != null && gv_crushDebrisEnd[lv_i] <= lv_now) {
+            ActorSend(gv_crushDebris[lv_i], "Destroy");
+            gv_crushDebris[lv_i] = null;
+        }
+    }
+}
+
+// One effect model, played once at lp_at, removed after c_CRUSH_DEBRIS_LIFE.
+void gf_CrushFx (string lp_model, point lp_at, fixed lp_scale) {
+    int lv_slot = gv_crushDebrisNext;
+
+    if (gv_crushDebris[lv_slot] != null) {
+        ActorSend(gv_crushDebris[lv_slot], "Destroy");
+    }
+    libNtve_gf_CreateModelAtPoint(lp_model, PointWithOffset(lp_at, RandomFixed(-c_CRUSH_OFFSET, c_CRUSH_OFFSET), RandomFixed(-c_CRUSH_OFFSET, c_CRUSH_OFFSET)));
+    gv_crushDebris[lv_slot] = libNtve_gf_ActorLastCreated();
+    // Impact clips have only Birth; the default Stand shows nothing.
+    ActorSend(gv_crushDebris[lv_slot], "AnimPlay Crush Birth NonLooping 0");
+    ActorSend(gv_crushDebris[lv_slot], libNtve_gf_AnimSetTimeScaleGlobal(c_CRUSH_ANIM_SPEED));
+    ActorSend(gv_crushDebris[lv_slot], libNtve_gf_SetScale(lp_scale, lp_scale, lp_scale, 0.0));
+    gv_crushDebrisEnd[lv_slot] = GameGetMissionTime() + c_CRUSH_DEBRIS_LIFE;
+    gv_crushDebrisNext = ModI(lv_slot + 1, c_CRUSH_RING);
+}
+
+void gf_CrushLater (string lp_model, point lp_at, int lp_i);
+
+void gf_CrushPlant (int lp_i) {
+    point lv_at = Point(gv_crushX[lp_i], gv_crushY[lp_i]);
+
+    gv_crushGone[lp_i] = true;
+    gv_crushRemoved += 1;
+    libNtve_gf_RemoveDoodadsinRegion(RegionCircle(lv_at, c_CRUSH_PICK), gv_crushKindName[gv_crushKind[lp_i]]);
+    // Operator: rocks at impact, the two dust clips after a short random delay.
+    gf_CrushFx(c_CRUSH_DEBRIS3, lv_at, gv_crushS[lp_i] * RandomFixed(c_CRUSH_JITTER_LO, c_CRUSH_JITTER_HI));
+    gf_CrushLater(c_CRUSH_DEBRIS, lv_at, lp_i);
+    gf_CrushLater(c_CRUSH_DEBRIS2, lv_at, lp_i);
+}
+
+// Delayed clips: queued here, played by gt_CrushLate when due.
+void gf_CrushLater (string lp_model, point lp_at, int lp_i) {
+    int lv_q = gv_crushLateNext;
+
+    if (gv_crushLateModel[lv_q] != "") {
+        gf_CrushFx(gv_crushLateModel[lv_q], gv_crushLateAt[lv_q], gv_crushLateScale[lv_q]);  // queue full: play now
+    }
+    gv_crushLateModel[lv_q] = lp_model;
+    gv_crushLateAt[lv_q] = lp_at;
+    gv_crushLateScale[lv_q] = gv_crushS[lp_i] * RandomFixed(c_CRUSH_JITTER_LO, c_CRUSH_JITTER_HI);
+    gv_crushLateDue[lv_q] = GameGetMissionTime() + RandomFixed(c_CRUSH_DELAY_LO, c_CRUSH_DELAY_HI);
+    gv_crushLateNext = ModI(lv_q + 1, c_CRUSH_LATE);
+}
+
+bool gt_CrushLate_Func (bool testConds, bool runActions) {
+    int lv_q;
+    fixed lv_now = GameGetMissionTime();
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_q = 0; lv_q < c_CRUSH_LATE; lv_q += 1) {
+        if (gv_crushLateModel[lv_q] != "" && gv_crushLateDue[lv_q] <= lv_now) {
+            gf_CrushFx(gv_crushLateModel[lv_q], gv_crushLateAt[lv_q], gv_crushLateScale[lv_q]);
+            gv_crushLateModel[lv_q] = "";
+        }
+    }
+    return true;
+}
+
+void gf_CrushAround (point lp_at) {
+    int lv_bx = FixedToInt(PointGetX(lp_at) / c_CRUSH_BUCKET);
+    int lv_by = FixedToInt(PointGetY(lp_at) / c_CRUSH_BUCKET);
+    int lv_x;
+    int lv_y;
+    int lv_b;
+    int lv_i;
+
+    for (lv_y = MaxI(0, lv_by - 1); lv_y <= MinI(c_CRUSH_GRID - 1, lv_by + 1); lv_y += 1) {
+        for (lv_x = MaxI(0, lv_bx - 1); lv_x <= MinI(c_CRUSH_GRID - 1, lv_bx + 1); lv_x += 1) {
+            lv_b = lv_y * c_CRUSH_GRID + lv_x;
+            for (lv_i = gv_crushStart[lv_b]; lv_i < gv_crushStart[lv_b] + gv_crushLen[lv_b]; lv_i += 1) {
+                if (!gv_crushGone[lv_i] && DistanceBetweenPoints(lp_at, Point(gv_crushX[lv_i], gv_crushY[lv_i])) <= c_CRUSH_REACH) {
+                    gf_CrushPlant(lv_i);
+                }
+            }
+        }
+    }
+}
+
+void gf_CrushType (string lp_type) {
+    unitgroup lv_g = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+    int lv_n = UnitGroupCount(lv_g, c_unitCountAll);
+    int lv_i;
+    unit lv_u;
+
+    for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
+        lv_u = UnitGroupUnit(lv_g, lv_i);
+        if (UnitIsAlive(lv_u)) {
+            gf_CrushAround(UnitGetPosition(lv_u));
+        }
+    }
+}
+
+bool gt_CrushTick_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (c_CRUSH_COUNT > 0) {
+        gf_CrushType("Goliath");
+        gf_CrushType("Queen");
+    }
+    gf_CrushDebrisSweep();
+    return true;
+}
+
+void gt_CrushTick_Init () {
+    gf_CrushLoad();
+    gt_CrushTick = TriggerCreate("gt_CrushTick_Func");
+    TriggerAddEventTimePeriodic(gt_CrushTick, c_CRUSH_PERIOD, c_timeGame);
+    gt_CrushLate = TriggerCreate("gt_CrushLate_Func");
+    TriggerAddEventTimePeriodic(gt_CrushLate, c_CRUSH_LATE_PERIOD, c_timeGame);
+}

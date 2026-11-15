@@ -1,0 +1,97 @@
+// Operator gallery: candidate crush effects in front of the hero, labelled.
+// Each model is created exactly as crush.galaxy does it and replayed every
+// c_FXG_PERIOD seconds. Not a pass/fail test: the operator judges the looks.
+
+const int c_FXG_N = 16;
+const int c_FXG_COLS = 8;
+const fixed c_FXG_GAP = 3.0;
+const fixed c_FXG_NEAR = 7.0;
+const fixed c_FXG_ROW = 5.0;
+const fixed c_FXG_PERIOD = 3.0;
+
+string[c_FXG_N] gv_fxgModel;
+string[c_FXG_N] gv_fxgModel2;  // optional second clip in the same slot
+point[c_FXG_N] gv_fxgAt;
+actor[c_FXG_N] gv_fxgActor;
+actor[c_FXG_N] gv_fxgActor2;
+trigger gt_FxGallery;
+
+// Round 2 (2026-11-16): mud, biological, debris. Slot 15 is the current
+// crush pick (two clips together) for side-by-side comparison.
+void gf_FxgList () {
+    gv_fxgModel[0] = "PhysicsImpactCreepLight";
+    gv_fxgModel[1] = "PhysicsImpactCreepLarge";
+    gv_fxgModel[2] = "PhysicsImpactCreepMassive";
+    gv_fxgModel[3] = "PhysicsImpactSandLarge";
+    gv_fxgModel[4] = "PhysicsImpactSandMassive";
+    gv_fxgModel[5] = "PhysicsImpactRockLarge";
+    gv_fxgModel[6] = "PhysicsImpactRockMassive";
+    gv_fxgModel[7] = "ZergLargeTriggeredExplosion";
+    gv_fxgModel[8] = "ZergBuildingBloodHeavy";
+    gv_fxgModel[9] = "ZergBuildingBloodTinyHeavy";
+    gv_fxgModel[10] = "RavagerCorrosiveBileImpact";
+    gv_fxgModel[11] = "NydusCreepSpout";
+    gv_fxgModel[12] = "QueenCreepBirth";
+    gv_fxgModel[13] = "LurkerMPAttackDeathBloodGeyser";
+    gv_fxgModel[14] = "HydraliskGroundAttackImpact";
+    gv_fxgModel[15] = "PhysicsImpactDustMassive";
+    gv_fxgModel2[15] = "JumpLandDust";
+}
+
+void gf_FxgLayout (unit lp_hero) {
+    point lv_o = UnitGetPosition(lp_hero);
+    fixed lv_f = UnitGetFacing(lp_hero);
+    fixed lv_side;
+    fixed lv_fwd;
+    int lv_i;
+
+    for (lv_i = 0; lv_i < c_FXG_N; lv_i += 1) {
+        lv_side = (IntToFixed(ModI(lv_i, c_FXG_COLS)) - (IntToFixed(c_FXG_COLS) - 1.0) / 2.0) * c_FXG_GAP;
+        lv_fwd = c_FXG_NEAR + IntToFixed(lv_i / c_FXG_COLS) * c_FXG_ROW;
+        gv_fxgAt[lv_i] = PointWithOffsetPolar(PointWithOffsetPolar(lv_o, lv_fwd, lv_f), lv_side, lv_f - 90.0);
+        TextTagCreate(StringToText(IntToString(lv_i) + " " + gv_fxgModel[lv_i] + " " + gv_fxgModel2[lv_i]), 18, gv_fxgAt[lv_i], 1.5, true, false, PlayerGroupAll());
+    }
+}
+
+void gf_FxgPlay () {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < c_FXG_N; lv_i += 1) {
+        if (gv_fxgActor[lv_i] != null) {
+            ActorSend(gv_fxgActor[lv_i], "Destroy");
+        }
+        libNtve_gf_CreateModelAtPoint(gv_fxgModel[lv_i], gv_fxgAt[lv_i]);
+        gv_fxgActor[lv_i] = libNtve_gf_ActorLastCreated();
+        ActorSend(gv_fxgActor[lv_i], "AnimPlay Crush Birth NonLooping 0");
+        ActorSend(gv_fxgActor[lv_i], libNtve_gf_SetScale(1.5, 1.5, 1.5, 0.0));
+        if (gv_fxgActor2[lv_i] != null) {
+            ActorSend(gv_fxgActor2[lv_i], "Destroy");
+            gv_fxgActor2[lv_i] = null;
+        }
+        if (gv_fxgModel2[lv_i] != "") {
+            libNtve_gf_CreateModelAtPoint(gv_fxgModel2[lv_i], gv_fxgAt[lv_i]);
+            gv_fxgActor2[lv_i] = libNtve_gf_ActorLastCreated();
+            ActorSend(gv_fxgActor2[lv_i], "AnimPlay Crush Birth NonLooping 0");
+            ActorSend(gv_fxgActor2[lv_i], libNtve_gf_SetScale(1.5, 1.5, 1.5, 0.0));
+        }
+    }
+}
+
+bool gt_FxGallery_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gf_FxgList();
+    gf_FxgLayout(gv_heroActive);
+    while (true) {
+        gf_FxgPlay();
+        Wait(c_FXG_PERIOD, c_timeGame);
+    }
+    return true;
+}
+
+void gt_FxGallery_Init () {
+    gt_FxGallery = TriggerCreate("gt_FxGallery_Func");
+    TriggerExecute(gt_FxGallery, false, false);
+}

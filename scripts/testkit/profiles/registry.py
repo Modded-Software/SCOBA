@@ -17,6 +17,8 @@ PROFILE_OUTPUTS = {
     "treepath": ROOT / "out" / "SCOBA256_treepath.SC2Map",
     "fprot": ROOT / "out" / "SCOBA256_fprot.SC2Map",
     "flora": ROOT / "out" / "SCOBA256_flora.SC2Map",
+    "crushtest": ROOT / "out" / "SCOBA256_crushtest.SC2Map",
+    "fxgallery": ROOT / "out" / "SCOBA256_fxgallery.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -32,6 +34,8 @@ PROFILE_BANKS = {
     "treepath": ("SCOBATREEPATH",),
     "fprot": ("SCOBAFPROT",),
     "flora": ("SCOBAFLORA",),
+    "crushtest": ("SCOBACRUSH",),
+    "fxgallery": (),
 }
 
 
@@ -72,4 +76,7 @@ def profile_module(name):
     if name == "flora":
         from . import flora
         return flora
+    if name == "crushtest":
+        from . import crushtest
+        return crushtest
     raise SystemExit(f"unknown test profile: {name}")

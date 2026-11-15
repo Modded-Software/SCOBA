@@ -133,12 +133,14 @@ HAZARDS = (
 HAZARD_VARIATIONS = {"ZerusLavaGroundCrack": 3, "ZerusLavaGroundSpire": 3, "ZerusTarPit": 7}
 # Stock footprint half sizes, to keep the lane open (FootprintDoodad4x4 etc.).
 HAZARD_HALF = {"ZerusLavaGroundCrack": 1.5, "ZerusLavaGroundSpire": 0.5, "ZerusTarPit": 2.0}
+# Lava hazards keep this far (cells, beyond their half size) from water (operator, 2026-11-16).
+HAZARD_WATER_CLEAR = {"ZerusLavaGroundCrack": 8.0, "ZerusLavaGroundSpire": 8.0}
 # Hazard sits this share of the lane's half clearance to the side, at most HAZARD_SIDE_MAX.
 HAZARD_SIDE = 0.5
 HAZARD_SIDE_MAX = 4.0
 # A lane's corridor: cells this close to its route. Detours are measured inside it.
 LANE_CORRIDOR = 8.0
 # Shared shifts along the lane tried when a pair's spot is blocked.
-HAZARD_SHIFTS = (0.0, 3.0, -3.0, 6.0, -6.0)
+HAZARD_SHIFTS = (0.0, 3.0, -3.0, 6.0, -6.0, 9.0, 12.0, 15.0)  # far shifts: lava clear of water
 # A lane must stay connected with hazards in, no longer than this multiple.
 LANE_DETOUR_MAX = 1.25
