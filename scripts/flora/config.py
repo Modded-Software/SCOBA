@@ -21,14 +21,19 @@ FLAT_SLOPE = 0.45
 RELIEF = 4.0
 RELIEF_RADIUS = 3
 # Water: depth bands below the water surface (map WaterData height).
-GROUND_LIFT = 1.0  # placed z = computed ground + this (operator probe 2026-11-15, row F)
+GROUND_LIFT = 3.0  # placed z = computed ground + this (probe row F +1, then operator +2)
+DOODAD_LIFT = 2.0  # non-flora absolute doodads are raised by this (operator, 2026-11-15)
 SHORE_BAND = 3.0  # dry cells this close to water are shore
 BRAMBLE_FOREST = 2  # ZerusBrambles need this many trees within CLUSTER_RADIUS
 BRAMBLE_WATER_CLEAR = 4.0  # and stay this far from water
 BRAMBLE_LANE_CLEAR = 6.0  # and from any lane route
 SHALLOW = 0.6  # swamp plants stand in water up to this depth
 WATER_PLANT_MIN = 0.2
-WATER_PLANT_MAX = 2.5
+GRASS_LANE_CLEAR = 3.0  # river grass and water plants keep this far from lane routes
+GRASS_RIVER_WEIGHT = 1.0  # land grass weight is its noise (GRASS_LAND_NOISE to 1)
+GRASS_LAND_NOISE = 0.8  # land grass only where noise exceeds this (operator: less grass on land)
+RIVER_MIN_PER_100 = 6  # build check: props per 100 water cells
+FLORA_CAP = 8000  # build check: total flora and hazard props (load time, frame rate)
 
 # Keep-outs (radius around the object).
 KEEP_HERO = 12.0  # player 1 units and the faction heroes
@@ -67,12 +72,12 @@ FAMILIES: dict[str, Family] = {
     "ZerusPlantClusterLarge": Family(4.0, 80, (1.0, 1.2), 6),
     "ZerusPlantClusterMedium": Family(3.0, 150, (1.0, 1.2), 8),
     "ZerusPlantClusterSmall": Family(2.0, 250, (1.0, 1.2), 8),
-    "ZerusWaterPlant": Family(3.0, 150, (0.9, 1.3), 11),
+    "ZerusWaterPlant": Family(3.0, 350, (0.9, 1.4), 11),
     "ZerusSwampPlantsLarge": Family(5.0, 60, (0.9, 1.2), 5),
-    "ZerusSwampPlants": Family(2.5, 250, (0.9, 1.2), 7),
+    "ZerusSwampPlants": Family(2.5, 450, (0.9, 1.4), 7),
     "ZerusGroundVines": Family(4.0, 200, (0.95, 1.15), 4),
     "ZerusBrambles": Family(3.0, 400, (0.9, 3.0), 3),
-    "ZerusTallGrassCluster": Family(3.5, 300, (0.9, 1.2), 2),
+    "ZerusTallGrassCluster": Family(3.5, 1400, (0.4, 1.0), 2),  # river + land
     "ZerusDeadlyPlant": Family(5.0, 16, (1.0, 1.2), 1),
     "ZerusPlant": Family(3.0, 250, (0.9, 1.1), 20),  # also replaces dry-ground reeds
     "ZerusPlantlife": Family(3.0, 120, (0.9, 1.1), 17),

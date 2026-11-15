@@ -107,7 +107,9 @@ def load(map_dir: Path) -> Terrain:
     map_dir = Path(map_dir)
     raw = _vertices(map_dir)
     scale = _scale(map_dir)
-    vertices = raw * scale + _offset(raw, scale, (map_dir / "Objects").read_text(encoding="utf-8"))
+    # Trees raised by flora.lift (marker present) sit DOODAD_LIFT above the ground they were fitted to.
+    lifted = config.DOODAD_LIFT if (map_dir / ".doodads_lifted").exists() else 0.0
+    vertices = raw * scale + _offset(raw, scale, (map_dir / "Objects").read_text(encoding="utf-8")) - lifted
     height = (vertices[:-1, :-1] + vertices[1:, :-1] + vertices[:-1, 1:] + vertices[1:, 1:]) / 4
     n = height.shape[0]
     gy, gx = np.gradient(height)

@@ -98,7 +98,7 @@ class RuleTests(unittest.TestCase):
         got = self.cells_of("ZerusWaterPlant")
         self.assertTrue(got)
         for x, y in got:
-            self.assertTrue(config.WATER_PLANT_MIN < self.terrain.depth[y, x] < config.WATER_PLANT_MAX)
+            self.assertGreater(self.terrain.depth[y, x], config.WATER_PLANT_MIN)
 
     def test_swamp_near_water(self) -> None:
         dist = distance_to(self.terrain.wet)
@@ -107,12 +107,20 @@ class RuleTests(unittest.TestCase):
         self.assertTrue(all(dist[y, x] <= config.SHORE_BAND for x, y in got))
 
     def test_ground_rules_stay_dry_flat_and_out_of_keepouts(self) -> None:
-        for kind in ("ZerusTallGrassCluster", "ZerusBrambles", "ZerusGroundVines", "ZerusPlant", "ZerusPlantlife",
+        for kind in ("ZerusBrambles", "ZerusGroundVines", "ZerusPlant", "ZerusPlantlife",
                      "ZerusPlantClusterSmall", "ZerusPlantClusterMedium", "ZerusPlantClusterLarge", "ZerusDeadlyPlant"):
             for x, y in self.cells_of(kind):
                 self.assertFalse(self.terrain.wet[y, x], kind)
                 self.assertLess(self.terrain.slope[y, x], config.FLAT_SLOPE, kind)
                 self.assertFalse(self.scene.keepout[y, x], kind)
+
+    def test_tall_grass_fills_water_and_keeps_out(self) -> None:
+        cells = self.cells_of("ZerusTallGrassCluster")
+        self.assertTrue(any(self.terrain.wet[y, x] for x, y in cells))  # river grass exists
+        for x, y in cells:
+            self.assertFalse(self.scene.keepout[y, x])
+            # Negative case: no grass on a lane route.
+            self.assertGreater(self.ctx.to_lane[y, x], config.GRASS_LANE_CLEAR)
 
     def test_cluster_size_follows_tree_scale(self) -> None:
         def ring_scales(kind: str) -> set[float]:
@@ -245,7 +253,7 @@ class BuildTests(unittest.TestCase):
         plan = Plan([], [Placed("ZerusTarPit", 1.5, 2.5, 0.0, 0, "Zerg", 0, 18.0)], [], [], [])
         xml = objects_xml(plan, 500, terrain)
         self.assertIn('Id="500"', xml)
-        self.assertIn('Position="1.5,2.5,11.0000"', xml)  # flat world ground 10 + GROUND_LIFT 1
+        self.assertIn('Position="1.5,2.5,13.0000"', xml)  # flat world ground 10 + GROUND_LIFT 3
         self.assertIn('<Flag Index="HeightAbsolute" Value="1"/>', xml)
         # Negative case: z 0 buried props off low ground (operator probe).
         self.assertNotIn(',0" Rotation', xml)

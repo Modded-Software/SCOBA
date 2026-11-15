@@ -153,8 +153,16 @@ def brambles(c: Context, rng: random.Random) -> list[Candidate]:
 
 
 def tall_grass(c: Context, rng: random.Random) -> list[Candidate]:
-    open_ground = c.land & (c.noise > 0.6) & (c.to_tree > 6) & (c.to_wet > 3)
-    return cells(open_ground, c.noise, rng)
+    """Open ground and the whole river at any depth (operator, 2026-11-15: river FULL of grass).
+
+    Submerged grass is wanted. Lanes stay clear.
+    """
+    t = c.terrain
+    clear = c.to_lane > config.GRASS_LANE_CLEAR
+    open_ground = c.land & (c.noise > config.GRASS_LAND_NOISE) & (c.to_tree > 6) & clear
+    river = t.wet & ~c.scene.keepout & clear
+    weight = np.where(river, config.GRASS_RIVER_WEIGHT, c.noise)
+    return cells(open_ground | river, weight, rng)
 
 
 def swamp(c: Context, rng: random.Random) -> list[Candidate]:
@@ -173,7 +181,7 @@ def swamp_large(c: Context, rng: random.Random) -> list[Candidate]:
 
 def water_plant(c: Context, rng: random.Random) -> list[Candidate]:
     t = c.terrain
-    wet = t.wet & (t.depth > config.WATER_PLANT_MIN) & (t.depth < config.WATER_PLANT_MAX) & ~c.scene.keepout
+    wet = t.wet & (t.depth > config.WATER_PLANT_MIN) & ~c.scene.keepout & (c.to_lane > config.GRASS_LANE_CLEAR)
     return cells(wet, 1.0, rng)
 
 

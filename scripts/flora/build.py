@@ -208,6 +208,15 @@ def check_flora(map_dir: Path) -> list[str]:
         to_lane = min(math.hypot(x - lx, y - ly) for lx, ly in lane_points)
         if to_wet[int(y), int(x)] <= config.BRAMBLE_WATER_CLEAR or to_lane <= config.BRAMBLE_LANE_CLEAR - 1:
             problems.append(f"bramble at ({x:.1f},{y:.1f}) is near water or on a lane (lane {to_lane:.1f})")
+    wet = terrain.depth > 0
+    in_river = sum(1 for _k, x, y, _z, _a in placed if wet[int(y), int(x)])
+    if 100 * in_river < config.RIVER_MIN_PER_100 * int(wet.sum()):
+        problems.append(f"river holds {in_river} props, under {config.RIVER_MIN_PER_100} per 100 of {int(wet.sum())} water cells")
+    if len(placed) > config.FLORA_CAP:
+        problems.append(f"{len(placed)} flora props exceed the cap {config.FLORA_CAP}")
+    for k, x, y, _z, _a in placed:
+        if k in ("ZerusTallGrassCluster", "ZerusWaterPlant") and min(math.hypot(x - lx, y - ly) for lx, ly in lane_points) <= config.GRASS_LANE_CLEAR - 1:
+            problems.append(f"{k} at ({x:.1f},{y:.1f}) is on a lane")
     lookalikes = treevary.conflicts([t for _m, t in treevary.parse((map_dir / "Objects").read_text(encoding="utf-8"))])
     if lookalikes:
         problems.append(f"{len(lookalikes)} neighbouring tree pairs look alike (scale, rotation and variation)")

@@ -20,6 +20,7 @@ from hdtex.inject import apply_hd_textures
 from project_root import project_root
 from props_expand import expand_props
 from flora.build import apply_flora
+from flora.lift import lift_doodads
 from footprints.build import apply_scaled_footprints
 from slow_death_assets import generate as generate_slow_deaths
 from spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
@@ -487,6 +488,7 @@ def main() -> int:
     apply_scaled_footprints(dst)
     if os.environ.get("SC2_NO_FLORA") != "1":
         apply_flora(dst)
+    lift_doodads(dst)
     # After every step that places doodads: a doodad model added later would fade when it hides a unit.
     disable_doodad_occlusion(dst)
     scale_psi_destroyer(dst)
