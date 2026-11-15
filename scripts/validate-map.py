@@ -16,6 +16,8 @@ sys.path.insert(0, str(SCRIPT_DIR / "vendor" / "m3addon"))
 import m3
 from animation_tokens import normalized_animation_name, validate_animation_name
 from hdtex.check import check_hd_textures
+from flora.build import check_flora
+from flora.config import MARKER as FLORA_MARKER
 from footprints.build import check_scaled_footprints
 from validate_aim_shot import check_aim_shot_data, check_aim_shot_script
 from validate_assets import check_control_icons, check_stamp
@@ -495,6 +497,10 @@ def main() -> int:
     check_hd_textures(map_dir)
     for problem in check_scaled_footprints(map_dir):
         fail(problem)
+    # A build with SC2_NO_FLORA=1 has no flora marker and no flora to check.
+    if (map_dir / FLORA_MARKER).exists():
+        for problem in check_flora(map_dir):
+            fail(problem)
     check_script(map_dir)
     check_animation_names(map_dir)
     check_stamp(map_dir)

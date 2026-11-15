@@ -1,0 +1,139 @@
+// Flora and lane hazard test profile.
+// Probe points and lane waypoints come from the generated flora_targets.galaxy.
+
+trigger gt_Flora;
+const fixed c_FL_REACH = 2.5;
+const fixed c_FL_STEP_TIMEOUT = 12.0;
+const fixed c_FL_SPEED = 18.0;
+
+void gf_FloraTargets ();
+void gf_FloraHeightTargets ();
+
+string gf_FlIndex (int lp_i) {
+    if (lp_i < 10) {
+        return "00" + IntToString(lp_i);
+    }
+    if (lp_i < 100) {
+        return "0" + IntToString(lp_i);
+    }
+    return IntToString(lp_i);
+}
+
+// Engine ground height at a placed doodad, in centi-units, against the z written to Objects.
+void gf_FlGround (string lp_key, fixed lp_x, fixed lp_y) {
+    BankValueSetFromInt(gv_dbgBank, "ground", lp_key, FixedToInt(WorldHeight(c_heightMapGround, Point(lp_x, lp_y)) * 100.0));
+}
+
+void gf_FlProbe (string lp_section, string lp_key, fixed lp_x, fixed lp_y) {
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_key, PointPathingPassable(Point(lp_x, lp_y)));
+}
+
+// Moves the other heroes away and puts the test hero, invulnerable and fast, at lp_at.
+void gf_FlReset (point lp_at) {
+    int lv_player;
+    unit lv_hero;
+
+    for (lv_player = 2; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        if (UnitIsValid(gv_tPSUNIT[lv_player])) {
+            UnitSetPosition(gv_tPSUNIT[lv_player], Point(8.0 + IntToFixed(lv_player) * 2.0, 8.0), false);
+        }
+    }
+    lv_hero = gv_tPSUNIT[1];
+    gf_UnitTargetSet(1, null);
+    // Chase stand stops click moves (gt_DisableClickMove); the walk needs chase.
+    gf_ChaseStandSet(lv_hero, false);
+    gf_CombatSetRoot(1, false);
+    UnitSetState(lv_hero, c_unitStateInvulnerable, true);
+    UnitSetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_FL_SPEED);
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(0.1, c_timeGame);
+    UnitSetPosition(lv_hero, lp_at, false);
+    UnitSetPropertyFixed(lv_hero, c_unitPropLifePercent, 100.0);
+    Wait(0.5, c_timeGame);
+}
+
+void gf_FlLaneBegin (string lp_section, fixed lp_x, fixed lp_y) {
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "startPass", PointPathingPassable(Point(lp_x, lp_y)));
+    gf_FlReset(Point(lp_x, lp_y));
+    // Positive control for gf_FlGround: engine unit z against WorldHeight at the same point.
+    BankValueSetFromInt(gv_dbgBank, "ground", lp_section + "HeroZ", FixedToInt(UnitGetHeight(gv_tPSUNIT[1]) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, "ground", lp_section + "WorldZ", FixedToInt(WorldHeight(c_heightMapGround, UnitGetPosition(gv_tPSUNIT[1])) * 100.0));
+    BankSave(gv_dbgBank);
+}
+
+// Walks the hero to one waypoint; records whether it got there and how long it took.
+void gf_FlLaneStep (string lp_section, int lp_k, fixed lp_x, fixed lp_y) {
+    point lv_to;
+    unit lv_hero;
+    fixed lv_start;
+    fixed lv_now;
+
+    lv_hero = gv_tPSUNIT[1];
+    lv_to = Point(lp_x, lp_y);
+    UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), lv_to), c_orderQueueReplace);
+    lv_start = TimerGetElapsed(gv_sCOBA_Clock);
+    lv_now = lv_start;
+    while (DistanceBetweenPoints(UnitGetPosition(lv_hero), lv_to) > c_FL_REACH && lv_now - lv_start < c_FL_STEP_TIMEOUT) {
+        Wait(0.125, c_timeGame);
+        lv_now = TimerGetElapsed(gv_sCOBA_Clock);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "reach" + gf_FlIndex(lp_k), DistanceBetweenPoints(UnitGetPosition(lv_hero), lv_to) <= c_FL_REACH);
+    BankValueSetFromString(gv_dbgBank, lp_section, "at" + gf_FlIndex(lp_k), IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_hero)) * 10.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_hero)) * 10.0)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "ms" + gf_FlIndex(lp_k), FixedToInt((lv_now - lv_start) * 1000.0));
+    BankSave(gv_dbgBank);
+}
+
+void gf_FlLaneEnd (string lp_section, int lp_last) {
+    unit lv_hero;
+
+    lv_hero = gv_tPSUNIT[1];
+    BankValueSetFromInt(gv_dbgBank, lp_section, "waypoints", lp_last);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "realClicks", gv_dbgRealClicks);
+    UnitIssueOrder(lv_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    BankSave(gv_dbgBank);
+}
+
+// Every height reading at one point, as text (no int rounding).
+void gf_FlHeights (string lp_key, point lp_at) {
+    string lv_s;
+
+    lv_s = FixedToString(WorldHeight(c_heightMapGround, lp_at), 3);
+    lv_s = lv_s + "|" + FixedToString(WorldHeight(c_heightMapAir, lp_at), 3);
+    lv_s = lv_s + "|" + FixedToString(WorldHeight(c_heightMapGlide, lp_at), 3);
+    lv_s = lv_s + "|" + IntToString(CliffLevel(lp_at));
+    lv_s = lv_s + "|" + FixedToString(PointGetHeight(lp_at), 3);
+    BankValueSetFromString(gv_dbgBank, "heights", lp_key, lv_s);
+}
+
+bool gt_Flora_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAFLORA", 1);
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "flora");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    // The lane triggers re-order any unit entering an X region (camera.galaxy);
+    // the walk measures pathing only, so they are off for this test.
+    TriggerEnable(gt_XCenterUnitOrders, false);
+    TriggerEnable(gt_XTopUnitOrders, false);
+    TriggerEnable(gt_XBottomUnitOrders, false);
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    gf_FlHeights("hero", UnitGetPosition(gv_tPSUNIT[1]));
+    BankValueSetFromString(gv_dbgBank, "heights", "heroUnit", FixedToString(UnitGetHeight(gv_tPSUNIT[1]), 3) + "|" + FixedToString(PointGetX(UnitGetPosition(gv_tPSUNIT[1])), 2) + "," + FixedToString(PointGetY(UnitGetPosition(gv_tPSUNIT[1])), 2));
+    gf_FloraHeightTargets();
+    BankSave(gv_dbgBank);
+    gf_FloraTargets();
+    gf_FlReset(gv_dbgAnchor);
+    BankValueSetFromInt(gv_dbgBank, "meta", "realClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_Flora_Init () {
+    gt_Flora = TriggerCreate("gt_Flora_Func");
+    TriggerAddEventMapInit(gt_Flora);
+}

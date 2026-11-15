@@ -55,6 +55,7 @@ actions:
   aimfreeze              rebuild, build aim freeze test map, run 10-second hold test
   treepath               rebuild, build tree and spore pathing test map, run it
   fprot                  rebuild, build footprint rotation probe map, run it
+  flora                  rebuild, build flora and lane hazard test map, run it
   build-profile <name>   rebuild, build one profile map, stop
   run-profile <name>     rebuild, build one profile map, run it
 EOF
@@ -69,6 +70,7 @@ profile_timeout() {
         aim) printf '%s\n' "${SC2_CASE_TIMEOUT:-150}" ;;
         pncprobe) printf '%s\n' "${SC2_CASE_TIMEOUT:-180}" ;;
         treepath) printf '%s\n' "${SC2_CASE_TIMEOUT:-240}" ;;
+        flora) printf '%s\n' "${SC2_CASE_TIMEOUT:-300}" ;;
         combat|tps)
             if [ "${SC2_TEST_GROUP:-all}" = all ]; then
                 printf '%s\n' "${SC2_CASE_TIMEOUT:-420}"
@@ -97,7 +99,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot) ;;
+        combat|tps|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -145,7 +147,7 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot)
+    aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora)
         run_profile "$ACTION"
         ;;
     build-profile)

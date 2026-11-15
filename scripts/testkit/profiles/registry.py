@@ -16,6 +16,7 @@ PROFILE_OUTPUTS = {
     "tps": ROOT / "out" / "SCOBA256_tpstest.SC2Map",
     "treepath": ROOT / "out" / "SCOBA256_treepath.SC2Map",
     "fprot": ROOT / "out" / "SCOBA256_fprot.SC2Map",
+    "flora": ROOT / "out" / "SCOBA256_flora.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -30,6 +31,7 @@ PROFILE_BANKS = {
     "tps": ("SCOBATPSTEST",),
     "treepath": ("SCOBATREEPATH",),
     "fprot": ("SCOBAFPROT",),
+    "flora": ("SCOBAFLORA",),
 }
 
 
@@ -67,4 +69,7 @@ def profile_module(name):
     if name == "fprot":
         from . import fprot
         return fprot
+    if name == "flora":
+        from . import flora
+        return flora
     raise SystemExit(f"unknown test profile: {name}")
