@@ -31,13 +31,13 @@ unitgroup gf_CreateSpawnGroup (int lp_count, string lp_type, int lp_player, poin
     return UnitLastCreatedGroup();
 }
 
-void gf_OrderSpawnGroup (unitgroup lp_group, point lp_target) {
+void gf_OrderSpawnGroup (unitgroup lp_group, int lp_side, int lp_lane) {
     UnitGroupLoopBegin(lp_group);
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
         UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
     }
     UnitGroupLoopEnd();
-    UnitGroupIssueOrder(lp_group, OrderTargetingPoint(AbilityCommand("attack", 0), lp_target), c_orderQueueReplace);
+    gf_GateSendGroup(lp_group, lp_side, lp_lane, gv_xLOCATIONS[lp_lane]);
 }
 
 bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
@@ -46,7 +46,7 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
 
     // Variable Declarations
     int lv_playerIndex;
-    point lv_target;
+    int lv_lane;
     point lv_podA;
     point lv_podB;
     point lv_podC;
@@ -63,7 +63,7 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
     auto58D71E67_ai = 1;
     lv_playerIndex = 4;
     for ( ; ( (auto58D71E67_ai >= 0 && lv_playerIndex <= auto58D71E67_ae) || (auto58D71E67_ai <= 0 && lv_playerIndex >= auto58D71E67_ae) ) ; lv_playerIndex += auto58D71E67_ai ) {
-        lv_target = RegionGetCenter(gv_xLOCATIONS[(lv_playerIndex - 3)]);
+        lv_lane = lv_playerIndex - 3;
         lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], null, null);
         lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, null);
         lv_podC = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, lv_podB);
@@ -71,12 +71,12 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
         lv_group = gf_CreateSpawnGroup(8, "Zergling", lv_playerIndex, lv_podA);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podA, lv_group, false, lv_playerIndex);
         Wait(4.0, c_timeGame);
-        gf_OrderSpawnGroup(lv_group, lv_target);
+        gf_OrderSpawnGroup(lv_group, 0, lv_lane);
 
         lv_group = gf_CreateSpawnGroup(1, "RoachCorpser", lv_playerIndex, lv_podB);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podB, lv_group, false, lv_playerIndex);
         Wait(4.0, c_timeGame);
-        gf_OrderSpawnGroup(lv_group, lv_target);
+        gf_OrderSpawnGroup(lv_group, 0, lv_lane);
 
         lv_group = gf_CreateSpawnGroup(2, "Roach", lv_playerIndex, lv_podC);
         if ((TechTreeUnitCount(lv_playerIndex, "Queen", c_techCountQueuedOrBetter) == 0)) {
@@ -85,7 +85,7 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
         }
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podC, lv_group, false, lv_playerIndex);
         Wait(4.0, c_timeGame);
-        gf_OrderSpawnGroup(lv_group, lv_target);
+        gf_OrderSpawnGroup(lv_group, 0, lv_lane);
     }
     return true;
 }
@@ -101,7 +101,7 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
 
     // Variable Declarations
     int lv_playerIndex;
-    point lv_target;
+    int lv_lane;
     point lv_podA;
     point lv_podB;
     unitgroup lv_group;
@@ -117,7 +117,7 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
     autoA973637F_ai = 1;
     lv_playerIndex = 1;
     for ( ; ( (autoA973637F_ai >= 0 && lv_playerIndex <= autoA973637F_ae) || (autoA973637F_ai <= 0 && lv_playerIndex >= autoA973637F_ae) ) ; lv_playerIndex += autoA973637F_ai ) {
-        lv_target = RegionGetCenter(gv_xLOCATIONS[lv_playerIndex]);
+        lv_lane = lv_playerIndex;
         lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], null, null);
         lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, null);
 
@@ -127,13 +127,13 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
             UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
         }
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podA, lv_group, true, lv_playerIndex);
-        gf_OrderSpawnGroup(lv_group, lv_target);
+        gf_OrderSpawnGroup(lv_group, 1, lv_lane);
 
         lv_group = gf_CreateSpawnGroup(2, "Marauder", lv_playerIndex, lv_podB);
         libNtve_gf_CreateUnitsAtPoint2(1, "Firebat", 0, lv_playerIndex, lv_podB);
         UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podB, lv_group, true, lv_playerIndex);
-        gf_OrderSpawnGroup(lv_group, lv_target);
+        gf_OrderSpawnGroup(lv_group, 1, lv_lane);
     }
     return true;
 }

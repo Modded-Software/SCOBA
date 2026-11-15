@@ -14,6 +14,8 @@ include "scripts/app/systems/hit_volumes"
 include "scripts/app/data/hit_volumes_load"
 include "scripts/app/data/flora_crush"
 include "scripts/app/systems/crush"
+include "scripts/app/data/lane_gates"
+include "scripts/app/systems/lanegates"
 include "scripts/app/systems/aim"
 include "scripts/app/systems/aim_shooting"
 include "scripts/app/systems/camera"
@@ -141,4 +143,5 @@ void main () {
     gt_DamageFloater_Init();
     gt_UiFloaterTick_Init();
     gt_CrushTick_Init();
+    gf_GateLoad();
 }

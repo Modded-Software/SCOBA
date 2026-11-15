@@ -453,12 +453,7 @@ bool gt_XCenterUnitOrders_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if ((PlayerRace(EventPlayer()) == "Terr")) {
-        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(2))), c_orderQueueReplace);
-    }
-    else {
-        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(1))), c_orderQueueReplace);
-    }
+    gf_GateFromX(EventUnit(), 1);  // center lane
     return true;
 }
 
@@ -473,12 +468,7 @@ bool gt_XTopUnitOrders_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if ((PlayerRace(EventPlayer()) == "Terr")) {
-        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(6))), c_orderQueueReplace);
-    }
-    else {
-        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(4))), c_orderQueueReplace);
-    }
+    gf_GateFromX(EventUnit(), 3);  // top lane
     return true;
 }
 
@@ -493,12 +483,7 @@ bool gt_XBottomUnitOrders_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    if ((PlayerRace(EventPlayer()) == "Terr")) {
-        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(5))), c_orderQueueReplace);
-    }
-    else {
-        UnitGroupIssueOrder(libNtve_gf_ConvertUnitToUnitGroup(EventUnit()), OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(RegionFromId(3))), c_orderQueueReplace);
-    }
+    gf_GateFromX(EventUnit(), 2);  // bottom lane
     return true;
 }
 

@@ -21,7 +21,9 @@ from typing import NamedTuple
 
 from footprints.catalog import append_catalog
 
-from . import config, crush, scene as scene_mod, terrain as terrain_mod, treevary
+from . import config, crush, gates, treevary
+from . import scene as scene_mod
+from . import terrain as terrain_mod
 from .grid import distance_to
 from .lanes import Lane, Placed, find_lanes, hazard_cells, place_hazards, settle
 from .rules import context
@@ -135,6 +137,7 @@ def apply_flora(map_dir: Path) -> bool:
     marker = map_dir / config.MARKER
     if marker.exists():
         return False
+    gates.write(map_dir)  # before flora: gates read the bare scene
     p = plan(map_dir)
     problems = balance_problems(p.hazards, len(p.lanes)) + family_problems(p)
     (map_dir / config.REPORT).write_text("\n".join(report_lines(p)) + "\n", encoding="utf-8")
@@ -167,7 +170,7 @@ def placed_doodads(map_dir: Path) -> list[tuple[str, float, float, float, bool]]
     kinds = set(config.FAMILIES) | set(config.HAZARD_VARIATIONS)
     out = []
     pattern = r'<ObjectDoodad\b[^>]*\bPosition="([^"]+)"[^>]*\bType="([^"]+)"[^>]*?(/>|>(.*?)</ObjectDoodad>)'
-    for match in re.finditer(pattern, text, re.S):
+    for match in re.finditer(pattern, text, re.DOTALL):
         if match.group(2) in kinds:
             x, y, z = (float(v) for v in match.group(1).split(",")[:3])
             absolute = 'Index="HeightAbsolute" Value="1"' in (match.group(4) or "")
@@ -227,12 +230,13 @@ def check_flora(map_dir: Path) -> list[str]:
     have_crush = crush_path.read_text(encoding="utf-8").replace("\r\n", "\n") if crush_path.exists() else ""
     if have_crush != want_crush:
         problems.append(f"{crush.DATA_FILE} does not match the placed crushable flora")
+    problems += gates.check(map_dir)
     lookalikes = treevary.conflicts([t for _m, t in treevary.parse((map_dir / "Objects").read_text(encoding="utf-8"))])
     if lookalikes:
         problems.append(f"{len(lookalikes)} neighbouring tree pairs look alike (scale, rotation and variation)")
     # Placed flora must never fade: doodad_occlusion sets Occlusion None; it must run after apply_flora.
     for kind in sorted({k for k, *_ in placed}):
-        block = re.search(r'<CModel id="' + kind + r'">(.*?)</CModel>', models, re.S)
+        block = re.search(r'<CModel id="' + kind + r'">(.*?)</CModel>', models, re.DOTALL)
         if block is None or not re.search(r'<Occlusion value="None"\s*/>', block.group(1)):
             problems.append(f"model {kind} can fade (no Occlusion None)")
     problems.extend(f"lane {i} detour {d:.2f} over {config.LANE_DETOUR_MAX}" for i, d in enumerate(p.detour) if d > config.LANE_DETOUR_MAX or not math.isfinite(d))
