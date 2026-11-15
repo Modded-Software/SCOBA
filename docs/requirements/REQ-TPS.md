@@ -14,7 +14,7 @@ In scope:
 
 - movement and body orientation in TPS;
 - the mouse cursor and the crosshair;
-- the middle hold;
+- the free-cursor state;
 - the aiming state;
 - the aim shot and its outcomes;
 - the shot floaters;
@@ -33,7 +33,7 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 - **Crosshair**: the UI image fixed at the screen center.
 - **Under the crosshair**: what the camera center ray meets first.
 - **Aiming**: the state held by the right mouse button.
-- **Middle hold**: the state held by the middle mouse button.
+- **Free-cursor state**: the TPS state toggled by a middle mouse click. The cursor is shown and mouse look is off. It holds with the button released.
 - **Aim shot**: one hero attack started by a left click while aiming.
 - **Proxy**: a hidden unit that receives an aim shot which has no enemy to hit.
 - **Proxy shot**: an aim shot fired at the proxy.
@@ -77,17 +77,18 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-26 | The crosshair MUST have its normal color over anything else. |
 | R-TPS-27 | The four crosshair colors MUST contrast clearly with each other and with the terrain. |
 
-### 3.4 Middle hold
+### 3.4 Free-cursor state
 
 | ID | Requirement |
 | --- | --- |
-| R-TPS-30 | During a middle hold, mouse look MUST be off. The camera MUST NOT turn. |
-| R-TPS-31 | During a middle hold, the regular mouse cursor MUST be shown and free for UI interaction. |
-| R-TPS-32 | During a middle hold, the crosshair MUST be hidden. |
-| R-TPS-33 | Releasing the middle button MUST restore mouse look, the hidden cursor, and the crosshair. |
+| R-TPS-30 | In the free-cursor state, mouse look MUST be off. The camera MUST NOT turn. |
+| R-TPS-31 | In the free-cursor state, the regular mouse cursor MUST be shown and free for UI interaction. |
+| R-TPS-32 | In the free-cursor state, the crosshair MUST be hidden. |
+| R-TPS-33 | A middle click MUST enter the free-cursor state. A second middle click MUST leave it and restore mouse look, the hidden cursor, and the crosshair. The state MUST change on the release of the button, never on the press. |
 | R-TPS-34 | The Alt key MUST NOT have this function any more. |
-| R-TPS-35 | A middle hold MUST NOT enter aiming and MUST NOT fire an aim shot. |
-| R-TPS-36 | During a middle hold, the engine MUST NOT scroll the camera with the middle-button drag. The engine camera input MUST be locked for the hold and unlocked on release. |
+| R-TPS-35 | The free-cursor state MUST NOT enter aiming and MUST NOT fire an aim shot. |
+| R-TPS-36 | The free-cursor state MUST NOT depend on a held mouse button. The script MUST NOT lock the engine camera input. A switch to Point & Click MUST end the free-cursor state. |
+| R-TPS-37 | A middle press and drag MUST NOT scroll the camera, in any state. The engine drag scroll MUST be turned off in the camera data. |
 
 ### 3.5 Aiming
 
@@ -129,6 +130,8 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-75 | `Out of range` and `Friendly Fire Disabled` SHOULD be drawn the same way as `Miss`. |
 | R-TPS-76 | `Miss` and `Out of range` MUST be gray. `Friendly Fire Disabled` MUST be yellow. |
 | R-TPS-77 | A damage number MUST be larger than before (font size 24). Its size MUST grow with the damage value and MUST reach its largest size at damage 1000. Applies in TPS and Point & Click. |
+| R-TPS-84 | The crosshair MUST pick a unit along its whole visible body, not only near its base, also with the sky behind it. It MUST NOT pick a unit when aimed clear above it. |
+| R-TPS-85 | No TPS overlay element (crosshair, shot texts) may take mouse input. Hover and click on a unit behind the overlay MUST work in Point & Click and in the free-cursor state, also after shot texts were shown. |
 | R-TPS-78 | Every floater MUST start at a random x and y offset: the UI shot texts, the damage numbers, and the Point & Click `Out of range` text. The offset MUST NOT move a UI shot text onto the crosshair. |
 
 ### 3.8 Highlight, targeting, selection
@@ -136,7 +139,7 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | ID | Requirement |
 | --- | --- |
 | R-TPS-80 | While not aiming, highlight, UI targeting, and selection MUST work as in Point & Click, with the crosshair in place of the cursor. |
-| R-TPS-81 | During a middle hold, highlight, UI targeting, and selection MUST work as in Point & Click, with the regular cursor. |
+| R-TPS-81 | In the free-cursor state, highlight, UI targeting, and selection MUST work as in Point & Click, with the regular cursor. |
 | R-TPS-82 | While aiming, a left click MUST NOT change the UI target. A unit that is already the UI target stays the UI target. |
 | R-TPS-83 | Switching between TPS and Point & Click MUST leave no input, aim, cursor, or crosshair state from the previous mode active. |
 
@@ -147,7 +150,7 @@ uses for each.
 
 | ID | Point |
 | --- | --- |
-| O-TPS-1 | Closed. The operator decided: a middle hold also turns off backpedal and the torso follow (R-TPS-10, 11). |
+| O-TPS-1 | Closed. The operator decided: the free-cursor state also turns off backpedal and the torso follow (R-TPS-10, 11). |
 | O-TPS-2 | Whether the head tilt (R-TPS-13) also turns sideways is not decided. The text assumes pitch only. |
 | O-TPS-3 | Whether the damage floater of R-TPS-52 moves to the UI layer is not decided. The text assumes it stays at the enemy. |
 | O-TPS-4 | Closed. The operator decided on 2026-11-14: a shot must not stop or slow the walk (R-TPS-61). R-TPS-1 changed with it. |
@@ -162,7 +165,7 @@ uses for each.
 | AC-TPS-4 | Aiming, look up and down: the torso pitches. The head does not tilt separately. |
 | AC-TPS-5 | Enter TPS: the cursor is hidden, the crosshair shows, mouse look is on. |
 | AC-TPS-6 | Point the crosshair at an out-of-range enemy, an in-range enemy, a friendly unit, and the ground: it is gray, green, yellow, and normal. |
-| AC-TPS-7 | Hold the middle button: the camera stops turning, the cursor shows, the crosshair hides. Release: all three return. |
+| AC-TPS-7 | Click the middle button and release it: the camera stops turning, the cursor shows, the crosshair hides. Click it again: all three return. |
 | AC-TPS-8 | Press Alt in TPS: nothing changes. |
 | AC-TPS-9 | Hold the right button: the camera moves to the side arm and the field of view drops. Release: both return. |
 | AC-TPS-10 | Aiming, left click an in-range enemy: one shot, the enemy loses the weapon damage, the damage floats. |
@@ -174,9 +177,9 @@ uses for each.
 | AC-TPS-16 | Not aiming, left click: no shot and no shot floater. |
 | AC-TPS-17 | Aiming, left click an enemy that is not the UI target: the UI target does not change. |
 | AC-TPS-18 | Not aiming, left click a unit under the crosshair: it becomes the UI target, as in Point & Click. |
-| AC-TPS-19 | Middle hold, left click a unit with the cursor: it becomes the UI target, as in Point & Click. |
+| AC-TPS-19 | Free-cursor state, left click a unit with the cursor: it becomes the UI target, as in Point & Click. |
 | AC-TPS-20 | Both heroes hold no more abilities than before this phase. |
-| AC-TPS-21 | Switch to Point & Click while aiming and during a middle hold: the cursor shows, the crosshair hides, the camera and field of view are restored, and no aim state is left. |
+| AC-TPS-21 | Switch to Point & Click while aiming and in the free-cursor state: the cursor shows, the crosshair hides, the camera and field of view are restored, and no aim state is left. |
 | AC-TPS-22 | Aiming, hold W, left click: one shot fires and the hero keeps its walking speed. |
 | AC-TPS-23 | Aiming, left click the sky and an enemy out of range: the shot launches, and no hit effect shows or sounds. Left click the ground in range: the hit effect shows. |
-| AC-TPS-24 | Middle hold and drag: the camera does not scroll and does not turn. |
+| AC-TPS-24 | Free-cursor state, no button held, move the mouse: the cursor moves; the camera does not scroll and does not turn. |

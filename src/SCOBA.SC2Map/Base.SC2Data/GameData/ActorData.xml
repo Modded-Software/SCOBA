@@ -228,6 +228,8 @@
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="0.800000"/>
+        <!-- Half the stock 3.75: the walk clip plays twice as fast at the same unit speed. -->
+        <WalkAnimMoveSpeed value="1.875"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Queen ................................................................................. -->
@@ -377,7 +379,7 @@
         <DeathArray index="Normal" SoundLink="Kerrigan_Death"/>
         <PortraitModel value="KerriganPortrait"/>
         <Model value="KerriganSCOBA"/>
-        <Scale value="0.750000"/>
+        <Scale value="1.000000"/>
         <WalkAnimMoveSpeed value="1.1992"/>
         <BarWidth value="78"/>
         <BarOffset value="60"/>

@@ -37,6 +37,24 @@ int gf_UiFloaterSlot (int lp_player) {
     return lv_oldest;
 }
 
+// The texts are frames of the map's UI layout (ScobaTps.SC2Layout). They
+// accept no mouse input, so they never block the cursor pick of a unit
+// behind them (R-TPS-85). A trigger dialog would: it takes the mouse over
+// its whole rectangle. The frames are shared; every call names the player.
+void gf_UiFloaterHookup () {
+    int lv_slot;
+
+    if (gv_uiFloaterPanel != c_invalidDialogControlId) {
+        return;
+    }
+    DialogControlHookupStandard(c_triggerControlTypePanel, c_UI_FLOATER_FRAME);
+    gv_uiFloaterPanel = DialogControlLastCreated();
+    for (lv_slot = 0; lv_slot < c_UI_FLOATER_POOL; lv_slot += 1) {
+        DialogControlHookup(gv_uiFloaterPanel, c_triggerControlTypeLabel, "Text" + IntToString(lv_slot));
+        gv_uiFloaterLabel[lv_slot] = DialogControlLastCreated();
+    }
+}
+
 // One executed shot shows one text. A hit shows none: its damage floats at
 // the enemy.
 void gf_UiFloaterShow (int lp_player, int lp_kind) {
@@ -49,20 +67,9 @@ void gf_UiFloaterShow (int lp_player, int lp_kind) {
     }
     gv_tpsFloaterCount[lp_kind] += 1;
     lv_group = PlayerGroupSingle(lp_player);
-    if (gv_uiFloaterDialog[lp_player] == c_invalidDialogId) {
-        // The dialog's lower edge is c_UI_FLOATER_CLEAR above the crosshair.
-        DialogCreate(c_UI_FLOATER_WIDTH + (2 * c_UI_FLOATER_JITTER_X), c_UI_FLOATER_DIALOG_HEIGHT, c_anchorCenter, 0, 0 - c_UI_FLOATER_CLEAR - (c_UI_FLOATER_DIALOG_HEIGHT / 2), false);
-        gv_uiFloaterDialog[lp_player] = DialogLastCreated();
-        DialogSetImageVisible(gv_uiFloaterDialog[lp_player], false);
-        DialogSetVisible(gv_uiFloaterDialog[lp_player], lv_group, true);
-    }
+    gf_UiFloaterHookup();
     lv_slot = gf_UiFloaterSlot(lp_player);
-    if (gv_uiFloaterLabel[lp_player][lv_slot] == c_invalidDialogControlId) {
-        libNtve_gf_CreateDialogItemLabel(gv_uiFloaterDialog[lp_player], c_UI_FLOATER_WIDTH, c_UI_FLOATER_LABEL_HEIGHT, c_anchorBottom, 0, 0, gf_UiFloaterText(lp_kind), gf_UiFloaterColor(lp_kind), false, 2.0);
-        gv_uiFloaterLabel[lp_player][lv_slot] = DialogControlLastCreated();
-        libNtve_gf_SetDialogItemStyle(gv_uiFloaterLabel[lp_player][lv_slot], c_UI_FLOATER_STYLE, lv_group);
-    }
-    lv_label = gv_uiFloaterLabel[lp_player][lv_slot];
+    lv_label = gv_uiFloaterLabel[lv_slot];
     libNtve_gf_SetDialogItemText(lv_label, gf_UiFloaterText(lp_kind), lv_group);
     libNtve_gf_SetDialogItemColor(lv_label, gf_UiFloaterColor(lp_kind), lv_group);
     gv_uiFloaterX[lp_player][lv_slot] = RandomInt(0 - c_UI_FLOATER_JITTER_X, c_UI_FLOATER_JITTER_X);
@@ -80,7 +87,7 @@ void gf_UiFloaterHide (int lp_player) {
 
     for (lv_slot = 0; lv_slot < c_UI_FLOATER_POOL; lv_slot += 1) {
         if (gv_uiFloaterOn[lp_player][lv_slot]) {
-            DialogControlSetVisible(gv_uiFloaterLabel[lp_player][lv_slot], PlayerGroupSingle(lp_player), false);
+            DialogControlSetVisible(gv_uiFloaterLabel[lv_slot], PlayerGroupSingle(lp_player), false);
             gv_uiFloaterOn[lp_player][lv_slot] = false;
         }
     }
@@ -105,11 +112,11 @@ bool gt_UiFloaterTick_Func (bool testConds, bool runActions) {
             }
             lv_age = GameGetMissionTime() - gv_uiFloaterAt[lv_player][lv_slot];
             if (lv_age >= c_UI_FLOATER_DURATION) {
-                DialogControlSetVisible(gv_uiFloaterLabel[lv_player][lv_slot], PlayerGroupSingle(lv_player), false);
+                DialogControlSetVisible(gv_uiFloaterLabel[lv_slot], PlayerGroupSingle(lv_player), false);
                 gv_uiFloaterOn[lv_player][lv_slot] = false;
                 continue;
             }
-            DialogControlSetPosition(gv_uiFloaterLabel[lv_player][lv_slot], PlayerGroupSingle(lv_player), c_anchorBottom, gv_uiFloaterX[lv_player][lv_slot], gv_uiFloaterY[lv_player][lv_slot] + FixedToInt((lv_age / c_UI_FLOATER_DURATION) * c_UI_FLOATER_RISE));
+            DialogControlSetPosition(gv_uiFloaterLabel[lv_slot], PlayerGroupSingle(lv_player), c_anchorBottom, gv_uiFloaterX[lv_player][lv_slot], gv_uiFloaterY[lv_player][lv_slot] + FixedToInt((lv_age / c_UI_FLOATER_DURATION) * c_UI_FLOATER_RISE));
         }
     }
     return true;

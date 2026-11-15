@@ -239,17 +239,15 @@ color gf_ReticleColor (int lp_kind) {
     return Color(100.0, 100.0, 100.0);
 }
 
-void gf_ReticleCreate (int lp_player) {
-    if (gv_reticleDialog[lp_player] != c_invalidDialogId) {
+// The crosshair is a frame of the map's UI layout. It accepts no mouse
+// input, so it never blocks the cursor pick under it (R-TPS-85). The frame
+// is shared; every call names the player.
+void gf_ReticleHookup () {
+    if (gv_reticleImage != c_invalidDialogControlId) {
         return;
     }
-    DialogCreate(32, 32, c_anchorCenter, 0, 0, false);
-    gv_reticleDialog[lp_player] = DialogLastCreated();
-    DialogSetImageVisible(gv_reticleDialog[lp_player], false);
-    libNtve_gf_CreateDialogItemImage(gv_reticleDialog[lp_player], 32, 32, c_anchorCenter, 0, 0, StringToText(""), "Assets\\Textures\\cursor-target-none.dds", c_triggerImageTypeNormal, false, gf_ReticleColor(c_RETICLE_NORMAL), c_triggerBlendModeNormal);
-    gv_reticleImage[lp_player] = DialogControlLastCreated();
-    gv_reticleKind[lp_player] = c_RETICLE_NORMAL;
-    DialogSetVisible(gv_reticleDialog[lp_player], PlayerGroupSingle(lp_player), false);
+    DialogControlHookupStandard(c_triggerControlTypeImage, c_UI_RETICLE_FRAME);
+    gv_reticleImage = DialogControlLastCreated();
 }
 
 bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
@@ -265,10 +263,16 @@ bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
         if (!gf_IsHeroPlayer(lv_player)) {
             continue;
         }
-        gf_ReticleCreate(lv_player);
+        gf_ReticleHookup();
         lv_group = PlayerGroupSingle(lv_player);
         lv_visible = gf_TpsActive(lv_player) && !gv_mOUSEMIDDLE[lv_player];
-        DialogSetVisible(gv_reticleDialog[lv_player], lv_group, lv_visible);
+        if (lv_visible != gv_reticleShown[lv_player]) {
+            gv_reticleShown[lv_player] = lv_visible;
+            DialogControlSetVisible(gv_reticleImage, lv_group, lv_visible);
+            // A shown crosshair starts in its normal color.
+            gv_reticleKind[lv_player] = c_RETICLE_NORMAL;
+            libNtve_gf_SetDialogItemColor(gv_reticleImage, gf_ReticleColor(c_RETICLE_NORMAL), lv_group);
+        }
         if (!lv_visible) {
             gf_TpsStatusHover(lv_player, null);
             continue;
@@ -277,7 +281,7 @@ bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
         lv_kind = gf_ReticleKind(lv_player);
         if (lv_kind != gv_reticleKind[lv_player]) {
             gv_reticleKind[lv_player] = lv_kind;
-            libNtve_gf_SetDialogItemColor(gv_reticleImage[lv_player], gf_ReticleColor(lv_kind), lv_group);
+            libNtve_gf_SetDialogItemColor(gv_reticleImage, gf_ReticleColor(lv_kind), lv_group);
         }
     }
     return true;

@@ -13,6 +13,25 @@ fixed gf_DbgTpsRight (point lp_point) {
     return ((PointGetX(lp_point) - PointGetX(lv_hero)) * Cos(lv_yaw)) + ((PointGetY(lp_point) - PointGetY(lv_hero)) * Sin(lv_yaw));
 }
 
+// How many shot text labels are hooked up, or hooked up and shown. Shown is
+// the script flag: DialogControlIsVisible on these labels raised a trigger
+// error in tps/20261115-010448 after the first text.
+int gf_DbgTpsTexts (bool lp_shown) {
+    int lv_slot;
+    int lv_count;
+
+    lv_count = 0;
+    for (lv_slot = 0; lv_slot < c_UI_FLOATER_POOL; lv_slot += 1) {
+        if (gv_uiFloaterLabel[lv_slot] == c_invalidDialogControlId) {
+            continue;
+        }
+        if (!lp_shown || gv_uiFloaterOn[1][lv_slot]) {
+            lv_count += 1;
+        }
+    }
+    return lv_count;
+}
+
 // The real toggle order: command 0 enters TPS, command 1 returns to PNC.
 void gf_DbgTpsSet (bool lp_on) {
     if (gf_TpsActive(1) == lp_on) {
@@ -50,10 +69,14 @@ void gf_DbgTpsExtra (string lp_section, string lp_tag) {
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "AimActive", gv_aIMACTIVE[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "MiddleHold", gv_mOUSEMIDDLE[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CursorVisible", gv_controlCursor[1]);
-    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CameraLock", gv_controlCameraLock[1]);
     BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "ShotEffect", gv_tpsShotEffect[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ControlRelative", gv_cONTROLRELATIVE[1]);
-    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Crosshair", DialogIsVisible(gv_reticleDialog[1], 1));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Crosshair", gv_reticleShown[1]);
+    // The overlay frames come from the UI layout: a hookup that failed
+    // leaves the invalid id.
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CrosshairHooked", gv_reticleImage != c_invalidDialogControlId);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "TextHooked", gf_DbgTpsTexts(false));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "TextShown", gf_DbgTpsTexts(true));
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CrossEnemy", UnitIsValid(gv_dbgEnemy) && (gf_AimUnitAtCrosshair(1, false) == gv_dbgEnemy));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamPitch", FixedToInt(CameraGetPitch(1)));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamDist100", FixedToInt(CameraGetDistance(1) * 100.0));
@@ -74,6 +97,13 @@ void gf_DbgTpsExtra (string lp_section, string lp_tag) {
     }
     else {
         BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "CrossType", "none");
+    }
+    // Raw value: the unit the engine's own cursor pick reports.
+    if (UnitIsValid(gv_unitHighlight[1])) {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "HighlightType", UnitGetType(gv_unitHighlight[1]));
+    }
+    else {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "HighlightType", "none");
     }
     // Raw values for the pending-shot expiry.
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ShotAgeMs", FixedToInt((GameGetMissionTime() - gv_tpsShotAt[1]) * 1000.0));
@@ -254,19 +284,23 @@ void gf_DbgTpsLook (unit lp_unit, fixed lp_extraYaw) {
     Wait(0.4, c_timeGame);
 }
 
-// R-TPS-30 to 35: cursor, mouse look, crosshair, and aim across a middle hold.
+// R-TPS-30 to 35: a middle click toggles the free cursor. The state holds
+// after the button is released; a second click ends it.
 void gf_DbgTpsCursor (string lp_section) {
     gf_DbgTpsReset(lp_section);
     gf_DbgTpsSnap(lp_section, "t0000");
     gf_DbgTpsSet(true);
     gf_DbgTpsSnap(lp_section, "ttps");
     gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+    gf_DbgTpsSnap(lp_section, "tdown");
+    gf_TpsMouseUp(1, gv_aBILITYCAMERA);
     Wait(0.4, c_timeGame);
     gf_DbgTpsSnap(lp_section, "tmid");
     gf_TpsMouseDown(1, gv_fIRE);
     Wait(0.3, c_timeGame);
     gf_DbgTpsSnap(lp_section, "tmidaim");
     gf_TpsMouseUp(1, gv_fIRE);
+    gf_TpsMouseDown(1, gv_aBILITYCAMERA);
     gf_TpsMouseUp(1, gv_aBILITYCAMERA);
     Wait(0.4, c_timeGame);
     gf_DbgTpsSnap(lp_section, "trel");
@@ -274,10 +308,10 @@ void gf_DbgTpsCursor (string lp_section) {
     Wait(0.3, c_timeGame);
     gf_DbgTpsSnap(lp_section, "taim");
     gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+    gf_TpsMouseUp(1, gv_aBILITYCAMERA);
     Wait(0.4, c_timeGame);
     gf_DbgTpsSnap(lp_section, "taimmid");
     gf_TpsMouseUp(1, gv_fIRE);
-    gf_TpsMouseUp(1, gv_aBILITYCAMERA);
     Wait(0.3, c_timeGame);
     gf_DbgTpsSet(false);
     gf_DbgTpsSnap(lp_section, "tend");
@@ -339,6 +373,47 @@ void gf_DbgTpsMove (string lp_section, bool lp_back, bool lp_left) {
     gf_DbgTpsSnap(lp_section, "tend");
 }
 
+// Turns the camera so the crosshair ray passes the unit at lp_height above
+// its base, then snapshots.
+void gf_DbgTpsPickAt (string lp_section, string lp_tag, unit lp_unit, fixed lp_height) {
+    point lv_from;
+    point lv_to;
+
+    lv_from = UnitGetPosition(gv_tPSUNIT[1]);
+    lv_to = UnitGetPosition(lp_unit);
+    CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to), 0.0, -1, 10);
+    CameraSetValue(1, c_cameraValuePitch, ATan2(c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT - lp_height, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap(lp_section, lp_tag);
+}
+
+// R-TPS-84: the crosshair picks a unit along its whole body and not above
+// it. lp_top is a height inside the visible body near its top; lp_above is
+// clear above the model.
+void gf_DbgTpsPick (string lp_section, string lp_type, fixed lp_dx, fixed lp_top, fixed lp_above) {
+    unit lv_unit;
+
+    gf_DbgTpsReset(lp_section);
+    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, 0, 4, PointWithOffset(gv_dbgAnchor, lp_dx, 0.0));
+    lv_unit = UnitLastCreated();
+    UnitSetState(lv_unit, c_unitStateStunned, true);
+    gv_dbgEnemy = lv_unit;
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "Radius100", FixedToInt(UnitGetPropertyFixed(lv_unit, c_unitPropRadius, c_unitPropNormal) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "Dist100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), UnitGetPosition(lv_unit)) * 100.0));
+    gf_DbgTpsSet(true);
+    gf_DbgTpsPickAt(lp_section, "tbase", lv_unit, 0.0);
+    gf_DbgTpsPickAt(lp_section, "thigh", lv_unit, lp_top);
+    // Negative case: the ray passes clear above the unit.
+    gf_DbgTpsPickAt(lp_section, "tabove", lv_unit, lp_above);
+    gf_DbgTpsPickAt(lp_section, "tmid", lv_unit, lp_top * 0.5);
+    gf_TpsLeftClick(1);
+    Wait(0.3, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tclick");
+    gf_DbgTpsSet(false);
+    gf_DbgTpsSnap(lp_section, "tend");
+}
+
 bool gt_TpsTest_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
@@ -360,6 +435,10 @@ bool gt_TpsTest_Func (bool testConds, bool runActions) {
     }
     if (gf_DbgGroup("target")) {
         gf_DbgTpsTarget("tps_target");
+    }
+    if (gf_DbgGroup("pick")) {
+        gf_DbgTpsPick("tps_pick_marine", "Marine", 5.0, 1.4, 5.0);
+        gf_DbgTpsPick("tps_pick_barracks", "Barracks", 9.0, 2.5, 9.0);
     }
     if (gf_DbgGroup("aim")) {
         // R-TPS-40 to 44: a right hold aims; release restores the camera.
@@ -395,9 +474,9 @@ bool gt_TpsTest_Func (bool testConds, bool runActions) {
         Wait(0.5, c_timeGame);
         gf_DbgTpsSnap("tps_head", "trel");
         gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+        gf_TpsMouseUp(1, gv_aBILITYCAMERA);
         Wait(0.4, c_timeGame);
         gf_DbgTpsSnap("tps_head", "tmid");
-        gf_TpsMouseUp(1, gv_aBILITYCAMERA);
         gf_DbgTpsSet(false);
         gf_DbgTpsSnap("tps_head", "tend");
     }

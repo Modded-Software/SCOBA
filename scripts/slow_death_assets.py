@@ -24,18 +24,20 @@ sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
 import m3
 
 MARKER = ".slow_death_assets"
-MARKER_VERSION = "3\n"
+MARKER_VERSION = "4\n"
 
 # (CASC entry, target in the map, time stretch, child stretch). Stretch 100
 # is twice the earlier 50 (the old CModel AnimSpeed 0.02): every death runs
-# 2x slower. The child stretch retimes the particle and ribbon simulation;
-# 50 runs it twice as fast as the keyframes, as before.
+# 2x slower. The stretch sets the death length and when each child starts
+# and stops, so the hull and the bursts stay in the original sync.
+# The child stretch retimes only the particle and ribbon simulation inside
+# each child; 25 runs it four times as fast as the keyframes.
 SLOW_DEATHS = (
     (
         r"mods\liberty.sc2mod\base.sc2assets\assets\units\terran\battlecruiserlokideath\battlecruiserlokideath.m3",
         Path("Assets") / "Units" / "Terran" / "BattlecruiserLokiDeath" / "BattlecruiserLokiDeathSlow.m3",
         100,
-        50,
+        25,
     ),
 )
 

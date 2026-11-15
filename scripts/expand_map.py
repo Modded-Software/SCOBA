@@ -19,7 +19,7 @@ from expand_helpers import clone_cells, read, upsample_grid, write
 from project_root import project_root
 from props_expand import expand_props
 from slow_death_assets import generate as generate_slow_deaths
-from spore_scale import scale_spores
+from spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
 from strip_gui_triggers import strip_triggers
 from water_splashes import apply as apply_water_splashes
 
@@ -482,6 +482,8 @@ def main() -> int:
         expand_props(dst)
     if os.environ.get("SC2_NO_SPORES") != "1":
         scale_spores(dst)
+    scale_psi_destroyer(dst)
+    slow_psi_destroyer_animations(dst)
     if args.out is None:
         old = root / "out" / ".build-old"
         if old.exists():

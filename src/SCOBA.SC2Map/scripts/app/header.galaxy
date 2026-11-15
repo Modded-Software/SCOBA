@@ -145,6 +145,7 @@ void gf_TpsProxyRemove (int lp_player);
 void gf_TpsShotClear (int lp_player);
 void gf_TpsShotFired (int lp_player, unit lp_target);
 void gf_TpsShotExpire (int lp_player);
+void gf_UiFloaterHookup ();
 void gf_UiFloaterShow (int lp_player, int lp_kind);
 void gf_UiFloaterHide (int lp_player);
 bool gt_UiFloaterTick_Func (bool testConds, bool runActions);

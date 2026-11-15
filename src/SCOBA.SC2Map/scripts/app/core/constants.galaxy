@@ -90,19 +90,15 @@ const fixed c_TPS_SHOT_TIMEOUT = 2.0;
 const int c_UI_FLOATER_POOL = 4;
 const fixed c_UI_FLOATER_DURATION = 1.2;
 const fixed c_UI_FLOATER_RISE = 60.0;
-// The texts sit above the crosshair, never on it: the lowest text edge is
-// c_UI_FLOATER_CLEAR pixels above the screen center. Each text starts at a
-// random offset inside the jitter, then rises. The dialog is tall enough for
-// label height + jitter + rise.
-const int c_UI_FLOATER_CLEAR = 40;
-const int c_UI_FLOATER_DIALOG_HEIGHT = 200;
+// The frames live in Base.SC2Data/UI/Layout/Custom/ScobaTps.SC2Layout: the
+// text panel above the crosshair, its four labels, their size and font
+// style, and the crosshair image. None of them accepts the mouse (R-TPS-85).
+const string c_UI_FLOATER_FRAME = "UIContainer/FullscreenUpperContainer/ScobaShotText";
+const string c_UI_RETICLE_FRAME = "UIContainer/FullscreenUpperContainer/ScobaCrosshair";
+// Each text starts at a random offset inside the jitter, then rises. The
+// panel is wide and tall enough for label + jitter + rise.
 const int c_UI_FLOATER_JITTER_X = 80;
 const int c_UI_FLOATER_JITTER_Y = 30;
-// The font style lives in Base.SC2Data/UI/FontStyles.SC2Style. The label
-// box is wide and tall enough for the longest text at that font height.
-const string c_UI_FLOATER_STYLE = "SCOBAFloaterText";
-const int c_UI_FLOATER_WIDTH = 700;
-const int c_UI_FLOATER_LABEL_HEIGHT = 48;
 // World floaters. A damage number grows with the damage, in a straight line
 // from the base size at 0 to the largest size at c_FLOATER_DAMAGE_FULL.
 const int c_FLOATER_SIZE_BASE = 32;

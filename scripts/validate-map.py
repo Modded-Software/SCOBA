@@ -18,6 +18,7 @@ from animation_tokens import normalized_animation_name, validate_animation_name
 from validate_aim_shot import check_aim_shot_data, check_aim_shot_script
 from validate_assets import check_control_icons, check_stamp
 from validate_slow_deaths import check_slow_deaths
+from validate_tps_overlay import check_tps_overlay
 
 GENERATED_MODELS = [
     Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3",
@@ -454,18 +455,7 @@ def check_script(map_dir: Path) -> None:
         fail("aiming must not suppress the hero attack: the aim shot is a hero attack")
     if "gf_SelectHeroForce" not in combined or "gf_TpsStatusIs" not in combined:
         fail("scripts missing selection and action status helpers")
-    if "storm_ui_cursor_default_enemy" in combined or "storm_ui_cursor_default_friendly" in combined:
-        fail("reticle must use the crosshair texture, not arrow cursors")
-    if "cursor-target-none.dds" not in combined or "gf_ReticleColor" not in combined:
-        fail("reticle must be the crosshair texture, tinted per state")
-    if "gf_UiFloaterShow" not in combined or "gf_AimMissFloater" in combined:
-        fail("shot outcome text must be the UI-layer floater")
-    styles = ET.parse(map_dir / "Base.SC2Data" / "UI" / "FontStyles.SC2Style").getroot()
-    floater = [style for style in styles.iter("Style") if style.get("name") == "SCOBAFloaterText"]
-    if len(floater) != 1 or int(floater[0].get("height", "0")) < 28:
-        fail("SCOBAFloaterText font style missing or smaller than 28")
-    if 'c_UI_FLOATER_STYLE = "SCOBAFloaterText"' not in combined or "c_UI_FLOATER_STYLE, lv_group" not in combined:
-        fail("UI floater labels must use the SCOBAFloaterText font style")
+    check_tps_overlay(map_dir, combined)
     if "gf_AnimTargetPitchTick" not in combined:
         fail("scripts missing PNC target pitch")
     if "gf_PncAttack" not in combined or "gf_PncCancel" not in combined:

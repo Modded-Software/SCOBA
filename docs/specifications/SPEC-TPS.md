@@ -86,8 +86,9 @@ not repeated here.
 | R-TPS-27 | [operator] | |
 | R-TPS-30 to 33 | [tested] flags | `tps` group `cursor` |
 | R-TPS-34 | [built] | The Alt triggers are removed. No key test. |
-| R-TPS-35 | [tested] no aim in a middle hold; a middle hold ends aiming | `tps` group `cursor` |
-| R-TPS-36 | [tested] script lock flag only. That the engine stops its middle-drag scroll is [operator]: the harness cannot press a real middle button. | `tps_cursor` `CameraLock` |
+| R-TPS-35 | [tested] no aim in the free-cursor state; the free-cursor state ends aiming | `tps` group `cursor` |
+| R-TPS-36 | [tested] the state holds after the release and ends on the switch to Point & Click. No camera lock: build check. That the real cursor is free is [operator]: the harness has no real mouse. | `tps_cursor` `tmid`, `tend`; `validate_aim_shot.py` |
+| R-TPS-37 | [built] camera data, build check. The effect on a real drag is [operator]. | `validate_aim_shot.py` |
 | R-TPS-40, 41, 42, 44 | [tested] | `tps` group `aim` |
 | R-TPS-43 | [built] | Galaxy has no field-of-view getter. [operator] |
 | R-TPS-50 | [tested] standing and walking | `tps_shot_*`, `tps_shot_walk`, `rungun` |
@@ -105,8 +106,10 @@ not repeated here.
 | R-TPS-70 to 72 | [tested] counters | every shot case, `tps_shot_stop` |
 | R-TPS-73 to 76 | [built], look [operator] | |
 | R-TPS-77, 78 | [built], look [operator] | No test run. 5.6 |
+| R-TPS-85 | [tested] frames hooked up, no dialog (build check). That the cursor picks a unit behind the overlay is [operator]: the harness has no real mouse. | `tps/20261115-010604`: `CrosshairHooked`, `TextHooked` |
+| R-TPS-84 | Not built. Red test: `tps_pick_marine thigh CrossEnemy: got=False want=True`. | `tps/20261115-005001`, group `pick` |
 | R-TPS-80 | [tested] | `tps` group `target` |
-| R-TPS-81 | [tested] attack command in a middle hold. A cursor left click in a middle hold is [built]. | `controls_attack` |
+| R-TPS-81 | [tested] attack command in the free-cursor state. A cursor left click in the free-cursor state is [built]. | `controls_attack` |
 | R-TPS-82 | [tested] | `tps` group `target` |
 | R-TPS-83 | [tested] flags after leaving TPS | `tend` of every `tps` scenario |
 
@@ -115,12 +118,12 @@ not repeated here.
 ### 5.1 Movement and body (R-TPS-10 to 15)
 
 - `gf_StrafeHoldSync` turns strafe movement on for the whole of TPS, except
-  during a middle hold.
+  in the free-cursor state.
 - The hero carries `SCOBAAimNoTurn` while strafe is on. Script sets the facing
   to the camera yaw, standing and moving.
 - The WASD loops and the periodic `gt_AimMoveTick` both call
   `gf_AimMoveStep`.
-- A middle hold turns backpedal and the torso follow off (operator decision,
+- The free-cursor state turns backpedal and the torso follow off (operator decision,
   closes O-TPS-1).
 
 ### 5.2 Head tilt (R-TPS-13, 14)
@@ -134,25 +137,36 @@ not repeated here.
   direction are [operator].
 - `gf_AnimHeadTick` maps the camera pitch to a step and plays the clip in its
   own bracket, `SCOBAHead`. Level pitch is 20 degrees. It clears the bracket
-  while aiming, in a middle hold, and in Point & Click.
+  while aiming, in the free-cursor state, and in Point & Click.
 - The build validator and a host test fail if the script step count or range
   differs from the generated clips.
 - Assumption for O-TPS-2: pitch only.
 
-### 5.3 Cursor, crosshair, middle hold (R-TPS-20 to 36)
+### 5.3 Cursor, crosshair, free-cursor state (R-TPS-20 to 36)
 
 | State | Mouse look | Cursor | Crosshair |
 | --- | --- | --- | --- |
 | TPS | on | hidden | shown |
 | TPS, aiming | on | hidden | shown |
-| TPS, middle hold | off | shown | hidden |
+| TPS, free-cursor state | off | shown | hidden |
 
 - `gf_TpsMouseDown` and `gf_TpsMouseUp` handle the middle and right buttons.
   The Alt path is removed.
-- A middle hold ends aiming and blocks it.
-- `gf_ControlApply` calls `CameraLockInput(player, lock)` with lock true only
-  in a TPS middle hold (R-TPS-36). Stock use of the native: the Void campaign
-  flyover mode. Its effect on the engine middle-drag scroll is [operator].
+- A middle click toggles the free-cursor state. In TPS `gv_mOUSEMIDDLE` holds
+  that state, not the button. The press only sets `gv_tpsMiddleDown`; the
+  release of a press seen in TPS flips the state. No mouse button is down when
+  the mouse mode changes (R-TPS-33, 36). The mode switch clears both flags.
+- Operator report on a toggle at the press: the first click freed the cursor;
+  the third stopped mouse look but the cursor stayed hidden. Cause not
+  measured: the harness has no real mouse.
+- The free-cursor state ends aiming and blocks it.
+- The script never calls `CameraLockInput`. An earlier build locked the camera
+  input for a middle hold; the operator reported the cursor still not free.
+- With mouse look off, a middle drag is the engine drag scroll (the
+  `CameraSetMouseRotates` reference says so). The map camera sets
+  `ForwardScale` and `StrafeScale` to 0 for `Normal` and `Follow`, so the drag
+  moves nothing (R-TPS-37). That these fields scale the drag scroll is
+  [operator].
 - The crosshair is one image tinted by kind: normal white, enemy in range
   green, enemy out of range gray, friendly yellow (`gf_ReticleKind`,
   `gf_ReticleColor`).
@@ -208,8 +222,21 @@ not repeated here.
 - `gt_CombatAttackEffect` runs when the engine fires the weapon. If the fired
   target is the pending shot target, it shows the floater and clears the
   pending outcome. Nothing else creates these floaters.
-- `systems/ui_floaters.galaxy`: a pool of four dialog labels per player near
-  the screen center. Script moves a label up, fades it, and hides it.
+- Overlay frames (R-TPS-85): the crosshair image and the four text labels
+  are frames in `Base.SC2Data/UI/Layout/Custom/ScobaTps.SC2Layout`, under
+  `GameUI/UIContainer/FullscreenUpperContainer`. Every frame has
+  `AcceptsMouse` false. Script hooks them up (`gf_ReticleHookup`,
+  `gf_UiFloaterHookup`) and only shows, moves, tints, and fills them. The
+  frames are shared; each call names the player.
+- Regression in `e2ba12d`: the texts were labels in a trigger dialog. From
+  the first shot text on, the invisible dialog (860 x 200 px above the
+  screen center) took the mouse and blocked the engine's cursor pick of
+  every unit behind it. Found by the operator; confirmed by the operator
+  (clickable before the first miss, dead after). The crosshair was a
+  trigger dialog too and is moved with it.
+- `systems/ui_floaters.galaxy` moves a label up, fades it, and hides it.
+- `scripts/validate_tps_overlay.py` fails the build if a frame accepts the
+  mouse, or if `aim.galaxy` or `ui_floaters.galaxy` creates a dialog.
 - Font: style `SCOBAFloaterText`, height 32, in
   `Base.SC2Data/UI/FontStyles.SC2Style`. The build validator fails if the
   style is missing or below 28.
@@ -220,20 +247,20 @@ not repeated here.
   (72) at `c_FLOATER_DAMAGE_FULL` (1000) and above. The Point & Click
   `Out of range` text uses the base size. [built]; the look is [operator].
   Whether the engine draws a text tag at size 72 is not proven.
-- Random start (R-TPS-78). UI texts: the dialog's lower edge is
-  `c_UI_FLOATER_CLEAR` (40 px) above the screen center, so no text covers the
-  crosshair (R-TPS-73). Each text starts up to `c_UI_FLOATER_JITTER_X` (80)
+- Random start (R-TPS-78). UI texts: the text panel's lower edge is 40 px
+  above the screen center (layout anchor), so no text covers the crosshair
+  (R-TPS-73). Each text starts up to `c_UI_FLOATER_JITTER_X` (80)
   left or right and up to `c_UI_FLOATER_JITTER_Y` (30) higher, then rises.
   World floaters: `gf_FloaterCreate` moves the start point up to
-  `c_FLOATER_JITTER` (0.5) in x and y. [built]. That a negative dialog offset
-  is upward is read from the old layout, not measured.
+  `c_FLOATER_JITTER` (0.5) in x and y. [built]. That a positive label offset
+  from the bottom anchor is upward is not measured.
 - Assumption for O-TPS-3: the damage floater stays at the enemy.
 
 ### 5.7 Targeting (R-TPS-80 to 83)
 
 - Not aiming: the left click and the highlight use the unit under the
   crosshair and call `gf_LeftClickTarget`, the Point & Click result.
-- Middle hold: the handlers take the Point & Click path with the cursor.
+- Free-cursor state: the handlers take the Point & Click path with the cursor.
 - Aiming: the left click calls `gf_AimShotPress` only. It never calls
   `gf_UnitTargetSet`.
 - `gf_PncRestore` ends aiming, clears the pending shot, removes the proxy,
@@ -244,7 +271,7 @@ not repeated here.
 | Module | Role |
 | --- | --- |
 | `systems/strafe.galaxy` | Strafe for all of TPS. The walk step does not know about shots. |
-| `systems/controls.galaxy` | Mode switch, middle and right button handlers, cursor state, engine camera input lock. |
+| `systems/controls.galaxy` | Mode switch, middle and right button handlers, cursor state. |
 | `systems/aim.galaxy` | Aim camera, aim side, crosshair kind and color. |
 | `systems/aim_shooting.galaxy` | Crosshair ray, proxy, pending shot, `gf_AimShotEffect`, `gf_AimShotPress`. |
 | `systems/ui_floaters.galaxy` | UI-layer floaters. |
@@ -264,17 +291,17 @@ not repeated here.
   the aim ray. It calls the handlers the mouse events call. It does not send
   real mouse or key events.
 - `scripts/playtest.sh rungun`: one aim click while walking.
-- `scripts/playtest.sh controls`: mode switch, middle hold, and the attack
-  command in a middle hold.
+- `scripts/playtest.sh controls`: mode switch, free-cursor state, and the attack
+  command in the free-cursor state.
 - Host tests: `scripts/testkit/tests/`. `test_character_anim.py` ties the
   head tilt constants in script, assets, and the `tps` profile together.
 
 | Group | Asserts | Negative case |
 | --- | --- | --- |
 | `move` | Facing on the camera yaw while S and A move the hero; facing follows a camera turn. | Leaving TPS removes `SCOBAAimNoTurn`. |
-| `cursor` | Input flags for TPS, aiming, middle hold. Camera input lock on in a middle hold. | A right press in a middle hold does not aim. The lock is off outside a middle hold. |
+| `cursor` | Input flags for TPS, aiming, free-cursor state. The state holds after the middle release; a second click ends it. | A right press in the free-cursor state does not aim. The switch to Point & Click ends the state. |
 | `aim` | Aim flag, anchor on the right, shorter camera arm. | Release restores the distance and removes the anchor. |
-| `head` | Head step level, down, up with the camera pitch. | Step 0 in Point & Click, while aiming, in a middle hold. |
+| `head` | Head step level, down, up with the camera pitch. | Step 0 in Point & Click, while aiming, in the free-cursor state. |
 | `target` | Not aiming: the click sets the UI target. | The click never attacks. Aiming: the UI target is unchanged. |
 | `shot` | Per outcome: shots +1, life, proxy, effect name, cooldown, hero position, one text of the right kind. Walking: one shot, the walk keeps its speed. Weapon ranges. | Click on cooldown, click when not aiming: no shot, no text. Walking: never an attack order. Air proxy: not the hit effect. No late damage 2 s after a miss. |
 | `kerrigan` | The shot cases with Kerrigan. | As `shot`. |
@@ -297,7 +324,7 @@ Floater checks read script counters. They do not prove the text is visible.
 
 ## 9. Operator Checks
 
-- The cursor is hidden in TPS and shown in a middle hold.
+- The cursor is hidden in TPS and shown in the free-cursor state.
 - Crosshair colors and their contrast.
 - `Miss` is visible when aiming at the sky; floater size, position, motion,
   color.
@@ -311,20 +338,21 @@ Floater checks read script counters. They do not prove the text is visible.
 - A shot while walking: no stutter, attack animation plays.
 - A Tosh shot at the sky or beyond range: launch and sound, no impact, no
   impact sound.
-- A middle hold: the camera does not scroll with the drag; the cursor moves
-  freely.
+- The free-cursor state after a middle click: the cursor moves freely and
+  hovers and clicks units; the camera does not turn or scroll.
 - Aim camera side and field of view.
 
 ## 10. Not Tested
 
 - Real mouse and key events. The harness calls the handlers.
-- A cursor left click during a middle hold (R-TPS-81).
+- A cursor left click in the free-cursor state (R-TPS-81).
 - The proxy as a target of other units (R-TPS-59).
 - The field of view (R-TPS-43).
 - The Alt key (R-TPS-34).
 - An in-game ability count (R-TPS-3).
 - A walking shot with Kerrigan (R-TPS-61).
-- A real middle-button drag (R-TPS-36).
+- A real middle click with a real cursor (R-TPS-31, 36).
+- A real middle press and drag (R-TPS-37).
 
 ## 11. Open Points
 
@@ -332,17 +360,23 @@ O-TPS-2, O-TPS-3 in the requirements.
 
 ## 12. Runs
 
-Full suites on the final product build:
+Full suites on the build with the middle-click toggle and the layout overlay:
 
 | Run | Result |
 | --- | --- |
-| `tps/20261114-234256` | 420 passes, 1 failure: `tps_kerr_enemy tlate EnemyHp: got=500 want<500` (section 8). `RealClicks` 0. |
-| `combat/20261114-235937` | 188 passes, 0 failures. `RealClicks` 0. |
-| `controls/20261114-235839` | 51 passes, 0 failures. |
-| `rungun/20261114-235738` | 0 failures. |
+| `tps/20261115-015007` | 438 passes, 2 failures: `tps_pick_marine thigh CrossEnemy: got=False want=True` (R-TPS-84, open) and `tps_kerr_enemy tlate EnemyHp: got=500 want<500` (section 8). `RealClicks` 0. |
+| `combat/20261115-015410` | 188 passes, 0 failures. `RealClicks` 0. |
+| `controls/20261115-015316` | 51 passes, 0 failures. |
+| `rungun/20261115-015745` | 0 failures. |
 
 Other runs:
 
+- `tps/20261115-011630`: group `cursor` with the toggle test on the hold code,
+  19 failures (`tps_cursor tmid CursorVisible: got=False want=True`).
+- `tps/20261115-011742`: group `cursor` on the toggle code, 0 failures.
+- `tps/20261115-014818`: group `cursor` with the release test on the press
+  toggle, 3 failures (`tps_cursor tdown CursorVisible: got=True want=False`).
+- `tps/20261115-014918`: group `cursor` on the release toggle, 0 failures.
 - `tps/20261114-233625`: the three bug tests on the old code, 12 failures
   (no `ShotEffect`, walk path 2519 against 3101, attack order while walking).
 - `tps/20261114-234058`: group `shot` on the new code, 0 failures. Walk path

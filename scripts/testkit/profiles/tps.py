@@ -93,7 +93,7 @@ def _check_move(checks) -> None:
 
 
 def _tps_free(checks, section: str, tag: str, free: bool) -> None:
-    """Cursor freed (PNC or middle hold) against TPS mouse look."""
+    """Cursor freed (PNC or the free-cursor state) against TPS mouse look."""
     flag = checks.true if free else checks.false
     anti = checks.false if free else checks.true
     flag(section, tag, "CursorVisible")
@@ -108,22 +108,21 @@ def _check_cursor(checks) -> None:
     section = "tps_cursor"
     _tps_free(checks, section, "t0000", True)
     checks.false(section, "t0000", "MiddleHold")
-    for tag in ("ttps", "trel", "taim"):
+    # Negative case: the middle press alone (tdown) changes nothing.
+    for tag in ("ttps", "tdown", "trel", "taim"):
         _tps_free(checks, section, tag, False)
         checks.false(section, tag, "MiddleHold")
-    # The engine camera input (middle-button drag scroll) is locked during a
-    # TPS middle hold only. Negative case: never in PNC or with mouse look on.
-    for tag in ("t0000", "ttps", "trel", "taim", "tend"):
-        checks.false(section, tag, "CameraLock")
+    # A middle click frees the cursor; the state holds with the button
+    # released (tmid, taimmid). A second click ends it (trel).
     for tag in ("tmid", "tmidaim", "taimmid"):
         _tps_free(checks, section, tag, True)
-        checks.true(section, tag, "CameraLock")
         checks.true(section, tag, "MiddleHold")
         checks.true(section, tag, "TpsMode")
-        # Negative case: no aim during a middle hold, and it ends a running aim.
+        # Negative case: no aim with the cursor free, and it ends a running aim.
         checks.false(section, tag, "AimActive")
     checks.false(section, "ttps", "AimActive")
     checks.true(section, "taim", "AimActive")
+    # The switch to PNC ends the free-cursor state.
     _tps_free(checks, section, "tend", True)
     checks.false(section, "tend", "MiddleHold")
     checks.false(section, "tend", "AimActive")
@@ -239,6 +238,10 @@ def _shot_cases(checks, prefix: str) -> None:
     checks.eq(section, "taim", "ReticleKind", RETICLE_NORMAL)
     # R-TPS-73: the sky shot aims above the ground.
     checks.gt(section, "tshot", "ProxyZ100", 100)
+    # R-TPS-85: the crosshair and the text are layout frames, hooked up.
+    checks.true(section, "taim", "CrosshairHooked")
+    checks.eq(section, "tshot", "TextHooked", 4)
+    checks.gt(section, "tshot", "TextShown", 0)
 
     section = f"{prefix}_friendly"
     checks.true(section, "taim", "CrossAlly")
@@ -272,6 +275,8 @@ def _check_shot(checks) -> None:
     _shot_cases(checks, "tps_shot")
     # A hit on a unit runs the weapon effect. A sky shot is in the air.
     checks.eq("tps_shot_enemy", "tshot", "ShotEffect", TOSH_SHOT)
+    # Negative case: a hit shows no shot text.
+    checks.eq("tps_shot_enemy", "tshot", "TextShown", 0)
     checks.eq("tps_shot_friendly", "tshot", "ShotEffect", TOSH_SHOT)
     checks.eq("tps_shot_sky", "tshot", "ShotEffect", TOSH_AIR_SHOT)
     _air_rule(checks, "tps_shot_far")
@@ -380,7 +385,7 @@ def _check_head(checks) -> None:
     """R-TPS-12 to 14. Script state only: the look of the tilt is an operator check."""
     section = "tps_head"
     level = (HEAD_STEPS + 1) // 2
-    # Negative cases: no head clip in PNC, while aiming, or in a middle hold.
+    # Negative cases: no head clip in PNC, while aiming, or with the cursor free.
     for tag in ("t0000", "taim", "tmid", "tend"):
         checks.eq(section, tag, "HeadStep", 0)
     checks.eq(section, "tlevel", "HeadStep", level)
@@ -396,9 +401,31 @@ def _check_head(checks) -> None:
     checks.gt(section, "taim", "PitchStep", 0)
 
 
-GROUPS = ("move", "cursor", "aim", "head", "target", "shot", "kerrigan")
+def _check_pick(checks) -> None:
+    """R-TPS-84: the crosshair picks a unit along its whole body."""
+    for section in ("tps_pick_marine", "tps_pick_barracks"):
+        raw = {key: checks.value(section, "", key) for key in ("Radius100", "Dist100")}
+        for tag in ("tbase", "thigh", "tabove", "tmid"):
+            raw[tag] = (
+                checks.value(section, tag, "CrossType"),
+                checks.value(section, tag, "HighlightType"),
+                checks.value(section, tag, "CamPitch"),
+            )
+        print(f"{section} raw (cross, engine highlight, pitch) {raw}")
+        for tag in ("tbase", "thigh", "tmid"):
+            checks.true(section, tag, "CrossEnemy")
+        # Negative case: a ray clear above the unit picks nothing.
+        checks.false(section, "tabove", "CrossEnemy")
+        checks.eq(section, "tabove", "CrossType", "none")
+        # The click on the body sets the UI target.
+        checks.true(section, "tmid", "TargetNone")
+        checks.true(section, "tclick", "TargetEnemy")
+
+
+GROUPS = ("move", "cursor", "aim", "head", "target", "pick", "shot", "kerrigan")
 
 GROUP_CHECKS = {
+    "pick": _check_pick,
     "head": _check_head,
     "aim": _check_aim,
     "move": _check_move,

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- TPS overlay: the crosshair and the shot texts (R-TPS-73, R-TPS-85).
+     No frame here accepts the mouse, so the engine's cursor pick of units
+     behind the overlay keeps working. Script hooks the frames up by name
+     and only shows, moves, tints, and fills them. -->
+<Desc>
+    <Frame type="Label" name="ShotTextTemplate">
+        <Anchor side="Bottom" relative="$parent" pos="Max" offset="0"/>
+        <Anchor side="Left" relative="$parent" pos="Mid" offset="0"/>
+        <Anchor side="Right" relative="$parent" pos="Mid" offset="0"/>
+        <Width val="700"/>
+        <Height val="48"/>
+        <Style val="SCOBAFloaterText"/>
+        <AcceptsMouse val="false"/>
+        <Visible val="false"/>
+    </Frame>
+
+    <Frame type="Frame" name="GameUI/UIContainer/FullscreenUpperContainer" file="GameUI">
+        <Frame type="Image" name="ScobaCrosshair">
+            <Anchor side="Top" relative="$parent" pos="Mid" offset="0"/>
+            <Anchor side="Bottom" relative="$parent" pos="Mid" offset="0"/>
+            <Anchor side="Left" relative="$parent" pos="Mid" offset="0"/>
+            <Anchor side="Right" relative="$parent" pos="Mid" offset="0"/>
+            <Width val="32"/>
+            <Height val="32"/>
+            <Texture val="Assets\Textures\cursor-target-none.dds"/>
+            <AcceptsMouse val="false"/>
+            <Visible val="false"/>
+        </Frame>
+
+        <!-- The lower edge is 40 above the screen center: no text covers
+             the crosshair. Width and height match the script constants. -->
+        <Frame type="Frame" name="ScobaShotText">
+            <Anchor side="Bottom" relative="$parent" pos="Mid" offset="-40"/>
+            <Anchor side="Left" relative="$parent" pos="Mid" offset="0"/>
+            <Anchor side="Right" relative="$parent" pos="Mid" offset="0"/>
+            <Width val="860"/>
+            <Height val="200"/>
+            <AcceptsMouse val="false"/>
+
+            <Frame type="Label" name="Text0" template="ScobaTps/ShotTextTemplate"/>
+            <Frame type="Label" name="Text1" template="ScobaTps/ShotTextTemplate"/>
+            <Frame type="Label" name="Text2" template="ScobaTps/ShotTextTemplate"/>
+            <Frame type="Label" name="Text3" template="ScobaTps/ShotTextTemplate"/>
+        </Frame>
+    </Frame>
+</Desc>

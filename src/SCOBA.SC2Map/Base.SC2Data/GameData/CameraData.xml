@@ -15,6 +15,10 @@
         <BorderSizeX value="0"/>
         <BorderSizeY value="0"/>
         <MaxScrollDistance index="Follow" value="0.000000"/>
+        <ForwardScale index="Normal" value="0.000000"/>
+        <ForwardScale index="Follow" value="0.000000"/>
+        <StrafeScale index="Normal" value="0.000000"/>
+        <StrafeScale index="Follow" value="0.000000"/>
         <HeightDisplacementFactor value="0.000000"/>
         <HeightDisplacementPitchMin value="0.000000"/>
         <HeightDisplacementPitchMax value="0.000000"/>

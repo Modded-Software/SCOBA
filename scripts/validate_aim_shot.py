@@ -158,10 +158,18 @@ def check_aim_shot_script(map_dir: Path, combined: str) -> None:
     for name in ("strafe.galaxy", "combat_fsm.galaxy"):
         if "gv_tpsShotKind" in read(map_dir / SYSTEMS / name):
             fail(f"{name} must not hold the hero for a pending aim shot")
-    if "gv_controlCameraLock[lp_player] = gf_TpsActive(lp_player) && gv_mOUSEMIDDLE[lp_player];" not in combined:
-        fail("a TPS middle hold must lock the engine camera input")
-    if app_text.count("CameraLockInput(") != 1:
-        fail("the engine camera input lock must be set in one place")
+    if "CameraLockInput(" in app_text:
+        fail("the engine camera input must not be locked")
+    if "gv_mOUSEMIDDLE[lp_player] = !gv_mOUSEMIDDLE[lp_player];" not in combined:
+        fail("a TPS middle click must toggle the free-cursor state")
+    # With mouse look off, a middle drag is the engine drag scroll. Its
+    # scales are zero, so it cannot move the camera (R-TPS-37).
+    camera = ET.parse(map_dir / GAMEDATA / "CameraData.xml").getroot().find("CCamera[@id='Dflt']")
+    for field in ("ForwardScale", "StrafeScale"):
+        for mode in ("Normal", "Follow"):
+            scale = camera.find(f"{field}[@index='{mode}']")
+            if scale is None or float(scale.get("value")) != 0.0:
+                fail(f"camera {field} {mode} must be 0: the engine drag scroll must not move the camera")
     if "gf_AnimAttackStart" in aim_text or "gf_AnimAimAttackStart" in aim_text:
         fail("an aim press must not start the attack animation")
     if "gf_UnitTargetSet" in aim_text:
