@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
 import m3
 
 MARKER = ".skybox_flip"
-MARKER_VERSION = "2\n"  # 2: y axis (1 was z)
+MARKER_VERSION = "4\n"  # 4: sky grown x8; 2: y axis (1 was z)
 EXTRACT_ROOT = Path("/mnt/ws-fast/sc2res/tmp")  # operator: extract into ws-fast
 
 # (CASC entry, target in the map). The CModel ids live in src ModelData.xml.
@@ -106,9 +106,31 @@ def flip_model(model) -> dict[str, int]:
     return counts
 
 
+SKY_SCALE = 8.0  # operator test 2026-11-16: sky sphere radius x8
+
+
+def grow_sky(model, factor: float = SKY_SCALE) -> int:
+    """The sky mesh has a finite radius and is depth tested: the far
+    battlecruiser (height 120, scale 16) sat beyond it, so the blended sky
+    layers drew over it. CModel scale is ignored for skyboxes, so the root
+    bone scale (rest value and its null value) is multiplied here."""
+    roots = 0
+    for bone in model.bones:
+        if bone.parent == -1:
+            for value in (bone.scale.initValue, bone.scale.nullValue):
+                value.x *= factor
+                value.y *= factor
+                value.z *= factor
+            loc = bone.location.initValue
+            loc.x, loc.y, loc.z = loc.x * factor, loc.y * factor, loc.z * factor
+            roots += 1
+    return roots
+
+
 def generate_model(source: Path, target: Path) -> None:
     model = m3.loadModel(str(source))
     counts = flip_model(model)
+    counts["grown_roots"] = grow_sky(model)
     print(f"{target.name}: flipped {counts}")
     target.parent.mkdir(parents=True, exist_ok=True)
     m3.saveAndInvalidateModel(model, str(target))
