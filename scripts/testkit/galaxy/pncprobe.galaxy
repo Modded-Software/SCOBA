@@ -30,6 +30,9 @@ bool gt_PncProbe_Func (bool testConds, bool runActions) {
     else if (gv_dbgGroup == "warp") {
         gf_ProbeWarp("hover");
     }
+    else if (gv_dbgGroup == "inrange") {
+        gf_ProbeInRange("inrange");
+    }
     else if (gv_dbgGroup == "point") {
         gf_ProbePoint("hover");
     }

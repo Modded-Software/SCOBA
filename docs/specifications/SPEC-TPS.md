@@ -51,6 +51,7 @@ guard; `tps` and `combat` assert `RealClicks` 0.
 | T13 | The screen-centre ray passes through the point the camera follows at the camera height offset (0.9), along the camera yaw and pitch: the hero at rest, the shoulder proxy while aiming. Engine hover and script pick on a Zergling at 3, 5, 8, 12 agree within 0.1 to 0.8 degrees in pitch and yaw, at rest and in aim. The camera distance does not move the ray. | [probe] `pncprobe/20261115-224549` (measure), `pncprobe/20261115-231002` (match) |
 | T33 | The engine hover is dead while `CameraForceMouseRelative` is on. A hidden free cursor still picks. | [probe] earlier `pncprobe` hover runs |
 | T34 | Mouse down raises `CameraGetPitch`: positive pitch looks down. | [probe] `pncprobe/20261115-223159` |
+| T36 | `UnitInRangeAndAbleToAttackTarget` needs the hero to face the target: false at distance 1 to 2 while aiming (hero facing 14 to 27 degrees off, shoulder ray) and false at every distance with the hero facing away. Not a range check. | [probe] `pncprobe/20261116-145352`, group `inrange` |
 | T35 | A unit position has no height; `UnitGetHeight` gives it (Overseer 7.0). | [probe] `tps/20261115-213703` |
 | T14 | All three hero weapons exclude `Hidden` and `Invulnerable` targets. `RazorTalons` requires `Ground`. Psi Blast has `MinimumRange` 2. | [stock] weapon data |
 | T15 | Stock `InvisibleTargetDummy` is unselectable, uncommandable, 1000 life, and carries `ImmuneToDamage`. | [stock] swarm unit data |
@@ -277,6 +278,13 @@ not repeated here.
   direction from the camera yaw and pitch (T13). The old origin, 0.5 aside
   and 1.5 high, never hit a Zergling the engine hovered.
 - The ray starts inside the hero; the pick skips the player's own hero.
+- The pick has no practical range: `c_SCOBA_PICK_MAX_RANGE` 256 (the whole
+  map). The reticle and status bar show for a unit at any distance. Only the
+  ground point stops at `c_SCOBA_CROSSHAIR_MAX_RANGE` (20).
+- In range (`gf_AimTargetInRange`): hero centre to the target edge (unit
+  `Radius`) within `UnitWeaponRange` and not below the weapon
+  `MinimumRange`; never for an invulnerable unit. Facing does not matter
+  (T36). Beyond range: gray reticle and `Out of range`, no damage.
 - Each unit is tested against its hit volume: spheres, capsules and boxes
   from the rest-pose m3 hit-test shapes, with actor `Scale` x model
   `ScaleMax` baked in. No radius, no margin. Model facing is model -y
@@ -438,6 +446,24 @@ Crosshair pick (R-TPS-84):
 - `pncprobe/20261115-231002`: group `point`, 0 failures, `RealClicks` 0.
 - A `tps pick` rerun on the new ray ended with `no tps test bank produced`.
 - Host tests: 277 OK.
+- `pncprobe/20261116-145352`: group `inrange` on the native check, 11
+  failures (close enemies out of range while aiming or facing away; no pick
+  at 30).
+- `pncprobe/20261116-145555`: group `inrange` on the distance check and the
+  uncapped pick, 0 failures. Marine at 1, 2, 4, 8, 11.8 in range in every
+  state; at 30 picked and out of range.
+- `tps/20261116-150246`: group `target`, 0 failures.
+- `tps/20261116-150349`: group `shot`, 21 failures, all from the 0.25 s Tosh
+  period of `067ffff`: the second click per case fires (Shots +1, one more
+  floater) and `CooldownMs`, `ButtonCdMs` read 0 at `tshot`. Same in `sky`
+  and `ground`, where no unit is picked. Host tests: 350 OK.
+- `controls/20261116-150635`: 1 failure, `controls_collision_clamp distance:
+  got=1 base=1` (camera collision; cause not found).
+- `rungun/20261116-150740`: 1 failure, `rungun shot CooldownRingMs: got=0`
+  (likely the 0.25 s period of `067ffff`; not measured).
+- `combat`: not run. The build failed in the map validator: `tree 2145865770
+  footprint does not match its mesh`, from uncommitted flora work
+  (`scripts/flora/build.py`, `scripts/flora/border.py`).
 
 Only the harness files of `combat` and `pncprobe` changed after
 `tps/20261114-234256`.

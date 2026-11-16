@@ -52,6 +52,13 @@ void gf_DbgTpsSet (bool lp_on) {
 void gf_DbgTpsReset (string lp_section) {
     gf_DbgTpsSet(false);
     gf_DbgReset(lp_section, false, true);
+    // The start Medic follows the hero; the pick has no range cap, so it
+    // would stand in the ray of every scenario. Park it off the lane.
+    if (UnitIsValid(gv_sCOBAMedic[1])) {
+        UnitIssueOrder(gv_sCOBAMedic[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+        UnitSetState(gv_sCOBAMedic[1], c_unitStateStunned, true);
+        UnitSetPosition(gv_sCOBAMedic[1], Point(20.0, 20.0), false);
+    }
 }
 
 // The range of every hero weapon, keyed by weapon id.
@@ -360,9 +367,10 @@ void gf_DbgTpsTarget (string lp_section) {
     gf_TpsLeftClick(1);
     Wait(0.3, c_timeGame);
     gf_DbgTpsSnap(lp_section, "tground");
-    gf_DbgTpsLook(lv_enemy, 0.0);
     gf_TpsMouseDown(1, gv_fIRE);
     Wait(0.4, c_timeGame);
+    // Aiming moves the ray to the shoulder proxy: aim again, as a player does.
+    gf_DbgTpsLook(lv_enemy, 0.0);
     gf_DbgTpsSnap(lp_section, "taim");
     gf_TpsLeftClick(1);
     gf_AimShotPress(1);

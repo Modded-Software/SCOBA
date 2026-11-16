@@ -21,7 +21,7 @@ from typing import NamedTuple
 
 from footprints.catalog import append_catalog
 
-from . import config, crush, gates, hazard_paint, treevary
+from . import border, config, crush, gates, hazard_paint, treevary
 from . import scene as scene_mod
 from . import terrain as terrain_mod
 from .grid import disk_cells, distance_to
@@ -164,10 +164,16 @@ def apply_flora(map_dir: Path) -> bool:
     if "</PlacedObjects>" not in text:
         raise ValueError(f"{objects} has no </PlacedObjects>")
     next_id = scene_mod.load(map_dir).next_id
-    objects.write_text(text.replace("</PlacedObjects>", objects_xml(p, next_id, terrain_mod.load(map_dir)) + "</PlacedObjects>", 1), encoding="utf-8")
+    loaded_terrain = terrain_mod.load(map_dir)
+    flora_xml = objects_xml(p, next_id, loaded_terrain)
+    border_id = next_id + len(p.hazards) + len(p.plants)
+    border_xml = "".join(
+        doodad_xml(border_id + i, k, x, y, z, rot, s, var) for i, (k, var, x, y, z, rot, s) in enumerate(border.plan(loaded_terrain, text))
+    )
+    objects.write_text(text.replace("</PlacedObjects>", flora_xml + border_xml + "</PlacedObjects>", 1), encoding="utf-8")
     data = map_dir / "Base.SC2Data" / "GameData"
     append_catalog(data / "FootprintData.xml", none_footprint_xml())
-    append_catalog(data / "ActorData.xml", plant_actors_xml())
+    append_catalog(data / "ActorData.xml", plant_actors_xml() + border.actor_xml(config.NONE_FOOTPRINT))
     loaded = terrain_mod.load(map_dir)
     (map_dir / crush.DATA_FILE).write_text(crush.galaxy(crush_rows(p, loaded, objects.read_text(encoding="utf-8")), crush.water_spans(loaded)), encoding="utf-8")
     variations = {k: f.variations for k, f in config.FAMILIES.items()} | config.HAZARD_VARIATIONS
@@ -205,8 +211,20 @@ def check_flora(map_dir: Path) -> list[str]:
     p = plan(map_dir)
     want = sorted([(h.kind, h.x, h.y) for h in p.hazards] + [(pl.kind, pl.x, pl.y) for pl in p.plants])
     placed = placed_doodads(map_dir)
+    # Border plants (flora/border.py) are checked on their own: the planned
+    # set must be placed exactly, and they leave the flora checks below.
+    terrain0 = terrain_mod.load(map_dir)
+    objects_text = (map_dir / "Objects").read_text(encoding="utf-8")
+    edge = {(k, f"{x:g}", f"{y:g}") for k, _v, x, y, _z, _r, _s in border.plan(terrain0, objects_text)}
+    placed_edge = [d for d in placed if (d[0], f"{d[1]:g}", f"{d[2]:g}") in edge]
+    placed = [d for d in placed if (d[0], f"{d[1]:g}", f"{d[2]:g}") not in edge]
+    edge_brambles = sum(1 for k, *_ in edge if k == border.BRAMBLE)
+    edge_trees = len(re.findall(r'Type="' + border.BORDER_TREE + '"', objects_text))
+    problems_edge = []
+    if len(placed_edge) != edge_brambles or edge_trees != len(edge) - edge_brambles or edge_trees == 0:
+        problems_edge.append(f"border: {len(placed_edge)}/{edge_brambles} brambles, {edge_trees}/{len(edge) - edge_brambles} trees placed")
     have = sorted((kind, x, y) for kind, x, y, _z, _a in placed)
-    problems = balance_problems(p.hazards, len(p.lanes)) + family_problems(p)
+    problems = balance_problems(p.hazards, len(p.lanes)) + family_problems(p) + problems_edge
     if len(p.hazards) != config.HAZARD_TOTAL:
         problems.append(f"{len(p.hazards)} hazards placed, want {config.HAZARD_TOTAL}: {p.notes}")
     if want != have:

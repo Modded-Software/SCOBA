@@ -1,0 +1,92 @@
+// In-range probe (R-TPS-23, 52): why does a close enemy read "Out of range"
+// for Tosh? gf_AimTargetInRange is UnitInRangeAndAbleToAttackTarget. Enemy
+// Marine at 1, 2, 4, 8, 13 east of Tosh, in TPS: at rest, while aiming, and
+// right after an aim shot. Raw values beside the native's answer.
+
+void gf_ProbeInRangeRow (string lp_section, string lp_tag, unit lp_unit) {
+    unit lv_hero;
+    int lv_i;
+    string lv_row;
+
+    lv_hero = gv_tPSUNIT[1];
+    lv_row = "native " + IntToString(BoolToInt(UnitInRangeAndAbleToAttackTarget(lv_hero, lp_unit))) + " script " + IntToString(BoolToInt(gf_AimTargetInRange(1, lp_unit)));
+    lv_row = lv_row + " dist " + FixedToString(DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lp_unit)), 2);
+    lv_row = lv_row + " wIdx " + IntToString(gf_AimWeaponIndex(1));
+    lv_row = lv_row + " wRange " + FixedToString(gf_AimWeaponRange(1), 2);
+    lv_row = lv_row + " cd " + FixedToString(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN), 2);
+    lv_row = lv_row + " facing " + FixedToString(UnitGetFacing(lv_hero), 1);
+    lv_row = lv_row + " order " + IntToString(UnitOrderCount(lv_hero));
+    lv_row = lv_row + " aim " + IntToString(BoolToInt(gv_aIMACTIVE[1]));
+    lv_row = lv_row + " cam " + FixedToString(CameraGetPitch(1), 1) + ";" + FixedToString(CameraGetYaw(1), 1);
+    lv_row = lv_row + " pick " + IntToString(BoolToInt(gf_AimUnitAtCrosshair(1, false) == lp_unit));
+    lv_row = lv_row + " invuln " + IntToString(BoolToInt(UnitTestState(lp_unit, c_unitStateInvulnerable)));
+    lv_row = lv_row + " valid " + IntToString(BoolToInt(gf_UnitTargetValid(1, lp_unit, true)));
+    lv_row = lv_row + " weapons";
+    for (lv_i = 1; lv_i <= UnitWeaponCount(lv_hero); lv_i += 1) {
+        lv_row = lv_row + " " + UnitWeaponGet(lv_hero, lv_i) + ":" + IntToString(BoolToInt(UnitWeaponIsEnabled(lv_hero, lv_i))) + ":" + FixedToString(UnitWeaponRange(lv_hero, lv_i), 1) + ":" + FixedToString(UnitWeaponPeriod(lv_hero, lv_i), 2);
+    }
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag, lv_row);
+}
+
+// Points the crosshair ray at the unit's body (0.5 above its base) from the
+// camera focus, three times (the focus moves with the yaw while aiming).
+void gf_ProbeInRangeLook (unit lp_unit) {
+    point lv_from;
+    point lv_to;
+    int lv_i;
+
+    lv_to = UnitGetPosition(lp_unit);
+    for (lv_i = 0; lv_i < 3; lv_i += 1) {
+        lv_from = gf_AimCameraFocus(1);
+        CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to), 0.0, -1, 10);
+        CameraSetValue(1, c_cameraValuePitch, ATan2(c_SCOBA_CAMERA_HEIGHT_OFFSET - 0.5, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
+        Wait(0.15, c_timeGame);
+    }
+    Wait(0.3, c_timeGame);
+}
+
+void gf_ProbeInRange (string lp_section) {
+    unit lv_unit;
+    int lv_k;
+    fixed[6] lv_dist;
+
+    lv_dist[0] = 1.0;
+    lv_dist[1] = 2.0;
+    lv_dist[2] = 4.0;
+    lv_dist[3] = 8.0;
+    lv_dist[4] = 13.0;
+    lv_dist[5] = 30.0;
+    gf_DbgReset(lp_section, false, true);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    for (lv_k = 0; lv_k < 6; lv_k += 1) {
+        UnitSetPosition(gv_tPSUNIT[1], gv_dbgAnchor, false);
+        libNtve_gf_CreateUnitsAtPoint2(1, "Marine", 0, 4, PointWithOffset(gv_dbgAnchor, lv_dist[lv_k], 0.0));
+        lv_unit = UnitLastCreated();
+        UnitSetState(lv_unit, c_unitStateStunned, true);
+        UnitSetPropertyFixed(lv_unit, c_unitPropLifeMax, 5000.0);
+        UnitSetPropertyFixed(lv_unit, c_unitPropLife, 5000.0);
+        gv_dbgEnemy = lv_unit;
+        Wait(0.3, c_timeGame);
+        gf_ProbeInRangeLook(lv_unit);
+        gf_ProbeInRangeRow(lp_section, "d" + IntToString(lv_k) + "rest", lv_unit);
+        UnitSetFacing(gv_tPSUNIT[1], 180.0, 0.0);
+        Wait(0.3, c_timeGame);
+        gf_ProbeInRangeRow(lp_section, "d" + IntToString(lv_k) + "away", lv_unit);
+        gf_AimBegin(1);
+        Wait(0.5, c_timeGame);
+        gf_ProbeInRangeLook(lv_unit);
+        gf_ProbeInRangeRow(lp_section, "d" + IntToString(lv_k) + "aim", lv_unit);
+        UnitCreateEffectUnit(gv_tPSUNIT[1], gf_AimShotEffect(1, UnitWeaponGet(gv_tPSUNIT[1], gf_AimWeaponIndex(1)), lv_unit), lv_unit);
+        UnitAddCooldown(gv_tPSUNIT[1], c_SCOBA_ATTACK_COOLDOWN, 1.0);
+        Wait(0.1, c_timeGame);
+        gf_ProbeInRangeRow(lp_section, "d" + IntToString(lv_k) + "shot", lv_unit);
+        gf_AimEnd(1);
+        Wait(1.2, c_timeGame);
+        UnitRemove(lv_unit);
+        BankSave(gv_dbgBank);
+    }
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankSave(gv_dbgBank);
+}

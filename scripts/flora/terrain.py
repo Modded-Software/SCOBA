@@ -53,7 +53,8 @@ def _scale(map_dir: Path) -> float:
 def _offset(raw: np.ndarray, scale: float, objects: str) -> float:
     """Median of placed-tree z minus raw ground at the tree."""
     rests = []
-    for match in re.finditer(r'<ObjectDoodad\b[^>]*\bPosition="([^"]+)"[^>]*\bType="ZerusTree[^"]*"[^>]*>', objects):
+    for match in re.finditer(r'<ObjectDoodad\b[^>]*\bPosition="([^"]+)"[^>]*\bType="ZerusTree(?!ScobaBorder)[^"]*"[^>]*>', objects):
+        # Border trees (flora/border.py) are placed from this calibration; they never feed it.
         x, y, z = (float(v) for v in match.group(1).split(","))
         rests.append(z - bilinear(raw, x, y) * scale)
     if not rests:

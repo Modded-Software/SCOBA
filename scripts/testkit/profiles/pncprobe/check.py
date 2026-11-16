@@ -19,6 +19,35 @@ def _point(data: dict, checks: Checks) -> None:
     check_point(data.get("hover", {}), checks)
 
 
+# Enemy Marine at 1, 2, 4, 8, 13 (d0-d4) and 30 (d5) east of Tosh, weapon
+# range 14. The script in-range check ignores the hero facing (the native
+# does not: pncprobe 20261116-145031) and measures distance only.
+INRANGE_STATES = ("rest", "away", "aim", "shot")
+
+
+def _inrange(data: dict, checks: Checks) -> None:
+    raw = data.get("inrange", {})
+    for key in sorted(raw):
+        print(f"  {key}: {raw[key]}")
+    for d in range(6):
+        want = 1 if d < 5 else 0
+        for state in INRANGE_STATES:
+            row = str(raw.get(f"d{d}{state}", "")).split()
+            got = int(row[row.index("script") + 1]) if "script" in row else None
+            verdict = "PASS" if got == want else "FAIL"
+            print(f"inrange d{d}{state} script: got={got} want={want} {verdict}")
+            if verdict == "FAIL":
+                checks.failures += 1
+        # The probe aimed the crosshair at the Marine: the pick must see it.
+        for state in ("rest", "aim"):
+            row = str(raw.get(f"d{d}{state}", "")).split()
+            got = int(row[row.index("pick") + 1]) if "pick" in row else None
+            verdict = "PASS" if got == 1 else "FAIL"
+            print(f"inrange d{d}{state} pick: got={got} want=1 {verdict}")
+            if verdict == "FAIL":
+                checks.failures += 1
+
+
 def _report(fn: Callable[[dict], None]) -> Report:
     return lambda data, _checks: fn(data)
 
@@ -38,6 +67,7 @@ GROUP_REPORTS: dict[str, Report] = {
     "ray": _report(print_ray),
     "look": _report(print_ray),
     "point": _point,
+    "inrange": _inrange,
     "attach": _report(print_attach),
 }
 

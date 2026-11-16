@@ -112,6 +112,8 @@ def trees_of(map_dir: Path, objects: str) -> list[Tree]:
     trees = []
     for match in re.finditer(r'<ObjectDoodad\b[^>]*\bType="(ZerusTree[^"]*)"[^>]*>', objects):
         block = match.group(0)
+        if match.group(1) == "ZerusTreeScobaBorder":
+            continue  # border trees (flora/border.py): off the playable area, no footprint
         body = actors.get(match.group(1), "")
         fp = re.search(r'<Footprint value="([^"]+)"/>', body)
         if fp is None or fp.group(1) not in footprints:
