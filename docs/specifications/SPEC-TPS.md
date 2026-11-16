@@ -76,7 +76,7 @@ not repeated here.
 
 | Req | State | Evidence |
 | --- | --- | --- |
-| R-TPS-1 | [tested] effect name, effect event, damage, cooldown, button clock. Muzzle, sound, animation [operator]. | `tps` group `shot`: `ShotEffect`, `CooldownMs`, `ButtonCdMs` |
+| R-TPS-1 | [tested] effect name, effect event, damage, cooldown, button clock. Muzzle, sound, animation [operator]. | `tps` group `shot`: `ShotEffect`, `EarlyCdMs`, `EarlyBtnMs` |
 | R-TPS-2 | [built] | One strafe step, one left-click result (`gf_LeftClickTarget`), one effect handler. The UI floater is a new module: a world text tag cannot show at the sky (R-TPS-73). |
 | R-TPS-3 | [built] | The five aim-shot abilities are removed. The build validator fails if their ids return. No in-game ability count check. |
 | R-TPS-10, 11 | [tested] | `tps` group `move` |
@@ -87,7 +87,7 @@ not repeated here.
 | R-TPS-16 | [built] Earlier variant (on while aiming, 9 yaw steps) passed `tps/20261116-160329`; current build not run. Look, yaw direction, Kerrigan [operator]. | `tps_head_lead` |
 | R-TPS-20 | [tested] script flag. The cursor itself [operator] (T5). | `tps` group `cursor` |
 | R-TPS-21, 22 | [tested] | `tps` group `cursor` |
-| R-TPS-23 to 26 | [tested] crosshair kind. Colors [operator]. | `tps` groups `shot`, `kerrigan` |
+| R-TPS-23 to 26 | [tested] crosshair kind, Tosh. Colors [operator]. Kerrigan not tested. | `tps` group `shot` |
 | R-TPS-27 | [operator] | |
 | R-TPS-30 to 33 | [tested] flags | `tps` group `cursor` |
 | R-TPS-34 | [built] | The Alt triggers are removed. No key test. |
@@ -98,12 +98,12 @@ not repeated here.
 | R-TPS-43 | [built] | Galaxy has no field-of-view getter. [operator] |
 | R-TPS-50 | [tested] standing and walking | `tps_shot_*`, `tps_shot_walk`, `rungun` |
 | R-TPS-51 | [tested] | `tps_shot_noaim` |
-| R-TPS-52 | Tosh [tested] damage. Kerrigan fails: Psi Blast deals no damage at this distance (T32, section 8). The damage text is the Point & Click floater; not asserted here. | `tps_shot_enemy`; failing `tps_kerr_enemy tlate EnemyHp` |
-| R-TPS-53, 54 | [tested] | `tps_shot_far`, `tps_shot_ground`, `tps_shot_sky`, Kerrigan cases |
-| R-TPS-55 | [tested] with a Marine in range | `tps_shot_friendly`, `tps_kerr_friendly` |
+| R-TPS-52 | Tosh [tested] damage. Kerrigan not tested (section 8). The damage text is the Point & Click floater; not asserted here. | `tps_shot_enemy` |
+| R-TPS-53, 54 | [tested] Tosh | `tps_shot_far`, `tps_shot_ground`, `tps_shot_sky` |
+| R-TPS-55 | [tested] with a Marine in range | `tps_shot_friendly` |
 | R-TPS-56 | [operator] | |
-| R-TPS-57 | [tested] | `CooldownMs`, `ButtonCdMs` in every shot case |
-| R-TPS-58 | [tested] | second click in every shot case |
+| R-TPS-57 | [tested] one game loop after the shot effect: hero cooldown and button clock above 0 and at most the weapon cooldown, command on cooldown. The ring itself [operator]. | `tpsclock.galaxy`: `EarlyCdMs`, `EarlyBtnMs`, `EarlyCmdCd`, `CdTimeMs` in every shot case |
+| R-TPS-58 | [tested] second click in the same loop, while the cooldown runs (`AgainCdMs` above 0) | every standing shot case |
 | R-TPS-59 | [built] | The crosshair and click targeting reject the proxy. Attacks on it by other units are not tested. |
 | R-TPS-60 | [tested] | every standing shot case |
 | R-TPS-61 | [tested] Tosh. The path over 1 s after the click is at least 97 % of the path over 1 s before it. Never an attack order, always a move order. Kerrigan [built]. | `tps_shot_walk` |
@@ -307,7 +307,10 @@ not repeated here.
   measured shapes. Model facing is model -y (`c_HV_MODEL_YAW` 90).
 - Hive and PsiDecimator (psi destroyer) are scenery: no hit volume
   (`HV_UNPICKABLE`), and UnitData sets them invulnerable, untargetable,
-  with no collision and no footprint.
+  with no collision and no footprint. `tps_pick_scenery` asserts the
+  invulnerable state and the target filter only. Damage and collision are
+  not tested: the `UnitDamage` probe took life from them and the Zergling
+  path probe failed on the Marine control too (operator 2026-11-16: dropped).
 - Data: `scripts/hitvolumes/` measures `scripts/data/hit_volumes.json`
   (70 units) and generates `scripts/app/data/hit_volumes_*.galaxy`
   (63 types). `validate_aim_shot.py` fails on stale data.
@@ -338,7 +341,7 @@ not repeated here.
 ## 7. Tests
 
 - Entry point: `scripts/playtest.sh tps [group]`. Groups: `move`, `cursor`,
-  `aim`, `head`, `target`, `shot`, `kerrigan`, `pick`.
+  `aim`, `head`, `target`, `pick`, `shot`, `hold`.
 - `SC2_TEST_GROUP=point scripts/playtest.sh pncprobe`, with the host pointer
   injector parking the hidden cursor at the window centre: engine hover
   against script pick (R-TPS-84). The start Medic (`gt_MedicSpawn`) and all
@@ -362,8 +365,7 @@ not repeated here.
 | `aim` | Aim flag, anchor on the right, shorter camera arm. | Release restores the distance and removes the anchor. |
 | `head` | Head step level, down, up with the camera pitch. Lead: a 60 degree turn left and right turns the head ahead within two game loops. | Step 0 in Point & Click, while aiming (also on a fast look down), in the free-cursor state, after leaving TPS. No lead 1 s after each turn. The turn right does not lead left. |
 | `target` | Not aiming: the click sets the UI target. | The click never attacks. Aiming: the UI target is unchanged. |
-| `shot` | Per outcome: shots +1, life, proxy, effect name, cooldown, hero position, one text of the right kind. Walking: one shot, the walk keeps its speed. Weapon ranges. | Click on cooldown, click when not aiming: no shot, no text. Walking: never an attack order. Air proxy: not the hit effect. No late damage 2 s after a miss. |
-| `kerrigan` | The shot cases with Kerrigan. | As `shot`. |
+| `shot` | Per outcome: shots +1, life, proxy, effect name, cooldown and button clock one loop after the shot, hero position, one text of the right kind. Walking: one shot, the walk keeps its speed. Weapon ranges. | Click while the cooldown runs, click when not aiming: no shot, no text. Walking: never an attack order. Air proxy: not the hit effect. No late damage 2 s after a miss. |
 | `pick` | Medic head, Marine thigh and middle, Ultralisk front, Zergling at 18.5, Overseer body, Hive top, Marine before Hive, Thor chest with aim held (reticle, status bar, shot). | Above the Medic, beside the Marine and Zergling, behind the Ultralisk, under the Overseer, north of the Hive. |
 | `pncprobe point` | Engine and script band centres within 2 degrees, pitch at 3, 5, 8, 12 and yaw at 5, rest and aim. Nothing but hero and target near the lane; Medic parked. | No script pick 4 degrees outside the engine band. |
 
@@ -379,9 +381,9 @@ Floater checks read script counters. They do not prove the text is visible.
   to the proxy with the `Friendly Fire Disabled` text
   (`tps/20261114-211914`, raw `CrossType`). R-TPS-55 asks for a shot at the
   unit. Cause not found.
-- Kerrigan is a proof of concept. Psi Blast deals no damage beyond about 3.0
-  (T32). `tps_kerr_enemy tlate EnemyHp` fails. Cause not found. Kerrigan has
-  no air effect (R-TPS-62).
+- Kerrigan is a proof of concept. Psi Blast dealt no damage beyond about 3.0
+  (T32); cause not found. The `tps` group `kerrigan` is deleted (operator
+  2026-11-16). Kerrigan has no air effect (R-TPS-62).
 
 ## 9. Operator Checks
 
@@ -414,7 +416,8 @@ Floater checks read script counters. They do not prove the text is visible.
 - The field of view (R-TPS-43).
 - The Alt key (R-TPS-34).
 - An in-game ability count (R-TPS-3).
-- A walking shot with Kerrigan (R-TPS-61).
+- Any Kerrigan shot case (R-TPS-23 to 26, 52 to 55, 61).
+- Scenery damage and collision (section 5).
 - A real middle click with a real cursor (R-TPS-31, 36).
 - A real middle press and drag (R-TPS-37).
 - The `pick` group, full `tps`, `combat`, `controls`, `rungun` on the new
@@ -485,6 +488,15 @@ Crosshair pick (R-TPS-84):
 - `combat`: not run. The build failed in the map validator: `tree 2145865770
   footprint does not match its mesh`, from uncommitted flora work
   (`scripts/flora/build.py`, `scripts/flora/border.py`).
+
+Shot clocks on the 0.25 s Tosh period:
+
+- `tps/20261116-215657`: group `shot`, 21 failures. A probe one loop after
+  the shot read 125 ms on the hero cooldown and the button clock in each
+  aimed case. The old read at +0.25 s found both over.
+- `tps/20261116-220628`: group `shot` on `tpsclock.galaxy`, 0 failures.
+- `tps/20261116-222551`: full `tps`, 403 passes, 0 failures, `RealClicks`
+  0. Kerrigan group deleted, scenery damage and collision checks dropped.
 
 Only the harness files of `combat` and `pncprobe` changed after
 `tps/20261114-234256`.

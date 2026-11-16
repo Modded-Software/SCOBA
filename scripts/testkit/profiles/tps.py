@@ -16,6 +16,7 @@ from ..runner import TestRunSpec
 from .combat import _delta, _report, _walk_scale, _yaw_off
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 from .tps_pick import check_pick
+from .tps_shot import shot_clocks
 
 ROOT = project_root()
 
@@ -39,6 +40,7 @@ def map_spec() -> TestMapSpec:
             ROOT / "scripts" / "testkit" / "galaxy" / "tpspick.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tpshead.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tpshold.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "tpsclock.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/tps/common",
@@ -46,6 +48,7 @@ def map_spec() -> TestMapSpec:
             "scripts/test/tps/tpspick",
             "scripts/test/tps/tpshead",
             "scripts/test/tps/tpshold",
+            "scripts/test/tps/tpsclock",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_TpsTest_Init();"),
     )
@@ -175,10 +178,8 @@ def _tps_shot(checks, section: str, floater: str | None, shots: int = 1) -> None
     for key in FLOATERS:
         want = (checks.value(section, "taim", key) or 0) + (1 if key == floater else 0)
         checks.eq(section, "tend", key, want)
-    # R-TPS-57: the shot starts the hero cooldown and the button clock.
     if aiming:
-        checks.gt(section, "tshot", "CooldownMs", 0)
-        checks.gt(section, "tshot", "ButtonCdMs", 0)
+        shot_clocks(checks, section, again=True)
     # R-TPS-60: the hero does not move.
     moved = max(abs(_delta(checks, section, "taim", "tend", key) or 0) for key in ("HeroX10", "HeroY10"))
     _report(checks, f"{section} hero stays", moved <= 2, f"moved10={moved}")
@@ -263,12 +264,10 @@ def _shot_cases(checks, prefix: str) -> None:
     checks.eq(section, "tend", "AllyHp", life)
 
 
-# Hero weapon ranges as the engine reports them, times 10. They include the
-# +2 of the hero behavior UnitDirectControl. The ranged weapons reach twice
-# their stock in-game range (Tosh 7, Psi Blast 6). The melee weapon keeps
-# its stock in-game range (1 + 2).
-RANGED_RANGE10 = {"Tosh": 140, "ToshAuto": 140, "QueenOfBladesPsiBlast": 120, "QueenOfBladesPsiBlastAuto": 120}
-MELEE_RANGE10 = {"RazorTalons": 30, "RazorTalonsAuto": 30}
+# Tosh weapon range as the engine reports it, times 10. It includes the +2
+# of the hero behavior UnitDirectControl and is twice the stock in-game
+# range 7.
+TOSH_RANGE10 = {"Tosh": 140, "ToshAuto": 140}
 
 
 def _check_ranges(checks, section: str, weapons: dict) -> None:
@@ -277,7 +276,7 @@ def _check_ranges(checks, section: str, weapons: dict) -> None:
 
 
 def _check_shot(checks) -> None:
-    _check_ranges(checks, "tps_shot_enemy", {k: v for k, v in RANGED_RANGE10.items() if k.startswith("Tosh")})
+    _check_ranges(checks, "tps_shot_enemy", TOSH_RANGE10)
     # The enemy stands beyond the stock range 7 and inside the doubled one.
     checks.between("tps_shot_enemy", "taim", "Distance", 80, 135)
     # The far enemy stands outside the doubled range, on the crosshair ray.
@@ -348,25 +347,11 @@ def _check_shot_walk(checks) -> None:
     for key in FLOATERS:
         want = (checks.value(section, "taim", key) or 0) + (1 if key == "FloatMiss" else 0)
         checks.eq(section, "tend", key, want)
-    checks.gt(section, "tshot", "CooldownMs", 0)
-    checks.gt(section, "tshot", "ButtonCdMs", 0)
+    shot_clocks(checks, section, again=False)
     _tps_proxy_shot(checks, section)
     # No shot state is left.
     checks.eq(section, "tend", "ShotKind", 0)
     checks.true(section, "tend", "TargetNone")
-
-
-def _check_kerrigan(checks) -> None:
-    for section in ("tps_kerr_enemy", "tps_kerr_far", "tps_kerr_sky", "tps_kerr_friendly"):
-        checks.false(section, "taim", "HeroIsTosh")
-    _check_ranges(checks, "tps_kerr_enemy", {k: v for k, v in RANGED_RANGE10.items() if k.startswith("Queen")})
-    # Negative case: the melee weapon is not doubled.
-    _check_ranges(checks, "tps_kerr_enemy", MELEE_RANGE10)
-    # The enemy stands beyond the stock in-game Psi Blast range 6 and inside 12.
-    checks.between("tps_kerr_enemy", "taim", "Distance", 70, 115)
-    # The far enemy stands outside the doubled range, on the crosshair ray.
-    checks.between("tps_kerr_far", "taim", "Distance", 125, 200)
-    _shot_cases(checks, "tps_kerr")
 
 
 def _check_aim(checks) -> None:
@@ -455,7 +440,7 @@ def _check_hold(checks) -> None:
     checks.eq(section, "", "ReleasedChain", 0)
 
 
-GROUPS = ("move", "cursor", "aim", "head", "target", "pick", "shot", "hold", "kerrigan")
+GROUPS = ("move", "cursor", "aim", "head", "target", "pick", "shot", "hold")
 
 GROUP_CHECKS = {
     "pick": check_pick,
@@ -466,7 +451,6 @@ GROUP_CHECKS = {
     "target": _check_target,
     "shot": _check_shot,
     "hold": _check_hold,
-    "kerrigan": _check_kerrigan,
 }
 
 

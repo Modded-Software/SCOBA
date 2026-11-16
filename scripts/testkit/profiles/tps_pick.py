@@ -19,7 +19,7 @@ CASES = {
     "tps_pick_hive": ((), ("ttop", "tnorth", "tover")),
 }
 SCENERY = ("Hive", "PsiDecimator")
-SCENERY_KEYS = ("FilterIn", "StateInvuln", "LifeLost", "LingDist100")
+SCENERY_KEYS = ("FilterIn", "StateInvuln")
 # Missing: unit types near the lane the pick met without a volume (raw).
 RAW = ("Pick", "PickT100", "Ray", "Aim", "Missing")
 
@@ -44,16 +44,15 @@ def check_pick(checks) -> None:
     checks.eq("tps_pick_hive", "tmarine", "Pick", "Marine")
     checks.eq("tps_pick_hive", "tover", "Pick", "none")
     checks.eq("tps_pick_hive", "ttop", "Pick", "none")
-    # Scenery: invulnerable to the target filter and to damage; a Zergling
-    # walks to its centre. Marine control: the opposite on every point.
+    # Scenery: the engine holds it invulnerable, and the Invulnerable target
+    # filter excludes it. Marine control: the opposite on both points.
     for kind in (*SCENERY, "Marine"):
         print(f"tps_pick_scenery raw {kind}: " + " ".join(f"{k}={checks.value('tps_pick_scenery', '', kind + k)}" for k in SCENERY_KEYS))
     for kind in SCENERY:
         checks.false("tps_pick_scenery", "", kind + "FilterIn")
-        checks.eq("tps_pick_scenery", "", kind + "LifeLost", 0)
-        checks.lt("tps_pick_scenery", "", kind + "LingDist100", 100)
+        checks.true("tps_pick_scenery", "", kind + "StateInvuln")
     checks.true("tps_pick_scenery", "", "MarineFilterIn")
-    checks.gt("tps_pick_scenery", "", "MarineLifeLost", 0)
+    checks.false("tps_pick_scenery", "", "MarineStateInvuln")
     # The operator's Thor case, aim held: reticle enemy (1), status bar on
     # the Thor, the shot a hit (1) at the Thor.
     for key in ("tchestAim", "tchestReticle", "tchestStatus", "tchestShotKind", "tchestShotThor"):

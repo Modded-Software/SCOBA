@@ -125,36 +125,19 @@ void gf_TpsPickSky (string lp_type) {
 }
 
 // Scenery data (UnitData): a fresh unit of lp_type, no script state set.
-// Invulnerable: the Invulnerable target filter excludes it, and damage
-// leaves its life. No collision: a Zergling ordered to its centre gets
-// there. Marine is the control: filtered in, damaged, blocks nothing.
+// Invulnerable: the engine state is set and the Invulnerable target filter
+// excludes it. Marine is the control: not invulnerable, filtered in.
 void gf_TpsPickScenery (string lp_section, string lp_type) {
     unit lv_unit;
-    unit lv_ling;
-    fixed lv_life;
-    point lv_at;
 
     gf_DbgTpsReset(lp_section);
-    lv_at = PointWithOffset(gv_dbgAnchor, 12.0, 0.0);
-    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, c_unitCreateIgnorePlacement, 4, lv_at);
+    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, c_unitCreateIgnorePlacement, 4, PointWithOffset(gv_dbgAnchor, 12.0, 0.0));
     lv_unit = UnitLastCreated();
     UnitSetState(lv_unit, c_unitStateStunned, true);
     Wait(0.5, c_timeGame);
-    lv_at = UnitGetPosition(lv_unit);
-    lv_life = UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent);
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_type + "FilterIn", UnitFilterMatch(lv_unit, 1, UnitFilter(0, 0, 0, (1 << (c_targetFilterInvulnerable - 32)))));
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_type + "StateInvuln", UnitTestState(lv_unit, c_unitStateInvulnerable));
-    UnitDamage(gv_tPSUNIT[1], "ToshU", lv_unit, 10.0);
-    Wait(0.5, c_timeGame);
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_type + "LifeLost", FixedToInt(lv_life - UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent)));
-    libNtve_gf_CreateUnitsAtPoint2(1, "Zergling", 0, 4, PointWithOffset(lv_at, -6.0, 0.0));
-    lv_ling = UnitLastCreated();
-    UnitSetState(lv_ling, c_unitStateInvulnerable, true);
-    UnitIssueOrder(lv_ling, OrderTargetingPoint(AbilityCommand("move", 0), lv_at), c_orderQueueReplace);
-    Wait(4.0, c_timeGame);
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_type + "LingDist100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_ling), lv_at) * 100.0));
     BankSave(gv_dbgBank);
-    UnitRemove(lv_ling);
     UnitRemove(lv_unit);
     Wait(0.3, c_timeGame);
 }

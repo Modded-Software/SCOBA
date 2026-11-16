@@ -183,14 +183,12 @@ const int c_DBG_SHOT_SKY = 3;
 const int c_DBG_SHOT_FRIENDLY = 4;
 const int c_DBG_SHOT_NO_AIM = 5;
 
+void gf_DbgTpsShotClocks (string lp_section, string lp_tag, bool lp_again);  // tpsclock.galaxy
+
 // One scenario: arrange the case, aim, click, click again on cooldown.
-void gf_DbgTpsShot (string lp_section, int lp_case, bool lp_kerrigan, fixed lp_dx) {
+void gf_DbgTpsShot (string lp_section, int lp_case, fixed lp_dx) {
     gf_DbgTpsReset(lp_section);
     gf_DbgTpsAllyClear();
-    if (lp_kerrigan) {
-        gf_HeroSwitchTo(gv_heroKerrigan);
-        Wait(0.5, c_timeGame);
-    }
     if (lp_case == c_DBG_SHOT_ENEMY || lp_case == c_DBG_SHOT_FAR_ENEMY || lp_case == c_DBG_SHOT_NO_AIM) {
         gf_DbgSpawnOne(lp_section, lp_dx, 500.0);
     }
@@ -227,10 +225,10 @@ void gf_DbgTpsShot (string lp_section, int lp_case, bool lp_kerrigan, fixed lp_d
     }
     gf_DbgTpsSnap(lp_section, "taim");
     gf_AimShotPress(1);
-    gf_DbgSnapAfterShot(lp_section, "tshot");
+    // The clocks run, and a second click on cooldown fires nothing, leaves
+    // no text (R-TPS-57, R-TPS-58).
+    gf_DbgTpsShotClocks(lp_section, "tshot", true);
     gf_DbgTpsExtra(lp_section, "tshot");
-    // A second click on cooldown: no shot, no text (R-TPS-58).
-    gf_AimShotPress(1);
     Wait(1.6, c_timeGame);
     gf_DbgTpsSnap(lp_section, "tend");
     // A missile needs flight time at long range. Damage is read here.
@@ -248,6 +246,7 @@ void gf_DbgTpsShot (string lp_section, int lp_case, bool lp_kerrigan, fixed lp_d
 void gf_DbgTpsShotWalk (string lp_section) {
     point lv_before;
     point lv_click;
+    fixed lv_at;
 
     gf_DbgTpsReset(lp_section);
     gf_DbgTpsAllyClear();
@@ -265,9 +264,10 @@ void gf_DbgTpsShotWalk (string lp_section) {
     gf_DbgTpsSnap(lp_section, "taim");
     gf_AimShotPress(1);
     gf_DbgTpsSnap(lp_section, "tpress");
-    Wait(0.25, c_timeGame);
+    lv_at = GameGetMissionTime();
+    gf_DbgTpsShotClocks(lp_section, "tshot", false);
     gf_DbgTpsSnap(lp_section, "tshot");
-    Wait(0.75, c_timeGame);
+    Wait(1.0 - (GameGetMissionTime() - lv_at), c_timeGame);
     BankValueSetFromInt(gv_dbgBank, lp_section, "ShotPath1000", FixedToInt(DistanceBetweenPoints(lv_click, UnitGetPosition(gv_tPSUNIT[1])) * 1000.0));
     gf_DbgTpsSnap(lp_section, "tend");
     gv_fORWARD[1] = false;
@@ -458,23 +458,17 @@ bool gt_TpsTest_Func (bool testConds, bool runActions) {
         gf_DbgTpsHeadRun();
     }
     if (gf_DbgGroup("shot")) {
-        gf_DbgTpsShot("tps_shot_enemy", c_DBG_SHOT_ENEMY, false, 12.0);
-        gf_DbgTpsShot("tps_shot_far", c_DBG_SHOT_FAR_ENEMY, false, 17.0);
-        gf_DbgTpsShot("tps_shot_ground", c_DBG_SHOT_GROUND, false, 0.0);
-        gf_DbgTpsShot("tps_shot_sky", c_DBG_SHOT_SKY, false, 0.0);
-        gf_DbgTpsShot("tps_shot_friendly", c_DBG_SHOT_FRIENDLY, false, 4.0);
-        gf_DbgTpsShot("tps_shot_noaim", c_DBG_SHOT_NO_AIM, false, 5.0);
+        gf_DbgTpsShot("tps_shot_enemy", c_DBG_SHOT_ENEMY, 12.0);
+        gf_DbgTpsShot("tps_shot_far", c_DBG_SHOT_FAR_ENEMY, 17.0);
+        gf_DbgTpsShot("tps_shot_ground", c_DBG_SHOT_GROUND, 0.0);
+        gf_DbgTpsShot("tps_shot_sky", c_DBG_SHOT_SKY, 0.0);
+        gf_DbgTpsShot("tps_shot_friendly", c_DBG_SHOT_FRIENDLY, 4.0);
+        gf_DbgTpsShot("tps_shot_noaim", c_DBG_SHOT_NO_AIM, 5.0);
         gf_DbgTpsShotWalk("tps_shot_walk");
         gf_DbgTpsShotStop("tps_shot_stop");
     }
     if (gf_DbgGroup("hold")) {
         gf_DbgTpsHold("tps_hold");
-    }
-    if (gf_DbgGroup("kerrigan")) {
-        gf_DbgTpsShot("tps_kerr_enemy", c_DBG_SHOT_ENEMY, true, 12.0);
-        gf_DbgTpsShot("tps_kerr_far", c_DBG_SHOT_FAR_ENEMY, true, 17.0);
-        gf_DbgTpsShot("tps_kerr_sky", c_DBG_SHOT_SKY, true, 0.0);
-        gf_DbgTpsShot("tps_kerr_friendly", c_DBG_SHOT_FRIENDLY, true, 3.5);
     }
 
     gf_DbgTpsReset("done");
