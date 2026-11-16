@@ -37,11 +37,13 @@ def map_spec() -> TestMapSpec:
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tps.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tpspick.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "tpshold.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/tps/common",
             "scripts/test/tps/tps",
             "scripts/test/tps/tpspick",
+            "scripts/test/tps/tpshold",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_TpsTest_Init();"),
     )
@@ -407,7 +409,23 @@ def _check_head(checks) -> None:
     checks.gt(section, "taim", "PitchStep", 0)
 
 
-GROUPS = ("move", "cursor", "aim", "head", "target", "pick", "shot", "kerrigan")
+def _check_hold(checks) -> None:
+    """Held left button while aiming chains shots; release stops them."""
+    section = "tps_hold"
+    period = checks.value(section, "", "Period1000") or 0
+    shots = checks.value(section, "", "HeldShots")
+    print(f"{section} raw: period1000={period} held={shots} chain={checks.value(section, '', 'HeldChain')}")
+    # 2 s held: about 2000/period shots; window wider than one period each way.
+    want = 2000 // period if period else 0
+    ok = shots is not None and period > 0 and want - 2 <= shots <= want + 1
+    _report(checks, f"{section} held fire chains about {want} shots", ok, f"held={shots}")
+    checks.gt(section, "", "HeldChain", 0)
+    # Negative case: no shot after release.
+    checks.eq(section, "", "ReleasedShots", 0)
+    checks.eq(section, "", "ReleasedChain", 0)
+
+
+GROUPS = ("move", "cursor", "aim", "head", "target", "pick", "shot", "hold", "kerrigan")
 
 GROUP_CHECKS = {
     "pick": check_pick,
@@ -417,6 +435,7 @@ GROUP_CHECKS = {
     "cursor": _check_cursor,
     "target": _check_target,
     "shot": _check_shot,
+    "hold": _check_hold,
     "kerrigan": _check_kerrigan,
 }
 

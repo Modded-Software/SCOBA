@@ -70,6 +70,11 @@ NON_SPLASH_ACTORS = {
     "VikingFighter",
     "WarpPrismPhasing",
     "ZergDropPod",
+    # Footfall units (scripts/footfall/fx.py): their ripples come from the
+    # script, which checks water above the ground (operator 2026-11-16:
+    # engine squibs rippled on dry ground).
+    "Goliath",
+    "Queen",
 }
 
 ACTOR_RE = re.compile(

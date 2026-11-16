@@ -253,10 +253,21 @@ class BuildTests(unittest.TestCase):
         plan = Plan([], [Placed("ZerusTarPit", 1.5, 2.5, 0.0, 0, "Zerg", 0, 18.0)], [], [], [])
         xml = objects_xml(plan, 500, terrain)
         self.assertIn('Id="500"', xml)
-        self.assertIn('Position="1.5,2.5,12.8500"', xml)  # flat world ground 10 + GROUND_LIFT 2.85
+        self.assertIn('Position="1.5,2.5,12.7000"', xml)  # flat ground 10 + GROUND_LIFT 2.6 + HAZARD_LIFT 0.1
         self.assertIn('<Flag Index="HeightAbsolute" Value="1"/>', xml)
         # Negative case: z 0 buried props off low ground (operator probe).
         self.assertNotIn(',0" Rotation', xml)
+
+    def test_hazard_sits_on_the_lowest_footprint_ground(self) -> None:
+        # Operator 2026-11-16: the centre height left an edge floating.
+        terrain, _ = world()
+        height = terrain.height.copy()
+        height[5, 5] = 9.0  # one low cell under the tar pit (half 2.0)
+        terrain = terrain._replace(height=height)
+        plan = Plan([], [Placed("ZerusTarPit", 5.5, 5.5, 0.0, 0, "Zerg", 0, 18.0)], [], [], [])
+        xml = objects_xml(plan, 500, terrain)
+        self.assertIn('Position="5.5,5.5,11.7000"', xml)  # lowest ground 9 + 2.6 + 0.1
+        self.assertNotIn('Position="5.5,5.5,12.7000"', xml)
 
 
 if __name__ == "__main__":

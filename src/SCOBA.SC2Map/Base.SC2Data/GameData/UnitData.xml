@@ -306,8 +306,6 @@
             <LayoutButtons index="52" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
             <LayoutButtons index="53" Face="SCOBARightClickMove" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,On" Row="0" Column="4"/>
             <LayoutButtons index="54" Face="SCOBARightClickStand" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,Off" Row="0" Column="4"/>
-            <LayoutButtons index="55" Face="SCOBAControlPNC" Type="AbilCmd" AbilCmd="SCOBATPSToggle,On" Row="0" Column="2"/>
-            <LayoutButtons index="56" Face="SCOBAControlTPS" Type="AbilCmd" AbilCmd="SCOBATPSToggle,Off" Row="0" Column="2"/>
             <LayoutButtons index="0" Face="MedicHeal" Type="AbilCmd" AbilCmd="heal,Execute" Row="2" Column="0"/>
             <LayoutButtons index="1" Face="StunningBlast" Type="AbilCmd" AbilCmd="StunningBlast,Execute" Row="2" Column="3"/>
             <LayoutButtons index="2" Face="ForceField" Type="AbilCmd" AbilCmd="ForceField,Execute" Row="2" Column="1"/>
@@ -616,8 +614,6 @@
             <LayoutButtons index="52" Face="SCOBAAutoAttackOff" Type="AbilCmd" AbilCmd="SCOBAAutoAttackToggle,Off" Row="0" Column="3"/>
             <LayoutButtons index="53" Face="SCOBARightClickMove" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,On" Row="0" Column="4"/>
             <LayoutButtons index="54" Face="SCOBARightClickStand" Type="AbilCmd" AbilCmd="SCOBARightClickToggle,Off" Row="0" Column="4"/>
-            <LayoutButtons index="55" Face="SCOBAControlPNC" Type="AbilCmd" AbilCmd="SCOBATPSToggle,On" Row="0" Column="2"/>
-            <LayoutButtons index="56" Face="SCOBAControlTPS" Type="AbilCmd" AbilCmd="SCOBATPSToggle,Off" Row="0" Column="2"/>
             <LayoutButtons index="0" Face="MedicHeal" Type="AbilCmd" AbilCmd="heal,Execute" Row="2" Column="0"/>
             <LayoutButtons index="1" Face="StunningBlast" Type="AbilCmd" AbilCmd="StunningBlast,Execute" Row="2" Column="3"/>
             <LayoutButtons index="2" Face="ForceField" Type="AbilCmd" AbilCmd="ForceField,Execute" Row="2" Column="1"/>

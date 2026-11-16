@@ -51,5 +51,44 @@ class CrushTableTest(unittest.TestCase):
         self.assertIn("void gf_CrushLoad () {", text)
 
 
+class WaterSpanTest(unittest.TestCase):
+    def terrain(self):
+        import numpy as np
+        from types import SimpleNamespace
+
+        n = 8
+        height = np.full((n, n), 5.0)
+        lift = config.GROUND_LIFT
+        surface = 5.0 + lift + 1.0  # 1.0 above the visible ground
+        depth = np.full((n, n), -np.inf)
+        depth[2, 1:6] = surface - height[2, 1:6]  # water rect over row 2, x 1..5
+        height[2, 4] = 5.0 + 0.95  # shore: surface only 0.05 above the visible ground
+        depth[2, 4] = surface - height[2, 4]
+        return SimpleNamespace(height=height, depth=depth), surface
+
+    def test_spans_hold_wet_cells_only(self) -> None:
+        from flora.crush import water_spans
+
+        terrain, surface = self.terrain()
+        spans = water_spans(terrain)
+        self.assertEqual([(y, x0, x1) for y, x0, x1, _z, _d in spans], [(2, 1, 4), (2, 5, 6)])
+        self.assertTrue(all(abs(z - surface) < 1e-3 for *_r, z, _d in spans))
+        # Visible depth: surface over the visible ground (1.0 by construction).
+        self.assertTrue(all(abs(d - 1.0) < 1e-3 for *_r, d in spans))
+        # Negative cases: the shallow shore cell and cells outside the rect are dry.
+        self.assertFalse(any(x0 <= 4 < x1 for _y, x0, x1, _z, _d in spans))
+        self.assertFalse(any(y != 2 for y, *_r in spans))
+
+    def test_galaxy_rows_index_their_spans(self) -> None:
+        from flora.crush import water_spans
+
+        terrain, _ = self.terrain()
+        text = galaxy([], water_spans(terrain))
+        self.assertIn("const int c_WATER_SPANS = 2;", text)
+        self.assertIn("gv_waterRowFirst[2] = 0; gv_waterRowCount[2] = 2;", text)
+        self.assertNotIn("gv_waterRowCount[3]", text)
+        self.assertIn("gv_waterD[0] = 1.000;", text)
+
+
 if __name__ == "__main__":
     unittest.main()

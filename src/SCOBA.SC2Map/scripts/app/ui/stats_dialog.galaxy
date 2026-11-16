@@ -7,6 +7,7 @@ void gf_InitializeLevelingInterface () {
     gf_UnitSelectionDialogCreate();
     gf_SBDialogCreateAbilitiesButton();
     gf_SBDialogCreateInventoryButton();
+    gf_HudMapButtonsCreate();
     gf_PlayerBarsCreate();
     gf_InitializeAbilitiesButtons();
     gf_AbilitiesSelectionDialogCreate();

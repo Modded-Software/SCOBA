@@ -58,3 +58,95 @@ void gf_SBDialogCreateInventoryButton () {
     gv_singleButtonLabelInventory = DialogControlLastCreated();
     DialogSetVisible(gv_singleButtonDialogInventory, PlayerGroupAll(), true);
 }
+
+// Map-side buttons (operator 2026-11-16): three buttons right of the minimap,
+// mirroring stats/skills/inventory (same size, same heights, other side).
+// Minimap: 300 wide, 12 from the left (ScobaMinimap.SC2Layout), 6 px border.
+const int c_HUD_MAP_X = 330;  // 12 + 300 + 6 + 12 gap
+const int c_HUD_MAP_SLOTS = 3;
+const string c_HUD_ICON_PNC = "Assets\\Textures\\btn-ac-zerg-stukov-beaconrally.dds";
+const string c_HUD_ICON_TPS = "Assets\\Textures\\btn-ability-terran-snipe-color.dds";
+const string c_HUD_ICON_EMPTY = "Assets\\Textures\\btn-border-queue-trainingslot01-disabled.dds";
+const int c_HUD_SLOT_MODE = 0;  // bottom: control mode toggle
+int[c_HUD_MAP_SLOTS] gv_hudMapDialog;
+int[c_HUD_MAP_SLOTS] gv_hudMapButton;
+int[c_HUD_MAP_SLOTS] gv_hudMapIcon;
+trigger gt_HudMapClick;
+
+int gf_HudMapY (int lp_slot) {
+    if (lp_slot == 0) {
+        return 35;  // as the stats button
+    }
+    if (lp_slot == 1) {
+        return 112;  // as the skills button
+    }
+    return 189;  // as the inventory button
+}
+
+void gf_HudMapButtonCreate (int lp_slot, string lp_icon, text lp_tooltip) {
+    DialogCreate(64, 64, c_anchorBottomLeft, c_HUD_MAP_X, gf_HudMapY(lp_slot), true);
+    gv_hudMapDialog[lp_slot] = DialogLastCreated();
+    libNtve_gf_CreateDialogItemButton(DialogLastCreated(), gv_singleButtonConstantButtonSizeAbilities, gv_singleButtonConstantButtonSizeAbilities, c_anchorCenter, 0, 0, lp_tooltip, StringToText(""), "");
+    gv_hudMapButton[lp_slot] = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemBackgroundVisible(gv_hudMapButton[lp_slot], false, PlayerGroupAll());
+    libNtve_gf_SetDialogItemBorderVisible(gv_hudMapButton[lp_slot], false, PlayerGroupAll());
+    libNtve_gf_CreateDialogItemImage(DialogLastCreated(), gv_singleButtonConstantIconSizeAbilities, gv_singleButtonConstantIconSizeAbilities, c_anchorCenter, 0, 0, StringToText(""), lp_icon, c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
+    gv_hudMapIcon[lp_slot] = DialogControlLastCreated();
+    DialogSetVisible(gv_hudMapDialog[lp_slot], PlayerGroupAll(), true);
+}
+
+void gf_HudMapButtonsCreate () {
+    gf_HudMapButtonCreate(c_HUD_SLOT_MODE, c_HUD_ICON_PNC, StringToText("Controls: WASD / Point & Click. Click to switch to Actions."));
+    gf_HudMapButtonCreate(1, c_HUD_ICON_EMPTY, StringToText("Coming soon"));
+    gf_HudMapButtonCreate(2, c_HUD_ICON_EMPTY, StringToText("Coming soon"));
+}
+
+// The mode button shows the mode the player is in; called on every mode change.
+void gf_HudModeIconUpdate (int lp_player) {
+    playergroup lv_one = PlayerGroupSingle(lp_player);
+
+    if (gv_hudMapIcon[c_HUD_SLOT_MODE] == c_invalidDialogControlId) {
+        return;
+    }
+    if (gf_TpsActive(lp_player)) {
+        libNtve_gf_SetDialogItemImage(gv_hudMapIcon[c_HUD_SLOT_MODE], c_HUD_ICON_TPS, lv_one);
+        libNtve_gf_SetDialogItemTooltip(gv_hudMapButton[c_HUD_SLOT_MODE], StringToText("Controls: Actions. Click to switch to WASD / Point & Click."), lv_one);
+    }
+    else {
+        libNtve_gf_SetDialogItemImage(gv_hudMapIcon[c_HUD_SLOT_MODE], c_HUD_ICON_PNC, lv_one);
+        libNtve_gf_SetDialogItemTooltip(gv_hudMapButton[c_HUD_SLOT_MODE], StringToText("Controls: WASD / Point & Click. Click to switch to Actions."), lv_one);
+    }
+}
+
+bool gt_HudMapClick_Func (bool testConds, bool runActions) {
+    int lv_player = EventPlayer();
+    unit lv_hero;
+
+    if (!runActions) {
+        return true;
+    }
+    if (EventDialogControl() == gv_hudMapButton[c_HUD_SLOT_MODE]) {
+        lv_hero = gv_tPSUNIT[lv_player];
+        if (!UnitIsValid(lv_hero)) {
+            return true;
+        }
+        // The same command the card button issued: On enters Actions, Off leaves.
+        if (gf_TpsActive(lv_player)) {
+            UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        }
+        else {
+            UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        }
+        return true;
+    }
+    if ((EventDialogControl() == gv_hudMapButton[1]) || (EventDialogControl() == gv_hudMapButton[2])) {
+        UIDisplayMessage(PlayerGroupSingle(lv_player), c_messageAreaSubtitle, StringToText("Coming soon"));
+    }
+    return true;
+}
+
+// Control ids start at 0 (c_invalidDialogControlId) until gf_HudMapButtonsCreate.
+void gt_HudMapClick_Init () {
+    gt_HudMapClick = TriggerCreate("gt_HudMapClick_Func");
+    TriggerAddEventDialogControl(gt_HudMapClick, c_playerAny, c_invalidDialogControlId, c_triggerControlEventTypeClick);
+}

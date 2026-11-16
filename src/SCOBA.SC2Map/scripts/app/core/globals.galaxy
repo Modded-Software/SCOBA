@@ -93,6 +93,12 @@ fixed[8] gv_animAimYawLast;
 bool[8] gv_animAimYawSeen;
 int[8] gv_animAimTurn;
 int[8] gv_animAimTurnHold;
+fixed[8] gv_animFreeFacingLast;
+bool[8] gv_animFreeFacingSeen;
+int[8] gv_animFreeTurnHold;
+int[8] gv_animFreeTurnState;
+fixed[8] gv_animAttackSpeed;  // attack clip speed factor, from the weapon period (gf_AnimAttackSpeed)  // c_ANIM_LOWER_TURN_LEFT/RIGHT while turning in place
+int[8] gv_animFreeTurns;  // turn-in-place starts, for tests
 bool[8] gv_animAimUpperOn;
 fixed[8] gv_animAimPitchTime;
 int[8] gv_animAimPitchStep;

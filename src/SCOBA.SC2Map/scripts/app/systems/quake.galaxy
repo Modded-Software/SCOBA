@@ -10,10 +10,17 @@ const fixed c_QUAKE_PERIOD = 0.0625;          // one game loop: 16 samples/s
 const fixed c_QUAKE_RANGE_PER_RADIUS = 12.0;  // felt range = radius x this
 const fixed c_QUAKE_HEIGHT_PER_RADIUS = 0.04; // peak jolt at the unit, full speed (0.4 far too strong)
 const fixed c_QUAKE_ROLL_PER_HEIGHT = 8.0;    // degrees of roll per unit of jolt
-const fixed c_QUAKE_STEP_HZ = 2.0;            // footfalls per second at full speed
-const fixed c_QUAKE_STEP_DECAY = 0.35;        // jolt left on the next tick (stepped fall-off)
+// Operator 2026-11-16: one shake per footfall (1 Hz). Each shake is a fast
+// vibration that fades out: the sign flips every tick (8 Hz, the fastest the
+// 16 Hz tick allows) and the size drops by c_QUAKE_STEP_DECAY per tick.
+const fixed c_QUAKE_STEP_HZ = 1.0;            // footfalls per second at full speed
+const fixed c_QUAKE_STEP_DECAY = 0.6;         // share kept each tick (fade-out)
+const fixed c_QUAKE_STEP_SHIFT = 0.5;         // operator: walker shake was half a step out of phase
 const fixed c_QUAKE_HEIGHT_MAX = 0.06;
 const fixed c_QUAKE_ROLL_MAX = 0.5;
+// Operator 2026-11-16: pod landings shake much harder than walkers.
+const fixed c_QUAKE_IMP_HEIGHT_MAX = 0.6;
+const fixed c_QUAKE_IMP_ROLL_MAX = 5.0;
 const int c_QUAKE_PLAYERS = 8;
 
 trigger gt_QuakeTick;
@@ -48,8 +55,8 @@ fixed gf_QuakeMove (unit lp_u) {
     return MinF(1.0, lv_now / lv_max);
 }
 
-// Stepped footfall wave, -1..1: a hard jolt at each footfall that falls off
-// in steps, alternating sign per step, plus a random kick (jagged, not a sine).
+// One footfall, -1..1: a hard jolt on the footfall tick, then a vibration
+// that flips sign every tick and fades by c_QUAKE_STEP_DECAY per tick.
 fixed gf_QuakeStep (fixed lp_cycles) {
     fixed lv_frac = lp_cycles - IntToFixed(FixedToInt(lp_cycles));
     int lv_tick = FixedToInt(lv_frac / (c_QUAKE_PERIOD * c_QUAKE_STEP_HZ));
@@ -59,33 +66,310 @@ fixed gf_QuakeStep (fixed lp_cycles) {
     for (lv_k = 0; lv_k < lv_tick; lv_k += 1) {
         lv_level *= -c_QUAKE_STEP_DECAY;
     }
-    return lv_level * RandomFixed(0.7, 1.0);
+    return lv_level;
 }
 
-// Adds the waves of every live lp_type unit near lp_at into gv_quakeHeight/Roll[lp_p].
-void gf_QuakeAdd (int lp_p, string lp_type, point lp_at, fixed lp_t) {
+// Roll side of one step: alternates per footfall (left foot, right foot).
+fixed gf_QuakeSide (fixed lp_cycles) {
+    if (ModI(FixedToInt(lp_cycles), 2) == 0) {
+        return 1.0;
+    }
+    return -1.0;
+}
+
+// Crusher registry. A Goliath or Queen gets a slot when first seen alive and
+// loses it on its death event (gt_QuakeDeath), so a dead unit never shakes.
+// Each slot keeps its own step phase, advanced once per tick by the unit's
+// speed, so a speed change never skips or repeats a footfall.
+const int c_QUAKE_UNITS = 64;
+unit[c_QUAKE_UNITS] gv_quakeUnit;
+fixed[c_QUAKE_UNITS] gv_quakePhase;
+fixed[c_QUAKE_UNITS] gv_quakeMoveNow;
+trigger gt_QuakeDeath;
+int gv_quakeRemoved;  // slots cleared by death, for tests
+bool[c_QUAKE_UNITS] gv_quakeWet;  // Goliath water state (gf_QuakeWater)
+fixed[c_QUAKE_UNITS] gv_quakeRippleAt;
+int gv_quakeRipples;  // ripples sent, for tests
+
+int gf_QuakeSlotOf (unit lp_u) {
+    int lv_s;
+
+    for (lv_s = 0; lv_s < c_QUAKE_UNITS; lv_s += 1) {
+        if (gv_quakeUnit[lv_s] == lp_u) {
+            return lv_s;
+        }
+    }
+    return -1;
+}
+
+void gf_QuakeRegisterType (string lp_type) {
     unitgroup lv_g = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
     int lv_n = UnitGroupCount(lv_g, c_unitCountAll);
     int lv_i;
+    int lv_s;
     unit lv_u;
-    fixed lv_move;
-    fixed lv_amp;
-    fixed lv_cycles;
 
     for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
         lv_u = UnitGroupUnit(lv_g, lv_i);
-        if (!UnitIsAlive(lv_u)) {
+        if (!UnitIsAlive(lv_u) || (gf_QuakeSlotOf(lv_u) >= 0)) {
             continue;
         }
-        lv_move = gf_QuakeMove(lv_u);
-        lv_amp = gf_QuakeAmp(DistanceBetweenPoints(lp_at, UnitGetPosition(lv_u)), UnitGetPropertyFixed(lv_u, c_unitPropRadius, c_unitPropCurrent), lv_move);
+        lv_s = gf_QuakeSlotOf(null);
+        if (lv_s < 0) {
+            return;  // registry full
+        }
+        gv_quakeUnit[lv_s] = lv_u;
+        gv_quakeWet[lv_s] = false;  // the actor starts with ScobaInWater 0
+        gv_quakeRippleAt[lv_s] = 0.0;
+        // Own start phase per unit (from its tag), so units do not step in sync.
+        gv_quakePhase[lv_s] = IntToFixed(ModI(UnitGetTag(lv_u), 100)) / 100.0;
+    }
+}
+
+bool gt_QuakeDeath_Func (bool testConds, bool runActions) {
+    int lv_s = gf_QuakeSlotOf(EventUnit());
+
+    if (!runActions || (lv_s < 0)) {
+        return true;
+    }
+    gv_quakeUnit[lv_s] = null;
+    gv_quakeMoveNow[lv_s] = 0.0;
+    gv_quakeRemoved += 1;
+    return true;
+}
+
+// Crusher footfall effects (dust or splash, thump) are actor data on the
+// model's walk footstep events, generated by scripts/footfall_fx.py for every
+// unit in its table, so they follow the clip. Operator 2026-11-16: the
+// script-timed version lagged the feet. The engine's water detection never
+// fired for these units, so the script decides "in water" (generated water
+// rects in data/flora_crush.galaxy, ground below the surface), sets the actor
+// status ScobaInWater, and signals idle ripples ("Signal ScobaRipple": the
+// actor creates one ripple per foot). Unit-agnostic: any registered crusher.
+const fixed c_WATER_RIPPLE_MIN = 0.4;  // seconds between ripples per foot
+const fixed c_WATER_RIPPLE_MAX = 0.8;
+
+// Water surface height at a point when its cell is wet, else -1. Wet cells
+// (surface at least 0.15 above the visible ground) are decided at build time
+// (scripts/flora/crush.py water_spans) and stored as runs per row:
+// WorldHeight read 0 everywhere in game (waterprobe run 20261116-124538).
+fixed gf_WaterSurfaceAt (point lp_p) {
+    int lv_x = FixedToInt(PointGetX(lp_p));
+    int lv_y = FixedToInt(PointGetY(lp_p));
+    int lv_i;
+    int lv_end;
+
+    if ((lv_y < 0) || (lv_y >= c_WATER_ROWS)) {
+        return -1.0;
+    }
+    lv_i = gv_waterRowFirst[lv_y];
+    lv_end = lv_i + gv_waterRowCount[lv_y];
+    while (lv_i < lv_end) {
+        if ((lv_x >= gv_waterX0[lv_i]) && (lv_x < gv_waterX1[lv_i])) {
+            return gv_waterZ[lv_i];
+        }
+        lv_i += 1;
+    }
+    return -1.0;
+}
+
+// Visible water depth (surface above the visible ground) at a wet point,
+// else -1. Mean per span, from the build table (crush.py water_spans).
+fixed gf_WaterDepthAt (point lp_p) {
+    int lv_x = FixedToInt(PointGetX(lp_p));
+    int lv_y = FixedToInt(PointGetY(lp_p));
+    int lv_i;
+    int lv_end;
+
+    if ((lv_y < 0) || (lv_y >= c_WATER_ROWS)) {
+        return -1.0;
+    }
+    lv_i = gv_waterRowFirst[lv_y];
+    lv_end = lv_i + gv_waterRowCount[lv_y];
+    while (lv_i < lv_end) {
+        if ((lv_x >= gv_waterX0[lv_i]) && (lv_x < gv_waterX1[lv_i])) {
+            return gv_waterD[lv_i];
+        }
+        lv_i += 1;
+    }
+    return -1.0;
+}
+
+bool gf_QuakeInWater (point lp_p) {
+    return (gf_WaterSurfaceAt(lp_p) >= 0.0);
+}
+
+// A small splash on the water surface at lp_p, if lp_p is in water
+// (operator 2026-11-16: aim shot misses). Returns whether it splashed.
+const string c_SHOT_SPLASH_ACTOR = "ScobaShotSplash";  // one-shot, removes itself (ActorData.xml)
+int gv_shotSplashes;  // for tests
+fixed gv_shotSplashLastH = -1.0;  // height above ground of the last splash, for tests
+
+bool gf_WaterSplashAt (point lp_p) {
+    fixed lv_depth = gf_WaterDepthAt(lp_p);
+    actor lv_a;
+
+    if ((lv_depth < 0.0)) {
+        return false;
+    }
+    // Created on the ground under the water (where the bullet hit plays,
+    // operator 2026-11-16), then raised by the visible depth to the surface.
+    // SetHeight is relative to the ground, as for blood (blood.galaxy).
+    lv_a = libNtve_gf_CreateActorAtPoint(c_SHOT_SPLASH_ACTOR, lp_p);
+    ActorSend(lv_a, libNtve_gf_SetHeight(lv_depth));
+    gv_shotSplashLastH = lv_depth;
+    gv_shotSplashes += 1;
+    return true;
+}
+
+
+
+// Water above the ground under the whole footprint: the centre and
+// c_WATER_FOOT_SAMPLES points on the unit radius all have the water surface
+// at least c_WATER_DEPTH_MIN above the ground (operator 2026-11-16: no
+// splashes where the water mesh is below the ground mesh, as on the shore).
+const int c_WATER_FOOT_SAMPLES = 8;
+
+bool gf_QuakeFootprintInWater (unit lp_u) {
+    point lv_at = UnitGetPosition(lp_u);
+    fixed lv_r = UnitGetPropertyFixed(lp_u, c_unitPropRadius, c_unitPropCurrent);
+    int lv_k;
+
+    if (!gf_QuakeInWater(lv_at)) {
+        return false;
+    }
+    for (lv_k = 0; lv_k < c_WATER_FOOT_SAMPLES; lv_k += 1) {
+        if (!gf_QuakeInWater(PointWithOffsetPolar(lv_at, lv_r, 360.0 * IntToFixed(lv_k) / IntToFixed(c_WATER_FOOT_SAMPLES)))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Footfall splashes use the centre test (ScobaInWater); idle ripples need
+// water above the ground under the whole footprint (operator 2026-11-16:
+// ripples showed on dry ground and where the water is below the ground).
+void gf_QuakeWater (int lp_s, unit lp_u) {
+    actor lv_a = libNtve_gf_MainActorofUnit(lp_u);
+    bool lv_wet = gf_QuakeInWater(UnitGetPosition(lp_u));
+
+    if (lv_wet != gv_quakeWet[lp_s]) {
+        gv_quakeWet[lp_s] = lv_wet;
+        if (lv_wet) {
+            ActorSend(lv_a, "StatusSet ScobaInWater 1");
+        }
+        else {
+            ActorSend(lv_a, "StatusSet ScobaInWater 0");
+        }
+    }
+    if (!lv_wet || (GameGetMissionTime() < gv_quakeRippleAt[lp_s])) {
+        return;
+    }
+    if (!gf_QuakeFootprintInWater(lp_u)) {
+        return;
+    }
+    gv_quakeRippleAt[lp_s] = GameGetMissionTime() + RandomFixed(c_WATER_RIPPLE_MIN, c_WATER_RIPPLE_MAX);
+    ActorSend(lv_a, "Signal ScobaRipple");
+    gv_quakeRipples += 1;
+}
+
+// Once per tick: register new crushers, drop invalid ones, advance phases.
+void gf_QuakeAdvance () {
+    int lv_s;
+    unit lv_u;
+
+    gf_QuakeRegisterType("Goliath");
+    gf_QuakeRegisterType("Queen");
+    for (lv_s = 0; lv_s < c_QUAKE_UNITS; lv_s += 1) {
+        lv_u = gv_quakeUnit[lv_s];
+        if (lv_u == null) {
+            continue;
+        }
+        if (!UnitIsAlive(lv_u)) {
+            gv_quakeUnit[lv_s] = null;  // backstop if the death event was missed
+            gv_quakeMoveNow[lv_s] = 0.0;
+            continue;
+        }
+        gf_QuakeWater(lv_s, lv_u);
+        gv_quakeMoveNow[lv_s] = gf_QuakeMove(lv_u);
+        gv_quakePhase[lv_s] += c_QUAKE_PERIOD * c_QUAKE_STEP_HZ * gv_quakeMoveNow[lv_s];
+    }
+}
+
+// Adds the step of every registered crusher near lp_at into gv_quakeHeight/Roll[lp_p].
+void gf_QuakeAddUnits (int lp_p, point lp_at) {
+    int lv_s;
+    unit lv_u;
+    fixed lv_amp;
+    fixed lv_step;
+
+    for (lv_s = 0; lv_s < c_QUAKE_UNITS; lv_s += 1) {
+        lv_u = gv_quakeUnit[lv_s];
+        if (lv_u == null) {
+            continue;
+        }
+        lv_amp = gf_QuakeAmp(DistanceBetweenPoints(lp_at, UnitGetPosition(lv_u)), UnitGetPropertyFixed(lv_u, c_unitPropRadius, c_unitPropCurrent), gv_quakeMoveNow[lv_s]);
         if (lv_amp <= 0.0) {
             continue;
         }
-        // Own phase per unit (from its tag), so units do not step in sync.
-        lv_cycles = lp_t * c_QUAKE_STEP_HZ * lv_move + IntToFixed(ModI(UnitGetTag(lv_u), 100)) / 100.0;
-        gv_quakeHeight[lp_p] += lv_amp * gf_QuakeStep(lv_cycles);
-        gv_quakeRoll[lp_p] += c_QUAKE_ROLL_PER_HEIGHT * lv_amp * gf_QuakeStep(lv_cycles + 0.5) * RandomFixed(-1.0, 1.0);
+        lv_step = lv_amp * gf_QuakeStep(gv_quakePhase[lv_s] + c_QUAKE_STEP_SHIFT);
+        gv_quakeHeight[lp_p] += lv_step;
+        gv_quakeRoll[lp_p] += c_QUAKE_ROLL_PER_HEIGHT * lv_step * gf_QuakeSide(gv_quakePhase[lv_s] + c_QUAKE_STEP_SHIFT);
+    }
+}
+
+// One-off impulses (drop pod landings): a point source of size lp_radius that
+// shakes for lp_life seconds, its strength dropping linearly to 0.
+const int c_QUAKE_IMPULSES = 16;
+point[c_QUAKE_IMPULSES] gv_quakeImpAt;
+fixed[c_QUAKE_IMPULSES] gv_quakeImpRadius;
+fixed[c_QUAKE_IMPULSES] gv_quakeImpStart;
+fixed[c_QUAKE_IMPULSES] gv_quakeImpLife;
+fixed[c_QUAKE_IMPULSES] gv_quakeImpGain;
+int gv_quakeImpNext;
+
+// lp_radius sets the reach (12 x radius); lp_gain multiplies the strength only.
+void gf_QuakeImpulse (point lp_at, fixed lp_radius, fixed lp_gain, fixed lp_life) {
+    gv_quakeImpAt[gv_quakeImpNext] = lp_at;
+    gv_quakeImpRadius[gv_quakeImpNext] = lp_radius;
+    gv_quakeImpGain[gv_quakeImpNext] = lp_gain;
+    gv_quakeImpStart[gv_quakeImpNext] = GameGetMissionTime();
+    gv_quakeImpLife[gv_quakeImpNext] = lp_life;
+    gv_quakeImpNext = ModI(gv_quakeImpNext + 1, c_QUAKE_IMPULSES);
+}
+
+// Operator 2026-11-16: one large shake per impulse. The full jolt lands on
+// the first tick; the aftershock flips sign every tick (8 Hz, the fastest
+// the 16 Hz tick allows) and keeps c_QUAKE_IMP_DECAY of its size per tick.
+const fixed c_QUAKE_IMP_DECAY = 0.75;
+
+void gf_QuakeAddImpulses (int lp_p, point lp_at, fixed lp_t) {
+    int lv_i;
+    int lv_tick;
+    int lv_k;
+    fixed lv_amp;
+    fixed lv_level;
+
+    for (lv_i = 0; lv_i < c_QUAKE_IMPULSES; lv_i += 1) {
+        if (gv_quakeImpLife[lv_i] <= 0.0) {
+            continue;
+        }
+        if ((lp_t - gv_quakeImpStart[lv_i]) >= gv_quakeImpLife[lv_i]) {
+            gv_quakeImpLife[lv_i] = 0.0;
+            continue;
+        }
+        lv_amp = gv_quakeImpGain[lv_i] * gf_QuakeAmp(DistanceBetweenPoints(lp_at, gv_quakeImpAt[lv_i]), gv_quakeImpRadius[lv_i], 1.0);
+        if (lv_amp <= 0.0) {
+            continue;
+        }
+        lv_tick = FixedToInt((lp_t - gv_quakeImpStart[lv_i]) / c_QUAKE_PERIOD);
+        lv_level = 1.0;
+        for (lv_k = 0; lv_k < lv_tick; lv_k += 1) {
+            lv_level *= -c_QUAKE_IMP_DECAY;
+        }
+        gv_quakeHeight[lp_p] += lv_amp * lv_level;
+        // Roll tilts one way per impulse (from its slot), then follows the vibration.
+        gv_quakeRoll[lp_p] += c_QUAKE_ROLL_PER_HEIGHT * lv_amp * lv_level * gf_QuakeSide(IntToFixed(lv_i));
     }
 }
 
@@ -94,10 +378,13 @@ bool gt_QuakeTick_Func (bool testConds, bool runActions) {
     fixed lv_t = GameGetMissionTime();
     point lv_at;
     bool lv_shake;
+    fixed lv_walkH;
+    fixed lv_walkR;
 
     if (!runActions) {
         return true;
     }
+    gf_QuakeAdvance();
     for (lv_p = 1; lv_p < c_QUAKE_PLAYERS; lv_p += 1) {
         // Players with a hero only; no player-type gate (it skipped the operator's slot).
         if ((PlayerStatus(lv_p) != c_playerStatusActive) || (gv_tPSUNIT[lv_p] == null)) {
@@ -107,10 +394,17 @@ bool gt_QuakeTick_Func (bool testConds, bool runActions) {
         lv_at = UnitGetPosition(gv_tPSUNIT[lv_p]);
         gv_quakeHeight[lv_p] = 0.0;
         gv_quakeRoll[lv_p] = 0.0;
-        gf_QuakeAdd(lv_p, "Goliath", lv_at, lv_t);
-        gf_QuakeAdd(lv_p, "Queen", lv_at, lv_t);
+        gf_QuakeAddUnits(lv_p, lv_at);
         gv_quakeHeight[lv_p] = MaxF(-c_QUAKE_HEIGHT_MAX, MinF(c_QUAKE_HEIGHT_MAX, gv_quakeHeight[lv_p]));
         gv_quakeRoll[lv_p] = MaxF(-c_QUAKE_ROLL_MAX, MinF(c_QUAKE_ROLL_MAX, gv_quakeRoll[lv_p]));
+        // Impulses (pod landings) have their own, higher caps, added on top.
+        lv_walkH = gv_quakeHeight[lv_p];
+        lv_walkR = gv_quakeRoll[lv_p];
+        gv_quakeHeight[lv_p] = 0.0;
+        gv_quakeRoll[lv_p] = 0.0;
+        gf_QuakeAddImpulses(lv_p, lv_at, lv_t);
+        gv_quakeHeight[lv_p] = lv_walkH + MaxF(-c_QUAKE_IMP_HEIGHT_MAX, MinF(c_QUAKE_IMP_HEIGHT_MAX, gv_quakeHeight[lv_p]));
+        gv_quakeRoll[lv_p] = lv_walkR + MaxF(-c_QUAKE_IMP_ROLL_MAX, MinF(c_QUAKE_IMP_ROLL_MAX, gv_quakeRoll[lv_p]));
         lv_shake = (gv_quakeHeight[lv_p] != 0.0) || (gv_quakeRoll[lv_p] != 0.0);
         if (lv_shake || gv_quakeOn[lv_p]) {
             // Height base is the TPS constant; roll base is 0 (nothing else writes it).
@@ -126,4 +420,6 @@ bool gt_QuakeTick_Func (bool testConds, bool runActions) {
 void gt_QuakeTick_Init () {
     gt_QuakeTick = TriggerCreate("gt_QuakeTick_Func");
     TriggerAddEventTimePeriodic(gt_QuakeTick, c_QUAKE_PERIOD, c_timeGame);
+    gt_QuakeDeath = TriggerCreate("gt_QuakeDeath_Func");
+    TriggerAddEventUnitDied(gt_QuakeDeath, null);
 }

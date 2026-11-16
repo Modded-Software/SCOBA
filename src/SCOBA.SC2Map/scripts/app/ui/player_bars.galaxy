@@ -1,8 +1,39 @@
 // Module: ui/player_bars
 
+// Info lines centred below the XP bar: reinforcement countdown, total game time.
+// Same x and width as the XP bar (56, 410) inside a dialog of the XP dialog's width.
+int gv_pbInfoDlg;
+int gv_pbReinfText;
+int gv_pbTimeText;
+
+void gf_PlayerBarsInfoCreate () {
+    DialogCreate(480, 52, c_anchorTopRight, -10, 66, false);
+    gv_pbInfoDlg = DialogLastCreated();
+    DialogSetImageVisible(gv_pbInfoDlg, false);
+    libNtve_gf_CreateDialogItemLabel(gv_pbInfoDlg, 410, 30, c_anchorTopLeft, 56, 0, StringToText(""), Color(100,100,100), false, 0.0);
+    gv_pbReinfText = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemStyle(gv_pbReinfText, "SCOBAHudLine", PlayerGroupAll());
+    libNtve_gf_CreateDialogItemLabel(gv_pbInfoDlg, 410, 24, c_anchorTopLeft, 56, 30, StringToText(""), Color(100,100,100), false, 0.0);
+    gv_pbTimeText = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemStyle(gv_pbTimeText, "SCOBAHudLine", PlayerGroupAll());
+    // Operator 2026-11-16: game time hidden.
+    DialogControlSetVisible(gv_pbTimeText, PlayerGroupAll(), false);
+    DialogSetVisible(gv_pbInfoDlg, PlayerGroupAll(), true);
+}
+
+void gf_PlayerBarsInfoUpdate () {
+    int lv_reinf = FixedToInt(Ceiling(TimerGetRemaining(gv_sPAWNTIMER)));
+    int lv_game = FixedToInt(GameGetMissionTime());
+
+    // Title in the stock TimerTitle font (label style), time in TimerText, as the old timer window.
+    libNtve_gf_SetDialogItemText(gv_pbReinfText, StringToText("Reinforcements in: <s val=\"TimerText\">") + TextTimeFormat(StringToText("<hour/>:<min2/>:<sec2/>"), lv_reinf) + StringToText("</s>"), PlayerGroupAll());
+    libNtve_gf_SetDialogItemText(gv_pbTimeText, StringToText("Game time: ") + TextTimeFormat(StringToText("<hour/>:<min2/>:<sec2/>"), lv_game), PlayerGroupAll());
+}
+
 void gf_PlayerBarsCreate () {
     int lv_player;
 
+    gf_PlayerBarsInfoCreate();
     for (lv_player = 1; lv_player <= 6; lv_player += 1) {
         DialogCreate(480, 60, c_anchorTopRight, -10, 10, false);
         gv_pbXpDlg[lv_player] = DialogLastCreated();
@@ -16,7 +47,8 @@ void gf_PlayerBarsCreate () {
         gv_pbXpText[lv_player] = DialogControlLastCreated();
         DialogSetVisible(gv_pbXpDlg[lv_player], PlayerGroupSingle(lv_player), true);
 
-        DialogCreate(480, 52, c_anchorBottomLeft, 10, 60, false);
+        // Top left (operator 2026-11-16: bars swapped with the minimap).
+        DialogCreate(480, 52, c_anchorTopLeft, 10, 10, false);
         gv_pbHpDlg[lv_player] = DialogLastCreated();
         libNtve_gf_CreateDialogItemImage(gv_pbHpDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 6, StringToText(""), "Assets\\Textures\\btn-ability-terran-heal-color.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
         libNtve_gf_CreateDialogItemImage(gv_pbHpDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
@@ -27,7 +59,7 @@ void gf_PlayerBarsCreate () {
         gv_pbHpText[lv_player] = DialogControlLastCreated();
         DialogSetVisible(gv_pbHpDlg[lv_player], PlayerGroupSingle(lv_player), true);
 
-        DialogCreate(480, 52, c_anchorBottomLeft, 10, 10, false);
+        DialogCreate(480, 52, c_anchorTopLeft, 10, 60, false);
         gv_pbNrgDlg[lv_player] = DialogLastCreated();
         libNtve_gf_CreateDialogItemImage(gv_pbNrgDlg[lv_player], 40, 40, c_anchorTopLeft, 4, 6, StringToText(""), "Assets\\Textures\\btn-ability-protoss-psistorm-color.dds", c_triggerImageTypeNormal, false, Color(100,100,100), c_triggerBlendModeNormal);
         libNtve_gf_CreateDialogItemImage(gv_pbNrgDlg[lv_player], 410, 20, c_anchorTopLeft, 56, 16, StringToText(""), "Assets\\Textures\\white.dds", c_triggerImageTypeNormal, false, Color(10,10,10), c_triggerBlendModeNormal);
@@ -100,6 +132,7 @@ bool gt_PlayerBars_Func (bool testConds, bool runActions) {
         return true;
     }
     gf_PlayerBarsUpdate();
+    gf_PlayerBarsInfoUpdate();
     return true;
 }
 

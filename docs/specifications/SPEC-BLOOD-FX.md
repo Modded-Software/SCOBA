@@ -6,6 +6,9 @@
 - Filters: victim valid, damage > 0, type has `c_unitAttributeBiological`,
   source is not the victim, victim not on `c_BLOOD_COOLDOWN` (0.15 s).
 - Spurt: `c_BLOOD_SPURT` at the unit, life `c_BLOOD_SPURT_LIFE` (3 s).
+  Lifted by `c_BLOOD_SPURT_HEIGHT` (1.0). Its model up axis is turned
+  toward the damage source and tilted up `c_BLOOD_SPURT_TILT` (20 deg).
+  `c_BLOOD_SPURT_SIGN` -1 sprays away from the source.
 - Splats: `c_BLOOD_SPLAT`, 1 to `c_BLOOD_SPLATS_MAX` (3), 0.2 to
   `c_BLOOD_SPLAT_REACH` (0.8) from the unit, life `c_BLOOD_SPLAT_LIFE` (8 s).
 - Scale: linear from `c_BLOOD_SCALE_LO` (0.6) at 0 damage to

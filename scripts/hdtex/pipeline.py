@@ -35,7 +35,7 @@ from .sources import SOURCES, TextureRef
 
 MANIFEST = "manifest.json"
 MANIFEST_FORMAT = 2
-ENCODER_VERSION = 2  # raise it when the encode stage changes, so cached files are redone
+ENCODER_VERSION = 3  # raise it when the encode stage changes, so cached files are redone (3: normal layouts)
 
 
 class TextureEntry(TypedDict, total=False):
@@ -231,6 +231,11 @@ def encode_texture(
     role = roles.ROLES[ref.role]
     source_planes = role.split(source_rgba)
     levels = roles.limit_size(role.join(planes, source_planes, wrap), max_size)
+    reference = role.join(source_planes, None, wrap)
+    if ref.role == "normal":
+        layout = roles.normal_layout(source_rgba)
+        levels = roles.match_layout(levels, layout)
+        reference = roles.match_layout(reference, layout)
     height, width = levels[0].shape[:2]
     if width % source.width or height % source.height:
         raise ValueError(f"{ref.asset}: {width}x{height} is not a multiple of the source size")
@@ -255,7 +260,7 @@ def encode_texture(
         "fidelity_corr": metrics.channel_correlation(shrunk, source_rgba),
         # Far view: a small mip of the result against the same mip made from the source.
         "coarse_rmse": metrics.rmse(
-            _level(levels, coarse), _level(role.join(source_planes, None, wrap), coarse)
+            _level(levels, coarse), _level(reference, coarse)
         ),
         "seam_source": metrics.seam_ratio(source_rgba),
         "seam": metrics.seam_ratio(levels[0]),
@@ -300,12 +305,41 @@ def encode_stage(refs, originals, upscaled, work: Path, settings: Settings, forc
     return entries
 
 
-def build(source: str, map_dir: Path, settings: Settings, force: bool = False, casc: Casc | None = None) -> Path:
-    """Run every stage for one source. Returns the manifest path."""
+def select(refs: list[TextureRef], only: tuple[str, ...]) -> list[TextureRef]:
+    """The refs of the named catalog entries (such as CharLavaCracks). All refs when `only` is empty."""
+    if not only:
+        return refs
+    wanted = {name.lower() for name in only}
+    chosen = [ref for ref in refs if any(o.entry.lower() in wanted for o in ref.overrides)]
+    found = {o.entry.lower() for ref in chosen for o in ref.overrides}
+    if missing := sorted(wanted - found):
+        raise roles.RoleError(f"--texture names no entry of this map: {', '.join(missing)}")
+    return chosen
+
+
+def merge_entries(old: list[TextureEntry], new: list[TextureEntry]) -> list[TextureEntry]:
+    """The old manifest's entries with the rebuilt ones replaced (matched by map path)."""
+    rebuilt = {entry["map_path"] for entry in new}
+    return [entry for entry in old if entry["map_path"] not in rebuilt] + new
+
+
+def build(
+    source: str,
+    map_dir: Path,
+    settings: Settings,
+    force: bool = False,
+    casc: Casc | None = None,
+    only: tuple[str, ...] = (),
+) -> Path:
+    """Run every stage for one source, or for the entries in `only`. Returns the manifest path.
+
+    A partial build keeps the other textures of the existing manifest.
+    """
     work = variant_root(settings.variant) / source
     work.mkdir(parents=True, exist_ok=True)
     casc = casc or Casc()
-    refs = SOURCES[source](map_dir, casc, work)
+    every = SOURCES[source](map_dir, casc, work)
+    refs = select(every, only)
     print(f"hdtex: {variants.VARIANTS[settings.variant].title}: {source}: {len(refs)} textures", flush=True)
     known = {f"{stem_of(ref)}.{plane.name}" for ref in refs for plane in roles.ROLES[ref.role].planes}
     if unknown := settings.unknown_models(known):
@@ -315,18 +349,25 @@ def build(source: str, map_dir: Path, settings: Settings, force: bool = False, c
     tool = upscaler.version()
     upscaled = upscale_stage(planes, work, settings, force, tool)
     entries = encode_stage(refs, originals, upscaled, work, settings, force)
+    path = work / MANIFEST
+    models = {f"{stem}.{name}": model for (stem, name), (model, _path) in sorted(planes.items())}
+    if only:
+        if not path.is_file():
+            raise InputError(f"--texture needs an existing {path}; run a full build first")
+        old = json.loads(path.read_text())
+        entries = merge_entries(old["textures"], entries)
+        models = {**old["settings"]["models"], **models}
     manifest = {
         "format": MANIFEST_FORMAT,
         "variant": settings.variant,
         "source": source,
         "upscaler": tool,
         "settings": {
-            "models": {f"{stem}.{name}": model for (stem, name), (model, _path) in sorted(planes.items())},
+            "models": models,
             "max_size": settings.max_size,
             "wrap": settings.wrap,
         },
         "textures": entries,
     }
-    path = work / MANIFEST
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return path

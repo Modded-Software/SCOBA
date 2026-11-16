@@ -48,16 +48,16 @@
         <Tooltip value="The hero walks into range to attack, and right click on the ground moves it. Click to switch to Stand."/>
     </CButton>
     <CButton id="SCOBAControlPNC">
-        <Icon value="Assets\Textures\SCOBAModePNC.dds"/>
-        <AlertIcon value="Assets\Textures\SCOBAModePNC.dds"/>
+        <Icon value="Assets\Textures\btn-ac-zerg-stukov-beaconrally.dds"/>
+        <AlertIcon value="Assets\Textures\btn-ac-zerg-stukov-beaconrally.dds"/>
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
         <Name value="Controls: WASD / Point &amp; Click"/>
         <Tooltip value="WASD / Point &amp; Click: left click targets, right click attacks or moves, hold a mouse button to orbit the camera. Click to switch to Actions."/>
     </CButton>
     <CButton id="SCOBAControlTPS">
-        <Icon value="Assets\Textures\SCOBAModeTPS.dds"/>
-        <AlertIcon value="Assets\Textures\SCOBAModeTPS.dds"/>
+        <Icon value="Assets\Textures\btn-ability-terran-snipe-color.dds"/>
+        <AlertIcon value="Assets\Textures\btn-ability-terran-snipe-color.dds"/>
         <EditorCategories value="Race:Terran"/>
         <TintRacially value="1"/>
         <Name value="Controls: Actions"/>

@@ -114,6 +114,20 @@ def _at(lane: Lane, distance: float, direction: int) -> tuple[int, float, float,
     return None
 
 
+_TREE_CACHE: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+
+
+def _tree_cells(scene: Scene, n: int) -> np.ndarray:
+    """Cells holding a tree, computed once per scene (blocker runs thousands
+    of times while hazards are relocated)."""
+    hit = _TREE_CACHE.get(id(scene.tree_block))
+    if hit is None or hit[0] is not scene.tree_block:
+        hit = (scene.tree_block, scene.tree_block.reshape(n, FINE, n, FINE).any(axis=(1, 3)))
+        _TREE_CACHE.clear()
+        _TREE_CACHE[id(scene.tree_block)] = hit
+    return hit[1]
+
+
 def blocker(x: float, y: float, half: float, terrain: Terrain, scene: Scene, kind: str = "") -> str:
     """Why a hazard cannot stand here, or "" when it can."""
     n = terrain.height.shape[0]
@@ -124,17 +138,39 @@ def blocker(x: float, y: float, half: float, terrain: Terrain, scene: Scene, kin
         return "unpathable"
     if scene.keepout[rows, cols].any():
         return "keep-out"
-    trees = scene.tree_block.reshape(n, FINE, n, FINE).any(axis=(1, 3))
-    if trees[rows, cols].any():
+    if _tree_cells(scene, n)[rows, cols].any():
         return "tree"
     if (terrain.slope[rows, cols] > config.WALL_SLOPE).any():
         return "wall"
+    # Operator 2026-11-16: hazards looked bad on slopes; the footprint must be flat.
+    heights = terrain.height[rows, cols]
+    if heights.max() - heights.min() > config.HAZARD_FLAT_RANGE:
+        return "slope"
     clear = config.HAZARD_WATER_CLEAR.get(kind, 0.0)
     if clear > 0.0:
         wr, wc = disk_cells(x, y, half + clear, (n, n))
         if terrain.wet[wr, wc].any():
             return "near water"
     return ""
+
+
+def wiggle(x: float, y: float, half: float, terrain: Terrain, scene: Scene, kind: str) -> tuple[float, float, str]:
+    """The proposed spot, or the nearest free one on rings around it.
+
+    Returns (x, y, "") for a free spot, else the proposed spot and the
+    reason it is blocked. Only the position moves; the pair keeps its arc
+    distance, so the factions stay balanced.
+    """
+    first = blocker(x, y, half, terrain, scene, kind)
+    if not first:
+        return x, y, ""
+    for radius in config.HAZARD_WIGGLE_RINGS:
+        for k in range(config.HAZARD_WIGGLE_STEPS):
+            a = 2 * math.pi * k / config.HAZARD_WIGGLE_STEPS
+            wx, wy = x + radius * math.cos(a), y + radius * math.sin(a)
+            if not blocker(wx, wy, half, terrain, scene, kind):
+                return wx, wy, ""
+    return x, y, first
 
 
 def _spots(lane: Lane, hazard: config.Hazard, distance: float, side_scale: float) -> list[tuple[str, float, float, float]]:
@@ -154,22 +190,37 @@ def _spots(lane: Lane, hazard: config.Hazard, distance: float, side_scale: float
     return spots
 
 
+def _apart(spots: list[tuple[str, float, float, float]], half: float, placed: list[Placed]) -> bool:
+    """No overlap with the hazards placed so far (1 cell gap)."""
+    return all(math.hypot(x - h.x, y - h.y) > half + config.HAZARD_HALF[h.kind] + 1.0 for _, x, y, _ in spots for h in placed)
+
+
 def place_hazards(lanes: list[Lane], terrain: Terrain, scene: Scene) -> tuple[list[Placed], list[str]]:
-    """Hazard pairs per lane; notes say which pairs were dropped and why."""
+    """Hazard pairs, round-robin over the lanes up to HAZARD_TOTAL; a blocked
+    pair is relocated along the lane (HAZARD_SHIFTS) and around each spot
+    (wiggle). Notes say which pairs found no spot at all."""
     placed: list[Placed] = []
     notes = []
-    for lane in lanes:
-        for pair, hazard in enumerate(config.HAZARDS):
+    for pair, hazard in enumerate(config.HAZARDS):
+        for lane in lanes:
+            if len(placed) + 2 > config.HAZARD_TOTAL:
+                return placed, notes
             half = config.HAZARD_HALF[hazard.kind]
             chosen, why, along = [], "", 0.0
             # Both sides get the same shift, so the pair stays balanced.
             for shift in config.HAZARD_SHIFTS:
+                if hazard.distance + shift < config.HAZARD_MIN_ALONG:
+                    continue
                 for side_scale in (1.0, 0.5, 0.0):
                     spots = _spots(lane, hazard, hazard.distance + shift, side_scale)
                     if not spots:
                         why = "lane too short"
                         continue
-                    reasons = [blocker(x, y, half, terrain, scene, hazard.kind) for _, x, y, _ in spots]
+                    found = [wiggle(x, y, half, terrain, scene, hazard.kind) for _, x, y, _ in spots]
+                    reasons = [r for _, _, r in found]
+                    spots = [(s[0], fx, fy, s[3]) for s, (fx, fy, _) in zip(spots, found)]
+                    if not any(reasons) and not _apart(spots, half, placed):
+                        reasons = ["next to another hazard"] * len(spots)
                     if not any(reasons):
                         chosen, along = spots, hazard.distance + shift
                         break

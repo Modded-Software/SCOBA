@@ -22,6 +22,9 @@ HERO_UNITS = ("ToshSCOBA", "KerriganSCOBA")
 AIR_EFFECT = "SCOBAToshAirU"
 AIR_SHOT = "SCOBAToshAirShot"
 AIR_ACTOR = "SCOBAToshAirAttack"
+# Tosh's button clock and its period. TESTING (operator 2026-11-16): 0.1 s;
+# the release value is ("SCOBAAttackCooldown10", "1").
+TOSH_CLOCK = ("SCOBAAttackCooldown01", "0.25")
 
 # The aim shot runs the hero weapon's effect (R-TPS-1, R-TPS-3). The aim-shot
 # abilities, their effects, and their actors are gone and must stay gone.
@@ -119,7 +122,7 @@ def check_air_shot_data(gamedata: Path) -> None:
     if shot is None:
         fail(f"missing effect set: {AIR_SHOT}")
     parts = [element.get("value") for element in shot.findall("EffectArray")]
-    if parts != [AIR_EFFECT, "SCOBAAttackCooldown10"]:
+    if parts != [AIR_EFFECT, TOSH_CLOCK[0]]:
         fail(f"{AIR_SHOT} must run {AIR_EFFECT} and the Tosh button clock, got {parts}")
     actors = ET.parse(gamedata / "ActorData.xml").getroot()
     actor = actors.find(f"CActorAction[@id='{AIR_ACTOR}']")

@@ -92,7 +92,7 @@ const fixed c_TPS_SHOT_TIMEOUT = 2.0;
 // UI-layer shot floaters (R-TPS-73).
 const int c_UI_FLOATER_POOL = 4;
 const fixed c_UI_FLOATER_DURATION = 1.2;
-const fixed c_UI_FLOATER_RISE = 60.0;
+const fixed c_UI_FLOATER_RISE = 120.0;  // operator 2026-11-16: rise twice as far (was 60)
 // The frames live in Base.SC2Data/UI/Layout/Custom/ScobaTps.SC2Layout: the
 // text panel above the crosshair, its four labels, their size and font
 // style, and the crosshair image. None of them accepts the mouse (R-TPS-85).
@@ -112,6 +112,9 @@ const fixed c_FLOATER_DAMAGE_FULL = 1000.0;
 const fixed c_SCOBA_ZOOM_BLEND = 0.18;
 const fixed c_SCOBA_COLLISION_CLAMP_BLEND = 0.06;
 const fixed c_SCOBA_COLLISION_RESTORE_BLEND = 0.28;
+const int c_CAM_CLAMP_STEPS = 64;  // distance samples, eye inward to the hero
+const fixed c_CAM_GROUND_MARGIN = 0.35;  // eye stays this far above the terrain
+const fixed c_CAM_CLAMP_DEADBAND = 0.03;  // no new camera command below this change
 const fixed c_ANIM_MOVE_TARGET = 30.0;
 const fixed c_ANIM_MOVE_RETARGET = 2.0;
 const fixed c_ANIM_MOVE_HEADING = 3.0;

@@ -118,6 +118,10 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("marine", "", "removed", 0)
     checks.gt("goliath", "", "removed", PER_WALKER - 1)
     checks.gt("queen", "", "removed", 2 * PER_WALKER - 1)
+    # Crushed doodads fade through their own actor: every removal is a fade
+    # (negative case: none fell back to the instant removal).
+    for section in ("marine", "goliath", "queen"):
+        checks.eq(section, "", "faded", checks.value(section, "", "removed"))
 
 
 def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> TestRunSpec:

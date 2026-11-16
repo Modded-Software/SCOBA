@@ -48,19 +48,30 @@
         <ImpactUnit Value="Caster"/>
         <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="1.5"/>
     </CEffectModifyUnit>
+    <!-- TESTING (operator 2026-11-16): Tosh 0.25 s; his shots used SCOBAAttackCooldown10. -->
+    <CEffectModifyUnit id="SCOBAAttackCooldown01">
+        <ImpactUnit Value="Caster"/>
+        <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="0.25"/>
+    </CEffectModifyUnit>
+    <!-- Tosh shot damage 8-12 (operator 2026-11-16): Amount plus 0..Random. -->
+    <CEffectDamage id="ToshU">
+        <Amount value="8"/>
+        <Random value="4"/>
+    </CEffectDamage>
     <CEffectSet id="SCOBAToshShot">
         <EffectArray value="ToshU"/>
-        <EffectArray value="SCOBAAttackCooldown10"/>
+        <EffectArray value="SCOBAAttackCooldown01"/>
     </CEffectSet>
     <!-- TPS aim shot that ends in the air: the Tosh shot with no hit. It
          launches as ToshU does and deals nothing. Its actor
          SCOBAToshAirAttack has no impact model and no impact sound. -->
     <CEffectDamage id="SCOBAToshAirU" parent="ToshU">
         <Amount value="0"/>
+        <Random value="0"/>
     </CEffectDamage>
     <CEffectSet id="SCOBAToshAirShot">
         <EffectArray value="SCOBAToshAirU"/>
-        <EffectArray value="SCOBAAttackCooldown10"/>
+        <EffectArray value="SCOBAAttackCooldown01"/>
     </CEffectSet>
     <CEffectCreatePersistent id="RazorTalonsPersistent">
         <InitialEffect value="SCOBAAttackCooldown15"/>

@@ -16,6 +16,12 @@ const fixed c_BLOOD_COOLDOWN = 0.15;  // per unit, against fast-weapon spam
 const fixed c_BLOOD_SPURT_LIFE = 3.0;
 const fixed c_BLOOD_SPLAT_LIFE = 8.0;
 const fixed c_BLOOD_SWEEP = 0.5;
+// The spurt is lifted to chest height and its model up axis (the spray)
+// is turned toward the attacker, tilted up by c_BLOOD_SPURT_TILT degrees.
+// Set c_BLOOD_SPURT_SIGN to -1.0 to spray away from the attacker instead.
+const fixed c_BLOOD_SPURT_HEIGHT = 1.0;
+const fixed c_BLOOD_SPURT_TILT = 20.0;
+const fixed c_BLOOD_SPURT_SIGN = 1.0;
 const int c_BLOOD_RING = 256;
 const int c_BLOOD_CD_SLOTS = 64;
 
@@ -80,14 +86,33 @@ void gf_BloodFx (string lp_model, point lp_at, fixed lp_scale, fixed lp_life) {
     gv_bloodNext = ModI(lv_slot + 1, c_BLOOD_RING);
 }
 
+// Lifts the last spurt to chest height and turns its spray toward lp_src.
+void gf_BloodAim (actor lp_a, unit lp_u, unit lp_src) {
+    fixed lv_yaw;
+    fixed lv_c;
+    fixed lv_s;
+    fixed lv_t = c_BLOOD_SPURT_TILT;
+
+    ActorSend(lp_a, libNtve_gf_SetHeight(c_BLOOD_SPURT_HEIGHT));
+    if (!UnitIsValid(lp_src)) {
+        return;
+    }
+    lv_yaw = AngleBetweenPoints(UnitGetPosition(lp_u), UnitGetPosition(lp_src));
+    lv_c = Cos(lv_yaw) * c_BLOOD_SPURT_SIGN;
+    lv_s = Sin(lv_yaw) * c_BLOOD_SPURT_SIGN;
+    // up = spray direction (horizontal, tilted up); forward = perpendicular to it.
+    ActorSend(lp_a, libNtve_gf_SetRotation(0.0 - lv_c * Sin(lv_t), 0.0 - lv_s * Sin(lv_t), Cos(lv_t), lv_c * Cos(lv_t), lv_s * Cos(lv_t), Sin(lv_t)));
+}
+
 // One bleed: a spurt at the unit, then splats on the ground around it.
-void gf_BloodBleed (unit lp_u, fixed lp_damage) {
+void gf_BloodBleed (unit lp_u, unit lp_src, fixed lp_damage) {
     point lv_at = UnitGetPosition(lp_u);
     fixed lv_scale = gf_BloodScale(lp_damage);
     int lv_n = gf_BloodSplatCount(lp_damage);
     int lv_i;
 
     gf_BloodFx(c_BLOOD_SPURT, lv_at, lv_scale, c_BLOOD_SPURT_LIFE);
+    gf_BloodAim(libNtve_gf_ActorLastCreated(), lp_u, lp_src);
     for (lv_i = 0; lv_i < lv_n; lv_i += 1) {
         gf_BloodFx(c_BLOOD_SPLAT, PointWithOffsetPolar(lv_at, RandomFixed(0.2, c_BLOOD_SPLAT_REACH), RandomFixed(0.0, 360.0)), lv_scale, c_BLOOD_SPLAT_LIFE);
     }
@@ -117,7 +142,7 @@ bool gt_BloodDamaged_Func (bool testConds, bool runActions) {
         gv_bloodSkipCooldown += 1;
         return true;
     }
-    gf_BloodBleed(lv_victim, lv_damage);
+    gf_BloodBleed(lv_victim, EventUnitDamageSourceUnit(), lv_damage);
     return true;
 }
 

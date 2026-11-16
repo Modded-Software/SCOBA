@@ -23,6 +23,8 @@ void gf_AnimReset (int lp_player) {
     gv_animAimYawSeen[lp_player] = false;
     gv_animAimTurn[lp_player] = 0;
     gv_animAimTurnHold[lp_player] = 0;
+    gv_animFreeFacingSeen[lp_player] = false;
+    gv_animFreeTurnHold[lp_player] = 0;
     gv_animAimUpperOn[lp_player] = false;
     gv_animAimPitchTime[lp_player] = -1.0;
     gv_animAimPitchStep[lp_player] = 0;
@@ -70,11 +72,23 @@ bool gf_AnimAimAttackActive (int lp_player) {
     }
     return TimerGetElapsed(gv_sCOBA_Clock) < gv_animAimAttackUntil[lp_player];
 }
+// Speed factor of the attack clip: reference period over the weapon period,
+// so a faster weapon plays a faster, shorter clip.
+fixed gf_AnimAttackSpeed (int lp_player, string lp_weapon) {
+    fixed lv_period = StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, lp_weapon, "Period", lp_player));
+
+    if ((lv_period <= 0.0)) {
+        return 1.0;
+    }
+    return MaxF(c_ANIM_ATTACK_SPEED_MIN, c_ANIM_ATTACK_PERIOD_REF / lv_period);
+}
+
 void gf_AnimAttackStart (int lp_player, string lp_weapon, unit lp_target) {
     unit lv_hero;
     int lv_profile;
     int lv_state;
 
+    gv_animAttackSpeed[lp_player] = gf_AnimAttackSpeed(lp_player, lp_weapon);
     if (gv_aIMACTIVE[lp_player]) {
         gf_AnimAimAttackStart(lp_player, lp_weapon);
         return;
@@ -96,10 +110,52 @@ void gf_AnimAttackStart (int lp_player, string lp_weapon, unit lp_target) {
         lv_state = c_ANIM_UPPER_ATTACK_SPELL;
     }
     gv_animAttackState[lp_player] = lv_state;
-    gv_animAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_ANIM_ATTACK_DURATION;
+    gv_animAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + (c_ANIM_ATTACK_DURATION / gv_animAttackSpeed[lp_player]);
     gf_AnimTargetPitchBegin(lp_player, lp_target);
     gf_AnimUpperAttackStart(lp_player, lv_state);
 }
+// True while the hero turns in place: its facing changed this tick (or within
+// the hold) and it neither moves nor wants to. Reads the engine facing, so
+// TPS rotate and PNC right-click rotate are both covered. Returns the stand
+// turn state (c_ANIM_LOWER_TURN_LEFT/RIGHT, the turn-in-place leg clips) or
+// c_ANIM_LOWER_NONE. Operator 2026-11-16: the walk clip was wrong here.
+int gf_AnimFreeTurning (int lp_player, unit lp_hero) {
+    fixed lv_facing = UnitGetFacing(lp_hero);
+    fixed lv_delta;
+
+    if (!gv_animFreeFacingSeen[lp_player]) {
+        gv_animFreeFacingLast[lp_player] = lv_facing;
+        gv_animFreeFacingSeen[lp_player] = true;
+        return c_ANIM_LOWER_NONE;
+    }
+    lv_delta = gf_AnimYawDelta(gv_animFreeFacingLast[lp_player], lv_facing);
+    gv_animFreeFacingLast[lp_player] = lv_facing;
+    // Only real movement ends it: a rotate is a move order that turns the
+    // hero before it moves (move intent alone left the stock walk playing).
+    if (gf_AnimMoving(lp_player)) {
+        gv_animFreeTurnHold[lp_player] = 0;
+        return c_ANIM_LOWER_NONE;
+    }
+    if (AbsF(lv_delta) > c_ANIM_FREE_TURN_DEADBAND) {
+        if (gv_animFreeTurnHold[lp_player] <= 0) {
+            gv_animFreeTurns[lp_player] += 1;
+        }
+        if ((lv_delta > 0.0)) {
+            gv_animFreeTurnState[lp_player] = c_ANIM_LOWER_TURN_LEFT;
+        }
+        else {
+            gv_animFreeTurnState[lp_player] = c_ANIM_LOWER_TURN_RIGHT;
+        }
+        gv_animFreeTurnHold[lp_player] = c_ANIM_FREE_TURN_HOLD_TICKS;
+        return gv_animFreeTurnState[lp_player];
+    }
+    if (gv_animFreeTurnHold[lp_player] > 0) {
+        gv_animFreeTurnHold[lp_player] -= 1;
+        return gv_animFreeTurnState[lp_player];
+    }
+    return c_ANIM_LOWER_NONE;
+}
+
 int gf_AnimLowerState (int lp_player) {
     if (!gf_AnimMoveIntent(lp_player) && !gf_AnimMoving(lp_player)) {
         if (gv_animMoveHold[lp_player] < c_ANIM_LOWER_HOLD_TICKS) {
@@ -123,6 +179,7 @@ void gf_AnimTick (int lp_player) {
     int lv_upper;
     int lv_lower;
     bool lv_attacking;
+    int lv_turning;
 
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
@@ -156,6 +213,10 @@ void gf_AnimTick (int lp_player) {
             if (gv_animAimDir[lp_player] == c_ANIM_DIR_FORWARD) {
                 lv_lower = c_ANIM_LOWER_NONE;
             }
+        }
+        lv_turning = gf_AnimFreeTurning(lp_player, lv_hero);  // every tick: keeps the last facing current
+        if ((lv_lower == c_ANIM_LOWER_NONE) && (lv_turning != c_ANIM_LOWER_NONE)) {
+            lv_lower = lv_turning;
         }
         gf_AnimFullSet(lp_player, lv_lower);
         if (lv_attacking) {

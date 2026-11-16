@@ -41,21 +41,16 @@ def on_ready(ctx, data: dict) -> None:
 
 
 def _check_icons(checks) -> None:
-    icon_dir = PROFILE_OUTPUTS["controls"] / "Assets" / "Textures"
-    pnc = (icon_dir / "SCOBAModePNC.dds").read_bytes()
-    tps = (icon_dir / "SCOBAModeTPS.dds").read_bytes()
-    if pnc == tps:
-        print("controls_icons: icon files match FAIL")
+    from control_mode_icons import ICONS
+
+    if len(set(ICONS.values())) != len(ICONS):
+        print("controls_icons: icons match FAIL")
         checks.failures += 1
     else:
-        print("controls_icons: icon files differ PASS")
+        print("controls_icons: icons differ PASS")
     button_path = PROFILE_OUTPUTS["controls"] / "Base.SC2Data" / "GameData" / "ButtonData.xml"
     buttons = {element.get("id"): element for element in ET.parse(button_path).getroot().iter("CButton")}
-    expected = {
-        "SCOBAControlPNC": r"Assets\Textures\SCOBAModePNC.dds",
-        "SCOBAControlTPS": r"Assets\Textures\SCOBAModeTPS.dds",
-    }
-    for button_id, icon_path in expected.items():
+    for button_id, icon_path in ICONS.items():
         icon = buttons[button_id].find("Icon")
         if icon is not None and icon.get("value") == icon_path:
             print(f"controls_icons: {button_id} PASS")

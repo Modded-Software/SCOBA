@@ -117,7 +117,8 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
             UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
             Wait(0.01, c_timeGame);
-            CameraSetValue(1, c_cameraValueShadowClip, 25.0, 0.0, -1, 10.0);
+            // Operator 2026-11-16: shadow distance doubled (was 25).
+            CameraSetValue(1, c_cameraValueShadowClip, 50.0, 0.0, -1, 10.0);
             CameraSetValue(1, c_cameraValueFarClip, 16000.0, 0.0, -1, 10.0);
             CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, 65.0, 4.0, -1, 10);
             if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Tosh") || (UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "ToshSCOBA"))) {

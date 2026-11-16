@@ -17,6 +17,7 @@ include "scripts/app/systems/crush"
 include "scripts/app/data/lane_gates"
 include "scripts/app/systems/lanegates"
 include "scripts/app/systems/quake"
+include "scripts/app/systems/podimpact"
 include "scripts/app/systems/aim"
 include "scripts/app/systems/aim_shooting"
 include "scripts/app/systems/camera"
@@ -148,4 +149,6 @@ void main () {
     gt_CrushTick_Init();
     gf_GateLoad();
     gt_QuakeTick_Init();
+    gt_PodImpact_Init();
+    gt_HudMapClick_Init();
 }

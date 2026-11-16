@@ -358,23 +358,23 @@ fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {
     if (UnitGetType(gv_tPSUNIT[lp_player]) == "Tosh" || UnitGetType(gv_tPSUNIT[lp_player]) == "ToshSCOBA") {
         lv_offset = gv_mARINE;
     }
+    // Operator 2026-11-16: clamp, never snap. The camera keeps the longest
+    // distance (up to the desired one) at which the eye itself stays
+    // c_CAM_GROUND_MARGIN above the terrain, so it slides along the ground.
+    // Terrain between eye and hero no longer pulls it in.
     lv_ex = PointGetX(lv_eye);
     lv_ey = PointGetY(lv_eye);
     lv_ez = lv_tz + lv_offset + (Sin(lv_pitch) * lp_desired);
-    for (lv_seg = 1; lv_seg <= 16; lv_seg += 1) {
-        lv_fraction = lv_seg / 16.0;
+    for (lv_seg = c_CAM_CLAMP_STEPS; lv_seg >= 1; lv_seg -= 1) {
+        lv_fraction = IntToFixed(lv_seg) / IntToFixed(c_CAM_CLAMP_STEPS);
         lv_sample = Point(lv_tx + ((lv_ex - lv_tx) * lv_fraction), lv_ty + ((lv_ey - lv_ty) * lv_fraction));
-        lv_sampleZ = lv_tz + ((lv_ez - lv_tz) * lv_fraction);
-        if (((lv_fraction * lp_desired) > 0.8) && ((lv_sampleZ - 0.25) < WorldHeight(c_heightMapGround, lv_sample))) {
-            lv_safe = (lp_desired * ((lv_seg - 1) / 16.0)) - 0.25;
-            if (lv_safe < 0.4) {
-                lv_safe = 0.4;
-            }
-            return lv_safe;
+        lv_sampleZ = lv_tz + lv_offset + ((lv_ez - lv_tz - lv_offset) * lv_fraction);
+        if ((lv_sampleZ >= (WorldHeight(c_heightMapGround, lv_sample) + c_CAM_GROUND_MARGIN))) {
+            return lp_desired * lv_fraction;
         }
-        
     }
-    return lp_desired;
+    lv_safe = lp_desired / IntToFixed(c_CAM_CLAMP_STEPS);
+    return lv_safe;
 }
 
 void gf_CameraCollisionApply (int lp_player) {
@@ -391,19 +391,20 @@ void gf_CameraCollisionApply (int lp_player) {
     lv_desired = gv_cameraDistanceDesired[lp_player];
     lv_current = CameraGetDistance(lp_player);
     lv_safe = gf_CameraSafeDistance(lp_player, lv_desired);
-    if ((lv_safe < (lv_current - 0.15)) && (AbsF(lv_safe - gv_cameraDistanceApplied[lp_player]) > 0.15)) {
-        CameraSetValue(lp_player, c_cameraValueDistance, lv_safe, c_SCOBA_COLLISION_CLAMP_BLEND, -1, 10);
-        gv_cameraDistanceApplied[lp_player] = lv_safe;
-        if (gv_aIMACTIVE[lp_player]) {
-            gv_aimDbgClamps[lp_player] += 1;
-        }
+    // Follow the clamp both ways every tick in small steps: in fast (the eye
+    // must not enter the ground), out slowly; no all-or-nothing restore.
+    if ((AbsF(lv_safe - gv_cameraDistanceApplied[lp_player]) <= c_CAM_CLAMP_DEADBAND) && (AbsF(lv_current - lv_safe) <= c_CAM_CLAMP_DEADBAND)) {
+        return;
     }
-    else if ((lv_current < (lv_desired - 0.15)) && (lv_safe >= (lv_desired - 0.05)) && (AbsF(lv_desired - gv_cameraDistanceApplied[lp_player]) > 0.15)) {
-        CameraSetValue(lp_player, c_cameraValueDistance, lv_desired, c_SCOBA_COLLISION_RESTORE_BLEND, -1, 10);
-        gv_cameraDistanceApplied[lp_player] = lv_desired;
-        if (gv_aIMACTIVE[lp_player]) {
-            gv_aimDbgClamps[lp_player] += 1;
-        }
+    if ((lv_safe < lv_current)) {
+        CameraSetValue(lp_player, c_cameraValueDistance, lv_safe, c_SCOBA_COLLISION_CLAMP_BLEND, -1, 10);
+    }
+    else {
+        CameraSetValue(lp_player, c_cameraValueDistance, lv_safe, c_SCOBA_COLLISION_RESTORE_BLEND, -1, 10);
+    }
+    gv_cameraDistanceApplied[lp_player] = lv_safe;
+    if (gv_aIMACTIVE[lp_player]) {
+        gv_aimDbgClamps[lp_player] += 1;
     }
 }
 

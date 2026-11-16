@@ -57,6 +57,9 @@ actions:
   fprot                  rebuild, build footprint rotation probe map, run it
   flora                  rebuild, build flora and lane hazard test map, run it
   crushtest              rebuild, build the grass crush test map, run it
+  waterprobe             rebuild, build the water test probe map, run it
+  dissolveview           rebuild, build the doodad physics view map, launch it
+                         for manual viewing (bank SCOBADISSOLVE)
   picklog                rebuild, build the pick log map, launch it for manual play;
                          the log goes to the SCOBAPNCPROBE bank, section picklog
   build-profile <name>   rebuild, build one profile map, stop
@@ -103,7 +106,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest) ;;
+        combat|tps|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -151,13 +154,18 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest)
+    aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe)
         run_profile "$ACTION"
         ;;
     picklog)
         export SC2_TEST_GROUP=picklog
         build_profile pncprobe
         export SC2_MAP_SOURCE="$OUT_DIR/SCOBA256_pncprobe.SC2Map"
+        exec bash "$ROOT_DIR/scripts/launch-scoba.sh"
+        ;;
+    dissolveview)
+        PYTHONPATH="$ROOT_DIR/scripts" run_python -m testkit.profiles.dissolveview
+        export SC2_MAP_SOURCE="$OUT_DIR/SCOBA256_dissolveview.SC2Map"
         exec bash "$ROOT_DIR/scripts/launch-scoba.sh"
         ;;
     build-profile)

@@ -21,10 +21,10 @@ from typing import NamedTuple
 
 from footprints.catalog import append_catalog
 
-from . import config, crush, gates, treevary
+from . import config, crush, gates, hazard_paint, treevary
 from . import scene as scene_mod
 from . import terrain as terrain_mod
-from .grid import distance_to
+from .grid import disk_cells, distance_to
 from .lanes import Lane, Placed, find_lanes, hazard_cells, place_hazards, settle
 from .rules import context
 from .scatter import Plant, scatter
@@ -76,13 +76,29 @@ def doodad_xml(ident: int, kind: str, x: float, y: float, z: float, rotation: fl
     )
 
 
+def lift_of(kind: str) -> float:
+    """Placed z above the computed ground: hazards get HAZARD_LIFT more."""
+    return config.GROUND_LIFT + (config.HAZARD_LIFT if kind in config.HAZARD_VARIATIONS else 0.0)
+
+
+def hazard_ground(terrain: terrain_mod.Terrain, x: float, y: float, half: float) -> float:
+    """Lowest ground under a hazard footprint (operator 2026-11-16: the
+    centre height left an edge floating)."""
+    n = terrain.height.shape[0]
+    rows, cols = disk_cells(x, y, half, (n, n))
+    centre = terrain_mod.ground_z(terrain, x, y)
+    if len(rows) == 0:
+        return centre
+    return min(centre, float(terrain.height[rows, cols].min()))
+
+
 def objects_xml(p: Plan, next_id: int, terrain: terrain_mod.Terrain) -> str:
     rng = random.Random(f"{config.SEED}:hazards")
     entries = []
     ident = next_id
     for h in p.hazards:
         variation = rng.randrange(config.HAZARD_VARIATIONS[h.kind])
-        z = terrain_mod.ground_z(terrain, h.x, h.y) + config.GROUND_LIFT
+        z = hazard_ground(terrain, h.x, h.y, config.HAZARD_HALF[h.kind]) + lift_of(h.kind)
         entries.append(doodad_xml(ident, h.kind, h.x, h.y, z, h.rotation, 1.0, variation))
         ident += 1
     for plant in p.plants:
@@ -152,9 +168,11 @@ def apply_flora(map_dir: Path) -> bool:
     data = map_dir / "Base.SC2Data" / "GameData"
     append_catalog(data / "FootprintData.xml", none_footprint_xml())
     append_catalog(data / "ActorData.xml", plant_actors_xml())
-    (map_dir / crush.DATA_FILE).write_text(crush.galaxy(crush_rows(p, terrain_mod.load(map_dir))), encoding="utf-8")
+    loaded = terrain_mod.load(map_dir)
+    (map_dir / crush.DATA_FILE).write_text(crush.galaxy(crush_rows(p, loaded, objects.read_text(encoding="utf-8")), crush.water_spans(loaded)), encoding="utf-8")
     variations = {k: f.variations for k, f in config.FAMILIES.items()} | config.HAZARD_VARIATIONS
     add_preload(map_dir / "Preload.xml", sorted({h.kind for h in p.hazards} | {pl.kind for pl in p.plants}), variations)
+    hazard_paint.paint(map_dir, [(h.kind, h.x, h.y) for h in p.hazards])
     marker.write_text(f"plants={len(p.plants)} hazards={len(p.hazards)} lanes={len(p.lanes)}\n", encoding="utf-8")
     return True
 
@@ -189,15 +207,18 @@ def check_flora(map_dir: Path) -> list[str]:
     placed = placed_doodads(map_dir)
     have = sorted((kind, x, y) for kind, x, y, _z, _a in placed)
     problems = balance_problems(p.hazards, len(p.lanes)) + family_problems(p)
+    if len(p.hazards) != config.HAZARD_TOTAL:
+        problems.append(f"{len(p.hazards)} hazards placed, want {config.HAZARD_TOTAL}: {p.notes}")
     if want != have:
         problems.append(f"placed flora differs from the plan: {len(have)} placed, {len(want)} planned")
     terrain = terrain_mod.load(map_dir)
     off_ground = [
         (k, x, y, z) for k, x, y, z, a in placed
-        if not a or abs(z - terrain_mod.ground_z(terrain, x, y) - config.GROUND_LIFT) > GROUND_TOLERANCE
+        if not a or abs(z - terrain_mod.ground_z(terrain, x, y) - lift_of(k)) > GROUND_TOLERANCE
     ]
     if off_ground:
-        problems.append(f"{len(off_ground)} flora doodads are not at ground + {config.GROUND_LIFT}, e.g. {off_ground[:3]}")
+        problems.append(f"{len(off_ground)} flora doodads are not at their ground lift, e.g. {off_ground[:3]}")
+    problems.extend(hazard_paint.paint_problems(map_dir, [(h.kind, h.x, h.y) for h in p.hazards]))
     actors = (map_dir / "Base.SC2Data" / "GameData" / "ActorData.xml").read_text(encoding="utf-8")
     for kind in config.FAMILIES:
         block = re.search(r'<CActorDoodad id="' + kind + r'">\s*<Footprint value="([^"]+)"/>', actors)
@@ -225,10 +246,14 @@ def check_flora(map_dir: Path) -> list[str]:
     for k, x, y, _z, _a in placed:
         if k in ("ZerusTallGrassCluster", "ZerusWaterPlant") and min(math.hypot(x - lx, y - ly) for lx, ly in lane_points) <= config.GRASS_LANE_CLEAR - 1:
             problems.append(f"{k} at ({x:.1f},{y:.1f}) is on a lane")
-    want_crush = crush.galaxy(crush_rows(p, terrain))
+    try:
+        want_crush = crush.galaxy(crush_rows(p, terrain, (map_dir / "Objects").read_text(encoding="utf-8")), crush.water_spans(terrain))
+    except ValueError as exc:
+        problems.append(str(exc))
+        want_crush = None
     crush_path = map_dir / crush.DATA_FILE
     have_crush = crush_path.read_text(encoding="utf-8").replace("\r\n", "\n") if crush_path.exists() else ""
-    if have_crush != want_crush:
+    if want_crush is not None and have_crush != want_crush:
         problems.append(f"{crush.DATA_FILE} does not match the placed crushable flora")
     problems += gates.check(map_dir)
     lookalikes = treevary.conflicts([t for _m, t in treevary.parse((map_dir / "Objects").read_text(encoding="utf-8"))])
@@ -243,6 +268,20 @@ def check_flora(map_dir: Path) -> list[str]:
     return problems
 
 
-def crush_rows(p: Plan, terrain: terrain_mod.Terrain) -> list[tuple[str, float, float, float, float]]:
-    """(kind, x, y, z, scale) per plant; z is the placed doodad height."""
-    return [(pl.kind, pl.x, pl.y, round(terrain_mod.ground_z(terrain, pl.x, pl.y) + config.GROUND_LIFT, 3), pl.scale) for pl in p.plants]
+def placed_ids(objects: str) -> dict[tuple[str, str], int]:
+    """Doodad id by (type, "x,y") as doodad_xml writes them."""
+    pattern = r'<ObjectDoodad Id="(\d+)"[^>]*? Position="([^,]+),([^,]+),[^"]*"[^>]*? Type="([^"]+)"'
+    return {(t, f"{x},{y}"): int(i) for i, x, y, t in re.findall(pattern, objects)}
+
+
+def crush_rows(p: Plan, terrain: terrain_mod.Terrain, objects: str) -> list[tuple[str, float, float, float, float, int]]:
+    """(kind, x, y, z, scale, doodad id) per plant; z is the placed doodad
+    height. The id lets the crush fade the placed doodad (operator 2026-11-16)."""
+    ids = placed_ids(objects)
+    rows = []
+    for pl in p.plants:
+        ident = ids.get((pl.kind, f"{pl.x:g},{pl.y:g}"))
+        if ident is None:
+            raise ValueError(f"crush: no placed doodad for {pl.kind} at ({pl.x:g},{pl.y:g})")
+        rows.append((pl.kind, pl.x, pl.y, round(terrain_mod.ground_z(terrain, pl.x, pl.y) + config.GROUND_LIFT, 3), pl.scale, ident))
+    return rows

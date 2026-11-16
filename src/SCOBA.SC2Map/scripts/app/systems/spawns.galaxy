@@ -69,11 +69,13 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
         lv_podC = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, lv_podB);
 
         lv_group = gf_CreateSpawnGroup(8, "Zergling", lv_playerIndex, lv_podA);
+        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_podA);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podA, lv_group, false, lv_playerIndex);
         Wait(4.0, c_timeGame);
         gf_OrderSpawnGroup(lv_group, 0, lv_lane);
 
         lv_group = gf_CreateSpawnGroup(1, "RoachCorpser", lv_playerIndex, lv_podB);
+        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_podB);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podB, lv_group, false, lv_playerIndex);
         Wait(4.0, c_timeGame);
         gf_OrderSpawnGroup(lv_group, 0, lv_lane);
@@ -83,6 +85,7 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
             libNtve_gf_CreateUnitsAtPoint2(1, "Queen", 0, lv_playerIndex, lv_podC);
             UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
         }
+        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_podC);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podC, lv_group, false, lv_playerIndex);
         Wait(4.0, c_timeGame);
         gf_OrderSpawnGroup(lv_group, 0, lv_lane);
@@ -126,12 +129,14 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
             libNtve_gf_CreateUnitsAtPoint2(1, "Goliath", 0, lv_playerIndex, lv_podA);
             UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
         }
+        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Terran, lv_podA);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podA, lv_group, true, lv_playerIndex);
         gf_OrderSpawnGroup(lv_group, 1, lv_lane);
 
         lv_group = gf_CreateSpawnGroup(2, "Marauder", lv_playerIndex, lv_podB);
         libNtve_gf_CreateUnitsAtPoint2(1, "Firebat", 0, lv_playerIndex, lv_podB);
         UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
+        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Terran, lv_podB);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podB, lv_group, true, lv_playerIndex);
         gf_OrderSpawnGroup(lv_group, 1, lv_lane);
     }

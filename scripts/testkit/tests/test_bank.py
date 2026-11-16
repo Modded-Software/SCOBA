@@ -13,6 +13,8 @@ XML = """<?xml version="1.0" encoding="UTF-8"?>
     <Key name="done"><Value int="1"/></Key>
     <Key name="profile"><Value string="aim"/></Key>
     <Key name="ready"><Value flag="1"/></Key>
+    <Key name="depth"><Value fixed="0.467"/></Key>
+    <Key name="dry"><Value fixed="-1"/></Key>
   </Section>
 </Bank>
 """
@@ -27,6 +29,8 @@ class BankTests(unittest.TestCase):
             self.assertEqual(data["meta"]["done"], 1)
             self.assertEqual(data["meta"]["profile"], "aim")
             self.assertTrue(data["meta"]["ready"])
+            self.assertAlmostEqual(data["meta"]["depth"], 0.467)
+            self.assertEqual(data["meta"]["dry"], -1.0)
 
     def test_find_latest(self):
         with tempfile.TemporaryDirectory() as tmp:

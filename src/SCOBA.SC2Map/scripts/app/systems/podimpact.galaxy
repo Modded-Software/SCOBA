@@ -1,0 +1,85 @@
+// Drop pod landing impact: the crush chain (gf_CrushImpactAt) scaled up, at
+// random points 2-8 cells around the pod, plus a quake impulse (gf_QuakeImpulse).
+// The script has no landing event. The delays are the impact events in the pod
+// models' Birth animations: zergdroppod 3.133 s, droppodfalling 3.266 s.
+// Spawn code calls gf_PodImpactQueue before libVCMI_gf_CreateDropPod, because
+// the Terran call waits until the pod has landed.
+
+// Operator 2026-11-16: the model impact times (3.133 / 3.266) felt late; 0.75 s earlier.
+const fixed c_POD_DELAY_ZERG = 2.383;
+const fixed c_POD_DELAY_TERRAN = 2.516;
+const int c_POD_HITS = 6;                // impacts per pod
+const fixed c_POD_SPREAD_LO = 2.0;       // cells from the pod centre
+const fixed c_POD_SPREAD_HI = 8.0;
+const fixed c_POD_STAGGER = 0.15;        // impacts spread over this many seconds
+const fixed c_POD_SCALE = 3.0;           // base scale; the crush jitter applies on top
+// Operator 2026-11-16: much larger force, but local. Reach 12 x 3 = 36
+// cells (radius 15 reached 180 cells: the whole map shook every few
+// seconds). Peak 0.04 x 3 x 2.5 = 0.3 at the pod, fading over 2.5 s
+// (operator 2026-11-16: gain 5 was too strong).
+const fixed c_POD_QUAKE_RADIUS = 3.0;    // reach: 12 x this
+const fixed c_POD_QUAKE_GAIN = 2.5;      // strength only
+const fixed c_POD_QUAKE_LIFE = 2.5;
+const fixed c_POD_PERIOD = 0.0625;
+const int c_POD_QUEUE = 64;
+
+trigger gt_PodImpact;
+point[c_POD_QUEUE] gv_podAt;
+fixed[c_POD_QUEUE] gv_podDue;
+bool[c_POD_QUEUE] gv_podQuake;  // the centre hit also starts the shake
+bool[c_POD_QUEUE] gv_podUsed;
+int gv_podNext;
+int gv_podFired;  // impacts played, for tests
+
+void gf_PodImpactAdd (point lp_at, fixed lp_due, bool lp_quake) {
+    int lv_q = gv_podNext;
+
+    if (gv_podUsed[lv_q]) {
+        gf_CrushImpactAt(gv_podAt[lv_q], c_POD_SCALE);  // queue full: play now
+        gv_podFired += 1;
+    }
+    gv_podAt[lv_q] = lp_at;
+    gv_podDue[lv_q] = lp_due;
+    gv_podQuake[lv_q] = lp_quake;
+    gv_podUsed[lv_q] = true;
+    gv_podNext = ModI(lv_q + 1, c_POD_QUEUE);
+}
+
+// lp_race: libVCMI_ge_DropPodRace_Zerg or _Terran.
+void gf_PodImpactQueue (int lp_race, point lp_centre) {
+    fixed lv_land = GameGetMissionTime() + c_POD_DELAY_TERRAN;
+    int lv_k;
+
+    if (lp_race == libVCMI_ge_DropPodRace_Zerg) {
+        lv_land = GameGetMissionTime() + c_POD_DELAY_ZERG;
+    }
+    for (lv_k = 0; lv_k < c_POD_HITS; lv_k += 1) {
+        gf_PodImpactAdd(PointWithOffsetPolar(lp_centre, RandomFixed(c_POD_SPREAD_LO, c_POD_SPREAD_HI), RandomFixed(0.0, 360.0)), lv_land + RandomFixed(0.0, c_POD_STAGGER), false);
+    }
+    gf_PodImpactAdd(lp_centre, lv_land, true);  // one under the pod, which starts the shake
+}
+
+bool gt_PodImpact_Func (bool testConds, bool runActions) {
+    int lv_q;
+    fixed lv_now = GameGetMissionTime();
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_q = 0; lv_q < c_POD_QUEUE; lv_q += 1) {
+        if (gv_podUsed[lv_q] && (gv_podDue[lv_q] <= lv_now)) {
+            gf_CrushImpactAt(gv_podAt[lv_q], c_POD_SCALE);
+            if (gv_podQuake[lv_q]) {
+                gf_QuakeImpulse(gv_podAt[lv_q], c_POD_QUAKE_RADIUS, c_POD_QUAKE_GAIN, c_POD_QUAKE_LIFE);
+            }
+            gv_podUsed[lv_q] = false;
+            gv_podFired += 1;
+        }
+    }
+    return true;
+}
+
+void gt_PodImpact_Init () {
+    gt_PodImpact = TriggerCreate("gt_PodImpact_Func");
+    TriggerAddEventTimePeriodic(gt_PodImpact, c_POD_PERIOD, c_timeGame);
+}

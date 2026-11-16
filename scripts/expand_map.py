@@ -13,7 +13,6 @@ from pathlib import Path
 from attack_cooldown_link import apply as apply_attack_cooldown_link
 from bootstrap_galaxy import write_bootstrap
 from character_anim_assets import generate as generate_character_anim
-from control_mode_icons import generate as generate_control_icons
 from doodad_occlusion import disable_doodad_occlusion
 from expand_helpers import clone_cells, read, upsample_grid, write
 from hdtex.inject import apply_hd_textures
@@ -22,6 +21,8 @@ from props_expand import expand_props
 from flora.build import apply_flora
 from flora.lift import lift_doodads
 from footprints.build import apply_scaled_footprints
+from skybox_flip import generate as generate_skybox_flip
+from footfall.fx import generate as generate_footfall_fx
 from slow_death_assets import generate as generate_slow_deaths
 from spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
 from strip_gui_triggers import strip_triggers
@@ -478,9 +479,8 @@ def main() -> int:
     if os.environ.get("SC2_NO_WATER_SPLASHES") != "1":
         apply_water_splashes(dst)
     apply_attack_cooldown_link(dst)
-    generate_character_anim(dst, False)
-    generate_slow_deaths(dst, False)
-    generate_control_icons(dst, False)
+    for generate in (generate_character_anim, generate_slow_deaths, generate_skybox_flip, generate_footfall_fx):
+        generate(dst, False)
     if os.environ.get("SC2_NO_PROPS") != "1":
         expand_props(dst)
     if os.environ.get("SC2_NO_SPORES") != "1":

@@ -304,6 +304,7 @@ bool gt_AimCameraTick_Func (bool testConds, bool runActions) {
         }
         gf_AimCameraTick(lv_player);
         gf_TpsShotExpire(lv_player);
+        gf_AimShotHold(lv_player);
     }
     return true;
 }

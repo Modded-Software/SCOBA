@@ -122,18 +122,47 @@ def _vectors(planes: Planes) -> np.ndarray:
     return _unit(planes["normal"].astype(np.float32) / 255.0 * 2.0 - 1.0)
 
 
+# Swizzled normal maps carry X in alpha and Y in green; the game reads only
+# those two. Red and blue hold one of two fillers:
+#   "fixed": red 255, blue 0 (the Zerus maps);
+#   "copy":  red and blue equal, both a copy of Y (CharLavaCracks: R == B
+#            exactly, correlation with green 0.998).
+COPY_MIN_CORR = 0.95
+
+
+def normal_layout(rgba: np.ndarray) -> str:
+    red, green, blue = (rgba[:, :, c].astype(int) for c in range(3))
+    if np.abs(red - NORMAL_RED).max() <= NORMAL_TOLERANCE and np.abs(blue - NORMAL_BLUE).max() <= NORMAL_TOLERANCE:
+        return "fixed"
+    if np.abs(red - blue).max() <= NORMAL_TOLERANCE and red.std() > 0 and green.std() > 0:
+        if np.corrcoef(red.ravel(), green.ravel())[0, 1] >= COPY_MIN_CORR:
+            return "copy"
+    raise RoleError(
+        "not a swizzled normal map: red/blue must be 255/0 or both a copy of green, "
+        f"got red {red.min()}..{red.max()}, blue {blue.min()}..{blue.max()}"
+    )
+
+
 def split_normal(rgba: np.ndarray) -> Planes:
     """Rebuild Z, so the upscaler sees an ordinary blue-ish normal map."""
-    red, blue = rgba[:, :, 0].astype(int), rgba[:, :, 2].astype(int)
-    if np.abs(red - NORMAL_RED).max() > NORMAL_TOLERANCE or np.abs(blue - NORMAL_BLUE).max() > NORMAL_TOLERANCE:
-        raise RoleError(
-            "not a swizzled normal map: red must be 255 and blue 0, "
-            f"got red {red.min()}..{red.max()}, blue {blue.min()}..{blue.max()}"
-        )
+    normal_layout(rgba)
     x = rgba[:, :, 3].astype(np.float32) / 255.0 * 2.0 - 1.0
     y = rgba[:, :, 1].astype(np.float32) / 255.0 * 2.0 - 1.0
     z = np.sqrt(np.clip(1.0 - x * x - y * y, 0.0, 1.0))
     return {"normal": _to_byte(np.stack([x, y, z], axis=2) * 0.5 + 0.5)}
+
+
+def match_layout(levels: list[np.ndarray], layout: str) -> list[np.ndarray]:
+    """join_normal writes the "fixed" filler; "copy" maps get Y in red and blue again."""
+    if layout == "fixed":
+        return levels
+    out = []
+    for level in levels:
+        level = level.copy()
+        level[:, :, 0] = level[:, :, 1]
+        level[:, :, 2] = level[:, :, 1]
+        out.append(level)
+    return out
 
 
 def join_normal(planes: Planes, source: Planes | None = None, wrap: bool = True) -> list[np.ndarray]:

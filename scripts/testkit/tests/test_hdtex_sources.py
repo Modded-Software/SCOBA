@@ -216,6 +216,7 @@ class CommandLineTest(unittest.TestCase):
             "sha256": "",
             "encode_psnr": [40.0, 40.0, 40.0, 99.0],
             "fidelity_corr": [0.9, 0.9, 0.9, None],
+            "fidelity_psnr": [40.0, 40.0, 40.0, 99.0],
             "coarse_rmse": 0.5,
             "seam": 1.2,
             "seam_source": 1.0,

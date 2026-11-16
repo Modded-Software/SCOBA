@@ -36,8 +36,10 @@
     <CWeaponLegacy id="Tosh">
         <Range value="12"/>
         <Effect value="SCOBAToshShot"/>
+        <!-- TESTING (operator 2026-11-16): 0.1 s cooldown; was 1. -->
+        <Period value="0.25"/>
         <Cost>
-            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1"/>
+            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="0.25"/>
         </Cost>
     </CWeaponLegacy>
     <!-- Attack auto: fires outside attack orders, while moving, at any facing. -->

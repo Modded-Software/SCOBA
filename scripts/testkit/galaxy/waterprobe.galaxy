@@ -1,0 +1,55 @@
+// Water probe: the engine values behind the water test (quake.galaxy).
+// Along lines that cross the river it records, per sample, the engine
+// ground height (WorldHeight), the water surface the test finds (-1: dry),
+// and the test result. It also calls the miss splash at the samples and
+// records whether a splash actor was created.
+// Sample points come from the generated waterprobe_points.galaxy.
+
+trigger gt_WaterProbe;
+int gv_wpN;
+
+void gf_WaterProbePoints ();
+
+void gf_WpSample (string lp_line, int lp_k, fixed lp_x, fixed lp_y) {
+    point lv_p = Point(lp_x, lp_y);
+    string lv_key = "s" + IntToString(lp_k);
+    int lv_before = gv_shotSplashes;
+    bool lv_splash;
+
+    BankValueSetFromFixed(gv_dbgBank, lp_line, lv_key + "X", lp_x);
+    BankValueSetFromFixed(gv_dbgBank, lp_line, lv_key + "Y", lp_y);
+    BankValueSetFromFixed(gv_dbgBank, lp_line, lv_key + "Ground", WorldHeight(c_heightMapGround, lv_p));
+    BankValueSetFromFixed(gv_dbgBank, lp_line, lv_key + "Surface", gf_WaterSurfaceAt(lv_p));
+    BankValueSetFromFlag(gv_dbgBank, lp_line, lv_key + "Wet", gf_QuakeInWater(lv_p));
+    BankValueSetFromFixed(gv_dbgBank, lp_line, lv_key + "Depth", gf_WaterDepthAt(lv_p));
+    gv_shotSplashLastH = -1.0;
+    lv_splash = gf_WaterSplashAt(lv_p);
+    BankValueSetFromFixed(gv_dbgBank, lp_line, lv_key + "SplashH", gv_shotSplashLastH);
+    BankValueSetFromFlag(gv_dbgBank, lp_line, lv_key + "Splash", lv_splash);
+    BankValueSetFromInt(gv_dbgBank, lp_line, lv_key + "SplashCount", gv_shotSplashes - lv_before);
+    gv_wpN += 1;
+}
+
+bool gt_WaterProbe_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAWATERPROBE", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "spans", c_WATER_SPANS);
+    BankSave(gv_dbgBank);
+    gf_WaterProbePoints();
+    BankValueSetFromInt(gv_dbgBank, "meta", "count", gv_wpN);
+    BankValueSetFromInt(gv_dbgBank, "meta", "realClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_WaterProbe_Init () {
+    gt_WaterProbe = TriggerCreate("gt_WaterProbe_Func");
+    TriggerAddEventMapInit(gt_WaterProbe);
+}

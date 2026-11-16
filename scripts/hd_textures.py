@@ -33,6 +33,9 @@ MIN_ENCODE_PSNR = 35.0
 # The result shrunk to the source size must be the same picture. An inverted
 # channel correlates below zero, a swapped one near zero. The set measures 0.83 and up.
 MIN_FIDELITY_CORR = 0.7
+# A channel this close to the source (shrunk result, dB; RMSE about 0.8
+# levels) is not judged by correlation, which is noise on a near-flat channel.
+FLAT_PSNR = 50.0
 # Far view: a small mip of the result against the same mip of the source, in levels.
 # The set measures 0.82 at most. Without the low-frequency match it measures 1.90 and up.
 MAX_COARSE_RMSE = 1.5
@@ -76,17 +79,24 @@ def cmd_build(args: argparse.Namespace) -> int:
         tile=args.tile,
         variant=args.variant,
     )
-    manifest = pipeline.build(args.source, args.map, settings, force=args.force)
+    manifest = pipeline.build(args.source, args.map, settings, force=args.force, only=tuple(args.texture))
     print(f"hdtex: wrote {manifest}")
     return cmd_verify(args)
 
 
 def lowest_correlation(texture: dict) -> float:
-    """Lowest correlation over the channels that carry a picture."""
-    values = [value for value in texture["fidelity_corr"] if value is not None]
-    if not values:
+    """Lowest correlation over the channels that carry a picture.
+
+    A channel whose shrunk result already matches the source to FLAT_PSNR or
+    better is proven by its error. Its correlation is noise: CharLavaCracks
+    has nearly flat green and blue (PSNR 53.7 and 53.9 dB, correlation 0.09
+    and 0.25). Returns 1.0 when every channel is proven that way.
+    """
+    pairs = zip(texture["fidelity_corr"], texture["fidelity_psnr"])
+    values = [corr for corr, psnr in pairs if corr is not None and psnr < FLAT_PSNR]
+    if not values and all(value is None for value in texture["fidelity_corr"]):
         raise SystemExit(f"{texture['file']}: every channel is constant, nothing to compare")
-    return min(values)
+    return min(values) if values else 1.0
 
 
 def texture_problems(folder: Path, texture: dict) -> list[str]:
@@ -174,6 +184,10 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--model", action="append", default=[], metavar="[TEXTURE.]PLANE=MODEL", help="upscaler model for a plane")
     build.add_argument("--no-wrap", action="store_true", help="do not make opposite edges match; for textures that do not tile")
     build.add_argument("--force", action="store_true", help="redo every stage")
+    build.add_argument(
+        "--texture", action="append", default=[], metavar="ENTRY",
+        help="build only this catalog entry (such as CharLavaCracks); the rest of the manifest is kept",
+    )
     build.set_defaults(handler=cmd_build)
     commands.add_parser("verify", help="check the cache").set_defaults(handler=cmd_verify)
     commands.add_parser("preview", help="write comparison sheets").set_defaults(handler=cmd_preview)

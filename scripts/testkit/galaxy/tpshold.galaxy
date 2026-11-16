@@ -1,0 +1,32 @@
+// Held left button while aiming chains shots; release stops them. The press
+// fires one shot, the hold the rest. Shots are counted by gv_aimShots (the
+// engine weapon events) and the chained calls by gv_aimHoldShots.
+// Called from tps.galaxy (group "hold"); declared there.
+void gf_DbgTpsHold (string lp_section) {
+    int lv_shots0;
+    int lv_hold0;
+
+    gf_DbgTpsReset(lp_section);
+    gf_DbgTpsAllyClear();
+    gf_DbgTpsSet(true);
+    gf_DbgTpsCamera(0.0, -25.0);  // the sky: misses only
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.4, c_timeGame);
+    lv_shots0 = gv_aimShots[1];
+    lv_hold0 = gv_aimHoldShots;
+    gv_tpsPressed[1] = true;
+    gf_AimShotPress(1);
+    Wait(2.0, c_timeGame);
+    gv_tpsPressed[1] = false;
+    BankValueSetFromInt(gv_dbgBank, lp_section, "HeldShots", gv_aimShots[1] - lv_shots0);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "HeldChain", gv_aimHoldShots - lv_hold0);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "Period1000", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, "Tosh", "Period", 1)) * 1000.0));
+    Wait(0.5, c_timeGame);  // settle the last pending shot
+    lv_shots0 = gv_aimShots[1];
+    lv_hold0 = gv_aimHoldShots;
+    Wait(2.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "ReleasedShots", gv_aimShots[1] - lv_shots0);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "ReleasedChain", gv_aimHoldShots - lv_hold0);
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_DbgTpsSet(false);
+}

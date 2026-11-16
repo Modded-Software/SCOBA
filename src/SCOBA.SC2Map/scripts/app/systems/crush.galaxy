@@ -19,6 +19,8 @@ const int c_CRUSH_RING = 384;  // 3 clips x 128 plants within one life
 
 trigger gt_CrushTick;
 int gv_crushRemoved;
+int gv_crushFaded;  // crushed doodads faded through their actor, for tests
+const fixed c_CRUSH_FADE = 2.0;  // fade-out seconds of a crushed doodad
 actor[c_CRUSH_RING] gv_crushDebris;
 fixed[c_CRUSH_RING] gv_crushDebrisEnd;
 int gv_crushDebrisNext;
@@ -79,23 +81,41 @@ void gf_CrushFx (string lp_model, point lp_at, fixed lp_scale) {
     gv_crushDebrisNext = ModI(lv_slot + 1, c_CRUSH_RING);
 }
 
-void gf_CrushLater (string lp_model, point lp_at, int lp_i);
+void gf_CrushLater (string lp_model, point lp_at, fixed lp_base);
+
+// The shared impact chain: rocks and a rock sound now, the two dust clips
+// (and a dirt sound) after a short random delay. Used by plants and drop pods.
+void gf_CrushImpactAt (point lp_at, fixed lp_base) {
+    gf_CrushFx(c_CRUSH_DEBRIS3, lp_at, lp_base * RandomFixed(c_CRUSH_JITTER_LO, c_CRUSH_JITTER_HI));
+    gf_CrushSound(gv_crushRockSound[RandomInt(0, 1)], lp_at);
+    gf_CrushLater(c_CRUSH_DEBRIS, lp_at, lp_base);
+    gf_CrushLater(c_CRUSH_DEBRIS2, lp_at, lp_base);
+}
 
 void gf_CrushPlant (int lp_i) {
     point lv_at = Point(gv_crushX[lp_i], gv_crushY[lp_i]);
 
+    actor lv_a = null;
+
     gv_crushGone[lp_i] = true;
     gv_crushRemoved += 1;
-    libNtve_gf_RemoveDoodadsinRegion(RegionCircle(lv_at, c_CRUSH_PICK), gv_crushKindName[gv_crushKind[lp_i]]);
-    // Operator: rocks at impact, the two dust clips after a short random delay.
-    gf_CrushFx(c_CRUSH_DEBRIS3, lv_at, gv_crushS[lp_i] * RandomFixed(c_CRUSH_JITTER_LO, c_CRUSH_JITTER_HI));
-    gf_CrushSound(gv_crushRockSound[RandomInt(0, 1)], lv_at);
-    gf_CrushLater(c_CRUSH_DEBRIS, lv_at, lp_i);
-    gf_CrushLater(c_CRUSH_DEBRIS2, lv_at, lp_i);
+    // Fade the placed doodad out (operator 2026-11-16, dissolveview); without
+    // an id or actor it is removed at once as before.
+    if (gv_crushId[lp_i] > 0) {
+        lv_a = ActorFromDoodad(DoodadFromId(gv_crushId[lp_i]));
+    }
+    if (lv_a != null) {
+        ActorSend(lv_a, libNtve_gf_SetOpacity(0.0, c_CRUSH_FADE));
+        gv_crushFaded += 1;
+    }
+    else {
+        libNtve_gf_RemoveDoodadsinRegion(RegionCircle(lv_at, c_CRUSH_PICK), gv_crushKindName[gv_crushKind[lp_i]]);
+    }
+    gf_CrushImpactAt(lv_at, gv_crushS[lp_i]);
 }
 
 // Delayed clips: queued here, played by gt_CrushLate when due.
-void gf_CrushLater (string lp_model, point lp_at, int lp_i) {
+void gf_CrushLater (string lp_model, point lp_at, fixed lp_base) {
     int lv_q = gv_crushLateNext;
 
     if (gv_crushLateModel[lv_q] != "") {
@@ -103,7 +123,7 @@ void gf_CrushLater (string lp_model, point lp_at, int lp_i) {
     }
     gv_crushLateModel[lv_q] = lp_model;
     gv_crushLateAt[lv_q] = lp_at;
-    gv_crushLateScale[lv_q] = gv_crushS[lp_i] * RandomFixed(c_CRUSH_JITTER_LO, c_CRUSH_JITTER_HI);
+    gv_crushLateScale[lv_q] = lp_base * RandomFixed(c_CRUSH_JITTER_LO, c_CRUSH_JITTER_HI);
     gv_crushLateDue[lv_q] = GameGetMissionTime() + RandomFixed(c_CRUSH_DELAY_LO, c_CRUSH_DELAY_HI);
     gv_crushLateNext = ModI(lv_q + 1, c_CRUSH_LATE);
 }

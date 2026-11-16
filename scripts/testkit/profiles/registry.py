@@ -19,6 +19,8 @@ PROFILE_OUTPUTS = {
     "flora": ROOT / "out" / "SCOBA256_flora.SC2Map",
     "crushtest": ROOT / "out" / "SCOBA256_crushtest.SC2Map",
     "fxgallery": ROOT / "out" / "SCOBA256_fxgallery.SC2Map",
+    "waterprobe": ROOT / "out" / "SCOBA256_waterprobe.SC2Map",
+    "dissolveview": ROOT / "out" / "SCOBA256_dissolveview.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -36,6 +38,8 @@ PROFILE_BANKS = {
     "flora": ("SCOBAFLORA",),
     "crushtest": ("SCOBACRUSH",),
     "fxgallery": (),
+    "waterprobe": ("SCOBAWATERPROBE",),
+    "dissolveview": ("SCOBADISSOLVE",),
 }
 
 
@@ -79,4 +83,7 @@ def profile_module(name):
     if name == "crushtest":
         from . import crushtest
         return crushtest
+    if name == "waterprobe":
+        from . import waterprobe
+        return waterprobe
     raise SystemExit(f"unknown test profile: {name}")

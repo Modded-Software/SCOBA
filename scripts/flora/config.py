@@ -21,8 +21,14 @@ FLAT_SLOPE = 0.45
 RELIEF = 4.0
 RELIEF_RADIUS = 3
 # Water: depth bands below the water surface (map WaterData height).
-GROUND_LIFT = 2.85  # placed z = computed ground + this (operator 2026-11-16)
+GROUND_LIFT = 2.6  # placed z = computed ground + this (operator 2026-11-16: 2.85, then -0.25)
 DOODAD_LIFT = 1.85  # non-flora absolute doodads are raised by this (operator 2026-11-16)
+WATER_FX_DEPTH = 0.15  # water effects need the surface this far above the visible ground (operator 2026-11-16)
+HAZARD_LIFT = 0.1  # hazards sit this much above GROUND_LIFT (operator 2026-11-16: 1.0, 0.5, 0.3 floated)
+HAZARD_FLAT_RANGE = 0.15  # max ground height spread under a hazard footprint (operator 2026-11-16: 0.4 floated)
+HAZARD_WIGGLE_RINGS = tuple(0.75 * k for k in range(1, 9))  # cells: rings searched around a blocked spot (to 6)
+HAZARD_WIGGLE_STEPS = 16  # points per ring
+HAZARD_PAINT_BLEND = 3.0  # lava paint fades out over this many cells past a hazard (operator: 2-4)
 SHORE_BAND = 3.0  # dry cells this close to water are shore
 BRAMBLE_FOREST = 2  # ZerusBrambles need this many trees within CLUSTER_RADIUS
 BRAMBLE_WATER_CLEAR = 4.0  # and stay this far from water
@@ -141,6 +147,10 @@ HAZARD_SIDE_MAX = 4.0
 # A lane's corridor: cells this close to its route. Detours are measured inside it.
 LANE_CORRIDOR = 8.0
 # Shared shifts along the lane tried when a pair's spot is blocked.
-HAZARD_SHIFTS = (0.0, 3.0, -3.0, 6.0, -6.0, 9.0, 12.0, 15.0)  # far shifts: lava clear of water
+# Operator 2026-11-16: relocate, never drop, until a flat spot is found.
+HAZARD_SHIFTS = tuple(s * 1.5 * d for s in range(0, 21) for d in ((1,) if s == 0 else (1, -1)))
+HAZARD_MIN_ALONG = 12.0  # cells: no hazard closer than this to a lane end (the bases)
+# Total hazards placed (pairs filled round-robin over the lanes).
+HAZARD_TOTAL = 16
 # A lane must stay connected with hazards in, no longer than this multiple.
 LANE_DETOUR_MAX = 1.25

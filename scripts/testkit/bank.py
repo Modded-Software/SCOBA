@@ -12,10 +12,10 @@ def read_bank(path: Path) -> dict | None:
         root = ET.parse(path).getroot()
     except (ET.ParseError, OSError) as exc:
         raise RuntimeError(f"cannot parse bank {path}: {exc}") from exc
-    data: dict[str, dict[str, int | bool | str]] = {}
+    data: dict[str, dict[str, int | float | bool | str]] = {}
     for section in root.findall("Section"):
         name = section.get("name", "")
-        values: dict[str, int | bool | str] = {}
+        values: dict[str, int | float | bool | str] = {}
         for key in section.findall("Key"):
             value = key.find("Value")
             key_name = key.get("name", "")
@@ -23,6 +23,8 @@ def read_bank(path: Path) -> dict | None:
                 continue
             if value.get("int") is not None:
                 values[key_name] = int(value.get("int"))
+            elif value.get("fixed") is not None:
+                values[key_name] = float(value.get("fixed"))
             elif value.get("flag") is not None:
                 values[key_name] = value.get("flag") == "1"
             elif value.get("string") is not None:

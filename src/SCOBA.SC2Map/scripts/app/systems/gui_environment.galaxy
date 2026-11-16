@@ -1,5 +1,39 @@
 // Module: systems/gui_environment
 
+// Sky (operator 2026-11-16): AiurSkybox turned 180 degrees about the model y axis, so south
+// becomes north (AiurSkyboxFlipped, built by scripts/skybox_flip.py).
+// ZerusSkybox was tried and does not render; dropped. With more than one entry, gt_SkyCycle steps through them
+// every c_SKY_PERIOD, looping.
+const int c_SKY_COUNT = 1;
+const fixed c_SKY_PERIOD = 10.0;
+string[c_SKY_COUNT] gv_skyModel;
+int gv_skyIndex;
+trigger gt_SkyCycle;
+
+void gf_SkySet (int lp_index) {
+    gv_skyIndex = ModI(lp_index, c_SKY_COUNT);
+    GameSetBackground(c_backgroundFixed, gv_skyModel[gv_skyIndex], 100.0);
+}
+
+bool gt_SkyCycle_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_SkySet(gv_skyIndex + 1);
+    return true;
+}
+
+void gf_SkyInit () {
+    int lv_count = c_SKY_COUNT;  // a variable: Galaxy rejects constant conditions
+
+    gv_skyModel[0] = "AiurSkyboxFlipped";
+    gf_SkySet(0);
+    if (lv_count > 1) {
+        gt_SkyCycle = TriggerCreate("gt_SkyCycle_Func");
+        TriggerAddEventTimePeriodic(gt_SkyCycle, c_SKY_PERIOD, c_timeGame);
+    }
+}
+
 bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     // Variable Declarations
     int lv_lOCALPLAYER;
@@ -23,7 +57,7 @@ bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMenuBar, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMinimapPanel, true);
     UISetMiniMapBackGroundColor(Color(0,0,0));
-    UISetMiniMapCameraFoVVisible(false);
+    UISetMiniMapCameraFoVVisible(true);  // operator: the minimap shows the current view
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeVictoryPanel, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTipAlertPanel, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeTextTag, true);
@@ -58,16 +92,15 @@ bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeAllianceButton, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeAlertPanel, false);
     UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeAchievementMenuButton, false);
-    TimerWindowCreate(gv_sPAWNTIMER, StringExternal("Param/Value/A217A367"), true, false);
-    TimerWindowSetTimer(gv_tIMERWINDOW, gv_sPAWNTIMER);
-    TimerWindowSetAnchor(gv_tIMERWINDOW, c_anchorTopRight, -50, -50);
+    // The countdown is drawn by gf_PlayerBarsInfoUpdate (one line below the XP bar).
     TimerStart(gv_sPAWNTIMER, 40.0, true, c_timeReal);
     GameTimeOfDaySetLength(60.0);
     FogSetStartHeight(32.0);
     FogSetColor(Color(18.04, 18.43, 5.88));
     FogSetDensity(0.0002);
-    GameSetBackground(c_backgroundFixed, "AiurSkybox", 100.0);
+    gf_SkyInit();
     GameTimeOfDaySet("00");
+    // Operator 2026-11-16: fog of war removed (mask and fog off).
     VisEnable(c_visTypeMask, false);
     VisEnable(c_visTypeFog, false);
     return true;

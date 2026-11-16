@@ -8,10 +8,19 @@ fixed[1] gv_crushY;
 fixed[1] gv_crushZ;
 int[1] gv_crushKind;
 fixed[1] gv_crushS;
+int[1] gv_crushId;
 bool[1] gv_crushGone;
 int[1024] gv_crushStart;
 int[1024] gv_crushLen;
 string[15] gv_crushKindName;
+const int c_WATER_SPANS = 0;
+const int c_WATER_ROWS = 256;
+int[256] gv_waterRowFirst;
+int[256] gv_waterRowCount;
+int[1] gv_waterX0;
+int[1] gv_waterX1;
+fixed[1] gv_waterZ;
+fixed[1] gv_waterD;
 
 void gf_CrushLoad () {
     gv_crushKindName[0] = "ZerusCliffVines";

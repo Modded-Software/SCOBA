@@ -331,6 +331,12 @@
     <CActorModel id="ToshSCOBA">
         <AnimBlendTime value="0.000000"/>
     </CActorModel>
+    <!-- Aim shot miss in water: a small splash on the surface (quake.galaxy
+         gf_WaterSplashAt; operator 2026-11-16). One-shot: removes itself. -->
+    <CActorModel id="ScobaShotSplash" parent="ModelAnimationStyleOneShot">
+        <Model value="WaterSplashLarge"/>
+        <Scale value="0.600000"/>
+    </CActorModel>
     <!-- The Tosh shot that ends in the air: the launch of ToshAttack, no hit. -->
     <CActorAction id="SCOBAToshAirAttack" parent="GenericAttack" effectAttack="SCOBAToshAirU">
         <LaunchAssets Model="ToshAttackLaunch" Sound="Tosh_AttackLaunch"/>
@@ -477,6 +483,8 @@
     </CActorUnit>
     <CActorUnit id="Goliath">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
+        <!-- Footfall effects (dust/splash, thump, idle ripples): generated
+             into the built map by scripts/footfall_fx.py. -->
     </CActorUnit>
     <CActorUnit id="InfestedAbomination">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>

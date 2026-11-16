@@ -1,0 +1,66 @@
+// Operator view (profiles/dissolveview.py): the doodad placed in front of
+// Tosh gets the physics message through ActorFromDoodad. On-screen messages
+// mark each step; the raw actor state per second goes to SCOBADISSOLVE.
+
+const int c_DV_DOODAD = 1999000001;
+const int c_DV_SAMPLES = 20;
+trigger gt_DissolveView;
+
+void gf_DvSay (string lp_s) {
+    UIDisplayMessage(PlayerGroupAll(), c_messageAreaSubtitle, StringToText(lp_s));
+}
+
+bool gt_DissolveView_Func (bool testConds, bool runActions) {
+    bank lv_b;
+    actor lv_a;
+    actor lv_again;
+    actor lv_copy;
+    point lv_at;
+    int lv_i;
+    string lv_k;
+
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    lv_b = BankLoad("SCOBADISSOLVE", 1);
+    lv_a = ActorFromDoodad(DoodadFromId(c_DV_DOODAD));
+    BankValueSetFromFlag(lv_b, "dv", "found", (lv_a != null));
+    // Mark the doodad spot (placed by dissolveview.py) and log Tosh's spot.
+    PingCreate(PlayerGroupAll(), "PingSimple", Point(c_DV_X, c_DV_Y), Color(0.0, 100.0, 0.0), 30.0);
+    BankValueSetFromFixed(lv_b, "dv", "toshX", PointGetX(UnitGetPosition(gv_heroTosh)));
+    BankValueSetFromFixed(lv_b, "dv", "toshY", PointGetY(UnitGetPosition(gv_heroTosh)));
+    BankValueSetFromFixed(lv_b, "dv", "toshFacing", UnitGetFacing(gv_heroTosh));
+    BankSave(lv_b);
+    gf_DvSay("Doodad at " + FixedToString(c_DV_X, 1) + "," + FixedToString(c_DV_Y, 1) + " (green ping). Tosh at " + FixedToString(PointGetX(UnitGetPosition(gv_heroTosh)), 1) + "," + FixedToString(PointGetY(UnitGetPosition(gv_heroTosh)), 1) + ". Found actor: " + IntToString(BoolToInt(lv_a != null)) + ". Physics message in 20 s.");
+    // Runtime copy at the live hero: 4 cells along its current facing.
+    lv_at = PointWithOffsetPolar(UnitGetPosition(gv_tPSUNIT[1]), 4.0, UnitGetFacing(gv_tPSUNIT[1]));
+    libNtve_gf_CreateModelAtPoint("ZerusPlantClusterLarge", lv_at);
+    lv_copy = libNtve_gf_ActorLastCreated();
+    ActorSend(lv_copy, libNtve_gf_SetScale(1.5, 1.5, 1.5, 0.0));
+    PingCreate(PlayerGroupAll(), "PingSimple", lv_at, Color(100.0, 100.0, 0.0), 30.0);
+    BankValueSetFromFlag(lv_b, "dv", "copyFound", (lv_copy != null));
+    gf_DvSay("Copy plant 4 cells in front of the hero (yellow ping). Fade to 0 over 2 s for both in 15 s.");
+    Wait(15.0, c_timeGame);
+    ActorSend(lv_a, libNtve_gf_SetOpacity(0.0, 2.0));
+    ActorSend(lv_copy, libNtve_gf_SetOpacity(0.0, 2.0));
+    gf_DvSay("Fade sent (opacity 0 over 2 s). Watch both plants.");
+    for (lv_i = 1; lv_i <= c_DV_SAMPLES; lv_i += 1) {
+        Wait(1.0, c_timeGame);
+        lv_k = "t" + IntToString(lv_i);
+        lv_again = ActorFromDoodad(DoodadFromId(c_DV_DOODAD));
+        BankValueSetFromFlag(lv_b, "dv", lv_k + "Handle", (lv_a != null));
+        BankValueSetFromFlag(lv_b, "dv", lv_k + "Self", (ActorRefGet(lv_a, "::Self") != null));
+        BankValueSetFromFlag(lv_b, "dv", lv_k + "Lookup", (lv_again != null));
+        gf_DvSay("t=" + IntToString(lv_i) + " s  self=" + IntToString(BoolToInt(ActorRefGet(lv_a, "::Self") != null)) + " lookup=" + IntToString(BoolToInt(lv_again != null)));
+    }
+    BankValueSetFromInt(lv_b, "dv", "done", 1);
+    BankSave(lv_b);
+    gf_DvSay("Dissolve probe done.");
+    return true;
+}
+
+void gt_DissolveView_Init () {
+    gt_DissolveView = TriggerCreate("gt_DissolveView_Func");
+    TriggerAddEventMapInit(gt_DissolveView);
+}

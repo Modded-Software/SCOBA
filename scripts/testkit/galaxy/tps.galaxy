@@ -261,6 +261,8 @@ void gf_DbgTpsShotWalk (string lp_section) {
     gf_DbgTpsSet(false);
 }
 
+void gf_DbgTpsHold (string lp_section);  // tpshold.galaxy
+
 // A stop order right after the click cannot cancel the shot: the shot holds
 // no order. The next click after the cooldown fires again.
 void gf_DbgTpsShotStop (string lp_section) {
@@ -470,6 +472,9 @@ bool gt_TpsTest_Func (bool testConds, bool runActions) {
         gf_DbgTpsShot("tps_shot_noaim", c_DBG_SHOT_NO_AIM, false, 5.0);
         gf_DbgTpsShotWalk("tps_shot_walk");
         gf_DbgTpsShotStop("tps_shot_stop");
+    }
+    if (gf_DbgGroup("hold")) {
+        gf_DbgTpsHold("tps_hold");
     }
     if (gf_DbgGroup("kerrigan")) {
         gf_DbgTpsShot("tps_kerr_enemy", c_DBG_SHOT_ENEMY, true, 12.0);

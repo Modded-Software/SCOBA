@@ -254,6 +254,12 @@ void gf_TpsShotFired (int lp_player, unit lp_target) {
     if (lv_kind == c_TPS_SHOT_OUT_OF_RANGE) {
         gv_aimOutOfRange[lp_player] += 1;
     }
+    // A missed shot that ends over water splashes on the surface there
+    // (operator 2026-11-16). The proxy height is not used: it comes from
+    // WorldHeight, which reads 0 in this map (waterprobe 20261116-124538).
+    if ((lp_target == gv_tpsProxy[lp_player]) && UnitIsValid(lp_target)) {
+        gf_WaterSplashAt(UnitGetPosition(lp_target));
+    }
     gf_UiFloaterShow(lp_player, lv_kind);
     gf_TpsShotClear(lp_player);
 }
@@ -328,6 +334,24 @@ void gf_AimShotPress (int lp_player) {
     gv_tpsShotEffect[lp_player] = lv_effect;
     UnitCreateEffectUnit(lv_hero, lv_effect, lv_target);
     UnitAddCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN, StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, lv_weapon, "Cost.Cooldown.TimeUse", lp_player)));
+}
+
+// Held left button while aiming: chain fire (operator 2026-11-16). Each
+// tick fires the next aim shot once the cooldown is over and the last shot
+// has resolved; gf_AimShotPress keeps the same gates. Release stops it.
+int gv_aimHoldShots;  // chained shots after the press shot, for tests
+
+void gf_AimShotHold (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    if (!gv_tpsPressed[lp_player] || !gv_aIMACTIVE[lp_player] || gv_mOUSEMIDDLE[lp_player]) {
+        return;
+    }
+    if (!UnitIsValid(lv_hero) || (UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) > 0.0) || (gv_tpsShotKind[lp_player] != c_TPS_SHOT_NONE)) {
+        return;
+    }
+    gv_aimHoldShots += 1;
+    gf_AimShotPress(lp_player);
 }
 
 bool gt_AimShootingInit_Func (bool testConds, bool runActions) {

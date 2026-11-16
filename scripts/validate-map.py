@@ -19,8 +19,8 @@ from hdtex.check import check_hd_textures
 from flora.build import check_flora
 from flora.config import MARKER as FLORA_MARKER
 from footprints.build import check_scaled_footprints
-from validate_aim_shot import check_aim_shot_data, check_aim_shot_script
-from validate_assets import check_control_icons, check_stamp
+from validate_aim_shot import TOSH_CLOCK, check_aim_shot_data, check_aim_shot_script
+from validate_assets import check_control_icons, check_footfall_fx, check_skybox_flip, check_stamp
 from validate_slow_deaths import check_slow_deaths
 from validate_tps_overlay import check_tps_overlay
 
@@ -182,22 +182,7 @@ def check_catalogs(map_dir: Path) -> None:
         if button not in buttons:
             fail(f"missing button: {button}")
 
-    button_tree = ET.parse(gamedata / "ButtonData.xml")
-    button_icons = {
-        'SCOBAControlPNC': r'Assets\Textures\SCOBAModePNC.dds',
-        'SCOBAControlTPS': r'Assets\Textures\SCOBAModeTPS.dds',
-    }
-    for button_id, icon_path in button_icons.items():
-        button = None
-        for candidate in button_tree.getroot().iter("CButton"):
-            if candidate.get("id") == button_id:
-                button = candidate
-                break
-        if button is None:
-            fail(f"missing button: {button_id}")
-        icon = button.find("Icon")
-        if icon is None or icon.get("value") != icon_path:
-            fail(f"{button_id} has wrong control icon")
+    # Control mode icons: checked by validate_assets.check_control_icons.
 
     behavior_tree = ET.parse(gamedata / "BehaviorData.xml")
     stand_root = None
@@ -264,6 +249,10 @@ def check_catalogs(map_dir: Path) -> None:
             fail(f"card layout face for {button.get('AbilCmd')} must be {want}")
     if seen < len(faces) * 2:
         fail("card layout missing toggle buttons")
+    # The control mode toggle is a HUD button next to the minimap, not a card button.
+    for button in unit_tree.getroot().iter("LayoutButtons"):
+        if button.get("AbilCmd", "").startswith("SCOBATPSToggle,"):
+            fail("SCOBATPSToggle must not be on the command card")
 
     weapon_tree = ET.parse(gamedata / "WeaponData.xml")
     behavior_text = (gamedata / "BehaviorData.xml").read_text(encoding="utf-8")
@@ -306,7 +295,7 @@ def check_catalogs(map_dir: Path) -> None:
     # Cooldown clock: every hero weapon shot sets the Weapon Attack button
     # cooldown to the weapon period, in data.
     effects = ET.parse(gamedata / "EffectData.xml").getroot()
-    for effect_id, period in (("SCOBAAttackCooldown10", "1"), ("SCOBAAttackCooldown15", "1.5")):
+    for effect_id, period in (("SCOBAAttackCooldown10", "1"), ("SCOBAAttackCooldown15", "1.5"), TOSH_CLOCK):
         cost = effects.find(f"CEffectModifyUnit[@id='{effect_id}']/Cost")
         if cost is None:
             fail(f"missing cooldown effect: {effect_id}")
@@ -318,8 +307,11 @@ def check_catalogs(map_dir: Path) -> None:
     if tosh_effect is None or tosh_effect.get("value") != "SCOBAToshShot":
         fail("Tosh weapon must fire SCOBAToshShot")
     tosh_set = [e.get("value") for e in effects.findall("CEffectSet[@id='SCOBAToshShot']/EffectArray")]
-    if tosh_set != ["ToshU", "SCOBAAttackCooldown10"]:
-        fail("SCOBAToshShot must run ToshU and SCOBAAttackCooldown10")
+    if tosh_set != ["ToshU", TOSH_CLOCK[0]]:
+        fail(f"SCOBAToshShot must run ToshU and {TOSH_CLOCK[0]}")
+    tosh_time = weapon_tree.getroot().find("CWeaponLegacy[@id='Tosh']/Cost/Cooldown")
+    if tosh_time is None or tosh_time.get("TimeUse") != TOSH_CLOCK[1]:
+        fail(f"Tosh weapon cooldown must be {TOSH_CLOCK[1]}, as its button clock")
     talons = effects.find("CEffectCreatePersistent[@id='RazorTalonsPersistent']/InitialEffect")
     if talons is None or talons.get("value") != "SCOBAAttackCooldown15":
         fail("RazorTalonsPersistent must start SCOBAAttackCooldown15")
@@ -491,6 +483,8 @@ def main() -> int:
     check_dimensions(map_dir)
     check_catalogs(map_dir)
     check_control_icons(map_dir)
+    check_skybox_flip(map_dir)
+    check_footfall_fx(map_dir)
     check_animation_names(map_dir)
     check_animation_actors(map_dir)
     check_slow_deaths(map_dir)

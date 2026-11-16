@@ -1,12 +1,34 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <Desc>
+    <!-- Thin frame around the minimap: the HUD bar border texture.
+         Operator 2026-11-16: as a child of the batched MinimapPanel it drew
+         its dark centre over the map. It is a sibling of the panel now, with
+         a lower render priority, so the opaque map hides the centre and only
+         the 6 px edge outside the map shows. -->
+    <Frame type="Frame" name="GameUI/UIContainer/ConsoleUIContainer" file="GameUI">
+        <Frame type="Image" name="ScobaMinimapBorder">
+            <Anchor side="Top" relative="$parent/MinimapPanel" pos="Min" offset="-6"/>
+            <Anchor side="Left" relative="$parent/MinimapPanel" pos="Min" offset="-6"/>
+            <Anchor side="Bottom" relative="$parent/MinimapPanel" pos="Max" offset="6"/>
+            <Anchor side="Right" relative="$parent/MinimapPanel" pos="Max" offset="6"/>
+            <Texture val="@@UI/TriggerDialogFrameBackground" layer="0"/>
+            <TextureType val="Border" layer="0"/>
+            <Tiled val="true" layer="0"/>
+            <RenderPriority val="400"/>
+            <AcceptsMouse val="false"/>
+        </Frame>
+    </Frame>
+
+    <!-- Bottom left, 12 from the edges. The script places three buttons to
+         its right (ui/hud_buttons: c_HUD_MAP_* must match these numbers). -->
     <Frame type="MinimapPanel" name="GameUI/UIContainer/ConsoleUIContainer/MinimapPanel" file="GameUI">
-        <Anchor side="Top" relative="$parent" pos="Min" offset="8"/>
-        <Anchor side="Left" relative="$parent" pos="Min" offset="8"/>
-        <Anchor side="Bottom" relative="$parent" pos="Min" offset="308"/>
-        <Anchor side="Right" relative="$parent" pos="Min" offset="308"/>
+        <Anchor side="Top" relative="$parent" pos="Max" offset="-312"/>
+        <Anchor side="Left" relative="$parent" pos="Min" offset="12"/>
+        <Anchor side="Bottom" relative="$parent" pos="Max" offset="-12"/>
+        <Anchor side="Right" relative="$parent" pos="Min" offset="312"/>
         <Width val="300"/>
         <Height val="300"/>
+        <RenderPriority val="512"/>
 
         <Frame type="Minimap" name="Minimap">
             <Anchor side="Top" relative="$parent" pos="Min" offset="0"/>

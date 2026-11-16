@@ -33,6 +33,7 @@ void gf_CtWalk (string lp_section, string lp_key, unit lp_u, int lp_i) {
 
 void gf_CtEnd (string lp_section, unit lp_u) {
     BankValueSetFromInt(gv_dbgBank, lp_section, "removed", gv_crushRemoved);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "faded", gv_crushFaded);
     UnitRemove(lp_u);
     BankSave(gv_dbgBank);
 }
