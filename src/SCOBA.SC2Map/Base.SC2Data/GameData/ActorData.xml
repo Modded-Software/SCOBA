@@ -177,7 +177,7 @@
         <Scale value="1.250000"/>
     </CActorUnit>
     <CActorUnit id="MengskBC">
-        <Scale value="52.000000"/>
+        <Scale value="72.000000"/>
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.250000"/>
         <!-- Death speed lives in the model: a unit-actor time scale never reaches the death model. -->
         <DeathArray index="Normal" ModelLink="BattlecruiserLokiDeathSlow" SoundLink=""/>

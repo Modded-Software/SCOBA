@@ -21,8 +21,8 @@ FLAT_SLOPE = 0.45
 RELIEF = 4.0
 RELIEF_RADIUS = 3
 # Water: depth bands below the water surface (map WaterData height).
-GROUND_LIFT = 3.0  # placed z = computed ground + this (probe row F +1, then operator +2)
-DOODAD_LIFT = 2.0  # non-flora absolute doodads are raised by this (operator, 2026-11-15)
+GROUND_LIFT = 2.85  # placed z = computed ground + this (operator 2026-11-16)
+DOODAD_LIFT = 1.85  # non-flora absolute doodads are raised by this (operator 2026-11-16)
 SHORE_BAND = 3.0  # dry cells this close to water are shore
 BRAMBLE_FOREST = 2  # ZerusBrambles need this many trees within CLUSTER_RADIUS
 BRAMBLE_WATER_CLEAR = 4.0  # and stay this far from water

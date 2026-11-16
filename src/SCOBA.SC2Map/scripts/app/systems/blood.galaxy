@@ -1,0 +1,142 @@
+// Module: systems/blood
+// Blood feedback (REQ-BLOOD-FX). Each time a biological unit takes damage,
+// a spurt model plays at the unit and splat models land on the ground
+// around it. All players see it. Size and splat count grow with damage.
+// Models are destroyed after their life. Counters are read by the blood test.
+
+// Stock models. The operator picks the final look (operator check).
+const string c_BLOOD_SPURT = "ZergBuildingBloodTinyHeavy";
+const string c_BLOOD_SPLAT = "ZergBuildingBloodHeavy";
+const fixed c_BLOOD_SCALE_LO = 0.6;  // scale at 0 damage
+const fixed c_BLOOD_SCALE_HI = 1.6;  // scale at c_BLOOD_DAMAGE_FULL and up
+const fixed c_BLOOD_DAMAGE_FULL = 100.0;
+const int c_BLOOD_SPLATS_MAX = 3;  // ground splats at full damage; 1 at 0
+const fixed c_BLOOD_SPLAT_REACH = 0.8;  // splats land this far from the unit
+const fixed c_BLOOD_COOLDOWN = 0.15;  // per unit, against fast-weapon spam
+const fixed c_BLOOD_SPURT_LIFE = 3.0;
+const fixed c_BLOOD_SPLAT_LIFE = 8.0;
+const fixed c_BLOOD_SWEEP = 0.5;
+const int c_BLOOD_RING = 256;
+const int c_BLOOD_CD_SLOTS = 64;
+
+trigger gt_BloodDamaged;
+trigger gt_BloodSweep;
+int gv_bloodSpurts;  // spurt events played
+int gv_bloodSplats;  // ground splats played
+int gv_bloodSkipCooldown;  // events dropped by the per-unit cooldown
+fixed gv_bloodLastScale;
+int gv_bloodLastSplats;
+actor[c_BLOOD_RING] gv_bloodActor;
+fixed[c_BLOOD_RING] gv_bloodEnd;
+int gv_bloodNext;
+unit[c_BLOOD_CD_SLOTS] gv_bloodCdUnit;
+fixed[c_BLOOD_CD_SLOTS] gv_bloodCdAt;
+int gv_bloodCdNext;
+
+// 0 at no damage, 1 at c_BLOOD_DAMAGE_FULL and up.
+fixed gf_BloodShare (fixed lp_damage) {
+    return MinF(MaxF(lp_damage, 0.0) / c_BLOOD_DAMAGE_FULL, 1.0);
+}
+
+fixed gf_BloodScale (fixed lp_damage) {
+    return c_BLOOD_SCALE_LO + gf_BloodShare(lp_damage) * (c_BLOOD_SCALE_HI - c_BLOOD_SCALE_LO);
+}
+
+int gf_BloodSplatCount (fixed lp_damage) {
+    return 1 + FixedToInt(Round(gf_BloodShare(lp_damage) * IntToFixed(c_BLOOD_SPLATS_MAX - 1)));
+}
+
+// True when lp_u bled less than c_BLOOD_COOLDOWN ago. Otherwise stamps now.
+bool gf_BloodOnCooldown (unit lp_u) {
+    int lv_i;
+    fixed lv_now = GameGetMissionTime();
+
+    for (lv_i = 0; lv_i < c_BLOOD_CD_SLOTS; lv_i += 1) {
+        if (gv_bloodCdUnit[lv_i] == lp_u) {
+            if (lv_now - gv_bloodCdAt[lv_i] < c_BLOOD_COOLDOWN) {
+                return true;
+            }
+            gv_bloodCdAt[lv_i] = lv_now;
+            return false;
+        }
+    }
+    gv_bloodCdUnit[gv_bloodCdNext] = lp_u;
+    gv_bloodCdAt[gv_bloodCdNext] = lv_now;
+    gv_bloodCdNext = ModI(gv_bloodCdNext + 1, c_BLOOD_CD_SLOTS);
+    return false;
+}
+
+void gf_BloodFx (string lp_model, point lp_at, fixed lp_scale, fixed lp_life) {
+    int lv_slot = gv_bloodNext;
+
+    if (gv_bloodActor[lv_slot] != null) {
+        ActorSend(gv_bloodActor[lv_slot], "Destroy");
+    }
+    libNtve_gf_CreateModelAtPoint(lp_model, lp_at);
+    gv_bloodActor[lv_slot] = libNtve_gf_ActorLastCreated();
+    ActorSend(gv_bloodActor[lv_slot], "AnimPlay Blood Birth NonLooping 0");
+    ActorSend(gv_bloodActor[lv_slot], libNtve_gf_SetScale(lp_scale, lp_scale, lp_scale, 0.0));
+    gv_bloodEnd[lv_slot] = GameGetMissionTime() + lp_life;
+    gv_bloodNext = ModI(lv_slot + 1, c_BLOOD_RING);
+}
+
+// One bleed: a spurt at the unit, then splats on the ground around it.
+void gf_BloodBleed (unit lp_u, fixed lp_damage) {
+    point lv_at = UnitGetPosition(lp_u);
+    fixed lv_scale = gf_BloodScale(lp_damage);
+    int lv_n = gf_BloodSplatCount(lp_damage);
+    int lv_i;
+
+    gf_BloodFx(c_BLOOD_SPURT, lv_at, lv_scale, c_BLOOD_SPURT_LIFE);
+    for (lv_i = 0; lv_i < lv_n; lv_i += 1) {
+        gf_BloodFx(c_BLOOD_SPLAT, PointWithOffsetPolar(lv_at, RandomFixed(0.2, c_BLOOD_SPLAT_REACH), RandomFixed(0.0, 360.0)), lv_scale, c_BLOOD_SPLAT_LIFE);
+    }
+    gv_bloodSpurts += 1;
+    gv_bloodSplats += lv_n;
+    gv_bloodLastScale = lv_scale;
+    gv_bloodLastSplats = lv_n;
+}
+
+bool gt_BloodDamaged_Func (bool testConds, bool runActions) {
+    unit lv_victim = EventUnit();
+    fixed lv_damage = EventUnitDamageAmount();
+
+    if (!runActions) {
+        return true;
+    }
+    if (!UnitIsValid(lv_victim) || lv_damage <= 0.0) {
+        return true;
+    }
+    if (!UnitTypeTestAttribute(UnitGetType(lv_victim), c_unitAttributeBiological)) {
+        return true;
+    }
+    if (EventUnitDamageSourceUnit() == lv_victim) {
+        return true;
+    }
+    if (gf_BloodOnCooldown(lv_victim)) {
+        gv_bloodSkipCooldown += 1;
+        return true;
+    }
+    gf_BloodBleed(lv_victim, lv_damage);
+    return true;
+}
+
+bool gt_BloodSweep_Func (bool testConds, bool runActions) {
+    int lv_i;
+    fixed lv_now = GameGetMissionTime();
+
+    for (lv_i = 0; lv_i < c_BLOOD_RING; lv_i += 1) {
+        if (gv_bloodActor[lv_i] != null && gv_bloodEnd[lv_i] <= lv_now) {
+            ActorSend(gv_bloodActor[lv_i], "Destroy");
+            gv_bloodActor[lv_i] = null;
+        }
+    }
+    return true;
+}
+
+void gt_Blood_Init () {
+    gt_BloodDamaged = TriggerCreate("gt_BloodDamaged_Func");
+    TriggerAddEventUnitDamaged(gt_BloodDamaged, null, c_unitDamageTypeAny, c_unitDamageEither, null);
+    gt_BloodSweep = TriggerCreate("gt_BloodSweep_Func");
+    TriggerAddEventTimePeriodic(gt_BloodSweep, c_BLOOD_SWEEP, c_timeGame);
+}

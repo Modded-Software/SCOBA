@@ -45,6 +45,23 @@ void gf_CrushDebrisSweep () {
     }
 }
 
+// Stock impact sounds matching the clips: rocks at impact, dirt with the dust.
+string[2] gv_crushRockSound;
+string[3] gv_crushDirtSound;
+const fixed c_CRUSH_SOUND_VOLUME = 100.0;
+
+void gf_CrushSoundsInit () {
+    gv_crushRockSound[0] = "PhysicsImpactRockHeavy";
+    gv_crushRockSound[1] = "PhysicsImpactRockMassive";
+    gv_crushDirtSound[0] = "PhysicsImpactDirtMedium";
+    gv_crushDirtSound[1] = "PhysicsImpactDirtHeavy";
+    gv_crushDirtSound[2] = "PhysicsImpactDirtMassive";
+}
+
+void gf_CrushSound (string lp_sound, point lp_at) {
+    SoundPlayAtPointForPlayer(SoundLink(lp_sound, -1), c_maxPlayers, PlayerGroupAll(), lp_at, 0.0, c_CRUSH_SOUND_VOLUME, 0.0);
+}
+
 // One effect model, played once at lp_at, removed after c_CRUSH_DEBRIS_LIFE.
 void gf_CrushFx (string lp_model, point lp_at, fixed lp_scale) {
     int lv_slot = gv_crushDebrisNext;
@@ -72,6 +89,7 @@ void gf_CrushPlant (int lp_i) {
     libNtve_gf_RemoveDoodadsinRegion(RegionCircle(lv_at, c_CRUSH_PICK), gv_crushKindName[gv_crushKind[lp_i]]);
     // Operator: rocks at impact, the two dust clips after a short random delay.
     gf_CrushFx(c_CRUSH_DEBRIS3, lv_at, gv_crushS[lp_i] * RandomFixed(c_CRUSH_JITTER_LO, c_CRUSH_JITTER_HI));
+    gf_CrushSound(gv_crushRockSound[RandomInt(0, 1)], lv_at);
     gf_CrushLater(c_CRUSH_DEBRIS, lv_at, lp_i);
     gf_CrushLater(c_CRUSH_DEBRIS2, lv_at, lp_i);
 }
@@ -100,6 +118,9 @@ bool gt_CrushLate_Func (bool testConds, bool runActions) {
     for (lv_q = 0; lv_q < c_CRUSH_LATE; lv_q += 1) {
         if (gv_crushLateModel[lv_q] != "" && gv_crushLateDue[lv_q] <= lv_now) {
             gf_CrushFx(gv_crushLateModel[lv_q], gv_crushLateAt[lv_q], gv_crushLateScale[lv_q]);
+            if (gv_crushLateModel[lv_q] == c_CRUSH_DEBRIS) {
+                gf_CrushSound(gv_crushDirtSound[RandomInt(0, 2)], gv_crushLateAt[lv_q]);  // one per plant
+            }
             gv_crushLateModel[lv_q] = "";
         }
     }
@@ -154,6 +175,7 @@ bool gt_CrushTick_Func (bool testConds, bool runActions) {
 
 void gt_CrushTick_Init () {
     gf_CrushLoad();
+    gf_CrushSoundsInit();
     gt_CrushTick = TriggerCreate("gt_CrushTick_Func");
     TriggerAddEventTimePeriodic(gt_CrushTick, c_CRUSH_PERIOD, c_timeGame);
     gt_CrushLate = TriggerCreate("gt_CrushLate_Func");

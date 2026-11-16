@@ -19,7 +19,7 @@ PSI_DESTROYER_SCALE = 2.0
 PSI_DESTROYER_UNITS = {"PsiDecimator"}
 PSI_DESTROYER_MARKER = ".psi_destroyer_scaled"
 # Its animations run this many times slower: the unit model and its death model.
-PSI_DESTROYER_ANIM_SLOWDOWN = 2.0
+PSI_DESTROYER_ANIM_SLOWDOWN = 10.0  # operator 2026-11-16: 5x slower than the former 2.0
 PSI_DESTROYER_MODELS = ("PsiDecimator", "PsiDecimatorDeath")
 PSI_DESTROYER_ANIM_MARKER = ".psi_destroyer_slowed"
 # AnimSpeed of a CModel that does not set one.

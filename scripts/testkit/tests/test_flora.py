@@ -253,7 +253,7 @@ class BuildTests(unittest.TestCase):
         plan = Plan([], [Placed("ZerusTarPit", 1.5, 2.5, 0.0, 0, "Zerg", 0, 18.0)], [], [], [])
         xml = objects_xml(plan, 500, terrain)
         self.assertIn('Id="500"', xml)
-        self.assertIn('Position="1.5,2.5,13.0000"', xml)  # flat world ground 10 + GROUND_LIFT 3
+        self.assertIn('Position="1.5,2.5,12.8500"', xml)  # flat world ground 10 + GROUND_LIFT 2.85
         self.assertIn('<Flag Index="HeightAbsolute" Value="1"/>', xml)
         # Negative case: z 0 buried props off low ground (operator probe).
         self.assertNotIn(',0" Rotation', xml)

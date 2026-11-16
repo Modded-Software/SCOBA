@@ -1,0 +1,129 @@
+// Ground shake ("seismic waves") from walking crushers (Goliath, Queen).
+// Every crusher adds a stepped wave to each hero player's camera: height jolt
+// plus a jagged roll. Amplitude grows with the unit's size and current speed
+// and falls off with distance to that player's hero, to 0 at a range that
+// grows with the unit's size. Waves from several units add up; the sum is
+// capped. Written directly with CameraSetValue each tick, without blending,
+// so each step is an abrupt jolt (operator 2026-11-16: not smooth).
+
+const fixed c_QUAKE_PERIOD = 0.0625;          // one game loop: 16 samples/s
+const fixed c_QUAKE_RANGE_PER_RADIUS = 12.0;  // felt range = radius x this
+const fixed c_QUAKE_HEIGHT_PER_RADIUS = 0.04; // peak jolt at the unit, full speed (0.4 far too strong)
+const fixed c_QUAKE_ROLL_PER_HEIGHT = 8.0;    // degrees of roll per unit of jolt
+const fixed c_QUAKE_STEP_HZ = 2.0;            // footfalls per second at full speed
+const fixed c_QUAKE_STEP_DECAY = 0.35;        // jolt left on the next tick (stepped fall-off)
+const fixed c_QUAKE_HEIGHT_MAX = 0.06;
+const fixed c_QUAKE_ROLL_MAX = 0.5;
+const int c_QUAKE_PLAYERS = 8;
+
+trigger gt_QuakeTick;
+bool[c_QUAKE_PLAYERS] gv_quakeOn;  // last tick wrote a shaken camera
+fixed[c_QUAKE_PLAYERS] gv_quakeHeight;  // last offsets
+fixed[c_QUAKE_PLAYERS] gv_quakeRoll;
+
+// Amplitude of one unit at distance lp_d: size lp_radius, speed share lp_move (0-1).
+fixed gf_QuakeAmp (fixed lp_d, fixed lp_radius, fixed lp_move) {
+    fixed lv_range = c_QUAKE_RANGE_PER_RADIUS * lp_radius;
+    fixed lv_fall;
+
+    if ((lp_move <= 0.0) || (lv_range <= 0.0) || (lp_d >= lv_range)) {
+        return 0.0;
+    }
+    lv_fall = 1.0 - lp_d / lv_range;
+    return c_QUAKE_HEIGHT_PER_RADIUS * lp_radius * MinF(lp_move, 1.0) * lv_fall;
+}
+
+// Speed share 0-1: current speed over full speed. Without a full speed, any
+// movement counts as full.
+fixed gf_QuakeMove (unit lp_u) {
+    fixed lv_now = UnitGetPropertyFixed(lp_u, c_unitPropMovementSpeedCurrent, c_unitPropCurrent);
+    fixed lv_max = UnitGetPropertyFixed(lp_u, c_unitPropMovementSpeed, c_unitPropNormal);
+
+    if (lv_now <= 0.0) {
+        return 0.0;
+    }
+    if (lv_max <= 0.0) {
+        return 1.0;
+    }
+    return MinF(1.0, lv_now / lv_max);
+}
+
+// Stepped footfall wave, -1..1: a hard jolt at each footfall that falls off
+// in steps, alternating sign per step, plus a random kick (jagged, not a sine).
+fixed gf_QuakeStep (fixed lp_cycles) {
+    fixed lv_frac = lp_cycles - IntToFixed(FixedToInt(lp_cycles));
+    int lv_tick = FixedToInt(lv_frac / (c_QUAKE_PERIOD * c_QUAKE_STEP_HZ));
+    fixed lv_level = 1.0;
+    int lv_k;
+
+    for (lv_k = 0; lv_k < lv_tick; lv_k += 1) {
+        lv_level *= -c_QUAKE_STEP_DECAY;
+    }
+    return lv_level * RandomFixed(0.7, 1.0);
+}
+
+// Adds the waves of every live lp_type unit near lp_at into gv_quakeHeight/Roll[lp_p].
+void gf_QuakeAdd (int lp_p, string lp_type, point lp_at, fixed lp_t) {
+    unitgroup lv_g = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+    int lv_n = UnitGroupCount(lv_g, c_unitCountAll);
+    int lv_i;
+    unit lv_u;
+    fixed lv_move;
+    fixed lv_amp;
+    fixed lv_cycles;
+
+    for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
+        lv_u = UnitGroupUnit(lv_g, lv_i);
+        if (!UnitIsAlive(lv_u)) {
+            continue;
+        }
+        lv_move = gf_QuakeMove(lv_u);
+        lv_amp = gf_QuakeAmp(DistanceBetweenPoints(lp_at, UnitGetPosition(lv_u)), UnitGetPropertyFixed(lv_u, c_unitPropRadius, c_unitPropCurrent), lv_move);
+        if (lv_amp <= 0.0) {
+            continue;
+        }
+        // Own phase per unit (from its tag), so units do not step in sync.
+        lv_cycles = lp_t * c_QUAKE_STEP_HZ * lv_move + IntToFixed(ModI(UnitGetTag(lv_u), 100)) / 100.0;
+        gv_quakeHeight[lp_p] += lv_amp * gf_QuakeStep(lv_cycles);
+        gv_quakeRoll[lp_p] += c_QUAKE_ROLL_PER_HEIGHT * lv_amp * gf_QuakeStep(lv_cycles + 0.5) * RandomFixed(-1.0, 1.0);
+    }
+}
+
+bool gt_QuakeTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+    fixed lv_t = GameGetMissionTime();
+    point lv_at;
+    bool lv_shake;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = 1; lv_p < c_QUAKE_PLAYERS; lv_p += 1) {
+        // Players with a hero only; no player-type gate (it skipped the operator's slot).
+        if ((PlayerStatus(lv_p) != c_playerStatusActive) || (gv_tPSUNIT[lv_p] == null)) {
+            continue;
+        }
+        // CameraGetTarget is not the TPS camera (read 108+ next to a Goliath); the hero is.
+        lv_at = UnitGetPosition(gv_tPSUNIT[lv_p]);
+        gv_quakeHeight[lv_p] = 0.0;
+        gv_quakeRoll[lv_p] = 0.0;
+        gf_QuakeAdd(lv_p, "Goliath", lv_at, lv_t);
+        gf_QuakeAdd(lv_p, "Queen", lv_at, lv_t);
+        gv_quakeHeight[lv_p] = MaxF(-c_QUAKE_HEIGHT_MAX, MinF(c_QUAKE_HEIGHT_MAX, gv_quakeHeight[lv_p]));
+        gv_quakeRoll[lv_p] = MaxF(-c_QUAKE_ROLL_MAX, MinF(c_QUAKE_ROLL_MAX, gv_quakeRoll[lv_p]));
+        lv_shake = (gv_quakeHeight[lv_p] != 0.0) || (gv_quakeRoll[lv_p] != 0.0);
+        if (lv_shake || gv_quakeOn[lv_p]) {
+            // Height base is the TPS constant; roll base is 0 (nothing else writes it).
+            // Duration 0: jump to the value, no blend.
+            CameraSetValue(lv_p, c_cameraValueHeightOffset, c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight[lv_p], 0.0, -1, 10);
+            CameraSetValue(lv_p, c_cameraValueRoll, gv_quakeRoll[lv_p], 0.0, -1, 10);
+        }
+        gv_quakeOn[lv_p] = lv_shake;
+    }
+    return true;
+}
+
+void gt_QuakeTick_Init () {
+    gt_QuakeTick = TriggerCreate("gt_QuakeTick_Func");
+    TriggerAddEventTimePeriodic(gt_QuakeTick, c_QUAKE_PERIOD, c_timeGame);
+}

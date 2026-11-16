@@ -16,6 +16,7 @@ include "scripts/app/data/flora_crush"
 include "scripts/app/systems/crush"
 include "scripts/app/data/lane_gates"
 include "scripts/app/systems/lanegates"
+include "scripts/app/systems/quake"
 include "scripts/app/systems/aim"
 include "scripts/app/systems/aim_shooting"
 include "scripts/app/systems/camera"
@@ -34,6 +35,7 @@ include "scripts/app/systems/combat_fsm"
 include "scripts/app/systems/combat_tick"
 include "scripts/app/systems/companion"
 include "scripts/app/systems/damage_floaters"
+include "scripts/app/systems/blood"
 include "scripts/app/systems/energy_bar"
 include "scripts/app/systems/gui_environment"
 include "scripts/app/systems/input"
@@ -141,7 +143,9 @@ void main () {
     gt_DeathAward_Init();
     gt_DamageCleanup_Init();
     gt_DamageFloater_Init();
+    gt_Blood_Init();
     gt_UiFloaterTick_Init();
     gt_CrushTick_Init();
     gf_GateLoad();
+    gt_QuakeTick_Init();
 }

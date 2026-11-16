@@ -35,3 +35,19 @@ Implements REQ-FLORA-CRUSH.
 - `crushtest` profile: Marine walks 3 plants (none removed), Goliath and Queen
   3 each (all removed).
 - `fxgallery`: operator gallery of candidate clips, not pass/fail.
+
+## Sounds
+
+- Rock clip: random `PhysicsImpactRockHeavy` / `PhysicsImpactRockMassive`.
+- First dust clip: random `PhysicsImpactDirtMedium` / `Heavy` / `Massive`.
+- `SoundPlayAtPointForPlayer`, all players, at the plant.
+
+## Ground shake (`scripts/app/systems/quake.galaxy`)
+
+- Every 1/16 s per hero player: each live Goliath/Queen adds
+  amp = 0.04 x radius x speed share x (1 - d / (12 x radius)); d from the hero.
+- Stepped wave: a jolt per footfall (2 Hz at full speed), then x(-0.35) per
+  tick, random 0.7-1.0 per step; roll random sign.
+- Sum capped: height +-0.06, roll +-0.5 deg. Written with `CameraSetValue`,
+  no blend (height = 0.9 base + sum, roll = sum).
+- `CameraGetTarget` is not the TPS camera position; the hero is used.

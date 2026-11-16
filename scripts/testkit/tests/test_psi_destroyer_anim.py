@@ -121,8 +121,8 @@ class SlowPsiDestroyerTest(unittest.TestCase):
         self.models.parent.mkdir(parents=True)
         self.models.write_text(MODELS, encoding="utf-8")
 
-    def test_slowdown_is_two_for_unit_and_death_models(self) -> None:
-        self.assertEqual(PSI_DESTROYER_ANIM_SLOWDOWN, 2.0)
+    def test_slowdown_is_ten_for_unit_and_death_models(self) -> None:
+        self.assertEqual(PSI_DESTROYER_ANIM_SLOWDOWN, 10.0)
         self.assertEqual(PSI_DESTROYER_MODELS, ("PsiDecimator", "PsiDecimatorDeath"))
 
     def test_models_are_slowed_and_marked(self) -> None:

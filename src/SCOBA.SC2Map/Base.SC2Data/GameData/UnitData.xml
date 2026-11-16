@@ -401,7 +401,7 @@
         <LifeMax value="100000"/>
         <StationaryTurningRate value="2.9882"/>
         <TurningRate value="5.9765"/>
-        <Height value="180"/>
+        <Height value="256"/>
         <DefaultAcquireLevel value="Passive"/>
         <Response value="Nothing"/>
     </CUnit>
