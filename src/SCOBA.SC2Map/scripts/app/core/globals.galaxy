@@ -162,6 +162,7 @@ string[c_ANIM_HERO_COUNT][c_ANIM_LOWER_COUNT][c_ANIM_DIR_COUNT] gv_animAimClip;
 fixed[8] gv_cAMERAFOV;
 fixed[8] gv_cameraDistanceDesired;
 fixed[8] gv_cameraDistanceApplied;
+fixed[8] gv_cameraHeightApplied;  // last height offset written by gf_CameraHeightApply
 fixed[8] gv_cameraAimSavedDistance;
 bool[8] gv_cameraCollisionOff;
 fixed[8] gv_aimDbgMaxStep;
@@ -277,7 +278,6 @@ trigger gt_CameraDebug;
 trigger gt_CameraDebugMove;
 trigger gt_RefreshEnergyBar;
 trigger gt_PlayerBars;
-trigger gt_Jump;
 trigger gt_DisableClickMove;
 trigger gt_ForwardStart;
 trigger gt_ForwardEnd;

@@ -267,9 +267,11 @@ not repeated here.
 - Random start (R-TPS-78). UI texts: the text panel's lower edge is 40 px
   above the screen center (layout anchor), so no text covers the crosshair
   (R-TPS-73). Each text starts up to `c_UI_FLOATER_JITTER_X` (80)
-  left or right and up to `c_UI_FLOATER_JITTER_Y` (30) higher, then rises.
+  left or right and up to `c_UI_FLOATER_JITTER_Y` (30) higher, then rises
+  `c_UI_FLOATER_RISE` (240 px) over its life.
   World floaters: `gf_FloaterCreate` moves the start point up to
-  `c_FLOATER_JITTER` (0.5) in x and y. [built]. That a positive label offset
+  `c_FLOATER_JITTER` (0.5) in x and y, then rises at 0.70 per second.
+  [built]. That a positive label offset
   from the bottom anchor is upward is not measured.
 - Assumption for O-TPS-3: the damage floater stays at the enemy.
 

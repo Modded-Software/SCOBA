@@ -604,6 +604,15 @@
             <ModifyFlags index="SuppressTurning" value="1"/>
         </Modification>
     </CBehaviorBuff>
+    <!-- Walk jump takeoff (R-JUMP-22): a very short burst of speed at the
+         push-off. Added by gf_JumpPress; it ends on its own. -->
+    <CBehaviorBuff id="SCOBAJumpBurst">
+        <InfoFlags index="Hidden" value="1"/>
+        <BehaviorCategories index="Temporary" value="1"/>
+        <EditorCategories value="AbilityorEffectType:Units"/>
+        <Duration value="0.2"/>
+        <Modification MoveSpeedMultiplier="1.4" AccelerationMultiplier="10" DecelerationMultiplier="10"/>
+    </CBehaviorBuff>
     <!-- TPS friendly fire: on the hero. Its damage to own and allied units is
          zero. Same form as stock ImmuneToFriendlySplash and InfightLowDamage. -->
     <CBehaviorBuff id="SCOBAFriendlyFireBlock">

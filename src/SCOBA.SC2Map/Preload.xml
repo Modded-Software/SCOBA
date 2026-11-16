@@ -82,7 +82,6 @@
 <Actor id="Waterfall"/>
 <Actor id="ZerusTree" Variations="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14"/>
 <Behavior id="CloakField"/>
-<Behavior id="DehakaJump"/>
 <Behavior id="UnitDirectControl"/>
 <Model id="AiurSkybox"/>
 <Terrain id="Zerus"/>

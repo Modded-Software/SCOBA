@@ -96,7 +96,7 @@ bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     TimerStart(gv_sPAWNTIMER, 40.0, true, c_timeReal);
     GameTimeOfDaySetLength(60.0);
     FogSetStartHeight(32.0);
-    FogSetColor(Color(18.04, 18.43, 5.88));
+    FogSetColor(Color(22.0, 13.0, 30.0));
     FogSetDensity(0.0002);
     gf_SkyInit();
     GameTimeOfDaySet("00");

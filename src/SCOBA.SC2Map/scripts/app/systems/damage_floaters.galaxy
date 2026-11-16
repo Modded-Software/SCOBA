@@ -17,7 +17,7 @@ void gf_FloaterCreate (int lp_player, point lp_point, text lp_text, color lp_col
     TextTagCreate(lp_text, lp_size, lv_point, 1.6, true, false, PlayerGroupSingle(lp_player));
     lv_tag = TextTagLastCreated();
     TextTagSetColor(lv_tag, c_textTagColorText, lp_color);
-    TextTagSetVelocity(lv_tag, 0.35, 90.0);
+    TextTagSetVelocity(lv_tag, 0.70, 90.0);  // operator 2026-11-16: twice as far (was 0.35)
     TextTagSetTime(lv_tag, c_textTagTimeDuration, 1.6);
     TextTagSetTime(lv_tag, c_textTagTimeFadeOut, 1.1);
     TextTagShow(lv_tag, PlayerGroupSingle(lp_player), true);

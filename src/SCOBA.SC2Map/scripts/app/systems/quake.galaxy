@@ -409,7 +409,11 @@ bool gt_QuakeTick_Func (bool testConds, bool runActions) {
         if (lv_shake || gv_quakeOn[lv_p]) {
             // Height base is the TPS constant; roll base is 0 (nothing else writes it).
             // Duration 0: jump to the value, no blend.
-            CameraSetValue(lv_p, c_cameraValueHeightOffset, c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight[lv_p], 0.0, -1, 10);
+            // Airborne, the jump step writes base + quake + jump each loop
+            // with its own blend; a snap here would jump ahead of the unit.
+            if (!gf_JumpAirborne(lv_p)) {
+                gf_CameraHeightApply(lv_p, 0.0);
+            }
             CameraSetValue(lv_p, c_cameraValueRoll, gv_quakeRoll[lv_p], 0.0, -1, 10);
         }
         gv_quakeOn[lv_p] = lv_shake;

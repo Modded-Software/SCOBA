@@ -120,7 +120,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             // Operator 2026-11-16: shadow distance 64 (16000 blurred the shadows).
             CameraSetValue(1, c_cameraValueShadowClip, 64.0, 0.0, -1, 10.0);
             CameraSetValue(1, c_cameraValueFarClip, 16000.0, 0.0, -1, 10.0);
-            CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, 65.0, 4.0, -1, 10);
+            CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, c_SCOBA_REST_FOV, 4.0, -1, 10);
             if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Tosh") || (UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "ToshSCOBA"))) {
                 CameraSetValue(lv_localPlayer, c_cameraValueDistance, 1.5, 0.5, -1, 10);
                 gv_cameraDistanceDesired[lv_localPlayer] = 1.5;

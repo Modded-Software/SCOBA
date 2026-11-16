@@ -271,7 +271,8 @@ void gf_AnimFullClear (int lp_player) {
     gv_animFullState[lp_player] = c_ANIM_LOWER_NONE;
     gv_animFullDir[lp_player] = -1;
 }
-// Walk clips play at the rate the engine gives the stock walk.
+// Strafe walk clips play at the rate the engine gives the stock walk, times
+// c_ANIM_STRAFE_RATE.
 fixed gf_AnimWalkScale (unit lp_hero, int lp_state) {
     fixed lv_walk;
 
@@ -282,7 +283,7 @@ fixed gf_AnimWalkScale (unit lp_hero, int lp_state) {
     if (lv_walk <= 0.0) {
         return 1.0;
     }
-    return UnitGetPropertyFixed(lp_hero, c_unitPropMovementSpeed, c_unitPropCurrent) / lv_walk;
+    return c_ANIM_STRAFE_RATE * UnitGetPropertyFixed(lp_hero, c_unitPropMovementSpeed, c_unitPropCurrent) / lv_walk;
 }
 void gf_AnimFullSet (int lp_player, int lp_state) {
     unit lv_hero;
@@ -290,8 +291,13 @@ void gf_AnimFullSet (int lp_player, int lp_state) {
     int lv_profile;
     int lv_dir;
     fixed lv_scale;
+    fixed lv_blend;
     string lv_clip;
 
+    // A jump clip owns the lower bracket until landing recovery ends (REQ-JUMP).
+    if (gf_JumpOwnsLower(lp_player)) {
+        return;
+    }
     if (lp_state == c_ANIM_LOWER_NONE) {
         gf_AnimFullClear(lp_player);
         return;
@@ -316,7 +322,14 @@ void gf_AnimFullSet (int lp_player, int lp_state) {
         gf_AnimFullClear(lp_player);
         return;
     }
-    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, 0.15, 0.15, lv_scale, c_animTimeVariantAsTimeScale));
+    lv_blend = 0.15;
+    if (gv_jumpGaitResume[lp_player]) {
+        // After a landing the walk continues where the End clip stopped: a
+        // short blend, no slide (R-JUMP-22).
+        lv_blend = c_JUMP_RESUME_BLEND;
+    }
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, lv_blend, lv_blend, lv_scale, c_animTimeVariantAsTimeScale));
+    gf_JumpGaitOnLowerPlay(lp_player, lp_state);  // walk phase after a jump (R-JUMP-18)
     gv_animFullState[lp_player] = lp_state;
     gv_animFullDir[lp_player] = lv_dir;
     gv_animFullScale[lp_player] = lv_scale;

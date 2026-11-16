@@ -273,12 +273,16 @@ def _yaw_off(checks, section: str, tag: str) -> float | None:
     return abs((facing - yaw + 180) % 360 - 180)
 
 
+# Strafe and backpedal walk clips vs the stock walk rate (operator 2026-11-16).
+STRAFE_RATE = 1.25
+
+
 def _walk_scale(checks, section: str, tag: str) -> None:
-    """Strafe walk clips play at unit speed / WalkAnimMoveSpeed, as the stock walk does."""
+    """Strafe walk clips play 1.25 times the stock walk rate (unit speed / WalkAnimMoveSpeed)."""
     scale = checks.value(section, tag, "WalkScale1000") or 0
     speed = checks.value(section, tag, "UnitSpeed1000") or 0
     walk = checks.value(section, tag, "WalkAnim1000") or 0
-    want = speed * 1000 / walk if walk else 0
+    want = STRAFE_RATE * speed * 1000 / walk if walk else 0
     ok = walk > 0 and speed > 0 and abs(scale - want) <= 20
     _report(checks, f"{section} {tag} walk clip rate", ok, f"scale={scale} speed={speed} walk={walk} want={want:.0f}")
 

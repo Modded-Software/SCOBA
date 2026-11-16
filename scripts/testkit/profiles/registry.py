@@ -21,6 +21,7 @@ PROFILE_OUTPUTS = {
     "fxgallery": ROOT / "out" / "SCOBA256_fxgallery.SC2Map",
     "waterprobe": ROOT / "out" / "SCOBA256_waterprobe.SC2Map",
     "dissolveview": ROOT / "out" / "SCOBA256_dissolveview.SC2Map",
+    "jump": ROOT / "out" / "SCOBA256_jumptest.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -40,6 +41,7 @@ PROFILE_BANKS = {
     "fxgallery": (),
     "waterprobe": ("SCOBAWATERPROBE",),
     "dissolveview": ("SCOBADISSOLVE",),
+    "jump": ("SCOBAJUMPTEST",),
 }
 
 
@@ -86,4 +88,7 @@ def profile_module(name):
     if name == "waterprobe":
         from . import waterprobe
         return waterprobe
+    if name == "jump":
+        from . import jump
+        return jump
     raise SystemExit(f"unknown test profile: {name}")

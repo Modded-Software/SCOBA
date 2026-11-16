@@ -1,0 +1,493 @@
+// Module: systems/jump
+// Hero jump (REQ-JUMP). The script owns the elevation: every game loop it sets
+// the height of the next loop on the ballistic curve, and the same value on
+// the camera height offset. While jump clips exist for the hero, the jump owns
+// the lower bracket and plays clips baked from the idle or walk clip it
+// replaces, with the knees bent and tucked (R-JUMP-16); gf_AnimFullSet stands
+// aside. The upper bracket is never written here (R-JUMP-13).
+
+void gf_JumpConfigInit () {
+    int lv_profile;
+    int lv_phase;
+
+    for (lv_phase = 0; lv_phase < 8; lv_phase += 1) {
+        gv_jumpStartScale[lv_phase] = 1.0;
+        gv_jumpLandScale[lv_phase] = 1.0;
+    }
+    for (lv_profile = 0; lv_profile < c_ANIM_HERO_COUNT; lv_profile += 1) {
+        for (lv_phase = 0; lv_phase < c_JUMP_PHASES; lv_phase += 1) {
+            gv_jumpClip[lv_profile][lv_phase] = "";
+        }
+    }
+    // Clip name prefixes; the base and ",Leg" are added by gf_JumpClipNow.
+    // Built by scripts/jumpanim/bake.py. Kerrigan has none (O-JUMP-2).
+    gf_JumpConfigClip(c_ANIM_HERO_TOSH, c_JUMP_RISE, "Jump,Start");
+    gf_JumpConfigClip(c_ANIM_HERO_TOSH, c_JUMP_AIR, "Jump");
+    gf_JumpConfigClip(c_ANIM_HERO_TOSH, c_JUMP_LAND, "Jump,End");
+    gv_jumpDirName[c_ANIM_DIR_FORWARD] = "Walk,Forward";
+    gv_jumpDirName[c_ANIM_DIR_FORWARD_LEFT] = "Walk,Forward,Left";
+    gv_jumpDirName[c_ANIM_DIR_LEFT] = "Walk,Left";
+    gv_jumpDirName[c_ANIM_DIR_BACK_LEFT] = "Walk,Back,Left";
+    gv_jumpDirName[c_ANIM_DIR_BACK] = "Walk,Back";
+    gv_jumpDirName[c_ANIM_DIR_BACK_RIGHT] = "Walk,Back,Right";
+    gv_jumpDirName[c_ANIM_DIR_RIGHT] = "Walk,Right";
+    gv_jumpDirName[c_ANIM_DIR_FORWARD_RIGHT] = "Walk,Forward,Right";
+    // Ballistics (R-JUMP-3): peak = g_up * t_up^2 / 2 = g_down * t_down^2 / 2.
+    gv_jumpGravUp = 2.0 * c_JUMP_PEAK / (c_JUMP_TIME_UP * c_JUMP_TIME_UP);
+    gv_jumpGravDown = c_JUMP_FALL_GAIN * gv_jumpGravUp;
+    gv_jumpV0 = gv_jumpGravUp * c_JUMP_TIME_UP;
+    gv_jumpTimeDown = SquareRoot(2.0 * c_JUMP_PEAK / gv_jumpGravDown);
+    gv_jumpAirtime = c_JUMP_CROUCH + c_JUMP_TIME_UP + gv_jumpTimeDown;
+}
+void gf_JumpConfigClip (int lp_profile, int lp_phase, string lp_clip) {
+    gv_jumpClip[lp_profile][lp_phase] = lp_clip;
+}
+// Height above ground at lp_t seconds after the press (R-JUMP-3), with a
+// takeoff crouch of lp_crouch seconds on the ground.
+fixed gf_JumpArcAt (fixed lp_t, fixed lp_crouch) {
+    fixed lv_s = lp_t - lp_crouch;
+    fixed lv_d;
+
+    if (lv_s <= 0.0 || lv_s >= c_JUMP_TIME_UP + gv_jumpTimeDown) {
+        return 0.0;
+    }
+    if (lv_s < c_JUMP_TIME_UP) {
+        return gv_jumpV0 * lv_s - 0.5 * gv_jumpGravUp * lv_s * lv_s;
+    }
+    lv_d = lv_s - c_JUMP_TIME_UP;
+    return MaxF(0.0, c_JUMP_PEAK - 0.5 * gv_jumpGravDown * lv_d * lv_d);
+}
+// The stand jump curve: the full takeoff crouch.
+fixed gf_JumpArc (fixed lp_t) {
+    return gf_JumpArcAt(lp_t, c_JUMP_CROUCH);
+}
+// Takeoff crouch of this jump. A walk jump plays the Start clip at the walk
+// clip rate, so the crouch is that much shorter (R-JUMP-22).
+fixed gf_JumpCrouchOf (int lp_player) {
+    return c_JUMP_CROUCH / gv_jumpStartScale[lp_player];
+}
+// Press to touchdown of this jump.
+fixed gf_JumpAirtimeOf (int lp_player) {
+    return gf_JumpCrouchOf(lp_player) + c_JUMP_TIME_UP + gv_jumpTimeDown;
+}
+bool gf_JumpAirborne (int lp_player) {
+    return gv_jumpPhase[lp_player] == c_JUMP_RISE || gv_jumpPhase[lp_player] == c_JUMP_AIR;
+}
+// Hero travel over the last game loop; the jump tick runs every loop.
+void gf_JumpTrackMove (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+    point lv_at;
+
+    if (!UnitIsValid(lv_hero)) {
+        gv_jumpLastPos[lp_player] = null;
+        gv_jumpStepDist[lp_player] = 0.0;
+        return;
+    }
+    lv_at = UnitGetPosition(lv_hero);
+    gv_jumpStepDist[lp_player] = 0.0;
+    if (gv_jumpLastPos[lp_player] != null) {
+        gv_jumpStepDist[lp_player] = DistanceBetweenPoints(gv_jumpLastPos[lp_player], lv_at);
+    }
+    gv_jumpLastPos[lp_player] = lv_at;
+}
+// True only while the hero is walking now: it moved over the last game loop,
+// and a movement key or a move order drives it. A key held against a wall, a
+// move order left over after the keys are released, or a push is not walking.
+bool gf_JumpWalking (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    if (gv_jumpStepDist[lp_player] <= c_JUMP_WALK_STEP) {
+        return false;
+    }
+    return gf_MovementKeyHeld(lp_player) || (UnitOrderCount(lv_hero) > 0 && UnitOrderHasAbil(lv_hero, "move"));
+}
+// --- Gait phase (R-JUMP-18) ---
+bool gf_JumpHasClips (unit lp_hero) {
+    return UnitIsValid(lp_hero) && gv_jumpClip[gf_AnimHeroProfile(lp_hero)][c_JUMP_RISE] != "";
+}
+bool gf_JumpAimWalkState (int lp_state) {
+    return lp_state == c_ANIM_LOWER_WALK || lp_state == c_ANIM_LOWER_WALK_BACK;
+}
+// Walk clip rate: the engine plays the stock walk at speed /
+// WalkAnimMoveSpeed; an aim or strafe walk clip plays c_ANIM_STRAFE_RATE
+// faster (gf_AnimWalkScale).
+fixed gf_JumpGaitRate (int lp_player, unit lp_hero) {
+    fixed lv_walk = gv_animWalkMoveSpeed[gf_AnimHeroProfile(lp_hero)];
+    fixed lv_rate = 1.0;
+
+    if (lv_walk > 0.0) {
+        lv_rate = UnitGetPropertyFixed(lp_hero, c_unitPropMovementSpeed, c_unitPropCurrent) / lv_walk;
+    }
+    if (gf_JumpAimWalkState(gv_animFullState[lp_player])) {
+        lv_rate = lv_rate * c_ANIM_STRAFE_RATE;
+    }
+    return lv_rate;
+}
+// Every game loop: advance the walk phase the legs are in. Free movement plays
+// the stock walk, which starts when the hero starts to move; aim and strafe
+// walk clips restart in gf_JumpGaitOnLowerPlay.
+void gf_JumpGaitTrack (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+    bool lv_walking;
+    fixed lv_phase;
+
+    if (!gf_JumpHasClips(lv_hero)) {
+        gv_jumpGaitWalking[lp_player] = false;
+        return;
+    }
+    lv_walking = gf_JumpWalking(lp_player);
+    if (lv_walking && !gv_jumpGaitWalking[lp_player] && !gf_JumpAimWalkState(gv_animFullState[lp_player])) {
+        gv_jumpGait[lp_player] = 0.0;
+    }
+    // An aim or strafe walk clip advances from the moment it plays, moving or
+    // not; outside a jump nothing else owns the lower bracket.
+    if (lv_walking || (gf_JumpAimWalkState(gv_animFullState[lp_player]) && gv_jumpPhase[lp_player] == c_JUMP_NONE)) {
+        lv_phase = gv_jumpGait[lp_player] + c_JUMP_TICK * gf_JumpGaitRate(lp_player, lv_hero) / c_JUMP_GAIT_CYCLE;
+        gv_jumpGait[lp_player] = lv_phase - IntToFixed(FixedToInt(lv_phase));
+    }
+    gv_jumpGaitWalking[lp_player] = lv_walking;
+}
+// Walk phase of a stride's flight frame in a walk direction.
+fixed gf_JumpGaitFlight (int lp_dir, int lp_stride) {
+    fixed lv_phase = c_JUMP_GAIT_FLIGHT;
+
+    if (lp_dir == c_ANIM_DIR_BACK_LEFT || lp_dir == c_ANIM_DIR_BACK || lp_dir == c_ANIM_DIR_BACK_RIGHT) {
+        lv_phase = c_JUMP_GAIT_FLIGHT_BACK;
+    }
+    lv_phase = lv_phase + IntToFixed(lp_stride) / IntToFixed(c_JUMP_GAIT_STRIDES);
+    return lv_phase - IntToFixed(FixedToInt(lv_phase));
+}
+// The stride whose Start clip begins nearest the tracked phase: the Start
+// clip begins c_JUMP_GAIT_PUSH before its flight frame.
+int gf_JumpGaitStride (int lp_player, int lp_dir) {
+    fixed lv_x = (gv_jumpGait[lp_player] + c_JUMP_GAIT_PUSH - gf_JumpGaitFlight(lp_dir, 0) + 1.0) * IntToFixed(c_JUMP_GAIT_STRIDES);
+
+    return ModI(FixedToInt(lv_x + 0.5), c_JUMP_GAIT_STRIDES);
+}
+void gf_JumpSetClipTime (int lp_player, unit lp_hero, string lp_tag) {
+    fixed lv_time = gv_jumpGait[lp_player] * c_JUMP_GAIT_CYCLE;
+
+    // Unscaled clip time. libNtve_gf_SetAnimationTime writes the flag as 0/1;
+    // libNtve_gf_AnimSetTime writes "False", which the engine rejects.
+    libNtve_gf_SetAnimationTime(libNtve_gf_MainActorofUnit(lp_hero), c_ANIM_BRACKET_LOWER, lv_time, false);
+    gv_jumpSetTimes[lp_player] += 1;
+    gv_jumpSetTimeLog[lp_player] = gv_jumpSetTimeLog[lp_player] + lp_tag + ":" + IntToString(FixedToInt(lv_time * 1000.0)) + ";";
+}
+// Hook in gf_AnimFullSet after it plays a lower clip. A walk clip after a
+// jump that landed into the aim walk continues the tracked phase; any other
+// walk clip starts the cycle at 0.
+void gf_JumpGaitOnLowerPlay (int lp_player, int lp_state) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    if (gf_JumpAimWalkState(lp_state) && gf_JumpHasClips(lv_hero)) {
+        if (gv_jumpGaitResume[lp_player]) {
+            gf_JumpSetClipTime(lp_player, lv_hero, "R");
+        }
+        else {
+            gv_jumpGait[lp_player] = 0.0;
+        }
+    }
+    gv_jumpGaitResume[lp_player] = false;
+}
+// The clip the jump is built on: walk in the move direction, else idle. A
+// walk jump keeps its stride from takeoff to landing: the legs never swap
+// in the air (R-JUMP-18).
+void gf_JumpPickBase (int lp_player) {
+    int lv_stride = gv_jumpStride[lp_player];
+
+    gv_jumpBase[lp_player] = c_ANIM_LOWER_IDLE;
+    gv_jumpBaseDir[lp_player] = c_ANIM_DIR_FORWARD;
+    gv_jumpStride[lp_player] = -1;
+    if (!gf_JumpWalking(lp_player)) {
+        return;
+    }
+    gv_jumpBase[lp_player] = c_ANIM_LOWER_WALK;
+    // Free movement faces the move; aim and strafe walk in gv_animAimDir.
+    if (gv_aIMACTIVE[lp_player] || gv_holdStrafe[lp_player]) {
+        gv_jumpBaseDir[lp_player] = gv_animAimDir[lp_player];
+    }
+    if (lv_stride < 0) {
+        lv_stride = gf_JumpGaitStride(lp_player, gv_jumpBaseDir[lp_player]);
+    }
+    gv_jumpStride[lp_player] = lv_stride;
+}
+string gf_JumpClipNow (int lp_player) {
+    string lv_prefix;
+    string lv_base = "Stand";
+
+    if (gv_jumpPhase[lp_player] == c_JUMP_NONE || !UnitIsValid(gv_jumpUnit[lp_player])) {
+        return "";
+    }
+    lv_prefix = gv_jumpClip[gf_AnimHeroProfile(gv_jumpUnit[lp_player])][gv_jumpPhase[lp_player]];
+    if (lv_prefix == "") {
+        return "";
+    }
+    if (gv_jumpBase[lp_player] == c_ANIM_LOWER_WALK) {
+        // Walk jump clips exist once per stride, 01 and 02 (R-JUMP-18).
+        lv_base = gv_jumpDirName[gv_jumpBaseDir[lp_player]] + ",0" + IntToString(gv_jumpStride[lp_player] + 1);
+    }
+    return lv_prefix + "," + lv_base + ",Leg";
+}
+// True while the jump plays a clip on the lower bracket.
+bool gf_JumpOwnsLower (int lp_player) {
+    return gf_JumpClipNow(lp_player) != "";
+}
+// The lower bracket was cleared elsewhere (gf_AnimReset): play the clip again.
+void gf_JumpAnimInvalidate (int lp_player) {
+    gv_jumpClipPlayed[lp_player] = "";
+}
+void gf_JumpAnimApply (int lp_player) {
+    string lv_clip = gf_JumpClipNow(lp_player);
+    int lv_flags;
+    fixed lv_scale = 1.0;
+
+    if (lv_clip == "" || lv_clip == gv_jumpClipPlayed[lp_player]) {
+        return;
+    }
+    lv_flags = c_animFlagFullMatch | c_animFlagPlayForever;
+    if (gv_jumpPhase[lp_player] != c_JUMP_AIR) {
+        // Takeoff and landing hold their last frame.
+        lv_flags = lv_flags | c_animFlagNonLooping;
+    }
+    // The walk under Start and End is baked at walk rate 1: played at the
+    // walk clip rate, the feet keep the ground speed (R-JUMP-22).
+    if (gv_jumpPhase[lp_player] == c_JUMP_RISE) {
+        lv_scale = gv_jumpStartScale[lp_player];
+    }
+    else if (gv_jumpPhase[lp_player] == c_JUMP_LAND) {
+        if (gv_jumpBase[lp_player] == c_ANIM_LOWER_WALK) {
+            // Never slower than half rate: the recovery stays short.
+            lv_scale = MaxF(0.5, gf_JumpGaitRate(lp_player, gv_jumpUnit[lp_player]));
+        }
+        gv_jumpLandScale[lp_player] = lv_scale;
+    }
+    ActorSend(libNtve_gf_MainActorofUnit(gv_jumpUnit[lp_player]), MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, lv_flags, c_JUMP_BLEND, c_JUMP_BLEND, lv_scale, c_animTimeVariantAsTimeScale));
+    gv_jumpClipPlayed[lp_player] = lv_clip;
+    gv_jumpClipLog[lp_player] = gv_jumpClipLog[lp_player] + lv_clip + ";";
+    gv_jumpScaleLog[lp_player] = gv_jumpScaleLog[lp_player] + IntToString(FixedToInt(lv_scale * 100.0)) + ";";
+}
+// Hands the lower bracket back to the normal clip choice (R-JUMP-14).
+void gf_JumpAnimRelease (int lp_player) {
+    fixed lv_phase;
+
+    if (gv_jumpClipPlayed[lp_player] != "" && UnitIsValid(gv_jumpUnit[lp_player])) {
+        ActorSend(libNtve_gf_MainActorofUnit(gv_jumpUnit[lp_player]), "AnimClear " + c_ANIM_BRACKET_LOWER);
+    }
+    gv_jumpClipPlayed[lp_player] = "";
+    // Landed into the aim or strafe walk: that walk clip starts at the walk
+    // phase the End clip stops at (gf_JumpGaitOnLowerPlay). Free movement
+    // goes back to the stock walk, which kept running under the jump clips.
+    gv_jumpGaitResume[lp_player] = gv_jumpPhase[lp_player] == c_JUMP_LAND && gv_jumpBase[lp_player] == c_ANIM_LOWER_WALK && gf_JumpAimWalkState(gv_animFullState[lp_player]);
+    if (gv_jumpGaitResume[lp_player]) {
+        lv_phase = gf_JumpGaitFlight(gv_jumpBaseDir[lp_player], gv_jumpStride[lp_player]) + c_JUMP_GAIT_LAND;
+        gv_jumpGait[lp_player] = lv_phase - IntToFixed(FixedToInt(lv_phase));
+    }
+    // gf_AnimFullSet plays its clip again on the next anim tick.
+    gv_animFullState[lp_player] = c_ANIM_LOWER_NONE;
+    gv_animFullDir[lp_player] = -1;
+}
+// Jump part of the camera height (R-JUMP-17), blended over lp_time with the unit.
+void gf_JumpCamera (int lp_player, fixed lp_height, fixed lp_time) {
+    gv_jumpCamHeight[lp_player] = lp_height;
+    gf_CameraHeightApply(lp_player, lp_time);
+}
+void gf_JumpEnd (int lp_player) {
+    if (UnitIsValid(gv_jumpUnit[lp_player])) {
+        UnitSetHeight(gv_jumpUnit[lp_player], 0.0, 0.0);
+    }
+    if (gv_jumpCamHeight[lp_player] != 0.0) {
+        gf_JumpCamera(lp_player, 0.0, 0.0);
+    }
+    gf_JumpAnimRelease(lp_player);
+    gv_jumpPhase[lp_player] = c_JUMP_NONE;
+    gv_jumpUnit[lp_player] = null;
+    gv_jumpStride[lp_player] = -1;
+}
+void gf_JumpReset (int lp_player) {
+    gf_JumpEnd(lp_player);
+    gv_jumpPresses[lp_player] = 0;
+    gv_jumpStarts[lp_player] = 0;
+    gv_jumpRejects[lp_player] = 0;
+    if (gv_jumpThumpActor[lp_player] != null) {
+        ActorSend(gv_jumpThumpActor[lp_player], "Destroy");
+        gv_jumpThumpActor[lp_player] = null;
+    }
+    gv_jumpThumps[lp_player] = 0;
+    gv_jumpThumpsWet[lp_player] = 0;
+    gv_jumpThumpMs[lp_player] = -1;
+    gv_jumpThumpH100[lp_player] = -1;
+    gv_jumpLandSpeed100[lp_player] = -1;
+    gv_jumpClipLog[lp_player] = "";
+    gv_jumpScaleLog[lp_player] = "";
+    gv_jumpBursts[lp_player] = 0;
+    gv_jumpStartScale[lp_player] = 1.0;
+    gv_jumpLandScale[lp_player] = 1.0;
+    if (UnitIsValid(gv_tPSUNIT[lp_player])) {
+        UnitBehaviorRemove(gv_tPSUNIT[lp_player], c_JUMP_BURST, 1);
+    }
+    gv_jumpGait[lp_player] = 0.0;
+    gv_jumpGaitWalking[lp_player] = false;
+    gv_jumpGaitResume[lp_player] = false;
+    gv_jumpSetTimes[lp_player] = 0;
+    gv_jumpSetTimeLog[lp_player] = "";
+}
+// The Goliath leg thump at the hero's feet (R-JUMP-8).
+void gf_JumpThump (int lp_player, unit lp_hero) {
+    point lv_at = UnitGetPosition(lp_hero);
+
+    SoundPlayAtPointForPlayer(SoundLink(c_JUMP_THUMP_SOUND, -1), c_maxPlayers, PlayerGroupAll(), lv_at, 0.0, 100.0, 0.0);
+    gv_jumpThumps[lp_player] += 1;
+    if (gf_QuakeInWater(lv_at)) {
+        gv_jumpThumpsWet[lp_player] += 1;
+        return;
+    }
+    if (gv_jumpThumpActor[lp_player] != null) {
+        ActorSend(gv_jumpThumpActor[lp_player], "Destroy");
+    }
+    libNtve_gf_CreateModelAtPoint(c_JUMP_THUMP_MODEL, lv_at);
+    gv_jumpThumpActor[lp_player] = libNtve_gf_ActorLastCreated();
+    // Impact clips have only Birth; the default Stand shows nothing.
+    ActorSend(gv_jumpThumpActor[lp_player], "AnimPlay Thump Birth NonLooping 0");
+    gv_jumpThumpEnd[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_JUMP_THUMP_LIFE;
+}
+void gf_JumpThumpExpire (int lp_player) {
+    if (gv_jumpThumpActor[lp_player] != null && TimerGetElapsed(gv_sCOBA_Clock) >= gv_jumpThumpEnd[lp_player]) {
+        ActorSend(gv_jumpThumpActor[lp_player], "Destroy");
+        gv_jumpThumpActor[lp_player] = null;
+    }
+}
+// Touchdown: height 0, landing clip, thump. Once per jump.
+void gf_JumpLand (int lp_player) {
+    unit lv_hero = gv_jumpUnit[lp_player];
+    fixed lv_now = TimerGetElapsed(gv_sCOBA_Clock);
+
+    if (!gf_JumpAirborne(lp_player)) {
+        return;  // ended early (switch, death) or already landed
+    }
+    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero) || gv_tPSUNIT[lp_player] != lv_hero) {
+        gf_JumpEnd(lp_player);
+        return;
+    }
+    gv_jumpThumpH100[lp_player] = FixedToInt(UnitGetHeight(lv_hero) * 100.0);
+    gv_jumpThumpMs[lp_player] = FixedToInt((lv_now - gv_jumpStartAt[lp_player]) * 1000.0);
+    gv_jumpLandSpeed100[lp_player] = FixedToInt(gv_jumpGravDown * gv_jumpTimeDown * 100.0);
+    UnitSetHeight(lv_hero, 0.0, 0.0);
+    gf_JumpCamera(lp_player, 0.0, 0.0);
+    gv_jumpPhase[lp_player] = c_JUMP_LAND;
+    gv_jumpLandAt[lp_player] = lv_now;
+    gf_JumpPickBase(lp_player);  // the landing mixes with what the hero does now
+    gf_JumpAnimApply(lp_player);
+    gf_JumpThump(lp_player, lv_hero);
+}
+void gf_JumpStep (int lp_player) {
+    unit lv_hero = gv_jumpUnit[lp_player];
+    fixed lv_now;
+    fixed lv_t;
+    fixed lv_next;
+    fixed lv_h;
+
+    if (gv_jumpPhase[lp_player] == c_JUMP_NONE) {
+        return;
+    }
+    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero) || gv_tPSUNIT[lp_player] != lv_hero) {
+        gf_JumpEnd(lp_player);  // R-JUMP-7
+        return;
+    }
+    lv_now = TimerGetElapsed(gv_sCOBA_Clock);
+    if (gf_JumpAirborne(lp_player)) {
+        lv_t = lv_now - gv_jumpStartAt[lp_player];
+        if (lv_t >= gf_JumpAirtimeOf(lp_player)) {
+            // The step runs every game loop: this is the first loop at or
+            // after the air time, the loop where the height reads 0.
+            gf_JumpLand(lp_player);
+            return;
+        }
+        lv_next = MinF(lv_t + c_JUMP_TICK, gf_JumpAirtimeOf(lp_player));
+        lv_h = gf_JumpArcAt(lv_next, gf_JumpCrouchOf(lp_player));
+        UnitSetHeight(lv_hero, lv_h, lv_next - lv_t);
+        // Same target height and blend time as the unit: no lead (R-JUMP-17).
+        gf_JumpCamera(lp_player, lv_h, lv_next - lv_t);
+        if (gv_jumpPhase[lp_player] == c_JUMP_RISE && lv_t >= c_JUMP_RISE_TIME / gv_jumpStartScale[lp_player]) {
+            gv_jumpPhase[lp_player] = c_JUMP_AIR;
+            gf_JumpPickBase(lp_player);
+        }
+    }
+    else if (lv_now - gv_jumpLandAt[lp_player] >= c_JUMP_LAND_TIME / gv_jumpLandScale[lp_player]) {
+        gf_JumpAnimRelease(lp_player);
+        gv_jumpPhase[lp_player] = c_JUMP_NONE;
+        gv_jumpUnit[lp_player] = null;
+        gv_jumpStride[lp_player] = -1;
+        return;
+    }
+    gf_JumpAnimApply(lp_player);
+}
+// Starts a jump. False if the press is rejected (R-JUMP-4).
+bool gf_JumpPress (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    gv_jumpPresses[lp_player] += 1;
+    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero) || gf_JumpAirborne(lp_player)) {
+        gv_jumpRejects[lp_player] += 1;
+        return false;
+    }
+    if (gv_jumpPhase[lp_player] != c_JUMP_NONE && gv_jumpUnit[lp_player] != lv_hero) {
+        gf_JumpEnd(lp_player);
+    }
+    gv_jumpPhase[lp_player] = c_JUMP_RISE;
+    gv_jumpStartAt[lp_player] = TimerGetElapsed(gv_sCOBA_Clock);
+    gv_jumpUnit[lp_player] = lv_hero;
+    gv_jumpStarts[lp_player] += 1;
+    gv_jumpStride[lp_player] = -1;  // a new jump picks its stride from the walk phase
+    gf_JumpPickBase(lp_player);
+    gv_jumpStartScale[lp_player] = 1.0;
+    gv_jumpLandScale[lp_player] = 1.0;
+    if (gv_jumpBase[lp_player] == c_ANIM_LOWER_WALK) {
+        // Push-off: a very short burst of speed (R-JUMP-22). The Start clip
+        // and the takeoff crouch run at the walk clip rate with the burst.
+        UnitBehaviorAdd(lv_hero, c_JUMP_BURST, lv_hero, 1);
+        gv_jumpBursts[lp_player] += 1;
+        if (gf_JumpHasClips(lv_hero)) {
+            gv_jumpStartScale[lp_player] = MaxF(1.0, gf_JumpGaitRate(lp_player, lv_hero));
+        }
+    }
+    // The first height and clip are set now, not on the next tick (R-JUMP-2).
+    gf_JumpStep(lp_player);
+    return true;
+}
+bool gt_JumpKey_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_JumpPress(EventPlayer());
+    return true;
+}
+bool gt_JumpTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_JumpTrackMove(lv_player);
+        gf_JumpGaitTrack(lv_player);
+        gf_JumpStep(lv_player);
+        gf_JumpThumpExpire(lv_player);
+    }
+    return true;
+}
+
+bool gt_JumpInit_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_JumpConfigInit();
+    return true;
+}
+void gt_Jump_Init () {
+    gt_JumpInit = TriggerCreate("gt_JumpInit_Func");
+    TriggerAddEventMapInit(gt_JumpInit);
+    gt_JumpKey = TriggerCreate("gt_JumpKey_Func");
+    TriggerAddEventKeyPressed(gt_JumpKey, c_playerAny, gv_jUMP, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_JumpTick = TriggerCreate("gt_JumpTick_Func");
+    TriggerAddEventTimePeriodic(gt_JumpTick, c_JUMP_TICK, c_timeGame);
+}

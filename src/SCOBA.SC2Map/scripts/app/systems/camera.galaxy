@@ -1,5 +1,18 @@
 // Module: systems/camera
 
+// The one writer of the TPS camera height offset while a quake or a jump is
+// active: base + quake shake + jump elevation (R-JUMP-17). lp_time blends
+// to the value; the jump passes its per-loop height time so camera and unit
+// move together.
+void gf_CameraHeightApply (int lp_player, fixed lp_time) {
+    fixed lv_height = c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player];
+
+    // Velocity 0, deceleration 0: a plain linear blend over lp_time. The old
+    // (-1, 10) carried velocity and eased out, and lagged the jump (operator).
+    CameraSetValue(lp_player, c_cameraValueHeightOffset, lv_height, lp_time, 0.0, 0.0);
+    gv_cameraHeightApplied[lp_player] = lv_height;
+}
+
 void gf_CameraZoomApply (int lp_player) {
     fixed lv_desired;
     fixed lv_safe;
@@ -102,27 +115,6 @@ void gt_CameraDebug_Init () {
     TriggerAddEventTimePeriodic(gt_CameraDebug, 1.0, c_timeGame);
 }
 
-
-bool gt_Jump_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
-    if (!runActions) {
-        return true;
-    }
-
-    UnitBehaviorAdd(gv_tPSUNIT[lv_localPlayer], "DehakaJump", gv_tPSUNIT[lv_localPlayer], 1);
-    return true;
-}
-
-void gt_Jump_Init () {
-    gt_Jump = TriggerCreate("gt_Jump_Func");
-    TriggerAddEventKeyPressed(gt_Jump, c_playerAny, gv_jUMP, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
-}
 
 bool gt_ZoomEnd_Func (bool testConds, bool runActions) {
     // Variable Declarations

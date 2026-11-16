@@ -39,7 +39,7 @@ const int c_SCOBA_LEFT_ORBIT_PIXELS = 2;
 const int c_SCOBA_RIGHT_ORBIT_PIXELS = 4;
 const fixed c_SCOBA_CLICK_SCAN_RADIUS = 8.0;
 const fixed c_SCOBA_CLICK_MARGIN = 0.75;
-const fixed c_SCOBA_AIM_FOV = 45.0;
+const fixed c_SCOBA_AIM_FOV = 55.0;
 const fixed c_SCOBA_AIM_SHOULDER_OFFSET = 0.5;
 const fixed c_SCOBA_AIM_SHOULDER_ANGLE = 90.0;
 // The aim camera side (R-TPS-42): "right" or "left".
@@ -94,7 +94,7 @@ const fixed c_TPS_SHOT_TIMEOUT = 2.0;
 // UI-layer shot floaters (R-TPS-73).
 const int c_UI_FLOATER_POOL = 4;
 const fixed c_UI_FLOATER_DURATION = 1.2;
-const fixed c_UI_FLOATER_RISE = 120.0;  // operator 2026-11-16: rise twice as far (was 60)
+const fixed c_UI_FLOATER_RISE = 240.0;  // operator 2026-11-16: rise twice as far again (was 120, before that 60)
 // The frames live in Base.SC2Data/UI/Layout/Custom/ScobaTps.SC2Layout: the
 // text panel above the crosshair, its four labels, their size and font
 // style, and the crosshair image. None of them accepts the mouse (R-TPS-85).
@@ -125,5 +125,5 @@ const fixed c_ANIM_MOVE_TURN_DURATION = 0.01;
 
 
 const string c_SCOBA_TPS_BEHAVIOR = "SCOBATPSBehavior";
-const fixed c_SCOBA_REST_FOV = 65.0;
+const fixed c_SCOBA_REST_FOV = 75.0;
 const fixed c_SCOBA_ZOOM_FOV = 25.0;

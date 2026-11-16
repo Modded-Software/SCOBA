@@ -6,6 +6,7 @@ void gf_AnimReset (int lp_player) {
     gf_AnimUpperClear(lp_player);
     gf_AnimLowerClear(lp_player);
     gf_AnimHeadClear(lp_player);
+    gf_JumpAnimInvalidate(lp_player);  // the lower clear above may drop a jump clip
     gv_animUpperState[lp_player] = c_ANIM_UPPER_NONE;
     gv_animLowerState[lp_player] = c_ANIM_LOWER_NONE;
     gv_animUpperClipIndex[lp_player] = -1;

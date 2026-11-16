@@ -144,4 +144,9 @@
         <Model value="Assets\Units\Zerg\Kerrigan\KerriganSCOBA.m3"/>
         <AnimSpeed value="0.750000"/>
     </CModel>
+    <!-- Hero jump touchdown dust (REQ-JUMP R-JUMP-8): the stock light physics
+         impact puff. JumpLandDust was too large even at the Queen scale. -->
+    <CModel id="ScobaJumpDust">
+        <Model value="Assets\Effects\Other\PhysicsImpactDustLight\PhysicsImpactDustLight.m3"/>
+    </CModel>
 </Catalog>

@@ -1,0 +1,94 @@
+// Module: core/jump
+// Hero jump (REQ-JUMP). Constants and state. Logic: systems/jump.
+
+const int c_JUMP_NONE = 0;
+const int c_JUMP_RISE = 1;  // takeoff clip; airborne
+const int c_JUMP_AIR = 2;   // air pose clip; airborne
+const int c_JUMP_LAND = 3;  // landing clip; on the ground (landing recovery)
+const int c_JUMP_PHASES = 4;
+
+// Ballistic flight (R-JUMP-3). Takeoff crouch on the ground, then launch at
+// v0 under gravity g_up to the peak, then fall under g_down = gain * g_up.
+// Derived values (v0, g_up, g_down, fall time, air time) are set in
+// gf_JumpConfigInit from these.
+const fixed c_JUMP_PEAK = 0.6;
+const fixed c_JUMP_CROUCH = 0.133;    // takeoff crouch on the ground (CROUCH_MS in the bake)
+const fixed c_JUMP_TIME_UP = 0.30;    // launch to peak
+const fixed c_JUMP_FALL_GAIN = 1.6;   // fall gravity / rise gravity
+// One game loop. Each tick sets the height of the next tick over this time.
+const fixed c_JUMP_TICK = 0.0625;
+// Clip lengths of the Start clips and the End clips (landing recovery).
+const fixed c_JUMP_RISE_TIME = 0.267;
+// A walk jump plays Start and End at the walk clip rate (gf_JumpGaitRate):
+// the feet keep the ground speed. The landing recovery then lasts
+// c_JUMP_LAND_TIME / rate (R-JUMP-22).
+const fixed c_JUMP_LAND_TIME = 0.25;
+const fixed c_JUMP_BLEND = 0.04;
+// Blend of the aim or strafe walk clip that follows a landing.
+const fixed c_JUMP_RESUME_BLEND = 0.05;
+// Walk jump takeoff: a very short burst of speed (BehaviorData SCOBAJumpBurst).
+const string c_JUMP_BURST = "SCOBAJumpBurst";
+// Gait matching (R-JUMP-18). The walk (Attack Walk, 0-667 ms) is a jog with
+// two flight frames per cycle, half a cycle apart; a walk jump exists once
+// per stride (flight frame). Stride k flies at FLIGHT + k / STRIDES; the back
+// walks are the walk reversed (FLIGHT_BACK). The Start clip plays the walk
+// over PUSH of a cycle up to the flight frame; the End clip plays it on over
+// LAND of a cycle. Values from scripts/jumpanim/bake.py;
+// jumpanim/validate.py checks them against the built model.
+const fixed c_JUMP_GAIT_CYCLE = 0.667;
+const int c_JUMP_GAIT_STRIDES = 2;
+const fixed c_JUMP_GAIT_FLIGHT = 0.05;
+const fixed c_JUMP_GAIT_FLIGHT_BACK = 0.95;
+const fixed c_JUMP_GAIT_PUSH = 0.2;
+const fixed c_JUMP_GAIT_LAND = 0.405;
+// Walking: more travel than this over one game loop (walk is about 0.14).
+const fixed c_JUMP_WALK_STEP = 0.03;
+// Touchdown thump (R-JUMP-8): the stock PhysicsImpactDustLight puff
+// (ModelData ScobaJumpDust; JumpLandDust was too large even at the Queen
+// scale) and the Goliath footfall sound (scripts/footfall/fx.py). No dust
+// in water, as the footfalls.
+const string c_JUMP_THUMP_MODEL = "ScobaJumpDust";
+const string c_JUMP_THUMP_SOUND = "GoliathFootstep";
+const fixed c_JUMP_THUMP_LIFE = 2.0;
+
+fixed gv_jumpGravUp;     // derived, gf_JumpConfigInit
+fixed gv_jumpGravDown;
+fixed gv_jumpV0;
+fixed gv_jumpTimeDown;
+fixed gv_jumpAirtime;    // press to touchdown: crouch + up + down
+int[8] gv_jumpPhase;
+fixed[8] gv_jumpCamHeight;  // jump part of the camera height offset (R-JUMP-17)
+int[8] gv_jumpBase;         // lower state of the mixed clip: c_ANIM_LOWER_IDLE or _WALK
+int[8] gv_jumpBaseDir;      // walk direction of the mixed clip
+int[8] gv_jumpLandSpeed100; // fall speed at the last touchdown, x100
+fixed[8] gv_jumpGait;        // tracked walk phase, 0..1 of c_JUMP_GAIT_CYCLE
+bool[8] gv_jumpGaitWalking;  // walking on the last jump tick
+bool[8] gv_jumpGaitResume;   // the next aim walk clip starts at gv_jumpGait
+int[8] gv_jumpStride;        // stride of the walk jump clips, -1 if none
+int[8] gv_jumpSetTimes;      // AnimSetTime messages sent (tests)
+string[8] gv_jumpSetTimeLog; // "R:<ms>;" walk resume (tests)
+point[8] gv_jumpLastPos;    // hero position at the last jump tick
+fixed[8] gv_jumpStepDist;   // hero travel over the last game loop
+fixed[8] gv_jumpStartAt;   // game clock at takeoff
+fixed[8] gv_jumpLandAt;    // game clock at touchdown
+fixed[8] gv_jumpStartScale; // time scale of the Start clip and of the takeoff crouch
+fixed[8] gv_jumpLandScale; // time scale of the End clip: the recovery lasts c_JUMP_LAND_TIME / this
+int[8] gv_jumpBursts;      // takeoff speed bursts given (tests)
+string[8] gv_jumpScaleLog; // "<clip time scale x100>;" per clip played (tests)
+unit[8] gv_jumpUnit;       // the unit that jumps (hero switch, R-JUMP-7)
+string[8] gv_jumpClipPlayed;  // the clip on the lower bracket, "" if none
+int[8] gv_jumpPresses;     // test counters
+int[8] gv_jumpStarts;
+int[8] gv_jumpRejects;
+actor[8] gv_jumpThumpActor;
+fixed[8] gv_jumpThumpEnd;
+int[8] gv_jumpThumps;       // touchdowns with the thump played
+int[8] gv_jumpThumpsWet;    // of those, in water (sound only)
+int[8] gv_jumpThumpMs;      // last touchdown, ms after takeoff
+int[8] gv_jumpThumpH100;    // hero height at the last touchdown, x100
+string[c_ANIM_HERO_COUNT][c_JUMP_PHASES] gv_jumpClip;  // clip name prefix per phase
+string[c_ANIM_DIR_COUNT] gv_jumpDirName;  // walk base tokens per direction
+string[8] gv_jumpClipLog;  // clips played since the last reset, ";"-separated (tests)
+trigger gt_JumpKey;
+trigger gt_JumpTick;
+trigger gt_JumpInit;

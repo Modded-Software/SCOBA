@@ -21,6 +21,7 @@ from flora.config import MARKER as FLORA_MARKER
 from footprints.build import check_scaled_footprints
 from validate_aim_shot import TOSH_CLOCK, check_aim_shot_data, check_aim_shot_script
 from validate_assets import check_control_icons, check_footfall_fx, check_skybox_flip, check_stamp
+from jumpanim.validate import check_jump
 from validate_slow_deaths import check_slow_deaths
 from validate_tps_overlay import check_tps_overlay
 
@@ -488,6 +489,7 @@ def main() -> int:
     check_footfall_fx(map_dir)
     check_animation_names(map_dir)
     check_animation_actors(map_dir)
+    check_jump(map_dir, galaxy_text(map_dir))
     check_slow_deaths(map_dir)
     check_hd_textures(map_dir)
     for problem in check_scaled_footprints(map_dir):

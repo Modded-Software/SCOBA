@@ -1,0 +1,354 @@
+// Jump test profile (REQ-JUMP). Every value read here is engine state or
+// jump script state; scripts/testkit/profiles/jump.py decides pass or fail.
+
+trigger gt_JumpTest;
+trigger gt_JtForward;
+fixed gv_jtWalkStart = -1.0;  // first loop the hero moved (engine position)
+
+// Waits lp_time in game loops; records the first loop the hero moved.
+void gf_JtWalkWait (fixed lp_time) {
+    unit lv_hero = gv_tPSUNIT[1];
+    point lv_last = UnitGetPosition(lv_hero);
+    fixed lv_end = TimerGetElapsed(gv_sCOBA_Clock) + lp_time;
+
+    gv_jtWalkStart = -1.0;
+    while (TimerGetElapsed(gv_sCOBA_Clock) < lv_end) {
+        Wait(c_JUMP_TICK, c_timeGame);
+        if (gv_jtWalkStart < 0.0 && DistanceBetweenPoints(lv_last, UnitGetPosition(lv_hero)) > c_JUMP_WALK_STEP) {
+            gv_jtWalkStart = TimerGetElapsed(gv_sCOBA_Clock);
+        }
+        lv_last = UnitGetPosition(lv_hero);
+    }
+}
+
+// Free-mode forward walk, as the W key trigger runs it (own thread).
+bool gt_JtForward_Func (bool testConds, bool runActions) {
+    gf_ForwardBegin(1);
+    return true;
+}
+
+const int c_JT_ACT_NONE = 0;
+const int c_JT_ACT_PRESS = 1;      // press again at lp_actLoop
+const int c_JT_ACT_SWITCH = 2;     // switch to Kerrigan at lp_actLoop
+const int c_JT_ACT_PRESS_LAND = 3; // press on the first loop in landing recovery
+
+// Reset every toggle, order, position, aim, and jump state.
+void gf_JtReset (string lp_section) {
+    if (gv_aIMACTIVE[1]) {
+        gf_AimEnd(1);
+    }
+    gf_JumpReset(1);
+    gf_DbgReset(lp_section, false, true);
+    gf_JumpReset(1);
+    UnitSetHeight(gv_tPSUNIT[1], 0.0, 0.0);
+    Wait(0.2, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "resetH100", FixedToInt(UnitGetHeight(gv_tPSUNIT[1]) * 100.0));
+}
+
+// Samples one game loop at a time. lp_press: press at t = 0.
+void gf_JtTrace (string lp_section, bool lp_press, int lp_loops, int lp_act, int lp_actLoop) {
+    unit lv_hero = gv_tPSUNIT[1];
+    fixed lv_t0 = TimerGetElapsed(gv_sCOBA_Clock);
+    fixed lv_h;
+    int lv_ms;
+    int lv_i;
+    int lv_phase;
+    int lv_last_phase;
+    fixed lv_peak = 0.0;
+    int lv_first_up = -1;
+    int lv_last_up = -1;
+    int lv_first_down = -1;  // first sample back at height 0
+    bool lv_mid = false;
+    bool lv_acted = false;
+    string lv_seq;
+    string lv_raw = "";
+    string lv_cam = "";
+    int lv_peak_ms = -1;
+    fixed lv_crouch_max = 0.0;  // height while ms <= 125 (takeoff crouch)
+    fixed lv_cam_jump;          // jump part of the camera height last written
+    fixed lv_cam_gap = 0.0;     // max |camera jump part - engine unit height|
+    fixed lv_cam_max = 0.0;
+    int lv_crouch_ms = 125;     // last sample of the takeoff crouch
+    int lv_land_ms = -1;        // first sample in landing recovery
+    int lv_done_ms = -1;        // first sample after it
+    point lv_pos = UnitGetPosition(lv_hero);
+    string lv_steps = "";       // engine travel per game loop, x1000
+
+    gf_DbgSnap(lp_section, "t0");
+    BankValueSetFromInt(gv_dbgBank, lp_section, "t0H100", FixedToInt(UnitGetHeight(lv_hero) * 100.0));
+    if (lp_press) {
+        // Raw movement inputs at the press (what the base pick sees).
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "pressKeys", gf_MovementKeyHeld(1));
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "pressMoveOrder", UnitOrderCount(lv_hero) > 0 && UnitOrderHasAbil(lv_hero, "move"));
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "pressMoving", gf_AnimMoving(1));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressStep100", FixedToInt(gv_jumpStepDist[1] * 100.0));
+        // Gait (R-JUMP-18): tracked phase, rate, and the harness's own walk start.
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressGaitMs", FixedToInt(gv_jumpGait[1] * c_JUMP_GAIT_CYCLE * 1000.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressRate100", FixedToInt(gf_JumpGaitRate(1, lv_hero) * 100.0));
+        // Raw: the stock walk rate (unit speed / WalkAnimMoveSpeed) and the lower clip scale.
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressStock100", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0 / gv_animWalkMoveSpeed[gf_AnimHeroProfile(lv_hero)]));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressFullState", gv_animFullState[1]);
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressScale100", FixedToInt(gv_animFullScale[1] * 100.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "walkMs", -1);
+        if (gv_jtWalkStart >= 0.0) {
+            BankValueSetFromInt(gv_dbgBank, lp_section, "walkMs", FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_jtWalkStart) * 1000.0));
+        }
+        gv_jtWalkStart = -1.0;
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressStep1000", FixedToInt(gv_jumpStepDist[1] * 1000.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressSpeed100", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0));
+        BankValueSetFromFlag(gv_dbgBank, lp_section, "pressOk", gf_JumpPress(1));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressStride", gv_jumpStride[1]);
+        // Takeoff burst and clip rates (R-JUMP-22): engine speed and behavior right after the press.
+        BankValueSetFromInt(gv_dbgBank, lp_section, "burstSpeed100", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "burstCount", UnitBehaviorCount(lv_hero, c_JUMP_BURST));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "startScale100", FixedToInt(gv_jumpStartScale[1] * 100.0));
+        lv_crouch_ms = FixedToInt(gf_JumpCrouchOf(1) * 1000.0) - 8;
+    }
+    lv_last_phase = gv_jumpPhase[1];
+    lv_seq = IntToString(lv_last_phase);
+    for (lv_i = 0; lv_i < lp_loops; lv_i += 1) {
+        Wait(c_JUMP_TICK, c_timeGame);
+        // Phase first: an action below may change it in this loop.
+        lv_phase = gv_jumpPhase[1];
+        if (lv_phase != lv_last_phase) {
+            lv_seq = lv_seq + IntToString(lv_phase);
+            lv_last_phase = lv_phase;
+        }
+        if (lp_act == c_JT_ACT_PRESS && lv_i == lp_actLoop) {
+            BankValueSetFromFlag(gv_dbgBank, lp_section, "actOk", gf_JumpPress(1));
+        }
+        if (lp_act == c_JT_ACT_SWITCH && lv_i == lp_actLoop) {
+            gf_HeroSwitchTo(gv_heroKerrigan);
+        }
+        if (lp_act == c_JT_ACT_PRESS_LAND && !lv_acted && gv_jumpPhase[1] == c_JUMP_LAND) {
+            BankValueSetFromFlag(gv_dbgBank, lp_section, "actOk", gf_JumpPress(1));
+            lv_acted = true;
+        }
+        lv_h = UnitGetHeight(lv_hero);
+        lv_ms = FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - lv_t0) * 1000.0);
+        if (lv_phase == c_JUMP_LAND && lv_land_ms < 0) {
+            lv_land_ms = lv_ms;
+        }
+        if (lv_phase == c_JUMP_NONE && lv_land_ms >= 0 && lv_done_ms < 0) {
+            lv_done_ms = lv_ms;
+        }
+        if (lv_i < 16) {
+            lv_steps = lv_steps + IntToString(FixedToInt(DistanceBetweenPoints(lv_pos, UnitGetPosition(lv_hero)) * 1000.0)) + " ";
+        }
+        lv_pos = UnitGetPosition(lv_hero);
+        // The jump part of the last camera write. The quake part changes
+        // between writes, so it is not derived from the applied total.
+        lv_cam_jump = gv_jumpCamHeight[1];
+        if (lv_i < 16) {
+            // Raw arc samples, so a failure shows what the engine did.
+            lv_raw = lv_raw + IntToString(lv_ms) + ":" + IntToString(FixedToInt(lv_h * 100.0)) + " ";
+            // Camera: jump part written, and the raw camera target height.
+            lv_cam = lv_cam + IntToString(lv_ms) + ":" + IntToString(FixedToInt(lv_cam_jump * 100.0)) + "/" + IntToString(FixedToInt(PointGetHeight(CameraGetTarget(1)) * 100.0)) + " ";
+        }
+        if (gv_tPSUNIT[1] == lv_hero) {
+            lv_cam_gap = MaxF(lv_cam_gap, AbsF(lv_cam_jump - lv_h));
+        }
+        lv_cam_max = MaxF(lv_cam_max, lv_cam_jump);
+        if (lv_ms <= lv_crouch_ms) {
+            lv_crouch_max = MaxF(lv_crouch_max, lv_h);
+        }
+        if (lv_h > lv_peak) {
+            lv_peak_ms = lv_ms;
+        }
+        lv_peak = MaxF(lv_peak, lv_h);
+        if (lv_h > 0.1 && lv_first_up < 0) {
+            lv_first_up = lv_ms;
+        }
+        if (lv_h > 0.05) {
+            lv_last_up = lv_ms;
+        }
+        if (lv_first_down < 0 && lv_first_up >= 0 && lv_h <= 0.01) {
+            lv_first_down = lv_ms;
+        }
+        if (lv_phase == c_JUMP_AIR && !lv_mid) {
+            lv_mid = true;
+            gf_DbgSnap(lp_section, "mid");
+            BankValueSetFromInt(gv_dbgBank, lp_section, "midUpper", gv_animUpperState[1]);
+            BankValueSetFromFlag(gv_dbgBank, lp_section, "midAim", gv_aIMACTIVE[1]);
+            BankValueSetFromFlag(gv_dbgBank, lp_section, "midOwned", gf_JumpOwnsLower(1));
+            BankValueSetFromString(gv_dbgBank, lp_section, "midClip", gv_jumpClipPlayed[1]);
+        }
+    }
+    gf_DbgSnap(lp_section, "end");
+    BankValueSetFromInt(gv_dbgBank, lp_section, "peakH100", FixedToInt(lv_peak * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "peakMs", lv_peak_ms);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "crouchH100", FixedToInt(lv_crouch_max * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "landSpeed100", gv_jumpLandSpeed100[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "v0100", FixedToInt(gv_jumpV0 * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "camGap100", FixedToInt(lv_cam_gap * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "camMax100", FixedToInt(lv_cam_max * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "camEnd100", FixedToInt(gv_jumpCamHeight[1] * 100.0));
+    // The total written: base + quake + jump at the last write, x100.
+    BankValueSetFromInt(gv_dbgBank, lp_section, "camApplied100", FixedToInt(gv_cameraHeightApplied[1] * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "camBase100", FixedToInt(c_SCOBA_CAMERA_HEIGHT_OFFSET * 100.0));
+    BankValueSetFromString(gv_dbgBank, lp_section, "cam", lv_cam);
+    BankValueSetFromString(gv_dbgBank, lp_section, "clipLog", gv_jumpClipLog[1]);
+    BankValueSetFromString(gv_dbgBank, lp_section, "scaleLog", gv_jumpScaleLog[1]);
+    BankValueSetFromString(gv_dbgBank, lp_section, "steps", lv_steps);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "bursts", gv_jumpBursts[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "landScale100", FixedToInt(gv_jumpLandScale[1] * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "landMs", lv_land_ms);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "doneMs", lv_done_ms);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endSpeed100", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endBurstCount", UnitBehaviorCount(lv_hero, c_JUMP_BURST));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "setTimes", gv_jumpSetTimes[1]);
+    BankValueSetFromString(gv_dbgBank, lp_section, "setTimeLog", gv_jumpSetTimeLog[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "resumePending", gv_jumpGaitResume[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endStride", gv_jumpStride[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "firstUpMs", lv_first_up);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "lastUpMs", lv_last_up);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "firstDownMs", lv_first_down);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endH100", FixedToInt(UnitGetHeight(lv_hero) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endPropH100", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropHeight, c_unitPropCurrent) * 100.0));
+    BankValueSetFromString(gv_dbgBank, lp_section, "phaseSeq", lv_seq);
+    BankValueSetFromString(gv_dbgBank, lp_section, "raw", lv_raw);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endPhase", gv_jumpPhase[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "presses", gv_jumpPresses[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "starts", gv_jumpStarts[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "rejects", gv_jumpRejects[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "thumps", gv_jumpThumps[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "thumpsWet", gv_jumpThumpsWet[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "thumpMs", gv_jumpThumpMs[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "thumpH100", gv_jumpThumpH100[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "thumpActor", gv_jumpThumpActor[1] != null);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "endOwned", gf_JumpOwnsLower(1));
+    BankValueSetFromString(gv_dbgBank, lp_section, "endClip", gv_jumpClipPlayed[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "endHeroIsKerrigan", gv_tPSUNIT[1] == gv_heroKerrigan);
+    BankSave(gv_dbgBank);
+}
+
+void gf_JtStand () {
+    gf_JtReset("jump_stand");
+    gf_JtTrace("jump_stand", true, 24, c_JT_ACT_NONE, 0);
+}
+// Negative: no press, no height (R-JUMP-5).
+void gf_JtNone () {
+    gf_JtReset("jump_none");
+    gf_JtTrace("jump_none", false, 16, c_JT_ACT_NONE, 0);
+}
+// Negative: a press in the air is rejected and the arc is unchanged (R-JUMP-4).
+void gf_JtDouble () {
+    gf_JtReset("jump_double");
+    gf_JtTrace("jump_double", true, 24, c_JT_ACT_PRESS, 4);
+}
+// A press in landing recovery starts a new jump (R-JUMP-4).
+void gf_JtRejump () {
+    gf_JtReset("jump_rejump");
+    gf_JtTrace("jump_rejump", true, 32, c_JT_ACT_PRESS_LAND, 0);
+}
+// Walk and aim during the jump: the hero moves, the upper body stays on aim
+// (R-JUMP-6, 13), the legs go back to the walk after landing (R-JUMP-14).
+void gf_JtAimWalk () {
+    gf_JtReset("jump_aimwalk");
+    gf_AimBegin(1);
+    Wait(0.4, c_timeGame);
+    gv_fORWARD[1] = true;
+    gf_JtWalkWait(0.5);
+    gf_JtTrace("jump_aimwalk", true, 24, c_JT_ACT_NONE, 0);
+    BankValueSetFromInt(gv_dbgBank, "jump_aimwalk", "afterUpper", gv_animUpperState[1]);
+    BankValueSetFromInt(gv_dbgBank, "jump_aimwalk", "afterFull", gv_animFullState[1]);
+    gv_fORWARD[1] = false;
+    gf_AimEnd(1);
+    BankSave(gv_dbgBank);
+}
+// Stop, then jump at once (free movement): the legs mix with idle, not walk
+// (R-JUMP-16, operator report 2026-11-16).
+void gf_JtStopJump () {
+    point lv_before;
+
+    gf_JtReset("jump_stopjump");
+    lv_before = UnitGetPosition(gv_tPSUNIT[1]);
+    gv_kEYFORWARD[1] = true;
+    TriggerExecute(gt_JtForward, false, false);
+    Wait(0.6, c_timeGame);
+    // Proof that the hero really walked before the stop.
+    BankValueSetFromInt(gv_dbgBank, "jump_stopjump", "walked10", FixedToInt(DistanceBetweenPoints(lv_before, UnitGetPosition(gv_tPSUNIT[1])) * 10.0));
+    // Key release as gt_ForwardEnd does it, then jump two loops later.
+    gv_kEYFORWARD[1] = false;
+    gv_fORWARD[1] = false;
+    gf_AimMoveStop(1);
+    gf_CombatSyncRoot(1);
+    Wait(2.0 * c_JUMP_TICK, c_timeGame);
+    gf_JtTrace("jump_stopjump", true, 20, c_JT_ACT_NONE, 0);
+}
+// Free walk (no aim) on the forward loop, and jump: the legs mix with the
+// forward walk.
+void gf_JtFreeWalk () {
+    gf_JtReset("jump_freewalk");
+    gv_kEYFORWARD[1] = true;
+    TriggerExecute(gt_JtForward, false, false);
+    gf_JtWalkWait(0.6);
+    gf_JtTrace("jump_freewalk", true, 20, c_JT_ACT_NONE, 0);
+    gv_kEYFORWARD[1] = false;
+    gv_fORWARD[1] = false;
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(0.2, c_timeGame);
+}
+// Negative: a held key that moves nothing is not walking.
+void gf_JtKeyStill () {
+    gf_JtReset("jump_keystill");
+    gv_fORWARD[1] = true;
+    Wait(0.3, c_timeGame);
+    gf_JtTrace("jump_keystill", true, 20, c_JT_ACT_NONE, 0);
+    gv_fORWARD[1] = false;
+}
+// Hero switch mid-air puts the old unit down (R-JUMP-7).
+void gf_JtSwitch () {
+    gf_JtReset("jump_switch");
+    gf_JtTrace("jump_switch", true, 16, c_JT_ACT_SWITCH, 4);
+}
+// Kerrigan jumps with her normal legs (R-JUMP-15).
+void gf_JtKerrigan () {
+    gf_JtReset("jump_kerrigan");
+    gf_HeroSwitchTo(gv_heroKerrigan);
+    Wait(0.5, c_timeGame);
+    gf_JumpReset(1);
+    gf_JtTrace("jump_kerrigan", true, 24, c_JT_ACT_NONE, 0);
+}
+
+bool gt_JumpTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAJUMPTEST", 1);
+    gv_bINPUTLOG = false;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "jump");
+    BankValueSetFromString(gv_dbgBank, "meta", "group", gv_dbgGroup);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "jump_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    if (gf_DbgGroup("arc")) {
+        gf_JtStand();
+        gf_JtNone();
+        gf_JtDouble();
+        gf_JtRejump();
+    }
+    if (gf_DbgGroup("body")) {
+        gf_JtAimWalk();
+        gf_JtStopJump();
+        gf_JtFreeWalk();
+        gf_JtKeyStill();
+    }
+    if (gf_DbgGroup("hero")) {
+        gf_JtSwitch();
+        gf_JtKerrigan();
+    }
+    gf_DbgReset("jump_end", false, true);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_JumpTest_Init () {
+    gt_JtForward = TriggerCreate("gt_JtForward_Func");
+    gt_JumpTest = TriggerCreate("gt_JumpTest_Func");
+    TriggerAddEventMapInit(gt_JumpTest);
+}

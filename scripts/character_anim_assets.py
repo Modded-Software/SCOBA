@@ -13,6 +13,7 @@ from pathlib import Path
 
 from project_root import project_root
 from animation_tokens import validate_animation_name
+from jumpanim.bake import JUMP_HEROES, make_jump_groups
 from character_anim_m3 import add_kickback, axis_quaternion, clone, make_lower_group, make_pitch_group, quat_multiply
 from hitvolumes.shapes import axis, columns, inverse, norm
 
@@ -23,7 +24,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "36\n"
+MARKER_VERSION = "43\n"  # 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -302,7 +303,9 @@ def generate_model(
     kick_sign: float,
     kick_degrees: float,
     head_bone: str,
+    jump: bool = False,
 ) -> None:
+    """jump: add the jump leg clips (jumpanim.bake)."""
     model = m3.loadModel(str(source))
     upper_ids, lower_ids = classify_bones(model, upper_roots, lower_roots)
     attack_ids, _ = classify_bones(model, attack_roots, lower_roots)
@@ -398,7 +401,10 @@ def generate_model(
             2,
         )
     head = make_head_groups(model, groups, pitch_axis, pitch_sign, head_bone)
-    print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)} head={bone_chain(model, head)}")
+    jump_log = "jump: none"
+    if jump:
+        jump_log = make_jump_groups(model, groups)
+    print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)} head={bone_chain(model, head)} {jump_log}")
     target.parent.mkdir(parents=True, exist_ok=True)
     m3.saveAndInvalidateModel(model, str(target))
 
@@ -464,9 +470,9 @@ def generate(root: Path, force: bool) -> None:
     temp_root = Path(tempfile.mkdtemp(prefix="sco anim ", dir=root.parent))
     try:
         entries = []
-        for entry, target, model_id, model_value, *params in SOURCE_MODELS.values():
+        for key, (entry, target, model_id, model_value, *params) in SOURCE_MODELS.items():
             # params: the generate_model arguments after source and target, in order.
-            generate_model(extract_model(entry, temp_root), root / target, *params)
+            generate_model(extract_model(entry, temp_root), root / target, *params, jump=key in JUMP_HEROES)
             entries.append((model_id, model_value))
         (root / MODEL_DATA).write_text(model_data_text(root, entries))
         marker.write_text(MARKER_VERSION)
