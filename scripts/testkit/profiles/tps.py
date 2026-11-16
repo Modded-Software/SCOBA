@@ -37,12 +37,14 @@ def map_spec() -> TestMapSpec:
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tps.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tpspick.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "tpshead.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tpshold.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/tps/common",
             "scripts/test/tps/tps",
             "scripts/test/tps/tpspick",
+            "scripts/test/tps/tpshead",
             "scripts/test/tps/tpshold",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_TpsTest_Init();"),
@@ -387,19 +389,23 @@ def _check_aim(checks) -> None:
 
 
 HEAD_STEPS = 9
+HEAD_YAW_STEPS = 11
+# Clip number = (yaw step - 1) * HEAD_STEPS + pitch step.
+HEAD_YAW_CENTER = (HEAD_YAW_STEPS - 1) // 2 * HEAD_STEPS
 
 
 def _check_head(checks) -> None:
-    """R-TPS-12 to 14. Script state only: the look of the tilt is an operator check."""
+    """R-TPS-12 to 14, 16. Script state: the look of the head is an operator check."""
     section = "tps_head"
     level = (HEAD_STEPS + 1) // 2
     # Negative cases: no head clip in PNC, while aiming, or with the cursor free.
     for tag in ("t0000", "taim", "tmid", "tend"):
         checks.eq(section, tag, "HeadStep", 0)
-    checks.eq(section, "tlevel", "HeadStep", level)
-    checks.eq(section, "tdown", "HeadStep", 1)
-    checks.eq(section, "tup", "HeadStep", HEAD_STEPS)
-    checks.eq(section, "trel", "HeadStep", HEAD_STEPS)
+    # Settled: no yaw lead, the pitch step follows the camera pitch.
+    checks.eq(section, "tlevel", "HeadStep", HEAD_YAW_CENTER + level)
+    checks.eq(section, "tdown", "HeadStep", HEAD_YAW_CENTER + 1)
+    checks.eq(section, "tup", "HeadStep", HEAD_YAW_CENTER + HEAD_STEPS)
+    checks.eq(section, "trel", "HeadStep", HEAD_YAW_CENTER + HEAD_STEPS)
     checks.gt(section, "tup", "HeadSends", checks.value(section, "tlevel", "HeadSends") or 0)
     # R-TPS-12: outside aiming the torso pitch clips do not play.
     for tag in ("tlevel", "tdown", "tup", "trel"):
@@ -407,6 +413,30 @@ def _check_head(checks) -> None:
     # R-TPS-14: aiming pitches the torso.
     checks.true(section, "taim", "AimActive")
     checks.gt(section, "taim", "PitchStep", 0)
+
+    # R-TPS-16: the head leads a fast turn, then settles.
+    section = "tps_head_lead"
+    rest = HEAD_YAW_CENTER + level
+    for tag in ("tsettle", "tleftrest", "trightrest"):
+        checks.eq(section, tag, "HeadStep", rest)
+        checks.between(section, tag, "HeadLeadYaw10", -10, 10)
+        checks.between(section, tag, "HeadLeadPitch10", -10, 10)
+    # A 60 degree turn left, two game loops later: the head is turned well left
+    # (yaw step 9 or more of 11). The head tick runs once a loop at most.
+    checks.gt(section, "tleft", "HeadLeadYaw10", 150)
+    checks.gt(section, "tleft", "HeadStep", 8 * HEAD_STEPS)
+    # Negative case: the turn right leads right, not left (yaw step 3 or less).
+    checks.lt(section, "tright", "HeadLeadYaw10", -150)
+    checks.lt(section, "tright", "HeadStep", 3 * HEAD_STEPS + 1)
+    # Negative case: aiming, a fast look down leaves the head off; the torso pitches.
+    checks.true(section, "taimdown", "AimActive")
+    checks.eq(section, "taimdown", "HeadStep", 0)
+    checks.eq(section, "taimdown", "HeadLeadPitch10", 0)
+    checks.gt(section, "taimdown", "PitchStep", 0)
+    checks.eq(section, "taimrest", "HeadStep", 0)
+    checks.gt(section, "taimrest", "PitchStep", 0)
+    # Negative case: leaving TPS clears the head.
+    checks.eq(section, "tend", "HeadStep", 0)
 
 
 def _check_hold(checks) -> None:

@@ -82,8 +82,9 @@ not repeated here.
 | R-TPS-10, 11 | [tested] | `tps` group `move` |
 | R-TPS-12 | [tested] | `tps_head`: torso pitch step 0 outside aiming |
 | R-TPS-13 | [tested] step follows the camera pitch. Look and direction [operator]. | `tps_head` |
-| R-TPS-14 | [tested] | `tps_head`: head step 0 and torso pitch step above 0 while aiming |
+| R-TPS-14 | [built] Head off while aiming; not run on the current build. | `tps_head`, `tps_head_lead` `taimdown` |
 | R-TPS-15 | [built] | TPS uses the right-hold step and clips. No check compares the two walks. |
+| R-TPS-16 | [built] Earlier variant (on while aiming, 9 yaw steps) passed `tps/20261116-160329`; current build not run. Look, yaw direction, Kerrigan [operator]. | `tps_head_lead` |
 | R-TPS-20 | [tested] script flag. The cursor itself [operator] (T5). | `tps` group `cursor` |
 | R-TPS-21, 22 | [tested] | `tps` group `cursor` |
 | R-TPS-23 to 26 | [tested] crosshair kind. Colors [operator]. | `tps` groups `shot`, `kerrigan` |
@@ -130,21 +131,33 @@ not repeated here.
 - The free-cursor state turns backpedal and the torso follow off (operator decision,
   closes O-TPS-1).
 
-### 5.2 Head tilt (R-TPS-13, 14)
+### 5.2 Head tilt and lead (R-TPS-13, 14, 16)
 
-- `scripts/character_anim_assets.py` generates nine static head-only clips,
-  `Ready Cover 01` to `09`, from the `Stand` pose, from -15 to +15 degrees.
-  They sit under the upper-body clips in priority.
+- `scripts/character_anim_assets.py` generates 99 static head-only clips,
+  `Ready Cover 01` to `99`, from the `Stand` pose: a grid of 9 pitch steps
+  (-15 to +15 degrees) by 11 yaw steps (-25 to +25, 5 degrees each). Clip
+  number = (yaw step - 1) * 9 + pitch step. 99 is the two-digit token limit.
+  Priority 14. The torso clips are unchanged.
+- The yaw axis is the head bone's local axis closest to model up, taken from
+  the rest pose at build time and printed in the build log. Tosh: `Z +1`.
+  Kerrigan: `X +1`.
+- Lead: `gf_AnimHeadLeadUpdate` eases a virtual body yaw and pitch toward the
+  camera with time constant `c_ANIM_HEAD_LEAD_TAU` (0.2 s). The head shows
+  the gap, camera minus body: zero when still, ahead during a turn. The head
+  blend is one game loop (0.0625 s), so steps interpolate every frame.
+- Not aiming only: the head adds the lead to the R-TPS-13 tilt. Aiming
+  clears the head bracket.
+- The head tick runs at most once a game loop (62.5 ms); tests wait two loops.
 - The head bone is a per-model setting; the build fails if the model lacks
   it. Tosh: `BoneHead`, the parent of the `Ref_Head` attachment. Kerrigan
   has no `Ref_Head`; the setting is `Bone29`. That choice and the tilt
   direction are [operator].
-- `gf_AnimHeadTick` maps the camera pitch to a step and plays the clip in its
-  own bracket, `SCOBAHead`. Level pitch is 20 degrees. It clears the bracket
+- `gf_AnimHeadTick` maps tilt plus lead to a clip and plays it in its own
+  bracket, `SCOBAHead`. Level pitch is 20 degrees. It clears the bracket
   while aiming, in the free-cursor state, and in Point & Click.
-- The build validator and a host test fail if the script step count or range
-  differs from the generated clips.
-- Assumption for O-TPS-2: pitch only.
+- The build validator and a host test fail if the script step counts or
+  ranges differ from the generated clips.
+- O-TPS-2 is closed: the head turns sideways as the lead.
 
 ### 5.3 Cursor, crosshair, free-cursor state (R-TPS-20 to 36)
 
@@ -287,8 +300,12 @@ not repeated here.
   (T36). Beyond range: gray reticle and `Out of range`, no damage.
 - Each unit is tested against its hit volume: spheres, capsules and boxes
   from the rest-pose m3 hit-test shapes, with actor `Scale` x model
-  `ScaleMax` baked in. No radius, no margin. Model facing is model -y
-  (`c_HV_MODEL_YAW` 90).
+  `ScaleMax` baked in, then scaled x1.15 about the unit origin
+  (`HV_INFLATE`, `scripts/hitvolumes/galaxy.py`). The JSON keeps the
+  measured shapes. Model facing is model -y (`c_HV_MODEL_YAW` 90).
+- Hive and PsiDecimator (psi destroyer) are scenery: no hit volume
+  (`HV_UNPICKABLE`), and UnitData sets them invulnerable, untargetable,
+  with no collision and no footprint.
 - Data: `scripts/hitvolumes/` measures `scripts/data/hit_volumes.json`
   (70 units) and generates `scripts/app/data/hit_volumes_*.galaxy`
   (63 types). `validate_aim_shot.py` fails on stale data.
@@ -341,7 +358,7 @@ not repeated here.
 | `move` | Facing on the camera yaw while S and A move the hero; facing follows a camera turn. | Leaving TPS removes `SCOBAAimNoTurn`. |
 | `cursor` | Input flags for TPS, aiming, free-cursor state. The state holds after the middle release; a second click ends it. | A right press in the free-cursor state does not aim. The switch to Point & Click ends the state. |
 | `aim` | Aim flag, anchor on the right, shorter camera arm. | Release restores the distance and removes the anchor. |
-| `head` | Head step level, down, up with the camera pitch. | Step 0 in Point & Click, while aiming, in the free-cursor state. |
+| `head` | Head step level, down, up with the camera pitch. Lead: a 60 degree turn left and right turns the head ahead within two game loops. | Step 0 in Point & Click, while aiming (also on a fast look down), in the free-cursor state, after leaving TPS. No lead 1 s after each turn. The turn right does not lead left. |
 | `target` | Not aiming: the click sets the UI target. | The click never attacks. Aiming: the UI target is unchanged. |
 | `shot` | Per outcome: shots +1, life, proxy, effect name, cooldown, hero position, one text of the right kind. Walking: one shot, the walk keeps its speed. Weapon ranges. | Click on cooldown, click when not aiming: no shot, no text. Walking: never an attack order. Air proxy: not the hit effect. No late damage 2 s after a miss. |
 | `kerrigan` | The shot cases with Kerrigan. | As `shot`. |
@@ -375,6 +392,8 @@ Floater checks read script counters. They do not prove the text is visible.
 - A shot at the sky travels upward.
 - Head tilt outside aiming: amount and direction, both heroes. Kerrigan's
   head bone (`Bone29`).
+- Head lead (R-TPS-16): that it looks good, that the head turns the right
+  way sideways (yaw axis from the rest pose), the 0.2 s settle, both heroes.
 - Torso pitch while aiming.
 - Backpedal and strafe animation in TPS.
 - A shot while walking: no stutter, attack animation plays.

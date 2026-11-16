@@ -71,14 +71,24 @@ const string c_ANIM_BRACKET_LOWER = "SCOBALo";
 const string c_ANIM_BRACKET_ATTACK = "SCOBAAimAtk";
 const string c_ANIM_BRACKET_AIM_ATTACK = "SCOBAAimAtk";
 
-// Head tilt outside aiming (R-TPS-13). Steps and range match HEAD_TILT_* in
-// scripts/character_anim_assets.py. The head is level at the level pitch.
+// Head look (R-TPS-13, 16). Steps and ranges match HEAD_TILT_* and HEAD_YAW_*
+// in scripts/character_anim_assets.py. The head is level at the level pitch.
+// Clip number = (yaw step - 1) * c_ANIM_HEAD_STEPS + pitch step.
 const string c_ANIM_BRACKET_HEAD = "SCOBAHead";
 const int c_ANIM_HEAD_STEPS = 9;
 const fixed c_ANIM_HEAD_MAX = 15.0;
+const int c_ANIM_HEAD_YAW_STEPS = 11;
+const fixed c_ANIM_HEAD_YAW_MAX = 25.0;
 const fixed c_ANIM_HEAD_SCALE = 0.4;
 const fixed c_ANIM_HEAD_LEVEL_PITCH = 20.0;
-const fixed c_ANIM_HEAD_BLEND = 0.15;
+// The head tick runs once a game loop (0.0625 s). A blend of one loop lets
+// the engine interpolate between steps on every rendered frame, so the head
+// moves smoothly instead of jumping once per loop.
+const fixed c_ANIM_HEAD_BLEND = 0.0625;
+// Head lead: a virtual body eases toward the crosshair with this time
+// constant; the head shows the gap, so it swings ahead and settles back.
+const fixed c_ANIM_HEAD_LEAD_TAU = 0.2;
+const fixed c_ANIM_HEAD_LEAD_GAIN = 1.0;
 
 const int c_PROBE_ATTACHMENT_COUNT = 6;
 const int c_PROBE_BUFFER_ROWS = 64;

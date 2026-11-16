@@ -61,8 +61,9 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-11 | The hero torso MUST always follow the camera yaw, standing and moving. |
 | R-TPS-12 | While not aiming, the torso MUST NOT follow the camera pitch. |
 | R-TPS-13 | While not aiming, the head MUST tilt slightly up or down toward the camera pitch. |
-| R-TPS-14 | While aiming, the whole torso MUST follow the camera pitch. The head MUST NOT tilt separately. |
+| R-TPS-14 | While aiming, the whole torso MUST follow the camera pitch. The head MUST NOT tilt or lead separately. |
 | R-TPS-15 | The TPS walk MUST turn and animate as the Point & Click right-hold walk does (R-PNC-68). |
+| R-TPS-16 | In TPS, while not aiming, the head MUST follow the crosshair faster than the torso: on a fast camera turn or look up or down it MUST turn ahead in that direction, sideways and up or down, and MUST settle back once the camera stops. The torso animation MUST NOT change for this. Operator 2026-11-16. |
 
 ### 3.3 Cursor and crosshair
 
@@ -151,7 +152,7 @@ uses for each.
 | ID | Point |
 | --- | --- |
 | O-TPS-1 | Closed. The operator decided: the free-cursor state also turns off backpedal and the torso follow (R-TPS-10, 11). |
-| O-TPS-2 | Whether the head tilt (R-TPS-13) also turns sideways is not decided. The text assumes pitch only. |
+| O-TPS-2 | Closed. The operator decided on 2026-11-16: the head also turns sideways, as the lead of R-TPS-16. The R-TPS-13 tilt stays pitch only. |
 | O-TPS-3 | Whether the damage floater of R-TPS-52 moves to the UI layer is not decided. The text assumes it stays at the enemy. |
 | O-TPS-4 | Closed. The operator decided on 2026-11-14: a shot must not stop or slow the walk (R-TPS-61). R-TPS-1 changed with it. |
 
@@ -162,7 +163,8 @@ uses for each.
 | AC-TPS-1 | In TPS, not aiming, hold S: the hero walks backward and keeps facing the camera view. Hold A: it strafes left. |
 | AC-TPS-2 | In TPS, turn the camera while standing and while walking: the hero facing stays on the camera yaw. |
 | AC-TPS-3 | In TPS, not aiming, look up and down: the torso does not pitch. The head tilts slightly. |
-| AC-TPS-4 | Aiming, look up and down: the torso pitches. The head does not tilt separately. |
+| AC-TPS-4 | Aiming, look up and down slowly: the torso pitches. The head does not tilt separately. |
+| AC-TPS-4a | In TPS, not aiming, flick the camera sideways or up and down: the head turns ahead of the torso, then settles back. |
 | AC-TPS-5 | Enter TPS: the cursor is hidden, the crosshair shows, mouse look is on. |
 | AC-TPS-6 | Point the crosshair at an out-of-range enemy, an in-range enemy, a friendly unit, and the ground: it is gray, green, yellow, and normal. |
 | AC-TPS-7 | Click the middle button and release it: the camera stops turning, the cursor shows, the crosshair hides. Click it again: all three return. |

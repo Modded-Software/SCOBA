@@ -139,7 +139,7 @@ class GalaxyTests(unittest.TestCase):
         self.assertIn("gf_HvSphere(", galaxy.shape_call({"k": "capsule", "a": [1, 0, 0], "b": [1, 0, 0], "r": 0.5}))
 
     def test_chunks_stay_under_the_line_cap(self) -> None:
-        files = galaxy.render(fake(60, 12), far=20.0)
+        files = galaxy.render(fake(60, 12), far=20.0, f=1.0)
         chunks = [n for n in files if n not in (galaxy.SIZE, galaxy.LOAD)]
         self.assertGreater(len(chunks), 1)
         for name in chunks:
@@ -149,7 +149,7 @@ class GalaxyTests(unittest.TestCase):
             self.assertIn(f"gf_HvLoad{i}();", files[galaxy.LOAD])
 
     def test_far_types(self) -> None:
-        files = galaxy.render(fake(30, 1), far=20.0)
+        files = galaxy.render(fake(30, 1), far=20.0, f=1.0)
         text = "".join(files.values())
         # Reach 0.5 + i: U020 .. U029 are past 20.
         self.assertIn('gf_HvType("U020", 1.5000, true);', text)
@@ -158,7 +158,7 @@ class GalaxyTests(unittest.TestCase):
         self.assertIn("const fixed c_HV_NEAR_REACH = 19.5000;", files[galaxy.SIZE])
 
     def test_stale_and_extra_files(self) -> None:
-        files = galaxy.render(fake(3, 1), far=20.0)
+        files = galaxy.render(fake(3, 1), far=20.0, f=1.0)
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
             galaxy.write(out, files)
@@ -168,6 +168,43 @@ class GalaxyTests(unittest.TestCase):
             problems = galaxy.stale(out, files)
             self.assertTrue(any("differs" in p for p in problems), problems)
             self.assertTrue(any("not generated" in p for p in problems), problems)
+
+    def test_inflate_about_origin(self) -> None:
+        self.assertEqual(galaxy.HV_INFLATE, 1.15)
+        box = {"k": "box", "c": [0, 0, 2], "u": AXES, "h": [1, 2, 4]}
+        got = galaxy.inflate(box, 1.25)
+        self.assertEqual(got["c"], [0, 0, 2.5])
+        self.assertEqual(got["h"], [1.25, 2.5, 5.0])
+        self.assertEqual(got["u"], AXES)
+        cap = galaxy.inflate({"k": "capsule", "a": [0, 0, 0], "b": [0, 0, 2], "r": 0.4}, 1.25)
+        self.assertEqual(cap["b"], [0, 0, 2.5])
+        self.assertAlmostEqual(cap["r"], 0.5)
+        # The measured shape is not changed.
+        self.assertEqual(box["h"], [1, 2, 4])
+
+    def test_render_applies_the_factor(self) -> None:
+        text = "".join(galaxy.render(fake(30, 1), far=20.0).values())
+        # Sphere c z 1.0, r 0.5 -> 1.15, 0.575; bound 1.5 -> 1.725.
+        self.assertIn("gf_HvSphere(0.0000, 0.0000, 1.1500, 0.5750);", text)
+        # Reach 17.5 x 1.15 = 20.1: past 20, a far type now; 16.5 x 1.15 is not.
+        self.assertIn('gf_HvType("U017", 1.7250, true);', text)
+        self.assertIn('gf_HvType("U016", 1.7250, false);', text)
+
+    def test_inflated_ray_hits_and_misses(self) -> None:
+        sphere = [{"k": "sphere", "c": [0.0, 0.0, 1.0], "r": 0.5}]
+        big = [galaxy.inflate(s, galaxy.HV_INFLATE) for s in sphere]
+        # z 1.6: above the measured sphere (top 1.5), inside the pick one (top 1.725).
+        self.assertIsNone(ray.unit_hit(sphere, (5, 0, 0), 0.0, (0, 0, 1.6), EAST))
+        self.assertIsNotNone(ray.unit_hit(big, (5, 0, 0), 0.0, (0, 0, 1.6), EAST))
+        # Negative: z 1.8 misses the pick volume too.
+        self.assertIsNone(ray.unit_hit(big, (5, 0, 0), 0.0, (0, 0, 1.8), EAST))
+
+    def test_unpickable_types_have_no_volume(self) -> None:
+        text = "".join(galaxy.render(galaxy.load_json(), galaxy.crosshair_range()).values())
+        for name in ("Hive", "PsiDecimator"):
+            self.assertNotIn(f'gf_HvType("{name}"', text)
+        # Negative: other types keep theirs.
+        self.assertIn('gf_HvType("Marine"', text)
 
     def test_committed_files_match_the_json(self) -> None:
         files = galaxy.render(galaxy.load_json(), galaxy.crosshair_range())
@@ -186,8 +223,6 @@ IN_GAME = {
     ("tps_pick_ultra", "tback"): ("Ultralisk", 12.0, 90.0, (1.4, 4.0, 2.1), False),
     ("tps_pick_far", "tbody"): ("Zergling", 18.5, 0.0, (0.0, 0.0, 0.4), True),
     ("tps_pick_far", "tside"): ("Zergling", 18.5, 0.0, (0.7, 0.0, 0.4), False),
-    ("tps_pick_hive", "ttop"): ("Hive", 30.0, 0.0, (0.0, 0.0, 28.0), True),
-    ("tps_pick_hive", "tnorth"): ("Hive", 30.0, 0.0, (30.0, 30.0, 1.5), False),
 }
 # The ray origin is the camera focus (hero, or hero and shoulder proxy centre)
 # at the camera height offset; it sits within this of the hero, sideways.
@@ -200,7 +235,7 @@ class InGameCaseTests(unittest.TestCase):
     camera focus can take."""
 
     def setUp(self) -> None:
-        self.units = galaxy.load_json()["units"]
+        self.units = galaxy.pick_units()
 
     def hit(self, kind: str, dx: float, facing: float, point, oy: float):
         at = (dx, 0.0, 0.0)
@@ -228,13 +263,9 @@ class InGameCaseTests(unittest.TestCase):
                 self.assertIsNotNone(body, (height, oy))
                 self.assertIsNone(under, (height, oy))
 
-    def test_marine_before_hive(self) -> None:
-        marine = self.hit("Marine", 3.0, 0.0, (0.0, 0.0, 0.6), 0.0)
+    def test_marine_not_hit_over_its_head(self) -> None:
+        self.assertIsNotNone(self.hit("Marine", 3.0, 0.0, (0.0, 0.0, 0.6), 0.0))
         o = (0.0, 0.0, EYE)
-        hive = ray.unit_hit(self.units["Hive"]["shapes"], (30.0, 0.0, 0.0), 0.0, o, ray.aim(o, (3.0, 0.0, 0.6)))
-        self.assertIsNotNone(marine)
-        self.assertTrue(hive is None or hive > marine + 0.3, (marine, hive))
-        # Over the Marine to the Hive top: the Marine is not on that ray.
         self.assertIsNone(ray.unit_hit(self.units["Marine"]["shapes"], (3.0, 0.0, 0.0), 0.0, o, ray.aim(o, (30.0, 0.0, 28.0))))
 
 
@@ -248,6 +279,7 @@ class EngineRayTests(unittest.TestCase):
     bands; the old origin (shoulder 0.5 aside, 1.5 high) does not."""
 
     def band(self, dist: float, o) -> tuple[float, float] | None:
+        # The engine hovers the measured model shape, not the inflated pick volume.
         shapes = galaxy.load_json()["units"]["Zergling"]["shapes"]
         hits = []
         for i in range(-300, 301):

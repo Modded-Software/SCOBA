@@ -13,7 +13,8 @@ from pathlib import Path
 
 from project_root import project_root
 from animation_tokens import validate_animation_name
-from character_anim_m3 import add_kickback, clone, make_lower_group, make_pitch_group
+from character_anim_m3 import add_kickback, axis_quaternion, clone, make_lower_group, make_pitch_group, quat_multiply
+from hitvolumes.shapes import axis, columns, inverse, norm
 
 ROOT = project_root()
 M3_VENDOR = ROOT / "scripts" / "vendor" / "m3addon"
@@ -22,7 +23,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "34\n"
+MARKER_VERSION = "36\n"
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -92,15 +93,6 @@ AIM_PITCH_MAX_DEG = 50.0
 AIM_PITCH_FRAME_MS = 100
 AIM_PITCH_STEPS = 99
 
-# Head tilt outside aiming (R-TPS-13): static head-only clips. They sit under
-# the upper-body clips, which own the head while they play.
-HEAD_TILT_GROUP = "Ready Cover"
-HEAD_TILT_SOURCE = "Stand"
-HEAD_TILT_MAX_DEG = 15.0
-HEAD_TILT_STEPS = 9
-HEAD_TILT_FRAME_MS = 100
-HEAD_TILT_PRIORITY = 5
-
 AIM_DIRECTIONS = (
     ("Forward", 0.0, False),
     ("Forward Left", 45.0, False),
@@ -132,10 +124,40 @@ def bone_chain(model, name: str) -> str:
     return ">".join(chain)
 
 
+# Head look (R-TPS-13, 16): static head-only clips on a pitch x yaw grid.
+# Group number = (yaw step - 1) * HEAD_TILT_STEPS + pitch step. They sit above
+# every upper-body clip, so the head owns its bone while aiming and attacking.
+HEAD_TILT_GROUP = "Ready Cover"
+HEAD_TILT_SOURCE = "Stand"
+HEAD_TILT_MAX_DEG = 15.0
+HEAD_TILT_STEPS = 9
+HEAD_YAW_MAX_DEG = 25.0
+HEAD_YAW_STEPS = 11
+HEAD_TILT_FRAME_MS = 100
+HEAD_TILT_PRIORITY = 14
+
+
+def head_yaw_axis(model, head: str) -> tuple[str, float]:
+    """The head's local axis closest to model up (+Z), and its sign.
+
+    A positive angle about it then turns the head counter-clockwise seen from
+    above, the same way a rising camera yaw turns.
+    """
+    index = next(i for i, bone in enumerate(model.bones) if bone.name == head)
+    rest = inverse(columns(model.absoluteInverseBoneRestPositions[index].matrix))
+    ups = [rest[2][c] / max(1e-9, norm(axis(rest, c))) for c in range(3)]
+    best = max(range(3), key=lambda c: abs(ups[c]))
+    return "XYZ"[best], (1.0 if ups[best] > 0.0 else -1.0)
+
+
 def make_head_groups(model, groups, pitch_axis: str, pitch_sign: float, head: str) -> str:
-    """One head-only clip per tilt step, from the stand pose."""
+    """One head-only clip per pitch x yaw step, from the stand pose."""
     if not any(bone.name == head for bone in model.bones):
         raise KeyError(f"head bone {head} not in the model")
+    yaw_axis, yaw_sign = head_yaw_axis(model, head)
+    if yaw_axis == pitch_axis:
+        raise ValueError(f"head {head}: yaw axis {yaw_axis} equals the pitch axis")
+    print(f"head {head}: pitch {pitch_axis} {pitch_sign:+.0f}, yaw {yaw_axis} {yaw_sign:+.0f}")
     head_id = next(bone.rotation.header.animId for bone in model.bones if bone.name == head)
     stand_source = model.sequenceTransformationCollections[groups[HEAD_TILT_SOURCE].stcIndices[0]]
     pairs = [pair for pair in zip(stand_source.animIds, stand_source.animRefs) if pair[0] == head_id]
@@ -144,25 +166,36 @@ def make_head_groups(model, groups, pitch_axis: str, pitch_sign: float, head: st
     head_source = clone(stand_source)
     head_source.animIds = [pair[0] for pair in pairs]
     head_source.animRefs = [pair[1] for pair in pairs]
-    for step in range(HEAD_TILT_STEPS):
-        angle = HEAD_TILT_MAX_DEG * ((2.0 * step / (HEAD_TILT_STEPS - 1)) - 1.0)
-        make_pitch_group(
-            model,
-            groups,
-            f"{HEAD_TILT_GROUP} {step + 1:02d}",
-            HEAD_TILT_SOURCE,
-            head_source,
-            0,
-            (head,),
-            (1.0,),
-            pitch_axis,
-            pitch_sign,
-            angle,
-            angle,
-            HEAD_TILT_FRAME_MS,
-            2,
-            HEAD_TILT_PRIORITY,
-        )
+    for yaw_step in range(HEAD_YAW_STEPS):
+        yaw = HEAD_YAW_MAX_DEG * ((2.0 * yaw_step / (HEAD_YAW_STEPS - 1)) - 1.0)
+        for step in range(HEAD_TILT_STEPS):
+            angle = HEAD_TILT_MAX_DEG * ((2.0 * step / (HEAD_TILT_STEPS - 1)) - 1.0)
+            name = f"{HEAD_TILT_GROUP} {yaw_step * HEAD_TILT_STEPS + step + 1:02d}"
+            # Built level, then each key gets the yaw and the pitch, in that order.
+            make_pitch_group(
+                model,
+                groups,
+                name,
+                HEAD_TILT_SOURCE,
+                head_source,
+                0,
+                (head,),
+                (1.0,),
+                pitch_axis,
+                pitch_sign,
+                0.0,
+                0.0,
+                HEAD_TILT_FRAME_MS,
+                2,
+                HEAD_TILT_PRIORITY,
+            )
+            stc = model.sequenceTransformationCollections[groups[name].stcIndices[0]]
+            look = quat_multiply(axis_quaternion(yaw_axis, yaw_sign * yaw), axis_quaternion(pitch_axis, pitch_sign * angle))
+            for anim_id, anim_ref in zip(stc.animIds, stc.animRefs):
+                if anim_id != head_id or (anim_ref >> 16) & 0xFFFF != 3:
+                    continue
+                for key in stc.sd4q[anim_ref & 0xFFFF].keys:
+                    key.x, key.y, key.z, key.w = quat_multiply((float(key.x), float(key.y), float(key.z), float(key.w)), look)
     return head
 
 
@@ -431,45 +464,9 @@ def generate(root: Path, force: bool) -> None:
     temp_root = Path(tempfile.mkdtemp(prefix="sco anim ", dir=root.parent))
     try:
         entries = []
-        for (
-            entry,
-            target,
-            model_id,
-            model_value,
-            upper_roots,
-            attack_roots,
-            lower_roots,
-            turn_bone,
-            unit_speed,
-            pitch_bones,
-            pitch_weights,
-            pitch_axis,
-            pitch_sign,
-            kick_bones,
-            kick_axis,
-            kick_sign,
-            kick_degrees,
-            head_bone,
-        ) in SOURCE_MODELS.values():
-            source = extract_model(entry, temp_root)
-            generate_model(
-                source,
-                root / target,
-                upper_roots,
-                attack_roots,
-                lower_roots,
-                turn_bone,
-                unit_speed,
-                pitch_bones,
-                pitch_weights,
-                pitch_axis,
-                pitch_sign,
-                kick_bones,
-                kick_axis,
-                kick_sign,
-                kick_degrees,
-                head_bone,
-            )
+        for entry, target, model_id, model_value, *params in SOURCE_MODELS.values():
+            # params: the generate_model arguments after source and target, in order.
+            generate_model(extract_model(entry, temp_root), root / target, *params)
             entries.append((model_id, model_value))
         (root / MODEL_DATA).write_text(model_data_text(root, entries))
         marker.write_text(MARKER_VERSION)

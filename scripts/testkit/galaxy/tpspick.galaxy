@@ -124,6 +124,41 @@ void gf_TpsPickSky (string lp_type) {
     BankValueSetFromString(gv_dbgBank, "tps_pick_sky", lp_type, "at " + FixedToString(PointGetX(lv_at), 1) + ";" + FixedToString(PointGetY(lv_at), 1) + " pointZ " + FixedToString(PointGetHeight(lv_at), 2) + " unitHeight " + FixedToString(UnitGetHeight(lv_unit), 2) + " ground " + FixedToString(WorldHeight(c_heightMapGround, lv_at), 2) + " air " + FixedToString(WorldHeight(c_heightMapAir, lv_at), 2) + " facing " + FixedToString(UnitGetFacing(lv_unit), 1) + " dist " + FixedToString(DistanceBetweenPoints(lv_at, Point(c_TPSPICK_X, c_TPSPICK_Y)), 1));
 }
 
+// Scenery data (UnitData): a fresh unit of lp_type, no script state set.
+// Invulnerable: the Invulnerable target filter excludes it, and damage
+// leaves its life. No collision: a Zergling ordered to its centre gets
+// there. Marine is the control: filtered in, damaged, blocks nothing.
+void gf_TpsPickScenery (string lp_section, string lp_type) {
+    unit lv_unit;
+    unit lv_ling;
+    fixed lv_life;
+    point lv_at;
+
+    gf_DbgTpsReset(lp_section);
+    lv_at = PointWithOffset(gv_dbgAnchor, 12.0, 0.0);
+    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, c_unitCreateIgnorePlacement, 4, lv_at);
+    lv_unit = UnitLastCreated();
+    UnitSetState(lv_unit, c_unitStateStunned, true);
+    Wait(0.5, c_timeGame);
+    lv_at = UnitGetPosition(lv_unit);
+    lv_life = UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_type + "FilterIn", UnitFilterMatch(lv_unit, 1, UnitFilter(0, 0, 0, (1 << (c_targetFilterInvulnerable - 32)))));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_type + "StateInvuln", UnitTestState(lv_unit, c_unitStateInvulnerable));
+    UnitDamage(gv_tPSUNIT[1], "ToshU", lv_unit, 10.0);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_type + "LifeLost", FixedToInt(lv_life - UnitGetPropertyFixed(lv_unit, c_unitPropLife, c_unitPropCurrent)));
+    libNtve_gf_CreateUnitsAtPoint2(1, "Zergling", 0, 4, PointWithOffset(lv_at, -6.0, 0.0));
+    lv_ling = UnitLastCreated();
+    UnitSetState(lv_ling, c_unitStateInvulnerable, true);
+    UnitIssueOrder(lv_ling, OrderTargetingPoint(AbilityCommand("move", 0), lv_at), c_orderQueueReplace);
+    Wait(4.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_type + "LingDist100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_ling), lv_at) * 100.0));
+    BankSave(gv_dbgBank);
+    UnitRemove(lv_ling);
+    UnitRemove(lv_unit);
+    Wait(0.3, c_timeGame);
+}
+
 void gf_DbgTpsPickRun () {
     unit lv_unit;
     unit lv_marine;
@@ -194,16 +229,19 @@ void gf_DbgTpsPickRun () {
     gf_TpsPickAim("tps_pick_flyer", "tbody", lv_unit, 0.0, 0.0, 0.0);
     gf_TpsPickAim("tps_pick_flyer", "tunder", lv_unit, 0.0, 0.0, -2.0);
     gf_TpsPickEnd("tps_pick_flyer", lv_unit);
-    // The Hive, a far type: its top in; a ray past its side out.
+    // The Hive is unpickable scenery: its top and side are out; a Marine in
+    // front of it is still picked, and over the Marine nothing is.
     lv_unit = gf_TpsPickBegin("tps_pick_hive", "Hive", 30.0, 0.0);
     gf_TpsPickAim("tps_pick_hive", "ttop", lv_unit, 0.0, 0.0, 28.0);
     gf_TpsPickAim("tps_pick_hive", "tnorth", lv_unit, 30.0, 30.0, 1.5);
-    // Nearest first: a Marine in front of the Hive is picked, not the Hive.
     lv_marine = gf_TpsPickSpawn("tps_pick_hive", "m", "Marine", 3.0, 0.0);
     gf_TpsPickAim("tps_pick_hive", "tmarine", lv_marine, 0.0, 0.0, 0.6);
     gf_TpsPickAim("tps_pick_hive", "tover", lv_unit, 0.0, 0.0, 28.0);
     UnitRemove(lv_marine);
     gf_TpsPickEnd("tps_pick_hive", lv_unit);
+    gf_TpsPickScenery("tps_pick_scenery", "Hive");
+    gf_TpsPickScenery("tps_pick_scenery", "PsiDecimator");
+    gf_TpsPickScenery("tps_pick_scenery", "Marine");
     // The group leaves no state behind: the anchor and the camera return.
     gv_dbgAnchor = lv_anchor;
     gf_DbgTpsReset("tps_pick_done");

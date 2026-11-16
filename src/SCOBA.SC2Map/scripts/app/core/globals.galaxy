@@ -106,6 +106,14 @@ int[8] gv_animAimPitchTicks;
 int[8] gv_animAimPitchSends;
 int[8] gv_animHeadStep;
 int[8] gv_animHeadSends;
+// Head lead state: the virtual body yaw and pitch, the last update time, and
+// the last lead in degrees (for tests).
+bool[8] gv_animHeadLeadSeen;
+fixed[8] gv_animHeadBodyYaw;
+fixed[8] gv_animHeadBodyPitch;
+fixed[8] gv_animHeadLeadAt;
+fixed[8] gv_animHeadLeadYaw;
+fixed[8] gv_animHeadLeadPitch;
 fixed[8] gv_animAimPitchRest;
 fixed[8] gv_animAimAttackUntil;
 int[8] gv_animTargetPitchStep;

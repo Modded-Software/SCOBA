@@ -357,12 +357,13 @@ def check_animation_names(map_dir: Path) -> None:
         for name in ("Turn Left", "Turn Right"):
             if normalized_animation_name(name) in groups:
                 fail(f"{relative} has upper turn group {name!r}")
-        # Head tilt clips (R-TPS-13): one per step the script can ask for.
+        # Head look clips (R-TPS-13, 16): one per pitch x yaw step the script can ask for.
         head_steps = int(re.search(r"c_ANIM_HEAD_STEPS = (\d+);", text).group(1))
+        head_steps *= int(re.search(r"c_ANIM_HEAD_YAW_STEPS = (\d+);", text).group(1))
         for step in range(1, head_steps + 1):
             if normalized_animation_name(f"Ready Cover {step:02d}") not in groups:
                 fail(f"{relative} missing head tilt group Ready Cover {step:02d}")
-        if normalized_animation_name(f"Ready Cover {head_steps + 1:02d}") in groups:
+        if head_steps < 99 and normalized_animation_name(f"Ready Cover {head_steps + 1:02d}") in groups:
             fail(f"{relative} has more head tilt groups than c_ANIM_HEAD_STEPS")
         pitch_bone = AIM_ATTACK_PITCH.get(relative)
         if pitch_bone is not None:

@@ -15,8 +15,11 @@ CASES = {
     "tps_pick_flyer": (("tbody",), ("tunder",)),
     "tps_pick_far": (("tbody",), ("tside",)),
     "tps_pick_thor": (("tchest",), ()),
-    "tps_pick_hive": (("ttop", "tmarine", "tover"), ("tnorth",)),
+    # The Hive is unpickable scenery: no ray picks it.
+    "tps_pick_hive": ((), ("ttop", "tnorth", "tover")),
 }
+SCENERY = ("Hive", "PsiDecimator")
+SCENERY_KEYS = ("FilterIn", "StateInvuln", "LifeLost", "LingDist100")
 # Missing: unit types near the lane the pick met without a volume (raw).
 RAW = ("Pick", "PickT100", "Ray", "Aim", "Missing")
 
@@ -36,9 +39,21 @@ def check_pick(checks) -> None:
         # Negative cases: a ray outside the volume does not pick the unit.
         for tag in misses:
             checks.false(section, tag, "PickIsUnit")
-    # Nearest first: the Marine in front of the Hive, the Hive over it.
+    # The Marine in front of the Hive is picked; over it, nothing.
+    checks.true("tps_pick_hive", "tmarine", "PickIsUnit")
     checks.eq("tps_pick_hive", "tmarine", "Pick", "Marine")
-    checks.eq("tps_pick_hive", "tover", "Pick", "Hive")
+    checks.eq("tps_pick_hive", "tover", "Pick", "none")
+    checks.eq("tps_pick_hive", "ttop", "Pick", "none")
+    # Scenery: invulnerable to the target filter and to damage; a Zergling
+    # walks to its centre. Marine control: the opposite on every point.
+    for kind in (*SCENERY, "Marine"):
+        print(f"tps_pick_scenery raw {kind}: " + " ".join(f"{k}={checks.value('tps_pick_scenery', '', kind + k)}" for k in SCENERY_KEYS))
+    for kind in SCENERY:
+        checks.false("tps_pick_scenery", "", kind + "FilterIn")
+        checks.eq("tps_pick_scenery", "", kind + "LifeLost", 0)
+        checks.lt("tps_pick_scenery", "", kind + "LingDist100", 100)
+    checks.true("tps_pick_scenery", "", "MarineFilterIn")
+    checks.gt("tps_pick_scenery", "", "MarineLifeLost", 0)
     # The operator's Thor case, aim held: reticle enemy (1), status bar on
     # the Thor, the shot a hit (1) at the Thor.
     for key in ("tchestAim", "tchestReticle", "tchestStatus", "tchestShotKind", "tchestShotThor"):

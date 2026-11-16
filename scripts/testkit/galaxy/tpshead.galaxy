@@ -1,0 +1,60 @@
+// TPS head tilt and lead scenarios (R-TPS-12 to 14, 16). Called from tps.galaxy.
+void gf_DbgTpsHeadRun () {
+    // R-TPS-12, 13: the head tilt follows the camera pitch outside aiming.
+    // Each settled snapshot waits well past the lead time constant.
+    gf_DbgTpsReset("tps_head");
+    gf_DbgTpsCamera(CameraGetYaw(1), 20.0);
+    gf_DbgTpsSnap("tps_head", "t0000");
+    gf_DbgTpsSet(true);
+    gf_DbgTpsCamera(CameraGetYaw(1), 20.0);
+    Wait(1.0, c_timeGame);
+    gf_DbgTpsSnap("tps_head", "tlevel");
+    gf_DbgTpsCamera(CameraGetYaw(1), 60.0);
+    Wait(1.0, c_timeGame);
+    gf_DbgTpsSnap("tps_head", "tdown");
+    gf_DbgTpsCamera(CameraGetYaw(1), -25.0);
+    Wait(1.0, c_timeGame);
+    gf_DbgTpsSnap("tps_head", "tup");
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(1.5, c_timeGame);
+    gf_DbgTpsSnap("tps_head", "taim");
+    gf_TpsMouseUp(1, gv_fIRE);
+    Wait(1.5, c_timeGame);
+    gf_DbgTpsSnap("tps_head", "trel");
+    gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+    gf_TpsMouseUp(1, gv_aBILITYCAMERA);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap("tps_head", "tmid");
+    gf_DbgTpsSet(false);
+    gf_DbgTpsSnap("tps_head", "tend");
+
+    // R-TPS-16: the head leads a fast camera turn and settles back.
+    gf_DbgTpsReset("tps_head_lead");
+    gf_DbgTpsSet(true);
+    gf_DbgTpsCamera(90.0, 20.0);
+    Wait(1.0, c_timeGame);
+    gf_DbgTpsSnap("tps_head_lead", "tsettle");
+    CameraSetValue(1, c_cameraValueYaw, 150.0, 0.0, -1, 10);
+    // Two game loops (62.5 ms each): the head tick runs at most once a loop.
+    Wait(0.125, c_timeGame);
+    gf_DbgTpsSnap("tps_head_lead", "tleft");
+    Wait(1.0, c_timeGame);
+    gf_DbgTpsSnap("tps_head_lead", "tleftrest");
+    CameraSetValue(1, c_cameraValueYaw, 90.0, 0.0, -1, 10);
+    Wait(0.125, c_timeGame);
+    gf_DbgTpsSnap("tps_head_lead", "tright");
+    Wait(1.0, c_timeGame);
+    gf_DbgTpsSnap("tps_head_lead", "trightrest");
+    // Negative case: aiming, a fast look down must leave the head off.
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(1.5, c_timeGame);
+    gf_DbgTpsSnap("tps_head_lead", "taim");
+    CameraSetValue(1, c_cameraValuePitch, CameraGetPitch(1) + 25.0, 0.0, -1, 10);
+    Wait(0.125, c_timeGame);
+    gf_DbgTpsSnap("tps_head_lead", "taimdown");
+    Wait(1.0, c_timeGame);
+    gf_DbgTpsSnap("tps_head_lead", "taimrest");
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_DbgTpsSet(false);
+    gf_DbgTpsSnap("tps_head_lead", "tend");
+}

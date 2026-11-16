@@ -4,6 +4,8 @@ unit gv_dbgAlly;
 void gf_DbgTpsLook (unit lp_unit, fixed lp_extraYaw);
 // In tpspick.galaxy (R-TPS-84).
 void gf_DbgTpsPickRun ();
+// In tpshead.galaxy (R-TPS-12 to 16).
+void gf_DbgTpsHeadRun ();
 
 // How far a point lies to the right of the hero, seen along the camera yaw.
 fixed gf_DbgTpsRight (point lp_point) {
@@ -96,6 +98,12 @@ void gf_DbgTpsExtra (string lp_section, string lp_tag) {
     }
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadStep", gv_animHeadStep[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadSends", gv_animHeadSends[1]);
+    // Head lead (R-TPS-16), raw: the lead in tenths of a degree, the camera
+    // yaw and the unit facing the torso follows.
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadLeadYaw10", FixedToInt(gv_animHeadLeadYaw[1] * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadLeadPitch10", FixedToInt(gv_animHeadLeadPitch[1] * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamYaw10", FixedToInt(CameraGetYaw(1) * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Facing10", FixedToInt(UnitGetFacing(gv_tPSUNIT[1]) * 10.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "PitchStep", gv_animAimPitchStep[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ShotKind", gv_tpsShotKind[1]);
     // Raw values: which unit the crosshair is on.
@@ -447,29 +455,7 @@ bool gt_TpsTest_Func (bool testConds, bool runActions) {
         gf_DbgTpsSnap("tps_aim", "tend");
     }
     if (gf_DbgGroup("head")) {
-        // R-TPS-12 to 14: the head follows the camera pitch only outside aiming.
-        gf_DbgTpsReset("tps_head");
-        gf_DbgTpsCamera(CameraGetYaw(1), 20.0);
-        gf_DbgTpsSnap("tps_head", "t0000");
-        gf_DbgTpsSet(true);
-        gf_DbgTpsCamera(CameraGetYaw(1), 20.0);
-        gf_DbgTpsSnap("tps_head", "tlevel");
-        gf_DbgTpsCamera(CameraGetYaw(1), 60.0);
-        gf_DbgTpsSnap("tps_head", "tdown");
-        gf_DbgTpsCamera(CameraGetYaw(1), -25.0);
-        gf_DbgTpsSnap("tps_head", "tup");
-        gf_TpsMouseDown(1, gv_fIRE);
-        Wait(0.5, c_timeGame);
-        gf_DbgTpsSnap("tps_head", "taim");
-        gf_TpsMouseUp(1, gv_fIRE);
-        Wait(0.5, c_timeGame);
-        gf_DbgTpsSnap("tps_head", "trel");
-        gf_TpsMouseDown(1, gv_aBILITYCAMERA);
-        gf_TpsMouseUp(1, gv_aBILITYCAMERA);
-        Wait(0.4, c_timeGame);
-        gf_DbgTpsSnap("tps_head", "tmid");
-        gf_DbgTpsSet(false);
-        gf_DbgTpsSnap("tps_head", "tend");
+        gf_DbgTpsHeadRun();
     }
     if (gf_DbgGroup("shot")) {
         gf_DbgTpsShot("tps_shot_enemy", c_DBG_SHOT_ENEMY, false, 12.0);

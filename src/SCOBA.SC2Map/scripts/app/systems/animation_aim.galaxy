@@ -314,6 +314,9 @@ void gf_AnimTargetPitchClear (int lp_player) {
 }
 
 void gf_AnimHeadClear (int lp_player) {
+    gv_animHeadLeadSeen[lp_player] = false;
+    gv_animHeadLeadYaw[lp_player] = 0.0;
+    gv_animHeadLeadPitch[lp_player] = 0.0;
     if (gv_animHeadStep[lp_player] == 0) {
         return;
     }
@@ -323,25 +326,63 @@ void gf_AnimHeadClear (int lp_player) {
     }
 }
 
-// The head step for a camera pitch: 1 is fully down, the last is fully up.
-int gf_AnimHeadStep (fixed lp_cameraPitch) {
-    fixed lv_tilt;
-
+fixed gf_AnimHeadSignedPitch (fixed lp_cameraPitch) {
     if (lp_cameraPitch > 180.0) {
-        lp_cameraPitch = lp_cameraPitch - 360.0;
+        return lp_cameraPitch - 360.0;
     }
-    lv_tilt = (c_ANIM_HEAD_LEVEL_PITCH - lp_cameraPitch) * c_ANIM_HEAD_SCALE;
-    lv_tilt = MaxF(-c_ANIM_HEAD_MAX, MinF(c_ANIM_HEAD_MAX, lv_tilt));
-    return FixedToInt(Round(((lv_tilt + c_ANIM_HEAD_MAX) / (2.0 * c_ANIM_HEAD_MAX)) * (c_ANIM_HEAD_STEPS - 1))) + 1;
+    return lp_cameraPitch;
 }
 
-// TPS, not aiming: the head tilts slightly toward the camera pitch
-// (R-TPS-13). Aiming pitches the whole torso instead (R-TPS-14). A middle
-// hold turns it off with the rest of the TPS body rules.
+// The step for an angle on a symmetric range: 1 at -max, the last at +max.
+int gf_AnimHeadStepOf (fixed lp_angle, fixed lp_max, int lp_steps) {
+    fixed lv_angle;
+
+    lv_angle = MaxF(-lp_max, MinF(lp_max, lp_angle));
+    return FixedToInt(Round(((lv_angle + lp_max) / (2.0 * lp_max)) * (lp_steps - 1))) + 1;
+}
+
+// The pitch step for a camera pitch: 1 is fully down, the last is fully up.
+int gf_AnimHeadStep (fixed lp_cameraPitch) {
+    return gf_AnimHeadStepOf((c_ANIM_HEAD_LEVEL_PITCH - gf_AnimHeadSignedPitch(lp_cameraPitch)) * c_ANIM_HEAD_SCALE, c_ANIM_HEAD_MAX, c_ANIM_HEAD_STEPS);
+}
+
+// Head lead (R-TPS-16): a virtual body eases toward the camera with time
+// constant c_ANIM_HEAD_LEAD_TAU. The lead is the gap, camera minus body:
+// zero while the camera is still, ahead of the turn while it moves. The
+// torso and the facing are not touched.
+void gf_AnimHeadLeadUpdate (int lp_player) {
+    fixed lv_yaw;
+    fixed lv_pitch;
+    fixed lv_now;
+    fixed lv_k;
+
+    lv_yaw = CameraGetYaw(lp_player);
+    lv_pitch = gf_AnimHeadSignedPitch(CameraGetPitch(lp_player));
+    lv_now = GameGetMissionTime();
+    if (!gv_animHeadLeadSeen[lp_player]) {
+        gv_animHeadLeadSeen[lp_player] = true;
+        gv_animHeadBodyYaw[lp_player] = lv_yaw;
+        gv_animHeadBodyPitch[lp_player] = lv_pitch;
+        gv_animHeadLeadAt[lp_player] = lv_now;
+    }
+    lv_k = MinF(1.0, MaxF(0.0, lv_now - gv_animHeadLeadAt[lp_player]) / c_ANIM_HEAD_LEAD_TAU);
+    gv_animHeadLeadAt[lp_player] = lv_now;
+    gv_animHeadBodyYaw[lp_player] += gf_AnimYawDelta(gv_animHeadBodyYaw[lp_player], lv_yaw) * lv_k;
+    gv_animHeadBodyPitch[lp_player] += (lv_pitch - gv_animHeadBodyPitch[lp_player]) * lv_k;
+    gv_animHeadLeadYaw[lp_player] = gf_AnimYawDelta(gv_animHeadBodyYaw[lp_player], lv_yaw) * c_ANIM_HEAD_LEAD_GAIN;
+    // Pitch up is positive for the head; a rising camera pitch looks down.
+    gv_animHeadLeadPitch[lp_player] = (gv_animHeadBodyPitch[lp_player] - lv_pitch) * c_ANIM_HEAD_LEAD_GAIN;
+}
+
+// TPS, not aiming: the head leads the crosshair (R-TPS-16) and tilts
+// slightly toward the camera pitch (R-TPS-13). Aiming pitches the whole
+// torso instead (R-TPS-14). A middle hold turns it off with the rest of the
+// TPS body rules.
 void gf_AnimHeadTick (int lp_player) {
     unit lv_hero;
     int lv_profile;
     int lv_step;
+    fixed lv_tilt;
 
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
@@ -353,7 +394,10 @@ void gf_AnimHeadTick (int lp_player) {
         gf_AnimHeadClear(lp_player);
         return;
     }
-    lv_step = gf_AnimHeadStep(CameraGetPitch(lp_player));
+    gf_AnimHeadLeadUpdate(lp_player);
+    lv_tilt = gv_animHeadLeadPitch[lp_player] + (c_ANIM_HEAD_LEVEL_PITCH - gf_AnimHeadSignedPitch(CameraGetPitch(lp_player))) * c_ANIM_HEAD_SCALE;
+    lv_step = gf_AnimHeadStepOf(lv_tilt, c_ANIM_HEAD_MAX, c_ANIM_HEAD_STEPS);
+    lv_step += (gf_AnimHeadStepOf(gv_animHeadLeadYaw[lp_player], c_ANIM_HEAD_YAW_MAX, c_ANIM_HEAD_YAW_STEPS) - 1) * c_ANIM_HEAD_STEPS;
     if (lv_step == gv_animHeadStep[lp_player]) {
         return;
     }
