@@ -1,0 +1,309 @@
+// Pod Birth harness (SPEC-HERO-DROP 3). Does the pod model play Birth, and
+// do the camera and the script run on the same clip time?
+// The clip is read from the engine as the split-body probe does
+// (anim_probe_lower): AnimLengthQueryByName on the main actor, slot
+// c_animNameDefault; length (AnimLengthSync), remaining
+// (AnimLengthRemainingSync), clip time = length - remaining.
+// Raw values only; the profile decides.
+
+trigger gt_PodBirthTest;
+
+// "len/rem" in ms for one slot of the pod's main actor.
+string gf_PbClip (unit lp_pod, bool lp_scaled) {
+    generichandle lv_q;
+
+    AnimLengthQueryByName(libNtve_gf_MainActorofUnit(lp_pod), c_animNameDefault, lp_scaled);
+    AnimLengthQueryWait();
+    lv_q = AnimLengthQueryLastCreated();
+    return IntToString(FixedToInt(AnimLengthSync(lv_q) * 1000.0)) + "/" + IntToString(FixedToInt(AnimLengthRemainingSync(lv_q) * 1000.0));
+}
+
+// Attachment probe: where the engine says the pod's points are. A point
+// that follows the drawn model moves with Birth.
+// Every drop pod unit on the map: "type@x,y" x10, ';'-separated.
+string gf_PbPods () {
+    unitgroup lv_g = UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+    int lv_i;
+    unit lv_u;
+    string lv_t;
+    string lv_out = "";
+
+    for (lv_i = 1; lv_i <= UnitGroupCount(lv_g, c_unitCountAll); lv_i += 1) {
+        lv_u = UnitGroupUnit(lv_g, lv_i);
+        lv_t = UnitGetType(lv_u);
+        if (lv_t == "SCOBAHeroPod" || lv_t == "TerranDropPod" || lv_t == "ZergDropPod") {
+            lv_out = lv_out + lv_t + "@" + IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_u)) * 10.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_u)) * 10.0)) + ";";
+        }
+    }
+    return lv_out;
+}
+
+int gf_PbMs (fixed lp_since) {
+    return FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - lp_since) * 1000.0);
+}
+
+void gf_PbReset (string lp_section) {
+    TimerPause(gv_sPAWNTIMER, true);
+    if (UnitIsValid(gv_dropPod[1])) {
+        UnitRemove(gv_dropPod[1]);
+    }
+    gv_dropPod[1] = null;
+    gv_dropPending[1] = false;
+    gf_HeroDropCamera(1, 0.0, 0.0);
+    if (!UnitIsAlive(gv_heroTosh)) {
+        UnitRevive(gv_heroTosh);
+    }
+    gf_DbgReset(lp_section, false, false);
+}
+
+// Unit: the stock calls alone (create, Birth on the default slot). Per
+// loop: ms since the create loop, unscaled len/rem, scaled len/rem.
+void gf_PbPlays () {
+    string lv_s = "pb_plays";
+    unit lv_pod;
+    fixed lv_t0;
+    string lv_trace = "";
+    int lv_i;
+
+    gf_PbReset(lv_s);
+    libNtve_gf_CreateUnitsAtPoint2(1, c_DROP_POD_UNIT, c_unitCreateIgnorePlacement, 1, PointWithOffset(gv_dbgAnchor, 6.0, 0.0));
+    lv_pod = UnitLastCreated();
+    libNtve_gf_PlayAnimation(libNtve_gf_MainActorofUnit(lv_pod), c_animNameDefault, c_DROP_CLIP, c_animFlagNonLooping, c_animTimeDefault);
+    lv_t0 = TimerGetElapsed(gv_sCOBA_Clock);
+    BankValueSetFromString(gv_dbgBank, lv_s, "podAt100", IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_pod)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_pod)) * 100.0)));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podFacing100", FixedToInt(UnitGetFacing(lv_pod) * 100.0));
+    BankSave(gv_dbgBank);
+    for (lv_i = 0; lv_i < 64; lv_i += 1) {
+        lv_trace = lv_trace + IntToString(gf_PbMs(lv_t0)) + ":" + gf_PbClip(lv_pod, false) + ":" + gf_PbClip(lv_pod, true) + " ";
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromString(gv_dbgBank, lv_s, "trace", lv_trace);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podH100", FixedToInt(UnitGetHeight(lv_pod) * 100.0));
+    UnitRemove(lv_pod);
+    BankSave(gv_dbgBank);
+}
+
+// Negative: the same pod, no play call. Birth must not be reported.
+void gf_PbNone () {
+    string lv_s = "pb_none";
+    unit lv_pod;
+    string lv_trace = "";
+    int lv_i;
+
+    gf_PbReset(lv_s);
+    libNtve_gf_CreateUnitsAtPoint2(1, c_DROP_POD_UNIT, c_unitCreateIgnorePlacement, 1, PointWithOffset(gv_dbgAnchor, 6.0, 0.0));
+    lv_pod = UnitLastCreated();
+    for (lv_i = 0; lv_i < 8; lv_i += 1) {
+        lv_trace = lv_trace + gf_PbClip(lv_pod, false) + " ";
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromString(gv_dbgBank, lv_s, "trace", lv_trace);
+    UnitRemove(lv_pod);
+    BankSave(gv_dbgBank);
+}
+
+// Integration: the real drop (death, gf_HeroDropStart). Per loop: script
+// ms since the map's start stamp, the harness's own engine clip read
+// (len/rem), the map's clip time (ms, -1 = miss), the map's read and miss
+// counts, applied camera height, camera target x,y (x100), pod unit height.
+void gf_PbDrop () {
+    string lv_s = "pb_drop";
+    unit lv_pod;
+    string lv_trace = "";
+    int lv_i;
+
+    gf_PbReset(lv_s);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "camBase100", FixedToInt(c_SCOBA_CAMERA_HEIGHT_OFFSET * 100.0));
+    UnitKill(gv_heroTosh);
+    Wait(c_DROP_TICK, c_timeGame);
+    // A yaw that is not the default: the pod facing must follow it.
+    CameraSetValue(1, c_cameraValueYaw, 135.0, 0.0, 0.0, 0.0);
+    Wait(c_DROP_TICK, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "yawBefore100", FixedToInt(CameraGetYaw(1) * 100.0));
+    gf_HeroDropStart(1);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "travel100", FixedToInt(gv_dropTravel[1] * 100.0));
+    lv_pod = gv_dropPod[1];
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(lv_pod));
+    BankValueSetFromString(gv_dbgBank, lv_s, "podAt100", IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_pod)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_pod)) * 100.0)));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podFacing100", FixedToInt(UnitGetFacing(lv_pod) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "groundH100", FixedToInt(UnitGetHeight(lv_pod) * 100.0));
+    BankValueSetFromString(gv_dbgBank, lv_s, "podsAtCreate", gf_PbPods());
+    for (lv_i = 0; lv_i < 80 && UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        if (lv_i == 8) {
+            BankValueSetFromString(gv_dbgBank, lv_s, "podsMid", gf_PbPods());
+        }
+        lv_trace = lv_trace + IntToString(gf_PbMs(gv_dropStartAt[1])) + ":" + gf_PbClip(lv_pod, false) + ":" + IntToString(FixedToInt(gv_dropClipAt[1] * 1000.0)) + ":" + IntToString(gv_dropClipReads[1]) + "/" + IntToString(gv_dropClipMisses[1]) + ":" + IntToString(FixedToInt(gv_cameraHeightApplied[1] * 100.0)) + ":" + IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 100.0)) + ":" + IntToString(FixedToInt(UnitGetHeight(lv_pod) * 100.0)) + ":" + IntToString(FixedToInt(CameraGetYaw(1) * 100.0)) + "," + IntToString(FixedToInt(CameraGetPitch(1) * 100.0)) + "," + IntToString(FixedToInt(CameraGetDistance(1) * 100.0)) + " ";
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromString(gv_dbgBank, lv_s, "trace", lv_trace);
+    BankValueSetFromString(gv_dbgBank, lv_s, "heroAt10", IntToString(FixedToInt(PointGetX(UnitGetPosition(gv_heroTosh)) * 10.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(gv_heroTosh)) * 10.0)));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "reads", gv_dropClipReads[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "misses", gv_dropClipMisses[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "landMs", gf_PbMs(gv_dropStartAt[1]));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "landings", gv_dropLandings[1]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "heroAlive", UnitIsAlive(gv_heroTosh));
+    BankSave(gv_dbgBank);
+    Wait(1.0, c_timeGame);
+}
+
+// Operator check (no engine read of the drawn pod exists): top-down, north
+// up, pod facing 0, Birth played 3 times. A red ping marks the predicted
+// start (MODEL_YAW 90), a green ping the landing spot. The operator reports
+// where the pod starts relative to the red ping.
+void gf_PbCalib () {
+    string lv_s = "pb_calib";
+    point lv_at = PointWithOffset(gv_dbgAnchor, 6.0, 0.0);
+    unit lv_pod;
+    int lv_i;
+
+    gf_PbReset(lv_s);
+    gf_HeroDropRoot(1, 0.0);
+    CameraFollowUnitGroup(1, UnitGroupEmpty(), false, false);
+    CameraPan(1, lv_at, 0.0, 0.0, 0.0, false);
+    CameraSetValue(1, c_cameraValueYaw, 90.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValuePitch, 89.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueDistance, 220.0, 0.0, 0.0, 0.0);
+    UIDisplayMessage(PlayerGroupAll(), c_messageAreaSubtitle, StringToText("CALIB: north up. RED = predicted pod start. GREEN = landing."));
+    for (lv_i = 0; lv_i < 3; lv_i += 1) {
+        libNtve_gf_CreateUnitsWithDefaultFacing(1, c_DROP_POD_UNIT, c_unitCreateIgnorePlacement, 1, lv_at);
+        lv_pod = UnitLastCreated();
+        UnitSetFacing(lv_pod, 0.0, 0.0);
+        gv_dropFacing[1] = 0.0;
+        gv_dropAt[1] = lv_at;
+        gf_HeroDropRoot(1, 0.0);
+        PingCreate(PlayerGroupAll(), "PingSimple", gv_dropRootAt[1], Color(100, 0, 0), 4.0);
+        PingCreate(PlayerGroupAll(), "PingSimple", lv_at, Color(0, 100, 0), 4.0);
+        libNtve_gf_PlayAnimation(libNtve_gf_MainActorofUnit(lv_pod), c_animNameDefault, c_DROP_CLIP, c_animFlagNonLooping, c_animTimeDefault);
+        Wait(4.0, c_timeGame);
+        UnitRemove(lv_pod);
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "done", 1);
+    BankSave(gv_dbgBank);
+}
+
+// Unit: in-game DOF vs arm and aim. The engine has no DOF getter: this
+// records the applied values plus the engine arm they came from.
+void gf_PbDofAt (string lp_s, string lp_tag, fixed lp_dist) {
+    CameraSetValue(1, c_cameraValueDistance, lp_dist, 0.0, 0.0, 0.0);
+    gv_cameraDistanceDesired[1] = lp_dist;
+    Wait(0.25, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag, IntToString(FixedToInt(CameraGetDistance(1) * 100.0)) + "," + IntToString(FixedToInt(gv_cameraDofNear[1] * 100.0)) + "," + IntToString(FixedToInt(gv_cameraDofFar[1] * 100.0)));
+}
+
+void gf_PbDof () {
+    string lv_s = "pb_dof";
+
+    gf_PbReset(lv_s);
+    gv_cameraCollisionOff[1] = true;
+    gf_PbDofAt(lv_s, "d10", 10.0);
+    gf_PbDofAt(lv_s, "d40", 40.0);
+    gf_AimBegin(1);
+    gf_PbDofAt(lv_s, "aim10", 10.0);
+    gf_AimEnd(1);
+    gf_PbDofAt(lv_s, "after10", 10.0);
+    gf_PbDofAt(lv_s, "min2", 2.0);
+    gv_cameraCollisionOff[1] = false;
+    BankSave(gv_dbgBank);
+}
+
+// Operator probe: how the engine reads the near falloffs. Aim camera at
+// the real arm, DOF tick off, markers on the ground at labelled distances
+// from the eye. Each setting shown 4 s with an on-screen label. The
+// operator reports which markers blur per label (no blur getter).
+void gf_PbProbeSet (string lp_label, fixed lp_d, fixed lp_s, fixed lp_e) {
+    UIDisplayMessage(PlayerGroupAll(), c_messageAreaSubtitle, StringToText(lp_label + "  near " + FixedToString(lp_s, 2) + " .. " + FixedToString(lp_e, 2) + "  focus " + FixedToString(lp_d, 2)));
+    CameraSetValue(1, c_cameraValueDepthOfField, 1.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFocalDepth, lp_d, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffStart, c_CAM_DOF_FAR_NONE, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEnd, c_CAM_DOF_FAR_NONE * 2.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffStartNear, lp_s, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEndNear, lp_e, 0.0, 0.0, 0.0);
+    BankValueSetFromString(gv_dbgBank, "pb_dofprobe", lp_label, FixedToString(lp_d, 2) + "," + FixedToString(lp_s, 2) + "," + FixedToString(lp_e, 2));
+    BankSave(gv_dbgBank);
+    Wait(4.0, c_timeGame);
+}
+
+void gf_PbDofProbe () {
+    string lv_s = "pb_dofprobe";
+    fixed lv_d;
+    fixed lv_yaw;
+    point lv_eye;
+    point lv_at;
+    fixed[5] lv_r;
+    int lv_i;
+    int[5] lv_tags;
+    unitgroup lv_marks = UnitGroupEmpty();
+
+    gf_PbReset(lv_s);
+    TriggerEnable(gt_CameraDofTick, false);
+    gf_AimBegin(1);
+    Wait(1.0, c_timeGame);
+    lv_d = CameraGetDistance(1);
+    lv_yaw = CameraGetYaw(1);
+    lv_eye = PointWithOffsetPolar(CameraGetTarget(1), -lv_d * Cos(CameraGetPitch(1)), lv_yaw);
+    lv_r[0] = 1.0; lv_r[1] = 2.0; lv_r[2] = 3.0; lv_r[3] = 5.0; lv_r[4] = 8.0;
+    for (lv_i = 0; lv_i < 5; lv_i += 1) {
+        // Off the look line to the right, so the hero does not hide them.
+        lv_at = PointWithOffsetPolar(PointWithOffsetPolar(lv_eye, lv_r[lv_i], lv_yaw), 0.6 + 0.15 * IntToFixed(lv_i), lv_yaw - 90.0);
+        libNtve_gf_CreateUnitsAtPoint2(1, "Marine", c_unitCreateIgnorePlacement, 0, lv_at);
+        UnitGroupAdd(lv_marks, UnitLastCreated());
+        lv_tags[lv_i] = TextTagCreate(StringToText(FixedToString(lv_r[lv_i], 0)), 24, lv_at, 1.5, true, false, PlayerGroupAll());
+    }
+    BankValueSetFromString(gv_dbgBank, lv_s, "arm", FixedToString(lv_d, 2) + " pitch " + FixedToString(CameraGetPitch(1), 1));
+    // Extreme set (operator: A-E showed no near blur).
+    gf_PbProbeSet("A", 20.0, 0.0, 20.0);
+    gf_PbProbeSet("B", 50.0, 0.0, 50.0);
+    gf_PbProbeSet("C", lv_d, 20.0, 0.0);
+    gf_PbProbeSet("D", 100.0, 10.0, 90.0);
+    gf_PbProbeSet("E", lv_d, 0.0, 100.0);
+    UIDisplayMessage(PlayerGroupAll(), c_messageAreaSubtitle, StringToText("F control: far blur 0.0..0.5 (all beyond focus)"));
+    CameraSetValue(1, c_cameraValueFalloffStartNear, 0.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEndNear, 0.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFocalDepth, lv_d, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffStart, 0.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEnd, 0.5, 0.0, 0.0, 0.0);
+    Wait(4.0, c_timeGame);
+    UnitGroupLoopBegin(lv_marks);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep()) {
+        UnitRemove(UnitGroupLoopCurrent());
+    }
+    UnitGroupLoopEnd();
+    for (lv_i = 0; lv_i < 5; lv_i += 1) {
+        TextTagDestroy(lv_tags[lv_i]);
+    }
+    gf_AimEnd(1);
+    TriggerEnable(gt_CameraDofTick, true);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "done", 1);
+    BankSave(gv_dbgBank);
+}
+
+bool gt_PodBirthTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(0.5, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAPODBIRTH", 1);
+    gv_bINPUTLOG = false;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "podbirth");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "pb_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    // The drop first: Tosh dies right away.
+    gf_PbDrop();
+    gf_PbPlays();
+    gf_PbNone();
+    gf_PbDof();
+    gf_PbDofProbe();
+    gf_DbgReset("pb_end", false, true);
+    BankValueSetFromInt(gv_dbgBank, "pb_end", "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_PodBirthTest_Init () {
+    gt_PodBirthTest = TriggerCreate("gt_PodBirthTest_Func");
+    TriggerAddEventMapInit(gt_PodBirthTest);
+}

@@ -27,6 +27,12 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
         return true;
     }
 
+    // The intro starts with no game UI and no minimap, before any wait
+    // (operator 2026-11-17). Touchdown restores both (gf_IntroEnd).
+    if (c_INTRO_ENABLED) {
+        UISetMode(PlayerGroupAll(), c_uiModeFullscreen, 0.0);
+        UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMinimapPanel, false);
+    }
     gv_sPAWNLOCATIONS[1] = RegionFromId(1);
     gv_sPAWNLOCATIONS[2] = RegionFromId(3);
     gv_sPAWNLOCATIONS[3] = RegionFromId(4);
@@ -175,6 +181,8 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             gf_PncEnsure(lv_localPlayer);
         }
     }
+    // The hero is bound and the dialogs exist: the intro loop starts.
+    gf_IntroStart();
     return true;
 }
 

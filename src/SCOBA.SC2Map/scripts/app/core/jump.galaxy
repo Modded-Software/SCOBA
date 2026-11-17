@@ -12,7 +12,7 @@ const int c_JUMP_PHASES = 4;
 // Derived values (v0, g_up, g_down, fall time, air time) are set in
 // gf_JumpConfigInit from these.
 const fixed c_JUMP_PEAK = 0.6;
-const fixed c_JUMP_CROUCH = 0.133;    // takeoff crouch on the ground (CROUCH_MS in the bake)
+const fixed c_JUMP_CROUCH = 0.15;    // takeoff crouch on the ground (CROUCH_MS in the bake)
 const fixed c_JUMP_TIME_UP = 0.30;    // launch to peak
 const fixed c_JUMP_FALL_GAIN = 1.6;   // fall gravity / rise gravity
 // One game loop. Each tick sets the height of the next tick over this time.
@@ -42,7 +42,7 @@ const fixed c_JUMP_GAIT_CYCLE = 0.667;
 const int c_JUMP_GAIT_STRIDES = 2;
 const fixed c_JUMP_GAIT_FLIGHT = 0.05;
 const fixed c_JUMP_GAIT_FLIGHT_BACK = 0.95;
-const fixed c_JUMP_GAIT_PUSH = 0.2;
+const fixed c_JUMP_GAIT_PUSH = 0.225;
 const fixed c_JUMP_GAIT_LAND = 0.405;
 // Walking: more travel than this over one game loop (walk is about 0.14).
 const fixed c_JUMP_WALK_STEP = 0.03;

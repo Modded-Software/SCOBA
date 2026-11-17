@@ -30,23 +30,28 @@ from jumpanim.kin import (
     unit,
 )
 
-# Joint angle changes from the standing pose, degrees: the mean of the three
-# reference trials (module docstring). jumpanim/validate.py checks the built
-# clips against the range of the trials.
-CROUCH_KNEE_DEG = 62.0
-CROUCH_ANKLE_DEG = -17.0
-LAND_KNEE_DEG = 40.0
-LAND_ANKLE_DEG = -14.0
-AIR_KNEE_DEG = 13.0
+# Joint angle changes from the standing pose, degrees (module docstring of
+# jumpanim.bake). Operator 2026-11-17: the jump was stiff; the targets are
+# the strongest real trials: crouch and landing of the high jumps (16_03,
+# 16_04), air knee of the tucked hops and run jumps (75_03, 75_12).
+# jumpanim/validate.py checks the built clips against the range of all trials.
+CROUCH_KNEE_DEG = 72.0
+CROUCH_ANKLE_DEG = -19.0
+LAND_KNEE_DEG = 52.0
+LAND_ANKLE_DEG = -18.0
+AIR_KNEE_DEG = 35.0
 AIR_ANKLE_DEG = 32.0
 # Reference ranges (min, max) over the trials, for the build checks.
+# "air hip" (thigh forward) is not a target: a foot rise under the hip gives
+# about half the knee bend, as in the reference, where the feet stay under the hips.
 REFERENCE = {
-    "crouch knee": (51.5, 71.7),
-    "landing knee": (37.5, 44.3),
-    "air knee": (7.6, 23.3),
+    "crouch knee": (51.5, 84.6),
+    "landing knee": (37.5, 64.3),
+    "air knee": (7.6, 45.4),
     "air ankle": (24.9, 36.5),
-    "crouch ankle": (-19.2, -15.4),
-    "landing ankle": (-17.2, -8.7),
+    "air hip": (5.5, 17.4),
+    "crouch ankle": (-21.0, -15.4),
+    "landing ankle": (-22.8, -8.7),
 }
 # Stand jump, at the apogee: the feet are this many hip widths apart (the
 # hip width is the distance between the hip joints). Reference at the flight
@@ -230,6 +235,23 @@ def ankle_change(model, pose: Pose, rig: Rig) -> float:
     return sum(ankle_angle(model, pose, leg, rig.foot_forward[leg[2]]) - rig.ankle[leg[2]] for leg in LEGS) / len(LEGS)
 
 
+def thigh_pitch(model, pose: Pose, leg: tuple[str, str, str], forward) -> float:
+    """Thigh (hip to knee) angle from straight down, toward forward, degrees."""
+    world = bone_world(model, pose, leg)
+    thigh = sub(world[leg[1]][0], world[leg[0]][0])
+    return math.degrees(math.atan2(dot(thigh, forward), -thigh[2]))
+
+
+def hip_change(model, pose: Pose, stand: Pose, rig: Rig) -> float:
+    """Mean hip flexion change from the standing pose, degrees (+ thigh forward).
+
+    The pelvis does not turn in a jump clip, so the thigh pitch change is
+    the hip flexion change."""
+    return sum(
+        thigh_pitch(model, pose, leg, rig.forward) - thigh_pitch(model, stand, leg, rig.forward) for leg in LEGS
+    ) / len(LEGS)
+
+
 SOLVE_STEPS = 24  # bisection steps: the leg length / 2^24
 
 
@@ -271,7 +293,13 @@ def crouch_for(model, stand: Pose, rig: Rig, knee: float, ankle: float) -> tuple
 
     if ankle_at(0.0) >= ankle:
         return down_for(0.0), 0.0  # the shins lean no further than the reference
-    back = bisect(ankle_at, ankle, 0.0, 0.5 * rig.leg, "ankle bend")
+    # The farther back the pelvis, the less the deepest drop bends the knees:
+    # the ankle is searched only where the knee bend is still reachable.
+    deepest = (1.0 - MIN_REACH) * rig.leg
+    limit = 0.5 * rig.leg
+    if knee_change(model, crouched(deepest, limit), rig) < knee:
+        limit = bisect(lambda back: -knee_change(model, crouched(deepest, back), rig), -knee, 0.0, limit, "knee bend with the pelvis back")
+    back = bisect(ankle_at, ankle, 0.0, limit * (1.0 - 1e-6), "ankle bend")
     return down_for(back), back
 
 

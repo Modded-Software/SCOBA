@@ -421,3 +421,8 @@ bool gt_MedicSpawn_Func (bool testConds, bool runActions);
 void gt_MedicSpawn_Init ();
 bool gt_VisualTuning_Func (bool testConds, bool runActions);
 void gt_VisualTuning_Init ();
+void gf_HeroDropDeploy (int lp_player, unit lp_hero, point lp_at);
+void gf_IntroStart ();
+void gf_IntroFall ();
+void gf_IntroEnd (int lp_player);
+void gt_Intro_Init ();

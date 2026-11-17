@@ -1,0 +1,417 @@
+// Module: systems/intro
+// The intro (REQ-INTRO, SPEC-INTRO): a loop of camera shots with no UI and
+// the line "Press SPACE to deploy". SPACE: crash zoom on the hero's drop
+// point, then the hero pod fall of the hero drop. Touchdown ends it.
+//
+// Map init (gt_IntroPrepare): black, cinematic mode, the input and camera
+// triggers off. End of gt_MapInit (gf_IntroStart): hero
+// out of the world, dialogs hidden, music, creep seed, prompt, first cut.
+// One trigger writes the camera in the intro (gt_IntroTick).
+
+// --- Shots -------------------------------------------------------------
+
+fixed gf_IntroSmooth (fixed lp_u) {
+    return lp_u * lp_u * (3.0 - 2.0 * lp_u);
+}
+
+// Eased progress, as ease() in scripts/hitvolumes/intro_shots.py.
+fixed gf_IntroEase (int lp_ease, fixed lp_u, fixed lp_length) {
+    fixed lv_u = MinF(MaxF(lp_u, 0.0), 1.0);
+    fixed lv_r = c_INTRO_ARC_RAMP;
+    fixed lv_v = 1.0 / (1.0 - c_INTRO_ARC_RAMP);
+    fixed lv_w;
+
+    if (lp_ease == c_INTRO_EASE_E || lp_ease == c_INTRO_EASE_Z) {
+        return gf_IntroSmooth(lv_u);
+    }
+    if (lp_ease == c_INTRO_EASE_L) {
+        return lv_u;
+    }
+    if (lp_ease == c_INTRO_EASE_S) {
+        return 0.0;
+    }
+    if (lp_ease == c_INTRO_EASE_A) {
+        if (lv_u < lv_r) {
+            return lv_v * lv_u * lv_u / (2.0 * lv_r);
+        }
+        if (lv_u > 1.0 - lv_r) {
+            return 1.0 - lv_v * (1.0 - lv_u) * (1.0 - lv_u) / (2.0 * lv_r);
+        }
+        return lv_v * (lv_u - lv_r / 2.0);
+    }
+    if (lp_ease == c_INTRO_EASE_O) {
+        return 1.0 - (1.0 - lv_u) * (1.0 - lv_u) * (1.0 - lv_u);
+    }
+    // c_INTRO_EASE_C: O over c_INTRO_CRASH_MOVE, then held.
+    lv_w = MinF(lv_u * lp_length / c_INTRO_CRASH_MOVE, 1.0);
+    return 1.0 - (1.0 - lv_w) * (1.0 - lv_w) * (1.0 - lv_w);
+}
+
+fixed gf_IntroLerp (fixed lp_a, fixed lp_b, fixed lp_e) {
+    return lp_a + (lp_b - lp_a) * lp_e;
+}
+
+void gf_IntroDofSet (bool lp_on) {
+    gv_introDof = lp_on;
+    if (lp_on) {
+        CameraSetValue(1, c_cameraValueDepthOfField, c_INTRO_DOF_ON, 0.0, 0.0, 0.0);
+        CameraSetValue(1, c_cameraValueFocalDepth, c_INTRO_DOF_FOCUS, 0.0, 0.0, 0.0);
+        CameraSetValue(1, c_cameraValueFalloffStart, c_INTRO_DOF_FAR_START, 0.0, 0.0, 0.0);
+        CameraSetValue(1, c_cameraValueFalloffEnd, c_INTRO_DOF_FAR_END, 0.0, 0.0, 0.0);
+        CameraSetValue(1, c_cameraValueFalloffStartNear, c_INTRO_DOF_NEAR_START, 0.0, 0.0, 0.0);
+        CameraSetValue(1, c_cameraValueFalloffEndNear, c_INTRO_DOF_NEAR_END, 0.0, 0.0, 0.0);
+        return;
+    }
+    CameraSetValue(1, c_cameraValueDepthOfField, 0.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFocalDepth, c_INTRO_DFLT_FOCUS, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffStart, c_INTRO_DFLT_FAR_START, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEnd, c_INTRO_DFLT_FAR_END, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffStartNear, 0.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEndNear, 0.0, 0.0, 0.0, 0.0);
+}
+
+// Every intro scene: near DOF (operator 2026-11-17); far DOF only on the
+// rows flagged dof in the shot table.
+void gf_IntroSceneDof (bool lp_far) {
+    gf_IntroDofSet(true);
+    if (!lp_far) {
+        CameraSetValue(1, c_cameraValueFalloffStart, c_CAM_DOF_FAR_NONE, 0.0, 0.0, 0.0);
+        CameraSetValue(1, c_cameraValueFalloffEnd, c_CAM_DOF_FAR_NONE * 2.0, 0.0, 0.0, 0.0);
+    }
+}
+
+// Camera at progress lp_u of row lp_row, blended over lp_time (0 at a cut).
+void gf_IntroApply (int lp_row, fixed lp_u, fixed lp_time) {
+    fixed lv_e = gf_IntroEase(gv_introRow_ease[lp_row], lp_u, gv_introRow_length[lp_row]);
+    bool lv_odd = ModI(gv_introPass, 2) == 1;
+    fixed lv_x0 = gv_introRow_x0[lp_row];
+    fixed lv_y0 = gv_introRow_y0[lp_row];
+    fixed lv_x1 = gv_introRow_x1[lp_row];
+    fixed lv_y1 = gv_introRow_y1[lp_row];
+    fixed lv_yaw0 = gv_introRow_yaw0[lp_row];
+    fixed lv_yaw1 = gv_introRow_yaw1[lp_row];
+    fixed lv_swap;
+    fixed lv_z;
+    point lv_target;
+
+    if (lv_odd && gv_introRow_variant[lp_row] == c_INTRO_VAR_TARGET) {
+        lv_swap = lv_x0; lv_x0 = lv_x1; lv_x1 = lv_swap;
+        lv_swap = lv_y0; lv_y0 = lv_y1; lv_y1 = lv_swap;
+    }
+    if (lv_odd && gv_introRow_variant[lp_row] == c_INTRO_VAR_YAW) {
+        lv_swap = lv_yaw0; lv_yaw0 = lv_yaw1; lv_yaw1 = lv_swap;
+    }
+    if (lp_row == c_INTRO_ROW_ZOOM) {
+        // The zoom ends on the drop's first frame: the look ray through the
+        // pod's Birth start meets the ground at the landing spot (SPEC-HERO-DROP 3).
+        lv_target = gv_introDropAt;
+    }
+    else {
+        lv_target = Point(gf_IntroLerp(lv_x0, lv_x1, lv_e), gf_IntroLerp(lv_y0, lv_y1, lv_e));
+    }
+    gv_introTarget = lv_target;
+    gv_introYaw = gf_IntroLerp(lv_yaw0, lv_yaw1, lv_e);
+    gv_introPitch = gf_IntroLerp(gv_introRow_pitch0[lp_row], gv_introRow_pitch1[lp_row], lv_e);
+    gv_introFov = gf_IntroLerp(gv_introRow_fov0[lp_row], gv_introRow_fov1[lp_row], lv_e);
+    if (gv_introRow_ease[lp_row] == c_INTRO_EASE_Z) {
+        // Dolly zoom (R-INTRO-7): distance x tan(FOV / 2) constant.
+        gv_introDist = c_INTRO_DOLLY_K / Tan(gv_introFov / 2.0);
+    }
+    else {
+        gv_introDist = gf_IntroLerp(gv_introRow_dist0[lp_row], gv_introRow_dist1[lp_row], lv_e);
+    }
+    lv_z = gf_IntroLerp(gv_introRow_z0[lp_row], gv_introRow_z1[lp_row], lv_e);
+    if (lp_row == c_INTRO_ROW_ZOOM) {
+        // No height offset: the arm reaches back to the pod's start.
+        lv_z = c_SCOBA_CAMERA_HEIGHT_OFFSET;
+        gv_introDist = gf_IntroLerp(gv_introRow_dist0[lp_row], c_DROP_CAM_DISTANCE + c_POD_BIRTH_START_Z / Sin(c_POD_BIRTH_PITCH), lv_e);
+    }
+    // Raw only: reads 0 in this map (SPEC-INTRO F13). The table z is the
+    // offset above the ground.
+    gv_introGround = WorldHeight(c_heightMapGround, lv_target);
+    gv_introHeight = lv_z;
+    CameraPan(1, lv_target, lp_time, 0.0, 0.0, false);
+    gv_introSent = lv_target;
+    CameraSetValue(1, c_cameraValueYaw, gv_introYaw, lp_time, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValuePitch, gv_introPitch, lp_time, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueDistance, gv_introDist, lp_time, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFieldOfView, gv_introFov, lp_time, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueHeightOffset, gv_introHeight, lp_time, 0.0, 0.0);
+}
+
+// Cut to row lp_row at time lp_t into it.
+void gf_IntroCut (int lp_row, fixed lp_t) {
+    gv_introShot = lp_row;
+    gv_introShotStart = TimerGetElapsed(gv_sCOBA_Clock) - lp_t;
+    gv_introCuts += 1;
+    gf_IntroSceneDof(gv_introRow_dof[lp_row]);
+    gf_IntroApply(lp_row, lp_t / gv_introRow_length[lp_row], 0.0);
+}
+
+// Tests: jump to shot lp_row at lp_t seconds, pass lp_pass.
+void gf_IntroGoto (int lp_row, fixed lp_t, int lp_pass) {
+    if (gv_introState != c_INTRO_LOOP) {
+        return;
+    }
+    gv_introPass = lp_pass;
+    gf_IntroCut(lp_row, lp_t);
+}
+
+void gf_IntroLoopStep () {
+    fixed lv_t = TimerGetElapsed(gv_sCOBA_Clock) - gv_introShotStart;
+    int lv_row = gv_introShot;
+
+    if (lv_t >= gv_introRow_length[lv_row]) {
+        lv_t -= gv_introRow_length[lv_row];
+        lv_row += 1;
+        if (lv_row >= c_INTRO_SHOTS) {
+            lv_row = 0;
+            gv_introPass += 1;
+        }
+        // A long frame never skips a shot: the next one starts at its top
+        // if the time left over is longer than it.
+        if (lv_t >= gv_introRow_length[lv_row]) {
+            lv_t = 0.0;
+        }
+        gf_IntroCut(lv_row, lv_t);
+        return;
+    }
+    gf_IntroApply(lv_row, (lv_t + c_INTRO_TICK) / gv_introRow_length[lv_row], c_INTRO_TICK);
+}
+
+void gf_IntroZoomStep () {
+    fixed lv_t = TimerGetElapsed(gv_sCOBA_Clock) - gv_introZoomStart;
+    fixed lv_len = gv_introRow_length[c_INTRO_ROW_ZOOM];
+
+    if (lv_t >= lv_len) {
+        gf_IntroFall();
+        return;
+    }
+    gf_IntroApply(c_INTRO_ROW_ZOOM, (lv_t + c_INTRO_TICK) / lv_len, MinF(c_INTRO_TICK, lv_len - lv_t));
+}
+
+// --- Prompt ------------------------------------------------------------
+
+void gf_IntroPromptCreate () {
+    DialogCreate(c_INTRO_PROMPT_W, c_INTRO_PROMPT_H, c_anchorBottom, 0, c_INTRO_PROMPT_OFFSET, false);
+    gv_introPrompt = DialogLastCreated();
+    DialogSetImageVisible(gv_introPrompt, false);
+    libNtve_gf_CreateDialogItemLabel(gv_introPrompt, c_INTRO_PROMPT_W, c_INTRO_PROMPT_H, c_anchorCenter, 0, 0, StringToText("Press SPACE to deploy"), Color(100,100,100), false, 0.0);
+    gv_introPromptLabel = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemStyle(gv_introPromptLabel, "SCOBAIntroPrompt", PlayerGroupAll());
+    DialogSetRenderPriority(gv_introPrompt, 600);
+    DialogSetVisible(gv_introPrompt, PlayerGroupSingle(1), true);
+    gv_introPromptLow = false;
+}
+
+void gf_IntroPromptHide () {
+    if (gv_introPrompt != c_invalidDialogId) {
+        DialogSetVisible(gv_introPrompt, PlayerGroupSingle(1), false);
+    }
+}
+
+// --- Creep seed (R-INTRO-13) ------------------------------------------
+
+void gf_IntroSeedGroup (unitgroup lp_group) {
+    UnitGroupLoopBegin(lp_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
+        // On along the center lane through the enemy half's gate.
+        gf_GateFromX(UnitGroupLoopCurrent(), 1);
+        gv_introSeeded += 1;
+    }
+    UnitGroupLoopEnd();
+}
+
+void gf_IntroSeed () {
+    point lv_x = RegionGetCenter(gv_xLOCATIONS[1]);
+    point lv_terran = PointWithOffset(lv_x, c_INTRO_SEED_OFFSET, c_INTRO_SEED_OFFSET);
+    point lv_zerg = PointWithOffset(lv_x, -c_INTRO_SEED_OFFSET, -c_INTRO_SEED_OFFSET);
+    unitgroup lv_group;
+
+    lv_group = gf_CreateSpawnGroup(4, "Marine", 1, lv_terran);
+    libNtve_gf_CreateUnitsAtPoint2(1, "Goliath", 0, 1, lv_terran);
+    UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
+    gf_IntroSeedGroup(lv_group);
+    gv_introSeedTerran = UnitGroupCopy(lv_group);
+    lv_group = gf_CreateSpawnGroup(8, "Zergling", 4, lv_zerg);
+    libNtve_gf_CreateUnitsAtPoint2(2, "Roach", 0, 4, lv_zerg);
+    UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
+    gf_IntroSeedGroup(lv_group);
+    gv_introSeedZerg = UnitGroupCopy(lv_group);
+}
+
+// --- Flow --------------------------------------------------------------
+
+// Map init: black, cinematic mode, input and camera triggers off.
+void gf_IntroPrepare () {
+    if (!gf_IntroEnabled()) {
+        gv_introState = c_INTRO_OFF;
+        return;
+    }
+    gv_introState = c_INTRO_LOOP;
+    gv_introActive = true;
+    CinematicFade(false, 0.0, c_fadeStyleNormal, Color(0,0,0), 0.0, false);
+    CinematicMode(PlayerGroupSingle(1), true, 0.0);
+    gv_introCinematic = true;
+    // No CameraLockInput (SPEC-TPS: it kept the cursor captured). The
+    // camera triggers are off, and gt_IntroTick writes the camera each loop.
+    gf_IntroTriggersOff();
+}
+
+void gf_IntroHeroHide (unit lp_hero) {
+    if (!UnitIsValid(lp_hero)) {
+        return;
+    }
+    UnitIssueOrder(lp_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    libNtve_gf_PauseUnit(lp_hero, true);
+    UnitSetState(lp_hero, c_unitStateSelectable, false);
+    UnitSetState(lp_hero, c_unitStateHighlightable, false);
+    UnitSetState(lp_hero, c_unitStateHidden, true);
+}
+
+// End of gt_MapInit: the hero is bound, the dialogs exist.
+void gf_IntroStart () {
+    if (gv_introState != c_INTRO_LOOP) {
+        return;
+    }
+    gf_IntroHeroHide(gv_heroActive);
+    UnitClearSelection(1);
+    gf_IntroDialogsHide();
+    CameraFollowUnitGroup(1, UnitGroupEmpty(), false, false);
+    CameraUseHeightSmoothing(1, false);
+    gv_introMusicValid = CatalogEntryIsValid(c_gameCatalogSoundtrack, c_INTRO_MUSIC);
+    gv_introSilenceValid = CatalogEntryIsValid(c_gameCatalogSoundtrack, c_INTRO_SILENCE);
+    SoundtrackPlay(PlayerGroupAll(), c_soundtrackCategoryMusic, c_INTRO_MUSIC, c_soundtrackCueAny, c_soundtrackIndexAny, true);
+    gv_introMusic = true;
+    gf_IntroSeed();
+    gf_IntroPromptCreate();
+    gv_introPass = 0;
+    gf_IntroCut(0, 0.0);
+    CinematicFade(true, c_INTRO_FADE_IN, c_fadeStyleNormal, Color(0,0,0), 0.0, false);
+    TriggerEnable(gt_IntroTick, true);
+    TriggerEnable(gt_IntroPulse, true);
+}
+
+// SPACE in the loop (R-INTRO-10).
+void gf_IntroDeployPress () {
+    if (gv_introState != c_INTRO_LOOP || gv_introCuts == 0) {
+        gv_introSpaceIgnored += 1;
+        return;
+    }
+    gv_introDeploys += 1;
+    gv_introState = c_INTRO_ZOOM;
+    gf_IntroPromptHide();
+    TriggerEnable(gt_IntroPulse, false);
+    // No music after deploy (operator 2026-11-17, O-INTRO-1).
+    // Stop, then silence as the default, so no default track comes back
+    // (the Void campaign's own pattern).
+    SoundtrackStop(PlayerGroupAll(), c_soundtrackCategoryMusic, true);
+    SoundtrackPlay(PlayerGroupAll(), c_soundtrackCategoryMusic, c_INTRO_SILENCE, c_soundtrackCueAny, c_soundtrackIndexAny, true);
+    gv_introMusic = false;
+    gv_introDropAt = gf_DropPodPoint(gv_sPAWNLOCATIONS[1], null, null);
+    gv_introZoomStart = TimerGetElapsed(gv_sCOBA_Clock);
+    gv_introShot = c_INTRO_ROW_ZOOM;
+    gv_introCuts += 1;
+    gf_IntroDofSet(false);
+    gf_IntroApply(c_INTRO_ROW_ZOOM, 0.0, 0.0);
+}
+
+// End of the crash zoom: the hero pod falls (hero drop).
+void gf_IntroFall () {
+    // gt_IntroTick stays on: in FALL it only keeps the dialogs hidden.
+    gv_introState = c_INTRO_FALL;
+    // The pod ride looks as a hero drop: rest lens, the map-start pitch.
+    // Rest lens; yaw, pitch and arm come from the drop (chase on the pod's line).
+    CameraSetValue(1, c_cameraValueFieldOfView, c_SCOBA_REST_FOV, 0.0, 0.0, 0.0);
+    gv_introFov = c_SCOBA_REST_FOV;
+    gv_introPitch = c_POD_BIRTH_PITCH;
+    gf_HeroDropDeploy(1, gv_heroActive, gv_introDropAt);
+}
+
+// Touchdown (R-INTRO-12). Called by gf_HeroDropLand after the hero bind.
+void gf_IntroEnd (int lp_player) {
+    if (lp_player != 1 || !gv_introActive) {
+        return;
+    }
+    gf_IntroPromptHide();
+    gf_IntroDofSet(false);
+    gf_IntroDialogsRestore();
+    gf_IntroTriggersRestore();
+    CinematicMode(PlayerGroupSingle(1), false, c_INTRO_LETTERBOX_OUT);
+    gv_introCinematic = false;
+    // Game UI and minimap back (hidden at map init, app/init).
+    UISetMode(PlayerGroupAll(), c_uiModeConsole, c_INTRO_LETTERBOX_OUT);
+    UISetFrameVisible(PlayerGroupAll(), c_syncFrameTypeMinimapPanel, true);
+    TriggerEnable(gt_IntroTick, false);
+    TriggerEnable(gt_IntroPulse, false);
+    gv_introState = c_INTRO_DONE;
+    gv_introActive = false;
+}
+
+// --- Triggers ----------------------------------------------------------
+
+bool gt_IntroPrepare_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_IntroPrepare();
+    return true;
+}
+
+bool gt_IntroTick_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_IntroDialogsEnforce();
+    if (gv_introSent != null && (gv_introState == c_INTRO_LOOP || gv_introState == c_INTRO_ZOOM)) {
+        gv_introCamRead = CameraGetTarget(1);
+        gv_introCamGap = DistanceBetweenPoints(gv_introCamRead, gv_introSent);
+    }
+    if (gv_introState == c_INTRO_LOOP) {
+        gf_IntroLoopStep();
+    }
+    else if (gv_introState == c_INTRO_ZOOM) {
+        gf_IntroZoomStep();
+    }
+    return true;
+}
+
+bool gt_IntroDeploy_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_IntroDeployPress();
+    return true;
+}
+
+bool gt_IntroPulse_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (gv_introState != c_INTRO_LOOP) {
+        return true;
+    }
+    gv_introPromptLow = !gv_introPromptLow;
+    if (gv_introPromptLow) {
+        DialogControlFadeTransparency(gv_introPromptLabel, PlayerGroupSingle(1), c_INTRO_PULSE, c_INTRO_PULSE_HIGH);
+    }
+    else {
+        DialogControlFadeTransparency(gv_introPromptLabel, PlayerGroupSingle(1), c_INTRO_PULSE, c_INTRO_PULSE_LOW);
+    }
+    return true;
+}
+
+void gt_Intro_Init () {
+    gf_IntroShotsLoad();
+    gt_IntroPrepare = TriggerCreate("gt_IntroPrepare_Func");
+    TriggerAddEventMapInit(gt_IntroPrepare);
+    gt_IntroTick = TriggerCreate("gt_IntroTick_Func");
+    TriggerAddEventTimePeriodic(gt_IntroTick, c_INTRO_TICK, c_timeGame);
+    TriggerEnable(gt_IntroTick, false);
+    gt_IntroPulse = TriggerCreate("gt_IntroPulse_Func");
+    TriggerAddEventTimePeriodic(gt_IntroPulse, c_INTRO_PULSE, c_timeGame);
+    TriggerEnable(gt_IntroPulse, false);
+    gt_IntroDeploy = TriggerCreate("gt_IntroDeploy_Func");
+    TriggerAddEventKeyPressed(gt_IntroDeploy, 1, c_keySpace, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}

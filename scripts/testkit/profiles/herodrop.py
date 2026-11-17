@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from hitvolumes import pod_birth
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
@@ -16,17 +17,17 @@ from ..runner import TestRunSpec
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
-# c_DROP_HEIGHT 40 and c_DROP_FALL 2.2 s (core/hero_drop.galaxy).
-DROP_H100 = 4000
-FALL_MS = 2200
+# The pod falls in its Birth clip; the camera follows the clip root
+# (scripts/hitvolumes/pod_birth.py). Touchdown: the first loop at or after the land key,
+# times from the pod's create loop.
+FALL_MS = pod_birth.LAND_MS
 LOOP_MS = 62
-# The pod appears in the loop after the reinforcement; the harness starts
-# its clock in the loop it first sees the pod. Touchdown: the first loop at
-# or after the fall time, seen by the harness up to two loops later.
-LAND_MS = (FALL_MS - 2 * LOOP_MS, FALL_MS + 3 * LOOP_MS)
-# The camera height is set to the pod's target for the next loop. One loop
-# of the fastest fall part (40 x 0.94 / 1.6 s) is about 1.5.
-CAM_LAG_H100 = 160
+LAND_MS = (FALL_MS, FALL_MS + 3 * LOOP_MS)
+# The harness reads in the same loop as the drop tick, before or after it:
+# the camera is at the root of this loop or the next. Within that window it
+# must be on the root to 1.0 (XY) and 1.0 (height).
+ROOT_TOL_100 = 100
+UNIT_GROUND_H100 = 5  # pod unit height: on the ground
 CAM_ON_TARGET_100 = 100  # camera target to pod or hero, horizontal
 
 
@@ -36,39 +37,71 @@ def _report(checks, name: str, ok: bool, detail: str) -> None:
         checks.failures += 1
 
 
-def _fall(checks, s: str) -> None:
-    """R-DROP-3, R-DROP-4: the pod falls from the drop height to the ground; the camera carries it."""
+def _window(ms: int, facing: float) -> list[tuple[float, float, float]]:
+    """The Birth root offset (world, x100) over this loop and the next."""
+    return [tuple(v * 100.0 for v in pod_birth.world(m, facing)) for m in range(max(ms - LOOP_MS, 0), ms + LOOP_MS + 1, 5)]
+
+
+def birth_follow(checks, s: str, ground: int) -> list[tuple[int, int, int, int, int, int]]:
+    """A stock pod drop; the camera follows the Birth root (herodrop and intro).
+
+    Rows: ms from the create loop, unit height, applied camera height,
+    camera target x, y (x100), and a last flag column for the caller.
+    """
     text = checks.value(s, "", "fall") or ""
     rows = []
     for item in text.split():
         ms, rest = item.split(":", 1)
-        pod, cam, dist, alive = (int(v) for v in rest.split("/"))
-        rows.append((int(ms), pod, cam, dist, alive))
+        unit_h, cam_h, cam_xy, alive = rest.split("/")
+        cx, cy = (int(v) for v in cam_xy.split(","))
+        rows.append((int(ms), int(unit_h), int(cam_h), cx, cy, int(alive)))
     print(f"{s} raw fall rows={len(rows)} first={rows[:3]} last={rows[-3:]}")
-    cams = [checks.value(s, "", f"camXY{i}") for i in range(4)]
-    print(f"{s} raw pod={checks.value(s, '', 'podXY')} death={checks.value(s, '', 'deathXY')} cam={cams}")
+    pod_at = checks.value(s, "", "podAt100") or "0,0"
+    px, py = (int(v) for v in str(pod_at).split(","))
+    facing = (checks.value(s, "", "podFacing100") or 0) / 100.0
+    print(f"{s} raw podAt100={pod_at} facing={facing} seenMs={checks.value(s, '', 'seenMs')} death={checks.value(s, '', 'deathXY')}")
     _report(checks, f"{s} fall sampled", len(rows) >= 20, f"rows={len(rows)}")
     if not rows:
-        return
-    ground = checks.value(s, "tland", "HeroH100") or 0
+        return rows
     base = checks.value(s, "", "camBase100") or 0
-    first = rows[0][1] - ground
-    _report(checks, f"{s} pod starts at the drop height", DROP_H100 - 200 <= first <= DROP_H100 + 50, f"first={first} ground={ground}")
-    rises = [r for a, r in zip(rows, rows[1:]) if r[1] > a[1] + 5]
-    _report(checks, f"{s} pod never rises", not rises, f"rises={rises[:3]}")
-    last = rows[-1][1] - ground
-    _report(checks, f"{s} pod near the ground at the last loop", last <= 300, f"last={last}")
-    lag = [(ms, pod - ground, cam - base) for ms, pod, cam, _, _ in rows if abs((pod - ground) - (cam - base)) > CAM_LAG_H100]
-    _report(checks, f"{s} camera height carries the pod height", not lag, f"off={lag[:4]}")
-    # The camera XY lock is an operator check: CameraGetTarget is right only
-    # in the loop after a pan (T26). Raw: the first row is that loop.
-    print(f"{s} raw camera to pod, first loop={rows[0][3]}")
-    _report(checks, f"{s} camera panned onto the pod", rows[0][3] <= CAM_ON_TARGET_100, f"dist100={rows[0][3]}")
+    # Stock drop: the unit is never lifted; the model falls (negative of
+    # the old design, a landed pod carried down in the air).
+    lifted = [(ms, h - ground) for ms, h, *_ in rows if abs(h - ground) > UNIT_GROUND_H100]
+    _report(checks, f"{s} pod unit stays on the ground", not lifted, f"lifted={lifted[:3]}")
+    # The camera target (engine) on the root, recomputed here from the
+    # engine pod position and facing.
+    off_xy = []
+    off_h = []
+    for ms, _, cam_h, cx, cy, _ in rows:
+        win = _window(ms, facing)
+        dxy = min(((px + wx - cx) ** 2 + (py + wy - cy) ** 2) ** 0.5 for wx, wy, _ in win)
+        dh = min(abs(max(wz, 0.0) - (cam_h - base)) for _, _, wz in win)
+        if dxy > ROOT_TOL_100:
+            off_xy.append((ms, int(dxy)))
+        if dh > ROOT_TOL_100:
+            off_h.append((ms, int(dh)))
+    print(f"{s} raw camera to root xy per loop={[(r[0], r[3] - px, r[4] - py) for r in rows[:6]]}")
+    _report(checks, f"{s} camera target on the Birth root", not off_xy, f"off={off_xy[:4]}")
+    _report(checks, f"{s} camera height on the Birth root", not off_h, f"off={off_h[:4]}")
+    # Negative: early in the fall the camera is far from the pod unit (it
+    # follows the drawn pod, not the unit on the ground).
+    ms0, _, _, cx0, cy0, _ = rows[0]
+    d0 = ((cx0 - px) ** 2 + (cy0 - py) ** 2) ** 0.5
+    _report(checks, f"{s} camera off the pod unit early", ms0 > 800 or d0 >= 3000, f"ms={ms0} dist100={int(d0)}")
+    # The camera height falls with the root: never rises past one window.
+    rises = [(a[0], b[0]) for a, b in zip(rows, rows[1:]) if b[2] > a[2] + 20]
+    _report(checks, f"{s} camera height never rises", not rises, f"rises={rises[:3]}")
+    return rows
+
+
+def _fall(checks, s: str) -> None:
+    """R-DROP-3, R-DROP-4."""
+    rows = birth_follow(checks, s, checks.value(s, "tland", "HeroH100") or 0)
     # The arm is long enough for the pod (c_DROP_CAM_DISTANCE 20).
     dist = checks.value(s, "", "midCamDist100")
     _report(checks, f"{s} camera arm behind the pod", dist is not None and 1500 <= dist <= 2000, f"dist100={dist}")
     # Negative: the hero stays dead while the pod falls.
-    alive = [ms for ms, _, _, _, a in rows if a]
+    alive = [r[0] for r in rows if r[5]]
     _report(checks, f"{s} hero dead during the fall", not alive, f"aliveAt={alive[:4]}")
 
 

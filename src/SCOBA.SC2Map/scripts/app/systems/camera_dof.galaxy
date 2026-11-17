@@ -1,0 +1,74 @@
+// Module: systems/camera_dof
+// In-game camera DOF (REQ-CAMERA-DOF), split from systems/camera.
+
+// In-game DOF (REQ-CAMERA-DOF). Max strength = the intro DOF
+// (c_INTRO_DOF_*): near 1..6, far 4..18, at the focus (the camera arm).
+// Near: k = (d - 1) / (40 - 1), falloffs = max x k (R-DOF-1).
+// Aim: near at k = 1 at any arm, no far (R-DOF-2, R-DOF-4).
+// Far: kf = (d - 3) / (40 - 3), falloffs = max / kf; kf <= 0: none (R-DOF-3).
+// k = 0 and kf <= 0, no aim: DOF off (R-DOF-5).
+void gf_CameraDofApply (int lp_player) {
+    fixed lv_d;
+    fixed lv_k;
+    fixed lv_kf;
+    bool lv_aim;
+
+    if (gv_introActive || UnitIsValid(gv_dropPod[lp_player]) || !UnitIsValid(gv_tPSUNIT[lp_player])) {
+        return;
+    }
+    lv_d = CameraGetDistance(lp_player);
+    lv_aim = gv_aIMACTIVE[lp_player];
+    lv_k = MaxF(MinF((lv_d - c_CAM_DOF_NEAR_MIN_ARM) / (c_CAM_DOF_MAX_ARM - c_CAM_DOF_NEAR_MIN_ARM), 1.0), 0.0);
+    lv_kf = MaxF(MinF((lv_d - c_CAM_DOF_FAR_MIN_ARM) / (c_CAM_DOF_MAX_ARM - c_CAM_DOF_FAR_MIN_ARM), 1.0), 0.0);
+    if (lv_aim) {
+        lv_k = 1.0;
+        lv_kf = 0.0;
+    }
+    gv_cameraDofNear[lp_player] = lv_k;
+    gv_cameraDofFar[lp_player] = lv_kf;
+    if (lv_k <= 0.0 && lv_kf <= 0.0) {
+        CameraSetValue(lp_player, c_cameraValueDepthOfField, 0.0, 0.0, 0.0, 0.0);
+        return;
+    }
+    CameraSetValue(lp_player, c_cameraValueDepthOfField, 1.0, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFocalDepth, lv_d, 0.0, 0.0, 0.0);
+    // Near falloffs scale with the arm, not fixed units: at a short arm
+    // (aim, TPS) fixed 1..6 lies behind the camera, so nothing blurred.
+    // Blur starts just before the focus; the fade is >= 0.35 x arm wide
+    // (feathered), and shorter (stronger) as k grows.
+    if (lv_aim) {
+        // Aim: blur from the focus on, almost the whole lower screen.
+        CameraSetValue(lp_player, c_cameraValueFocalDepth, c_CAM_DOF_AIM_FOCUS, 0.0, 0.0, 0.0);
+        CameraSetValue(lp_player, c_cameraValueFalloffStartNear, c_CAM_DOF_AIM_NEAR_START, c_CAM_DOF_BLEND, 0.0, 0.0);
+        CameraSetValue(lp_player, c_cameraValueFalloffEndNear, c_CAM_DOF_AIM_NEAR_END, c_CAM_DOF_BLEND, 0.0, 0.0);
+    }
+    else {
+        CameraSetValue(lp_player, c_cameraValueFalloffStartNear, lv_d * c_CAM_DOF_NEAR_START_FRAC, c_CAM_DOF_BLEND, 0.0, 0.0);
+        CameraSetValue(lp_player, c_cameraValueFalloffEndNear, lv_d * (1.0 - (1.0 - c_CAM_DOF_NEAR_REACH) * lv_k), c_CAM_DOF_BLEND, 0.0, 0.0);
+    }
+    if (lv_kf > 0.0) {
+        CameraSetValue(lp_player, c_cameraValueFalloffStart, c_CAM_DOF_FAR_MAX_START / lv_kf, c_CAM_DOF_BLEND, 0.0, 0.0);
+        CameraSetValue(lp_player, c_cameraValueFalloffEnd, c_CAM_DOF_FAR_MAX_END / lv_kf, c_CAM_DOF_BLEND, 0.0, 0.0);
+    }
+    else {
+        CameraSetValue(lp_player, c_cameraValueFalloffStart, c_CAM_DOF_FAR_NONE, 0.0, 0.0, 0.0);
+        CameraSetValue(lp_player, c_cameraValueFalloffEnd, c_CAM_DOF_FAR_NONE * 2.0, 0.0, 0.0, 0.0);
+    }
+}
+
+bool gt_CameraDofTick_Func (bool testConds, bool runActions) {
+    int lv_player;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        gf_CameraDofApply(lv_player);
+    }
+    return true;
+}
+
+void gt_CameraDofTick_Init () {
+    gt_CameraDofTick = TriggerCreate("gt_CameraDofTick_Func");
+    TriggerAddEventTimePeriodic(gt_CameraDofTick, 0.05, c_timeGame);
+}

@@ -14,6 +14,7 @@ from jumpanim.bake import (
     APEX_MS,
     CROUCH_MS,
     END,
+    FEET_DOWN_MS,
     FEET,
     FLIGHT_PHASE,
     FLIGHT_PHASE_BACK,
@@ -30,6 +31,7 @@ from jumpanim.bake import (
     STRIDES,
     TOUCHDOWN_MS,
     ankle_change,
+    hip_change,
     baked_name,
     base_time,
     bone_world,
@@ -200,18 +202,23 @@ def check_reference(model) -> list[str]:
     rig = measure_rig(model, clip_pose(model, STAND_BASE.group, 0))
     start, air, end = (baked_name(phase, STAND_BASE) for phase in JUMP_PHASES)
 
-    def deepest(name: str, last_ms: int) -> dict:
-        poses = [clip_pose(model, name, ms) for ms in clip_times(model, name) if ms <= last_ms]
+    def deepest(name: str, first_ms: int, last_ms: int) -> dict:
+        poses = [clip_pose(model, name, ms) for ms in clip_times(model, name) if first_ms <= ms <= last_ms]
         return max(poses, key=lambda pose: knee_change(model, pose, rig))
 
-    crouch = deepest(start, CROUCH_MS)
-    landing = deepest(end, END.length_ms)
+    crouch = deepest(start, 0, CROUCH_MS)
+    # The landing crouch with the feet down: before FEET_DOWN_MS the air tuck
+    # still bends the knees and the toes still point.
+    landing = deepest(end, FEET_DOWN_MS, END.length_ms)
     flight = clip_pose(model, air, 0)
+    # The stand under the air clip at its start: the hip change is the jump's only.
+    under = clip_pose(model, STAND_BASE.group, base_time(AIR, STAND_BASE, None, 0, 0))
     got = {
         "crouch knee": knee_change(model, crouch, rig),
         "crouch ankle": ankle_change(model, crouch, rig),
         "air knee": knee_change(model, flight, rig),
         "air ankle": ankle_change(model, flight, rig),
+        "air hip": hip_change(model, flight, under, rig),
         "landing knee": knee_change(model, landing, rig),
         "landing ankle": ankle_change(model, landing, rig),
     }

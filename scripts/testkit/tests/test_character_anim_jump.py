@@ -98,7 +98,7 @@ class JumpClipPlanTest(unittest.TestCase):
         # The flight the gather follows is the script's flight.
         self.assertAlmostEqual(galaxy_fixed("c_JUMP_TIME_UP"), TIME_UP_MS / 1000.0, places=3)
         self.assertAlmostEqual(galaxy_fixed("c_JUMP_FALL_GAIN"), FALL_GAIN, places=3)
-        self.assertAlmostEqual(TOUCHDOWN_MS, 670.0, delta=1.0)
+        self.assertAlmostEqual(TOUCHDOWN_MS, 687.0, delta=1.0)  # crouch 150 + rise 300 + fall 237
         # The air clip does not wrap before touchdown, with one game loop to spare.
         self.assertGreaterEqual(AIR.length_ms, TOUCHDOWN_MS - START.length_ms + galaxy_fixed("c_JUMP_TICK") * 1000.0)
 

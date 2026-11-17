@@ -233,7 +233,8 @@ loop frame to the SPACE press.
 
 ## 6. Deploy
 
-1. **SPACE.** The prompt goes in the same loop.
+1. **SPACE.** The prompt goes in the same loop. The theme fades out.
+   No music from here on.
 2. **The snap (0.35 s).** Hard cut to a high view over the hero's drop
    point: yaw 225, pitch 55, distance 60, lens 60. Crash zoom: lens 60 to
    12 in 0.3 s, fast in, hard stop. The only crash zoom in the intro (P9).
@@ -246,5 +247,6 @@ loop frame to the SPACE press.
 ## 7. Not in this script
 
 - Sound design beyond the theme: none.
+- Music after deploy: none (operator, 2026-11-17).
 - Text other than the prompt: none.
 - Camera roll: none. The quake owns roll.

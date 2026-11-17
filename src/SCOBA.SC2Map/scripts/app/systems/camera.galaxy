@@ -373,6 +373,11 @@ void gf_CameraCollisionApply (int lp_player) {
     if (!UnitIsValid(gv_tPSUNIT[lp_player]) || gv_cameraCollisionOff[lp_player]) {
         return;
     }
+    // The hero drop owns the arm while its pod falls (podbirth/20261117-114618:
+    // the clamp reset the arm to 20 between drop loops, 125 -> 20 -> 101).
+    if (UnitIsValid(gv_dropPod[lp_player])) {
+        return;
+    }
     if (gv_cameraDistanceDesired[lp_player] <= 0.0) {
         gv_cameraDistanceDesired[lp_player] = CameraGetDistance(lp_player);
     }

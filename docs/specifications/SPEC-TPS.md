@@ -542,3 +542,19 @@ Shot clocks on the 0.25 s Tosh period:
 
 Only the harness files of `combat` and `pncprobe` changed after
 `tps/20261114-234256`.
+
+## Camera depth of field (REQ-CAMERA-DOF)
+
+`gf_CameraDofApply` (systems/camera.galaxy), own 0.05 s timer
+`gt_CameraDofTick`, PnC and TPS. Skipped during the intro and the hero drop.
+Focus = camera arm d. Max strength = the intro DOF (near 1..6, far 4..18).
+
+- Near: k = clamp((d - 1) / 39); near falloffs = (0.08 d, (1 - 0.6375 k) d):
+  scaled to the arm, feathered.
+- Far: kf = clamp((d - 3) / 37); far falloffs = (2.5, 12) / kf; kf = 0: far
+  falloff 100000 (none).
+- Aim: focus 2, near falloffs (0.2, 1.8), absolute (operator pick,
+  aimdof/20261117-134320 point 5); no far blur.
+- k = 0 and kf = 0: DOF off.
+
+The blur's look is an operator check.

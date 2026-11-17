@@ -15,13 +15,20 @@ the shin leans (dorsiflexion). A stand jump keeps the stand stance and a walk
 jump keeps the stride of the walk.
 
 How far the joints bend comes from motion capture (`REFERENCE`): CMU Graphics
-Lab Motion Capture Database, subject 16, trials 01 and 02 (jump) and 05
-(forward jump), mocap.cs.cmu.edu. Angles are changes from the standing pose:
+Lab Motion Capture Database, mocap.cs.cmu.edu, subject 16 trials 01, 02
+(jump), 03, 04 (high jump), 05 (forward jump); subject 75 trials 01-03 (run
+jump), 12 (hops). Angles are changes from the standing pose, mean of the legs:
 
-    crouch lowest:   knee +64 +71 +53   ankle -17 -18 -17 (dorsiflexed)
-    flight peak:     knee  +9 +12 +19   ankle +35 +27 +35 (toes down)
-    landing lowest:  knee +40 +38 +44   ankle -15 -17  -9
+    trial            crouch knee ankle   flight knee hip ankle   landing knee ankle
+    16_01 16_02 16_05   +64 +71 +53 / -17   +9 +12 +19 / +35       +40 +38 +44 / -15
+    16_03 high jump     +71 / -17           +19 (max +23), hip +17, ankle +34   +52 / -16
+    16_04 high jump     +70 / -21           +13, hip +8, ankle +29              +47 / -22
+    75_12 hops          up to +85           +25 to +35, hip +6                  up to +64
+    75_03 run jump      +30 (run-up)        +39, hip +4, ankle +39              +49
 
+Operator 2026-11-17 (the jump was stiff): the targets are the strongest
+trials: high jump crouch and landing, tucked air knee. The feet stay under
+the hips in flight; the thigh goes forward by about half the knee bend.
 The ankle is flat through the crouch, swings toes down at liftoff, and is
 flat again about 70 ms around touchdown (toes first). At liftoff the knees
 are about 70% extended.
@@ -118,6 +125,7 @@ from jumpanim.ik import (
     crouch_shift,
     gather_foot,
     gather_knee,
+    hip_change,
     joint_width,
     knee_change,
     knee_flexion,
@@ -142,7 +150,7 @@ FLIGHT_PHASE_BACK = 0.95  # the back walks are the walk reversed
 # Start and End play the walk at walk rate 1 (operator 2026-11-16: the feet
 # slid): the script plays them at the walk clip rate, as the walk itself.
 # PUSH_CYCLE = CROUCH_MS / cycle; LAND_CYCLE - AIR_CYCLE = End length / cycle.
-PUSH_CYCLE = 0.2     # walk cycle part Start plays before the flight frame
+PUSH_CYCLE = 0.225   # walk cycle part Start plays before the flight frame
 LAND_CYCLE = 0.405   # walk cycle part End ends at, after the flight frame
 # Walk cycle part the legs move on in the air, liftoff to touchdown: about
 # 4% of the walk rate (operator 2026-11-16: not a freeze frame). The legs
@@ -151,7 +159,7 @@ LAND_CYCLE = 0.405   # walk cycle part End ends at, after the flight frame
 AIR_CYCLE = 0.03
 
 # Timing (ms), from core/jump.galaxy: c_JUMP_CROUCH, _RISE_TIME, _LAND_TIME.
-CROUCH_MS = 133
+CROUCH_MS = 150
 # Flight, from core/jump.galaxy: c_JUMP_TIME_UP, c_JUMP_FALL_GAIN. The fall
 # takes the rise time / sqrt(gain).
 TIME_UP_MS = 300
@@ -174,7 +182,7 @@ class JumpClip(NamedTuple):
 
 
 START = JumpClip("Jump Start", 267, False)
-# Air covers the whole flight after Start (TOUCHDOWN_MS - 267 = 403 ms; up to
+# Air covers the whole flight after Start (TOUCHDOWN_MS - 267 = 420 ms; up to
 # 60 ms more when a walk jump plays Start faster) plus one game loop, so it
 # never wraps in a jump: its pose can change over time.
 AIR = JumpClip("Jump", 533, True)
@@ -210,9 +218,10 @@ JUMP_GROUPS = tuple(baked_name(phase, base, stride) for phase, base, stride in c
 
 
 CROUCH_PEAK_MS = 60    # deepest takeoff crouch
-CROUCH_EXTEND_MS = 148  # legs straight, just after liftoff
+CROUCH_EXTEND_MS = 165  # legs straight, just after liftoff
 LAND_PEAK_MS = 60      # deepest landing crouch
 LAND_RECOVER_MS = 220  # standing again
+FEET_DOWN_MS = 66      # touchdown to feet flat and down (toes first); liftoff to toes pointed
 
 
 def punch(peak: float, done: float, ms: float) -> float:
@@ -256,19 +265,19 @@ def tuck_weight(phase: JumpClip, ms: float) -> float:
     if phase is START:
         return smoothstep(CROUCH_MS, START.length_ms, ms)
     if phase is END:
-        return 1.0 - smoothstep(0.0, 66.0, ms)
+        return 1.0 - smoothstep(0.0, FEET_DOWN_MS, ms)
     return 1.0
 
 
 def point_weight(phase: JumpClip, ms: float) -> float:
     """Ankle swing toes down (0..1) at ms into the phase clip.
 
-    Flat on the ground; down over 66 ms from liftoff; flat again 66 ms into
+    Flat on the ground; down over FEET_DOWN_MS from liftoff; flat again FEET_DOWN_MS into
     the landing, while the feet are still raised by the tuck (toes first)."""
     if phase is START:
-        return smoothstep(CROUCH_MS, CROUCH_MS + 66.0, ms)
+        return smoothstep(CROUCH_MS, CROUCH_MS + FEET_DOWN_MS, ms)
     if phase is END:
-        return 1.0 - smoothstep(0.0, 66.0, ms)
+        return 1.0 - smoothstep(0.0, FEET_DOWN_MS, ms)
     return 1.0
 
 
@@ -420,7 +429,7 @@ def make_jump_groups(model, groups) -> str:
 # Re-exported for the validator and the tests.
 __all__ = [
     "AIR", "AIR_ANKLE_DEG", "AIR_CYCLE", "AIR_KNEE_DEG", "APEX_MS", "CROUCH_ANKLE_DEG",
-    "CROUCH_EXTEND_MS", "CROUCH_KNEE_DEG", "CROUCH_MS", "CROUCH_PEAK_MS", "END", "FALL_GAIN",
+    "CROUCH_EXTEND_MS", "CROUCH_KNEE_DEG", "CROUCH_MS", "CROUCH_PEAK_MS", "END", "FALL_GAIN", "FEET_DOWN_MS",
     "FEET", "FLIGHT_PHASE", "FLIGHT_PHASE_BACK", "GATHER_FEET", "GATHER_KNEES", "GATHER_REFERENCE",
     "JUMP_BASES", "JUMP_GROUPS", "JUMP_HEROES", "JUMP_PHASES", "JumpBase", "JumpClip",
     "LAND_ANKLE_DEG", "LAND_CYCLE", "LAND_KNEE_DEG", "LAND_PEAK_MS", "LAND_RECOVER_MS", "LEGS",
@@ -431,7 +440,7 @@ __all__ = [
     "body_forward", "bone_named", "bone_world", "clip_forward", "clip_plan", "clip_pose", "conj",
     "cross", "crouch_depth", "crouch_for", "crouch_shift", "crouch_weight", "dot", "feet_distance",
     "flight_phase", "foot_positions", "gait_flights", "gather_foot", "gather_knee", "gather_weight",
-    "group_clip", "joint_width", "knee_change", "knee_flexion", "knee_position", "leg_length",
+    "group_clip", "hip_change", "joint_width", "knee_change", "knee_flexion", "knee_position", "leg_length",
     "length", "lerp_key", "local_rotation", "make_baked_clip", "make_jump_groups", "make_rig",
     "measure_rig", "move_pelvis", "mul", "point_foot", "point_weight", "punch", "quat_tuple",
     "rotate", "sample_key", "sample_times", "set_world_rotation", "shape_pose", "shortest_arc",

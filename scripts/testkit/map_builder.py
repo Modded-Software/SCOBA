@@ -156,6 +156,22 @@ def _insert_init_calls(text: str, calls: tuple[str, ...]) -> str:
     return text[:end] + block + text[end:]
 
 
+INTRO_FILE = Path("scripts") / "app" / "core" / "intro.galaxy"
+INTRO_ON = "const bool c_INTRO_ENABLED = true;"
+INTRO_OFF = "const bool c_INTRO_ENABLED = false;"
+INTRO_PROFILES = ("intro",)
+
+
+def patch_intro(root: Path, profile: str) -> None:
+    """Intro off for every profile but intro (SPEC-INTRO 3.11)."""
+    path = root / INTRO_FILE
+    text = path.read_text(encoding="utf-8")
+    if text.count(INTRO_ON) != 1:
+        raise SystemExit(f"{INTRO_FILE}: expected one '{INTRO_ON}'")
+    if profile not in INTRO_PROFILES:
+        path.write_text(text.replace(INTRO_ON, INTRO_OFF), encoding="utf-8")
+
+
 def build_instrumented_map(spec: TestMapSpec) -> Path:
     expected = PROFILE_OUTPUTS.get(spec.profile)
     if expected is None:
@@ -170,6 +186,7 @@ def build_instrumented_map(spec: TestMapSpec) -> Path:
         shutil.rmtree(spec.output)
     shutil.copytree(spec.source, spec.output)
     patch_map_options(spec.output, spec.options)
+    patch_intro(spec.output, spec.profile)
     if spec.patch is not None:
         spec.patch(spec.output)
     patch_mapinfo(spec.output / "MapInfo")

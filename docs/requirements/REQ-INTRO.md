@@ -10,7 +10,8 @@ sequence. Operator choices the same day:
 - the world is live behind the shots; at 00:00 two creep groups already
   fight at the center X, and only there;
 - letterbox bars, provisional (O-INTRO-2);
-- a Zerus theme plays;
+- a Zerus theme plays during the loop, and stops at deploy: no music
+  after deploy;
 - depth of field on one tracking shot only.
 
 The shots are described in [SCRIPT-INTRO](../specifications/SCRIPT-INTRO.md).
@@ -68,7 +69,7 @@ Out of scope:
 | R-INTRO-12 | At touchdown the hero MUST stand alive at the pod, bound as R-DROP-6, in the control mode and toggles a game without intro starts with. Letterbox MUST go, the game UI MUST come back as before the intro, input and camera control MUST return to the player. |
 | R-INTRO-13 | At 00:00 one Terran creep group and one Zerg creep group MUST stand at the center X and fight. After the fight the survivors MUST go on along the center lane. No other lane MUST get extra units. |
 | R-INTRO-14 | The world MUST run during the intro: game clock, spawn timer, waves and fights as without intro. |
-| R-INTRO-15 | A Zerus theme MUST start with the intro. |
+| R-INTRO-15 | A Zerus theme MUST start with the intro. SPACE (deploy) MUST stop it. No music MUST play after deploy. |
 
 ## 4. Acceptance
 
@@ -82,14 +83,14 @@ Operator checks. A person judges them; no test claims them.
 | AC-INTRO-4 | Depth of field is visible in S2: the fight sharp, foreground and far bank soft. |
 | AC-INTRO-5 | S8 reads as a dolly zoom: the PsiDecimator holds still, the world behind it swells. |
 | AC-INTRO-6 | The crash zoom reads as one snap, then the pod ride. |
-| AC-INTRO-7 | The Zerus theme is audible from the first frame. |
+| AC-INTRO-7 | The Zerus theme is audible from the first frame, and muted from deploy on. |
 | AC-INTRO-8 | Cuts land on rhythm; the loop does not feel repetitive on the second pass. |
 
 ## 5. Open points
 
 | ID | Point |
 | --- | --- |
-| O-INTRO-1 | Music after touchdown: the theme keeps playing until it ends. Stop, cross-fade or keep is open. |
+| O-INTRO-1 | Closed 2026-11-17: the operator chose no music after deploy. The soundtrack stops at SPACE (R-INTRO-15). |
 | O-INTRO-2 | Letterbox is provisional. A later choice may drop it. |
 | O-INTRO-3 | Tree and doodad occlusion is not tested (AC-INTRO-2). |
 | O-INTRO-4 | A skip of the loop on later games, and the intro on a hero death, are not asked for. |

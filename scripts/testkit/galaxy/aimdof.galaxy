@@ -1,0 +1,73 @@
+// Aim near-DOF tuning (REQ-CAMERA-DOF R-DOF-2). Operator check: no blur
+// getter. Aim on at once, DOF tick off, 5 candidates around the one the
+// operator saw blur (focus 100, near 10..90), 5 s each, labelled.
+trigger gt_AimDofTest;
+const int c_AD_POINTS = 10;
+
+// One datapoint: aim held and arm pinned to 1 before the values are set.
+void gf_AdSet (string lp_label, fixed lp_f, fixed lp_s, fixed lp_e) {
+    if (!gv_aIMACTIVE[1]) {
+        gv_cameraDistanceDesired[1] = 1.0 / c_SCOBA_AIM_ARM_SCALE;
+        gf_AimBegin(1);
+    }
+    gv_cameraDistanceDesired[1] = 1.0;
+    CameraSetValue(1, c_cameraValueDistance, 1.0, 0.0, 0.0, 0.0);
+    UIDisplayMessage(PlayerGroupAll(), c_messageAreaSubtitle, StringToText(lp_label + "  focus " + FixedToString(lp_f, 2) + "  near " + FixedToString(lp_s, 2) + " .. " + FixedToString(lp_e, 2)));
+    CameraSetValue(1, c_cameraValueDepthOfField, 1.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFocalDepth, lp_f, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffStart, c_CAM_DOF_FAR_NONE, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEnd, c_CAM_DOF_FAR_NONE * 2.0, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffStartNear, lp_s, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEndNear, lp_e, 0.0, 0.0, 0.0);
+    Wait(2.0, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, "ad", lp_label, FixedToString(lp_f, 2) + "," + FixedToString(lp_s, 2) + "," + FixedToString(lp_e, 2) + "," + IntToString(FixedToInt(CameraGetDistance(1) * 100.0)) + "," + IntToString(BoolToInt(gv_aIMACTIVE[1])));
+    BankSave(gv_dbgBank);
+}
+
+bool gt_AimDofTest_Func (bool testConds, bool runActions) {
+    int lv_i;
+    fixed lv_k;
+
+    if (!runActions) {
+        return true;
+    }
+    Wait(0.5, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAAIMDOF", 1);
+    gv_bINPUTLOG = false;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "aimdof");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "ad_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    TriggerEnable(gt_CameraDofTick, false);
+    // Arm 1 while aiming: aim scales the desired arm by c_SCOBA_AIM_ARM_SCALE,
+    // so start from 1 / scale; then pin 1 with the collision clamp off.
+    gv_cameraCollisionOff[1] = true;
+    gv_cameraDistanceDesired[1] = 1.0 / c_SCOBA_AIM_ARM_SCALE;
+    gf_AimBegin(1);
+    gv_cameraDistanceDesired[1] = 1.0;
+    CameraSetValue(1, c_cameraValueDistance, 1.0, 0.0, 0.0, 0.0);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, "ad", "aim", BoolToInt(gv_aIMACTIVE[1]));
+    BankValueSetFromString(gv_dbgBank, "ad", "arm", FixedToString(CameraGetDistance(1), 2));
+    // 10 datapoints from 0 to the sweep's smallest (focus 4, near 0.4..3.6):
+    // (focus 100, near 10..90) x k, k = 0.004 .. 0.04 (operator 2026-11-17).
+    for (lv_i = 1; lv_i <= c_AD_POINTS; lv_i += 1) {
+        lv_k = 0.04 * IntToFixed(lv_i) / IntToFixed(c_AD_POINTS);
+        gf_AdSet(IntToString(lv_i), 100.0 * lv_k, 10.0 * lv_k, 90.0 * lv_k);
+    }
+    gf_AimEnd(1);
+    gv_cameraCollisionOff[1] = false;
+    TriggerEnable(gt_CameraDofTick, true);
+    gf_DbgReset("ad_end", false, true);
+    BankValueSetFromInt(gv_dbgBank, "ad_end", "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_AimDofTest_Init () {
+    gt_AimDofTest = TriggerCreate("gt_AimDofTest_Func");
+    TriggerAddEventMapInit(gt_AimDofTest);
+}

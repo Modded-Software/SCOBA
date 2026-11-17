@@ -4,18 +4,29 @@
 // The hero's own pod: a TerranDropPod copy (UnitData SCOBAHeroPod). Its
 // actor shows the landed pose; the script lowers the unit (R-DROP-3).
 const string c_DROP_POD_UNIT = "SCOBAHeroPod";
-// Fall: height c_DROP_HEIGHT at the start, 0 at c_DROP_FALL. The curve is
-// the stock pod fall (droppodfalling.m3 Birth, root z 19.02 at 0 ms, 1.14
-// at 1600 ms, 0 at 2200 ms): a hard drop, then a brake. The stock height
-// (19.02 x actor scale 4.5) is above the camera far clip 50.
-const fixed c_DROP_HEIGHT = 40.0;
-const fixed c_DROP_FALL = 2.2;
-const fixed c_DROP_BRAKE_AT = 1.6;
-const fixed c_DROP_BRAKE_PART = 0.06;  // height part left at the brake (1.14 / 19.02)
+// Fall: the stock drop. The pod unit is created on the ground and its
+// model plays its own Birth clip, untouched (as libVCMI_gf_CreateDropPod).
+// The camera follows the clip's root bone, replayed from the model keys
+// (data/pod_birth, scripts/hitvolumes/pod_birth.py). Touchdown: the key where the
+// root reaches the ground.
+const fixed c_DROP_FALL = c_POD_BIRTH_LAND;
+const string c_DROP_CLIP = "Birth";
+// A clip length within this of c_POD_BIRTH_LENGTH is Birth (Stand is 5 s).
+const fixed c_DROP_CLIP_LEN_TOL = 0.05;
+// Touchdown at the latest this long after the land key on the script
+// clock, if the engine never reports Birth (counted in gv_dropClipMisses).
+const fixed c_DROP_LAND_LATE = 1.0;
+// The camera chases the pod on its own line (operator 2026-11-17): yaw =
+// travel direction, pitch = the fast part's descent angle. After touchdown
+// the pitch goes back to the map-start pitch.
+const fixed c_DROP_LAND_PITCH = 30.0;
 const fixed c_DROP_TICK = 0.0625;     // one game loop
 // Camera arm behind the pod while it falls. The pod (actor scale 4.5) is
 // much larger than the hero arm (1.5); operator 2026-11-16: 8 was too close.
 const fixed c_DROP_CAM_DISTANCE = 20.0;
+const fixed c_DROP_FOV_START = 30.0;   // drop camera FOV at the Birth start (deg), narrow
+const fixed c_DROP_FOV_END = 90.0;    // drop camera FOV at touchdown (deg), wide
+const fixed c_DROP_CLIP_DRIFT = 0.15; // re-anchor the drop clock past this (s)
 
 // Loops after the revive in which the toggles are set again.
 const int c_DROP_RESTORE_LOOPS = 8;
@@ -25,12 +36,29 @@ trigger gt_HeroDropReinforce;
 trigger gt_HeroDropTick;
 
 bool[8] gv_dropPending;      // the hero is dead and waits for a reinforcement
+bool[8] gv_dropIntro;        // the pod is the intro deploy: the hero is alive and hidden (SPEC-INTRO 3.9)
 unit[8] gv_dropHero;         // the dead hero
 unit[8] gv_dropPod;          // the pod in its fall, null when there is none
 point[8] gv_dropDeathAt;     // where the hero died
 point[8] gv_dropAt;          // where the pod lands
 fixed[8] gv_dropStartAt;     // fall start, gv_sCOBA_Clock
 fixed[8] gv_dropCamHeight;   // pod part of the camera height offset (R-DROP-4)
+fixed[8] gv_dropFacing;      // the pod's facing, read from the engine at create
+fixed[8] gv_dropTravel;      // the fall's travel direction: the camera yaw at create
+point[8] gv_dropRootAt;      // the Birth root's ground point at the next loop's clip time
+fixed[8] gv_dropRootZ;       // the Birth root's height above the pod at that time
+fixed[8] gv_dropClipBase;    // game clock at clip time 0; -1 until the first read
+int[8] gv_dropLeg;           // Birth key the camera move ends on (0 = none yet)
+bool[8] gv_dropLegDirty;     // re-issue the move (start, re-anchor)
+point[8] gv_dropAimAt;       // camera target: where the look ray through the root meets the ground
+fixed[8] gv_dropAimDist;     // camera arm: c_DROP_CAM_DISTANCE + ray length from the root to the ground
+// The Birth clip as the engine reports it (AnimLengthQueryByName on the
+// pod's main actor, slot c_animNameDefault), read every drop loop. The
+// camera runs on this clip time, never on a script clock.
+fixed[8] gv_dropClipLen;     // AnimLengthSync, unscaled; c_POD_BIRTH_LENGTH while Birth plays
+fixed[8] gv_dropClipAt;      // clip time: length - remaining
+int[8] gv_dropClipReads;     // reads that saw Birth
+int[8] gv_dropClipMisses;    // reads that did not (other clip or none)
 bool[8] gv_dropSingle;       // toggles of the hero when it died
 bool[8] gv_dropStand;
 bool[8] gv_dropTps;          // TPS mode when it died; death removes the behavior

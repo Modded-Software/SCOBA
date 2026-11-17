@@ -1,0 +1,93 @@
+// Module: core/intro
+// Intro loop and deploy (REQ-INTRO, SPEC-INTRO). Constants and state.
+// Shot table: data/intro_shots (generated). Logic: systems/intro.
+
+// The test map builder writes false here for every profile but intro
+// (SPEC-INTRO 3.11). Read it through a variable: Galaxy rejects constant
+// conditions.
+const bool c_INTRO_ENABLED = true;
+
+// States (SPEC-INTRO 3.2).
+const int c_INTRO_OFF = 0;
+const int c_INTRO_LOOP = 1;
+const int c_INTRO_ZOOM = 2;
+const int c_INTRO_FALL = 3;
+const int c_INTRO_DONE = 4;
+
+const fixed c_INTRO_TICK = 0.0625;          // one game loop
+const fixed c_INTRO_FADE_IN = 1.5;
+const fixed c_INTRO_LETTERBOX_OUT = 0.5;
+const string c_INTRO_MUSIC = "ZZerus01MusicMain";
+const string c_INTRO_SILENCE = "Music_Silence";   // default music after deploy: none
+
+// Prompt (SPEC-INTRO 3.10).
+const int c_INTRO_PROMPT_W = 900;
+const int c_INTRO_PROMPT_H = 48;
+const int c_INTRO_PROMPT_OFFSET = 24;
+const fixed c_INTRO_PULSE = 0.8;
+const fixed c_INTRO_PULSE_LOW = 0.0;        // transparency, percent
+const fixed c_INTRO_PULSE_HIGH = 55.0;
+
+// Depth of field in S2 (SPEC-INTRO 3.6), and the Dflt camera values.
+const fixed c_INTRO_DOF_ON = 1.0;
+const fixed c_INTRO_DOF_FOCUS = 16.0;
+const fixed c_INTRO_DOF_FAR_START = 4.0;
+const fixed c_INTRO_DOF_FAR_END = 18.0;
+const fixed c_INTRO_DOF_NEAR_START = 1.0;
+const fixed c_INTRO_DOF_NEAR_END = 6.0;
+const fixed c_INTRO_DFLT_FOCUS = 8.0;
+const fixed c_INTRO_DFLT_FAR_START = 0.0003;
+const fixed c_INTRO_DFLT_FAR_END = 8.0;
+
+// Creep seed at the center X (SPEC-INTRO 3.7).
+const fixed c_INTRO_SEED_OFFSET = 3.5;
+
+// Map dialogs hidden in the intro, and the triggers off in it.
+const int c_INTRO_DIALOGS = 14;
+const int c_INTRO_TRIGGERS = 41;
+
+// The pod ride (FALL): the pitch gt_MapInit gives the hero camera.
+const fixed c_INTRO_FALL_PITCH = 30.0;
+
+trigger gt_IntroPrepare;
+trigger gt_IntroTick;
+trigger gt_IntroDeploy;
+trigger gt_IntroPulse;
+
+int gv_introState;
+bool gv_introActive;          // LOOP, ZOOM, FALL
+int gv_introShot;             // row of the shot on screen
+int gv_introPass;
+fixed gv_introShotStart;      // gv_sCOBA_Clock at the cut
+fixed gv_introZoomStart;
+point gv_introDropAt;
+int gv_introPrompt;           // dialog
+int gv_introPromptLabel;
+bool gv_introPromptLow;       // pulse direction
+bool[c_INTRO_DIALOGS] gv_introDialogKept;
+int gv_introDialogReshown;    // dialogs the game showed in the intro, hidden again
+bool[c_INTRO_TRIGGERS] gv_introTriggerKept;
+// Script state for tests: the values last written to the camera.
+point gv_introTarget;
+fixed gv_introYaw;
+fixed gv_introPitch;
+fixed gv_introDist;
+fixed gv_introFov;
+fixed gv_introHeight;         // height offset written
+fixed gv_introGround;         // ground under the target (U3)
+bool gv_introDof;
+// Engine target, read at each tick: the loop after the last pan, the one
+// loop CameraGetTarget reads right (SPEC-HERO-DROP F6). Gap to what was sent.
+point gv_introSent;
+point gv_introCamRead;
+fixed gv_introCamGap = -1.0;
+bool gv_introMusic;
+bool gv_introMusicValid;      // the soundtrack id resolves in the loaded catalogs (U5)
+bool gv_introSilenceValid;
+bool gv_introCinematic;
+int gv_introCuts;
+int gv_introSeeded;
+unitgroup gv_introSeedTerran;
+unitgroup gv_introSeedZerg;
+int gv_introDeploys;
+int gv_introSpaceIgnored;

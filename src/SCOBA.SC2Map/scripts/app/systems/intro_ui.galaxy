@@ -1,0 +1,161 @@
+// Module: systems/intro_ui
+// Intro on/off, dialogs and triggers held off in the intro (SPEC-INTRO
+// 3.5, 3.8), split from systems/intro.
+
+bool gf_IntroEnabled () {
+    bool lv_on = c_INTRO_ENABLED;
+
+    return lv_on;
+}
+
+// Map dialogs of player 1 hidden in the intro (R-INTRO-2).
+int gf_IntroDialog (int lp_i) {
+    if (lp_i == 0) { return gv_pbInfoDlg; }
+    if (lp_i == 1) { return gv_pbXpDlg[1]; }
+    if (lp_i == 2) { return gv_pbHpDlg[1]; }
+    if (lp_i == 3) { return gv_pbNrgDlg[1]; }
+    if (lp_i == 4) { return gv_singleButtonDialog; }
+    if (lp_i == 5) { return gv_singleButtonDialogAbilities; }
+    if (lp_i == 6) { return gv_singleButtonDialogInventory; }
+    if (lp_i == 7) { return gv_hudMapDialog[0]; }
+    if (lp_i == 8) { return gv_hudMapDialog[1]; }
+    if (lp_i == 9) { return gv_hudMapDialog[2]; }
+    if (lp_i == 10) { return gv_userSelectionDialog; }
+    if (lp_i == 11) { return gv_abilitiesSelectionDialog; }
+    if (lp_i == 12) { return gv_abilitiesSelectionAdditionalColumnDialog; }
+    if (lp_i == 13) { return gv_sCOBAOrderDialog; }
+    return c_invalidDialogId;
+}
+
+// Triggers off in the intro: player input, and every camera writer but
+// gt_IntroTick (R-INTRO-9, SPEC-INTRO 3.5, 3.8).
+trigger gf_IntroTrigger (int lp_i) {
+    if (lp_i == 0) { return gt_CameraFollowDistance; }
+    if (lp_i == 1) { return gt_CameraDebugMove; }
+    if (lp_i == 2) { return gt_ZoomEnd; }
+    if (lp_i == 3) { return gt_ZoomStart; }
+    if (lp_i == 4) { return gt_CursorStart; }
+    if (lp_i == 5) { return gt_CursorEnd; }
+    if (lp_i == 6) { return gt_LeftOrbitStart; }
+    if (lp_i == 7) { return gt_RightOrbitStart; }
+    if (lp_i == 8) { return gt_CameraTurnTick; }
+    if (lp_i == 9) { return gt_CameraCollisionTick; }
+    if (lp_i == 10) { return gt_AimCameraTick; }
+    if (lp_i == 11) { return gt_AimCursorTick; }
+    if (lp_i == 12) { return gt_AimMoveTick; }
+    if (lp_i == 13) { return gt_ForwardStart; }
+    if (lp_i == 14) { return gt_ForwardEnd; }
+    if (lp_i == 15) { return gt_BackwardStart; }
+    if (lp_i == 16) { return gt_BackwardEnd; }
+    if (lp_i == 17) { return gt_LeftStart; }
+    if (lp_i == 18) { return gt_LeftEnd; }
+    if (lp_i == 19) { return gt_RightStart; }
+    if (lp_i == 20) { return gt_RightEnd; }
+    if (lp_i == 21) { return gt_JumpKey; }
+    if (lp_i == 22) { return gt_OrderKey; }
+    if (lp_i == 23) { return gt_OrderButton; }
+    if (lp_i == 24) { return gt_OrderCancel; }
+    if (lp_i == 25) { return gt_TargetClick; }
+    if (lp_i == 26) { return gt_TargetRelease; }
+    if (lp_i == 27) { return gt_UnitClick[1]; }
+    if (lp_i == 28) { return gt_HeroSwitchTosh; }
+    if (lp_i == 29) { return gt_HeroSwitchKerrigan; }
+    if (lp_i == 30) { return gt_TpsOn; }
+    if (lp_i == 31) { return gt_TpsOff; }
+    if (lp_i == 32) { return gt_KeepHeroSelected; }
+    if (lp_i == 33) { return gt_QuakeTick; }
+    if (lp_i == 34) { return gt_HudMapClick; }
+    if (lp_i == 35) { return gt_SBDialogStatsCallback; }
+    if (lp_i == 36) { return gt_UserSelectionDialogCallback; }
+    if (lp_i == 37) { return gt_SBDialogAbilitiesCallback; }
+    if (lp_i == 38) { return gt_AbilitiesSelectionDialogCallback; }
+    if (lp_i == 39) { return gt_AbilitiesandStatsTriggerDevelopment; }
+    if (lp_i == 40) { return gt_AnimProbeToggle; }
+    return null;
+}
+
+void gf_IntroTriggersOff () {
+    int lv_i;
+    trigger lv_t;
+
+    for (lv_i = 0; lv_i < c_INTRO_TRIGGERS; lv_i += 1) {
+        lv_t = gf_IntroTrigger(lv_i);
+        if (lv_t == null) {
+            continue;
+        }
+        gv_introTriggerKept[lv_i] = TriggerIsEnabled(lv_t);
+        TriggerEnable(lv_t, false);
+    }
+}
+
+void gf_IntroTriggersRestore () {
+    int lv_i;
+    trigger lv_t;
+
+    for (lv_i = 0; lv_i < c_INTRO_TRIGGERS; lv_i += 1) {
+        lv_t = gf_IntroTrigger(lv_i);
+        if (lv_t == null) {
+            continue;
+        }
+        TriggerEnable(lv_t, gv_introTriggerKept[lv_i]);
+    }
+}
+
+void gf_IntroDialogsHide () {
+    int lv_i;
+    int lv_d;
+
+    for (lv_i = 0; lv_i < c_INTRO_DIALOGS; lv_i += 1) {
+        lv_d = gf_IntroDialog(lv_i);
+        gv_introDialogKept[lv_i] = false;
+        if (lv_d == c_invalidDialogId) {
+            continue;
+        }
+        gv_introDialogKept[lv_i] = DialogIsVisible(lv_d, 1);
+        DialogSetVisible(lv_d, PlayerGroupSingle(1), false);
+    }
+}
+
+void gf_IntroDialogsRestore () {
+    int lv_i;
+    int lv_d;
+
+    for (lv_i = 0; lv_i < c_INTRO_DIALOGS; lv_i += 1) {
+        lv_d = gf_IntroDialog(lv_i);
+        if (lv_d == c_invalidDialogId) {
+            continue;
+        }
+        DialogSetVisible(lv_d, PlayerGroupSingle(1), gv_introDialogKept[lv_i]);
+    }
+}
+
+// Each loop: a dialog the game showed in the intro is hidden again and
+// kept visible for the touchdown.
+void gf_IntroDialogsEnforce () {
+    int lv_i;
+    int lv_d;
+
+    for (lv_i = 0; lv_i < c_INTRO_DIALOGS; lv_i += 1) {
+        lv_d = gf_IntroDialog(lv_i);
+        if (lv_d != c_invalidDialogId && DialogIsVisible(lv_d, 1)) {
+            gv_introDialogKept[lv_i] = true;
+            gv_introDialogReshown += 1;
+            DialogSetVisible(lv_d, PlayerGroupSingle(1), false);
+        }
+    }
+}
+
+// Number of the intro dialogs player 1 sees (tests).
+int gf_IntroDialogsVisible () {
+    int lv_i;
+    int lv_d;
+    int lv_n = 0;
+
+    for (lv_i = 0; lv_i < c_INTRO_DIALOGS; lv_i += 1) {
+        lv_d = gf_IntroDialog(lv_i);
+        if (lv_d != c_invalidDialogId && DialogIsVisible(lv_d, 1)) {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}

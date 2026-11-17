@@ -127,3 +127,18 @@ const fixed c_ANIM_MOVE_TURN_DURATION = 0.01;
 const string c_SCOBA_TPS_BEHAVIOR = "SCOBATPSBehavior";
 const fixed c_SCOBA_REST_FOV = 75.0;
 const fixed c_SCOBA_ZOOM_FOV = 25.0;
+// In-game DOF (REQ-CAMERA-DOF, systems/camera.galaxy).
+const fixed c_CAM_DOF_NEAR_MIN_ARM = 1.0;   // near DOF 0 here (R-DOF-1)
+const fixed c_CAM_DOF_FAR_MIN_ARM = 3.0;    // far DOF 0 below this (R-DOF-3)
+const fixed c_CAM_DOF_MAX_ARM = 40.0;       // max zoom: full strength
+const fixed c_CAM_DOF_FAR_NONE = 100000.0;  // far falloff past any far clip: no far blur
+const fixed c_CAM_DOF_BLEND = 0.2;          // value blend (s)
+const fixed c_CAM_DOF_NEAR_START_FRAC = 0.08; // near blur starts 0.08 x arm before the focus (wider sharp band)
+const fixed c_CAM_DOF_NEAR_REACH = 0.3625;  // full near blur at (1 - 0.6375 k) x arm: max -15% (operator 2026-11-17)
+const fixed c_CAM_DOF_FAR_MAX_START = 2.5;  // far blur at max arm: starts 2.5 past the focus (wider sharp band)
+const fixed c_CAM_DOF_FAR_MAX_END = 12.0;   // full far blur 12 past the focus: max -15%, wide feathered fade
+// Aim near DOF, absolute values: operator pick, point 5 of 10
+// (aimdof/20261117-134320), arm 1.
+const fixed c_CAM_DOF_AIM_FOCUS = 2.0;
+const fixed c_CAM_DOF_AIM_NEAR_START = 0.2;
+const fixed c_CAM_DOF_AIM_NEAR_END = 1.8;

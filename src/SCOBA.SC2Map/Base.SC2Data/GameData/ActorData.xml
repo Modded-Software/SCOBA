@@ -317,14 +317,33 @@
     <!--                                                                                         -->
     <!-- Terran Drop Pod (Art) ................................................................. -->
     <!--                                                                                         -->
-    <CActorUnit id="TerranDropPod">
+    <!-- The stock TerranDropPod actor and model live in liberty.sc2campaign,
+         which VoidStory does not load: without a parent and a model this
+         actor drew the engine's stand-in sphere. The art is the
+         DropPodFalling model of liberty.sc2mod (same .m3), as in the
+         Liberty campaign actor. -->
+    <!-- The pod art as a template (default="1"). A unit actor that names
+         the concrete TerranDropPod actor as parent is not created: the
+         engine logged "Scope[SCOBAHeroPod, Unit] Unable to create unit
+         actor. Creating ... sphere unit." (podbirth/20261117-105245). -->
+    <CActorUnit id="SCOBADropPodArt" parent="GenericUnitStandardNoAutoSoundLinks" default="1">
+        <Model value="DropPodFalling"/>
+        <On Terms="UnitBirth.*.Suppressed" Send="$Birth NonLooping 0.000000 0.000000"/>
+        <WalkAnimMoveSpeed value="0"/>
+        <UnitFlags index="ShowBlobShadow" value="0"/>
+        <StatusBarFlags index="Shields" value="0"/>
+        <StatusBarFlags index="Life" value="0"/>
+        <StatusBarFlags index="Energy" value="0"/>
+        <StatusBarFlags index="Cargo" value="0"/>
+        <StatusBarFlags index="Progress" value="0"/>
+        <StatusBarFlags index="Duration" value="0"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="4.500000"/>
     </CActorUnit>
-    <!-- The hero pod (REQ-HERO-DROP): the Terran pod look. Created without
-         a suppressed birth, it shows Stand, the landed pose; the script
-         lowers the unit. Its death clip opens the doors. -->
-    <CActorUnit id="SCOBAHeroPod" parent="TerranDropPod" unitName="SCOBAHeroPod"/>
+    <CActorUnit id="TerranDropPod" parent="SCOBADropPodArt" unitName="TerranDropPod"/>
+    <!-- The hero pod (REQ-HERO-DROP): the same art. The script plays
+         Birth on create (stock drop); its death clip opens the doors. -->
+    <CActorUnit id="SCOBAHeroPod" parent="SCOBADropPodArt" unitName="SCOBAHeroPod"/>
     <CActorUnit id="Thor">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="3.000000"/>

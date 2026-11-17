@@ -25,15 +25,15 @@ SECTIONS = {
     "hero": ("jump_switch", "jump_kerrigan"),
 }
 # Windows wider than one game loop (62.5 ms) around REQ-JUMP R-JUMP-2, 3.
-# Curve: crouch 133 ms on the ground, rise 300 ms to 0.6, fall 237 ms.
+# Curve: crouch 150 ms on the ground, rise 300 ms to 0.6, fall 237 ms.
 CROUCH_H100_MAX = 2
 RISE_MS = (125, 250)
 PEAK_H100 = (52, 62)
 PEAK_MS = (370, 500)
 AIRTIME_MS = (560, 720)
 UPPER_AIM_MID = 4
-# Touchdown: the air time (670 ms) up to the end of that game loop.
-THUMP_MS = (670, 735)
+# Touchdown: the air time (687 ms) up to the end of that game loop.
+THUMP_MS = (687, 752)
 # The camera part written at a sample is the hero's target for the next loop:
 # it equals the engine height one loop later. No lead.
 CAM_AHEAD_MS = 62
@@ -56,7 +56,7 @@ GAIT_WINDOW_AIM_MS = 140
 # runs on until then.
 RESUME_WINDOW_MS = 150
 # R-JUMP-22: takeoff crouch (c_JUMP_CROUCH). Burst and landing: jump_rates.py.
-CROUCH_MS = 133
+CROUCH_MS = 150
 
 
 def gait_const(name: str) -> float:

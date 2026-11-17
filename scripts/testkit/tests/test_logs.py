@@ -48,6 +48,25 @@ class TextureWarningTests(unittest.TestCase):
             self.assertEqual(collect_new_logs(logs, later)["texture_warnings"], [])
 
 
+class ActorAlertTests(unittest.TestCase):
+    # As the game wrote it in podbirth/20261117-105245.
+    SPHERE = "USER 1002 3.1 3.2 Scope[SCOBAHeroPod, Unit] Unable to create unit actor.  Creating fallback sphere unit.\n"
+    BENIGN = "USER 1084 1.0 1.0 Scope[ToshSCOBAUnit, Unit] received invalid message CActorMsg[AbilMorph.Start].\n"
+
+    def _failures(self, text: str) -> int:
+        with tempfile.TemporaryDirectory() as tmp:
+            logs = Path(tmp)
+            (logs / "a Alerts.txt").write_text(text)
+            with contextlib.redirect_stderr(io.StringIO()):
+                return report_logs(logs, 0)[0]
+
+    def test_fallback_sphere_fails_the_run(self):
+        self.assertEqual(self._failures(self.SPHERE), 1)
+
+    def test_other_actor_warning_does_not(self):
+        self.assertEqual(self._failures(self.BENIGN), 0)
+
+
 class LogTests(unittest.TestCase):
     def test_latest_script_error(self):
         with tempfile.TemporaryDirectory() as tmp:

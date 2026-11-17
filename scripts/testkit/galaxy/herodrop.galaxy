@@ -132,12 +132,16 @@ void gf_HdDrop () {
     BankValueSetFromString(gv_dbgBank, lv_s, "deathXY", IntToString(FixedToInt(PointGetX(gv_dropDeathAt[1]) * 10.0)) + "," + IntToString(FixedToInt(PointGetY(gv_dropDeathAt[1]) * 10.0)));
     BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(lv_pod));
     BankValueSetFromString(gv_dbgBank, lv_s, "podType", UnitGetType(lv_pod));
-    // Per loop: ms since the pod appeared, pod height, applied camera
-    // height, camera target to pod, hero alive.
+    // Engine pod position and facing: the host recomputes the Birth root
+    // from them (scripts/hitvolumes/pod_birth.py), independent of the map's replay.
+    BankValueSetFromString(gv_dbgBank, lv_s, "podAt100", IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_pod)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_pod)) * 100.0)));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podFacing100", FixedToInt(UnitGetFacing(lv_pod) * 100.0));
+    // Per loop: ms since the pod's create loop, engine pod unit height,
+    // applied camera height, engine camera target x,y, hero alive.
     for (lv_i = 0; lv_i < 64 && UnitIsValid(gv_dropPod[1]); lv_i += 1) {
-        lv_ms = FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - lv_start) * 1000.0);
-        lv_trace = lv_trace + IntToString(lv_ms) + ":" + IntToString(FixedToInt(UnitGetHeight(lv_pod) * 100.0)) + "/" + IntToString(FixedToInt(gv_cameraHeightApplied[1] * 100.0)) + "/" + IntToString(gf_HdDist100(CameraGetTarget(1), UnitGetPosition(lv_pod))) + "/" + IntToString(BoolToInt(UnitIsAlive(lv_hero))) + " ";
-        if (gf_HdDist100(CameraGetTarget(1), UnitGetPosition(lv_pod)) > 100) {
+        lv_ms = FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_dropStartAt[1]) * 1000.0);
+        lv_trace = lv_trace + IntToString(lv_ms) + ":" + IntToString(FixedToInt(UnitGetHeight(lv_pod) * 100.0)) + "/" + IntToString(FixedToInt(gv_cameraHeightApplied[1] * 100.0)) + "/" + IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 100.0)) + "/" + IntToString(BoolToInt(UnitIsAlive(lv_hero))) + " ";
+        if (gf_HdDist100(CameraGetTarget(1), gv_dropRootAt[1]) > 200) {
             lv_far += 1;
         }
         if (lv_i == 8) {
@@ -148,7 +152,8 @@ void gf_HdDrop () {
         }
         Wait(c_DROP_TICK, c_timeGame);
     }
-    BankValueSetFromInt(gv_dbgBank, lv_s, "landMs", FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - lv_start) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "landMs", FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_dropStartAt[1]) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "seenMs", FixedToInt((lv_start - gv_dropStartAt[1]) * 1000.0));
     BankValueSetFromString(gv_dbgBank, lv_s, "fall", lv_trace);
     BankValueSetFromInt(gv_dbgBank, lv_s, "camFar", lv_far);
     BankValueSetFromFlag(gv_dbgBank, lv_s, "podAliveAtLand", UnitIsValid(lv_pod) && UnitIsAlive(lv_pod));

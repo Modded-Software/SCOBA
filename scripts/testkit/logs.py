@@ -9,7 +9,12 @@ from pathlib import Path
 RED = "\033[31m"
 RESET = "\033[0m"
 ALERT_PREFIX = re.compile(r"^USER\s+\d+\s+[\d.]+\s+[\d.]+\s+(.*)$")
-FAIL_WORDS = ("error", "damaged", "failed", "exception", "assert", "script")
+FAIL_WORDS = (
+    "error", "damaged", "failed", "exception", "assert", "script",
+    # A unit actor that is not created draws the engine's stand-in sphere
+    # (podbirth/20261117-105245: "Unable to create unit actor").
+    "unable to create", "sphere unit",
+)
 SKIP_PREFIXES = (
     "StarCraft II",
     "Executable",

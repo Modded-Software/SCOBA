@@ -23,6 +23,9 @@ PROFILE_OUTPUTS = {
     "dissolveview": ROOT / "out" / "SCOBA256_dissolveview.SC2Map",
     "jump": ROOT / "out" / "SCOBA256_jumptest.SC2Map",
     "herodrop": ROOT / "out" / "SCOBA256_herodroptest.SC2Map",
+    "intro": ROOT / "out" / "SCOBA256_introtest.SC2Map",
+    "podbirth": ROOT / "out" / "SCOBA256_podbirth.SC2Map",
+    "aimdof": ROOT / "out" / "SCOBA256_aimdof.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -44,6 +47,9 @@ PROFILE_BANKS = {
     "dissolveview": ("SCOBADISSOLVE",),
     "jump": ("SCOBAJUMPTEST",),
     "herodrop": ("SCOBAHERODROP",),
+    "intro": ("SCOBAINTRO",),
+    "podbirth": ("SCOBAPODBIRTH",),
+    "aimdof": ("SCOBAAIMDOF",),
 }
 
 
@@ -96,4 +102,13 @@ def profile_module(name):
     if name == "herodrop":
         from . import herodrop
         return herodrop
+    if name == "intro":
+        from . import intro
+        return intro
+    if name == "podbirth":
+        from . import podbirth
+        return podbirth
+    if name == "aimdof":
+        from . import aimdof
+        return aimdof
     raise SystemExit(f"unknown test profile: {name}")

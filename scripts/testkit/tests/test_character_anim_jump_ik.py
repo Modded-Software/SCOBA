@@ -123,6 +123,17 @@ class LegSolveTest(unittest.TestCase):
             self.assertAlmostEqual(world[foot][0][2], self.rest[foot][0][2] + 0.05, places=6)
         self.assert_lengths_kept(pose)
 
+    def test_tuck_brings_the_thighs_forward(self) -> None:
+        # The air pose: feet up under the hips, so the thigh goes forward
+        # (knee up) by about half the knee bend, as in the reference (F17).
+        pose = self.shaped(0.0, self.rig.tuck, 0.0)
+        hip = jump.hip_change(self.model, pose, {}, self.rig)
+        knee = knee_change(self.model, pose, self.rig)
+        self.assertGreater(hip, 0.3 * knee)
+        self.assertLess(hip, 0.8 * knee)
+        # Negative: no tuck, no hip change.
+        self.assertAlmostEqual(jump.hip_change(self.model, {}, {}, self.rig), 0.0, places=6)
+
     def test_nothing_asked_changes_nothing(self) -> None:
         self.assertEqual(self.shaped(0.0, 0.0, 0.0), {})
 

@@ -5,5 +5,7 @@
     <!-- Stock timer window font (TimerTitle), centred on one line. The time
          inside the line uses the stock TimerText style via an <s> tag. -->
     <Style name="SCOBAHudLine" template="TimerTitle" hjustify="Center" vjustify="Middle"/>
+    <!-- Intro prompt (SPEC-INTRO 3.10): white, size 22, centred. -->
+    <Style name="SCOBAIntroPrompt" template="TalentTreeButtonText" height="22" textcolor="255,255,255,255"/>
     <Style name="SCOBAOrderButton" template="TalentTreeButtonText" styleflags="Underline" textcolor="255,255,255,255" highlightcolor="255,255,255,255"/>
 </StyleFile>

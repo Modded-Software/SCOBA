@@ -23,7 +23,9 @@ from validate_aim_shot import TOSH_CLOCK, check_aim_shot_data, check_aim_shot_sc
 from validate_assets import check_control_icons, check_footfall_fx, check_skybox_flip, check_stamp
 from jumpanim.validate import check_jump
 from validate_slow_deaths import check_slow_deaths
+from hitvolumes.validate_pod_actor import check_pod_actor
 from validate_tps_overlay import check_tps_overlay
+from hitvolumes.validate_intro import animation_actor_problems, intro_problems
 
 GENERATED_MODELS = [
     Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3",
@@ -399,27 +401,6 @@ def check_animation_names(map_dir: Path) -> None:
                 fail(f"{profile} clip {clip!r} missing from {relative}")
 
 
-def check_animation_actors(map_dir: Path) -> None:
-    actor_root = ET.parse(map_dir / "Base.SC2Data" / "GameData" / "ActorData.xml").getroot()
-    for actor_id, unit_name, model_name in GAMEPLAY_ACTORS:
-        node = actor_root.find(f".//CActorUnit[@id='{actor_id}']")
-        if node is None:
-            fail(f"missing gameplay actor {actor_id}")
-        if node.get("parent") != "GenericUnitBase":
-            fail(f"{actor_id} parent must be GenericUnitBase")
-        if node.get("unitName") != unit_name:
-            fail(f"{actor_id} unitName must be {unit_name}")
-        model = node.find("Model")
-        if model is None or model.get("value") != model_name:
-            fail(f"{actor_id} model must be {model_name}")
-        events = [(on.get("Terms"), on.get("Send")) for on in node.findall("On")]
-        for terms, _ in events:
-            if terms is None:
-                continue
-            if terms.startswith("Abil.attack.") or terms.startswith("WeaponStart.") or terms.startswith("WeaponStop."):
-                fail(f"{actor_id} must not define native attack event {terms!r}")
-
-
 def check_script(map_dir: Path) -> None:
     script = (map_dir / "MapScript.galaxy").read_text(encoding="utf-8", errors="replace")
     combined = galaxy_text(map_dir)
@@ -488,9 +469,12 @@ def main() -> int:
     check_skybox_flip(map_dir)
     check_footfall_fx(map_dir)
     check_animation_names(map_dir)
-    check_animation_actors(map_dir)
+    for problem in animation_actor_problems(map_dir, GAMEPLAY_ACTORS):
+        fail(problem)
     check_jump(map_dir, galaxy_text(map_dir))
     check_slow_deaths(map_dir)
+    for problem in check_pod_actor(map_dir):
+        fail(problem)
     check_hd_textures(map_dir)
     for problem in check_scaled_footprints(map_dir):
         fail(problem)
@@ -499,6 +483,8 @@ def main() -> int:
         for problem in check_flora(map_dir):
             fail(problem)
     check_script(map_dir)
+    for problem in intro_problems(map_dir):
+        fail(problem)
     check_animation_names(map_dir)
     check_stamp(map_dir)
     print(f"OK: validated {map_dir}")

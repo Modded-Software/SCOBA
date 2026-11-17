@@ -18,7 +18,7 @@ judge it.
 | R-JUMP-5 | [tested] | `jump_none`: `peakH100` < 2, no start |
 | R-JUMP-6 | [tested] | `jump_stand`: no order, facing and position unchanged; `jump_aimwalk`, `jump_freewalk`: travel while airborne |
 | R-JUMP-7 | [tested] | `jump_switch`: old unit `endH100` 0..1, phase 0, `camEnd100` 0 |
-| R-JUMP-8 | [tested] [build] [operator] | `thumps` per scenario (1; 0 none; 1 double; 2 rejump; 0 switch), `thumpMs` 670..735, same loop as `firstDownMs`, `thumpH100` 0..10, `thumpActor`; `jumpanim.validate.check_thump`; host test: `ScobaJumpDust` is `PhysicsImpactDustLight`, not `JumpLandDust`; look and sound: AC-JUMP-4 |
+| R-JUMP-8 | [tested] [build] [operator] | `thumps` per scenario (1; 0 none; 1 double; 2 rejump; 0 switch), `thumpMs` 687..752, same loop as `firstDownMs`, `thumpH100` 0..10, `thumpActor`; `jumpanim.validate.check_thump`; host test: `ScobaJumpDust` is `PhysicsImpactDustLight`, not `JumpLandDust`; look and sound: AC-JUMP-4 |
 | R-JUMP-10 | [tested] [build] [operator] | `clipLog`: Start, Air, End in order; `jumpanim/validate.py`; host test: no donor in the bake; look: AC-JUMP-1, 2 |
 | R-JUMP-11 | [build] | `jumpanim/validate.py`: no bone under `BoneSpine01` in any jump clip |
 | R-JUMP-12 | [build] | `jumpanim.validate.check_bones`: leg bone length change <= 0.001 over all 51 clips |
@@ -27,7 +27,7 @@ judge it.
 | R-JUMP-15 | [tested] | `jump_kerrigan`: full arc, `midOwned` false, empty `clipLog` |
 | R-JUMP-16 | [tested] [build] [operator] | `clipLog` has only clips built on a base (`no bare jump clip`); base Stand in `jump_stand`, `jump_stopjump`, `jump_keystill` (`no stride clip`); base `Walk,Forward` in `jump_aimwalk`, `jump_freewalk`; `jumpanim/validate.py`: stand jump feet <= 0.02 off the stand stance along the ground; walk jump air feet <= 0.02 off the walk stride, stride split >= 0.45, forward width <= 0.75 of the stand width; no bare clip in the model; look: AC-JUMP-6 |
 | R-JUMP-18 | [tested] [build] [operator] | `takeoff stride is the nearest` (mirror of `gf_JumpGaitStride`), `Start, Air, End use the takeoff stride`, `gait phase tracks the walk`, `walk resumes where the landing stops` (aim walk), `walk resume absent` (free walk), `no clip time set in the air`; `jumpanim/validate.py`: flight frames within 0.03 of the pelvis height maxima, seams <= 0.01, gait constants equal the bake's; look: AC-JUMP-2, 6. Not exercised in game: stride 02 (both walk scenarios take off in stride 01). |
-| R-JUMP-19 | [build] [operator] | `jumpanim.validate.check_reference`: six angles inside the reference ranges +-5 degrees; feet flat on the ground; host `LegSolveTest`, `ProfileTest`; look: AC-JUMP-1 |
+| R-JUMP-19 | [build] [operator] | `jumpanim.validate.check_reference`: seven angles (crouch knee, ankle; air knee, ankle, hip; landing knee, ankle) inside the reference ranges +-5 degrees (F14, F17); the landing read with the feet down (from `FEET_DOWN_MS`); feet flat on the ground; host `LegSolveTest`, `ProfileTest`; look: AC-JUMP-1 |
 | R-JUMP-22 | [tested] | `jump_aimwalk`, `jump_freewalk`: one burst, gone at the end; engine travel in the first loops >= 1.2x the walk before, back within 1.1x in the air (`hero moves faster at the push-off`, `burst is over in the air`); `scaleLog` Start = walk clip rate x `c_JUMP_BURST_SPEED`, Air 100, End = walk clip rate; `c_JUMP_BURST_SPEED` = data `MoveSpeedMultiplier`; landing recovery 250 ms / scale. Negative: `jump_stand`, `jump_stopjump`: no burst, all scales 100. The speed property is asserted unchanged only: the engine does not show the buff in it (F16). |
 | R-JUMP-17 | [tested] [operator] | `camMax100` 52..62; camera part written at each sample = engine height one loop (62 ms) later, within 0.02 (`camera matches the hero, no lead`); `camEnd100` 0; `jump_none`: `camMax100` 0; tps regression unchanged; smoothness: AC-JUMP-7 |
 
@@ -46,6 +46,7 @@ Run results go in section 7.
 | F14 | Motion capture reference: CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu), subject 16, trials 01, 02 (jump), 05 (forward jump), 120 fps. Changes from standing, degrees (01 / 02 / 05). Crouch lowest: knee +64 / +71 / +53, ankle -17 / -18 / -17, hip +46 / +47 / +50, pelvis -0.18 / -0.21 / -0.14 m. Flight peak: knee +9 / +12 / +19, ankle +35 / +27 / +35. Landing lowest: knee +40 / +38 / +44, ankle -15 / -17 / -9, pelvis -0.10 / -0.10 / -0.13 m. Trial 01 timing: crouch down 0.5 s, up to liftoff 0.17 s; at liftoff the knees have about 30% of the crouch left; the ankle goes from -17 to +37 within about 0.1 s around liftoff, and from +30 to 0 within about 0.07 s around touchdown; landing lowest 0.13 s after touchdown. | `/mnt/ws-fast/inspect/mocap/amc_legs.sh` on `16_01.amc`, `16_02.amc`, `16_05.amc` |
 | F15 | `libNtve_gf_AnimSetTime` sends `{False}`, which the engine rejects (`Invalid actor msg`). `libNtve_gf_SetAnimationTime` sends 0/1. | ScriptError 2026-11-16 18.41.38 |
 | F16 | `UnitGetPropertyFixed(c_unitPropMovementSpeed, c_unitPropCurrent)` does not show the `SCOBAJumpBurst` buff: 310 at the press and during the burst, while engine travel is 1.4x. The burst is tested by travel; the Start clip rate uses `c_JUMP_BURST_SPEED`. | `jump/20261117-014046` |
+| F17 | More CMU trials (mocap.cs.cmu.edu), changes from standing, degrees, mean of the legs. Subject 16 (120 fps): 03 high jump crouch knee +71 hip +66 ankle -17 pelvis -0.24 m, flight knee +19 (max +23) hip +17 ankle +34, landing knee +52 ankle -16; 04 high jump crouch knee +70 hip +59 ankle -21, flight knee +13 hip +8 ankle +29, landing knee +47 ankle -22. Subject 75 (60 fps): 12 hops crouch knee up to +85, flight knee +25..+35 hip +6, landing knee up to +64; 01-03 run jumps flight knee +11..+39. 16_35 is a run, not a jump. In flight the feet stay under the hips: the thigh goes forward by about half the knee bend. | `amc_legs.sh` on `16_03.amc`, `16_04.amc`, `75_01..03.amc`, `75_12.amc` (`FPS=60` for subject 75) |
 | F4 | `UnitGetHeight` gives a unit's height; a unit position has none. | SPEC-TPS T35 |
 | F5 | No stock asset or catalog id is named `JumpImpactLarge`. The only `JumpImpact` id is the Fenix sound `FenixChampionJumpImpact`. The footfall dusts are `JumpLandDust` at unit scales: `GoliathFootDust` 1.25-1.5, `QueenFootDust` 0.75-0.9. The Goliath sound is `GoliathFootstep`. | CASC listing `/mnt/ws-fast/inspect/jumpfx.txt`; `scripts/footfall/fx.py` |
 | F10 | Stock dust puffs, measured (particles, life, speed, size; spread ~ speed x life): `JumpLandDust` 82, 1.5 s, 8.2, 1.83, ~12; `PhysicsImpactDustLight` 28, 0.5 s, 0.81, 0.80, ~0.4; `PhysicsImpactDustMed` 36, 0.85 s, 1.25, 0.80, ~1.1. All have one `Birth` clip (Light, Med: 2 s). | `/mnt/ws-fast/inspect/dust_extract.sh`, `/tmp/opencode/dust_measure.log` |
@@ -70,7 +71,7 @@ Run results go in section 7.
     `airtime = crouch + t_up + t_down`. Set in `gf_JumpConfigInit`.
   - Closed form, not integrated: no drift between loops.
   - Values: v0 4.0, g_up 13.3, g_down 21.3, t_down 0.237 s, airtime
-    0.670 s, touchdown speed 5.06.
+    0.687 s, touchdown speed 5.06.
 - `gf_JumpStep(player)`, every game loop (`c_JUMP_TICK` 0.0625 s):
   `UnitSetHeight(hero, h(t + tick), tick)`; the engine blends to the next
   loop's height. The next time is capped at `airtime`.
@@ -92,7 +93,7 @@ Run results go in section 7.
 | Constant | Value |
 | --- | --- |
 | `c_JUMP_PEAK` | 0.6 |
-| `c_JUMP_CROUCH` | 0.133 s |
+| `c_JUMP_CROUCH` | 0.15 s (operator 2026-11-17: 150 ms at most) |
 | `c_JUMP_TIME_UP` | 0.30 s |
 | `c_JUMP_FALL_GAIN` | 1.6 |
 | `c_JUMP_RISE_TIME` | 0.267 s |
@@ -144,7 +145,7 @@ Run results go in section 7.
   - `gf_JumpGaitFlight(dir, stride)`: the flight frame phase,
     `c_JUMP_GAIT_FLIGHT` (0.05; back walks `_FLIGHT_BACK` 0.95) + stride / 2.
   - `gf_JumpGaitStride`: the stride whose Start clip begins nearest the
-    tracked phase. The Start clip begins `c_JUMP_GAIT_PUSH` (0.25) before
+    tracked phase. The Start clip begins `c_JUMP_GAIT_PUSH` (0.225) before
     its flight frame.
   - The stride is picked at the press and kept to the end of the jump
     (`gv_jumpStride`; -1 outside a walk jump).
@@ -185,18 +186,18 @@ them on the standing pose by bisection:
 
 | Target (change from standing) | Value | Solved on Tosh |
 | --- | --- | --- |
-| Takeoff crouch: knee, ankle | +62, -17 | pelvis down 0.185, back 0.062 |
-| Landing crouch: knee, ankle | +40, -14 | pelvis down 0.098, back 0.029 |
-| Air: knee | +13 | feet up 0.024 |
+| Takeoff crouch: knee, ankle | +72, -19 | pelvis down 0.228, back 0.065 |
+| Landing crouch: knee, ankle | +52, -18 | pelvis down 0.140, back 0.034 |
+| Air: knee | +35 (hip +20 follows: the feet stay under the hips) | feet up 0.079 |
 | Air: ankle | +32 | foot turned at the ankle |
 
 Weights over the clips (ms):
 
 | Clip | Length | Crouch | Tuck | Point |
 | --- | --- | --- | --- | --- |
-| `Jump Start` | 267, holds | fast down to 1 at 60, extends faster and faster, 0 at 148 | 0 to liftoff, 1 at 267 | 0 to liftoff, 1 at 199 |
+| `Jump Start` | 267, holds | fast down to 1 at 60, extends faster and faster, 0 at 165 | 0 to liftoff, 1 at 267 | 0 to liftoff, 1 at 216 |
 | `Jump` | 533, loops (never wraps in a jump) | 0 | 1 | 1 |
-| `Jump End` | 250, holds | impact to 1 at 60, standing again at 220 | 1 -> 0 over 0-66 | 1 -> 0 over 0-66 |
+| `Jump End` | 250, holds | impact to 1 at 60, standing again at 220 | 1 -> 0 over 0-66 (`FEET_DOWN_MS`) | 1 -> 0 over 0-66 |
 
 Crouch curve (`punch`): quadratic, fastest at touchdown and at liftoff, no
 ease (operator 2026-11-16: explosive). The feet are flat while the hero is
@@ -212,8 +213,8 @@ Bases (`JUMP_BASES`): `Stand` from `Attack Stand`, and `Walk <dir>` from the
 eight `Attack Walk <dir>` clips. Stand: 3 clips; the stand runs on under
 them. Walk: 3 phases x 8 directions x 2 strides = 48 clips (F13):
 
-- Start plays the walk over `PUSH_CYCLE` (0.2) up to the stride's flight
-  frame during the crouch (133 ms): walk rate 1.
+- Start plays the walk over `PUSH_CYCLE` (0.225) up to the stride's flight
+  frame during the crouch (150 ms): walk rate 1.
 - Air plays the walk on very slowly, `AIR_CYCLE` (0.03) from liftoff to
   touchdown (operator 2026-11-16: no freeze frame).
 - End plays the walk on to `LAND_CYCLE` (0.405) in 250 ms: walk rate 1.

@@ -50,7 +50,11 @@ actions:
                          (move, cursor, aim, head, target, pick, shot, hold, pose) or the full suite when no group is given
   jump [group]           rebuild, build jump test map, run one scenario group
                          (arc, body, hero) or the full suite when no group is given
+  intro [group]          rebuild, build intro test map, run one scenario group
+                         (boot, shots, wrap, gate, deploy; boot always runs) or the full suite
   herodrop               rebuild, build hero drop test map, run it
+  podbirth               rebuild, build pod Birth test map, run it
+  aimdof                 rebuild, sweep 10 aim near-DOF datapoints (operator check)
   aim                    rebuild, build aim test map, run aim profile
   motion                 rebuild, build motion test map, run motion profile
   controls               rebuild, build controls test map, run controls profile
@@ -91,6 +95,9 @@ profile_timeout() {
         motion) printf '%s\n' "${SC2_CASE_TIMEOUT:-80}" ;;
         jump) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
         herodrop) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
+        podbirth) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
+        aimdof) printf '%s\n' "${SC2_CASE_TIMEOUT:-60}" ;;
+        intro) printf '%s\n' "${SC2_CASE_TIMEOUT:-120}" ;;
         pitch) printf '%s\n' "${SC2_CASE_TIMEOUT:-30}" ;;
         aimfreeze) printf '%s\n' "${SC2_CASE_TIMEOUT:-20}" ;;
         *) printf '%s\n' "${SC2_CASE_TIMEOUT:-40}" ;;
@@ -111,7 +118,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|herodrop|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
+        combat|tps|jump|intro|herodrop|podbirth|aimdof|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -155,11 +162,11 @@ case "$ACTION" in
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-and-check.sh"
         ;;
-    combat|tps|jump)
+    combat|tps|jump|intro)
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    herodrop|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe)
+    herodrop|podbirth|aimdof|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe)
         run_profile "$ACTION"
         ;;
     picklog)
