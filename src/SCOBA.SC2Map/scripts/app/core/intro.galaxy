@@ -24,6 +24,7 @@ const string c_INTRO_SILENCE = "Music_Silence";   // default music after deploy:
 const int c_INTRO_PROMPT_W = 900;
 const int c_INTRO_PROMPT_H = 48;
 const int c_INTRO_PROMPT_OFFSET = 24;
+const int c_INTRO_COUNT = 3;   // SPACE countdown, seconds
 const fixed c_INTRO_PULSE = 0.8;
 const fixed c_INTRO_PULSE_LOW = 0.0;        // transparency, percent
 const fixed c_INTRO_PULSE_HIGH = 55.0;
@@ -35,6 +36,7 @@ const fixed c_INTRO_DOF_FAR_START = 4.0;
 const fixed c_INTRO_DOF_FAR_END = 18.0;
 const fixed c_INTRO_DOF_NEAR_START = 1.0;
 const fixed c_INTRO_DOF_NEAR_END = 6.0;
+const fixed c_INTRO_SCENE_NEAR_SCALE = 0.5;  // intro scene near DOF: lower = weaker
 const fixed c_INTRO_DFLT_FOCUS = 8.0;
 const fixed c_INTRO_DFLT_FAR_START = 0.0003;
 const fixed c_INTRO_DFLT_FAR_END = 8.0;
@@ -91,4 +93,7 @@ int gv_introSeeded;
 unitgroup gv_introSeedTerran;
 unitgroup gv_introSeedZerg;
 int gv_introDeploys;
+fixed gv_introCountAt = -1.0;  // countdown start (clock); -1: not counting
+int gv_introCountShown;        // the number on the prompt line
+string gv_introCountTrace;     // numbers shown, in order (tests)
 int gv_introSpaceIgnored;

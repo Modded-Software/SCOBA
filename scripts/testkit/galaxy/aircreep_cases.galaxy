@@ -1,0 +1,276 @@
+// Air creep harness, scenario groups (REQ-AIR-CREEP): route, fight,
+// ground, cap, balance, and the test trigger. Helpers, timer and wave
+// are in aircreep.galaxy, included first.
+
+// --- route: attack-move to the first X, then patrol to the other ------------
+// Starts c_AC_NEAR_X from the first X, on the side of X Center, so the trip
+// is short. lp_loop: after the patrol starts, the unit is put 3 short of
+// the patrol point; it must turn back to the first X.
+void gf_AcRouteOne (string lp_s, int lp_side, bool lp_topFirst, bool lp_loop) {
+    point lv_first;
+    point lv_start;
+    point lv_patrol;
+    unit lv_u;
+    int lv_patrolMs = -1;
+    int lv_t0;
+    order lv_o;
+
+    gf_AcReset();
+    if (lp_topFirst) {
+        lv_first = gf_AcTop();
+    }
+    else {
+        lv_first = gf_AcBottom();
+    }
+    lv_start = PointWithOffsetPolar(lv_first, c_AC_NEAR_X, AngleBetweenPoints(lv_first, gf_AcCenter()));
+    lv_u = gf_AirCreepLaunch(lp_side, lv_start, lp_topFirst);
+    gf_AcUnit(lp_s, "t0", lv_u, null);
+    BankSave(gv_dbgBank);
+    lv_t0 = gf_AcMs();
+    while (UnitIsAlive(lv_u) && TimerGetElapsed(gv_acClock) * 1000.0 - IntToFixed(lv_t0) < c_AC_ROUTE_WAIT * 1000.0) {
+        if (UnitOrderCount(lv_u) == 1 && UnitOrderHasAbil(lv_u, "move")) {
+            lv_patrolMs = gf_AcMs() - lv_t0;
+            break;
+        }
+        Wait(0.1, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "patrolMs", lv_patrolMs);
+    gf_AcUnit(lp_s, "p0", lv_u, null);
+    BankSave(gv_dbgBank);
+    if (!lp_loop || lv_patrolMs < 0) {
+        return;
+    }
+    lv_o = UnitOrder(lv_u, 0);
+    lv_patrol = OrderGetTargetPoint(lv_o);
+    if (lv_patrol == null) {
+        return;
+    }
+    // Put it near the patrol point, on the line back to the first X.
+    UnitSetPosition(lv_u, PointWithOffsetPolar(lv_patrol, 3.0, AngleBetweenPoints(lv_patrol, lv_first)), false);
+    Wait(2.0, c_timeGame);
+    gf_AcUnit(lp_s, "p2", lv_u, null);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "p2First100", gf_Ac100(DistanceBetweenPoints(UnitGetPosition(lv_u), lv_first)));
+    Wait(4.0, c_timeGame);
+    gf_AcUnit(lp_s, "p6", lv_u, null);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "p6First100", gf_Ac100(DistanceBetweenPoints(UnitGetPosition(lv_u), lv_first)));
+    BankSave(gv_dbgBank);
+}
+
+void gf_AcRoute () {
+    gf_AcRouteOne("ac_route_zerg", c_AIR_CREEP_ZERG, true, true);
+    gf_AcRouteOne("ac_route_terran", c_AIR_CREEP_TERRAN, false, false);
+}
+
+// --- fight: a Mutalisk and a Wraith meet --------------------------------------
+void gf_AcFight () {
+    string lv_s = "ac_fight";
+    point lv_at = Point(236.0, 20.0);
+    unit lv_m;
+    unit lv_w;
+
+    gf_AcReset();
+    gf_AcCrowd(lv_s, "crowd", lv_at);
+    lv_m = gf_AirCreepCreate(c_AIR_CREEP_ZERG, lv_at);
+    lv_w = gf_AirCreepCreate(c_AIR_CREEP_TERRAN, PointWithOffset(lv_at, 4.0, 0.0));
+    gf_AcWatchStart(UnitGroupEmpty());
+    UnitGroupAdd(gv_acWatch, lv_m);
+    UnitGroupAdd(gv_acWatch, lv_w);
+    gf_AcUnit(lv_s, "m0", lv_m, null);
+    gf_AcUnit(lv_s, "w0", lv_w, null);
+    BankSave(gv_dbgBank);
+    Wait(c_AC_FIGHT_WAIT, c_timeGame);
+    gf_AcUnit(lv_s, "m1", lv_m, null);
+    gf_AcUnit(lv_s, "w1", lv_w, null);
+    gf_AcWatchSave(lv_s);
+    BankSave(gv_dbgBank);
+}
+
+// --- ground: no damage to ground units or to other air units ---------------
+// One air creep, one stunned enemy ground unit under it, one stunned enemy
+// air unit without User1 beside it.
+void gf_AcGroundOne (string lp_s, int lp_side, string lp_ground, int lp_groundPlayer, string lp_air, int lp_airPlayer) {
+    point lv_at = Point(20.0, 236.0);
+    unit lv_c;
+    unit lv_g;
+    unit lv_a;
+
+    gf_AcReset();
+    gf_AcCrowd(lp_s, "crowd", lv_at);
+    lv_g = gf_AcProp(lp_ground, lp_groundPlayer, lv_at, true);
+    lv_a = gf_AcProp(lp_air, lp_airPlayer, PointWithOffset(lv_at, 2.0, 0.0), true);
+    gf_AcWatchStart(UnitGroupEmpty());
+    UnitGroupAdd(gv_acWatch, lv_g);
+    UnitGroupAdd(gv_acWatch, lv_a);
+    lv_c = gf_AirCreepCreate(lp_side, lv_at);
+    BankValueSetFromString(gv_dbgBank, lp_s, "groundType", UnitGetType(lv_g));
+    BankValueSetFromString(gv_dbgBank, lp_s, "airType", UnitGetType(lv_a));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "groundLife0", gf_AcLife100(lv_g));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "airLife0", gf_AcLife100(lv_a));
+    gf_AcUnit(lp_s, "c0", lv_c, null);
+    BankSave(gv_dbgBank);
+    Wait(c_AC_FIGHT_WAIT, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "groundAlive", UnitIsAlive(lv_g));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "airAlive", UnitIsAlive(lv_a));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "groundLife1", gf_AcLife100(lv_g));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "airLife1", gf_AcLife100(lv_a));
+    gf_AcCrowd(lp_s, "crowdEnd", lv_at);
+    gf_AcUnit(lp_s, "c1", lv_c, null);
+    gf_AcWatchSave(lp_s);
+    BankSave(gv_dbgBank);
+}
+
+// A Mutalisk beside a MengskBC (air, enemy, no User1) must not hurt it. The
+// BC is the harness's own: the placed ones run at 0.01 % life and may be
+// gone by now (raw count recorded).
+void gf_AcBc () {
+    string lv_s = "ac_ground_bc";
+    point lv_at = Point(20.0, 236.0);
+    unit lv_bc;
+    unit lv_c;
+
+    gf_AcReset();
+    BankValueSetFromInt(gv_dbgBank, lv_s, "placedBcs", UnitGroupCount(UnitGroup("MengskBC", c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0), c_unitCountAlive));
+    gf_AcCrowd(lv_s, "crowd", lv_at);
+    lv_bc = gf_AcProp("MengskBC", 7, lv_at, true);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "bcValid", UnitIsValid(lv_bc));
+    if (!UnitIsValid(lv_bc)) {
+        BankSave(gv_dbgBank);
+        return;
+    }
+    gf_AcWatchStart(UnitGroupEmpty());
+    UnitGroupAdd(gv_acWatch, lv_bc);
+    lv_c = gf_AirCreepCreate(c_AIR_CREEP_ZERG, PointWithOffset(lv_at, 2.0, 0.0));
+    // Whole life points: the BC's 100000 x 100 is past the fixed range.
+    BankValueSetFromInt(gv_dbgBank, lv_s, "bcLife0", FixedToInt(UnitGetPropertyFixed(lv_bc, c_unitPropLife, c_unitPropCurrent)));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "bcOwner", UnitGetOwner(lv_bc));
+    gf_AcUnit(lv_s, "c0", lv_c, null);
+    BankSave(gv_dbgBank);
+    Wait(c_AC_FIGHT_WAIT, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "bcLife1", FixedToInt(UnitGetPropertyFixed(lv_bc, c_unitPropLife, c_unitPropCurrent)));
+    gf_AcUnit(lv_s, "c1", lv_c, null);
+    gf_AcWatchSave(lv_s);
+    BankSave(gv_dbgBank);
+}
+
+void gf_AcGround () {
+    // Wraith (Tosh) over a Zergling, beside an Overlord (Zerg Hive player).
+    gf_AcGroundOne("ac_ground_wraith", c_AIR_CREEP_TERRAN, "Zergling", 4, "Overlord", 8);
+    // Mutalisk (Kerrigan) over a Marine, beside a Banshee (Tosh).
+    gf_AcGroundOne("ac_ground_muta", c_AIR_CREEP_ZERG, "Marine", 1, "Banshee", 1);
+    gf_AcBc();
+}
+
+// --- cap: at most 32 live air creeps per player -----------------------------
+void gf_AcCapSide (string lp_s, int lp_side, int lp_preset) {
+    point lv_at = Point(20.0, 236.0);
+    int lv_i;
+
+    gf_AcReset();
+    for (lv_i = 0; lv_i < lp_preset; lv_i += 1) {
+        gf_AirCreepCreate(lp_side, lv_at);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "preset", gf_AirCreepAlive(lp_side));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "made1", gf_AirCreepWave(lp_side));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "after1", gf_AirCreepAlive(lp_side));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "made2", gf_AirCreepWave(lp_side));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "after2", gf_AirCreepAlive(lp_side));
+    BankSave(gv_dbgBank);
+}
+
+void gf_AcCap () {
+    gf_AcCapSide("ac_cap_zerg", c_AIR_CREEP_ZERG, 31);
+    gf_AcCapSide("ac_cap_terran", c_AIR_CREEP_TERRAN, 32);
+}
+
+// --- balance: +-1 per formation from the live air creep counts ---------------
+// lp_own air creeps of lp_side and lp_enemy of the other side, then one wave
+// of lp_side. The two presets sit in opposite corners, out of weapon range
+// (60), so they do not fight while the wave is made.
+void gf_AcBalanceCase (string lp_s, int lp_side, int lp_own, int lp_enemy) {
+    point lv_ownAt = Point(20.0, 236.0);
+    point lv_enemyAt = Point(236.0, 20.0);
+    int lv_i;
+    int lv_made;
+
+    gf_AcReset();
+    for (lv_i = 0; lv_i < lp_own; lv_i += 1) {
+        gf_AirCreepCreate(lp_side, lv_ownAt);
+    }
+    for (lv_i = 0; lv_i < lp_enemy; lv_i += 1) {
+        gf_AirCreepCreate(1 - lp_side, lv_enemyAt);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "presetOwn", gf_AirCreepAlive(lp_side));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "presetEnemy", gf_AirCreepAlive(1 - lp_side));
+    lv_made = gf_AirCreepWave(lp_side);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "made", lv_made);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "balance", gv_airCreepLastBalance);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "sawOwn", gv_airCreepBalanceOwn);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "sawEnemy", gv_airCreepBalanceEnemy);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "sizeA", gv_airCreepLastSize1);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "sizeB", gv_airCreepLastSize2);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "afterOwn", gf_AirCreepAlive(lp_side));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "afterEnemy", gf_AirCreepAlive(1 - lp_side));
+    BankSave(gv_dbgBank);
+}
+
+void gf_AcBalance () {
+    gf_AcBalanceCase("ac_bal_zerg_behind", c_AIR_CREEP_ZERG, 2, 10);
+    gf_AcBalanceCase("ac_bal_zerg_ahead", c_AIR_CREEP_ZERG, 10, 2);
+    gf_AcBalanceCase("ac_bal_zerg_equal", c_AIR_CREEP_ZERG, 5, 5);
+    gf_AcBalanceCase("ac_bal_terran_behind", c_AIR_CREEP_TERRAN, 2, 10);
+    gf_AcBalanceCase("ac_bal_terran_ahead", c_AIR_CREEP_TERRAN, 10, 2);
+    gf_AcBalanceCase("ac_bal_terran_equal", c_AIR_CREEP_TERRAN, 5, 5);
+}
+
+bool gt_AirCreepTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gv_acClock = TimerCreate();
+    TimerStart(gv_acClock, 3600.0, false, c_timeReal);
+    gv_acProps = UnitGroupEmpty();
+    gv_acWatch = UnitGroupEmpty();
+    gt_AcDamage = TriggerCreate("gt_AcDamage_Func");
+    TriggerAddEventUnitDamaged(gt_AcDamage, null, c_unitDamageTypeAny, c_unitDamageEither, null);
+    Wait(0.5, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAAIRCREEP", 1);
+    gv_bINPUTLOG = false;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "aircreep");
+    BankValueSetFromString(gv_dbgBank, "meta", "group", gv_dbgGroup);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "ac_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    if (gf_DbgGroup("timer")) {
+        gf_AcTimer();
+    }
+    if (gf_DbgGroup("wave")) {
+        gf_AcWave();
+    }
+    if (gf_DbgGroup("route")) {
+        gf_AcRoute();
+    }
+    if (gf_DbgGroup("fight")) {
+        gf_AcFight();
+    }
+    if (gf_DbgGroup("ground")) {
+        gf_AcGround();
+    }
+    if (gf_DbgGroup("cap")) {
+        gf_AcCap();
+    }
+    if (gf_DbgGroup("balance")) {
+        gf_AcBalance();
+    }
+    gf_AcReset();
+    BankValueSetFromInt(gv_dbgBank, "ac_end", "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_AirCreepTest_Init () {
+    gt_AirCreepTest = TriggerCreate("gt_AirCreepTest_Func");
+    TriggerAddEventMapInit(gt_AirCreepTest);
+}

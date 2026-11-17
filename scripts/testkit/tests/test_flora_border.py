@@ -8,7 +8,7 @@ from flora import border, config
 OBJECTS = (
     '<ObjectDoodad Id="1" Variation="3" Position="10,10,5" Scale="2,2,2" Type="ZerusTreeFpabc">\n'
     '<ObjectDoodad Id="2" Variation="1" Position="20,20,5" Scale="3,3,3" Type="ZerusTreeFpdef">\n'
-    '<ObjectUnit Id="3" Position="21,9,0" Scale="1,1,1" UnitType="Hive" Player="8">\n'
+    '<ObjectUnit Id="3" Position="21,9,0" Scale="1,1,1" UnitType="SCOBAOvermind" Player="8">\n'
     '<ObjectUnit Id="4" Position="240,248,0" Scale="2,2,2" UnitType="PsiDecimator" Player="7">\n'
 )
 
@@ -50,7 +50,7 @@ class BorderTest(unittest.TestCase):
         import math
 
         plants = border.plan(bowl(), OBJECTS)
-        for ux, uy, r in ((21.0, 9.0, border.KEEPOUT_UNITS["Hive"]), (240.0, 248.0, border.KEEPOUT_UNITS["PsiDecimator"])):
+        for ux, uy, r in ((21.0, 9.0, border.KEEPOUT_UNITS["SCOBAOvermind"]), (240.0, 248.0, border.KEEPOUT_UNITS["PsiDecimator"])):
             near = [p for p in plants if math.hypot(p[2] - ux, p[3] - uy) <= r]
             self.assertEqual(near, [])
         # Negative case: missing keep-out units fail loudly.

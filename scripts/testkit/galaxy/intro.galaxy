@@ -315,17 +315,21 @@ void gf_ItDeploy () {
     int lv_i;
     int lv_space;
     int lv_fallMs;
+    int lv_pressAt;
 
     gf_IntroGoto(4, 1.0, 0);
     Wait(2.0 * c_INTRO_TICK, c_timeGame);
     gf_ItSnap(lv_s, "t0");
     // Two presses 150 ms apart: the second lands in ZOOM or early FALL.
     gf_ItHost("space,space", 60, 150);
+    lv_pressAt = gf_ItMs();
     for (lv_i = 0; lv_i < 80 && gv_introState == c_INTRO_LOOP; lv_i += 1) {
         Wait(c_INTRO_TICK, c_timeGame);
     }
     lv_space = gf_ItMs();
     BankValueSetFromInt(gv_dbgBank, lv_s, "seenState", gv_introState);
+    BankValueSetFromString(gv_dbgBank, lv_s, "countTrace", gv_introCountTrace);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "countMs", lv_space - lv_pressAt);
     gf_ItSnap(lv_s, "tzoom");
     // Per loop: ms since ZOOM was seen, state, script FOV, engine distance.
     for (lv_i = 0; lv_i < 16 && gv_introState == c_INTRO_ZOOM; lv_i += 1) {

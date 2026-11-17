@@ -49,6 +49,7 @@ NON_SPLASH_ACTORS = {
     "FactoryTechLab",
     "GreaterNydusWorm",
     "Hive",
+    "SCOBAOvermind",
     "InfestedColonistShip",
     "KorhalPalaceTurret",
     "Kraith",

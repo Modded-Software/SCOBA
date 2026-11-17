@@ -182,10 +182,10 @@ def _tps_shot(checks, section: str, floater: str | None, shots: int = 1) -> None
     checks.eq(section, "tend", "Presses", (checks.value(section, "taim", "Presses") or 0) + 2 * shots)
     checks.eq(section, "tend", "Shots", (checks.value(section, "taim", "Shots") or 0) + shots)
     (checks.true if aiming else checks.false)(section, "tshot", "ShotSeen")
-    # R-TPS-70 to 72: exactly one text of the right kind, none of the others.
+    # The shot texts are off (2026-11-17): no text of any kind. `floater`
+    # names the text the shot would have shown.
     for key in FLOATERS:
-        want = (checks.value(section, "taim", key) or 0) + (1 if key == floater else 0)
-        checks.eq(section, "tend", key, want)
+        checks.eq(section, "tend", key, checks.value(section, "taim", key) or 0)
     if aiming:
         shot_clocks(checks, section, again=True)
     # R-TPS-60: the hero does not move.
@@ -259,8 +259,8 @@ def _shot_cases(checks, prefix: str) -> None:
     checks.gt(section, "tshot", "ProxyZ100", 100)
     # R-TPS-85: the crosshair and the text are layout frames, hooked up.
     checks.true(section, "taim", "CrosshairHooked")
-    checks.eq(section, "tshot", "TextHooked", 4)
-    checks.gt(section, "tshot", "TextShown", 0)
+    # The texts are off: none is shown.
+    checks.eq(section, "tshot", "TextShown", 0)
 
     section = f"{prefix}_friendly"
     checks.true(section, "taim", "CrossAlly")
@@ -323,12 +323,12 @@ def _check_shot_stop(checks) -> None:
     # Negative case: the click never holds an attack order.
     checks.false(section, "tpress", "AttackOrder")
     checks.eq(section, "tstop", "Shots", shots + 1)
-    checks.eq(section, "tstop", "FloatMiss", miss + 1)
+    checks.eq(section, "tstop", "FloatMiss", miss)
     checks.eq(section, "tstop", "ShotKind", 0)
-    # The next click fires one more shot with its one text.
+    # The next click fires one more shot, with no text.
     checks.true(section, "tshot", "ShotSeen")
     checks.eq(section, "tend", "Shots", shots + 2)
-    checks.eq(section, "tend", "FloatMiss", miss + 2)
+    checks.eq(section, "tend", "FloatMiss", miss)
     checks.eq(section, "tend", "ShotKind", 0)
 
 
@@ -350,11 +350,10 @@ def _check_shot_walk(checks) -> None:
     for tag in ("tpress", "tshot", "tend"):
         checks.false(section, tag, "AttackOrder")
         checks.true(section, tag, "MoveOrder")
-    # The shot fires: effect, text, cooldown, button clock.
+    # The shot fires: effect, cooldown, button clock. No text.
     checks.eq(section, "tend", "Shots", (checks.value(section, "taim", "Shots") or 0) + 1)
     for key in FLOATERS:
-        want = (checks.value(section, "taim", key) or 0) + (1 if key == "FloatMiss" else 0)
-        checks.eq(section, "tend", key, want)
+        checks.eq(section, "tend", key, checks.value(section, "taim", key) or 0)
     shot_clocks(checks, section, again=False)
     _tps_proxy_shot(checks, section)
     # No shot state is left.

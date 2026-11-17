@@ -38,8 +38,11 @@ void gf_GateSendGroup (unitgroup lp_group, int lp_side, int lp_lane, region lp_d
 }
 
 // A unit entered the X region of lp_lane: on to the enemy spawn through the
-// gate on the enemy's half.
+// gate on the enemy's half. Air creeps keep their patrol (REQ-AIR-CREEP).
 void gf_GateFromX (unit lp_unit, int lp_lane) {
+    if (gf_AirCreepIs(lp_unit)) {
+        return;
+    }
     if (PlayerRace(UnitGetOwner(lp_unit)) == "Terr") {
         gf_GateSend(lp_unit, 0, lp_lane, gv_sPAWNLOCATIONS[lp_lane + 3]);
     }

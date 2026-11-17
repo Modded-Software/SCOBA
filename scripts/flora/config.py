@@ -49,7 +49,7 @@ HERO_UNITS = ("Kerrigan", "Tosh")
 KEEP_STRUCTURE = 6.0
 KEEP_UNIT = 3.0
 STRUCTURE_UNITS = (
-    "Hive", "GreaterNydusWorm", "HybridUltraliskShackled", "PsiDecimator", "MengskBC", "Leviathan", "SupplyDepot",
+    "Hive", "SCOBAOvermind", "GreaterNydusWorm", "HybridUltraliskShackled", "PsiDecimator", "MengskBC", "Leviathan", "SupplyDepot",
     "SensorTower", "PerditionTurret", "AutoTurret", "KorhalPalaceTurret", "SpineCrawler", "SporeCrawler",
     "SporeCannon", "InfestedSiegeBreakerSieged", "Brakk",
 )
@@ -60,7 +60,7 @@ CLUSTER_RADIUS = 12.0
 CLUSTER_MIN = 3
 
 # Zerg accents: deadly plants within this distance of these player-8 structures.
-ZERG_ACCENT_UNITS = ("SporeCannon", "SporeCrawler", "Hive", "GreaterNydusWorm", "SpineCrawler")
+ZERG_ACCENT_UNITS = ("SporeCannon", "SporeCrawler", "Hive", "SCOBAOvermind", "GreaterNydusWorm", "SpineCrawler")
 ZERG_ACCENT_RADIUS = 12.0
 
 # A family: how far its own instances keep apart, its cap, its scale range.

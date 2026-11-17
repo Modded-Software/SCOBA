@@ -97,6 +97,45 @@ def check_combat_pose(checks) -> None:
     checks.eq(s, "tend", "UpperState", 0)
     checks.false(s, "tend", "ReadyHold")
 
+    check_attack_rate(checks)
+
+
+def _period_factor(period_ms) -> float | None:
+    """The weapon-period speed factor, as gf_AnimAttackSpeed computes it."""
+    if not period_ms:
+        return None
+    return max(0.25, 1000.0 / period_ms)
+
+
+def check_attack_rate(checks) -> None:
+    """Tosh plays the attack clip at 2x the weapon-period rate (operator 2026-11-17)."""
+    s = "attack_rate"
+    factor = _period_factor(checks.value(s, "", "toshPeriod1000"))
+    want = None if factor is None else int(factor * 2.0 * 1000)
+    got = checks.value(s, "", "toshSpeed1000")
+    ok = want is not None and got is not None and abs(got - want) <= 2
+    _report(checks, f"{s} Tosh factor is 2x the weapon factor", ok, f"got={got} want={want}")
+    checks.true(s, "", "shotSeen")
+    # Engine path: the factor the FSM stored on the real shot.
+    stored = checks.value(s, "", "storedSpeed1000")
+    ok = want is not None and stored is not None and abs(stored - want) <= 2
+    _report(
+        checks,
+        f"{s} shot stored the 2x factor",
+        ok,
+        f"stored={stored} want={want} (raw: holdMs={checks.value(s, '', 'holdMs')}"
+        f" clipRaw={checks.value(s, '', 'clipRaw')} clipScaled={checks.value(s, '', 'clipScaled')})",
+    )
+    # The hold is 0.5 / factor: shorter than the old 1x hold.
+    if factor is not None:
+        checks.lt(s, "", "holdMs", int(500.0 / factor))
+    # Negative: Kerrigan keeps the weapon-period factor alone.
+    k_factor = _period_factor(checks.value(s, "", "kerriganPeriod1000"))
+    k_want = None if k_factor is None else int(k_factor * 1000)
+    k_got = checks.value(s, "", "kerriganSpeed1000")
+    ok = k_want is not None and k_got is not None and abs(k_got - k_want) <= 2
+    _report(checks, f"{s} Kerrigan factor unchanged", ok, f"got={k_got} want={k_want}")
+
 
 def check_tps_pose(checks) -> None:
     """R-TPS-17: TPS, Attack auto, not aiming: Tosh holds the shooting pose."""

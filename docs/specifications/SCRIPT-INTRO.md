@@ -41,7 +41,7 @@ Zerg side south-west. The center X sits in the river.
 | MengskBC, the Pride of Augustgrad | (103.8, 153.2) | 5.6, in water 1.6 deep |
 | Center X | (125.3, 118.8) | 3.9, in water |
 | Shackled Hybrid | (194.4, 193.1) | 8.8 |
-| Hive | (21.0, 9.0) | 7.1 |
+| Overmind | (21.0, 9.0) | 7.1 |
 | Greater Nydus Worm | (59.0, 59.0) | 6.1 |
 | PsiDecimator | (240.0, 248.0) | 8.3 |
 | Hero drop region | (176.7, 174.3), r 12 | 5.4 |
@@ -175,10 +175,10 @@ Distance 18 to 12. Lens 48 to 44.
 
 ### S6: THE HIVE (6 s, menace)
 
-**Picture.** The Hive in the south-west corner, from the north-east, a
+**Picture.** The Overmind in the south-west corner, from the north-east, a
 little above. The camera arcs around it, slow and even.
 
-**Camera.** Target the Hive, 3 above its ground. Pitch 18. Distance 22.
+**Camera.** Target the Overmind, 3 above its ground. Pitch 18. Distance 22.
 Lens 55. Yaw 205 to 245: a 40° arc.
 
 **Easing.** Linear arc, slow in and out over the first and last 10 %.

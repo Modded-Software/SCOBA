@@ -99,6 +99,16 @@
         <ScaleMax value="3.000000,3.000000,3.000000"/>
         <ScaleMin value="3.000000,3.000000,3.000000"/>
     </CModel>
+    <!-- Overmind set piece: 6.8 x LiveOvermind.m3 (15.3 x 19.3 x 9.4), twice
+         the 3x3 Hive's ground extent (operator 2026-11-18: 2x of 3.4). -->
+    <CModel id="SCOBAOvermind" parent="Building" Race="Zerg">
+        <Model value="Assets\Doodads\LiveOvermind\LiveOvermind.m3"/>
+        <Radius value="1.000000"/>
+        <SelectionRadius value="1.750000"/>
+        <ShadowRadius value="1.750000"/>
+        <ScaleMax value="6.800000,6.800000,6.800000"/>
+        <ScaleMin value="6.800000,6.800000,6.800000"/>
+    </CModel>
     <CModel id="HybridUltraliskShackled">
         <ScaleMax value="1.800000,1.800000,1.800000"/>
         <ScaleMin value="1.800000,1.800000,1.800000"/>

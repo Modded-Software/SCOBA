@@ -21,9 +21,10 @@ MAP = float(config.MAP_CELLS)
 ROWS = (1.0, -1.0)  # tree rows: cells inside (+) / outside (-) the map edge
 TREE_STEP = 9.0  # sparse: mean tree spacing along a row (operator: less dense, was 5)
 BRAMBLE_STEP = 8.0  # operator: way less dense (was 2.5)
-# No border plant near these placed units (operator 2026-11-16): the Hive and
-# the 2x scaled Psi Decimator on the two opposite corners. Radius in cells.
-KEEPOUT_UNITS = {"Hive": 14.0, "PsiDecimator": 18.0}
+# No border plant near these placed units (operator 2026-11-16): the
+# Overmind (was the Hive, same extent) and the 2x scaled Psi Decimator on the
+# two opposite corners. Radius in cells.
+KEEPOUT_UNITS = {"SCOBAOvermind": 14.0, "PsiDecimator": 18.0}
 
 
 def keepouts(objects: str) -> list[tuple[float, float, float]]:

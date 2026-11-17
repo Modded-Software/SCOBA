@@ -232,7 +232,7 @@ def check_shots(checks) -> None:
                     # R-INTRO-7 on the engine distance.
                     k = edist / 100 * math.tan(math.radians(sfov / 200))
                     _report(checks, f"{name} dolly invariant", abs(k - S.dolly_k()) <= 0.03 * S.dolly_k(), f"k={k:.3f} want={S.dolly_k():.3f}")
-    _report(checks, "shots sampled", count == 30, f"samples={count}")
+    _report(checks, "shots sampled", count == 3 * sum(2 if s.variant != S.VAR_NONE else 1 for s in S.SHOTS), f"samples={count}")
 
 
 def check_wrap(checks) -> None:
@@ -267,7 +267,12 @@ def check_deploy(checks) -> None:
     s = "deploy"
     # R-INTRO-10: SPACE starts the zoom; the prompt and the music go.
     checks.eq(s, "", "seenState", STATE_ZOOM)
-    checks.false(s, "tzoom", "Prompt")
+    # Countdown 3, 2, 1 on the prompt line, then the zoom (~3 s after SPACE).
+    checks.eq(s, "", "countTrace", "321")
+    count_ms = checks.value(s, "", "countMs") or 0
+    print(f"{s} raw countMs={count_ms}")
+    _report(checks, f"{s} zoom starts about 3 s after SPACE", 2500 <= count_ms <= 4000, f"ms={count_ms}")
+    checks.false(s, "tzoom", "Prompt")  # negative: the countdown line is gone
     checks.false(s, "tzoom", "Music")
     checks.eq(s, "tzoom", "Deploys", 1)
     zoom = checks.value(s, "", "zoom") or ""

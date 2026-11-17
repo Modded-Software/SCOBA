@@ -1,0 +1,402 @@
+// Air creep harness (REQ-AIR-CREEP). Raw engine values only; the profile
+// decides. Groups: timer (the live map-start schedule, runs first), wave,
+// route, fight, ground, cap. Every group after timer stops the live
+// schedule and removes every air creep and harness unit first.
+
+trigger gt_AirCreepTest;
+trigger gt_AcDamage;
+timer gv_acClock;           // real time since map init
+unitgroup gv_acProps;       // harness units other than air creeps
+unitgroup gv_acWatch;       // units whose damage is counted
+int gv_acCreepHits;         // damage events on watched units from air creeps
+int gv_acOtherHits;         // damage events on watched units from anything else
+string gv_acSources;        // raw: source type of every damage event
+
+// Damage on a watched unit: counted by source. An air creep hitting a
+// ground unit or a non-creep air unit is what must not happen; other
+// sources (lane spore cannons reach far) are recorded, not asserted.
+bool gt_AcDamage_Func (bool testConds, bool runActions) {
+    unit lv_src = EventUnitDamageSourceUnit();
+
+    if (!UnitGroupHasUnit(gv_acWatch, EventUnit())) {
+        return true;
+    }
+    if (lv_src != null && gf_AirCreepIs(lv_src)) {
+        gv_acCreepHits += 1;
+    }
+    else {
+        gv_acOtherHits += 1;
+    }
+    if (StringLength(gv_acSources) < 200) {
+        if (lv_src == null) {
+            gv_acSources = gv_acSources + "none ";
+        }
+        else {
+            gv_acSources = gv_acSources + UnitGetType(lv_src) + " ";
+        }
+    }
+    return true;
+}
+
+void gf_AcWatchStart (unitgroup lp_units) {
+    gv_acWatch = lp_units;
+    gv_acCreepHits = 0;
+    gv_acOtherHits = 0;
+    gv_acSources = "";
+}
+
+void gf_AcWatchSave (string lp_s) {
+    BankValueSetFromInt(gv_dbgBank, lp_s, "creepHits", gv_acCreepHits);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "otherHits", gv_acOtherHits);
+    BankValueSetFromString(gv_dbgBank, lp_s, "hitSources", gv_acSources);
+    gv_acWatch = UnitGroupEmpty();
+}
+
+const fixed c_AC_TIMER_END = 42.0;   // real s: Zerg 10, 30; Terran 20, 40
+const fixed c_AC_POLL = 0.25;        // real s
+const fixed c_AC_NEAR_X = 12.0;      // route start, from the X center
+const fixed c_AC_ROUTE_WAIT = 20.0;  // game s to reach the first X
+const fixed c_AC_FIGHT_WAIT = 8.0;   // game s, several weapon periods
+const fixed c_AC_CROWD = 20.0;       // other units this near spoil a case
+const int c_AC_SIZE_DRAWS = 600;     // formation-size draws per side
+const int c_AC_SIZE_BINS = 9;        // histogram of sizes 0..8
+
+string gf_AcXY100 (point lp_p) {
+    if (lp_p == null) {
+        return "";
+    }
+    return IntToString(FixedToInt(PointGetX(lp_p) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(lp_p) * 100.0));
+}
+
+int gf_AcMs () {
+    return FixedToInt(TimerGetElapsed(gv_acClock) * 1000.0);
+}
+
+int gf_Ac100 (fixed lp_v) {
+    return FixedToInt(lp_v * 100.0);
+}
+
+int gf_AcLife100 (unit lp_u) {
+    return gf_Ac100(UnitGetPropertyFixed(lp_u, c_unitPropLife, c_unitPropCurrent));
+}
+
+int gf_AcLifeMax100 (unit lp_u) {
+    return gf_Ac100(UnitGetPropertyFixed(lp_u, c_unitPropLifeMax, c_unitPropCurrent));
+}
+
+point gf_AcTop () {
+    return RegionGetCenter(RegionFromId(9));
+}
+
+point gf_AcBottom () {
+    return RegionGetCenter(RegionFromId(7));
+}
+
+point gf_AcCenter () {
+    return RegionGetCenter(RegionFromId(8));
+}
+
+unitgroup gf_AcAll (int lp_side) {
+    return UnitGroup(gf_AirCreepType(lp_side), c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+}
+
+// Stop the live schedule; remove every air creep and every harness unit.
+void gf_AcReset () {
+    int lv_side;
+    unitgroup lv_g;
+
+    TimerPause(gv_airCreepTimer, true);
+    TriggerEnable(gt_AirCreepTick, false);
+    // A wave already running waits per unit for its weapon removal
+    // (c_AIR_CREEP_ARM_TRIES ticks at most): let it finish first.
+    Wait(IntToFixed(c_AIR_CREEP_MAX_PER_WAVE * c_AIR_CREEP_ARM_TRIES) * 0.0625 + 0.25, c_timeGame);
+    for (lv_side = 0; lv_side < 2; lv_side += 1) {
+        lv_g = gf_AcAll(lv_side);
+        UnitGroupLoopBegin(lv_g);
+        for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+            UnitRemove(UnitGroupLoopCurrent());
+        }
+        UnitGroupLoopEnd();
+    }
+    UnitGroupLoopBegin(gv_acProps);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        UnitRemove(UnitGroupLoopCurrent());
+    }
+    UnitGroupLoopEnd();
+    gv_acProps = UnitGroupEmpty();
+    Wait(0.1, c_timeGame);
+}
+
+unit gf_AcProp (string lp_type, int lp_player, point lp_at, bool lp_stun) {
+    unit lv_u;
+
+    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, 0, lp_player, lp_at);
+    lv_u = UnitLastCreated();
+    if (lv_u == null) {
+        return null;
+    }
+    if (lp_stun) {
+        UnitSetState(lv_u, c_unitStateStunned, true);
+    }
+    UnitGroupAdd(gv_acProps, lv_u);
+    return lv_u;
+}
+
+// Player units (players 1-8) other than harness units and air creeps near
+// a case point. Their types go to lp_s/lp_key + "Types" (raw).
+int gf_AcCrowd (string lp_s, string lp_key, point lp_at) {
+    unitgroup lv_g = UnitGroup(null, c_playerAny, RegionCircle(lp_at, c_AC_CROWD), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    unit lv_u;
+    int lv_n = 0;
+    string lv_types = "";
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        if (UnitGetOwner(lv_u) >= 1 && UnitGetOwner(lv_u) <= 8 && !UnitGroupHasUnit(gv_acProps, lv_u) && !gf_AirCreepIs(lv_u)) {
+            lv_n += 1;
+            lv_types = lv_types + UnitGetType(lv_u) + "/" + IntToString(UnitGetOwner(lv_u)) + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Types", lv_types);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key, lv_n);
+    return lv_n;
+}
+
+// One order of a unit: ability, command index, target point, and the
+// target's distance to X Top, X Bottom and X Center (x100).
+void gf_AcOrder (string lp_s, string lp_t, unit lp_u, int lp_index) {
+    order lv_o = UnitOrder(lp_u, lp_index);
+    abilcmd lv_c;
+    point lv_p;
+
+    if (lv_o == null) {
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_t + "Abil", "");
+        return;
+    }
+    lv_c = OrderGetAbilityCommand(lv_o);
+    lv_p = OrderGetTargetPoint(lv_o);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_t + "Abil", AbilityCommandGetAbility(lv_c));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Cmd", AbilityCommandGetCommand(lv_c));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_t + "At100", gf_AcXY100(lv_p));
+    if (lv_p != null) {
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Top100", gf_Ac100(DistanceBetweenPoints(lv_p, gf_AcTop())));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Bottom100", gf_Ac100(DistanceBetweenPoints(lv_p, gf_AcBottom())));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Center100", gf_Ac100(DistanceBetweenPoints(lv_p, gf_AcCenter())));
+    }
+}
+
+// Engine state of one air creep.
+void gf_AcUnit (string lp_s, string lp_t, unit lp_u, point lp_home) {
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Valid", UnitIsValid(lp_u));
+    if (!UnitIsValid(lp_u)) {
+        return;
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_t + "Type", UnitGetType(lp_u));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Owner", UnitGetOwner(lp_u));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Alive", UnitIsAlive(lp_u));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_t + "At100", gf_AcXY100(UnitGetPosition(lp_u)));
+    if (lp_home != null) {
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Home100", gf_Ac100(DistanceBetweenPoints(UnitGetPosition(lp_u), lp_home)));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Height100", gf_Ac100(UnitGetHeight(lp_u)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Life100", gf_AcLife100(lp_u));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "LifeMax100", gf_AcLifeMax100(lp_u));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Orders", UnitOrderCount(lp_u));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Attacking", UnitOrderHasAbil(lp_u, "attack"));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Weapons", UnitWeaponCount(lp_u));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_t + "Weapon1", UnitWeaponGet(lp_u, 1));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_t + "Weapon2", UnitWeaponGet(lp_u, 2));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Top100", gf_Ac100(DistanceBetweenPoints(UnitGetPosition(lp_u), gf_AcTop())));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Bottom100", gf_Ac100(DistanceBetweenPoints(UnitGetPosition(lp_u), gf_AcBottom())));
+    gf_AcOrder(lp_s, lp_t + "O0", lp_u, 0);
+    gf_AcOrder(lp_s, lp_t + "O1", lp_u, 1);
+}
+
+// The last wave's balance: lp_s/<side>Bal<n>, -Own<n>, -Enemy<n>,
+// -SizeA<n>, -SizeB<n>.
+void gf_AcBalanceSave (string lp_s, int lp_side, int lp_n) {
+    string lv_p = "terran";
+
+    if (lp_side == c_AIR_CREEP_ZERG) {
+        lv_p = "zerg";
+    }
+    lv_p = lv_p + "Bal";
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_p + IntToString(lp_n), gv_airCreepLastBalance);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_p + "Own" + IntToString(lp_n), gv_airCreepBalanceOwn);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_p + "Enemy" + IntToString(lp_n), gv_airCreepBalanceEnemy);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_p + "SizeA" + IntToString(lp_n), gv_airCreepLastSize1);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_p + "SizeB" + IntToString(lp_n), gv_airCreepLastSize2);
+}
+
+// --- timer: the live schedule from map start --------------------------------
+void gf_AcTimer () {
+    string lv_s = "ac_timer";
+    int[2] lv_n;
+    int[2] lv_seen2;
+    int[2] lv_seen4;
+    int lv_side;
+    bool lv_s5 = false;
+    bool lv_s15 = false;
+    bool lv_s25 = false;
+    bool lv_s35 = false;
+    int lv_ms;
+
+    // Wave times come from the wave counters; unit counts from the spawn
+    // counters (units made). Live counts are raw: with the faster units and
+    // the long range, the two sides may fight early.
+    for (lv_side = 0; lv_side < 2; lv_side += 1) {
+        lv_seen2[lv_side] = -1;
+        lv_seen4[lv_side] = -1;
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "firstMs", gf_AcMs());
+    BankValueSetFromInt(gv_dbgBank, lv_s, "firstZerg", gv_airCreepSpawned[0]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "firstTerran", gv_airCreepSpawned[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "firstWavesZerg", gv_airCreepWaves[0]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "firstWavesTerran", gv_airCreepWaves[1]);
+    while (TimerGetElapsed(gv_acClock) < c_AC_TIMER_END) {
+        lv_ms = gf_AcMs();
+        for (lv_side = 0; lv_side < 2; lv_side += 1) {
+            lv_n[lv_side] = gv_airCreepSpawned[lv_side];
+            // The balance globals belong to the wave just started: the next
+            // wave is 10 s away.
+            if (lv_seen2[lv_side] < 0 && gv_airCreepWaves[lv_side] >= 1) {
+                lv_seen2[lv_side] = lv_ms;
+                gf_AcBalanceSave(lv_s, lv_side, 1);
+            }
+            if (lv_seen4[lv_side] < 0 && gv_airCreepWaves[lv_side] >= 2) {
+                lv_seen4[lv_side] = lv_ms;
+                gf_AcBalanceSave(lv_s, lv_side, 2);
+            }
+        }
+        if (!lv_s5 && lv_ms >= 5000) {
+            lv_s5 = true;
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at5Zerg", lv_n[0]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at5Terran", lv_n[1]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at5AliveZerg", gf_AirCreepAlive(0));
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at5AliveTerran", gf_AirCreepAlive(1));
+        }
+        if (!lv_s15 && lv_ms >= 15000) {
+            lv_s15 = true;
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at15Zerg", lv_n[0]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at15Terran", lv_n[1]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at15AliveZerg", gf_AirCreepAlive(0));
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at15AliveTerran", gf_AirCreepAlive(1));
+        }
+        if (!lv_s25 && lv_ms >= 25000) {
+            lv_s25 = true;
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at25Zerg", lv_n[0]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at25Terran", lv_n[1]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at25AliveZerg", gf_AirCreepAlive(0));
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at25AliveTerran", gf_AirCreepAlive(1));
+        }
+        if (!lv_s35 && lv_ms >= 35000) {
+            lv_s35 = true;
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at35Zerg", lv_n[0]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at35Terran", lv_n[1]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at35AliveZerg", gf_AirCreepAlive(0));
+            BankValueSetFromInt(gv_dbgBank, lv_s, "at35AliveTerran", gf_AirCreepAlive(1));
+        }
+        Wait(c_AC_POLL, c_timeReal);
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "zerg2Ms", lv_seen2[0]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "zerg4Ms", lv_seen4[0]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "terran2Ms", lv_seen2[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "terran4Ms", lv_seen4[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "endZerg", gf_AirCreepAlive(c_AIR_CREEP_ZERG));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "endTerran", gf_AirCreepAlive(c_AIR_CREEP_TERRAN));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "wavesZerg", gv_airCreepWaves[0]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "wavesTerran", gv_airCreepWaves[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "timerRemainMs", FixedToInt(TimerGetRemaining(gv_airCreepTimer) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "timerDurationMs", FixedToInt(TimerGetDuration(gv_airCreepTimer) * 1000.0));
+    BankSave(gv_dbgBank);
+}
+
+// --- wave: one wave per side at its home ------------------------------------
+void gf_AcWaveSide (string lp_s, int lp_side) {
+    point lv_home = gf_AirCreepHome(lp_side);
+    unitgroup lv_g;
+    int lv_before = gf_AirCreepAlive(lp_side);
+    int lv_made;
+    int lv_n;
+    int lv_i;
+
+    BankValueSetFromString(gv_dbgBank, lp_s, "home100", gf_AcXY100(lv_home));
+    lv_made = gf_AirCreepWave(lp_side);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "made", lv_made);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "armTicks", gv_airCreepArmTicks);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "before", lv_before);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "after", gf_AirCreepAlive(lp_side));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "otherSide", gf_AirCreepAlive(1 - lp_side));
+    lv_g = gf_AcAll(lp_side);
+    lv_n = UnitGroupCount(lv_g, c_unitCountAll);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "units", lv_n);
+    for (lv_i = 1; lv_i <= lv_n && lv_i <= c_AIR_CREEP_MAX_PER_WAVE; lv_i += 1) {
+        gf_AcUnit(lp_s, "u" + IntToString(lv_i), UnitGroupUnit(lv_g, lv_i), lv_home);
+    }
+    BankSave(gv_dbgBank);
+    // At flying height after a few seconds.
+    Wait(3.0, c_timeGame);
+    for (lv_i = 1; lv_i <= lv_n && lv_i <= c_AIR_CREEP_MAX_PER_WAVE; lv_i += 1) {
+        gf_AcUnit(lp_s, "late" + IntToString(lv_i), UnitGroupUnit(lv_g, lv_i), lv_home);
+    }
+    BankSave(gv_dbgBank);
+}
+
+// Formation sizes: many draws per side, no units made.
+void gf_AcSizes () {
+    string lv_s = "ac_sizes";
+    int lv_side;
+    int lv_i;
+    int lv_v;
+    int lv_min;
+    int lv_max;
+    int lv_sum;
+    int[c_AC_SIZE_BINS] lv_hist;
+    string lv_p;
+
+    for (lv_side = 0; lv_side < 2; lv_side += 1) {
+        lv_min = 99;
+        lv_max = -1;
+        lv_sum = 0;
+        for (lv_i = 0; lv_i < c_AC_SIZE_BINS; lv_i += 1) {
+            lv_hist[lv_i] = 0;
+        }
+        for (lv_i = 0; lv_i < c_AC_SIZE_DRAWS; lv_i += 1) {
+            lv_v = gf_AirCreepFormationSize(lv_side);
+            lv_sum += lv_v;
+            if (lv_v < lv_min) {
+                lv_min = lv_v;
+            }
+            if (lv_v > lv_max) {
+                lv_max = lv_v;
+            }
+            if (lv_v >= 0 && lv_v < c_AC_SIZE_BINS) {
+                lv_hist[lv_v] += 1;
+            }
+        }
+        if (lv_side == c_AIR_CREEP_ZERG) {
+            lv_p = "zerg";
+        }
+        else {
+            lv_p = "terran";
+        }
+        BankValueSetFromInt(gv_dbgBank, lv_s, lv_p + "Min", lv_min);
+        BankValueSetFromInt(gv_dbgBank, lv_s, lv_p + "Max", lv_max);
+        BankValueSetFromInt(gv_dbgBank, lv_s, lv_p + "Mean100", lv_sum * 100 / c_AC_SIZE_DRAWS);
+        for (lv_i = 2; lv_i < c_AC_SIZE_BINS; lv_i += 1) {
+            BankValueSetFromInt(gv_dbgBank, lv_s, lv_p + "N" + IntToString(lv_i), lv_hist[lv_i]);
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "draws", c_AC_SIZE_DRAWS);
+    BankSave(gv_dbgBank);
+}
+
+void gf_AcWave () {
+    gf_AcSizes();
+    gf_AcReset();
+    gf_AcWaveSide("ac_wave_zerg", c_AIR_CREEP_ZERG);
+    gf_AcReset();
+    gf_AcWaveSide("ac_wave_terran", c_AIR_CREEP_TERRAN);
+}

@@ -107,11 +107,16 @@ bool gf_AnimAimAttackActive (int lp_player) {
 // so a faster weapon plays a faster, shorter clip.
 fixed gf_AnimAttackSpeed (int lp_player, string lp_weapon) {
     fixed lv_period = StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, lp_weapon, "Period", lp_player));
+    fixed lv_rate = 1.0;
+    fixed lv_speed = 1.0;
 
-    if ((lv_period <= 0.0)) {
-        return 1.0;
+    if (UnitIsValid(gv_tPSUNIT[lp_player]) && gf_AnimHeroProfile(gv_tPSUNIT[lp_player]) == c_ANIM_HERO_TOSH) {
+        lv_rate = c_ANIM_ATTACK_RATE_TOSH;
     }
-    return MaxF(c_ANIM_ATTACK_SPEED_MIN, c_ANIM_ATTACK_PERIOD_REF / lv_period);
+    if ((lv_period > 0.0)) {
+        lv_speed = MaxF(c_ANIM_ATTACK_SPEED_MIN, c_ANIM_ATTACK_PERIOD_REF / lv_period);
+    }
+    return lv_speed * lv_rate;
 }
 
 void gf_AnimAttackStart (int lp_player, string lp_weapon, unit lp_target) {

@@ -351,6 +351,13 @@
     <!-- The hero pod (REQ-HERO-DROP): the same art. The script plays
          Birth on create (stock drop); its death clip opens the doors. -->
     <CActorUnit id="SCOBAHeroPod" parent="SCOBADropPodArt" unitName="SCOBAHeroPod"/>
+    <!-- The Overmind set piece (SCOBAOvermind unit and model). -->
+    <CActorUnit id="SCOBAOvermind" parent="GenericUnitStandard" unitName="SCOBAOvermind">
+        <Model value="SCOBAOvermind"/>
+        <BarWidth value="135"/>
+        <BarOffset value="65"/>
+        <NameOffset value="80"/>
+    </CActorUnit>
     <CActorUnit id="Thor">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="3.000000"/>
@@ -545,5 +552,53 @@
     <CActorUnit id="SpineCrawler">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
+    </CActorUnit>
+    <!-- Air creeps (REQ-AIR-CREEP): the stock art at 5x. The parents are
+         templates, as for the stock MutaliskViper and MengskWraith actors:
+         an actor whose parent is a concrete actor is not created
+         (validate_pod_actor). The attack actors of the stock units are keyed
+         to the effects, which the SCOBA weapons keep. -->
+    <CActorUnit id="SCOBAMutalisk" parent="GenericUnitStandard" unitName="SCOBAMutalisk">
+        <Model value="Mutalisk"/>
+        <Scale value="5.000000"/>
+        <DeathArray index="Normal" ModelLink="MutaliskDeath" SoundLink="Mutalisk_Explode"/>
+        <PortraitModel value="MutaliskPortrait"/>
+        <WalkAnimMoveSpeed value="2"/>
+        <BarWidth value="50"/>
+        <BarOffset value="60"/>
+        <UnitIcon value="Assets\Textures\btn-unit-zerg-mutalisk.dds"/>
+        <HeroIcon value="Assets\Textures\btn-unit-zerg-mutalisk.dds"/>
+        <GroupIcon>
+            <Image value="Assets\Textures\Wireframe-Zerg-Mutalisk.dds"/>
+        </GroupIcon>
+        <Wireframe>
+            <Image value="Assets\Textures\Wireframe-Zerg-Mutalisk.dds"/>
+        </Wireframe>
+        <LifeArmorIcon value="Assets\Textures\btn-upgrade-zerg-flyercarapace-level0.dds"/>
+        <HostSiteOps Ops="SOpBankerMutalisk"/>
+    </CActorUnit>
+    <CActorUnit id="SCOBAWraith" parent="GenericUnitBase" unitName="SCOBAWraith">
+        <Model value="MengskWraith"/>
+        <Scale value="5.000000"/>
+        <DeathArray index="Normal" ModelLink="MengskWraithDeath" SoundLink="Wraith_Explode"/>
+        <PortraitModel value="WraithPortrait"/>
+        <AnimBlendTime value="0.300000"/>
+        <On Terms="Abil.attack.ReadyStart" Send="AnimGroupApply Ready"/>
+        <On Terms="WeaponStart.SCOBAWraithA.AttackStart" Send="AnimBracketStart Attack Attack,Superior"/>
+        <On Terms="WeaponStop.*.AttackStop" Send="AnimBracketStop Attack"/>
+        <On Terms="Abil.attack.ReadyStop" Send="AnimGroupRemove Ready"/>
+        <BarWidth value="66"/>
+        <BarOffset value="55"/>
+        <UnitIcon value="Assets\Textures\btn-unit-terran-wraith.dds"/>
+        <HeroIcon value="Assets\Textures\btn-unit-terran-wraith.dds"/>
+        <GroupIcon>
+            <Image value="Assets\Textures\Wireframe-Terran-wraith.dds"/>
+        </GroupIcon>
+        <Wireframe>
+            <Image value="Assets\Textures\Wireframe-Terran-wraith.dds"/>
+        </Wireframe>
+        <LifeArmorIcon value="Assets\Textures\btn-upgrade-terran-shipplatinglevel0.dds"/>
+        <!-- No SOpBankerWraith: it lives in liberty.sc2campaign. -->
+        <Aliases value="_UnitLarge"/>
     </CActorUnit>
 </Catalog>

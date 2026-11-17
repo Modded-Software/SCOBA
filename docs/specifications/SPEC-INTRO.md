@@ -25,7 +25,7 @@ Code exists. `[tested]` entries passed in run `intro/20261117-024914`
 | R-INTRO-7 | [host] [tested] [operator] | host: invariant on the table; `shots S8`: engine distance × tan(script FOV / 2) within 3 %; the look: AC-INTRO-5 |
 | R-INTRO-8 | [tested] [operator] | `boot`: `Prompt` true; `deploy tzoom`: `Prompt` false; legibility: AC-INTRO-3 |
 | R-INTRO-9 | [tested] | `gate tw/t1/tf`: hero position, tag, orders, pods, state unchanged; camera values still the row's; `TrigOn` 0 |
-| R-INTRO-10 | [implemented] [operator] | `deploy`: injected SPACE; one `SCOBAHeroPod` at the drop point; pod height from 40, never rising. Not verified after the fall revert (2026-11-17); the pod looks broken (operator); the snap and the pod look: AC-INTRO-6 |
+| R-INTRO-10 | [implemented] [operator] | `deploy`: injected SPACE; countdown trace `321`, zoom 2.5..4 s after SPACE (`gf_IntroCountStep`); one `SCOBAHeroPod` at the drop point; pod height from 40, never rising. Not verified after the fall revert (2026-11-17); the pod looks broken (operator); the snap and the pod look: AC-INTRO-6 |
 | R-INTRO-11 | [tested] | `deploy`: `JumpPresses` 0, `Pods` 1, `SpaceIgnored` 2; `boot treinf`: `Pods` 0 |
 | R-INTRO-12 | [tested] | `deploy tland/tafter`: alive, shown, `Direct` 1, `Single` 1, `Stand` 1, `TpsMode` false, `Cinematic` false, `Dialogs` 10, `TrigOn` 41, state DONE |
 | R-INTRO-13 | [tested] | `boot`: 5 Terran and 10 Zerg seeded at X; both sides hurt by 6 s; `laneUnits6` 0 |
@@ -131,9 +131,10 @@ target − distance × (cos pitch × (cos yaw, sin yaw), −sin pitch).
 | S3 Map | 10 | E | (125.3, 118.8) | ground | 45 → 75 | 80 | 150 | 22 | off | none |
 | S4 Brambles | 6 | E | (194.4, 193.1) | ground + 3 | 90.8 | −6.0 | 30.5 | 70 → 45 | off | none |
 | S5 Shackled | 4 | E | (194.4, 193.1) | ground + 4 | 90.8 | 8 | 18 → 12 | 48 → 44 | off | none |
-| S6 Hive | 6 | A | (21.0, 9.0) | ground + 3 | 205 → 245 | 18 | 66 | 55 | off | yaw reversed |
+| S6 Overmind | 6 | A | (21.0, 9.0) | ground + 3 | 205 → 245 | 18 | 66 | 55 | off | yaw reversed |
 | S7 Worm | 3 | O | (59.0, 59.0) | ground + 6 → + 12 | 225 | −20 → −35 | 9 | 80 | off | none |
-| S8 Decimator | 6 | Z | (240.0, 248.0) | ground + 4 | 45 | 10 | from FOV | 70 → 24 | off | none |
+| S8 Jungle | 8 | L | (120.0, 150.0) → (120.0, 170.0), Terran jungle | ground + 2 | 90 | 12 | 6 | 60 | off | none |
+| S9 Decimator | 8 | Z | (240.0, 248.0) | ground + 4 | 45 | 10 | from FOV | 70 → 24 | off | none |
 | Zoom | 0.35 | C | hero drop point | ground | 225 | 55 | 60 | 60 → 12 | off | none |
 
 S2 `z` is water level 7.15 + 1.2. Pass length 59 s.
@@ -180,9 +181,10 @@ At map init, before the first frame:
 
 - Terran, player 1: 4 Marine, 1 Goliath at X + (3.5, 3.5), then 50 back toward spawn 1.
 - Zerg, player 4: 8 Zergling, 2 Roach at X − (3.5, 3.5), then 50 back toward spawn 4.
-- Each group: made by `gf_CreateSpawnGroup`, ordered by
-  `gf_GateFromX(unit, 1)`. The groups meet at once and fight. Survivors
-  go on along the center lane.
+- Each group: made by `gf_CreateSpawnGroup`, 50 back toward its spawn.
+  Ordered by `gf_IntroSeedOrder`: attack-move to the X center first, so
+  the paths cross on X and the groups fight there; then the enemy gate
+  and spawn (queued). Survivors go on along the center lane.
 
 No units are seeded on lanes 2 and 3. The spawn timer is not changed.
 
@@ -319,8 +321,13 @@ Host: `testkit.tests.test_intro_shots` and `testkit.tests.test_profiles`,
 
 ## DOF (operator 2026-11-17)
 
-- Every intro scene has near DOF (`gf_IntroSceneDof`): focus 16, near 1..6.
+- Every intro scene has near DOF (`gf_IntroSceneDof`): focus = the shot's
+  arm d, near falloffs (1..6) x d / 16 / (0.5 x the shot's `near`):
+  falloffs are distances from the focal plane, smaller = more blur. Shot `far` > 0: far blur from far x d past the focus,
+  full at 3 x that. S3: near 1.3. S9: near 2.0. S5: near 0.3, far 0.15. S6 (huge hive): near 0.1,
+  far 0.3. S7: near 2.0. S8: near 2.0, far 1.5.
   Far DOF (4..18) only on rows flagged `dof`; other rows push it past the far clip.
 - The hero drop has near and far DOF: focus `c_DROP_CAM_DISTANCE` (the pod),
   near 1..6, far 4..18. The in-game DOF tick takes over after touchdown.
 - How the blur looks is an operator check.
+

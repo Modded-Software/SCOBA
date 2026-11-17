@@ -71,7 +71,7 @@ Implementation lives in
 | R-PNC-21 | Attack `single`: the right click MUST produce exactly one shot. The hero MUST NOT attack again without a new attack command. |
 | R-PNC-22 | Attack `auto`: the hero MUST keep attacking the clicked enemy until it dies or the attack is cancelled. |
 | R-PNC-23 | Chase `move`, enemy out of range: the hero MUST walk until the enemy is in range, then attack. |
-| R-PNC-24 | Chase `stand`, enemy out of range: the hero MUST NOT move and MUST NOT attack. One `Out of range` floater MUST appear at the enemy. |
+| R-PNC-24 | Chase `stand`, enemy out of range: the hero MUST NOT move and MUST NOT attack. No `Out of range` floater MUST appear (changed 2026-11-17, R-TPS-79). |
 | R-PNC-25 | Chase `move`: a right click on the ground MUST issue a move order to that point and show the ground target model effect. |
 | R-PNC-26 | Chase `move`: a right click on a friendly unit MUST issue a move-follow on that unit. |
 | R-PNC-27 | Chase `stand`: a right click on the ground or on a friendly unit MUST NOT move the hero. Nothing is shown for the friendly click. |
@@ -159,7 +159,7 @@ after each shot of a sequence.
 | AC-PNC-4 | Attack `single`, three right clicks spaced past the weapon period: three shots. |
 | AC-PNC-5 | Attack `auto`, right click an enemy: the hero attacks it until it dies. |
 | AC-PNC-6 | Chase `move`, right click an out-of-range enemy: the hero walks into range and attacks. |
-| AC-PNC-7 | Chase `stand`, right click an out-of-range enemy: no movement, no shot, `Out of range` appears. |
+| AC-PNC-7 | Chase `stand`, right click an out-of-range enemy: no movement, no shot, no text appears. |
 | AC-PNC-8 | Chase `move`, right click the ground: the hero walks there, the ground marker shows, the boss bar hides. |
 | AC-PNC-9 | Chase `move`, right click a friendly unit that then moves: the hero follows it. |
 | AC-PNC-10 | Chase `stand`, right click the ground: the hero does not move and the boss bar hides. Right click a friendly: nothing happens. |

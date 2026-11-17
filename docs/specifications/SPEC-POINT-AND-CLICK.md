@@ -66,7 +66,7 @@ passed in that run unless another run is named.
 | R-PNC-20, 21 | [tested] | `single_shot`. |
 | R-PNC-22 | [tested] | `auto_click`. |
 | R-PNC-23 | [tested] | `single_out_move`, `auto_move_near`. |
-| R-PNC-24 | [tested] | `single_out_stand`: no order, no movement. The floater is [operator]. |
+| R-PNC-24 | [tested] | `single_out_stand`: no order, no movement, no `Out of range` floater (counter `PncRangeFloat`). |
 | R-PNC-25, 27, 28 | [tested] | `ground_move`, `ground_stand`. The ground marker is [operator]. |
 | R-PNC-26 | [planned] | A friendly right click still moves to the click point. |
 | R-PNC-30, 33 | [tested] | `cancel`. |
@@ -151,7 +151,7 @@ enemy, and the `Weapon Attack` button. [tested]
 | --- | --- | --- |
 | In range | any | Set UI target. Issue `attack` on the unit. |
 | Out of range | `move` | Set UI target. Issue `attack` on the unit. |
-| Out of range | `stand` | Set UI target. No order. Show `Out of range` at the enemy. |
+| Out of range | `stand` | Set UI target. No order. No text (R-TPS-79; the `Out of range` text is off). |
 
 In range uses `UnitInRangeAndAbleToAttackTarget`.
 
@@ -300,6 +300,14 @@ Not confirmed: what the engine's own attack animation shows under the
 bracket between shots. [open] If idle still shows through, actor data needs
 a change. That is the operator check in section 9.
 
+Tosh attack clip rate (operator 2026-11-17: 2x). [built], not verified.
+`gf_AnimAttackSpeed` multiplies the weapon-period factor by
+`c_ANIM_ATTACK_RATE_TOSH` (2.0) for Tosh only. Both shot paths (not aiming
+and aiming) read it. Tosh: factor 8, time scale 16, attack window 0.0625 s.
+The clip span shown per shot is unchanged; it plays in half the time. The
+ready linger (2 s) does not depend on it. Kerrigan is unchanged. Test:
+`combat pose`, section `attack_rate`. The look is [operator].
+
 ## 6. Module Structure [planned]
 
 | Layer | Module | Owns |
@@ -355,7 +363,7 @@ Decision: parked, not reverted. The TPS phase replaces it; see
 - The toggle button labels and icons (5.1, 5.10).
 - Firing without turning to the target in Attack `auto` (5.2).
 - Backpedal and strafe animation in a right hold (5.8).
-- The `Out of range` floater and the ground move marker (5.4).
+- The ground move marker (5.4). No `Out of range` text shows (R-TPS-79).
 - Attack animation, effects, and sound.
 - Tosh holds the shooting pose between sequential shots and for 2 s after
   the last, with no idle flicker (5.11).

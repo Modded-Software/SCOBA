@@ -75,6 +75,9 @@ const fixed c_SCOBA_CROSSHAIR_STEP = 0.5;
 const string c_SCOBA_OUT_OF_RANGE_TEXT = "Out of range";
 const string c_SCOBA_MISS_TEXT = "Miss";
 const string c_SCOBA_FRIENDLY_FIRE_TEXT = "Friendly Fire Disabled";
+// The Miss, Out of range, and Friendly Fire Disabled floaters are off
+// (operator 2026-11-17). Damage numbers stay on.
+const bool c_SCOBA_SHOT_TEXT_ON = false;
 // What the crosshair is on (R-TPS-23 to 26).
 const int c_RETICLE_NORMAL = 0;
 const int c_RETICLE_ENEMY = 1;

@@ -56,6 +56,8 @@ actions:
   podbirth               rebuild, build pod Birth test map, run it
   aimdof                 rebuild, sweep 10 aim near-DOF datapoints (operator check)
   skyduel                rebuild, check the three MengskBC spots and heights, Leviathan hidden
+  aircreep [group]       rebuild, build air creep test map, run one scenario group
+                         (timer, wave, route, fight, ground, cap, balance) or the full suite
   aim                    rebuild, build aim test map, run aim profile
   motion                 rebuild, build motion test map, run motion profile
   controls               rebuild, build controls test map, run controls profile
@@ -99,6 +101,7 @@ profile_timeout() {
         podbirth) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
         aimdof) printf '%s\n' "${SC2_CASE_TIMEOUT:-60}" ;;
         intro) printf '%s\n' "${SC2_CASE_TIMEOUT:-120}" ;;
+        aircreep) printf '%s\n' "${SC2_CASE_TIMEOUT:-240}" ;;
         pitch) printf '%s\n' "${SC2_CASE_TIMEOUT:-30}" ;;
         aimfreeze) printf '%s\n' "${SC2_CASE_TIMEOUT:-20}" ;;
         *) printf '%s\n' "${SC2_CASE_TIMEOUT:-40}" ;;
@@ -119,7 +122,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|intro|herodrop|podbirth|aimdof|skyduel|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
+        combat|tps|jump|intro|aircreep|herodrop|podbirth|aimdof|skyduel|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -163,7 +166,7 @@ case "$ACTION" in
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-and-check.sh"
         ;;
-    combat|tps|jump|intro)
+    combat|tps|jump|intro|aircreep)
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;

@@ -39,7 +39,7 @@ class TableTest(unittest.TestCase):
             self.assertEqual(S.check(Path(tmp)), [])
 
     def test_lengths(self) -> None:
-        self.assertAlmostEqual(S.LOOP_LENGTH, 59.0)
+        self.assertAlmostEqual(S.LOOP_LENGTH, 69.0)  # S8 jungle and S9 8 s (operator 2026-11-17)
         for shot in S.SHOTS:
             self.assertGreaterEqual(shot.length, 3.0, shot.name)
         self.assertLessEqual(S.ZOOM.length, 0.4)  # R-INTRO-10
@@ -115,7 +115,7 @@ class TableTest(unittest.TestCase):
         self.assertIn(f"const int c_INTRO_SHOTS = {len(S.SHOTS)};", text)
         self.assertIn(f"gv_introRow_dof[{len(S.SHOTS)}] = false;", text)
         self.assertIn("gv_introRow_dof[1] = true;", text)
-        self.assertIn("gv_introRow_ease[7] = c_INTRO_EASE_Z;", text)
+        self.assertIn("gv_introRow_ease[8] = c_INTRO_EASE_Z;", text)
 
 
 class IntroPatchTest(unittest.TestCase):

@@ -247,8 +247,14 @@ not repeated here.
   (`tps_shot_stop`).
 - `gf_TpsShotExpire` drops a pending shot after `c_TPS_SHOT_TIMEOUT` (2 s).
 
-### 5.6 Shot floaters (R-TPS-70 to 76)
+### 5.6 Shot floaters (R-TPS-70 to 76, 79)
 
+- Off (R-TPS-79, 2026-11-17): `c_SCOBA_SHOT_TEXT_ON` is false.
+  `gf_UiFloaterShow` returns at once, and `gf_PncAttack` creates no
+  `Out of range` text. Setting the constant true restores the behavior
+  below. The pending outcome is still computed; the reticle is unchanged.
+  Tests assert the counters `gv_tpsFloaterCount` and
+  `gv_pncRangeFloaterCount` do not rise (`tps_shot_*`, `single_out_stand`).
 - `gt_CombatAttackEffect` runs when the engine fires the weapon. If the fired
   target is the pending shot target, it shows the floater and clears the
   pending outcome. Nothing else creates these floaters.
@@ -318,7 +324,7 @@ not repeated here.
   `ScaleMax` baked in, then scaled x1.15 about the unit origin
   (`HV_INFLATE`, `scripts/hitvolumes/galaxy.py`). The JSON keeps the
   measured shapes. Model facing is model -y (`c_HV_MODEL_YAW` 90).
-- Hive and PsiDecimator (psi destroyer) are scenery: no hit volume
+- Hive, SCOBAOvermind and PsiDecimator (psi destroyer) are scenery: no hit volume
   (`HV_UNPICKABLE`), and UnitData sets them invulnerable, untargetable,
   with no collision and no footprint. `tps_pick_scenery` asserts the
   invulnerable state and the target filter only. Damage and collision are
@@ -343,6 +349,9 @@ not repeated here.
   torso pitch (`gv_animAimPitchStep`) stays 0, so R-TPS-12 holds.
 - Aiming clears the linger and owns the upper body. Switching to Attack
   `single` ends the hold at once.
+- Tosh's attack clip plays at 2x the weapon-period rate, aiming or not
+  (SPEC-POINT-AND-CLICK 5.11, `c_ANIM_ATTACK_RATE_TOSH`). The linger is
+  unchanged.
 
 ## 6. Module Structure
 

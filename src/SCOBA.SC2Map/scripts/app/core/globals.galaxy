@@ -71,6 +71,7 @@ unit[8] gv_tpsShotTarget;
 fixed[8] gv_tpsShotAt;
 string[8] gv_tpsShotEffect;
 int[5] gv_tpsFloaterCount;
+int gv_pncRangeFloaterCount;  // for tests
 int gv_uiFloaterPanel;
 int[4] gv_uiFloaterLabel;
 bool[8][4] gv_uiFloaterOn;

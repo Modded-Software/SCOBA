@@ -81,4 +81,13 @@
         <LaunchEffect value="SCOBAAttackCooldown10"/>
         <ImpactLocation Value="TargetUnitOrPoint"/>
     </CEffectLaunchMissile>
+    <!-- Glaive bounces (REQ-AIR-CREEP): air targets with User1 only, like
+         SCOBAAirGlaive. These two effects belong to the stock glaive chain.
+         SCOBAMutalisk is the only glaive unit on this map. -->
+    <CEffectEnumArea id="GlaiveWurmE1">
+        <SearchFilters value="Air,User1,Visible;Player,Ally,Neutral,Missile,Stasis,Dead,Hidden,Invulnerable"/>
+    </CEffectEnumArea>
+    <CEffectEnumArea id="GlaiveWurmE2">
+        <SearchFilters value="Air,User1,Visible;Player,Ally,Neutral,Missile,Stasis,Dead,Hidden,Invulnerable"/>
+    </CEffectEnumArea>
 </Catalog>

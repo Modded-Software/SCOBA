@@ -54,6 +54,11 @@ class Shot(NamedTuple):
     fov1: float
     dof: bool
     variant: int
+    # Per-shot DOF (operator 2026-11-17). near: near-blur strength (1 =
+    # default, lower = weaker). far: 0 = no far blur, else far blur from
+    # far x arm past the focus, full at 3 x that (lower = stronger).
+    near: float = 1.0
+    far: float = 0.0
 
 
 def dolly_k() -> float:
@@ -70,6 +75,14 @@ HYBRID = (194.4, 193.1)
 HIVE = (21.0, 9.0)
 NYDUS = (59.0, 59.0)
 PSI = (240.0, 248.0)
+# S8 start: the placed Predator nearest the Tosh spawn (Terran jungle).
+PREDATOR = (177.84, 135.15)
+# S8 roams (operator 2026-11-17: not attached to the Predator): from the
+# Predator spot north through the jungle, looking along the path.
+# Third jungle spot (operator 2026-11-17): the Predator pair at (117.7,
+# 157.1) and (116.1, 166.5), passed on the east, north, 8 s at 2.5 cells/s.
+JUNGLE_START = (120.0, 150.0)
+JUNGLE_END = (120.0, 170.0)
 BRAMBLE = (194.85, 162.8)  # S4 eye: survey spot 3 cells back along the yaw (operator 2026-11-17)
 # S1: the eye sits at the Brakk mob boss (Objects) and looks at the
 # battlecruiser (operator 2026-11-17). Target = eye + arm along the yaw.
@@ -99,12 +112,13 @@ ABSOLUTE = {"S2 Line": (WATER + 1.2, WATER + 1.2)}
 SHOTS: tuple[Shot, ...] = (
     Shot("S1 Pride", 12, "E", *S1_T0, *S1_T1, S1_Z, S1_Z, BRAKK_YAW, BRAKK_YAW, S1_P0, S1_P1, S1_D0, S1_D1, 50, 40, False, VAR_NONE),
     Shot("S2 Line", 12, "L", 119.6, 113.1, 131.0, 124.5, round(WATER + 1.2 - S2_GROUND[0], 2), round(WATER + 1.2 - S2_GROUND[1], 2), 135, 135, 6, 6, 16, 16, 50, 50, True, VAR_TARGET),
-    Shot("S3 Map", 10, "E", *X, *X, 0, 0, 45, 75, 80, 80, 150, 150, 22, 22, False, VAR_NONE),
+    Shot("S3 Map", 10, "E", *X, *X, 0, 0, 45, 75, 80, 80, 150, 150, 22, 22, False, VAR_NONE, 1.3),
     Shot("S4 Brambles", 6, "E", *HYBRID, *HYBRID, 3, 3, 90.8, 90.8, -6.0, -6.0, 30.5, 30.5, 70, 45, False, VAR_NONE),
-    Shot("S5 Shackled", 4, "E", *HYBRID, *HYBRID, 4, 4, 90.8, 90.8, 8, 8, 18, 12, 48, 44, False, VAR_NONE),
-    Shot("S6 Hive", 6, "A", *HIVE, *HIVE, 3, 3, 205, 245, 18, 18, 66, 66, 55, 55, False, VAR_YAW),
-    Shot("S7 Worm", 3, "O", *NYDUS, *NYDUS, 6, 12, 225, 225, -20, -35, 9, 9, 80, 80, False, VAR_NONE),
-    Shot("S8 Decimator", 6, "Z", *PSI, *PSI, 4, 4, 45, 45, 10, 10, DOLLY_DIST, round(dolly_dist(24), 1), 70, 24, False, VAR_NONE),
+    Shot("S5 Shackled", 4, "E", *HYBRID, *HYBRID, 4, 4, 90.8, 90.8, 8, 8, 18, 12, 48, 44, False, VAR_NONE, 0.3, 0.15),
+    Shot("S6 Overmind", 6, "A", *HIVE, *HIVE, 3, 3, 205, 245, 18, 18, 66, 66, 55, 55, False, VAR_YAW, 0.1, 0.3),
+    Shot("S7 Worm", 3, "O", *NYDUS, *NYDUS, 6, 12, 225, 225, -20, -35, 9, 9, 80, 80, False, VAR_NONE, 2.0),
+    Shot("S8 Jungle", 8, "L", *JUNGLE_START, *JUNGLE_END, 2, 2, 90, 90, 12, 12, 6, 6, 60, 60, False, VAR_NONE, 2.0, 1.5),
+    Shot("S9 Decimator", 8, "Z", *PSI, *PSI, 4, 4, 45, 45, 10, 10, DOLLY_DIST, round(dolly_dist(24), 1), 70, 24, False, VAR_NONE, 2.0),
 )
 # The crash zoom. Its target is the hero drop point, set at SPACE.
 # Ends on the hero drop chase camera: pitch = pod descent, arm 20.
@@ -197,7 +211,7 @@ def galaxy() -> str:
         f"const int c_INTRO_VAR_TARGET = {VAR_TARGET};",
         f"const int c_INTRO_VAR_YAW = {VAR_YAW};",
     ]
-    fields = ("length", "x0", "y0", "x1", "y1", "z0", "z1", "yaw0", "yaw1", "pitch0", "pitch1", "dist0", "dist1", "fov0", "fov1")
+    fields = ("length", "x0", "y0", "x1", "y1", "z0", "z1", "yaw0", "yaw1", "pitch0", "pitch1", "dist0", "dist1", "fov0", "fov1", "near", "far")
     for name in fields:
         lines.append(f"fixed[{n}] gv_introRow_{name};")
     for name in ("ease", "variant"):

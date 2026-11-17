@@ -62,6 +62,9 @@ void gf_UiFloaterShow (int lp_player, int lp_kind) {
     int lv_slot;
     int lv_label;
 
+    if (!c_SCOBA_SHOT_TEXT_ON) {
+        return;
+    }
     if (lp_kind != c_TPS_SHOT_OUT_OF_RANGE && lp_kind != c_TPS_SHOT_MISS && lp_kind != c_TPS_SHOT_FRIENDLY) {
         return;
     }

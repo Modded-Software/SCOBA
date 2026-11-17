@@ -682,6 +682,30 @@
     <CUnit id="Zergling">
         <Radius value="0.75"/>
     </CUnit>
+    <!-- The south-west corner set piece (operator 2026-11-17: replaces the
+         3x3 scaled Hive). The stock Overmind unit lives in
+         liberty.sc2campaign, which VoidStory does not load; its model
+         LiveOvermind.m3 is in liberty.sc2mod. Scenery like the Hive was:
+         invulnerable, untargetable, no collision, no footprint. -->
+    <CUnit id="SCOBAOvermind">
+        <Race value="Zerg"/>
+        <FlagArray index="Invulnerable" value="1"/>
+        <FlagArray index="Untargetable" value="1"/>
+        <FlagArray index="PreventDefeat" value="1"/>
+        <FlagArray index="UseLineOfSight" value="1"/>
+        <FogVisibility value="Snapshot"/>
+        <PlaneArray index="Ground" value="1"/>
+        <Attributes index="Biological" value="1"/>
+        <Attributes index="Structure" value="1"/>
+        <LifeStart value="5000"/>
+        <LifeMax value="5000"/>
+        <Sight value="8"/>
+        <Radius value="1.75"/>
+        <Footprint value=""/>
+        <PlacementFootprint value=""/>
+        <MinimapRadius value="1.5"/>
+        <EditorCategories value="ObjectType:Structure,ObjectFamily:Campaign"/>
+    </CUnit>
     <!-- The hero's own drop pod (REQ-HERO-DROP): the stock Terran pod, no
          collision, no footprint. The script sets its height. -->
     <CUnit id="SCOBAHeroPod" parent="TerranDropPod">
@@ -705,5 +729,49 @@
         <WeaponArray Link="QueenOfBladesPsiBlastAuto"/>
         <WeaponArray Link="RazorTalonsAuto"/>
         <BehaviorArray Link="SCOBAFriendlyFireBlock"/>
+    </CUnit>
+    <!-- Air creeps (REQ-AIR-CREEP). Flying height 72. Speed and acceleration:
+         Mutalisk 3x stock (2x, then 1.5x), Wraith 6x stock. Sight covers
+         each weapon range (see the per-unit notes). No
+         ground weapon. The User1 attribute marks both types. Their SCOBA
+         weapons require Air and User1, so they hit only each other. Create
+         them only through gf_AirCreepCreate: it removes the inherited stock
+         weapons. -->
+    <CUnit id="SCOBAMutalisk" parent="Mutalisk">
+        <Height value="72"/>
+        <Speed value="12"/>
+        <Acceleration value="10.5"/>
+        <!-- Sight covers the 60 weapon range (targets must be Visible). -->
+        <Sight value="60"/>
+        <Attributes index="User1" value="1"/>
+        <!-- The child keeps the parent's weapons: an indexed replace or
+             remove here did not take (aircreep/20261117-164144 and
+             -164529: GlaiveWurm stayed). gf_AirCreepCreate removes the stock
+             weapons on create. -->
+        <WeaponArray Link="SCOBAAirGlaive"/>
+    </CUnit>
+    <!-- Based on MengskWraith (swarm.sc2campaign): the stock Wraith lives in
+         liberty.sc2campaign, which VoidStory does not load. -->
+    <CUnit id="SCOBAWraith" parent="MengskWraith">
+        <Height value="72"/>
+        <!-- 6x stock speed (2x, then 3x: operator 2026-11-17). -->
+        <Speed value="22.5"/>
+        <Acceleration value="15.75"/>
+        <!-- Sight covers the 60 weapon range (targets must be Visible). -->
+        <Sight value="60"/>
+        <Attributes index="User1" value="1"/>
+        <!-- Stock MengskWraithA and MengskWraithG: removed on create, as
+             for SCOBAMutalisk. -->
+        <WeaponArray Link="SCOBAWraithA"/>
+    </CUnit>
+    <!-- SCOBAWraithA keeps the stock launch effects, so its missiles are the
+         stock ammo units (swarm.sc2campaign). Their mover is set to
+         SCOBAWraithMissile (2x speed). Only SCOBAWraith fires them on this
+         map: no stock MengskWraith is placed or spawned. -->
+    <CUnit id="MengskWraithAirWeaponLeft">
+        <Mover value="SCOBAWraithMissile"/>
+    </CUnit>
+    <CUnit id="MengskWraithAirWeaponRight">
+        <Mover value="SCOBAWraithMissile"/>
     </CUnit>
 </Catalog>

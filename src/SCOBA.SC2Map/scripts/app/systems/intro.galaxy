@@ -1,6 +1,6 @@
 // Module: systems/intro
 // The intro (REQ-INTRO, SPEC-INTRO): a loop of camera shots with no UI and
-// the line "Press SPACE to deploy". SPACE: crash zoom on the hero's drop
+// the line "Press SPACE to deploy". SPACE: a 3 s countdown, then a crash zoom on the hero's drop
 // point, then the hero pod fall of the hero drop. Touchdown ends it.
 //
 // Map init (gt_IntroPrepare): black, cinematic mode, the input and camera
@@ -72,8 +72,24 @@ void gf_IntroDofSet (bool lp_on) {
 
 // Every intro scene: near DOF (operator 2026-11-17); far DOF only on the
 // rows flagged dof in the shot table.
-void gf_IntroSceneDof (bool lp_far) {
+void gf_IntroSceneDof (int lp_row, bool lp_far) {
+    fixed lv_d = gv_introRow_dist0[lp_row];
+    // Falloffs are distances from the focal plane: SMALLER = MORE blur
+    // (aimdof pick: near 0.2..1.8 blurred hardest). Strength divides them.
+    fixed lv_k = lv_d / c_INTRO_DOF_FOCUS / (c_INTRO_SCENE_NEAR_SCALE * gv_introRow_near[lp_row]);
+
     gf_IntroDofSet(true);
+    // Near DOF scaled to the shot's arm and lowered (operator 2026-11-17:
+    // the S8 Predator arm is 2, intro near 1..6 is for focus 16).
+    CameraSetValue(1, c_cameraValueFocalDepth, gv_introRow_dist0[lp_row], 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffStartNear, c_INTRO_DOF_NEAR_START * lv_k, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueFalloffEndNear, c_INTRO_DOF_NEAR_END * lv_k, 0.0, 0.0, 0.0);
+    // Per-shot far blur (table far > 0): far x arm past the focus; smaller = more.
+    if (gv_introRow_far[lp_row] > 0.0) {
+        CameraSetValue(1, c_cameraValueFalloffStart, lv_d * gv_introRow_far[lp_row], 0.0, 0.0, 0.0);
+        CameraSetValue(1, c_cameraValueFalloffEnd, lv_d * gv_introRow_far[lp_row] * 3.0, 0.0, 0.0, 0.0);
+        return;
+    }
     if (!lp_far) {
         CameraSetValue(1, c_cameraValueFalloffStart, c_CAM_DOF_FAR_NONE, 0.0, 0.0, 0.0);
         CameraSetValue(1, c_cameraValueFalloffEnd, c_CAM_DOF_FAR_NONE * 2.0, 0.0, 0.0, 0.0);
@@ -109,8 +125,8 @@ void gf_IntroApply (int lp_row, fixed lp_u, fixed lp_time) {
     else {
         lv_target = Point(gf_IntroLerp(lv_x0, lv_x1, lv_e), gf_IntroLerp(lv_y0, lv_y1, lv_e));
     }
-    gv_introTarget = lv_target;
     gv_introYaw = gf_IntroLerp(lv_yaw0, lv_yaw1, lv_e);
+    gv_introTarget = lv_target;
     gv_introPitch = gf_IntroLerp(gv_introRow_pitch0[lp_row], gv_introRow_pitch1[lp_row], lv_e);
     gv_introFov = gf_IntroLerp(gv_introRow_fov0[lp_row], gv_introRow_fov1[lp_row], lv_e);
     if (gv_introRow_ease[lp_row] == c_INTRO_EASE_Z) {
@@ -144,7 +160,7 @@ void gf_IntroCut (int lp_row, fixed lp_t) {
     gv_introShot = lp_row;
     gv_introShotStart = TimerGetElapsed(gv_sCOBA_Clock) - lp_t;
     gv_introCuts += 1;
-    gf_IntroSceneDof(gv_introRow_dof[lp_row]);
+    gf_IntroSceneDof(lp_row, gv_introRow_dof[lp_row]);
     gf_IntroApply(lp_row, lp_t / gv_introRow_length[lp_row], 0.0);
 }
 
@@ -212,12 +228,31 @@ void gf_IntroPromptHide () {
 
 // --- Creep seed (R-INTRO-13) ------------------------------------------
 
+void gf_IntroSeedOrder (unit lp_unit) {
+    int lv_side = 1;
+    region lv_dest = gv_sPAWNLOCATIONS[1];
+    point lv_gate;
+
+    if (PlayerRace(UnitGetOwner(lp_unit)) == "Terr") {
+        lv_side = 0;
+        lv_dest = gv_sPAWNLOCATIONS[4];
+    }
+    UnitIssueOrder(lp_unit, OrderTargetingPoint(AbilityCommand("attack", 0), RegionGetCenter(gv_xLOCATIONS[1])), c_orderQueueReplace);
+    lv_gate = gf_GatePick(lv_side, 1);
+    if (lv_gate != null) {
+        UnitIssueOrder(lp_unit, OrderTargetingPoint(AbilityCommand("attack", 0), lv_gate), c_orderQueueAddToEnd);
+    }
+    UnitIssueOrder(lp_unit, OrderTargetingPoint(AbilityCommand("attack", 0), RegionRandomPoint(lv_dest)), c_orderQueueAddToEnd);
+}
+
 void gf_IntroSeedGroup (unitgroup lp_group) {
     UnitGroupLoopBegin(lp_group);
     for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
         UnitSetState(UnitGroupLoopCurrent(), c_unitStateHighlightable, true);
-        // On along the center lane through the enemy half's gate.
-        gf_GateFromX(UnitGroupLoopCurrent(), 1);
+        // First to the X center, so the two groups' paths cross there
+        // (operator 2026-11-17: they walked past each other); then on
+        // through the enemy half's gate, queued.
+        gf_IntroSeedOrder(UnitGroupLoopCurrent());
         gv_introSeeded += 1;
     }
     UnitGroupLoopEnd();
@@ -299,11 +334,37 @@ void gf_IntroStart () {
 }
 
 // SPACE in the loop (R-INTRO-10).
+// SPACE in the loop: a countdown on the prompt line, then the deploy
+// (operator 2026-11-17). The loop keeps playing; more presses are ignored.
 void gf_IntroDeployPress () {
-    if (gv_introState != c_INTRO_LOOP || gv_introCuts == 0) {
+    if (gv_introState != c_INTRO_LOOP || gv_introCuts == 0 || gv_introCountAt >= 0.0) {
         gv_introSpaceIgnored += 1;
         return;
     }
+    gv_introCountAt = TimerGetElapsed(gv_sCOBA_Clock);
+    gv_introCountShown = 0;
+    TriggerEnable(gt_IntroPulse, false);
+    DialogControlFadeTransparency(gv_introPromptLabel, PlayerGroupSingle(1), 0.0, 0.0);
+    gf_IntroCountStep();
+}
+
+// Each tick while counting: "Deploying in n..." (one line), deploy at 0.
+void gf_IntroCountStep () {
+    int lv_n = c_INTRO_COUNT - FixedToInt(TimerGetElapsed(gv_sCOBA_Clock) - gv_introCountAt);
+
+    if (lv_n <= 0) {
+        gv_introCountAt = -1.0;
+        gf_IntroDeployGo();
+        return;
+    }
+    if (lv_n != gv_introCountShown) {
+        gv_introCountShown = lv_n;
+        gv_introCountTrace = gv_introCountTrace + IntToString(lv_n);
+        libNtve_gf_SetDialogItemText(gv_introPromptLabel, StringToText("Deploying in " + IntToString(lv_n) + "..."), PlayerGroupAll());
+    }
+}
+
+void gf_IntroDeployGo () {
     gv_introDeploys += 1;
     gv_introState = c_INTRO_ZOOM;
     gf_IntroPromptHide();
@@ -375,6 +436,9 @@ bool gt_IntroTick_Func (bool testConds, bool runActions) {
     }
     if (gv_introState == c_INTRO_LOOP) {
         gf_IntroLoopStep();
+        if (gv_introCountAt >= 0.0) {
+            gf_IntroCountStep();
+        }
     }
     else if (gv_introState == c_INTRO_ZOOM) {
         gf_IntroZoomStep();

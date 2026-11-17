@@ -119,4 +119,6 @@
 <Unit id="KorhalPalaceTurret"/>
 <Unit id="PsiDecimator"/>
 <Unit id="HybridUltraliskShackled"/>
+<Unit id="SCOBAMutalisk"/>
+<Unit id="SCOBAWraith"/>
 </Preload>

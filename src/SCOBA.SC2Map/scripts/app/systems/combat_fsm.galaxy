@@ -59,7 +59,10 @@ void gf_PncAttack (int lp_player, unit lp_unit) {
     gf_UnitTargetSet(lp_player, lp_unit);
     gf_CombatSyncRoot(lp_player);
     if (gf_CombatStandOn(lp_player) && !UnitInRangeAndAbleToAttackTarget(lv_hero, lp_unit)) {
-        gf_FloaterCreate(lp_player, UnitGetPosition(lp_unit), StringToText(c_SCOBA_OUT_OF_RANGE_TEXT), Color(70.0, 70.0, 70.0), c_FLOATER_SIZE_BASE);
+        if (c_SCOBA_SHOT_TEXT_ON) {
+            gv_pncRangeFloaterCount += 1;
+            gf_FloaterCreate(lp_player, UnitGetPosition(lp_unit), StringToText(c_SCOBA_OUT_OF_RANGE_TEXT), Color(70.0, 70.0, 70.0), c_FLOATER_SIZE_BASE);
+        }
         return;
     }
     gf_AttackOrder(lp_player, lp_unit, !gf_CombatAutoOn(lp_player));

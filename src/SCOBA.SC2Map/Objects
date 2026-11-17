@@ -38,7 +38,7 @@
     </ObjectUnit>
     <ObjectUnit Id="2091851783" Position="14.9558,113.3615,0" Rotation="0.7656" Scale="1,1,1" UnitType="Brakk" Player="15"/>
     <ObjectUnit Id="797310284" Position="29.5,29.5,0" Rotation="2.4692" Scale="1,1,1" UnitType="GreaterNydusWorm" Player="8"/>
-    <ObjectUnit Id="283" Position="10.5,4.5,0" Scale="1,1,1" UnitType="Hive" Player="8">
+    <ObjectUnit Id="283" Position="10.5,4.5,0" Scale="1,1,1" UnitType="SCOBAOvermind" Player="8">
         <Flag Index="ForcePlacement" Value="1"/>
     </ObjectUnit>
     <ObjectUnit Id="1613478781" Position="97.1896,96.5441,0" Rotation="5.5058" Scale="1,1,1" UnitType="HybridUltraliskShackled" Player="7"/>

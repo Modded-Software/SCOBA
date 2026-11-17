@@ -160,6 +160,8 @@ def _check_single(checks) -> None:
     checks.true("single_out_stand", "tend", "TargetEnemy")
     _no_damage(checks, "single_out_stand", "t0000", "tend")
     _still(checks, "single_out_stand", "t0000", "tend")
+    # The Out of range floater is off (2026-11-17): none is created.
+    checks.eq("single_out_stand", "tend", "PncRangeFloat", checks.value("single_out_stand", "t0000", "PncRangeFloat"))
 
     # R-PNC-23 with single: walk in, one shot, idle.
     checks.decrease("single_out_move", "t0000", "t5000", "Distance")

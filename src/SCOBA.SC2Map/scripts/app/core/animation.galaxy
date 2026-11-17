@@ -63,6 +63,9 @@ const fixed c_ANIM_ATTACK_SPEED_MIN = 0.25;
 const fixed c_ANIM_ATTACK_DURATION = 0.5;
 const fixed c_ANIM_ATTACK_TIME_SCALE = 2.0;
 const fixed c_ANIM_ATTACK_START_TIME = 0.35;
+// Tosh's attack clip plays this much faster on top of the weapon-period
+// factor; its hold shortens to match (operator 2026-11-17: 2x).
+const fixed c_ANIM_ATTACK_RATE_TOSH = 2.0;
 const fixed c_ANIM_AIM_ATTACK_BLEND = 0.1;
 // PNC pose hold (R-PNC-80): seconds the shooting pose stays after a shot.
 const fixed c_ANIM_READY_LINGER = 2.0;

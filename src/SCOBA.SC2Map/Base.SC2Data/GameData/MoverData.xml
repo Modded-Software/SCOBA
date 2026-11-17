@@ -12,4 +12,12 @@
             <YawPitchRoll value="719.2968"/>
         </MotionPhases>
     </CMoverMissile>
+    <!-- SCOBAWraith missiles (REQ-AIR-CREEP): 2x the MissileDefault speed
+         above (24), operator 2026-11-17. Used by the stock Wraith ammo units
+         (UnitData.xml); no other unit on this map fires them. -->
+    <CMoverMissile id="SCOBAWraithMissile" parent="MissileDefault">
+        <MotionPhases index="0">
+            <MaxSpeed value="48"/>
+        </MotionPhases>
+    </CMoverMissile>
 </Catalog>

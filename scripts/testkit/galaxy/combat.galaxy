@@ -51,6 +51,44 @@ void gf_DbgAutoRun (string lp_section, fixed lp_dx, fixed lp_wait) {
 // Pose hold (R-PNC-80). The sample helpers are in common.galaxy.
 void gf_DbgUseKerrigan ();
 
+// "len/rem" ms of the attack bracket on the hero's main actor.
+string gf_DbgAttackClip (bool lp_scaled) {
+    generichandle lv_q;
+
+    AnimLengthQueryByName(libNtve_gf_MainActorofUnit(gv_tPSUNIT[1]), c_ANIM_BRACKET_ATTACK, lp_scaled);
+    AnimLengthQueryWait();
+    lv_q = AnimLengthQueryLastCreated();
+    return IntToString(FixedToInt(AnimLengthSync(lv_q) * 1000.0)) + "/" + IntToString(FixedToInt(AnimLengthRemainingSync(lv_q) * 1000.0));
+}
+
+// Tosh attack clip rate (operator 2026-11-17: 2x). Unit: the speed factor
+// for Tosh and Kerrigan weapons. Integration: one Tosh shot, the factor the
+// FSM stored, the attack hold, and the engine's raw and scaled clip lengths.
+void gf_DbgAttackRate () {
+    string lv_s = "attack_rate";
+    int lv_shots;
+
+    gf_DbgReset(lv_s, false, true);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "toshSpeed1000", FixedToInt(gf_AnimAttackSpeed(1, "Tosh") * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "toshPeriod1000", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, "Tosh", "Period", 1)) * 1000.0));
+    gf_DbgSpawnOne(lv_s, 3.0, 500.0);
+    lv_shots = gv_aimShotEffectEvents;
+    gf_PncAttack(1, gv_dbgEnemy);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "shotSeen", gf_DbgWaitShot(lv_shots));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "storedSpeed1000", FixedToInt(gv_animAttackSpeed[1] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "holdMs", FixedToInt((gv_animAttackUntil[1] - TimerGetElapsed(gv_sCOBA_Clock)) * 1000.0));
+    BankValueSetFromString(gv_dbgBank, lv_s, "clipRaw", gf_DbgAttackClip(false));
+    BankValueSetFromString(gv_dbgBank, lv_s, "clipScaled", gf_DbgAttackClip(true));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "timeScale1000", FixedToInt(c_ANIM_ATTACK_TIME_SCALE * 1000.0));
+    BankSave(gv_dbgBank);
+    // Negative: Kerrigan keeps the weapon-period factor alone.
+    gf_DbgReset(lv_s, false, true);
+    gf_DbgUseKerrigan();
+    BankValueSetFromInt(gv_dbgBank, lv_s, "kerriganSpeed1000", FixedToInt(gf_AnimAttackSpeed(1, "QueenOfBladesPsiBlast") * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "kerriganPeriod1000", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, "QueenOfBladesPsiBlast", "Period", 1)) * 1000.0));
+    BankSave(gv_dbgBank);
+}
+
 void gf_DbgPoseGroup () {
     int lv_shots;
 
@@ -419,6 +457,7 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
     }
     if (gf_DbgGroup("pose")) {
         gf_DbgPoseGroup();
+        gf_DbgAttackRate();
     }
     if (gf_DbgGroup("kerrigan")) {
         // Kerrigan weapons: one full shot per command.

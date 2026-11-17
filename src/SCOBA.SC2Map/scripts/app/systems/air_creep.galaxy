@@ -1,0 +1,333 @@
+// Module: systems/air_creep
+// Air creeps (REQ-AIR-CREEP, SPEC-AIR-CREEP). SCOBAMutalisk for Kerrigan
+// (player 4) at the Overmind, SCOBAWraith for Tosh (player 1) at the Psi
+// Destroyer. A wave is two formations of one side. One formation
+// attack-moves to X Top, the other to X Bottom. Each then patrols to the
+// other X. A Terran formation has 3 units; a Zerg formation has 4 to 6
+// (random, mean 5). Balance: a side with fewer live air creeps than the
+// enemy gets one more unit per formation, a side with more gets one fewer.
+// No wave at map start. Zerg waves at 10, 30, 50 s;
+// Terran waves at 20, 40, 60 s.
+// The time is real time, as for the reinforcement timer. At most 32 live air
+// creeps per player.
+
+const int c_AIR_CREEP_ZERG = 0;
+const int c_AIR_CREEP_TERRAN = 1;
+const fixed c_AIR_CREEP_PHASE = 10.0;  // real s between two waves; 20 s per side
+const int c_AIR_CREEP_TERRAN_PER_DIR = 3;  // units per formation
+const int c_AIR_CREEP_ZERG_MIN_PER_DIR = 4;
+const int c_AIR_CREEP_ZERG_MAX_PER_DIR = 6;
+const int c_AIR_CREEP_MAX_PER_DIR = 8;  // formation slots
+const int c_AIR_CREEP_MAX_PER_WAVE = 16;  // 2 formations of at most 8 slots
+const fixed c_AIR_CREEP_SPACING = 6.0;  // world, formation slot to centre
+const fixed c_AIR_CREEP_X_INNER = 9.5;  // world, formation centre to X centre (16 - 6 - margin)
+const int c_AIR_CREEP_CAP = 32;  // live units per player
+const int c_AIR_CREEP_BALANCE_STEP = 1;  // units per formation; 2 per wave
+const string c_AIR_CREEP_ZERG_UNIT = "SCOBAMutalisk";
+const string c_AIR_CREEP_TERRAN_UNIT = "SCOBAWraith";
+const int c_AIR_CREEP_PATROL_CMD = 1;  // "move" ability: 0 move, 1 patrol
+const int c_AIR_CREEP_ARM_TRIES = 16;  // game ticks to wait for the weapon removal
+
+timer gv_airCreepTimer;
+int gv_airCreepNextSide;
+int[2] gv_airCreepWaves;    // waves started per side (read by the aircreep test)
+int[2] gv_airCreepSpawned;  // units made per side (read by the aircreep test)
+int gv_airCreepArmTicks;    // ticks the last create waited (read by the aircreep test)
+// The last wave's balance (read by the aircreep test): per-formation step,
+// the live counts it saw, and the two formation sizes it chose.
+int gv_airCreepLastBalance;
+int gv_airCreepBalanceOwn;
+int gv_airCreepBalanceEnemy;
+int gv_airCreepLastSize1;
+int gv_airCreepLastSize2;
+trigger gt_AirCreepStart;
+trigger gt_AirCreepTick;
+
+int gf_AirCreepPlayer (int lp_side) {
+    if (lp_side == c_AIR_CREEP_ZERG) {
+        return 4;
+    }
+    return 1;
+}
+
+string gf_AirCreepType (int lp_side) {
+    if (lp_side == c_AIR_CREEP_ZERG) {
+        return c_AIR_CREEP_ZERG_UNIT;
+    }
+    return c_AIR_CREEP_TERRAN_UNIT;
+}
+
+string gf_AirCreepHomeType (int lp_side) {
+    if (lp_side == c_AIR_CREEP_ZERG) {
+        return "SCOBAOvermind";
+    }
+    return "PsiDecimator";
+}
+
+bool gf_AirCreepIs (unit lp_unit) {
+    string lv_type = UnitGetType(lp_unit);
+
+    return lv_type == c_AIR_CREEP_ZERG_UNIT || lv_type == c_AIR_CREEP_TERRAN_UNIT;
+}
+
+int gf_AirCreepAlive (int lp_side) {
+    unitgroup lv_g = UnitGroup(gf_AirCreepType(lp_side), gf_AirCreepPlayer(lp_side), RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+
+    return UnitGroupCount(lv_g, c_unitCountAlive);
+}
+
+// The position of the side's home structure; null when it is gone.
+point gf_AirCreepHome (int lp_side) {
+    unitgroup lv_g = UnitGroup(gf_AirCreepHomeType(lp_side), c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    unit lv_home = UnitGroupUnit(lv_g, 1);
+
+    if (lv_home == null) {
+        return null;
+    }
+    return UnitGetPosition(lv_home);
+}
+
+// Attack-move to lp_first, then patrol to lp_second. The patrol starts
+// where the attack-move ends, so the unit flies between the two points.
+void gf_AirCreepRouteTo (unit lp_unit, point lp_first, point lp_second) {
+    UnitIssueOrder(lp_unit, OrderTargetingPoint(AbilityCommand("attack", 0), lp_first), c_orderQueueReplace);
+    UnitIssueOrder(lp_unit, OrderTargetingPoint(AbilityCommand("move", c_AIR_CREEP_PATROL_CMD), lp_second), c_orderQueueAddToEnd);
+}
+
+// The same route to a random point in each region.
+void gf_AirCreepRoute (unit lp_unit, region lp_first, region lp_second) {
+    gf_AirCreepRouteTo(lp_unit, RegionRandomPoint(lp_first), RegionRandomPoint(lp_second));
+}
+
+// Formation slot lp_slot (0..7): an octagon around the formation centre,
+// each slot c_AIR_CREEP_SPACING from it. The fill order alternates sides
+// (90, 270, 180, 0, 135, 315, 225, 45 degrees), so any size stays balanced.
+point gf_AirCreepSlot (point lp_centre, int lp_slot) {
+    fixed lv_angle = 90.0;
+
+    if (lp_slot == 1) {
+        lv_angle = 270.0;
+    }
+    else if (lp_slot == 2) {
+        lv_angle = 180.0;
+    }
+    else if (lp_slot == 3) {
+        lv_angle = 0.0;
+    }
+    else if (lp_slot == 4) {
+        lv_angle = 135.0;
+    }
+    else if (lp_slot == 5) {
+        lv_angle = 315.0;
+    }
+    else if (lp_slot == 6) {
+        lv_angle = 225.0;
+    }
+    else if (lp_slot == 7) {
+        lv_angle = 45.0;
+    }
+    return PointWithOffsetPolar(lp_centre, c_AIR_CREEP_SPACING, lv_angle);
+}
+
+fixed gf_AirCreepSign (fixed lp_v, fixed lp_mid) {
+    if (lp_v < lp_mid) {
+        return 1.0;
+    }
+    return -1.0;
+}
+
+// A formation centre in lp_region: uniform over the disc of radius
+// c_AIR_CREEP_X_INNER around the region centre, so every slot stays inside
+// the X region (radius 16 on the built map).
+point gf_AirCreepCentreIn (region lp_region) {
+    fixed lv_r = c_AIR_CREEP_X_INNER * SquareRoot(RandomFixed(0.0, 1.0));
+
+    return PointWithOffsetPolar(RegionGetCenter(lp_region), lv_r, RandomFixed(0.0, 360.0));
+}
+
+// Units in one formation of lp_side: 3 for Terran, 4..6 for Zerg.
+int gf_AirCreepFormationSize (int lp_side) {
+    if (lp_side == c_AIR_CREEP_ZERG) {
+        return RandomInt(c_AIR_CREEP_ZERG_MIN_PER_DIR, c_AIR_CREEP_ZERG_MAX_PER_DIR);
+    }
+    return c_AIR_CREEP_TERRAN_PER_DIR;
+}
+
+// One air creep of lp_side at lp_at, with its SCOBA weapon only. A data
+// child keeps its parent's weapons (UnitData.xml), so the stock ones go here:
+// the ground weapon MengskWraithG and the weapons that hit any target. The
+// removal shows a game tick later; a stock glaive fired in that tick
+// (aircreep/20261117-164924). The unit stays hidden until the stock weapons
+// are gone. Paused does not work: a paused unit kept them
+// (aircreep/20261117-165253).
+unit gf_AirCreepCreate (int lp_side, point lp_at) {
+    unit lv_unit;
+    int lv_try;
+
+    libNtve_gf_CreateUnitsAtPoint2(1, gf_AirCreepType(lp_side), 0, gf_AirCreepPlayer(lp_side), lp_at);
+    lv_unit = UnitLastCreated();
+    if (lv_unit == null) {
+        return null;
+    }
+    UnitSetState(lv_unit, c_unitStateHidden, true);
+    if (lp_side == c_AIR_CREEP_ZERG) {
+        UnitWeaponRemove(lv_unit, "GlaiveWurm");
+    }
+    else {
+        UnitWeaponRemove(lv_unit, "MengskWraithA");
+        UnitWeaponRemove(lv_unit, "MengskWraithG");
+    }
+    for (lv_try = 0; lv_try < c_AIR_CREEP_ARM_TRIES && UnitWeaponCount(lv_unit) > 1; lv_try += 1) {
+        Wait(0.0625, c_timeGame);
+    }
+    gv_airCreepArmTicks = lv_try;
+    UnitSetState(lv_unit, c_unitStateHidden, false);
+    return lv_unit;
+}
+
+// One air creep of lp_side at lp_at. lp_topFirst: X Top first, else X Bottom.
+unit gf_AirCreepLaunch (int lp_side, point lp_at, bool lp_topFirst) {
+    unit lv_unit;
+    // X Top and X Bottom (gv_xLOCATIONS[3] and [2]). Read from the ids: the
+    // map-start wave can run before gt_MapInit fills gv_xLOCATIONS.
+    region lv_top = RegionFromId(9);
+    region lv_bottom = RegionFromId(7);
+
+    lv_unit = gf_AirCreepCreate(lp_side, lp_at);
+    if (lv_unit == null) {
+        return null;
+    }
+    if (lp_topFirst) {
+        gf_AirCreepRoute(lv_unit, lv_top, lv_bottom);
+    }
+    else {
+        gf_AirCreepRoute(lv_unit, lv_bottom, lv_top);
+    }
+    return lv_unit;
+}
+
+// One formation of lp_size units of lp_side. The slots sit around lp_centre
+// at spawn and around one formation centre in each X region on the route,
+// so the units fly in formation. Stops at c_AIR_CREEP_CAP live units.
+// Returns the number of units made.
+int gf_AirCreepFormation (int lp_side, point lp_centre, int lp_size, bool lp_topFirst) {
+    // X Top and X Bottom (gv_xLOCATIONS[3] and [2]); see gf_AirCreepLaunch.
+    region lv_top = RegionFromId(9);
+    region lv_bottom = RegionFromId(7);
+    point lv_first;
+    point lv_second;
+    unit lv_unit;
+    int lv_slot;
+    int lv_made = 0;
+
+    if (lp_topFirst) {
+        lv_first = gf_AirCreepCentreIn(lv_top);
+        lv_second = gf_AirCreepCentreIn(lv_bottom);
+    }
+    else {
+        lv_first = gf_AirCreepCentreIn(lv_bottom);
+        lv_second = gf_AirCreepCentreIn(lv_top);
+    }
+    for (lv_slot = 0; lv_slot < lp_size && lv_slot < c_AIR_CREEP_MAX_PER_DIR; lv_slot += 1) {
+        if (gf_AirCreepAlive(lp_side) >= c_AIR_CREEP_CAP) {
+            break;
+        }
+        lv_unit = gf_AirCreepCreate(lp_side, gf_AirCreepSlot(lp_centre, lv_slot));
+        if (lv_unit == null) {
+            continue;
+        }
+        gf_AirCreepRouteTo(lv_unit, gf_AirCreepSlot(lv_first, lv_slot), gf_AirCreepSlot(lv_second, lv_slot));
+        lv_made += 1;
+    }
+    return lv_made;
+}
+
+// Air balance for a wave of lp_side, per formation: +1 while lp_side has
+// fewer live air creeps than the enemy, -1 while it has more, 0 when equal.
+// Two formations per wave, so +2 / -2 units per wave. Only air creeps count.
+int gf_AirCreepBalance (int lp_side) {
+    int lv_own = gf_AirCreepAlive(lp_side);
+    int lv_enemy = gf_AirCreepAlive(1 - lp_side);
+
+    gv_airCreepBalanceOwn = lv_own;
+    gv_airCreepBalanceEnemy = lv_enemy;
+    if (lv_own < lv_enemy) {
+        return c_AIR_CREEP_BALANCE_STEP;
+    }
+    if (lv_own > lv_enemy) {
+        return -c_AIR_CREEP_BALANCE_STEP;
+    }
+    return 0;
+}
+
+// A formation size after the balance: at least 1, at most the slot count.
+int gf_AirCreepBalanced (int lp_size, int lp_balance) {
+    int lv_n = lp_size + lp_balance;
+
+    if (lv_n < 1) {
+        return 1;
+    }
+    if (lv_n > c_AIR_CREEP_MAX_PER_DIR) {
+        return c_AIR_CREEP_MAX_PER_DIR;
+    }
+    return lv_n;
+}
+
+// One wave of lp_side at its home: one formation to X Top, one to X Bottom.
+// The two formations start side by side. The balance is read once, before
+// the first unit is made. Returns the number of units made.
+int gf_AirCreepWave (int lp_side) {
+    point lv_home = gf_AirCreepHome(lp_side);
+    fixed lv_sx;
+    int lv_balance;
+    int lv_size1;
+    int lv_size2;
+    int lv_made = 0;
+
+    if (lv_home == null) {
+        return 0;
+    }
+    lv_balance = gf_AirCreepBalance(lp_side);
+    lv_size1 = gf_AirCreepBalanced(gf_AirCreepFormationSize(lp_side), lv_balance);
+    lv_size2 = gf_AirCreepBalanced(gf_AirCreepFormationSize(lp_side), lv_balance);
+    gv_airCreepLastBalance = lv_balance;
+    gv_airCreepLastSize1 = lv_size1;
+    gv_airCreepLastSize2 = lv_size2;
+    lv_sx = gf_AirCreepSign(PointGetX(lv_home), 128.0);
+    gv_airCreepWaves[lp_side] += 1;
+    lv_made += gf_AirCreepFormation(lp_side, lv_home, lv_size1, true);
+    lv_made += gf_AirCreepFormation(lp_side, PointWithOffset(lv_home, lv_sx * 3.0 * c_AIR_CREEP_SPACING, 0.0), lv_size2, false);
+    gv_airCreepSpawned[lp_side] += lv_made;
+    return lv_made;
+}
+
+// Map start: no wave yet. The first slot (c_AIR_CREEP_PHASE later) is the
+// Mutalisks, the next one the Wraiths, then the sides take turns.
+bool gt_AirCreepStart_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gv_airCreepNextSide = c_AIR_CREEP_ZERG;
+    TimerStart(gv_airCreepTimer, c_AIR_CREEP_PHASE, true, c_timeReal);
+    return true;
+}
+
+// One slot: the next side's wave. The side flips before the wave runs.
+bool gt_AirCreepTick_Func (bool testConds, bool runActions) {
+    int lv_side = gv_airCreepNextSide;
+
+    if (!runActions) {
+        return true;
+    }
+    gv_airCreepNextSide = 1 - lv_side;
+    gf_AirCreepWave(lv_side);
+    return true;
+}
+
+void gt_AirCreep_Init () {
+    gv_airCreepTimer = TimerCreate();
+    gt_AirCreepStart = TriggerCreate("gt_AirCreepStart_Func");
+    TriggerAddEventMapInit(gt_AirCreepStart);
+    gt_AirCreepTick = TriggerCreate("gt_AirCreepTick_Func");
+    TriggerAddEventTimer(gt_AirCreepTick, gv_airCreepTimer);
+}

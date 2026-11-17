@@ -20,6 +20,7 @@ include "scripts/app/data/hit_volumes_load"
 include "scripts/app/data/flora_crush"
 include "scripts/app/systems/crush"
 include "scripts/app/data/lane_gates"
+include "scripts/app/systems/air_creep"
 include "scripts/app/systems/lanegates"
 include "scripts/app/systems/quake"
 include "scripts/app/systems/podimpact"
@@ -140,6 +141,7 @@ void main () {
     gt_Target_Init();
     gt_ZerusSpawn_Init();
     gt_TerranSpawn_Init();
+    gt_AirCreep_Init();
     gt_HeroDrop_Init();
     gt_XCenterUnitOrders_Init();
     gt_XTopUnitOrders_Init();

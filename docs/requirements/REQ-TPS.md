@@ -109,9 +109,9 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-50 | While aiming, a left click MUST fire exactly one hero shot. |
 | R-TPS-51 | While not aiming, a left click MUST NOT issue an attack. |
 | R-TPS-52 | In-range enemy under the crosshair: the shot MUST hit that enemy and apply its damage. The damage MUST float. |
-| R-TPS-53 | Out-of-range enemy under the crosshair: the shot MUST still fire. It MUST be a proxy shot. The enemy MUST take no damage. `Out of range` MUST float. |
-| R-TPS-54 | Ground or sky under the crosshair: the shot MUST fire as a proxy shot. `Miss` MUST float. |
-| R-TPS-55 | Friendly unit under the crosshair: a real shot MUST fire at that unit. The unit MUST take no damage. `Friendly Fire Disabled` MUST float in yellow. |
+| R-TPS-53 | Out-of-range enemy under the crosshair: the shot MUST still fire. It MUST be a proxy shot. The enemy MUST take no damage. No text MUST float (R-TPS-79). |
+| R-TPS-54 | Ground or sky under the crosshair: the shot MUST fire as a proxy shot. No text MUST float (R-TPS-79). |
+| R-TPS-55 | Friendly unit under the crosshair: a real shot MUST fire at that unit. The unit MUST take no damage. No text MUST float (R-TPS-79). |
 | R-TPS-56 | Every aim shot MUST show the muzzle effect, play the weapon sound, and play the attack animation, whatever its outcome. |
 | R-TPS-57 | Every aim shot MUST start the hero attack cooldown and the cooldown clock on the `Weapon Attack` button (R-PNC-46). |
 | R-TPS-58 | A left click while the weapon is on cooldown MUST NOT fire and MUST NOT float any text. |
@@ -124,6 +124,7 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 
 | ID | Requirement |
 | --- | --- |
+| R-TPS-79 | Changed 2026-11-17 by the operator: the `Miss`, `Out of range`, and `Friendly Fire Disabled` floaters MUST NOT appear, in TPS and in Point & Click (R-PNC-24). R-TPS-70 to 76 and the shot-text part of R-TPS-78 are suspended while the texts are off. Damage numbers stay. |
 | R-TPS-70 | `Miss` and `Out of range` MUST appear only when a proxy shot was executed. A mouse press alone MUST NOT create them. |
 | R-TPS-71 | `Friendly Fire Disabled` MUST appear only when the shot at the friendly unit was executed. |
 | R-TPS-72 | One executed shot MUST create exactly one floater. |
@@ -172,10 +173,10 @@ uses for each.
 | AC-TPS-8 | Press Alt in TPS: nothing changes. |
 | AC-TPS-9 | Hold the right button: the camera moves to the side arm and the field of view drops. Release: both return. |
 | AC-TPS-10 | Aiming, left click an in-range enemy: one shot, the enemy loses the weapon damage, the damage floats. |
-| AC-TPS-11 | Aiming, left click an out-of-range enemy: one shot fires, the enemy loses no life, `Out of range` floats once. |
-| AC-TPS-12 | Aiming, left click the ground and the sky: one shot fires each time, `Miss` floats once each time and is visible. |
-| AC-TPS-13 | Aiming, left click a friendly unit: one shot fires at it, it loses no life, `Friendly Fire Disabled` floats once in yellow. |
-| AC-TPS-14 | Aiming, left click three times inside one weapon period: one shot and one floater. |
+| AC-TPS-11 | Aiming, left click an out-of-range enemy: one shot fires, the enemy loses no life, no text floats. |
+| AC-TPS-12 | Aiming, left click the ground and the sky: one shot fires each time, no text floats. |
+| AC-TPS-13 | Aiming, left click a friendly unit: one shot fires at it, it loses no life, no text floats. |
+| AC-TPS-14 | Aiming, left click three times inside one weapon period: one shot and no shot floater. |
 | AC-TPS-15 | Each of AC-TPS-10 to 13: the cooldown clock on `Weapon Attack` starts with the shot. The hero does not move. |
 | AC-TPS-16 | Not aiming, left click: no shot and no shot floater. |
 | AC-TPS-17 | Aiming, left click an enemy that is not the UI target: the UI target does not change. |

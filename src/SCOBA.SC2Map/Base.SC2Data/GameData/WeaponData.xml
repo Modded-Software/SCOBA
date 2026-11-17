@@ -61,4 +61,23 @@
         <Options index="OnlyFireWhileInAttackOrder" value="0"/>
         <Options index="OnlyFireAtAttackOrderTarget" value="0"/>
     </CWeaponLegacy>
+    <!-- Air creep weapons (REQ-AIR-CREEP): air targets with User1 only, so
+         a SCOBAMutalisk and a SCOBAWraith hit only each other. Stock range
+         and scan range: GlaiveWurm 3 and 5 (Core default), MengskWraithA 5
+         and 5 (both Core defaults). SCOBAAirGlaive is 20x (5x, then 4x:
+         operator 2026-11-17). SCOBAWraithA was 20x, then cut to range 60,
+         the glaive range (operator 2026-11-17). -->
+    <CWeaponLegacy id="SCOBAAirGlaive" parent="GlaiveWurm">
+        <TargetFilters value="Air,User1,Visible;Missile,Stasis,Dead,Hidden,Invulnerable"/>
+        <Effect value="GlaiveWurm"/>
+        <Range value="60"/>
+        <MinScanRange value="100"/>
+    </CWeaponLegacy>
+    <CWeaponLegacy id="SCOBAWraithA" parent="MengskWraithA">
+        <TargetFilters value="Air,User1,Visible;Missile,Stasis,Dead,Hidden,Invulnerable"/>
+        <Effect value="MengskWraithAPersistent"/>
+        <!-- 60, as SCOBAAirGlaive (operator 2026-11-17: down from 100). -->
+        <Range value="60"/>
+        <MinScanRange value="60"/>
+    </CWeaponLegacy>
 </Catalog>
