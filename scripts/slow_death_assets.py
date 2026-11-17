@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
 import m3
 
 MARKER = ".slow_death_assets"
-MARKER_VERSION = "7\n"  # 7: Goliath death 2x slower; 6: Goliath 3x; 5: BC child stretch 12.5 (children 2x faster)
+MARKER_VERSION = "10\n"  # 10: Leviathan Stand 3x faster; 9: Leviathan tentacle simulation 40x slower; 8: Leviathan death like the BC; 7: Goliath death 2x slower; 6: Goliath 3x; 5: BC child stretch 12.5 (children 2x faster)
 
 # (CASC entry, target in the map, time stretch, child stretch). Stretch 100
 # is twice the earlier 50 (the old CModel AnimSpeed 0.02): every death runs
@@ -40,6 +40,13 @@ SLOW_DEATHS = (
         100,
         12.5,
     ),
+    # Leviathan facing the MengskBC: the same timing as the BC death.
+    (
+        r"mods\liberty.sc2mod\base.sc2assets\assets\units\zerg\leviathandeath\leviathandeath.m3",
+        Path("Assets") / "Units" / "Zerg" / "LeviathanDeath" / "LeviathanDeathSlow.m3",
+        100,
+        12.5,
+    ),
     # Goliath: the whole death 2x slower, children included (operator
     # 2026-11-17; 3x was rejected).
     (
@@ -47,6 +54,31 @@ SLOW_DEATHS = (
         Path("Assets") / "Units" / "Terran" / "GoliathDeath" / "GoliathDeathSlow.m3",
         2,
         2,
+    ),
+)
+
+# (CASC entry, target in the map, simulation stretch). Keyframes keep their
+# timing (the CModel AnimSpeed slows them); only the particle and ribbon
+# simulation is retimed. LeviathanTentacle: AnimSpeed 0.025 = 1/40, so the
+# ribbon physics (speed, gravity, drag, lifespan) runs 40x slower to match.
+SLOW_SIMULATIONS = (
+    (
+        r"mods\liberty.sc2mod\base.sc2assets\assets\effects\zerg\leviathantentacle\leviathantentacle.m3",
+        Path("Assets") / "Effects" / "Zerg" / "LeviathanTentacle" / "LeviathanTentacleSlow.m3",
+        40,
+    ),
+)
+
+# (CASC entry, target in the map, sequence names, speed-up). The named clips
+# play `speed-up` times faster: their keyframes and length shrink by it. Other
+# clips are untouched. Leviathan Stand (idle) 3x faster than the shared
+# AnimSpeed 0.1 x actor 0.25 leaves it (operator 2026-11-17).
+FAST_CLIPS = (
+    (
+        r"mods\liberty.sc2mod\base.sc2assets\assets\units\zerg\leviathan\leviathan.m3",
+        Path("Assets") / "Units" / "Zerg" / "Leviathan" / "LeviathanSCOBA.m3",
+        ("Stand",),
+        3,
     ),
 )
 
@@ -118,6 +150,38 @@ def stretch_blocks(model, stretch: int) -> int:
                 block.frames = [int(frame) * stretch for frame in block.frames]
                 block.fend = int(block.fend) * stretch
                 count += 1
+    return count
+
+
+def speed_up_clips(model, names: tuple[str, ...], factor: int) -> int:
+    """Shrink the named sequences and their clips' key times by factor."""
+    if factor < 1:
+        raise ValueError("speed-up must be at least 1")
+    found = set()
+    for sequence in model.sequences:
+        if str(sequence.name) in names:
+            if int(sequence.animStartInMS) != 0:
+                raise ValueError(f"{sequence.name} does not start at 0 ms")
+            sequence.animEndInMS = round(int(sequence.animEndInMS) / factor)
+            found.add(str(sequence.name))
+    missing = set(names) - found
+    if missing:
+        raise ValueError(f"model lacks sequences {sorted(missing)}")
+    count = 0
+    for stc in model.sequenceTransformationCollections:
+        clip = str(stc.name)
+        if not any(clip == name or clip.startswith(name + "_") for name in names):
+            continue
+        for blocks in keyframe_blocks(stc):
+            for block in blocks:
+                frames = [round(int(frame) / factor) for frame in block.frames]
+                if any(b <= a for a, b in zip(frames, frames[1:])):
+                    raise ValueError(f"{clip}: keys merge at speed-up {factor}")
+                block.frames = frames
+                block.fend = round(int(block.fend) / factor)
+                count += 1
+    if count == 0:
+        raise ValueError(f"no clip blocks for {sorted(names)}")
     return count
 
 
@@ -258,6 +322,15 @@ def generate(root: Path, force: bool) -> None:
         for entry, target, stretch, child_stretch in SLOW_DEATHS:
             source = extract_model(entry, temp_root)
             generate_model(source, root / target, stretch, child_stretch)
+        for entry, target, sim_stretch in SLOW_SIMULATIONS:
+            source = extract_model(entry, temp_root)
+            generate_model(source, root / target, 1, sim_stretch)
+        for entry, target, names, factor in FAST_CLIPS:
+            model = m3.loadModel(str(extract_model(entry, temp_root)))
+            blocks = speed_up_clips(model, names, factor)
+            print(f"{target.name}: {list(names)} x{factor} faster, blocks={blocks}")
+            (root / target).parent.mkdir(parents=True, exist_ok=True)
+            m3.saveAndInvalidateModel(model, str(root / target))
         marker.write_text(MARKER_VERSION)
     finally:
         if temp_root.exists():

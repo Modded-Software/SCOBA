@@ -229,6 +229,11 @@ void gf_IntroSeed () {
     point lv_zerg = PointWithOffset(lv_x, -c_INTRO_SEED_OFFSET, -c_INTRO_SEED_OFFSET);
     unitgroup lv_group;
 
+    // c_INTRO_SEED_BACK cells back toward each side's own spawn, so the
+    // groups do not fight at once (operator 2026-11-17).
+    lv_terran = PointWithOffsetPolar(lv_terran, c_INTRO_SEED_BACK, AngleBetweenPoints(lv_terran, RegionGetCenter(gv_sPAWNLOCATIONS[1])));
+    lv_zerg = PointWithOffsetPolar(lv_zerg, c_INTRO_SEED_BACK, AngleBetweenPoints(lv_zerg, RegionGetCenter(gv_sPAWNLOCATIONS[4])));
+
     lv_group = gf_CreateSpawnGroup(4, "Marine", 1, lv_terran);
     libNtve_gf_CreateUnitsAtPoint2(1, "Goliath", 0, 1, lv_terran);
     UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());

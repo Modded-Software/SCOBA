@@ -53,6 +53,7 @@ NON_SPLASH_ACTORS = {
     "KorhalPalaceTurret",
     "Kraith",
     "LaserDrillTripod",
+    "Leviathan",
     "MengskBC",
     "MercCompound",
     "Mothership",

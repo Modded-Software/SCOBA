@@ -48,10 +48,11 @@ const fixed c_JUMP_GAIT_LAND = 0.405;
 const fixed c_JUMP_WALK_STEP = 0.03;
 // Touchdown thump (R-JUMP-8): the stock PhysicsImpactDustLight puff
 // (ModelData ScobaJumpDust; JumpLandDust was too large even at the Queen
-// scale) and the Goliath footfall sound (scripts/footfall/fx.py). No dust
-// in water, as the footfalls.
+// scale) and the Queen footfall sound (scripts/footfall/fx.py; operator
+// 2026-11-17: the Goliath sound was too big). No dust in water, as the
+// footfalls.
 const string c_JUMP_THUMP_MODEL = "ScobaJumpDust";
-const string c_JUMP_THUMP_SOUND = "GoliathFootstep";
+const string c_JUMP_THUMP_SOUND = "QueenFootstep";
 const fixed c_JUMP_THUMP_LIFE = 2.0;
 
 fixed gv_jumpGravUp;     // derived, gf_JumpConfigInit

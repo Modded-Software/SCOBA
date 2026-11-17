@@ -45,6 +45,67 @@ void gf_SetUnitLifePercent (string lp_unitType, fixed lp_percent) {
     UnitGroupLoopEnd();
 }
 
+// Turns every unit of one type to face the first unit of another type.
+// The Leviathan's placed rotation did not hold in game (operator 2026-11-17).
+void gf_FaceTypeAtType (string lp_type, string lp_target) {
+    unitgroup lv_targets = UnitGroup(lp_target, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 1);
+    unit lv_target = UnitGroupUnit(lv_targets, 1);
+    unitgroup lv_group;
+    unit lv_unit;
+
+    if (lv_target == null) {
+        return;
+    }
+    lv_group = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_unit = UnitGroupLoopCurrent();
+        UnitSetFacing(lv_unit, AngleBetweenPoints(UnitGetPosition(lv_unit), UnitGetPosition(lv_target)), 0.0);
+    }
+    UnitGroupLoopEnd();
+}
+
+// Hides every unit of one type (operator 2026-11-17: Leviathan hidden).
+void gf_HideType (string lp_type) {
+    unitgroup lv_group = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        UnitSetState(UnitGroupLoopCurrent(), c_unitStateHidden, true);
+    }
+    UnitGroupLoopEnd();
+}
+
+// Sets the flying height of every unit of one type farther than a radius from a point.
+void gf_SetHeightBeyond (string lp_type, point lp_at, fixed lp_radius, fixed lp_height) {
+    unitgroup lv_group = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    unit lv_unit;
+
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_unit = UnitGroupLoopCurrent();
+        if (DistanceBetweenPoints(UnitGetPosition(lv_unit), lp_at) > lp_radius) {
+            UnitSetHeight(lv_unit, lp_height, 0.0);
+        }
+    }
+    UnitGroupLoopEnd();
+}
+
+// Every unit of one type holds: stop order, no move, no turn.
+void gf_HoldType (string lp_type) {
+    unitgroup lv_group = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    unit lv_unit;
+
+    UnitGroupLoopBegin(lv_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_unit = UnitGroupLoopCurrent();
+        UnitIssueOrder(lv_unit, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+        UnitSetState(lv_unit, c_unitStateMoveSuppressed, true);
+        UnitSetState(lv_unit, c_unitStateTurnSuppressed, true);
+    }
+    UnitGroupLoopEnd();
+}
+
 bool gt_VisualTuning_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
@@ -108,7 +169,14 @@ bool gt_VisualTuning_Func (bool testConds, bool runActions) {
     gf_TripleDeathTime("WarpPrismPhasing");
     gf_TripleDeathTime("Zergling");
     gf_ScaleDeathTimePlayer(7, "MengskBC", 100.0);
+    gf_ScaleDeathTimePlayer(8, "Leviathan", 100.0);
     gf_SetUnitLifePercent("MengskBC", 0.01);
+    gf_FaceTypeAtType("Leviathan", "MengskBC");
+    gf_HideType("Leviathan");
+    // The MengskBC north and east of X Center (region 8): twice the unit's
+    // Height 256. The one over X Center keeps 256. All three hold still.
+    gf_SetHeightBeyond("MengskBC", RegionGetCenter(RegionFromId(8)), 20.0, 512.0);
+    gf_HoldType("MengskBC");
     return true;
 }
 

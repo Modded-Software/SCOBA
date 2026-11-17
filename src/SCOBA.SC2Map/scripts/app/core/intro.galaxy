@@ -41,6 +41,7 @@ const fixed c_INTRO_DFLT_FAR_END = 8.0;
 
 // Creep seed at the center X (SPEC-INTRO 3.7).
 const fixed c_INTRO_SEED_OFFSET = 3.5;
+const fixed c_INTRO_SEED_BACK = 50.0;  // seed groups start this far back toward their spawns
 
 // Map dialogs hidden in the intro, and the triggers off in it.
 const int c_INTRO_DIALOGS = 14;

@@ -55,6 +55,7 @@ actions:
   herodrop               rebuild, build hero drop test map, run it
   podbirth               rebuild, build pod Birth test map, run it
   aimdof                 rebuild, sweep 10 aim near-DOF datapoints (operator check)
+  skyduel                rebuild, check the three MengskBC spots and heights, Leviathan hidden
   aim                    rebuild, build aim test map, run aim profile
   motion                 rebuild, build motion test map, run motion profile
   controls               rebuild, build controls test map, run controls profile
@@ -118,7 +119,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|intro|herodrop|podbirth|aimdof|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
+        combat|tps|jump|intro|herodrop|podbirth|aimdof|skyduel|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -166,7 +167,7 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    herodrop|podbirth|aimdof|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe)
+    herodrop|podbirth|aimdof|skyduel|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe)
         run_profile "$ACTION"
         ;;
     picklog)

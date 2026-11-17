@@ -406,8 +406,17 @@
     <CUnit id="MengskBC">
         <LifeStart value="100000"/>
         <LifeMax value="100000"/>
-        <StationaryTurningRate value="2.9882"/>
-        <TurningRate value="5.9765"/>
+        <!-- Holds still: no move, no turn (operator 2026-11-17). -->
+        <Speed value="0"/>
+        <Acceleration value="0"/>
+        <StationaryTurningRate value="0"/>
+        <TurningRate value="0"/>
+        <Height value="256"/>
+        <DefaultAcquireLevel value="Passive"/>
+        <Response value="Nothing"/>
+    </CUnit>
+    <!-- Leviathan facing the MengskBC: same height, passive like it. -->
+    <CUnit id="Leviathan">
         <Height value="256"/>
         <DefaultAcquireLevel value="Passive"/>
         <Response value="Nothing"/>

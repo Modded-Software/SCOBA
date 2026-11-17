@@ -26,6 +26,7 @@ PROFILE_OUTPUTS = {
     "intro": ROOT / "out" / "SCOBA256_introtest.SC2Map",
     "podbirth": ROOT / "out" / "SCOBA256_podbirth.SC2Map",
     "aimdof": ROOT / "out" / "SCOBA256_aimdof.SC2Map",
+    "skyduel": ROOT / "out" / "SCOBA256_skyduel.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -50,6 +51,7 @@ PROFILE_BANKS = {
     "intro": ("SCOBAINTRO",),
     "podbirth": ("SCOBAPODBIRTH",),
     "aimdof": ("SCOBAAIMDOF",),
+    "skyduel": ("SCOBASKYDUEL",),
 }
 
 
@@ -111,4 +113,7 @@ def profile_module(name):
     if name == "aimdof":
         from . import aimdof
         return aimdof
+    if name == "skyduel":
+        from . import skyduel
+        return skyduel
     raise SystemExit(f"unknown test profile: {name}")

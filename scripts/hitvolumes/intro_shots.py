@@ -70,7 +70,7 @@ HYBRID = (194.4, 193.1)
 HIVE = (21.0, 9.0)
 NYDUS = (59.0, 59.0)
 PSI = (240.0, 248.0)
-BRAMBLE = (194.8, 165.8)  # S4 eye (survey)
+BRAMBLE = (194.85, 162.8)  # S4 eye: survey spot 3 cells back along the yaw (operator 2026-11-17)
 # S1: the eye sits at the Brakk mob boss (Objects) and looks at the
 # battlecruiser (operator 2026-11-17). Target = eye + arm along the yaw.
 BRAKK = (14.9558, 113.3615)
@@ -100,7 +100,7 @@ SHOTS: tuple[Shot, ...] = (
     Shot("S1 Pride", 12, "E", *S1_T0, *S1_T1, S1_Z, S1_Z, BRAKK_YAW, BRAKK_YAW, S1_P0, S1_P1, S1_D0, S1_D1, 50, 40, False, VAR_NONE),
     Shot("S2 Line", 12, "L", 119.6, 113.1, 131.0, 124.5, round(WATER + 1.2 - S2_GROUND[0], 2), round(WATER + 1.2 - S2_GROUND[1], 2), 135, 135, 6, 6, 16, 16, 50, 50, True, VAR_TARGET),
     Shot("S3 Map", 10, "E", *X, *X, 0, 0, 45, 75, 80, 80, 150, 150, 22, 22, False, VAR_NONE),
-    Shot("S4 Brambles", 6, "S", *HYBRID, *HYBRID, 3, 3, 90.8, 90.8, -7.5, -7.5, 27.5, 27.5, 70, 70, False, VAR_NONE),
+    Shot("S4 Brambles", 6, "E", *HYBRID, *HYBRID, 3, 3, 90.8, 90.8, -6.0, -6.0, 30.5, 30.5, 70, 45, False, VAR_NONE),
     Shot("S5 Shackled", 4, "E", *HYBRID, *HYBRID, 4, 4, 90.8, 90.8, 8, 8, 18, 12, 48, 44, False, VAR_NONE),
     Shot("S6 Hive", 6, "A", *HIVE, *HIVE, 3, 3, 205, 245, 18, 18, 66, 66, 55, 55, False, VAR_YAW),
     Shot("S7 Worm", 3, "O", *NYDUS, *NYDUS, 6, 12, 225, 225, -20, -35, 9, 9, 80, 80, False, VAR_NONE),

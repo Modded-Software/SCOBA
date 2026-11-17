@@ -7,15 +7,18 @@ from types import SimpleNamespace
 from project_root import project_root
 from slow_death_assets import (
     BLOCK_KINDS,
+    FAST_CLIPS,
     PARTICLE_ANIMATED,
     PARTICLE_PLAIN,
     RIBBON_ANIMATED,
     RIBBON_PLAIN,
     SDR3_KIND,
     SLOW_DEATHS,
+    SLOW_SIMULATIONS,
     keyframe_blocks,
     retime_model,
     scaled,
+    speed_up_clips,
 )
 
 MAP = project_root() / "out" / "SCOBA256.SC2Map"
@@ -186,6 +189,53 @@ class RetimeTest(unittest.TestCase):
         # Negative: the hull stretch must stay 100; only the child stretch halves.
         bc = [(stretch, child) for _, target, stretch, child in SLOW_DEATHS if target.name == "BattlecruiserLokiDeathSlow.m3"]
         self.assertEqual(bc, [(100, 12.5)])
+
+    def test_tentacle_simulation_matches_anim_speed(self) -> None:
+        # 40 = 1 / AnimSpeed 0.025; negative: no keyframe stretch (stretch 1 in generate).
+        self.assertEqual([(target.name, sim) for _, target, sim in SLOW_SIMULATIONS], [("LeviathanTentacleSlow.m3", 40)])
+        model = fake_model()
+        retime_model(model, 1, 40)
+        self.assertEqual(model.sequences[0].animEndInMS, 1000)
+        self.assertEqual(model.ribbons[0].speed.initValue, 2.0 / 40)
+        self.assertEqual(model.ribbons[0].gravity, 2.0 / 1600)
+
+    def test_speed_up_named_clip_only(self) -> None:
+        # Stand shrinks 3x; negative: the Walk clip and sequence keep their times.
+        stand = SimpleNamespace(name="Stand_full", **{kind: [] for kind in BLOCK_KINDS})
+        stand.sd3v = [block([0, 33, 3000], ["a", "b", "c"], 3000)]
+        walk = SimpleNamespace(name="Walk_full", **{kind: [] for kind in BLOCK_KINDS})
+        walk.sd3v = [block([0, 3000], ["a", "b"], 3000)]
+        model = SimpleNamespace(
+            sequences=[
+                SimpleNamespace(name="Stand", animStartInMS=0, animEndInMS=3000),
+                SimpleNamespace(name="Walk", animStartInMS=0, animEndInMS=3000),
+            ],
+            sequenceTransformationCollections=[stand, walk],
+        )
+        self.assertEqual(speed_up_clips(model, ("Stand",), 3), 1)
+        self.assertEqual(model.sequences[0].animEndInMS, 1000)
+        self.assertEqual(stand.sd3v[0].frames, [0, 11, 1000])
+        self.assertEqual(stand.sd3v[0].fend, 1000)
+        self.assertEqual(model.sequences[1].animEndInMS, 3000)
+        self.assertEqual(walk.sd3v[0].frames, [0, 3000])
+
+    def test_speed_up_missing_clip_fails(self) -> None:
+        model = SimpleNamespace(sequences=[], sequenceTransformationCollections=[])
+        with self.assertRaises(ValueError):
+            speed_up_clips(model, ("Stand",), 3)
+
+    def test_leviathan_stand_is_three_times_faster(self) -> None:
+        self.assertEqual([(t.name, n, f) for _, t, n, f in FAST_CLIPS], [("LeviathanSCOBA.m3", ("Stand",), 3)])
+
+    @unittest.skipUnless(MAP.is_dir(), "built map is absent")
+    def test_built_leviathan_stand_length(self) -> None:
+        # Stock leviathan.m3: Stand 3000 ms, Walk 3000 ms, Spell 1833 ms.
+        from dump_m3_clip_metrics import frame_rows
+
+        rows = frame_rows(MAP / FAST_CLIPS[0][1])
+        self.assertEqual(rows["Stand"]["dur"], 1000)
+        self.assertEqual(rows["Walk"]["dur"], 3000)
+        self.assertEqual(rows["Spell"]["dur"], 1833)
 
     def test_goliath_death_is_two_times_slower(self) -> None:
         # Hull and children both 2x; negative: no other stretch for the Goliath.

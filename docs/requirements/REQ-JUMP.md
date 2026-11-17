@@ -51,7 +51,7 @@ Implementation lives in [SPEC-JUMP](../specifications/SPEC-JUMP.md).
 | R-JUMP-6 | The jump MUST NOT change the hero's orders, facing, or walk. Walking during the jump MUST still move the hero. |
 | R-JUMP-7 | A hero switch or the hero's death during a jump MUST put that unit back at height 0 and end the jump. |
 | R-JUMP-17 | The camera height offset MUST carry the jump height in real time: every game loop of the jump it MUST be the base offset plus the quake shake plus the hero's jump height, with the same target height as the hero, blended linearly over the same loop time. The camera MUST NOT lead or trail the hero (operator 2026-11-16: an eased blend lagged; a one-loop lead made the model trail the camera, removed). At the end of the jump (touchdown, hero switch, death) the jump part MUST be 0. Without a jump the jump part MUST stay 0. |
-| R-JUMP-8 | Touchdown MUST play a thump at the hero's feet: the stock light physics impact dust (`PhysicsImpactDustLight`, map model `ScobaJumpDust`) and the Goliath `GoliathFootstep` sound. Revised 2026-11-16: `JumpLandDust` was too large at the Goliath scale (1.25-1.5) and still too large at the Queen scale (0.75-0.9). It MUST play once per touchdown, in the game loop where the height reaches 0. Like the Goliath, it MUST play no dust in water. A jump that ends in the air (R-JUMP-7) MUST NOT play it. Added by the operator 2026-11-16 as "JumpImpactLarge"; no stock asset has that name, so the effect the Goliath thump really uses is named here. |
+| R-JUMP-8 | Touchdown MUST play a thump at the hero's feet: the stock light physics impact dust (`PhysicsImpactDustLight`, map model `ScobaJumpDust`) and the Queen `QueenFootstep` sound (light stone footsteps; revised 2026-11-17: `GoliathFootstep` was too big). Revised 2026-11-16: `JumpLandDust` was too large at the Goliath scale (1.25-1.5) and still too large at the Queen scale (0.75-0.9). It MUST play once per touchdown, in the game loop where the height reaches 0. Like the Goliath, it MUST play no dust in water. A jump that ends in the air (R-JUMP-7) MUST NOT play it. Added by the operator 2026-11-16 as "JumpImpactLarge"; no stock asset has that name, so the effect the Goliath thump really uses is named here. |
 
 ### 3.2 Animation
 
@@ -86,7 +86,7 @@ Implementation lives in [SPEC-JUMP](../specifications/SPEC-JUMP.md).
 | AC-JUMP-1 | Tosh crouches and extends on takeoff, holds the legs in the air with the toes pointed, lands toes first, and absorbs the landing. The knee and ankle bend look natural. |
 | AC-JUMP-2 | The feet do not pop or twist between the jump clips and the stand or walk clips. |
 | AC-JUMP-3 | Aiming during the jump: the torso follows the crosshair. The legs show the jump. |
-| AC-JUMP-4 | The touchdown dust and thump sound match the Goliath footfall and line up with the feet hitting the ground. |
+| AC-JUMP-4 | The touchdown dust and the light thump sound fit Tosh and line up with the feet hitting the ground. |
 | AC-JUMP-5 | The jump height and the flight look believable: a short crouch, a quick rise, a slower top, a faster drop. |
 | AC-JUMP-6 | Jumping while walking: the legs push off from the walk, hold a stride in the air along the move direction, and land back into the walk on the leading foot. Jumping from idle: the legs crouch and tuck from the stand, feet at the stand width. No pop at the phase changes or at the release. |
 | AC-JUMP-7 | The camera rises and falls with the hero, smoothly, with no lag or step. |

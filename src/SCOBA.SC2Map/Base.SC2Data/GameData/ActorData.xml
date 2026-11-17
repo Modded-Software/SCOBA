@@ -182,6 +182,13 @@
         <!-- Death speed lives in the model: a unit-actor time scale never reaches the death model. -->
         <DeathArray index="Normal" ModelLink="BattlecruiserLokiDeathSlow" SoundLink=""/>
     </CActorUnit>
+    <!-- Leviathan facing the MengskBC: same size (mesh length 9.15 x 0.9 x 40 = 329
+         against the BC's 5.82 x 0.8 x 72 = 335) and the same animation slowdown. -->
+    <CActorUnit id="Leviathan">
+        <Scale value="40.000000"/>
+        <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.250000"/>
+        <DeathArray index="Normal" ModelLink="LeviathanDeathSlow" SoundLink=""/>
+    </CActorUnit>
     <CActorUnit id="Mitosaurus">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="2.500000"/>

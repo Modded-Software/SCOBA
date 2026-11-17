@@ -1,0 +1,145 @@
+// Sky BC harness: one MengskBC over X Center at its unit height, two at the
+// map edge north and east of it at twice that height, all holding still
+// (no move, no turn), the Leviathan hidden.
+// Raw engine values only; the profile decides.
+
+trigger gt_SkyDuelTest;
+
+string gf_SdXY100 (point lp_p) {
+    return IntToString(FixedToInt(PointGetX(lp_p) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(lp_p) * 100.0));
+}
+
+// "len/rem" in ms for the default slot of a unit's main actor.
+string gf_SdClip (unit lp_u, bool lp_scaled) {
+    generichandle lv_q;
+
+    AnimLengthQueryByName(libNtve_gf_MainActorofUnit(lp_u), c_animNameDefault, lp_scaled);
+    AnimLengthQueryWait();
+    lv_q = AnimLengthQueryLastCreated();
+    return IntToString(FixedToInt(AnimLengthSync(lv_q) * 1000.0)) + "/" + IntToString(FixedToInt(AnimLengthRemainingSync(lv_q) * 1000.0));
+}
+
+// Every live unit of one type: count, and the first one's state.
+void gf_SdSnapType (string lp_s, string lp_tag, string lp_type) {
+    unitgroup lv_g = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+    unit lv_u;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Count", UnitGroupCount(lv_g, c_unitCountAll));
+    lv_u = UnitGroupUnit(lv_g, 1);
+    if (lv_u == null) {
+        BankSave(gv_dbgBank);
+        return;
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "At100", gf_SdXY100(UnitGetPosition(lv_u)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Facing100", FixedToInt(UnitGetFacing(lv_u) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Height100", FixedToInt(UnitGetHeight(lv_u) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Owner", UnitGetOwner(lv_u));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "Alive", UnitIsAlive(lv_u));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "ClipRaw", gf_SdClip(lv_u, false));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "ClipScaled", gf_SdClip(lv_u, true));
+    BankSave(gv_dbgBank);
+}
+
+// MengskBC units within 10 of a point: count, and the first one's position,
+// height, facing, order count, hold states.
+void gf_SdSnapBcAt (string lp_s, string lp_tag, point lp_c) {
+    unitgroup lv_g = UnitGroup("MengskBC", c_playerAny, RegionCircle(lp_c, 10.0), UnitFilter(0, 0, 0, 0), 0);
+    unit lv_u = UnitGroupUnit(lv_g, 1);
+
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "Region100", gf_SdXY100(lp_c));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Count", UnitGroupCount(lv_g, c_unitCountAll));
+    if (lv_u != null) {
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "At100", gf_SdXY100(UnitGetPosition(lv_u)));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Height100", FixedToInt(UnitGetHeight(lv_u) * 100.0));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Facing100", FixedToInt(UnitGetFacing(lv_u) * 100.0));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Owner", UnitGetOwner(lv_u));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Orders", UnitOrderCount(lv_u));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "MoveSup", UnitTestState(lv_u, c_unitStateMoveSuppressed));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "TurnSup", UnitTestState(lv_u, c_unitStateTurnSuppressed));
+    }
+    BankSave(gv_dbgBank);
+}
+
+// Spot points: X Center (region 8), and the map edge north and east of it
+// (placed at src 62.6437,124 and 124,59.4165; built x2).
+point gf_SdSpot (string lp_tag) {
+    point lv_c = RegionGetCenter(RegionFromId(8));
+
+    if (lp_tag == "north") {
+        return Point(PointGetX(lv_c), 248.0);
+    }
+    if (lp_tag == "east") {
+        return Point(248.0, PointGetY(lv_c));
+    }
+    return lv_c;
+}
+
+// Act: order the center BC to move away and turn; it must not.
+void gf_SdPush () {
+    unitgroup lv_g = UnitGroup("MengskBC", c_playerAny, RegionCircle(gf_SdSpot("center"), 10.0), UnitFilter(0, 0, 0, 0), 0);
+    unit lv_u = UnitGroupUnit(lv_g, 1);
+
+    if (lv_u == null) {
+        return;
+    }
+    BankValueSetFromFlag(gv_dbgBank, "sd_main", "pushMoveIssued", UnitIssueOrder(lv_u, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(UnitGetPosition(lv_u), 20.0, 0.0)), c_orderQueueReplace));
+    BankSave(gv_dbgBank);
+}
+
+void gf_SdLevHidden (string lp_s, string lp_tag) {
+    unitgroup lv_g = UnitGroup("Leviathan", c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+    unit lv_u = UnitGroupUnit(lv_g, 1);
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Count", UnitGroupCount(lv_g, c_unitCountAll));
+    if (lv_u != null) {
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "Hidden", UnitTestState(lv_u, c_unitStateHidden));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "Alive", UnitIsAlive(lv_u));
+    }
+    BankSave(gv_dbgBank);
+}
+
+void gf_SdMain () {
+    string lv_s = "sd_main";
+
+    // No gf_DbgReset here: it removes enemies near Tosh. The scenario only
+    // reads placed units.
+    gf_SdSnapType(lv_s, "bcAll", "MengskBC");
+    gf_SdSnapBcAt(lv_s, "center", gf_SdSpot("center"));
+    gf_SdSnapBcAt(lv_s, "north", gf_SdSpot("north"));
+    gf_SdSnapBcAt(lv_s, "east", gf_SdSpot("east"));
+    gf_SdLevHidden(lv_s, "lev");
+    gf_SdPush();
+    // Two game seconds later: no move, no turn, heights hold, Leviathan hidden.
+    Wait(2.0, c_timeGame);
+    gf_SdSnapBcAt(lv_s, "centerLate", gf_SdSpot("center"));
+    gf_SdSnapBcAt(lv_s, "northLate", gf_SdSpot("north"));
+    gf_SdSnapBcAt(lv_s, "eastLate", gf_SdSpot("east"));
+    gf_SdLevHidden(lv_s, "levLate");
+    BankSave(gv_dbgBank);
+}
+
+bool gt_SkyDuelTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(0.5, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBASKYDUEL", 1);
+    gv_bINPUTLOG = false;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "skyduel");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "sd_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_SdMain();
+    gf_DbgReset("sd_end", false, true);
+    BankValueSetFromInt(gv_dbgBank, "sd_end", "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_SkyDuelTest_Init () {
+    gt_SkyDuelTest = TriggerCreate("gt_SkyDuelTest_Func");
+    TriggerAddEventMapInit(gt_SkyDuelTest);
+}

@@ -49,7 +49,7 @@ HERO_UNITS = ("Kerrigan", "Tosh")
 KEEP_STRUCTURE = 6.0
 KEEP_UNIT = 3.0
 STRUCTURE_UNITS = (
-    "Hive", "GreaterNydusWorm", "HybridUltraliskShackled", "PsiDecimator", "MengskBC", "SupplyDepot",
+    "Hive", "GreaterNydusWorm", "HybridUltraliskShackled", "PsiDecimator", "MengskBC", "Leviathan", "SupplyDepot",
     "SensorTower", "PerditionTurret", "AutoTurret", "KorhalPalaceTurret", "SpineCrawler", "SporeCrawler",
     "SporeCannon", "InfestedSiegeBreakerSieged", "Brakk",
 )

@@ -103,13 +103,13 @@ void gf_IntroShotsLoad () {
     gv_introRow_z1[3] = 3.0000;
     gv_introRow_yaw0[3] = 90.8000;
     gv_introRow_yaw1[3] = 90.8000;
-    gv_introRow_pitch0[3] = -7.5000;
-    gv_introRow_pitch1[3] = -7.5000;
-    gv_introRow_dist0[3] = 27.5000;
-    gv_introRow_dist1[3] = 27.5000;
+    gv_introRow_pitch0[3] = -6.0000;
+    gv_introRow_pitch1[3] = -6.0000;
+    gv_introRow_dist0[3] = 30.5000;
+    gv_introRow_dist1[3] = 30.5000;
     gv_introRow_fov0[3] = 70.0000;
-    gv_introRow_fov1[3] = 70.0000;
-    gv_introRow_ease[3] = c_INTRO_EASE_S;
+    gv_introRow_fov1[3] = 45.0000;
+    gv_introRow_ease[3] = c_INTRO_EASE_E;
     gv_introRow_variant[3] = 0;
     gv_introRow_dof[3] = false;
     // S5 Shackled

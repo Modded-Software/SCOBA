@@ -123,6 +123,24 @@
         <Model value="Assets\Units\Terran\BattlecruiserLokiDeath\BattlecruiserLokiDeathSlow.m3"/>
         <EditorCategories value="Race:Terran"/>
     </CModel>
+    <!-- Leviathan: the MengskBC slowdown (model 0.1, actor 0.25 at birth). -->
+    <!-- Stand (idle) is 3x faster inside the copy built by scripts/slow_death_assets.py (FAST_CLIPS). -->
+    <CModel id="Leviathan">
+        <Model value="Assets\Units\Zerg\Leviathan\LeviathanSCOBA.m3"/>
+        <AnimSpeed value="0.100000"/>
+    </CModel>
+    <!-- Tentacles are their own actors: the unit actor time scale misses them, so 0.1 x 0.25 here.
+         AnimSpeed misses the ribbon physics: the copy built by scripts/slow_death_assets.py
+         runs it 40x slower (SLOW_SIMULATIONS). -->
+    <CModel id="LeviathanTentacle">
+        <Model value="Assets\Effects\Zerg\LeviathanTentacle\LeviathanTentacleSlow.m3"/>
+        <AnimSpeed value="0.025000"/>
+    </CModel>
+    <!-- Slow copy of LeviathanDeath, built by scripts/slow_death_assets.py, timed like the BC death. -->
+    <CModel id="LeviathanDeathSlow" parent="UnitDeath">
+        <Model value="Assets\Units\Zerg\LeviathanDeath\LeviathanDeathSlow.m3"/>
+        <EditorCategories value="Race:Zerg"/>
+    </CModel>
     <CModel id="Mothership">
         <AnimSpeed value="0.250000"/>
         <Occlusion value="None"/>

@@ -129,7 +129,7 @@ target − distance × (cos pitch × (cos yaw, sin yaw), −sin pitch).
 | S1 Pride | 12 | E | eye at the Brakk (14.96, 113.36), looking at the BC (103.8, 153.2) | 14 | 24.15 | −25 → −45 | 8 → 14 | 50 → 40 | off | none |
 | S2 Line | 12 | L | (119.6, 113.1) → (131.0, 124.5) | 8.35 | 135 | 6 | 16 | 50 | on, focus 16 | target reversed |
 | S3 Map | 10 | E | (125.3, 118.8) | ground | 45 → 75 | 80 | 150 | 22 | off | none |
-| S4 Brambles | 6 | S | (194.4, 193.1) | ground + 3 | 90.8 | −7.5 | 27.5 | 70 | off | none |
+| S4 Brambles | 6 | E | (194.4, 193.1) | ground + 3 | 90.8 | −6.0 | 30.5 | 70 → 45 | off | none |
 | S5 Shackled | 4 | E | (194.4, 193.1) | ground + 4 | 90.8 | 8 | 18 → 12 | 48 → 44 | off | none |
 | S6 Hive | 6 | A | (21.0, 9.0) | ground + 3 | 205 → 245 | 18 | 66 | 55 | off | yaw reversed |
 | S7 Worm | 3 | O | (59.0, 59.0) | ground + 6 → + 12 | 225 | −20 → −35 | 9 | 80 | off | none |
@@ -178,8 +178,8 @@ values are a first guess for the operator to tune (U4).
 
 At map init, before the first frame:
 
-- Terran, player 1: 4 Marine, 1 Goliath at X + (3.5, 3.5).
-- Zerg, player 4: 8 Zergling, 2 Roach at X − (3.5, 3.5).
+- Terran, player 1: 4 Marine, 1 Goliath at X + (3.5, 3.5), then 50 back toward spawn 1.
+- Zerg, player 4: 8 Zergling, 2 Roach at X − (3.5, 3.5), then 50 back toward spawn 4.
 - Each group: made by `gf_CreateSpawnGroup`, ordered by
   `gf_GateFromX(unit, 1)`. The groups meet at once and fight. Survivors
   go on along the center lane.

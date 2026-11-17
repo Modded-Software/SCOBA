@@ -10,7 +10,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / "vendor" / "m3addon"))
 
 import m3
-from slow_death_assets import SLOW_DEATHS, event_names
+from slow_death_assets import FAST_CLIPS, SLOW_DEATHS, SLOW_SIMULATIONS, event_names
 from validate_assets import fail
 
 GAMEDATA = Path("Base.SC2Data") / "GameData"
@@ -20,6 +20,7 @@ GAMEDATA = Path("Base.SC2Data") / "GameData"
 # times stretched to match the model.
 SLOW_DEATH_MODELS = (
     ("BattlecruiserLokiDeathSlow", ("MengskBC", "DukesRevenge"), True),
+    ("LeviathanDeathSlow", ("Leviathan",), True),
     ("GoliathDeathSlow", ("Goliath",), False),
 )
 
@@ -61,7 +62,8 @@ def check_soundless_model(map_dir: Path, value: str) -> None:
     for _, relative, _, _ in SLOW_DEATHS:
         if str(relative).replace("/", "\\") != value:
             continue
-        extra = sorted(set(event_names(m3.loadModel(str(map_dir / relative)))) - {"Evt_SeqEnd"})
+        # Evt_SeqEnd ends the clip; Evt_Simulate pre-runs particles. Neither is a sound.
+        extra = sorted(set(event_names(m3.loadModel(str(map_dir / relative)))) - {"Evt_SeqEnd", "Evt_Simulate"})
         if extra:
             fail(f"{relative} carries model events {extra}; sounds must stay out")
 
@@ -115,6 +117,44 @@ def check_slow_death_data(map_dir: Path) -> None:
                     fail(f"{actor_id} must not also scale death time on the unit actor")
 
 
+# (CModel id, generated model it must use).
+SLOW_SIMULATION_MODELS = (("LeviathanTentacle", "Assets\\Effects\\Zerg\\LeviathanTentacle\\LeviathanTentacleSlow.m3"),)
+# (CModel id, generated model with fast clips it must use).
+FAST_CLIP_MODELS = (("Leviathan", "Assets\\Units\\Zerg\\Leviathan\\LeviathanSCOBA.m3"),)
+
+
+def check_fast_clips(map_dir: Path) -> None:
+    for _, relative, names, _ in FAST_CLIPS:
+        if not (map_dir / relative).is_file():
+            fail(f"missing fast clip model: {relative}")
+        present = {str(s.name) for s in m3.loadModel(str(map_dir / relative)).sequences}
+        if not set(names) <= present:
+            fail(f"{relative} lost sequences {sorted(set(names) - present)}")
+    models = ET.parse(map_dir / GAMEDATA / "ModelData.xml").getroot()
+    for model_id, value in FAST_CLIP_MODELS:
+        node = models.find(f"./CModel[@id='{model_id}']")
+        if node is None or node.find("Model") is None or node.find("Model").get("value") != value:
+            fail(f"CModel {model_id} must use {value}")
+
+
+def check_slow_simulations(map_dir: Path) -> None:
+    values = {str(relative).replace("/", "\\") for _, relative, _ in SLOW_SIMULATIONS}
+    for _, relative, _ in SLOW_SIMULATIONS:
+        path = map_dir / relative
+        if not path.is_file():
+            fail(f"missing slow simulation model: {relative}")
+        model = m3.loadModel(str(path))
+        if not model.particles and not model.ribbons:
+            fail(f"{relative} has no particles or ribbons to slow")
+    models = ET.parse(map_dir / GAMEDATA / "ModelData.xml").getroot()
+    for model_id, value in SLOW_SIMULATION_MODELS:
+        node = models.find(f"./CModel[@id='{model_id}']")
+        if node is None or node.find("Model") is None or node.find("Model").get("value") != value or value not in values:
+            fail(f"CModel {model_id} must use {value}")
+
+
 def check_slow_deaths(map_dir: Path) -> None:
     check_slow_death_models(map_dir)
     check_slow_death_data(map_dir)
+    check_slow_simulations(map_dir)
+    check_fast_clips(map_dir)
