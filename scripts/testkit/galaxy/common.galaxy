@@ -221,6 +221,10 @@ void gf_DbgSnap (string lp_section, string lp_tag) {
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "NoTurn", UnitBehaviorCount(lv_hero, c_SCOBA_NO_TURN_BEHAVIOR));
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "HoldStrafe", gv_holdStrafe[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LowerState", gv_animLowerState[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UpperState", gv_animUpperState[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UpperClears", gv_animUpperClears[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "PitchStep", gv_animTargetPitchStep[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ReadyHold", gf_AnimReadyHold(1));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AimDir", gv_animAimDir[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "FullState", gv_animFullState[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "WalkScale1000", FixedToInt(gv_animFullScale[1] * 1000.0));
@@ -249,19 +253,86 @@ void gf_DbgSnap (string lp_section, string lp_tag) {
     BankSave(gv_dbgBank);
 }
 
-// Waits up to 2 s for the next hero shot, then snapshots 0.25 s after it.
-void gf_DbgSnapAfterShot (string lp_section, string lp_tag) {
+// Shot clocks inside one weapon period. Tosh fires every 0.25 s (operator
+// 2026-11-16): a read 0.25 s or later after the shot finds the clocks over.
+// Waits up to 2 s for the next hero shot effect, then reads the hero
+// cooldown, the button clock, the command state and the weapon cooldown
+// time in the next game loop. lp_shots: gv_aimShotEffectEvents before the
+// command, so a shot that already came counts. Returns whether it came.
+bool gf_DbgClockRead (string lp_section, string lp_tag, int lp_shots) {
+    unit lv_hero;
     int lv_i;
-    int lv_shots;
+    bool lv_seen;
 
-    lv_shots = gv_aimShotEffectEvents;
+    lv_hero = gv_tPSUNIT[1];
     for (lv_i = 0; lv_i < 32; lv_i += 1) {
-        if (gv_aimShotEffectEvents > lv_shots) {
+        if (gv_aimShotEffectEvents > lp_shots) {
             break;
         }
         Wait(0.0625, c_timeGame);
     }
-    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ShotSeen", gv_aimShotEffectEvents > lv_shots);
-    Wait(0.25, c_timeGame);
+    lv_seen = gv_aimShotEffectEvents > lp_shots;
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ShotSeen", lv_seen);
+    Wait(0.0625, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EarlyCdMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EarlyBtnMs", FixedToInt(UnitAbilityGetCooldown(lv_hero, "SCOBAAutoAttackStatus", c_DBG_BUTTON_COOLDOWN) * 1000.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "EarlyCmdCd", UnitCheckAbilCmdState(lv_hero, AbilityCommand("SCOBAAutoAttackStatus", 0), c_cmdStateCooldown));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CdTimeMs", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, UnitWeaponGet(lv_hero, gf_AimWeaponIndex(1)), "Cost.Cooldown.TimeUse", 1)) * 1000.0));
+    return lv_seen;
+}
+
+// Waits up to 2 s for the next hero shot, reads the clocks one loop after
+// it (gf_DbgClockRead), then snapshots 0.25 s after the shot.
+void gf_DbgSnapAfterShot (string lp_section, string lp_tag) {
+    gf_DbgClockRead(lp_section, lp_tag, gv_aimShotEffectEvents);
+    Wait(0.1875, c_timeGame);
     gf_DbgSnap(lp_section, lp_tag);
+}
+
+// Pose hold (R-PNC-80, R-TPS-17). Waits up to 2 s for the next hero shot effect.
+bool gf_DbgWaitShot (int lp_shots) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < 32; lv_i += 1) {
+        if (gv_aimShotEffectEvents > lp_shots) {
+            return true;
+        }
+        Wait(0.0625, c_timeGame);
+    }
+    return gv_aimShotEffectEvents > lp_shots;
+}
+
+// Samples the upper-body state every game loop for lp_loops loops and adds
+// to the section counters: samples, samples with no pose state, samples with
+// no pitch pose on the bracket, samples with an attack order.
+void gf_DbgPoseSample (string lp_section, int lp_loops) {
+    int lv_i;
+    int lv_none;
+    int lv_noPitch;
+    int lv_order;
+
+    for (lv_i = 0; lv_i < lp_loops; lv_i += 1) {
+        Wait(0.0625, c_timeGame);
+        if (gv_animUpperState[1] == c_ANIM_UPPER_NONE) {
+            lv_none += 1;
+        }
+        if (gv_animTargetPitchStep[1] <= 0) {
+            lv_noPitch += 1;
+        }
+        if (UnitOrderHasAbil(gv_tPSUNIT[1], "attack")) {
+            lv_order += 1;
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "Samples", BankValueGetAsInt(gv_dbgBank, lp_section, "Samples") + lp_loops);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "NoneSamples", BankValueGetAsInt(gv_dbgBank, lp_section, "NoneSamples") + lv_none);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "NoPitchSamples", BankValueGetAsInt(gv_dbgBank, lp_section, "NoPitchSamples") + lv_noPitch);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "OrderSamples", BankValueGetAsInt(gv_dbgBank, lp_section, "OrderSamples") + lv_order);
+    BankSave(gv_dbgBank);
+}
+
+void gf_DbgPoseStart (string lp_section) {
+    BankValueSetFromInt(gv_dbgBank, lp_section, "Samples", 0);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "NoneSamples", 0);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "NoPitchSamples", 0);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "OrderSamples", 0);
 }

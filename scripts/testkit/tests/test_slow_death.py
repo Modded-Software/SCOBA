@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 from project_root import project_root
@@ -18,6 +19,7 @@ from slow_death_assets import (
 )
 
 MAP = project_root() / "out" / "SCOBA256.SC2Map"
+GOLIATH_SLOW = Path("Assets") / "Units" / "Terran" / "GoliathDeath" / "GoliathDeathSlow.m3"
 RATE_ID = 0x1111
 
 
@@ -166,6 +168,30 @@ class RetimeTest(unittest.TestCase):
         self.assertEqual(particle.zAcceleration, 0.5)
         self.assertEqual(model.ribbons[0].lifespan.initValue, 4.0)
 
+    def test_fractional_child_stretch(self) -> None:
+        # 12.5 is half of 25: the children run 2x faster; the keyframes keep the stretch.
+        model = fake_model()
+        retime_model(model, 100, 12.5)
+        stc = model.sequenceTransformationCollections[0]
+        particle = model.particles[0]
+        self.assertEqual(model.sequences[0].animEndInMS, 100000)
+        self.assertEqual(stc.sd3v[0].frames, [0, 10000, 20000])
+        self.assertEqual(stc.sdr3[0].keys, [0.8, 1.6])
+        self.assertEqual(particle.lifespan1.initValue, 25.0)
+        self.assertEqual(particle.emissionSpeed1.initValue, 0.16)
+        self.assertEqual(particle.zAcceleration, 2.0 / 156.25)
+        self.assertEqual(model.ribbons[0].lifespan.initValue, 25.0)
+
+    def test_configured_children_are_twice_as_fast(self) -> None:
+        # Negative: the hull stretch must stay 100; only the child stretch halves.
+        bc = [(stretch, child) for _, target, stretch, child in SLOW_DEATHS if target.name == "BattlecruiserLokiDeathSlow.m3"]
+        self.assertEqual(bc, [(100, 12.5)])
+
+    def test_goliath_death_is_two_times_slower(self) -> None:
+        # Hull and children both 2x; negative: no other stretch for the Goliath.
+        goliath = [(stretch, child) for _, target, stretch, child in SLOW_DEATHS if target == GOLIATH_SLOW]
+        self.assertEqual(goliath, [(2, 2)])
+
     def test_child_stretch_below_one_fails(self) -> None:
         with self.assertRaises(ValueError):
             retime_model(fake_model(), 4, 0)
@@ -188,9 +214,20 @@ class BuiltModelTest(unittest.TestCase):
 
         for _, relative, stretch, _ in SLOW_DEATHS:
             rows = frame_rows(MAP / relative)
-            self.assertEqual(list(rows), ["Death"])
-            self.assertEqual(rows["Death"]["dur"] % stretch, 0)
-            self.assertGreaterEqual(rows["Death"]["dur"], 1000 * stretch)
+            self.assertTrue(rows)
+            for name, row in rows.items():
+                self.assertTrue(name.startswith("Death"), name)
+                self.assertEqual(row["dur"] % stretch, 0, name)
+                self.assertGreaterEqual(row["dur"], 1000 * stretch, name)
+
+    @unittest.skipUnless(MAP.is_dir(), "built map is absent")
+    def test_built_goliath_death_is_two_times_stock(self) -> None:
+        # Stock GoliathDeath.m3: Death 6667 ms, Death 01 5000 ms, Death 02 5000 ms.
+        from dump_m3_clip_metrics import frame_rows
+
+        rows = frame_rows(MAP / GOLIATH_SLOW)
+        self.assertEqual({name: row["dur"] for name, row in rows.items()},
+                         {"Death": 13334, "Death 01": 10000, "Death 02": 10000})
 
 
 if __name__ == "__main__":

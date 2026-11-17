@@ -64,6 +64,8 @@ const fixed c_ANIM_ATTACK_DURATION = 0.5;
 const fixed c_ANIM_ATTACK_TIME_SCALE = 2.0;
 const fixed c_ANIM_ATTACK_START_TIME = 0.35;
 const fixed c_ANIM_AIM_ATTACK_BLEND = 0.1;
+// PNC pose hold (R-PNC-80): seconds the shooting pose stays after a shot.
+const fixed c_ANIM_READY_LINGER = 2.0;
 const fixed c_ANIM_MOVE_EPSILON = 0.05;
 // Strafe and backpedal walk clips play this much faster than the stock walk
 // rate (operator 2026-11-16: +25%). All heroes.

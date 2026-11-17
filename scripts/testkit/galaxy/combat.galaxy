@@ -16,12 +16,19 @@ void gf_DbgWalk (int lp_steps, fixed lp_angle) {
 }
 
 void gf_DbgSingleShots (string lp_section, fixed lp_dx) {
+    fixed lv_at;
+    int lv_shots;
+
     gf_DbgSpawnOne(lp_section, lp_dx, 500.0);
     gf_DbgSnap(lp_section, "t0000");
+    lv_at = TimerGetElapsed(gv_sCOBA_Clock);
+    lv_shots = gv_aimShotEffectEvents;
     gf_PncAttack(1, gv_dbgEnemy);
-    Wait(0.1, c_timeGame);
+    // The clocks one loop after the shot (0.25 s Tosh period).
+    gf_DbgClockRead(lp_section, "tclock", lv_shots);
+    Wait(MaxF(0.0, 0.1 - (TimerGetElapsed(gv_sCOBA_Clock) - lv_at)), c_timeGame);
     gf_DbgSnap(lp_section, "t0100");
-    Wait(0.4, c_timeGame);
+    Wait(MaxF(0.0, 0.5 - (TimerGetElapsed(gv_sCOBA_Clock) - lv_at)), c_timeGame);
     gf_DbgSnap(lp_section, "t0500");
     Wait(1.0, c_timeGame);
     gf_DbgSnap(lp_section, "t1500");
@@ -39,6 +46,79 @@ void gf_DbgAutoRun (string lp_section, fixed lp_dx, fixed lp_wait) {
     gf_DbgSnap(lp_section, "t0000");
     Wait(lp_wait, c_timeGame);
     gf_DbgSnap(lp_section, "tend");
+}
+
+// Pose hold (R-PNC-80). The sample helpers are in common.galaxy.
+void gf_DbgUseKerrigan ();
+
+void gf_DbgPoseGroup () {
+    int lv_shots;
+
+    // Single: three commands 1 s apart. The pose holds from the first shot
+    // to the last, then drops after the linger.
+    gf_DbgReset("pose_single_seq", false, true);
+    gf_DbgSpawnOne("pose_single_seq", 3.0, 500.0);
+    gf_DbgPoseStart("pose_single_seq");
+    gf_DbgSnap("pose_single_seq", "t0000");
+    lv_shots = gv_aimShotEffectEvents;
+    gf_PncAttack(1, gv_dbgEnemy);
+    BankValueSetFromFlag(gv_dbgBank, "pose_single_seq", "shot1Seen", gf_DbgWaitShot(lv_shots));
+    gf_DbgSnap("pose_single_seq", "tshot1");
+    gf_DbgPoseSample("pose_single_seq", 16);
+    lv_shots = gv_aimShotEffectEvents;
+    gf_PncAttack(1, gv_dbgEnemy);
+    BankValueSetFromFlag(gv_dbgBank, "pose_single_seq", "shot2Seen", gf_DbgWaitShot(lv_shots));
+    gf_DbgSnap("pose_single_seq", "tshot2");
+    gf_DbgPoseSample("pose_single_seq", 16);
+    lv_shots = gv_aimShotEffectEvents;
+    gf_PncAttack(1, gv_dbgEnemy);
+    BankValueSetFromFlag(gv_dbgBank, "pose_single_seq", "shot3Seen", gf_DbgWaitShot(lv_shots));
+    gf_DbgSnap("pose_single_seq", "tshot3");
+    gf_DbgPoseSample("pose_single_seq", 16);
+    gf_DbgSnap("pose_single_seq", "thold");
+    Wait(3.0, c_timeGame);
+    gf_DbgSnap("pose_single_seq", "ttail");
+
+    // Auto: the pose holds through the whole attack.
+    gf_DbgReset("pose_auto", true, true);
+    lv_shots = gv_aimShotEffectEvents;
+    gf_DbgSpawnOne("pose_auto", 3.0, 500.0);
+    gf_DbgPoseStart("pose_auto");
+    BankValueSetFromFlag(gv_dbgBank, "pose_auto", "shot1Seen", gf_DbgWaitShot(lv_shots));
+    gf_DbgSnap("pose_auto", "t0000");
+    gf_DbgPoseSample("pose_auto", 64);
+    gf_DbgSnap("pose_auto", "tend");
+
+    // Cancel drops the pose at once.
+    gf_DbgReset("pose_cancel", false, true);
+    gf_DbgSpawnOne("pose_cancel", 3.0, 500.0);
+    lv_shots = gv_aimShotEffectEvents;
+    gf_PncAttack(1, gv_dbgEnemy);
+    BankValueSetFromFlag(gv_dbgBank, "pose_cancel", "shot1Seen", gf_DbgWaitShot(lv_shots));
+    Wait(0.3, c_timeGame);
+    gf_DbgSnap("pose_cancel", "t0000");
+    gf_PncCancel(1);
+    Wait(0.25, c_timeGame);
+    gf_DbgSnap("pose_cancel", "tend");
+
+    // Negative: no attack, no pose.
+    gf_DbgReset("pose_idle", false, true);
+    gf_DbgSpawnOne("pose_idle", 3.0, 500.0);
+    gf_DbgPoseStart("pose_idle");
+    gf_DbgSnap("pose_idle", "t0000");
+    gf_DbgPoseSample("pose_idle", 32);
+    gf_DbgSnap("pose_idle", "tend");
+
+    // Negative: Kerrigan is unchanged. No pose after her attack clip.
+    gf_DbgReset("pose_kerrigan", false, true);
+    gf_DbgUseKerrigan();
+    gf_DbgSpawnOne("pose_kerrigan", 3.0, 500.0);
+    gf_DbgSnap("pose_kerrigan", "t0000");
+    lv_shots = gv_aimShotEffectEvents;
+    gf_PncAttack(1, gv_dbgEnemy);
+    BankValueSetFromFlag(gv_dbgBank, "pose_kerrigan", "shot1Seen", gf_DbgWaitShot(lv_shots));
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap("pose_kerrigan", "tend");
 }
 
 // Switch to Kerrigan after a reset. The switch copies both toggles.
@@ -141,6 +221,7 @@ void gf_DbgHoldTurn (string lp_section, bool lp_right, bool lp_forward) {
 bool gt_DbgTest_Func (bool testConds, bool runActions) {
     int lv_i;
     int lv_seen;
+    int lv_shots;
 
     if (!runActions) {
         return true;
@@ -318,8 +399,11 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
         gf_DbgReset("weapon_button", false, true);
         gf_DbgSpawnOne("weapon_button", 3.0, 500.0);
         gf_DbgSnap("weapon_button", "t0000");
+        lv_shots = gv_aimShotEffectEvents;
         UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingUnit(AbilityCommand("SCOBAAutoAttackStatus", 0), gv_dbgEnemy), c_orderQueueReplace);
-        Wait(0.5, c_timeGame);
+        // The clocks one loop after the shot (0.25 s Tosh period).
+        gf_DbgClockRead("weapon_button", "tclock", lv_shots);
+        Wait(0.25, c_timeGame);
         gf_DbgSnap("weapon_button", "t0500");
         Wait(2.5, c_timeGame);
         gf_DbgSnap("weapon_button", "tend");
@@ -332,6 +416,9 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
         gf_DbgReset("switch_auto_move", true, false);
         gf_DbgUseKerrigan();
         gf_DbgSnap("switch_auto_move", "tend");
+    }
+    if (gf_DbgGroup("pose")) {
+        gf_DbgPoseGroup();
     }
     if (gf_DbgGroup("kerrigan")) {
         // Kerrigan weapons: one full shot per command.

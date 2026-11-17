@@ -1,11 +1,11 @@
 // Module: systems/camera
 
-// The one writer of the TPS camera height offset while a quake or a jump is
-// active: base + quake shake + jump elevation (R-JUMP-17). lp_time blends
-// to the value; the jump passes its per-loop height time so camera and unit
-// move together.
+// The one writer of the TPS camera height offset while a quake, a jump or a
+// hero drop is active: base + quake shake + jump elevation (R-JUMP-17) +
+// pod height (R-DROP-4). lp_time blends to the value; the jump and the drop
+// pass their per-loop height time so camera and unit move together.
 void gf_CameraHeightApply (int lp_player, fixed lp_time) {
-    fixed lv_height = c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player];
+    fixed lv_height = c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player] + gv_dropCamHeight[lp_player];
 
     // Velocity 0, deceleration 0: a plain linear blend over lp_time. The old
     // (-1, 10) carried velocity and eased out, and lagged the jump (operator).
@@ -266,9 +266,7 @@ bool gt_LeftOrbitStart_Func (bool testConds, bool runActions) {
     if ((lv_dx * lv_dx + lv_dy * lv_dy) > (c_SCOBA_LEFT_ORBIT_PIXELS * c_SCOBA_LEFT_ORBIT_PIXELS)) {
         gv_lEFTORBIT[lv_player] = true;
         gv_rOTATECAMERA[lv_player] = true;
-        gv_cONTROLRELATIVE[lv_player] = true;
-        CameraSetMouseRotates(lv_player, true);
-        CameraForceMouseRelative(lv_player, true);
+        gf_ControlSendRelative(lv_player, true);
     }
     return true;
 }
@@ -298,9 +296,7 @@ bool gt_RightOrbitStart_Func (bool testConds, bool runActions) {
     if ((lv_dx * lv_dx + lv_dy * lv_dy) > (c_SCOBA_RIGHT_ORBIT_PIXELS * c_SCOBA_RIGHT_ORBIT_PIXELS)) {
         gv_rIGHTORBIT[lv_player] = true;
         gv_rOTATEUNIT[lv_player] = true;
-        gv_cONTROLRELATIVE[lv_player] = true;
-        CameraSetMouseRotates(lv_player, true);
-        CameraForceMouseRelative(lv_player, true);
+        gf_ControlSendRelative(lv_player, true);
     }
     return true;
 }

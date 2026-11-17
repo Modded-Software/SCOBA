@@ -53,6 +53,43 @@
         <ScaleMax value="1.400000,1.400000,1.400000"/>
         <ScaleMin value="1.400000,1.400000,1.400000"/>
     </CModel>
+    <!-- 2x slow copy of GoliathDeath, built by scripts/slow_death_assets.py. -->
+    <!-- No AnimSpeed, no low model. The stock sound events are kept, times x2. -->
+    <CModel id="GoliathDeathSlow" parent="UnitDeath">
+        <Model value="Assets\Units\Terran\GoliathDeath\GoliathDeathSlow.m3"/>
+        <EditorCategories value="Race:Terran"/>
+        <ScaleMax value="1.400000,1.400000,1.400000"/>
+        <ScaleMin value="1.400000,1.400000,1.400000"/>
+        <Occlusion value="Show"/>
+        <Events>
+            <Anim value="Death,00"/>
+            <Name value="GoliathDeathFXA"/>
+            <Type value="Sound"/>
+            <Time value="0.020000"/>
+            <Payload value="Goliath_DeathFXA"/>
+        </Events>
+        <Events>
+            <Anim value="Death,01"/>
+            <Name value="GoliathDeathFXA"/>
+            <Type value="Sound"/>
+            <Time value="0.020000"/>
+            <Payload value="Goliath_DeathFXA"/>
+        </Events>
+        <Events>
+            <Anim value="Death,00"/>
+            <Name value="GoliathDeathFXB"/>
+            <Type value="Sound"/>
+            <Time value="4.000000"/>
+            <Payload value="Goliath_DeathFXB"/>
+        </Events>
+        <Events>
+            <Anim value="Death,02"/>
+            <Name value="GoliathDeathFXB"/>
+            <Type value="Sound"/>
+            <Time value="1.740000"/>
+            <Payload value="Goliath_DeathFXB"/>
+        </Events>
+    </CModel>
     <CModel id="HeroNukeExplode">
         <ScaleMax value="3.000000,3.000000,3.000000"/>
         <ScaleMin value="3.000000,3.000000,3.000000"/>

@@ -1,0 +1,37 @@
+// Mouse-mode send checks (group "cursor"). Declared in tps.galaxy.
+
+// SPEC-TPS 5.3: mouse look and cursor reach the engine once per change.
+// Ten aim cycles send nothing. Each middle click sends one of each.
+void gf_DbgTpsSends (string lp_section) {
+    int lv_i;
+
+    gf_DbgTpsReset(lp_section);
+    gf_DbgTpsSet(true);
+    gf_DbgTpsSnap(lp_section, "ttps");
+    for (lv_i = 0; lv_i < 10; lv_i += 1) {
+        gf_TpsMouseDown(1, gv_fIRE);
+        Wait(0.2, c_timeGame);
+        gf_TpsMouseUp(1, gv_fIRE);
+        Wait(0.2, c_timeGame);
+    }
+    gf_DbgTpsSnap(lp_section, "taims");
+    // Negative: a call that changes nothing sends nothing.
+    gf_ControlApply(1);
+    gf_ControlApply(1);
+    gf_DbgTpsSnap(lp_section, "tsame");
+    gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+    gf_TpsMouseUp(1, gv_aBILITYCAMERA);
+    Wait(0.3, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tmid");
+    // Aiming is blocked in the free-cursor state: no send either.
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.2, c_timeGame);
+    gf_TpsMouseUp(1, gv_fIRE);
+    gf_DbgTpsSnap(lp_section, "tmidaim");
+    gf_TpsMouseDown(1, gv_aBILITYCAMERA);
+    gf_TpsMouseUp(1, gv_aBILITYCAMERA);
+    Wait(0.3, c_timeGame);
+    gf_DbgTpsSnap(lp_section, "tback");
+    gf_DbgTpsSet(false);
+    gf_DbgTpsSnap(lp_section, "tend");
+}

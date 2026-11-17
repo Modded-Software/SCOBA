@@ -76,7 +76,7 @@ passed in that run unless another run is named.
 | R-PNC-42, 45 | [tested] | `single_shot`, `weapon_button`. |
 | R-PNC-43 | [tested] | `auto_to_single`. |
 | R-PNC-44 | [tested] | `switch_single_stand`, `switch_auto_move`, hero state and button state. |
-| R-PNC-46 | [tested] | The button cooldown runs after every shot path: `single_shot`, `weapon_button`, `auto_click`, `auto_stand_in`, `talons_single`, `psiblast_single`, `talons_auto`. The clock overlay is [operator]. |
+| R-PNC-46 | [tested] | Read one game loop after the shot effect (`gf_DbgClockRead`; the 0.25 s Tosh period is over by the old 0.5 s read): `EarlyCdMs`, `EarlyBtnMs` above 0, at most the weapon cooldown for Tosh; Kerrigan above 0 only (her 1.5 s button clock is not her first weapon's). Every shot path: `single_shot`, `weapon_button`, `auto_click`, `auto_stand_in`, `talons_single`, `psiblast_single`, `talons_auto`. The clock overlay is [operator]. |
 | R-PNC-47 | [tested] | `startup`, hero state and button state. |
 | R-PNC-48 | [tested] | `toggle buttons match hero state` over every snapshot; `auto_to_single`; both switch scenarios. |
 | R-PNC-50, 53 | [tested] | `wasd_stand`, `auto_stand_out`. |
@@ -88,6 +88,7 @@ passed in that run unless another run is named.
 | R-PNC-70, 71, 72 | [planned] | Handlers are shared and branch on the mode. Design in 6. |
 | R-PNC-73, 74 | [built] | Labels are in `ButtonData.xml`. Their look is [operator]. |
 | R-PNC-75 | [built] | No test yet. |
+| R-PNC-80, 81, 82 | [tested] script state; [operator] the look | `pose_single_seq`, `pose_auto`, `pose_cancel`, `pose_idle`, `pose_kerrigan`, run `combat/20261117-000426`. TPS (R-TPS-17): run `tps/20261116-235526`. Design in 5.11. |
 
 The `RazorTalons` damage checks were removed on operator order.
 
@@ -269,6 +270,36 @@ Right hold matches middle hold (R-PNC-68):
 
 Ability ids keep their names. New code uses `Pnc`.
 
+### 5.11 Shooting pose hold
+
+R-PNC-80 to 82. [tested] for the script state, run
+`combat/20261117-000426`. The look is [operator].
+
+Cause of the report: `gf_AnimTick` kept the upper body posed only inside the
+attack window, 0.5 s / (1 / weapon period). For Tosh (period 0.25 s) that is
+0.125 s. After it the tick cleared the `SCOBAUp` bracket.
+
+- A shot plays the attack clip on `SCOBAAimAtk` and the pitch pose
+  `Ready,Alternate,NN` on `SCOBAUp` (unchanged).
+- `gf_AnimReadyHold(player)` is true for Tosh, not aiming, while he has an
+  `attack` order or `gv_animReadyUntil` has not passed. In TPS it also needs
+  Attack `auto` (R-TPS-17, SPEC-TPS 5.9).
+- `gf_AnimAttackStart` sets `gv_animReadyUntil` to now +
+  `c_ANIM_READY_LINGER` (2 s) on each shot.
+- `gf_AnimTick`: attack window over and hold on gives upper state
+  `c_ANIM_UPPER_READY`. `gf_AnimUpperSet` then keeps `SCOBAUp` as it is. The
+  pitch tick keeps the pose on the target. Hold off gives `NONE`, which
+  clears the bracket, as before.
+- `gf_PncCancel` calls `gf_AnimReadyEnd`. Hero switch and death go through
+  `gf_AnimReset`. Aim entry clears the linger.
+- Legs are untouched: no lower override.
+- This is animation state only. It issues no order and times no attack
+  (R-PNC-2).
+
+Not confirmed: what the engine's own attack animation shows under the
+bracket between shots. [open] If idle still shows through, actor data needs
+a change. That is the operator check in section 9.
+
 ## 6. Module Structure [planned]
 
 | Layer | Module | Owns |
@@ -306,8 +337,11 @@ Decision: parked, not reverted. The TPS phase replaces it; see
 ## 8. Tests
 
 - Entry point: `scripts/playtest.sh combat [group]`. Groups: `idle`, `single`,
-  `auto`, `cancel`, `wasd`, `hold`, `button`, `switch`, `kerrigan`. No group
-  runs all.
+  `auto`, `cancel`, `wasd`, `hold`, `button`, `switch`, `pose`, `kerrigan`.
+  No group runs all.
+- `pose` reads script animation state (upper state, pitch step, bracket
+  clear count) beside shots, damage and orders. Galaxy cannot read what an
+  actor bracket plays.
 - One group takes about one minute. The full suite takes about three.
 - Engine probes live in the `pncprobe` profile. They record raw values and
   assert nothing about the product.
@@ -323,6 +357,8 @@ Decision: parked, not reverted. The TPS phase replaces it; see
 - Backpedal and strafe animation in a right hold (5.8).
 - The `Out of range` floater and the ground move marker (5.4).
 - Attack animation, effects, and sound.
+- Tosh holds the shooting pose between sequential shots and for 2 s after
+  the last, with no idle flicker (5.11).
 
 ## 10. Remaining Work
 

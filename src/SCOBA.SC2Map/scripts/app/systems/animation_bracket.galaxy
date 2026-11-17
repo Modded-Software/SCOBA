@@ -32,6 +32,7 @@ void gf_AnimUpperClear (int lp_player) {
     if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE || gv_animAimUpperOn[lp_player] || gv_animTargetPitchStep[lp_player] > 0) {
         ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
         ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_UPPER);
+        gv_animUpperClears[lp_player] += 1;
     }
     ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_ATTACK);
     
@@ -77,6 +78,17 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
     }
     if (lp_state == c_ANIM_UPPER_ATTACK || lp_state == c_ANIM_UPPER_ATTACK_SPELL) {
         gf_AnimUpperAttackStart(lp_player, lp_state);
+        return;
+    }
+    if (lp_state == c_ANIM_UPPER_READY) {
+        // PNC pose hold (R-PNC-80): after an attack the pitch pose is
+        // already on the bracket and stays. The caller's pitch tick sets it
+        // when it is not. An aim pose is dropped first.
+        if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE && gv_animUpperState[lp_player] != c_ANIM_UPPER_ATTACK && gv_animUpperState[lp_player] != c_ANIM_UPPER_ATTACK_SPELL) {
+            gf_AnimUpperClear(lp_player);
+        }
+        gv_animUpperState[lp_player] = c_ANIM_UPPER_READY;
+        gv_animUpperClipIndex[lp_player] = c_ANIM_UPPER_READY;
         return;
     }
     lv_hero = gv_tPSUNIT[lp_player];

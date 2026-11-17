@@ -13,11 +13,14 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
+from .bank_checks import _delta, _no_damage, _report, _shots, _still
+from .pose import check_combat_pose
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .tps_shot import shot_clocks
 
 ROOT = project_root()
 
-GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "kerrigan")
+GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "pose", "kerrigan")
 
 
 def selected_group() -> str:
@@ -50,41 +53,6 @@ def on_ready(ctx, data: dict) -> None:
     return
 
 
-def _report(checks, name: str, ok: bool, detail: str) -> None:
-    status = "PASS" if ok else "FAIL"
-    print(f"{name}: {detail} {status}")
-    checks.results.append(
-        {"section": name, "tag": "", "key": "", "got": detail, "want": "", "status": status}
-    )
-    if not ok:
-        checks.failures += 1
-
-
-def _delta(checks, section: str, tag_a: str, tag_b: str, key: str):
-    before = checks.value(section, tag_a, key)
-    after = checks.value(section, tag_b, key)
-    if before is None or after is None:
-        return None
-    return after - before
-
-
-def _still(checks, section: str, tag_a: str, tag_b: str) -> None:
-    dx = _delta(checks, section, tag_a, tag_b, "HeroX")
-    dy = _delta(checks, section, tag_a, tag_b, "HeroY")
-    ok = dx is not None and dy is not None and abs(dx) + abs(dy) <= 1
-    _report(checks, f"{section} hero still", ok, f"dx={dx} dy={dy}")
-
-
-def _no_damage(checks, section: str, tag_a: str, tag_b: str) -> None:
-    delta = _delta(checks, section, tag_a, tag_b, "EnemyHp")
-    _report(checks, f"{section} {tag_a}->{tag_b} no damage", delta == 0, f"hpDelta={delta}")
-
-
-def _shots(checks, section: str, tag_a: str, tag_b: str, want: int) -> None:
-    delta = _delta(checks, section, tag_a, tag_b, "Shots")
-    _report(checks, f"{section} {tag_a}->{tag_b} shots", delta == want, f"got={delta} want={want}")
-
-
 def _buttons_match(checks, data: dict) -> None:
     """R-PNC-48: in every snapshot each toggle button shows the hero state."""
     count = 0
@@ -109,7 +77,11 @@ def _buttons_match(checks, data: dict) -> None:
 def _button_after_shot(checks, section: str) -> None:
     """R-PNC-46: a shot the engine started on its own sets the button cooldown."""
     checks.true(section, "tshot", "ShotSeen")
-    checks.gt(section, "tshot", "ButtonCdMs", 0)
+    # Read one loop after the shot: the 0.25 s Tosh clock is over by tshot.
+    checks.gt(section, "tshot", "EarlyBtnMs", 0)
+
+
+KERRIGAN_SINGLE = ("talons_single", "psiblast_single")
 
 
 def _single_shots(checks, section: str, damage: bool = True) -> None:
@@ -126,8 +98,7 @@ def _single_shots(checks, section: str, damage: bool = True) -> None:
     if damage:
         ok = one is not None and three is not None and one < 0 and abs(three - 3 * one) <= 4
         _report(checks, f"{section} damage per shot", ok, f"one={one} three={three}")
-    checks.gt(section, "t0500", "CooldownMs", 0)
-    checks.gt(section, "t0500", "ButtonCdMs", 0)
+    shot_clocks(checks, section, again=False, tag="tclock", bounded=section not in KERRIGAN_SINGLE)
     checks.eq(section, "t4000", "ButtonCdMs", 0)
     checks.eq(section, "t4000", "CooldownMs", 0)
     _still(checks, section, "t0000", "t8000")
@@ -368,9 +339,8 @@ def _check_button(checks) -> None:
     # R-PNC-45, R-PNC-46: Weapon Attack button.
     _shots(checks, "weapon_button", "t0000", "tend", 1)
     checks.damage("weapon_button", "t0000", "tend")
-    checks.gt("weapon_button", "t0500", "ButtonCdMs", 0)
+    shot_clocks(checks, "weapon_button", again=False, tag="tclock")
     checks.eq("weapon_button", "tend", "ButtonCdMs", 0)
-    checks.gt("weapon_button", "t0500", "CooldownMs", 0)
     checks.eq("weapon_button", "tend", "CooldownMs", 0)
     checks.false("weapon_button", "tend", "AttackOrder")
 
@@ -406,6 +376,7 @@ GROUP_CHECKS = {
     "hold": _check_hold,
     "button": _check_button,
     "switch": _check_switch,
+    "pose": check_combat_pose,
     "kerrigan": _check_kerrigan,
 }
 

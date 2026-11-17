@@ -13,10 +13,13 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .combat import _delta, _report, _walk_scale, _yaw_off
+from .bank_checks import _delta, _report
+from .combat import _walk_scale, _yaw_off
+from .pose import check_tps_pose
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 from .tps_pick import check_pick
 from .tps_shot import shot_clocks
+from .tps_sends import check_sends
 
 ROOT = project_root()
 
@@ -41,6 +44,8 @@ def map_spec() -> TestMapSpec:
             ROOT / "scripts" / "testkit" / "galaxy" / "tpshead.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tpshold.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "tpsclock.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "tpssends.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "tpspose.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/tps/common",
@@ -49,6 +54,8 @@ def map_spec() -> TestMapSpec:
             "scripts/test/tps/tpshead",
             "scripts/test/tps/tpshold",
             "scripts/test/tps/tpsclock",
+            "scripts/test/tps/tpssends",
+            "scripts/test/tps/tpspose",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_TpsTest_Init();"),
     )
@@ -136,6 +143,7 @@ def _check_cursor(checks) -> None:
     _tps_free(checks, section, "tend", True)
     checks.false(section, "tend", "MiddleHold")
     checks.false(section, "tend", "AimActive")
+    check_sends(checks)
 
 
 def _check_target(checks) -> None:
@@ -440,7 +448,7 @@ def _check_hold(checks) -> None:
     checks.eq(section, "", "ReleasedChain", 0)
 
 
-GROUPS = ("move", "cursor", "aim", "head", "target", "pick", "shot", "hold")
+GROUPS = ("move", "cursor", "aim", "head", "target", "pick", "shot", "hold", "pose")
 
 GROUP_CHECKS = {
     "pick": check_pick,
@@ -451,6 +459,7 @@ GROUP_CHECKS = {
     "target": _check_target,
     "shot": _check_shot,
     "hold": _check_hold,
+    "pose": check_tps_pose,
 }
 
 

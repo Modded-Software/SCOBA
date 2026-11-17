@@ -1,0 +1,42 @@
+// Module: core/hero_drop
+// Hero drop (REQ-HERO-DROP). Constants and state. Logic: systems/hero_drop.
+
+// The hero's own pod: a TerranDropPod copy (UnitData SCOBAHeroPod). Its
+// actor shows the landed pose; the script lowers the unit (R-DROP-3).
+const string c_DROP_POD_UNIT = "SCOBAHeroPod";
+// Fall: height c_DROP_HEIGHT at the start, 0 at c_DROP_FALL. The curve is
+// the stock pod fall (droppodfalling.m3 Birth, root z 19.02 at 0 ms, 1.14
+// at 1600 ms, 0 at 2200 ms): a hard drop, then a brake. The stock height
+// (19.02 x actor scale 4.5) is above the camera far clip 50.
+const fixed c_DROP_HEIGHT = 40.0;
+const fixed c_DROP_FALL = 2.2;
+const fixed c_DROP_BRAKE_AT = 1.6;
+const fixed c_DROP_BRAKE_PART = 0.06;  // height part left at the brake (1.14 / 19.02)
+const fixed c_DROP_TICK = 0.0625;     // one game loop
+// Camera arm behind the pod while it falls. The pod (actor scale 4.5) is
+// much larger than the hero arm (1.5); operator 2026-11-16: 8 was too close.
+const fixed c_DROP_CAM_DISTANCE = 20.0;
+
+// Loops after the revive in which the toggles are set again.
+const int c_DROP_RESTORE_LOOPS = 8;
+
+trigger gt_HeroDropDeath;
+trigger gt_HeroDropReinforce;
+trigger gt_HeroDropTick;
+
+bool[8] gv_dropPending;      // the hero is dead and waits for a reinforcement
+unit[8] gv_dropHero;         // the dead hero
+unit[8] gv_dropPod;          // the pod in its fall, null when there is none
+point[8] gv_dropDeathAt;     // where the hero died
+point[8] gv_dropAt;          // where the pod lands
+fixed[8] gv_dropStartAt;     // fall start, gv_sCOBA_Clock
+fixed[8] gv_dropCamHeight;   // pod part of the camera height offset (R-DROP-4)
+bool[8] gv_dropSingle;       // toggles of the hero when it died
+bool[8] gv_dropStand;
+bool[8] gv_dropTps;          // TPS mode when it died; death removes the behavior
+int[8] gv_dropRestoreLoops;  // loops left to set the toggles again
+// For tests.
+int[8] gv_dropDeaths;
+int[8] gv_dropPods;
+int[8] gv_dropLandings;
+int[8] gv_dropSwitchBlocked;

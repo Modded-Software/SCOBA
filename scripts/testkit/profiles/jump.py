@@ -14,6 +14,7 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
+from .jump_rates import JUMP_CORE, STRAFE_RATE, check_rates
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
@@ -54,14 +55,8 @@ GAIT_WINDOW_AIM_MS = 140
 # The walk resume is sent on the anim tick after the release; the tracker
 # runs on until then.
 RESUME_WINDOW_MS = 150
-# Strafe and backpedal walk clips vs the stock walk rate (operator 2026-11-16).
-STRAFE_RATE = 1.25
-# R-JUMP-22: takeoff crouch (c_JUMP_CROUCH), landing clip (c_JUMP_LAND_TIME),
-# and the speed burst of a walk jump (BehaviorData SCOBAJumpBurst).
+# R-JUMP-22: takeoff crouch (c_JUMP_CROUCH). Burst and landing: jump_rates.py.
 CROUCH_MS = 133
-LAND_MS = 250
-BURST = 1.4
-JUMP_CORE = ROOT / "src" / "SCOBA.SC2Map" / "scripts" / "app" / "core" / "jump.galaxy"
 
 
 def gait_const(name: str) -> float:
@@ -244,45 +239,6 @@ def _gait(checks, section: str, aim: bool) -> None:
     checks.eq(section, "", "endStride", -1)
 
 
-def _rates(checks, section: str, walk: bool, aim: bool = False) -> None:
-    """R-JUMP-22: takeoff burst, clip time scales, and a short landing.
-
-    Walk jump: the burst raises the engine move speed at the press and is
-    gone at the end; Start plays at the walk clip rate with the burst, End
-    at the walk clip rate; Air at 1. Stand jump (negative): no burst, all 1."""
-    v = {k: checks.value(section, "", k) for k in (
-        "pressSpeed100", "burstSpeed100", "endSpeed100", "burstCount", "endBurstCount", "bursts",
-        "startScale100", "landScale100", "pressStock100", "pressStep1000", "landMs", "doneMs")}
-    scales = [int(x) for x in (checks.value(section, "", "scaleLog") or "").split(";") if x]
-    steps = [int(x) for x in (checks.value(section, "", "steps") or "").split()]
-    print(f"{section} rates: {v} scaleLog={scales} steps={steps}")
-    checks.eq(section, "", "bursts", 1 if walk else 0)
-    checks.eq(section, "", "burstCount", 1 if walk else 0)
-    checks.eq(section, "", "endBurstCount", 0)
-    press, burst, end = v["pressSpeed100"], v["burstSpeed100"], v["endSpeed100"]
-    ok = None not in (press, burst, end) and abs(end - press) <= 2 and abs(burst - press * (BURST if walk else 1.0)) <= 3
-    _report(checks, f"{section} move speed {'bursts at the press and' if walk else 'has no burst and'} is back at the end", ok, f"press={press} burst={burst} end={end}")
-    stock = v["pressStock100"]
-    rate = None if stock is None else stock * (STRAFE_RATE if aim else 1.0)
-    want = [100, 100, 100] if not walk or rate is None else [rate * BURST, 100, rate]
-    ok = len(scales) >= 3 and all(abs(got - exp) <= 4 for got, exp in zip(scales, want))
-    _report(checks, f"{section} clip time scales Start, Air, End", ok, f"scales={scales[:3]} want={[round(x) for x in want]}")
-    if walk:
-        # Engine position: the first loops after the press are faster than
-        # the walk before it; the last sampled loops are not.
-        before = v["pressStep1000"]
-        ok = before is not None and len(steps) >= 12 and max(steps[:3]) >= 1.2 * before
-        _report(checks, f"{section} hero moves faster at the push-off", ok, f"before={before} first={steps[:3]}")
-        ok = before is not None and len(steps) >= 12 and max(steps[8:12]) <= 1.1 * before + 3
-        _report(checks, f"{section} burst is over in the air", ok, f"before={before} later={steps[8:12]}")
-    # Landing recovery: the End clip length over its time scale; never the old 400 ms.
-    land, done, scale = v["landMs"], v["doneMs"], v["landScale100"]
-    took = None if None in (land, done) or land < 0 or done < 0 else done - land
-    want_ms = None if not scale else LAND_MS * 100.0 / scale
-    ok = None not in (took, want_ms) and want_ms - 70 <= took <= want_ms + 70 and took < 380
-    _report(checks, f"{section} landing recovery is short", ok, f"took={took}ms want={want_ms}")
-
-
 def _no_gait(checks, section: str) -> None:
     """Negative: an idle jump sets no clip time and uses no stride."""
     checks.eq(section, "", "setTimes", 0)
@@ -323,7 +279,7 @@ def check_stand(checks) -> None:
     checks.eq(s, "", "midClip", "Jump,Stand,Leg")
     _clips(checks, s, "Stand")
     _no_gait(checks, s)
-    _rates(checks, s, walk=False)
+    check_rates(checks, s, walk=False)
     _camera(checks, s, True)
     checks.false(s, "", "endOwned")
     checks.eq(s, "", "endClip", "")
@@ -390,7 +346,7 @@ def check_aimwalk(checks) -> None:
     _report(checks, f"{s} air clip is a forward walk stride", re.fullmatch(r"Jump,Walk,Forward,0[12],Leg", mid) is not None, f"midClip={mid}")
     _clips(checks, s, "Walk,Forward")
     _gait(checks, s, aim=True)
-    _rates(checks, s, walk=True, aim=True)
+    check_rates(checks, s, walk=True, aim=True)
     _camera(checks, s, True)
 
 
@@ -414,7 +370,7 @@ def check_stopjump(checks) -> None:
     checks.eq(s, "", "midClip", "Jump,Stand,Leg")
     _clips(checks, s, "Stand")
     _no_gait(checks, s)
-    _rates(checks, s, walk=False)
+    check_rates(checks, s, walk=False)
     log = checks.value(s, "", "clipLog") or ""
     _report(checks, f"{s} no walk clip", "Walk" not in log, f"clipLog={log}")
 
@@ -427,7 +383,7 @@ def check_freewalk(checks) -> None:
     checks.gt(s, "", "pressStep100", WALK_STEP_H100)
     _clips(checks, s, "Walk,Forward")
     _gait(checks, s, aim=False)
-    _rates(checks, s, walk=True)
+    check_rates(checks, s, walk=True)
     moved = _moved10(checks, s)
     _report(checks, f"{s} walks while airborne", moved is not None and moved >= 10, f"moved10={moved}")
 

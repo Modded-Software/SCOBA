@@ -321,6 +321,10 @@
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <Scale value="4.500000"/>
     </CActorUnit>
+    <!-- The hero pod (REQ-HERO-DROP): the Terran pod look. Created without
+         a suppressed birth, it shows Stand, the landed pose; the script
+         lowers the unit. Its death clip opens the doors. -->
+    <CActorUnit id="SCOBAHeroPod" parent="TerranDropPod" unitName="SCOBAHeroPod"/>
     <CActorUnit id="Thor">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="3.000000"/>
@@ -482,7 +486,8 @@
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
     <CActorUnit id="Goliath">
-        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
+        <!-- Death speed lives in the model: a unit-actor time scale never reaches the death model. -->
+        <DeathArray index="Normal" ModelLink="GoliathDeathSlow"/>
         <!-- Footfall effects (dust/splash, thump, idle ripples): generated
              into the built map by scripts/footfall_fx.py. -->
     </CActorUnit>

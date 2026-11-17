@@ -45,11 +45,12 @@ actions:
   launch-check           rebuild, launch, and check runtime logs
   combat [group]         rebuild, build combat test map, run one scenario group
                          (idle, single, auto, cancel, wasd, hold, button, switch,
-                         kerrigan) or the full suite when no group is given
+                         pose, kerrigan) or the full suite when no group is given
   tps [group]            rebuild, build tps test map, run one scenario group
-                         (move, cursor, aim, head, target, shot, kerrigan) or the full suite when no group is given
+                         (move, cursor, aim, head, target, pick, shot, hold, pose) or the full suite when no group is given
   jump [group]           rebuild, build jump test map, run one scenario group
                          (arc, body, hero) or the full suite when no group is given
+  herodrop               rebuild, build hero drop test map, run it
   aim                    rebuild, build aim test map, run aim profile
   motion                 rebuild, build motion test map, run motion profile
   controls               rebuild, build controls test map, run controls profile
@@ -89,6 +90,7 @@ profile_timeout() {
             ;;
         motion) printf '%s\n' "${SC2_CASE_TIMEOUT:-80}" ;;
         jump) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
+        herodrop) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
         pitch) printf '%s\n' "${SC2_CASE_TIMEOUT:-30}" ;;
         aimfreeze) printf '%s\n' "${SC2_CASE_TIMEOUT:-20}" ;;
         *) printf '%s\n' "${SC2_CASE_TIMEOUT:-40}" ;;
@@ -109,7 +111,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
+        combat|tps|jump|herodrop|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -157,7 +159,7 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe)
+    herodrop|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe)
         run_profile "$ACTION"
         ;;
     picklog)

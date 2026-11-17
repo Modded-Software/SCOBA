@@ -1,0 +1,53 @@
+// Shooting pose checks (group "pose"). Declared in tps.galaxy.
+
+// R-TPS-17: TPS, Attack auto, not aiming: Tosh holds the shooting pose
+// between the engine's shots, standing and walking.
+void gf_DbgTpsPose () {
+    int lv_shots;
+
+    gf_DbgTpsReset("tps_pose_auto");
+    gf_DbgSpawnOne("tps_pose_auto", 3.0, 500.0);
+    gf_DbgTpsSet(true);
+    gf_DbgPoseStart("tps_pose_auto");
+    gf_DbgPoseStart("tps_pose_walk");
+    lv_shots = gv_aimShotEffectEvents;
+    gf_AttackSingleSet(gv_tPSUNIT[1], false);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pose_auto", "shot1Seen", gf_DbgWaitShot(lv_shots));
+    gf_DbgTpsSnap("tps_pose_auto", "t0000");
+    gf_DbgPoseSample("tps_pose_auto", 64);
+    gf_DbgTpsSnap("tps_pose_auto", "thold");
+    // Strafing: a move order replaces the attack order; the shots go on.
+    gv_lEFT[1] = true;
+    Wait(0.25, c_timeGame);
+    gf_DbgTpsSnap("tps_pose_auto", "twalk0");
+    gf_DbgPoseSample("tps_pose_walk", 24);
+    gf_DbgTpsSnap("tps_pose_auto", "twalk");
+    gv_lEFT[1] = false;
+    Wait(0.4, c_timeGame);
+    // Aiming takes the upper body over; the hold is off.
+    gf_TpsMouseDown(1, gv_fIRE);
+    Wait(0.4, c_timeGame);
+    gf_DbgTpsSnap("tps_pose_auto", "taim");
+    gf_TpsMouseUp(1, gv_fIRE);
+    Wait(0.75, c_timeGame);
+    gf_DbgTpsSnap("tps_pose_auto", "trel");
+    // Attack single ends the hold at once, inside the linger.
+    gf_AttackSingleSet(gv_tPSUNIT[1], true);
+    Wait(0.5, c_timeGame);
+    gf_DbgTpsSnap("tps_pose_auto", "tsingle");
+    Wait(1.0, c_timeGame);
+    gf_DbgTpsSnap("tps_pose_auto", "tend");
+    gf_DbgTpsSet(false);
+
+    // Negative: Attack single, enemy in range: no shot, no pose.
+    gf_DbgTpsReset("tps_pose_single");
+    gf_DbgSpawnOne("tps_pose_single", 3.0, 500.0);
+    gf_DbgTpsSet(true);
+    // TPS faces the camera yaw: look at the enemy so it is in the weapon arc.
+    gf_DbgTpsLook(gv_dbgEnemy, 0.0);
+    gf_DbgPoseStart("tps_pose_single");
+    gf_DbgTpsSnap("tps_pose_single", "t0000");
+    gf_DbgPoseSample("tps_pose_single", 32);
+    gf_DbgTpsSnap("tps_pose_single", "tend");
+    gf_DbgTpsSet(false);
+}

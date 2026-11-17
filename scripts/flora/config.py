@@ -23,6 +23,8 @@ RELIEF_RADIUS = 3
 # Water: depth bands below the water surface (map WaterData height).
 GROUND_LIFT = 2.6  # placed z = computed ground + this (operator 2026-11-16: 2.85, then -0.25)
 DOODAD_LIFT = 1.85  # non-flora absolute doodads are raised by this (operator 2026-11-16)
+# Trees are lowered by their final scale: (scale above, sink), largest first. Not cumulative.
+TREE_SINK = ((6.0, 2.0), (4.0, 1.0))  # operator 2026-11-16: scale > 4 z-1, scale > 6 z-2
 WATER_FX_DEPTH = 0.15  # water effects need the surface this far above the visible ground (operator 2026-11-16)
 HAZARD_LIFT = 0.1  # hazards sit this much above GROUND_LIFT (operator 2026-11-16: 1.0, 0.5, 0.3 floated)
 HAZARD_FLAT_RANGE = 0.15  # max ground height spread under a hazard footprint (operator 2026-11-16: 0.4 floated)

@@ -47,7 +47,9 @@ bool gt_RungunTest_Func (bool testConds, bool runActions) {
         if (lv_i == 30) {
             gf_AimShotPress(1);
         }
-        if (lv_i == 40) {
+        // One game loop after the press (each Wait below lasts a loop):
+        // the 0.25 s cooldown still runs.
+        if (lv_i == 31) {
             gf_RungunSnap("shot");
         }
         if (lv_i == 99) {

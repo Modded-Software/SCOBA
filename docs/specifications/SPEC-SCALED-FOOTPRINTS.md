@@ -69,7 +69,14 @@ Fit checks (R-FP-07), against the eroded mesh: covered ≥ `MIN_MESH_COVERED`
   get 1x1 layers, spores disk rows.
 - `ActorData.xml`: `ZerusTreeFp<hash>`, `parent="ZerusTree"`. `Preload.xml`
   entries for each.
-- `Objects`: each tree's `Type` becomes its actor. Positions are not moved.
+- `Objects`: each tree's `Type` becomes its actor. Positions are not moved
+  here. Later, `flora.lift.sink_trees` lowers every absolute `ZerusTree*`
+  (editor and border trees) by its final scale: scale > 4 by 1, scale > 6
+  by 2 (`TREE_SINK`, operator 2026-11-16; not cumulative). Footprints are cut
+  before the sink, so a sunk tree's feet band is measured 1-2 higher up its
+  model than where it now meets the ground. The ground calibration
+  (`flora.terrain._offset`) adds the sink back. Host test:
+  `test_tree_sink.py`.
 - `UnitData.xml`: `SporeCannon`, `SporeCrawler` `Footprint`.
 
 Built map: 334 trees, 249 footprints. Largest trees block about area 75
@@ -103,3 +110,4 @@ implemented, not verified.
 - Variation 12-14 trees: which model the engine shows.
 - Spores (operator will test).
 - Groves still leave intended paths open.
+- Sunk large trees (scale > 4) sit right on the ground, not buried.

@@ -84,6 +84,7 @@ not repeated here.
 | R-TPS-13 | [tested] step follows the camera pitch. Look and direction [operator]. | `tps_head` |
 | R-TPS-14 | [built] Head off while aiming; not run on the current build. | `tps_head`, `tps_head_lead` `taimdown` |
 | R-TPS-15 | [built] | TPS uses the right-hold step and clips. No check compares the two walks. |
+| R-TPS-17 | [tested] script state; look [operator] | `tps` group `pose`: `tps_pose_auto`, `tps_pose_walk`, `tps_pose_single`, full suite run `tps/20261116-235526`. 5.9 |
 | R-TPS-16 | [built] Earlier variant (on while aiming, 9 yaw steps) passed `tps/20261116-160329`; current build not run. Look, yaw direction, Kerrigan [operator]. | `tps_head_lead` |
 | R-TPS-20 | [tested] script flag. The cursor itself [operator] (T5). | `tps` group `cursor` |
 | R-TPS-21, 22 | [tested] | `tps` group `cursor` |
@@ -102,7 +103,7 @@ not repeated here.
 | R-TPS-53, 54 | [tested] Tosh | `tps_shot_far`, `tps_shot_ground`, `tps_shot_sky` |
 | R-TPS-55 | [tested] with a Marine in range | `tps_shot_friendly` |
 | R-TPS-56 | [operator] | |
-| R-TPS-57 | [tested] one game loop after the shot effect: hero cooldown and button clock above 0 and at most the weapon cooldown, command on cooldown. The ring itself [operator]. | `tpsclock.galaxy`: `EarlyCdMs`, `EarlyBtnMs`, `EarlyCmdCd`, `CdTimeMs` in every shot case |
+| R-TPS-57 | [tested] one game loop after the shot effect: hero cooldown and button clock above 0 and at most the weapon cooldown, command on cooldown. The ring itself [operator]. | `gf_DbgClockRead` (`common.galaxy`): `EarlyCdMs`, `EarlyBtnMs`, `EarlyCmdCd`, `CdTimeMs` in every shot case |
 | R-TPS-58 | [tested] second click in the same loop, while the cooldown runs (`AgainCdMs` above 0) | every standing shot case |
 | R-TPS-59 | [built] | The crosshair and click targeting reject the proxy. Attacks on it by other units are not tested. |
 | R-TPS-60 | [tested] | every standing shot case |
@@ -176,6 +177,18 @@ not repeated here.
 - Operator report on a toggle at the press: the first click freed the cursor;
   the third stopped mouse look but the cursor stayed hidden. Cause not
   measured: the harness has no real mouse.
+- Operator report 2026-11-16, same symptom on the release toggle: after some
+  aims a middle click stops mouse look, but the cursor does not act on the
+  game UI; it goes to the OS. A second click restores mouse look. Aim start
+  and end called `gf_ControlApply`, which re-sent `CameraSetMouseRotates`,
+  `CameraForceMouseRelative`, and `UISetCursorVisible` with unchanged values
+  every time. Hypothesis, not confirmed: the engine (or Wine) mis-tracks
+  repeated sends.
+- Send once [tested] `tps_sends`: `gf_ControlSendRelative` and
+  `gf_ControlSendCursor` call the engine only when the value changes. Map
+  start and the mode switch force one send (`gf_ControlForceSend`). The PNC
+  orbit starts use the same gate. Ten aim cycles send nothing; each middle
+  click sends one of each. Whether this cures the report is [operator].
 - The free-cursor state ends aiming and blocks it.
 - The script never calls `CameraLockInput`. An earlier build locked the camera
   input for a middle hold; the operator reported the cursor still not free.
@@ -319,6 +332,18 @@ not repeated here.
 - A type without a volume is not pickable and is recorded once
   (`gv_hvMissing`).
 
+### 5.9 Shooting pose, Attack auto, not aiming (R-TPS-17)
+
+- The Point & Click pose hold (SPEC-POINT-AND-CLICK 5.11) also runs in TPS.
+  `gf_AnimReadyHold` adds one TPS gate: Attack `auto`.
+- The auto weapon fires with no attack order (F4 there). In TPS the hold
+  therefore rests on the 2 s linger after each shot. Measured: 0 of 64
+  standing samples had an attack order (`tps/20261116-235345`).
+- The pose is the target pitch pose (`gv_animTargetPitchStep`). The aim
+  torso pitch (`gv_animAimPitchStep`) stays 0, so R-TPS-12 holds.
+- Aiming clears the linger and owns the upper body. Switching to Attack
+  `single` ends the hold at once.
+
 ## 6. Module Structure
 
 | Module | Role |
@@ -341,7 +366,7 @@ not repeated here.
 ## 7. Tests
 
 - Entry point: `scripts/playtest.sh tps [group]`. Groups: `move`, `cursor`,
-  `aim`, `head`, `target`, `pick`, `shot`, `hold`.
+  `aim`, `head`, `target`, `pick`, `shot`, `hold`, `pose`.
 - `SC2_TEST_GROUP=point scripts/playtest.sh pncprobe`, with the host pointer
   injector parking the hidden cursor at the window centre: engine hover
   against script pick (R-TPS-84). The start Medic (`gt_MedicSpawn`) and all
@@ -361,12 +386,13 @@ not repeated here.
 | Group | Asserts | Negative case |
 | --- | --- | --- |
 | `move` | Facing on the camera yaw while S and A move the hero; facing follows a camera turn. | Leaving TPS removes `SCOBAAimNoTurn`. |
-| `cursor` | Input flags for TPS, aiming, free-cursor state. The state holds after the middle release; a second click ends it. | A right press in the free-cursor state does not aim. The switch to Point & Click ends the state. |
+| `cursor` | Input flags for TPS, aiming, free-cursor state. The state holds after the middle release; a second click ends it. Engine sends: each middle click sends mouse look and cursor once. | A right press in the free-cursor state does not aim. The switch to Point & Click ends the state. Ten aim cycles, and calls that change nothing, send nothing. |
 | `aim` | Aim flag, anchor on the right, shorter camera arm. | Release restores the distance and removes the anchor. |
 | `head` | Head step level, down, up with the camera pitch. Lead: a 60 degree turn left and right turns the head ahead within two game loops. | Step 0 in Point & Click, while aiming (also on a fast look down), in the free-cursor state, after leaving TPS. No lead 1 s after each turn. The turn right does not lead left. |
 | `target` | Not aiming: the click sets the UI target. | The click never attacks. Aiming: the UI target is unchanged. |
 | `shot` | Per outcome: shots +1, life, proxy, effect name, cooldown and button clock one loop after the shot, hero position, one text of the right kind. Walking: one shot, the walk keeps its speed. Weapon ranges. | Click while the cooldown runs, click when not aiming: no shot, no text. Walking: never an attack order. Air proxy: not the hit effect. No late damage 2 s after a miss. |
 | `pick` | Medic head, Marine thigh and middle, Ultralisk front, Zergling at 18.5, Overseer body, Hive top, Marine before Hive, Thor chest with aim held (reticle, status bar, shot). | Above the Medic, beside the Marine and Zergling, behind the Ultralisk, under the Overseer, north of the Hive. |
+| `pose` | Attack `auto`, not aiming: upper pose state and target pitch in every sample, standing and strafing; shots repeat; no bracket clear. | Aiming: hold off, aim state. Attack `single`: hold off at once, no shot. `single` with an enemy in range and in the arc: no pose. Torso pitch step 0. |
 | `pncprobe point` | Engine and script band centres within 2 degrees, pitch at 3, 5, 8, 12 and yaw at 5, rest and aim. Nothing but hero and target near the lane; Medic parked. | No script pick 4 degrees outside the engine band. |
 
 Floater checks read script counters. They do not prove the text is visible.
@@ -381,6 +407,13 @@ Floater checks read script counters. They do not prove the text is visible.
   to the proxy with the `Friendly Fire Disabled` text
   (`tps/20261114-211914`, raw `CrossType`). R-TPS-55 asks for a shot at the
   unit. Cause not found.
+- `controls_collision_clamp distance: got=1 base=1` was a stale test, not
+  a camera fault. The snap stored whole units; the Tosh arm is 1.5 and the
+  clamp at pitch -60 takes it to about 1.13, so both read 1. The distance
+  checks now read `Distance1000` and report to `summary.txt`:
+  `controls/20261117-014522` base 1496, flat 1476, clamp 1128, restore
+  1468, 0 failures.
+  Not investigated.
 - Kerrigan is a proof of concept. Psi Blast dealt no damage beyond about 3.0
   (T32); cause not found. The `tps` group `kerrigan` is deleted (operator
   2026-11-16). Kerrigan has no air effect (R-TPS-62).
@@ -399,12 +432,16 @@ Floater checks read script counters. They do not prove the text is visible.
 - Head lead (R-TPS-16): that it looks good, that the head turns the right
   way sideways (yaw axis from the rest pose), the 0.2 s settle, both heroes.
 - Torso pitch while aiming.
+- Attack `auto`, not aiming: Tosh holds the shooting pose between shots,
+  standing and strafing, with no idle flicker (5.9).
 - Backpedal and strafe animation in TPS.
 - A shot while walking: no stutter, attack animation plays.
 - A Tosh shot at the sky or beyond range: launch and sound, no impact, no
   impact sound.
 - The free-cursor state after a middle click: the cursor moves freely and
   hovers and clicks units; the camera does not turn or scroll.
+- The same after ten or more aims (5.3, operator report 2026-11-16). Also
+  with no aiming at all.
 - Aim camera side and field of view.
 - Crosshair pick on large units live (Thor chest, head, arm; Hive top).
 
@@ -497,6 +534,11 @@ Shot clocks on the 0.25 s Tosh period:
 - `tps/20261116-220628`: group `shot` on `tpsclock.galaxy`, 0 failures.
 - `tps/20261116-222551`: full `tps`, 403 passes, 0 failures, `RealClicks`
   0. Kerrigan group deleted, scenery damage and collision checks dropped.
+- `tps/20261117-013357`: full `tps` on the combined tree (pose, send-once,
+  hero drop), 0 failures. Harness split: `tpssends.galaxy`, `tpspose.galaxy`,
+  `profiles/tps_sends.py`, `profiles/pose.py`, `profiles/bank_checks.py`.
+- `controls/20261117-014522`: 0 failures, distance checks in thousandths
+  (section 8).
 
 Only the harness files of `combat` and `pncprobe` changed after
 `tps/20261114-234256`.

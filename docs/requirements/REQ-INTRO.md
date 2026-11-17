@@ -1,0 +1,95 @@
+# REQ-INTRO: Intro Sequence and Deploy
+
+**Date:** 2026-11-17
+**Status:** Stated by the operator on 2026-11-17. The game opens on a loop
+of in-map camera shots of the map's best views, with no UI and one line
+low on screen: "Press SPACE to deploy". SPACE starts the hero drop-pod
+sequence. Operator choices the same day:
+
+- the "Pride of Augustgrad" is the `MengskBC` in the river;
+- the world is live behind the shots; at 00:00 two creep groups already
+  fight at the center X, and only there;
+- letterbox bars, provisional (O-INTRO-2);
+- a Zerus theme plays;
+- depth of field on one tracking shot only.
+
+The shots are described in [SCRIPT-INTRO](../specifications/SCRIPT-INTRO.md).
+The implementation and the state of each requirement are in
+[SPEC-INTRO](../specifications/SPEC-INTRO.md).
+
+## 1. Scope
+
+In scope:
+
+- the intro loop for player 1, from map start to SPACE;
+- the shot list, its order, timing and camera values;
+- the prompt line;
+- the creep fight at the center X at 00:00;
+- the music;
+- the deploy: SPACE, crash zoom, the hero pod fall, touchdown;
+- the return to play: UI, input, camera, hero.
+
+Out of scope:
+
+- players other than player 1;
+- a skip or replay option;
+- camera collision with trees and doodads (terrain and water only);
+- the look of each shot: an operator check (section 4).
+
+## 2. Definitions
+
+- **Intro**: the time from map start to touchdown of the deploy pod.
+- **Loop**: the part of the intro before SPACE, when the shots repeat.
+- **Shot**: one camera set-up with a start, an end, a length and an
+  easing. Shot values are in the SPEC-INTRO shot table.
+- **Pass**: one run through all shots. Passes count from 0.
+- **Cut**: the change from one shot to the next in one game loop.
+- **Eye**: the camera position: target, pitch, yaw and distance.
+- **Center X**: region 8, the center lane crossing, at (125.3, 118.8).
+- **Creep**: lane units: Terran units of player 1 and Zerg units of
+  player 4 on the center lane.
+- **Deploy**: what SPACE starts: crash zoom, pod fall, touchdown.
+
+## 3. Requirements
+
+| ID | Requirement |
+| --- | --- |
+| R-INTRO-1 | At map start the intro MUST run for player 1 before any input. The view opens from black. |
+| R-INTRO-2 | During the intro no game UI MUST show: no engine UI frames, no map dialogs (boss bars, player bars, HUD buttons, order dialog). Letterbox bars MUST show. |
+| R-INTRO-3 | The loop MUST play the shots in table order and restart after the last one, until SPACE. Odd passes MUST play the variant of each shot that has one (reversed move). |
+| R-INTRO-4 | Each shot MUST follow its table row: target, height, yaw, pitch, distance, field of view, length and easing. |
+| R-INTRO-5 | In every shot, at every moment, the eye MUST stay at least 0.5 above the ground or water under it, and the target inside the camera bounds. |
+| R-INTRO-6 | Depth of field MUST be on in shot S2 only. It MUST be off in every other shot and after the intro. |
+| R-INTRO-7 | The dolly-zoom shot S8 MUST keep distance × tan(FOV / 2) constant, so its subject keeps its size on screen. |
+| R-INTRO-8 | The line "Press SPACE to deploy" MUST show low on screen during the whole loop, and MUST NOT show outside it. |
+| R-INTRO-9 | During the intro the hero MUST NOT be in the world: hidden, paused, not selectable. Player input MUST NOT move, jump, aim, shoot, order, switch the hero or move the camera. |
+| R-INTRO-10 | SPACE during the loop MUST start the deploy at once, in any shot. The deploy MUST: hide the prompt; cut to a high view of the hero's drop point and crash-zoom onto it in at most 0.4 s; cut to the hero pod fall of REQ-HERO-DROP (R-DROP-3, R-DROP-4); land it as R-DROP-5. |
+| R-INTRO-11 | The SPACE press that deploys MUST NOT make the hero jump. A second SPACE during the deploy MUST NOT drop a second pod. A reinforcement during the loop MUST NOT drop the hero pod. |
+| R-INTRO-12 | At touchdown the hero MUST stand alive at the pod, bound as R-DROP-6, in the control mode and toggles a game without intro starts with. Letterbox MUST go, the game UI MUST come back as before the intro, input and camera control MUST return to the player. |
+| R-INTRO-13 | At 00:00 one Terran creep group and one Zerg creep group MUST stand at the center X and fight. After the fight the survivors MUST go on along the center lane. No other lane MUST get extra units. |
+| R-INTRO-14 | The world MUST run during the intro: game clock, spawn timer, waves and fights as without intro. |
+| R-INTRO-15 | A Zerus theme MUST start with the intro. |
+
+## 4. Acceptance
+
+Operator checks. A person judges them; no test claims them.
+
+| ID | Check |
+| --- | --- |
+| AC-INTRO-1 | Each shot reads as SCRIPT-INTRO describes it: subject, angle, move, feeling. |
+| AC-INTRO-2 | No shot clips into a tree, a doodad or a unit. |
+| AC-INTRO-3 | The prompt is legible in the bottom bar and pulses slowly. |
+| AC-INTRO-4 | Depth of field is visible in S2: the fight sharp, foreground and far bank soft. |
+| AC-INTRO-5 | S8 reads as a dolly zoom: the PsiDecimator holds still, the world behind it swells. |
+| AC-INTRO-6 | The crash zoom reads as one snap, then the pod ride. |
+| AC-INTRO-7 | The Zerus theme is audible from the first frame. |
+| AC-INTRO-8 | Cuts land on rhythm; the loop does not feel repetitive on the second pass. |
+
+## 5. Open points
+
+| ID | Point |
+| --- | --- |
+| O-INTRO-1 | Music after touchdown: the theme keeps playing until it ends. Stop, cross-fade or keep is open. |
+| O-INTRO-2 | Letterbox is provisional. A later choice may drop it. |
+| O-INTRO-3 | Tree and doodad occlusion is not tested (AC-INTRO-2). |
+| O-INTRO-4 | A skip of the loop on later games, and the intro on a hero death, are not asked for. |

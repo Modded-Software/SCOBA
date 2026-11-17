@@ -1,0 +1,190 @@
+// Hero drop harness (REQ-HERO-DROP). Engine state only: life, alive,
+// position, unit height, camera target and the applied camera height.
+// The reinforcement is the real gv_sPAWNTIMER expiry, restarted short.
+
+trigger gt_HeroDropTest;
+
+void gf_HdTps (bool lp_on) {
+    if (gf_TpsActive(1) == lp_on) {
+        return;
+    }
+    if (lp_on) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    }
+    else {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    }
+    Wait(0.5, c_timeGame);
+}
+
+// The timer stays paused between reinforcements the test fires.
+void gf_HdReinforce () {
+    TimerStart(gv_sPAWNTIMER, 0.1, false, c_timeGame);
+}
+
+// Every scenario starts with Tosh alive, no drop state, TPS on.
+void gf_HdReset (string lp_section, bool lp_auto) {
+    unit lv_hero = gv_heroTosh;
+
+    TimerPause(gv_sPAWNTIMER, true);
+    if (UnitIsValid(gv_dropPod[1])) {
+        UnitRemove(gv_dropPod[1]);
+    }
+    gv_dropPod[1] = null;
+    if (!UnitIsAlive(lv_hero)) {
+        UnitRevive(lv_hero);
+    }
+    gv_dropPending[1] = false;
+    gf_HeroDropCamera(1, 0.0, 0.0);
+    if (gv_heroActive != lv_hero) {
+        gf_HeroBind(lv_hero);
+    }
+    gf_HdTps(false);
+    gf_DbgReset(lp_section, lp_auto, false);
+    if (UnitIsValid(gv_sCOBAMedic[1])) {
+        UnitIssueOrder(gv_sCOBAMedic[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+        UnitSetState(gv_sCOBAMedic[1], c_unitStateStunned, true);
+        UnitSetPosition(gv_sCOBAMedic[1], Point(20.0, 20.0), false);
+    }
+    gf_HdTps(true);
+}
+
+// -1 when a point is not set yet (no death, no pod so far).
+int gf_HdDist100 (point lp_a, point lp_b) {
+    if (lp_a == null || lp_b == null) {
+        return -1;
+    }
+    return FixedToInt(DistanceBetweenPoints(lp_a, lp_b) * 100.0);
+}
+
+void gf_HdSnap (string lp_section, string lp_tag) {
+    unit lv_hero = gv_heroTosh;
+
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Alive", UnitIsAlive(lv_hero));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Pending", gv_dropPending[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "HeroActive", gv_heroActive == lv_hero);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "HeroTps", gv_tPSUNIT[1] == lv_hero);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "TpsMode", gf_TpsActive(1));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Deaths", gv_dropDeaths[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Pods", gv_dropPods[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Landings", gv_dropLandings[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Blocked", gv_dropSwitchBlocked[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Life", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropLife, c_unitPropCurrent)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LifeMax", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropLifeMax, c_unitPropCurrent)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Tag", UnitGetTag(lv_hero));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Level", gv_lEVEL[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "SavedTps", gv_dropTps[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Single", UnitBehaviorCount(lv_hero, c_SCOBA_SINGLE_BEHAVIOR));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Direct", UnitBehaviorCount(lv_hero, "UnitDirectControl"));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroH100", FixedToInt(UnitGetHeight(lv_hero) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamApplied100", FixedToInt(gv_cameraHeightApplied[1] * 100.0));
+    // The parts of the height offset: the pod quake (2.5 s) still shakes after touchdown.
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "DropCam100", FixedToInt(gv_dropCamHeight[1] * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Quake100", FixedToInt(gv_quakeHeight[1] * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "JumpCam100", FixedToInt(gv_jumpCamHeight[1] * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamToHero100", gf_HdDist100(CameraGetTarget(1), UnitGetPosition(lv_hero)));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamToDeath100", gf_HdDist100(CameraGetTarget(1), gv_dropDeathAt[1]));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroToPod100", gf_HdDist100(UnitGetPosition(lv_hero), gv_dropAt[1]));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroToDeath100", gf_HdDist100(UnitGetPosition(lv_hero), gv_dropDeathAt[1]));
+    BankSave(gv_dbgBank);
+}
+
+// Negative: a reinforcement while the hero lives drops no pod (R-DROP-1).
+void gf_HdAlive () {
+    string lv_s = "drop_alive";
+
+    gf_HdReset(lv_s, true);
+    gf_HdSnap(lv_s, "t0");
+    gf_HdReinforce();
+    Wait(1.0, c_timeGame);
+    gf_HdSnap(lv_s, "tend");
+}
+
+// Death, wait, reinforcement, fall, touchdown (R-DROP-1 to 7).
+void gf_HdDrop () {
+    string lv_s = "drop_main";
+    unit lv_hero = gv_heroTosh;
+    unit lv_pod;
+    string lv_trace = "";
+    fixed lv_start;
+    int lv_ms;
+    int lv_i;
+    int lv_far = 0;
+
+    gf_HdReset(lv_s, false);  // Single on: not the default, a lost toggle shows
+    gf_HdSnap(lv_s, "t0");
+    BankValueSetFromInt(gv_dbgBank, lv_s, "camBase100", FixedToInt(c_SCOBA_CAMERA_HEIGHT_OFFSET * 100.0));
+    UnitKill(lv_hero);
+    Wait(0.5, c_timeGame);
+    gf_HdSnap(lv_s, "tdead");
+    // The dead hero waits: no pod, the camera stays, no hero switch.
+    Wait(2.0, c_timeGame);
+    gf_HeroSwitchTo(gv_heroKerrigan);
+    Wait(0.2, c_timeGame);
+    gf_HdSnap(lv_s, "twait");
+    gf_HdReinforce();
+    for (lv_i = 0; lv_i < 32 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    lv_pod = gv_dropPod[1];
+    lv_start = TimerGetElapsed(gv_sCOBA_Clock);
+    BankValueSetFromString(gv_dbgBank, lv_s, "podXY", IntToString(FixedToInt(PointGetX(gv_dropAt[1]) * 10.0)) + "," + IntToString(FixedToInt(PointGetY(gv_dropAt[1]) * 10.0)));
+    BankValueSetFromString(gv_dbgBank, lv_s, "deathXY", IntToString(FixedToInt(PointGetX(gv_dropDeathAt[1]) * 10.0)) + "," + IntToString(FixedToInt(PointGetY(gv_dropDeathAt[1]) * 10.0)));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(lv_pod));
+    BankValueSetFromString(gv_dbgBank, lv_s, "podType", UnitGetType(lv_pod));
+    // Per loop: ms since the pod appeared, pod height, applied camera
+    // height, camera target to pod, hero alive.
+    for (lv_i = 0; lv_i < 64 && UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        lv_ms = FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - lv_start) * 1000.0);
+        lv_trace = lv_trace + IntToString(lv_ms) + ":" + IntToString(FixedToInt(UnitGetHeight(lv_pod) * 100.0)) + "/" + IntToString(FixedToInt(gv_cameraHeightApplied[1] * 100.0)) + "/" + IntToString(gf_HdDist100(CameraGetTarget(1), UnitGetPosition(lv_pod))) + "/" + IntToString(BoolToInt(UnitIsAlive(lv_hero))) + " ";
+        if (gf_HdDist100(CameraGetTarget(1), UnitGetPosition(lv_pod)) > 100) {
+            lv_far += 1;
+        }
+        if (lv_i == 8) {
+            BankValueSetFromInt(gv_dbgBank, lv_s, "midCamDist100", FixedToInt(CameraGetDistance(1) * 100.0));
+        }
+        if (lv_i < 4) {
+            BankValueSetFromString(gv_dbgBank, lv_s, "camXY" + IntToString(lv_i), IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 10.0)) + "," + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 10.0)) + " dist=" + IntToString(FixedToInt(CameraGetDistance(1) * 100.0)));
+        }
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "landMs", FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - lv_start) * 1000.0));
+    BankValueSetFromString(gv_dbgBank, lv_s, "fall", lv_trace);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "camFar", lv_far);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "podAliveAtLand", UnitIsValid(lv_pod) && UnitIsAlive(lv_pod));
+    gf_HdSnap(lv_s, "tland");
+    Wait(1.0, c_timeGame);
+    gf_HdSnap(lv_s, "tafter");
+    // Negative: the next reinforcement with the hero alive drops nothing.
+    gf_HdReinforce();
+    Wait(1.0, c_timeGame);
+    gf_HdSnap(lv_s, "tnext");
+}
+
+bool gt_HeroDropTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAHERODROP", 1);
+    gv_bINPUTLOG = false;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "herodrop");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "drop_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_HdAlive();
+    gf_HdDrop();
+    gf_HdTps(false);
+    gf_DbgReset("drop_end", false, true);
+    BankValueSetFromInt(gv_dbgBank, "drop_end", "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_HeroDropTest_Init () {
+    gt_HeroDropTest = TriggerCreate("gt_HeroDropTest_Func");
+    TriggerAddEventMapInit(gt_HeroDropTest);
+}

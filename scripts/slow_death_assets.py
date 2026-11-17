@@ -24,20 +24,29 @@ sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
 import m3
 
 MARKER = ".slow_death_assets"
-MARKER_VERSION = "4\n"
+MARKER_VERSION = "7\n"  # 7: Goliath death 2x slower; 6: Goliath 3x; 5: BC child stretch 12.5 (children 2x faster)
 
 # (CASC entry, target in the map, time stretch, child stretch). Stretch 100
 # is twice the earlier 50 (the old CModel AnimSpeed 0.02): every death runs
 # 2x slower. The stretch sets the death length and when each child starts
 # and stops, so the hull and the bursts stay in the original sync.
 # The child stretch retimes only the particle and ribbon simulation inside
-# each child; 25 runs it four times as fast as the keyframes.
+# each child; 12.5 runs it eight times as fast as the keyframes (2x the
+# earlier 25).
 SLOW_DEATHS = (
     (
         r"mods\liberty.sc2mod\base.sc2assets\assets\units\terran\battlecruiserlokideath\battlecruiserlokideath.m3",
         Path("Assets") / "Units" / "Terran" / "BattlecruiserLokiDeath" / "BattlecruiserLokiDeathSlow.m3",
         100,
-        25,
+        12.5,
+    ),
+    # Goliath: the whole death 2x slower, children included (operator
+    # 2026-11-17; 3x was rejected).
+    (
+        r"mods\liberty.sc2mod\base.sc2assets\assets\units\terran\goliathdeath\goliathdeath.m3",
+        Path("Assets") / "Units" / "Terran" / "GoliathDeath" / "GoliathDeathSlow.m3",
+        2,
+        2,
     ),
 )
 
@@ -74,7 +83,7 @@ RIBBON_PLAIN = {
 KEYED: dict[str, int] = {}
 
 
-def scaled(value: float, power: int, stretch: int) -> float:
+def scaled(value: float, power: int, stretch: float) -> float:
     return float(value) * (float(stretch) ** power)
 
 
@@ -112,7 +121,7 @@ def stretch_blocks(model, stretch: int) -> int:
     return count
 
 
-def scale_real_keys(model, anim_id: int, power: int, stretch: int) -> int:
+def scale_real_keys(model, anim_id: int, power: int, stretch: float) -> int:
     """Scale the float keys every clip holds for one animated property."""
     count = 0
     for stc in model.sequenceTransformationCollections:
@@ -135,14 +144,14 @@ def scale_real_keys(model, anim_id: int, power: int, stretch: int) -> int:
     return count
 
 
-def scale_reference(model, name: str, ref, power: int, stretch: int) -> None:
+def scale_reference(model, name: str, ref, power: int, stretch: float) -> None:
     """Scale one animated property: its base values and its keyed track."""
     ref.initValue = scaled(ref.initValue, power, stretch)
     ref.nullValue = scaled(ref.nullValue, power, stretch)
     KEYED[name] = KEYED.get(name, 0) + scale_real_keys(model, ref.header.animId, power, stretch)
 
 
-def scale_particle(model, emitter, stretch: int) -> None:
+def scale_particle(model, emitter, stretch: float) -> None:
     animated = PARTICLE_ANIMATED
     plain = PARTICLE_PLAIN
     scale_reference(model, "emissionSpeed1", emitter.emissionSpeed1, animated["emissionSpeed1"], stretch)
@@ -158,7 +167,7 @@ def scale_particle(model, emitter, stretch: int) -> None:
     emitter.noiseFrequency = scaled(emitter.noiseFrequency, plain["noiseFrequency"], stretch)
 
 
-def scale_ribbon(model, ribbon, stretch: int) -> None:
+def scale_ribbon(model, ribbon, stretch: float) -> None:
     animated = RIBBON_ANIMATED
     plain = RIBBON_PLAIN
     scale_reference(model, "speed", ribbon.speed, animated["speed"], stretch)
@@ -168,7 +177,7 @@ def scale_ribbon(model, ribbon, stretch: int) -> None:
     ribbon.surfaceNoiseFrequency = scaled(ribbon.surfaceNoiseFrequency, plain["surfaceNoiseFrequency"], stretch)
 
 
-def retime_model(model, stretch: int, child_stretch: int | None = None) -> dict[str, int]:
+def retime_model(model, stretch: int, child_stretch: float | None = None) -> dict[str, int]:
     """Stretch the keyframes by stretch and the emitter simulation by child_stretch."""
     if child_stretch is None:
         child_stretch = stretch
@@ -229,7 +238,7 @@ def describe(model) -> str:
     return "\n".join(lines)
 
 
-def generate_model(source: Path, target: Path, stretch: int, child_stretch: int) -> None:
+def generate_model(source: Path, target: Path, stretch: int, child_stretch: float) -> None:
     model = m3.loadModel(str(source))
     print(f"{target.name}: source")
     print(describe(model))

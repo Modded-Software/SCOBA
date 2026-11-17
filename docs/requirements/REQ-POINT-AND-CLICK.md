@@ -138,13 +138,24 @@ Implementation lives in
 | R-PNC-74 | The toggle buttons MUST read `Attack: Auto`, `Attack: Single`, `Chase: Move`, `Chase: Stand`. Each label names the current state, not the action. Their tooltips MUST describe this contract. |
 | R-PNC-75 | Order mode MUST keep working in PNC. |
 
+### 3.9 Shooting pose
+
+Stated by the operator on 2026-11-16: the hero dropped to idle before and
+after each shot of a sequence.
+
+| ID | Requirement |
+| --- | --- |
+| R-PNC-80 | In PNC, Tosh MUST hold the shooting pose between sequential shots. The upper body MUST keep the pose, pitched at the target, while he has an attack order and for 2 s after each shot. It MUST NOT return to idle inside that time. The legs keep the stock stand or walk. |
+| R-PNC-81 | The pose MUST end when neither condition of R-PNC-80 holds. A cancel (section 3.4) MUST end the 2 s at once. |
+| R-PNC-82 | The pose hold MUST NOT apply to Kerrigan (a proof of concept, operator 2026-11-16). TPS uses it only as R-TPS-17 says. |
+
 ## 4. Acceptance Criteria
 
 | ID | Criterion |
 | --- | --- |
 | AC-PNC-1 | Left click an enemy, a friendly unit, and a building: each shows the boss bar. The hero stays the only selected unit. The hero gets no order. |
 | AC-PNC-2 | Left click the ground: the boss bar hides and an ongoing attack stops. |
-| AC-PNC-3 | Attack `single`, right click an in-range enemy: one shot that deals its full damage, then the hero idles. |
+| AC-PNC-3 | Attack `single`, right click an in-range enemy: one shot that deals its full damage, then the attack order ends. Tosh keeps the shooting pose for 2 s (R-PNC-80), then idles. |
 | AC-PNC-4 | Attack `single`, three right clicks spaced past the weapon period: three shots. |
 | AC-PNC-5 | Attack `auto`, right click an enemy: the hero attacks it until it dies. |
 | AC-PNC-6 | Chase `move`, right click an out-of-range enemy: the hero walks into range and attacks. |
@@ -175,3 +186,5 @@ Implementation lives in
 | AC-PNC-31 | Start the map: the buttons read `Attack: Single` and `Chase: Stand`. An enemy in range is not attacked. |
 | AC-PNC-32 | Press the Attack toggle: the button reads `Attack: Auto` and the hero attacks an enemy in range. Press it again: it reads `Attack: Single` and the attack stops. |
 | AC-PNC-33 | Switch hero with Attack `auto` and Chase `move`: both buttons still read `Attack: Auto` and `Chase: Move`, and the new hero behaves that way. |
+| AC-PNC-34 | Tosh, Attack `single`, three right clicks on an in-range enemy one second apart: the upper body stays in the shooting pose from the first shot until 2 s after the last. It does not drop to idle between the shots. |
+| AC-PNC-35 | Tosh in the shooting pose, click the ground: the pose ends at once. |

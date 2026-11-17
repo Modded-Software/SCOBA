@@ -10,6 +10,7 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
+from .bank_checks import _report
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
@@ -57,6 +58,26 @@ def _check_icons(checks) -> None:
         else:
             print(f"controls_icons: {button_id} FAIL")
             checks.failures += 1
+
+
+def _check_distances(checks) -> None:
+    """Zoom and camera collision, read in thousandths: the Tosh arm is 1.5,
+    so whole units hide a clamp to about 1.15. Reported to summary.txt."""
+    def dist(section: str, tag: str):
+        return checks.value(section, tag, "Distance1000")
+
+    base = dist("controls_default", "t0000")
+    zoom = dist("controls_zoom", "t0100")
+    flat = dist("controls_collision", "t0200")
+    clamp = dist("controls_collision_clamp", "t0500")
+    restore = dist("controls_collision_restore", "t0800")
+    raw = f"base={base} zoom={zoom} flat={flat} clamp={clamp} restore={restore} (raw: clampPitch={checks.value('controls_collision_clamp', 't0500', 'Pitch')})"
+    have = None not in (base, zoom, flat, clamp, restore)
+    _report(checks, "controls_zoom animated distance", have and zoom - base >= 750, raw)
+    _report(checks, "controls_collision flat distance", have and abs(flat - base) <= 50, raw)
+    # Looking up at pitch -60 puts the unclamped eye under the ground margin.
+    _report(checks, "controls_collision_clamp distance", have and clamp <= flat - 100, raw)
+    _report(checks, "controls_collision_restore distance", have and abs(restore - flat) <= 50, raw)
 
 
 def check(ctx, data: dict, checks) -> None:
@@ -128,31 +149,7 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("controls_pnc", "t0500", "UpperState", 0)
     checks.eq("controls_pnc", "t0500", "LowerState", 0)
     checks.eq("controls_tps", "t0500", "CooldownMs", checks.value("controls_default", "t0000", "CooldownMs"))
-    base_distance = checks.value("controls_default", "t0000", "Distance") or 0
-    zoom_distance = checks.value("controls_zoom", "t0100", "Distance") or 0
-    if zoom_distance - base_distance >= 1:
-        print("controls_zoom animated distance: PASS")
-    else:
-        print(f"controls_zoom animated distance: got={zoom_distance} base={base_distance} FAIL")
-        checks.failures += 1
-    collision_distance = checks.value("controls_collision", "t0200", "Distance") or 0
-    if abs(collision_distance - base_distance) <= 1:
-        print("controls_collision flat distance: PASS")
-    else:
-        print(f"controls_collision flat distance: got={collision_distance} base={base_distance} FAIL")
-        checks.failures += 1
-    clamp_distance = checks.value("controls_collision_clamp", "t0500", "Distance") or 0
-    if clamp_distance < collision_distance:
-        print("controls_collision_clamp distance: PASS")
-    else:
-        print(f"controls_collision_clamp distance: got={clamp_distance} base={collision_distance} FAIL")
-        checks.failures += 1
-    restore_distance = checks.value("controls_collision_restore", "t0800", "Distance") or 0
-    if abs(restore_distance - collision_distance) <= 1:
-        print("controls_collision_restore distance: PASS")
-    else:
-        print(f"controls_collision_restore distance: got={restore_distance} base={collision_distance} FAIL")
-        checks.failures += 1
+    _check_distances(checks)
     _check_icons(checks)
 
     yaw = checks.value("controls_mouselook", "t0200", "CameraYaw")

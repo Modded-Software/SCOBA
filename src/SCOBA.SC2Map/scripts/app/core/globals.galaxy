@@ -55,6 +55,13 @@ bool[8] gv_controlCursor;
 bool[8] gv_tpsPressed;
 bool[8] gv_tpsMiddleDown;
 bool[8] gv_cONTROLRELATIVE;
+// The mouse mode last sent to the engine. Each value is sent only when it
+// changes (SPEC-TPS 5.3). Valid false forces the next send.
+bool[8] gv_ctrlSentValid;
+bool[8] gv_ctrlSentRelative;
+bool[8] gv_ctrlSentCursor;
+int[8] gv_ctrlRelativeSends;  // for tests
+int[8] gv_ctrlCursorSends;  // for tests
 int[8] gv_aimShots;
 int[8] gv_aimOutOfRange;
 unit[8] gv_tpsProxy;
@@ -75,6 +82,8 @@ int[8] gv_animUpperState;
 int[8] gv_animLowerState;
 int[8] gv_animAttackState;
 fixed[8] gv_animAttackUntil;
+fixed[8] gv_animReadyUntil;  // PNC pose hold: clock time the linger ends, -1 when off
+int[8] gv_animUpperClears;  // upper bracket clears, for tests
 int[8] gv_animFullState;
 int[8] gv_animFullDir;
 fixed[8] gv_animFullScale;

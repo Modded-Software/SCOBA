@@ -59,6 +59,18 @@ void gf_PodImpactQueue (int lp_race, point lp_centre) {
     gf_PodImpactAdd(lp_centre, lv_land, true);  // one under the pod, which starts the shake
 }
 
+// A pod whose touchdown the script knows (the hero pod, R-DROP-5): the same
+// hits and shake, from now.
+void gf_PodImpactNow (point lp_centre) {
+    fixed lv_now = GameGetMissionTime();
+    int lv_k;
+
+    for (lv_k = 0; lv_k < c_POD_HITS; lv_k += 1) {
+        gf_PodImpactAdd(PointWithOffsetPolar(lp_centre, RandomFixed(c_POD_SPREAD_LO, c_POD_SPREAD_HI), RandomFixed(0.0, 360.0)), lv_now + RandomFixed(0.0, c_POD_STAGGER), false);
+    }
+    gf_PodImpactAdd(lp_centre, lv_now, true);
+}
+
 bool gt_PodImpact_Func (bool testConds, bool runActions) {
     int lv_q;
     fixed lv_now = GameGetMissionTime();

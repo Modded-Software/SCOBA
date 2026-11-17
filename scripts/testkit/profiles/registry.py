@@ -22,6 +22,7 @@ PROFILE_OUTPUTS = {
     "waterprobe": ROOT / "out" / "SCOBA256_waterprobe.SC2Map",
     "dissolveview": ROOT / "out" / "SCOBA256_dissolveview.SC2Map",
     "jump": ROOT / "out" / "SCOBA256_jumptest.SC2Map",
+    "herodrop": ROOT / "out" / "SCOBA256_herodroptest.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -42,6 +43,7 @@ PROFILE_BANKS = {
     "waterprobe": ("SCOBAWATERPROBE",),
     "dissolveview": ("SCOBADISSOLVE",),
     "jump": ("SCOBAJUMPTEST",),
+    "herodrop": ("SCOBAHERODROP",),
 }
 
 
@@ -91,4 +93,7 @@ def profile_module(name):
     if name == "jump":
         from . import jump
         return jump
+    if name == "herodrop":
+        from . import herodrop
+        return herodrop
     raise SystemExit(f"unknown test profile: {name}")

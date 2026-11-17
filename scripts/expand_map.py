@@ -19,7 +19,7 @@ from hdtex.inject import apply_hd_textures
 from project_root import project_root
 from props_expand import expand_props
 from flora.build import apply_flora
-from flora.lift import lift_doodads
+from flora.lift import lift_doodads, sink_trees
 from footprints.build import apply_scaled_footprints
 from skybox_flip import generate as generate_skybox_flip
 from footfall.fx import generate as generate_footfall_fx
@@ -488,12 +488,9 @@ def main() -> int:
     apply_scaled_footprints(dst)
     if os.environ.get("SC2_NO_FLORA") != "1":
         apply_flora(dst)
-    lift_doodads(dst)
-    # After every step that places doodads: a doodad model added later would fade when it hides a unit.
-    disable_doodad_occlusion(dst)
-    scale_psi_destroyer(dst)
-    slow_psi_destroyer_animations(dst)
-    apply_hd_textures(dst)
+    # Occlusion is disabled after every step that places doodads: a doodad model added later would fade when it hides a unit.
+    for step in (lift_doodads, sink_trees, disable_doodad_occlusion, scale_psi_destroyer, slow_psi_destroyer_animations, apply_hd_textures):
+        step(dst)
     if args.out is None:
         old = root / "out" / ".build-old"
         if old.exists():

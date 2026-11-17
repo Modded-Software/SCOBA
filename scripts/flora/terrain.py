@@ -50,12 +50,19 @@ def _scale(map_dir: Path) -> float:
     return float(match.group(1))
 
 
-def _offset(raw: np.ndarray, scale: float, objects: str) -> float:
-    """Median of placed-tree z minus raw ground at the tree."""
+def _offset(raw: np.ndarray, scale: float, objects: str, sunk: bool = False) -> float:
+    """Median of placed-tree z minus raw ground at the tree.
+
+    sunk: the trees were lowered by flora.lift.sink_trees; add the sink back."""
+    from .lift import tree_sink
+
     rests = []
-    for match in re.finditer(r'<ObjectDoodad\b[^>]*\bPosition="([^"]+)"[^>]*\bType="ZerusTree(?!ScobaBorder)[^"]*"[^>]*>', objects):
+    pattern = r'<ObjectDoodad\b[^>]*\bPosition="([^"]+)"[^>]*\bScale="([^",]+)[^>]*\bType="ZerusTree(?!ScobaBorder)[^"]*"[^>]*>'
+    for match in re.finditer(pattern, objects):
         # Border trees (flora/border.py) are placed from this calibration; they never feed it.
         x, y, z = (float(v) for v in match.group(1).split(","))
+        if sunk:
+            z += tree_sink(float(match.group(2)))
         rests.append(z - bilinear(raw, x, y) * scale)
     if not rests:
         raise ValueError("no placed ZerusTree to calibrate ground height")
@@ -110,7 +117,8 @@ def load(map_dir: Path) -> Terrain:
     scale = _scale(map_dir)
     # Trees raised by flora.lift (marker present) sit DOODAD_LIFT above the ground they were fitted to.
     lifted = config.DOODAD_LIFT if (map_dir / ".doodads_lifted").exists() else 0.0
-    vertices = raw * scale + _offset(raw, scale, (map_dir / "Objects").read_text(encoding="utf-8")) - lifted
+    sunk = (map_dir / ".trees_sunk").exists()
+    vertices = raw * scale + _offset(raw, scale, (map_dir / "Objects").read_text(encoding="utf-8"), sunk) - lifted
     height = (vertices[:-1, :-1] + vertices[1:, :-1] + vertices[:-1, 1:] + vertices[1:, 1:]) / 4
     n = height.shape[0]
     gy, gx = np.gradient(height)

@@ -28,6 +28,7 @@ judge it.
 | R-JUMP-16 | [tested] [build] [operator] | `clipLog` has only clips built on a base (`no bare jump clip`); base Stand in `jump_stand`, `jump_stopjump`, `jump_keystill` (`no stride clip`); base `Walk,Forward` in `jump_aimwalk`, `jump_freewalk`; `jumpanim/validate.py`: stand jump feet <= 0.02 off the stand stance along the ground; walk jump air feet <= 0.02 off the walk stride, stride split >= 0.45, forward width <= 0.75 of the stand width; no bare clip in the model; look: AC-JUMP-6 |
 | R-JUMP-18 | [tested] [build] [operator] | `takeoff stride is the nearest` (mirror of `gf_JumpGaitStride`), `Start, Air, End use the takeoff stride`, `gait phase tracks the walk`, `walk resumes where the landing stops` (aim walk), `walk resume absent` (free walk), `no clip time set in the air`; `jumpanim/validate.py`: flight frames within 0.03 of the pelvis height maxima, seams <= 0.01, gait constants equal the bake's; look: AC-JUMP-2, 6. Not exercised in game: stride 02 (both walk scenarios take off in stride 01). |
 | R-JUMP-19 | [build] [operator] | `jumpanim.validate.check_reference`: six angles inside the reference ranges +-5 degrees; feet flat on the ground; host `LegSolveTest`, `ProfileTest`; look: AC-JUMP-1 |
+| R-JUMP-22 | [tested] | `jump_aimwalk`, `jump_freewalk`: one burst, gone at the end; engine travel in the first loops >= 1.2x the walk before, back within 1.1x in the air (`hero moves faster at the push-off`, `burst is over in the air`); `scaleLog` Start = walk clip rate x `c_JUMP_BURST_SPEED`, Air 100, End = walk clip rate; `c_JUMP_BURST_SPEED` = data `MoveSpeedMultiplier`; landing recovery 250 ms / scale. Negative: `jump_stand`, `jump_stopjump`: no burst, all scales 100. The speed property is asserted unchanged only: the engine does not show the buff in it (F16). |
 | R-JUMP-17 | [tested] [operator] | `camMax100` 52..62; camera part written at each sample = engine height one loop (62 ms) later, within 0.02 (`camera matches the hero, no lead`); `camEnd100` 0; `jump_none`: `camMax100` 0; tps regression unchanged; smoothness: AC-JUMP-7 |
 
 Run results go in section 7.
@@ -44,6 +45,7 @@ Run results go in section 7.
 | F13 | `Attack Walk <dir>` (0-667 ms) is a jog: two flight frames per cycle at phase 0.05 and 0.55 (pelvis height maxima); the back walks are the walk reversed (0.45, 0.95). | `jump: flight frames` build line; `jump_pose.sh` |
 | F14 | Motion capture reference: CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu), subject 16, trials 01, 02 (jump), 05 (forward jump), 120 fps. Changes from standing, degrees (01 / 02 / 05). Crouch lowest: knee +64 / +71 / +53, ankle -17 / -18 / -17, hip +46 / +47 / +50, pelvis -0.18 / -0.21 / -0.14 m. Flight peak: knee +9 / +12 / +19, ankle +35 / +27 / +35. Landing lowest: knee +40 / +38 / +44, ankle -15 / -17 / -9, pelvis -0.10 / -0.10 / -0.13 m. Trial 01 timing: crouch down 0.5 s, up to liftoff 0.17 s; at liftoff the knees have about 30% of the crouch left; the ankle goes from -17 to +37 within about 0.1 s around liftoff, and from +30 to 0 within about 0.07 s around touchdown; landing lowest 0.13 s after touchdown. | `/mnt/ws-fast/inspect/mocap/amc_legs.sh` on `16_01.amc`, `16_02.amc`, `16_05.amc` |
 | F15 | `libNtve_gf_AnimSetTime` sends `{False}`, which the engine rejects (`Invalid actor msg`). `libNtve_gf_SetAnimationTime` sends 0/1. | ScriptError 2026-11-16 18.41.38 |
+| F16 | `UnitGetPropertyFixed(c_unitPropMovementSpeed, c_unitPropCurrent)` does not show the `SCOBAJumpBurst` buff: 310 at the press and during the burst, while engine travel is 1.4x. The burst is tested by travel; the Start clip rate uses `c_JUMP_BURST_SPEED`. | `jump/20261117-014046` |
 | F4 | `UnitGetHeight` gives a unit's height; a unit position has none. | SPEC-TPS T35 |
 | F5 | No stock asset or catalog id is named `JumpImpactLarge`. The only `JumpImpact` id is the Fenix sound `FenixChampionJumpImpact`. The footfall dusts are `JumpLandDust` at unit scales: `GoliathFootDust` 1.25-1.5, `QueenFootDust` 0.75-0.9. The Goliath sound is `GoliathFootstep`. | CASC listing `/mnt/ws-fast/inspect/jumpfx.txt`; `scripts/footfall/fx.py` |
 | F10 | Stock dust puffs, measured (particles, life, speed, size; spread ~ speed x life): `JumpLandDust` 82, 1.5 s, 8.2, 1.83, ~12; `PhysicsImpactDustLight` 28, 0.5 s, 0.81, 0.80, ~0.4; `PhysicsImpactDustMed` 36, 0.85 s, 1.25, 0.80, ~1.1. All have one `Birth` clip (Light, Med: 2 s). | `/mnt/ws-fast/inspect/dust_extract.sh`, `/tmp/opencode/dust_measure.log` |
@@ -243,8 +245,8 @@ modes. The old `DehakaJump` trigger and preload entry are removed.
 | `scripts/jumpanim/ik.py` | Leg IK, rig, crouch, tuck, point, gather, reference angles. |
 | `scripts/jumpanim/validate.py` | Map checks: clips, names, bones, stance, gather, stride, air drift, walk rate, seams, reference angles, thump ids, camera smoothing. |
 | `src/.../Base.SC2Data/GameData/CameraData.xml` | Follow target and height offset smoothing 0. |
-| `src/.../Base.SC2Data/GameData/BehaviorData.xml` | `SCOBAJumpBurst`: takeoff speed x1.4 for 0.2 s. |
-| `scripts/testkit/galaxy/jump.galaxy`, `profiles/jump.py` | In-game test. |
+| `src/.../Base.SC2Data/GameData/BehaviorData.xml` | `SCOBAJumpBurst`: takeoff speed x1.4 for 0.2 s. `c_JUMP_BURST_SPEED` in `core/jump.galaxy` carries the same value for the Start clip rate. |
+| `scripts/testkit/galaxy/jump.galaxy`, `profiles/jump.py`, `profiles/jump_rates.py` | In-game test. `jump_rates.py`: burst, clip rates, landing (R-JUMP-22). |
 | `scripts/testkit/tests/test_character_anim_jump.py`, `test_character_anim_jump_ik.py` | Host tests. |
 
 ## 5. Tests
@@ -282,6 +284,7 @@ height), `clipLog`, press inputs.
   the walk clip time on `SCOBALo` is an operator check.
 - The jump is visual: the hero keeps ground pathing and stays a ground
   target.
+- The speed property does not show the takeoff burst (F16).
 
 ## 7. Runs
 
@@ -305,3 +308,5 @@ height), `clipLog`, press inputs.
 | `jump/20261116-190927` | `d6bcf1b3bbaa-071d5a3c06a98238` | failures: 0. Poses from Tosh's own clips, two strides (marker 41). Operator: more knee and ankle bend, from a reference. |
 | `jump/20261116-192245` | `d6bcf1b3bbaa-071d5a3c06a98238` | failures: 0. Knee and ankle angles from motion capture (marker 42, R-JUMP-19). |
 | `tps/20261116-192438` | `d6bcf1b3bbaa-071d5a3c06a98238` | failures: 26, same checks as the baseline. |
+| `jump/20261117-014046` | `53218f36484e-da48f9bd6e36fa6a` | failures: 4. Speed property shows no burst (F16); Start scale without the burst (code bug). |
+| `jump/20261117-014722` | `53218f36484e-66852ba562d8b843` | failures: 0. Start scale x `c_JUMP_BURST_SPEED`; burst by travel. |

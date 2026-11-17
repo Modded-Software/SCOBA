@@ -1,0 +1,201 @@
+// Module: systems/hero_drop
+// A dead hero comes back with the next reinforcement, in its own pod
+// (REQ-HERO-DROP). Death: the camera stays where the hero died. The next
+// gv_sPAWNTIMER expiry: a SCOBAHeroPod appears above the player's spawn
+// region and the script lowers it, one game loop at a time; the TPS camera
+// follows the pod and carries its height. Touchdown: pod impact, the same
+// hero unit revives at the pod with its level, and the pod opens.
+
+// Pod height part left at lp_t seconds into the fall (R-DROP-3): linear
+// from 1 to c_DROP_BRAKE_PART until the brake, then to 0 at c_DROP_FALL.
+fixed gf_HeroDropPart (fixed lp_t) {
+    if (lp_t <= 0.0) {
+        return 1.0;
+    }
+    if (lp_t < c_DROP_BRAKE_AT) {
+        return 1.0 - (1.0 - c_DROP_BRAKE_PART) * lp_t / c_DROP_BRAKE_AT;
+    }
+    if (lp_t < c_DROP_FALL) {
+        return c_DROP_BRAKE_PART * (c_DROP_FALL - lp_t) / (c_DROP_FALL - c_DROP_BRAKE_AT);
+    }
+    return 0.0;
+}
+
+// Pod part of the camera height, blended over lp_time with the pod.
+void gf_HeroDropCamera (int lp_player, fixed lp_height, fixed lp_time) {
+    gv_dropCamHeight[lp_player] = lp_height;
+    gf_CameraHeightApply(lp_player, lp_time);
+}
+
+// Toggles and TPS mode of the living hero, every loop. The death event
+// comes after the engine removed the behaviors (herodrop/20261116-225220:
+// TPS read off), so the drop keeps the last values seen alive (R-DROP-6).
+void gf_HeroDropTrack (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    if (gv_dropPending[lp_player] || gv_dropRestoreLoops[lp_player] > 0 || !UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
+        return;
+    }
+    gv_dropSingle[lp_player] = UnitBehaviorCount(lv_hero, c_SCOBA_SINGLE_BEHAVIOR) > 0;
+    gv_dropStand[lp_player] = UnitBehaviorCount(lv_hero, c_SCOBA_STAND_BEHAVIOR) > 0;
+    gv_dropTps[lp_player] = UnitBehaviorCount(lv_hero, c_SCOBA_TPS_BEHAVIOR) > 0;
+}
+
+// The hero died (R-DROP-1). The camera stays at the death spot (R-DROP-2).
+void gf_HeroDropDied (int lp_player, unit lp_hero) {
+    gv_dropDeaths[lp_player] += 1;
+    gv_dropPending[lp_player] = true;
+    gv_dropHero[lp_player] = lp_hero;
+    gv_dropDeathAt[lp_player] = UnitGetPosition(lp_hero);
+    gf_AimEnd(lp_player);
+    gf_StrafeHoldSet(lp_player, false);
+    if (gv_sCOBAOrderMode[lp_player]) {
+        gf_OrderExit(lp_player);
+    }
+    gv_pncSingleShot[lp_player] = false;
+    gv_tpsShotKind[lp_player] = c_TPS_SHOT_NONE;
+    gv_tpsShotTarget[lp_player] = null;
+    CameraFollowUnitGroup(lp_player, UnitGroupEmpty(), false, false);
+    CameraPan(lp_player, gv_dropDeathAt[lp_player], 0.0, -1, 10.0, false);
+}
+
+// The next reinforcement: the pod appears above the spawn region and the
+// camera locks to it (R-DROP-3, R-DROP-4).
+void gf_HeroDropStart (int lp_player) {
+    unit lv_pod;
+    point lv_at;
+
+    if (!gv_dropPending[lp_player] || UnitIsValid(gv_dropPod[lp_player])) {
+        return;
+    }
+    lv_at = gf_DropPodPoint(gv_sPAWNLOCATIONS[lp_player], null, null);
+    UnitCreate(1, c_DROP_POD_UNIT, c_unitCreateIgnorePlacement, lp_player, lv_at, CameraGetYaw(lp_player));
+    lv_pod = UnitLastCreated();
+    if (!UnitIsValid(lv_pod)) {
+        return;
+    }
+    gv_dropPods[lp_player] += 1;
+    gv_dropPod[lp_player] = lv_pod;
+    gv_dropAt[lp_player] = UnitGetPosition(lv_pod);
+    gv_dropStartAt[lp_player] = TimerGetElapsed(gv_sCOBA_Clock);
+    UnitSetHeight(lv_pod, c_DROP_HEIGHT, 0.0);
+    // Snap to the pod, then follow it: the camera is locked to the pod.
+    // CameraGetTarget is right only in the loop after a pan (T26,
+    // herodrop/20261116-225510), so the lock is an operator check.
+    CameraPan(lp_player, gv_dropAt[lp_player], 0.0, -1, 10.0, false);
+    CameraFollowUnitGroup(lp_player, libNtve_gf_ConvertUnitToUnitGroup(lv_pod), true, false);
+    gv_cameraDistanceDesired[lp_player] = c_DROP_CAM_DISTANCE;
+    CameraSetValue(lp_player, c_cameraValueDistance, c_DROP_CAM_DISTANCE, 0.0, -1, 10);
+    gf_HeroDropCamera(lp_player, c_DROP_HEIGHT, 0.0);
+}
+
+// Touchdown (R-DROP-5, R-DROP-6): the same hero unit, alive at the pod.
+void gf_HeroDropLand (int lp_player) {
+    unit lv_pod = gv_dropPod[lp_player];
+    unit lv_hero = gv_dropHero[lp_player];
+    point lv_at = gv_dropAt[lp_player];
+
+    UnitSetHeight(lv_pod, 0.0, 0.0);
+    gf_HeroDropCamera(lp_player, 0.0, 0.0);
+    gf_PodImpactNow(lv_at);
+    UnitRevive(lv_hero);
+    // The engine revives with 1 life (herodrop/20261116-224935).
+    UnitSetPropertyFixed(lv_hero, c_unitPropLifePercent, 100.0);
+    UnitSetPosition(lv_hero, lv_at, false);
+    UnitSetFacing(lv_hero, CameraGetYaw(lp_player), 0.0);
+    gv_dropPending[lp_player] = false;
+    gv_dropPod[lp_player] = null;
+    gv_dropLandings[lp_player] += 1;
+    // A toggle order in the loop of the revive did not take
+    // (herodrop/20261116-225854): the toggles are set again over the next
+    // loops (gf_HeroDropRestore), through their commands.
+    gv_dropRestoreLoops[lp_player] = c_DROP_RESTORE_LOOPS;
+    CameraPan(lp_player, lv_at, 0.0, -1, 10.0, false);
+    gf_HeroBind(lv_hero);
+    // The bind starts in Point & Click (gf_PncEnsure); the TPS mode the
+    // hero had comes back after it.
+    if (gv_dropTps[lp_player]) {
+        UnitBehaviorAdd(lv_hero, c_SCOBA_TPS_BEHAVIOR, lv_hero, 1);
+        gf_ControlModeApply(lp_player);
+    }
+    // The pod opens: its death clip opens the doors.
+    UnitKill(lv_pod);
+}
+
+// The toggles the hero had (R-DROP-6), after the revive. gf_ToggleSet
+// does nothing once a toggle matches.
+void gf_HeroDropRestore (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    if (gv_dropRestoreLoops[lp_player] <= 0) {
+        return;
+    }
+    gv_dropRestoreLoops[lp_player] -= 1;
+    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
+        return;
+    }
+    gf_AttackSingleSet(lv_hero, gv_dropSingle[lp_player]);
+    gf_ChaseStandSet(lv_hero, gv_dropStand[lp_player]);
+}
+
+void gf_HeroDropStep (int lp_player) {
+    unit lv_pod = gv_dropPod[lp_player];
+    fixed lv_t;
+    fixed lv_next;
+    fixed lv_h;
+
+    if (!UnitIsValid(lv_pod)) {
+        return;
+    }
+    lv_t = TimerGetElapsed(gv_sCOBA_Clock) - gv_dropStartAt[lp_player];
+    if (lv_t >= c_DROP_FALL) {
+        // The first loop at or after the fall time: the height reads 0.
+        gf_HeroDropLand(lp_player);
+        return;
+    }
+    lv_next = MinF(lv_t + c_DROP_TICK, c_DROP_FALL);
+    lv_h = c_DROP_HEIGHT * gf_HeroDropPart(lv_next);
+    UnitSetHeight(lv_pod, lv_h, lv_next - lv_t);
+    // Same target height and time as the pod: no lead, no trail.
+    gf_HeroDropCamera(lp_player, lv_h, lv_next - lv_t);
+}
+
+bool gt_HeroDropDeath_Func (bool testConds, bool runActions) {
+    unit lv_unit = EventUnit();
+
+    if (!runActions) {
+        return true;
+    }
+    if (lv_unit != gv_heroActive || !gv_heroSwitchReady || gv_dropPending[1]) {
+        return true;
+    }
+    gf_HeroDropDied(1, lv_unit);
+    return true;
+}
+
+bool gt_HeroDropReinforce_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_HeroDropStart(1);
+    return true;
+}
+
+bool gt_HeroDropTick_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_HeroDropRestore(1);
+    gf_HeroDropTrack(1);
+    gf_HeroDropStep(1);
+    return true;
+}
+
+void gt_HeroDrop_Init () {
+    gt_HeroDropDeath = TriggerCreate("gt_HeroDropDeath_Func");
+    TriggerAddEventUnitDied(gt_HeroDropDeath, null);
+    gt_HeroDropReinforce = TriggerCreate("gt_HeroDropReinforce_Func");
+    TriggerAddEventTimer(gt_HeroDropReinforce, gv_sPAWNTIMER);
+    gt_HeroDropTick = TriggerCreate("gt_HeroDropTick_Func");
+    TriggerAddEventTimePeriodic(gt_HeroDropTick, c_DROP_TICK, c_timeGame);
+}

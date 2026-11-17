@@ -62,6 +62,9 @@ void gf_ControlsSnap (string lp_section, string lp_tag) {
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "AttackOrder", UnitOrderHasAbil(lv_hero, "attack"));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Fov", FixedToInt(gv_cAMERAFOV[1]));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Distance", FixedToInt(CameraGetDistance(1)));
+    // The arm is 1.5 (Tosh): whole units hide the collision clamp.
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Distance1000", FixedToInt(CameraGetDistance(1) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Pitch", FixedToInt(CameraGetPitch(1)));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UpperState", gv_animUpperState[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LowerState", gv_animLowerState[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "MoveTarget", FixedToInt(c_ANIM_MOVE_TARGET * 100.0 + 0.5));

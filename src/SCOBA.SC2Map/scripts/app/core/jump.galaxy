@@ -28,6 +28,9 @@ const fixed c_JUMP_BLEND = 0.04;
 const fixed c_JUMP_RESUME_BLEND = 0.05;
 // Walk jump takeoff: a very short burst of speed (BehaviorData SCOBAJumpBurst).
 const string c_JUMP_BURST = "SCOBAJumpBurst";
+// Its MoveSpeedMultiplier. The engine speed property does not show the buff,
+// so the Start clip rate takes it from here (the jump profile checks both match).
+const fixed c_JUMP_BURST_SPEED = 1.4;
 // Gait matching (R-JUMP-18). The walk (Attack Walk, 0-667 ms) is a jog with
 // two flight frames per cycle, half a cycle apart; a walk jump exists once
 // per stride (flight frame). Stride k flies at FLIGHT + k / STRIDES; the back

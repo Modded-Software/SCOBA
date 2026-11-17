@@ -51,8 +51,9 @@ def check(ctx, data: dict, checks) -> None:
     period = checks.value("rungun", "shot", "WeaponPeriodMs")
     print(f"rungun shot WeaponPeriodMs: {period}")
     ring = checks.value("rungun", "shot", "CooldownRingMs")
-    if ring is None or ring <= 0 or ring > 2500:
-        print(f"rungun shot CooldownRingMs: got={ring} want0..2500 FAIL")
+    # One loop after the press: inside the 0.25 s Tosh cooldown.
+    if ring is None or ring <= 0 or ring > 250:
+        print(f"rungun shot CooldownRingMs: got={ring} want1..250 FAIL")
         checks.failures += 1
     checks.eq("rungun", "t0000", "CooldownRingMs", 0)
     checks.eq("rungun", "shot", "HeroAttackOrder", 0)

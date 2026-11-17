@@ -118,8 +118,9 @@ fi
 log "launching $MAP_NAME"
 cd "$SC2_DIR"
 
+# Window size, shadowmapsize=8192 and TerrainTextureSize=2048 (operator 2026-11-16), written to Variables.txt on every launch.
 if ! "$UV_BIN" run python "$ROOT_DIR/scripts/sc2-configure-window.py"; then
-    log "warning: could not configure window size"
+    fail "could not configure Variables.txt (window size, shadowmapsize, TerrainTextureSize)"
 fi
 
 if [ -f "$SC2_SWITCHER" ]; then

@@ -1,31 +1,12 @@
-// Shot clocks, read inside one weapon period. Tosh fires every 0.25 s
-// (operator 2026-11-16), so a read 0.25 s after the shot finds the clocks
-// over. This waits up to 2 s for the shot effect, reads the hero cooldown,
-// the button clock and the command state in the next game loop, and keeps
-// the period. With lp_again it clicks again in that loop, on cooldown
+// Shot clocks of the tps shot scenarios, read inside one weapon period by
+// gf_DbgClockRead (common.galaxy). lp_shots: gv_aimShotEffectEvents before
+// the click. With lp_again it clicks again in that loop, on cooldown
 // (R-TPS-58), and records the cooldown left at that click. Then it
 // snapshots 0.25 s after the shot. Called from tps.galaxy; declared there.
-void gf_DbgTpsShotClocks (string lp_section, string lp_tag, bool lp_again) {
-    unit lv_hero;
-    int lv_i;
-    int lv_shots;
-
-    lv_hero = gv_tPSUNIT[1];
-    lv_shots = gv_aimShotEffectEvents;
-    for (lv_i = 0; lv_i < 32; lv_i += 1) {
-        if (gv_aimShotEffectEvents > lv_shots) {
-            break;
-        }
-        Wait(0.0625, c_timeGame);
-    }
-    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ShotSeen", gv_aimShotEffectEvents > lv_shots);
-    Wait(0.0625, c_timeGame);
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EarlyCdMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EarlyBtnMs", FixedToInt(UnitAbilityGetCooldown(lv_hero, "SCOBAAutoAttackStatus", c_DBG_BUTTON_COOLDOWN) * 1000.0));
-    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "EarlyCmdCd", UnitCheckAbilCmdState(lv_hero, AbilityCommand("SCOBAAutoAttackStatus", 0), c_cmdStateCooldown));
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CdTimeMs", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, UnitWeaponGet(lv_hero, gf_AimWeaponIndex(1)), "Cost.Cooldown.TimeUse", 1)) * 1000.0));
+void gf_DbgTpsShotClocks (string lp_section, string lp_tag, int lp_shots, bool lp_again) {
+    gf_DbgClockRead(lp_section, lp_tag, lp_shots);
     if (lp_again) {
-        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AgainCdMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "AgainCdMs", FixedToInt(UnitGetCooldown(gv_tPSUNIT[1], c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
         gf_AimShotPress(1);
     }
     Wait(0.1875, c_timeGame);

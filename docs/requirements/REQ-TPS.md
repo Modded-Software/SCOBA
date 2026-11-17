@@ -64,6 +64,7 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-14 | While aiming, the whole torso MUST follow the camera pitch. The head MUST NOT tilt or lead separately. |
 | R-TPS-15 | The TPS walk MUST turn and animate as the Point & Click right-hold walk does (R-PNC-68). |
 | R-TPS-16 | In TPS, while not aiming, the head MUST follow the crosshair faster than the torso: on a fast camera turn or look up or down it MUST turn ahead in that direction, sideways and up or down, and MUST settle back once the camera stops. The torso animation MUST NOT change for this. Operator 2026-11-16. |
+| R-TPS-17 | In TPS with Attack `auto`, while not aiming, Tosh MUST hold the shooting pose between shots as R-PNC-80 to 82 define it, standing and walking. Aiming MUST own the upper body instead. With Attack `single` no pose is held: no shot fires outside the aim. Switching to `single` MUST end the pose at once. The pose MUST NOT follow the camera pitch (R-TPS-12). Operator 2026-11-16. |
 
 ### 3.3 Cursor and crosshair
 

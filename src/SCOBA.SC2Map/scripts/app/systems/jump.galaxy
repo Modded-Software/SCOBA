@@ -447,7 +447,7 @@ bool gf_JumpPress (int lp_player) {
         UnitBehaviorAdd(lv_hero, c_JUMP_BURST, lv_hero, 1);
         gv_jumpBursts[lp_player] += 1;
         if (gf_JumpHasClips(lv_hero)) {
-            gv_jumpStartScale[lp_player] = MaxF(1.0, gf_JumpGaitRate(lp_player, lv_hero));
+            gv_jumpStartScale[lp_player] = MaxF(1.0, gf_JumpGaitRate(lp_player, lv_hero)) * c_JUMP_BURST_SPEED;
         }
     }
     // The first height and clip are set now, not on the next tick (R-JUMP-2).

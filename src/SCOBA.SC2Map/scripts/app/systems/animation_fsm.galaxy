@@ -13,6 +13,7 @@ void gf_AnimReset (int lp_player) {
     gv_animLowerClipIndex[lp_player] = -1;
     gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
     gv_animAttackUntil[lp_player] = -1.0;
+    gv_animReadyUntil[lp_player] = -1.0;
     gv_animAttackTarget[lp_player] = null;
     gv_animTargetPitchStep[lp_player] = 0;
     gv_animTargetPitchTime[lp_player] = -1.0;
@@ -67,6 +68,35 @@ bool gf_AnimAttackActive (int lp_player) {
     }
     return TimerGetElapsed(gv_sCOBA_Clock) < gv_animAttackUntil[lp_player];
 }
+// PNC pose hold (R-PNC-80): Tosh keeps the shooting pose between shots,
+// while he has an attack order and for c_ANIM_READY_LINGER after a shot.
+// In TPS only with Attack auto and not aiming (R-TPS-17): the aim holds its
+// own pose, and Attack single fires no shot outside the aim. Not Kerrigan.
+bool gf_AnimReadyHold (int lp_player) {
+    unit lv_hero;
+
+    lv_hero = gv_tPSUNIT[lp_player];
+    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
+        return false;
+    }
+    if (gv_aIMACTIVE[lp_player]) {
+        return false;
+    }
+    if (gf_TpsActive(lp_player) && !gf_CombatAutoOn(lp_player)) {
+        return false;
+    }
+    if (gf_AnimHeroProfile(lv_hero) != c_ANIM_HERO_TOSH) {
+        return false;
+    }
+    if (UnitOrderHasAbil(lv_hero, "attack")) {
+        return true;
+    }
+    return gv_animReadyUntil[lp_player] >= 0.0 && TimerGetElapsed(gv_sCOBA_Clock) < gv_animReadyUntil[lp_player];
+}
+// Ends the linger. An attack order still holds the pose.
+void gf_AnimReadyEnd (int lp_player) {
+    gv_animReadyUntil[lp_player] = -1.0;
+}
 bool gf_AnimAimAttackActive (int lp_player) {
     if (gv_animAimAttackUntil[lp_player] < 0.0) {
         return false;
@@ -112,6 +142,7 @@ void gf_AnimAttackStart (int lp_player, string lp_weapon, unit lp_target) {
     }
     gv_animAttackState[lp_player] = lv_state;
     gv_animAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + (c_ANIM_ATTACK_DURATION / gv_animAttackSpeed[lp_player]);
+    gv_animReadyUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_ANIM_READY_LINGER;
     gf_AnimTargetPitchBegin(lp_player, lp_target);
     gf_AnimUpperAttackStart(lp_player, lv_state);
 }
@@ -190,6 +221,7 @@ void gf_AnimTick (int lp_player) {
     if (gv_aIMACTIVE[lp_player]) {
         lv_lower = gf_AnimLowerState(lp_player);
         gv_animAttackUntil[lp_player] = -1.0;
+        gv_animReadyUntil[lp_player] = -1.0;
         gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
         gf_AnimUpdateAimTurn(lp_player);
         if (lv_lower == c_ANIM_LOWER_IDLE && gv_animAimTurn[lp_player] != 0) {
@@ -223,6 +255,12 @@ void gf_AnimTick (int lp_player) {
         if (lv_attacking) {
             lv_upper = gv_animAttackState[lp_player];
         }
+        else if (gf_AnimReadyHold(lp_player)) {
+            // Between shots: the pitch pose stays on the upper bracket.
+            lv_upper = c_ANIM_UPPER_READY;
+            gv_animAttackUntil[lp_player] = -1.0;
+            gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
+        }
         else {
             lv_upper = c_ANIM_UPPER_NONE;
             gv_animAttackUntil[lp_player] = -1.0;
@@ -230,7 +268,7 @@ void gf_AnimTick (int lp_player) {
             gv_animAttackTarget[lp_player] = null;
         }
         gf_AnimUpperSet(lp_player, lv_upper);
-        if (lv_attacking) {
+        if (lv_upper != c_ANIM_UPPER_NONE) {
             gf_AnimTargetPitchTick(lp_player);
         }
     }

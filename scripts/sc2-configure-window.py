@@ -20,10 +20,15 @@ if not os.path.isfile(path):
 with open(path, "r", encoding="utf-8", errors="replace") as handle:
     lines = handle.read().splitlines()
 
+SHADOW_MAP_SIZE = "8192"  # operator 2026-11-16: forced on every launch (4096, 2048 tried, then 8192)
+TERRAIN_TEXTURE_SIZE = "2048"  # operator 2026-11-16: forced on every launch (was 768; 4096 tried, then 2048)
+
 values = {
     "displaymode": "0",
     "windowwidth": WIDTH,
     "windowheight": HEIGHT,
+    "shadowmapsize": SHADOW_MAP_SIZE,
+    "TerrainTextureSize": TERRAIN_TEXTURE_SIZE,
 }
 seen = set()
 result = []
@@ -42,4 +47,12 @@ for key, value in values.items():
 with open(path, "w", encoding="utf-8", newline="\n") as handle:
     handle.write("\n".join(result) + "\n")
 
-print("configured", path, WIDTH, HEIGHT)
+with open(path, "r", encoding="utf-8", errors="replace") as handle:
+    written = handle.read().splitlines()
+for key, want in (("shadowmapsize", SHADOW_MAP_SIZE), ("TerrainTextureSize", TERRAIN_TEXTURE_SIZE)):
+    found = [line for line in written if line.startswith(key + "=")]
+    if found != ["%s=%s" % (key, want)]:
+        print(key, "not set to", want, "in", path, found)
+        sys.exit(1)
+
+print("configured", path, WIDTH, HEIGHT, "shadowmapsize=" + SHADOW_MAP_SIZE, "TerrainTextureSize=" + TERRAIN_TEXTURE_SIZE)

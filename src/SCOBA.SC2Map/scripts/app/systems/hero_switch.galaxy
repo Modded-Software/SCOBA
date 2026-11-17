@@ -79,12 +79,36 @@ void gf_HeroApplyCamera (unit lp_unit) {
     CameraFollowUnitGroup(1, libNtve_gf_ConvertUnitToUnitGroup(lp_unit), true, false);
 }
 
+// Makes lp_hero player 1's hero: script state, toggles shown, direct
+// control, camera, selection. Used by the hero switch and the hero drop.
+void gf_HeroBind (unit lp_hero) {
+    gv_heroActive = lp_hero;
+    gv_tPSUNIT[1] = lp_hero;
+    gf_CombatSyncRoot(1);
+    gf_AnimReset(1);
+    gf_HeroApplyToggles(lp_hero);
+    UnitBehaviorRemove(lp_hero, "UnitDirectControl", 1);
+    UnitBehaviorAdd(lp_hero, "UnitDirectControl", lp_hero, 1);
+    UnitSetState(lp_hero, c_unitStateStatusBar, false);
+    UnitXPGainEnable(lp_hero, null, true);
+    gf_ControlApply(1);
+    gf_PncEnsure(1);
+    gf_HeroApplyCamera(lp_hero);
+    UnitClearSelection(1);
+    UnitSelect(lp_hero, 1, true);
+}
+
 void gf_HeroSwitchTo (unit lp_target) {
     unit lv_old;
     point lv_pos;
     fixed lv_facing;
 
     if (!gv_heroSwitchReady) {
+        return;
+    }
+    // A dead hero waits for its pod: no switch (R-DROP-7).
+    if (gv_dropPending[1]) {
+        gv_dropSwitchBlocked[1] += 1;
         return;
     }
     if (!UnitIsValid(lp_target) || !UnitIsAlive(lp_target)) {
@@ -117,21 +141,9 @@ void gf_HeroSwitchTo (unit lp_target) {
     UnitSetPosition(lp_target, lv_pos, true);
     UnitSetFacing(lp_target, lv_facing, 0.0);
     gf_HeroReveal(lp_target);
-    gv_heroActive = lp_target;
-    gv_tPSUNIT[1] = lp_target;
-    gf_CombatSyncRoot(1);
-    gf_AnimReset(1);
-    gf_HeroApplyToggles(lp_target);
     gf_AttackSingleSet(lp_target, UnitBehaviorCount(lv_old, c_SCOBA_SINGLE_BEHAVIOR) > 0);
     gf_ChaseStandSet(lp_target, UnitBehaviorCount(lv_old, c_SCOBA_STAND_BEHAVIOR) > 0);
-    UnitBehaviorAdd(lp_target, "UnitDirectControl", lp_target, 1);
-    UnitSetState(lp_target, c_unitStateStatusBar, false);
-    UnitXPGainEnable(lp_target, null, true);
-    gf_ControlApply(1);
-    gf_PncEnsure(1);
-    gf_HeroApplyCamera(lp_target);
-    UnitClearSelection(1);
-    UnitSelect(lp_target, 1, true);
+    gf_HeroBind(lp_target);
 }
 
 void gf_HeroUnitsReplace () {

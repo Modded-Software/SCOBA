@@ -673,12 +673,25 @@
     <CUnit id="Zergling">
         <Radius value="0.75"/>
     </CUnit>
+    <!-- The hero's own drop pod (REQ-HERO-DROP): the stock Terran pod, no
+         collision, no footprint. The script sets its height. -->
+    <CUnit id="SCOBAHeroPod" parent="TerranDropPod">
+        <Collide index="Ground" value="0"/>
+        <Collide index="Structure" value="0"/>
+        <Collide index="Unit" value="0"/>
+        <Footprint value=""/>
+        <PlacementFootprint value=""/>
+    </CUnit>
+    <!-- Heroes stay as dead units so UnitRevive brings the same unit back
+         (R-DROP-6), as the stock hero Dehaka does. -->
     <CUnit id="ToshSCOBA" parent="Tosh">
+        <DeathTime value="-1"/>
         <DefaultAcquireLevel value="Offensive"/>
         <WeaponArray Link="ToshAuto"/>
         <BehaviorArray Link="SCOBAFriendlyFireBlock"/>
     </CUnit>
     <CUnit id="KerriganSCOBA" parent="Kerrigan">
+        <DeathTime value="-1"/>
         <DefaultAcquireLevel value="Offensive"/>
         <WeaponArray Link="QueenOfBladesPsiBlastAuto"/>
         <WeaponArray Link="RazorTalonsAuto"/>
