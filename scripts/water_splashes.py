@@ -77,6 +77,7 @@ NON_SPLASH_ACTORS = {
     # engine squibs rippled on dry ground).
     "Goliath",
     "Queen",
+    "SCOBAVikingHeroAssault",
 }
 
 ACTOR_RE = re.compile(

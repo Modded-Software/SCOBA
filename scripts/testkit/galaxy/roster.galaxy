@@ -1,0 +1,164 @@
+// Roster harness (REQ-ROSTER, SPEC-ROSTER 4). Engine state: player type,
+// race, status, alliances; seat heroes; the waves of unplayed seats.
+
+trigger gt_RosterTest;
+
+// Players of the two teams, in core/roster order: seats, owners, corner.
+int gf_RsTeamPlayer (bool lp_terran, int lp_i) {
+    int lv_lane;
+
+    if (lp_i == 6) {
+        if (lp_terran) { return 7; }
+        return 8;
+    }
+    lv_lane = lp_i / 2 + 1;
+    if (!lp_terran) {
+        lv_lane += 3;
+    }
+    if (lp_i % 2 == 0) {
+        return gf_RosterSeat(lv_lane);
+    }
+    return gf_RosterOwner(lv_lane);
+}
+
+// Ally: passive and shared vision, both ways.
+bool gf_RsAlly (int lp_a, int lp_b) {
+    return PlayerGetAlliance(lp_a, c_allianceIdPassive, lp_b) && PlayerGetAlliance(lp_b, c_allianceIdPassive, lp_a)
+        && PlayerGetAlliance(lp_a, c_allianceIdVision, lp_b) && PlayerGetAlliance(lp_b, c_allianceIdVision, lp_a);
+}
+
+void gf_RsTable () {
+    string lv_s = "rs_table";
+    string lv_in = "";
+    string lv_cross = "";
+    int lv_p;
+    int lv_i;
+    int lv_j;
+    int lv_a;
+    int lv_b;
+    int lv_inBad = 0;
+    int lv_crossBad = 0;
+
+    for (lv_p = 0; lv_p < 16; lv_p += 1) {
+        BankValueSetFromInt(gv_dbgBank, lv_s, "p" + IntToString(lv_p) + "Type", PlayerType(lv_p));
+        BankValueSetFromString(gv_dbgBank, lv_s, "p" + IntToString(lv_p) + "Race", PlayerRace(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lv_s, "p" + IntToString(lv_p) + "Status", PlayerStatus(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lv_s, "p" + IntToString(lv_p) + "Lane", gf_RosterLaneOf(lv_p));
+        BankValueSetFromFlag(gv_dbgBank, lv_s, "p" + IntToString(lv_p) + "Owner", gf_RosterIsOwner(lv_p));
+    }
+    for (lv_i = 0; lv_i < 7; lv_i += 1) {
+        for (lv_j = 0; lv_j < 7; lv_j += 1) {
+            // Same team, two different players: allies.
+            lv_a = gf_RsTeamPlayer(true, lv_i);
+            lv_b = gf_RsTeamPlayer(true, lv_j);
+            if (lv_a != lv_b && !gf_RsAlly(lv_a, lv_b)) {
+                lv_inBad += 1;
+                lv_in = lv_in + IntToString(lv_a) + "-" + IntToString(lv_b) + " ";
+            }
+            lv_a = gf_RsTeamPlayer(false, lv_i);
+            lv_b = gf_RsTeamPlayer(false, lv_j);
+            if (lv_a != lv_b && !gf_RsAlly(lv_a, lv_b)) {
+                lv_inBad += 1;
+                lv_in = lv_in + IntToString(lv_a) + "-" + IntToString(lv_b) + " ";
+            }
+            // Across the teams: never passive, never shared vision.
+            lv_a = gf_RsTeamPlayer(true, lv_i);
+            lv_b = gf_RsTeamPlayer(false, lv_j);
+            if (PlayerGetAlliance(lv_a, c_allianceIdPassive, lv_b) || PlayerGetAlliance(lv_b, c_allianceIdPassive, lv_a)
+                || PlayerGetAlliance(lv_a, c_allianceIdVision, lv_b) || PlayerGetAlliance(lv_b, c_allianceIdVision, lv_a)) {
+                lv_crossBad += 1;
+                lv_cross = lv_cross + IntToString(lv_a) + "-" + IntToString(lv_b) + " ";
+            }
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "inBad", lv_inBad);
+    BankValueSetFromString(gv_dbgBank, lv_s, "inBadPairs", lv_in);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "crossBad", lv_crossBad);
+    BankValueSetFromString(gv_dbgBank, lv_s, "crossBadPairs", lv_cross);
+    BankSave(gv_dbgBank);
+}
+
+int gf_RsUnits (int lp_player, string lp_type) {
+    return UnitGroupCount(UnitGroup(lp_type, lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0), c_unitCountAlive);
+}
+
+// Units of a type with an order (the wave's gate order).
+int gf_RsOrdered (int lp_player, string lp_type) {
+    unitgroup lv_g = UnitGroup(lp_type, lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    int lv_n = 0;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (UnitOrderCount(UnitGroupLoopCurrent()) > 0) {
+            lv_n += 1;
+        }
+    }
+    UnitGroupLoopEnd();
+    return lv_n;
+}
+
+void gf_RsSeatSnap (string lp_s, string lp_tag) {
+    int lv_p;
+    string lv_k;
+
+    for (lv_p = 1; lv_p <= 6; lv_p += 1) {
+        lv_k = lp_tag + "p" + IntToString(lv_p);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Played", gf_RosterPlayed(lv_p));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "SeatHero", UnitIsValid(gv_rosterHero[lv_p]));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Tps", UnitIsValid(gv_tPSUNIT[lv_p]));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Toshes", gf_RsUnits(lv_p, "ToshSCOBA"));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Wallet", gf_WalletPlayer(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Pods", gv_dropPods[lv_p]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Marines", gf_RsUnits(lv_p, "Marine"));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "MarinesOrdered", gf_RsOrdered(lv_p, "Marine"));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Zerglings", gf_RsUnits(lv_p, "Zergling"));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "ZerglingsOrdered", gf_RsOrdered(lv_p, "Zergling"));
+    }
+    BankSave(gv_dbgBank);
+}
+
+// Seats and one real reinforcement: every lane's wave, for played and
+// unplayed seats; no pod for anyone (all heroes alive).
+void gf_RsSeats () {
+    string lv_s = "rs_seats";
+    int lv_i;
+
+    TimerPause(gv_sPAWNTIMER, true);
+    gf_RsSeatSnap(lv_s, "t0");
+    TimerStart(gv_sPAWNTIMER, 0.1, false, c_timeGame);
+    // The waves drop lane after lane (each pod waits, systems/spawns):
+    // poll until the last lanes have their ordered waves, at most 60 s.
+    for (lv_i = 0; lv_i < 240; lv_i += 1) {
+        if (gf_RsOrdered(3, "Marine") >= 4 && gf_RsOrdered(6, "Zergling") >= 8) {
+            break;
+        }
+        Wait(0.25, c_timeGame);
+    }
+    TimerPause(gv_sPAWNTIMER, true);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "waveMs", FixedToInt(IntToFixed(lv_i) * 250.0));
+    gf_RsSeatSnap(lv_s, "t1");
+}
+
+bool gt_RosterTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAROSTER", 1);
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "roster");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "rs_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_RsTable();
+    gf_RsSeats();
+    BankValueSetFromInt(gv_dbgBank, "rs_end", "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_RosterTest_Init () {
+    gt_RosterTest = TriggerCreate("gt_RosterTest_Func");
+    TriggerAddEventMapInit(gt_RosterTest);
+}

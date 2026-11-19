@@ -69,7 +69,8 @@ void gf_AbilitiesSelectionDialogUpdateButtonsandIcons (int lp_iPlayer) {
     lv_nButtons = gv_nAbilitiesButtons;
 
     // Implementation
-    auto6C461372_ae = lv_nButtons;
+    // Buttons are 0 .. n - 1; index n has no dialog control.
+    auto6C461372_ae = lv_nButtons - 1;
     auto6C461372_ai = 1;
     lv_iButton = 0;
     for ( ; ( (auto6C461372_ai >= 0 && lv_iButton <= auto6C461372_ae) || (auto6C461372_ai <= 0 && lv_iButton >= auto6C461372_ae) ) ; lv_iButton += auto6C461372_ai ) {
@@ -134,16 +135,22 @@ void gf_AbilitiesSelectionDialogUpdateKeyColumn (int lp_localPlayer, string lp_i
     gv_abilitiesSelectionAdditionalColumnAllocatedPoints[lp_localPlayer] += 1;
 }
 
-void gf_AbilitiesSelectionDialogHide () {
+// Hides the abilities panel and key column of one player only (R-UI-4).
+void gf_AbilitiesSelectionDialogHide (int lp_iPlayer) {
     // Implementation
-    DialogSetVisible(gv_abilitiesSelectionDialog, PlayerGroupAll(), false);
-    DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupAll(), false);
+    DialogSetVisible(gv_abilitiesSelectionDialog, PlayerGroupSingle(lp_iPlayer), false);
+    DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupSingle(lp_iPlayer), false);
+}
+
+// Buttons, icons and points label, without changing visibility.
+void gf_AbilitiesSelectionDialogRefresh (int lp_iPlayer) {
+    gf_AbilitiesSelectionDialogUpdateButtonsandIcons(lp_iPlayer);
+    libNtve_gf_SetDialogItemText(gv_abilitiesSelectionLabel, (StringExternal("Param/Value/11D77532") + IntToText(gv_availableAbilityPoints[lp_iPlayer])), PlayerGroupSingle(lp_iPlayer));
 }
 
 void gf_AbilitiesSelectionDialogShow (int lp_iPlayer) {
     // Implementation
-    gf_AbilitiesSelectionDialogUpdateButtonsandIcons(lp_iPlayer);
-    libNtve_gf_SetDialogItemText(gv_abilitiesSelectionLabel, (StringExternal("Param/Value/11D77532") + IntToText(gv_availableAbilityPoints[lp_iPlayer])), PlayerGroupSingle(lp_iPlayer));
+    gf_AbilitiesSelectionDialogRefresh(lp_iPlayer);
     DialogSetVisible(gv_abilitiesSelectionDialog, PlayerGroupSingle(lp_iPlayer), true);
     DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupSingle(lp_iPlayer), true);
 }
@@ -159,6 +166,10 @@ bool gt_AbilitiesandStatsTriggerDevelopment_Func (bool testConds, bool runAction
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     gv_availableAbilityPoints[lv_iPlayer] += 1;
     gv_availableStatPoints[lv_iPlayer] += 9;
@@ -172,21 +183,29 @@ void gt_AbilitiesandStatsTriggerDevelopment_Init () {
     TriggerAddEventKeyPressed(gt_AbilitiesandStatsTriggerDevelopment, c_playerAny, c_keyO, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
 }
 
+// HUD abilities button: open or close the abilities panel and key column
+// of one player (R-UI-4).
+void gf_AbilitiesPanelToggle (int lp_player) {
+    if ((DialogIsVisible(gv_abilitiesSelectionDialog, lp_player) == true)) {
+        gf_AbilitiesSelectionDialogHide(lp_player);
+    }
+    else {
+        gf_AbilitiesSelectionDialogShow(lp_player);
+    }
+}
+
 bool gt_SBDialogAbilitiesCallback_Func (bool testConds, bool runActions) {
     // Actions
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     if ((EventDialogControl() == gv_singleButtonButtonAbilities)) {
-        if ((DialogIsVisible(gv_abilitiesSelectionDialog, EventPlayer()) == true)) {
-            DialogSetVisible(gv_abilitiesSelectionDialog, PlayerGroupSingle(EventPlayer()), false);
-            DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupSingle(EventPlayer()), false);
-        }
-        else {
-            gf_AbilitiesSelectionDialogShow(EventPlayer());
-            DialogSetVisible(gv_abilitiesSelectionAdditionalColumnDialog, PlayerGroupSingle(EventPlayer()), true);
-        }
+        gf_AbilitiesPanelToggle(EventPlayer());
     }
 
     return true;
@@ -213,12 +232,16 @@ bool gt_AbilitiesSelectionDialogCallback_Func (bool testConds, bool runActions) 
     if (!runActions) {
         return true;
     }
-
-    if ((EventDialogControl() == gv_abilitiesSelectionDialogCloseButton)) {
-        gf_AbilitiesSelectionDialogHide();
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
     }
 
-    autoF8ECBB8E_ae = gv_nAbilitiesButtons;
+    if ((EventDialogControl() == gv_abilitiesSelectionDialogCloseButton)) {
+        gf_AbilitiesSelectionDialogHide(lv_localPlayer);
+    }
+
+    autoF8ECBB8E_ae = gv_nAbilitiesButtons - 1;
     autoF8ECBB8E_ai = 1;
     lv_iButton = 0;
     for ( ; ( (autoF8ECBB8E_ai >= 0 && lv_iButton <= autoF8ECBB8E_ae) || (autoF8ECBB8E_ai <= 0 && lv_iButton >= autoF8ECBB8E_ae) ) ; lv_iButton += autoF8ECBB8E_ai ) {

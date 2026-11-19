@@ -69,11 +69,12 @@ unit gf_HeroUnit (int lp_player) {
             lv_hero = gv_heroTosh;
         }
     }
-    else if (lp_player == 2) {
-        lv_hero = gv_heroKerrigan;
-    }
-    else {
+    else if (gf_RosterPlayed(lp_player)) {
+        // The seat hero (core/roster); an unplayed seat has none.
         lv_hero = gv_tPSUNIT[lp_player];
+        if (!UnitIsValid(lv_hero)) {
+            lv_hero = gv_rosterHero[lp_player];
+        }
     }
     return lv_hero;
 }
@@ -116,6 +117,10 @@ bool gt_KeepHeroSelected_Func (bool testConds, bool runActions) {
         return true;
     }
     for (lv_player = 1; lv_player <= 6; lv_player += 1) {
+        // Input hold of this player (systems/input_hold).
+        if (gf_InputHeld(lv_player)) {
+            continue;
+        }
         if (gv_sCOBAOrderMode[lv_player] == true) {
             continue;
         }
@@ -163,7 +168,7 @@ bool gf_UnitClickEvent (int lp_player, bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
-    if (!gf_IsHeroPlayer(lp_player)) {
+    if (!gf_IsHeroPlayer(lp_player) || gf_InputHeld(lp_player)) {
         return true;
     }
     gv_unitClickCandidate[lp_player] = EventUnit();

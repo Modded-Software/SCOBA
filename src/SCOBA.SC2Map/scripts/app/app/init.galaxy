@@ -27,6 +27,8 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
         return true;
     }
 
+    // The played seats first: heroes, wallets and the intro read them.
+    gf_RosterInit();
     // The intro starts with no game UI and no minimap, before any wait
     // (operator 2026-11-17). Touchdown restores both (gf_IntroEnd).
     if (c_INTRO_ENABLED) {
@@ -67,62 +69,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             UnitXPGainEnable(gv_tPSUNIT[lv_localPlayer], null, true);
             UnitSetState(gv_tPSUNIT[lv_localPlayer], c_unitStateStatusBar, false);
             libNtve_gf_StoreUnitSelection(lv_localPlayer, libNtve_ge_UnitSelectionStoreOption_DoNotClearUnitSelection);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", true);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackStatus", true);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBAAutoAttackToggle", true);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBATPSToggle", true);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBATPSToggle", true);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SCOBARightClickToggle", true);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "heal", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "heal", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "GuardianShield", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "InvulnerabilityShield", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BuildingStasis", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Frenzy", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "SummonCompanion", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "VoodooShield", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BlindingCloud", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "DisablingCloud", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZeratulBlink", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "RogueGhostCloak", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "BansheeCloak", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "PoisonNova", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Siphon", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "Irradiate", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "KarassPsiStorm", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HydraliskFrenzy", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "HeroNuclearStrike", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridGravitonPrison", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ForceField", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "TemporalField", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "StunningBlast", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ArtanisVortex", false);
-            UnitAbilityEnable(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
-            UnitAbilityShow(gv_tPSUNIT[lv_localPlayer], "ZHybridPsionicShockwave", false);
+            gf_HeroAbilitiesDefault(gv_tPSUNIT[lv_localPlayer]);
             Wait(0.01, c_timeGame);
             // Operator 2026-11-16: shadow distance 64 (16000 blurred the shadows).
             CameraSetValue(1, c_cameraValueShadowClip, 64.0, 0.0, -1, 10.0);
@@ -181,6 +128,10 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             gf_PncEnsure(lv_localPlayer);
         }
     }
+    // Hero money and HUD, then the lane bases and their AI (REQ-BASE-AI).
+    // The AI runs in the intro too.
+    gf_WalletInit();
+    gf_BaseAiInit();
     // The hero is bound and the dialogs exist: the intro loop starts.
     gf_IntroStart();
     return true;

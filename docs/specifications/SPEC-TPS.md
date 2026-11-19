@@ -408,7 +408,7 @@ Floater checks read script counters. They do not prove the text is visible.
 
 ## 8. Findings Outside This Phase
 
-- T26: `systems/camera.galaxy` reads `CameraGetTarget` for the camera
+- T26: `systems/camera/camera.galaxy` reads `CameraGetTarget` for the camera
   collision sample. If the value is stuck as measured, the sample is taken at
   the wrong point. Not changed here. The pushed commit `b3988d1` has the same
   code.
@@ -554,7 +554,7 @@ Only the harness files of `combat` and `pncprobe` changed after
 
 ## Camera depth of field (REQ-CAMERA-DOF)
 
-`gf_CameraDofApply` (systems/camera.galaxy), own 0.05 s timer
+`gf_CameraDofApply` (systems/camera/camera.galaxy), own 0.05 s timer
 `gt_CameraDofTick`, PnC and TPS. Skipped during the intro and the hero drop.
 Focus = camera arm d. Max strength = the intro DOF (near 1..6, far 4..18).
 

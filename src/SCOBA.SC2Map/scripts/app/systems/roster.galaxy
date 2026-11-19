@@ -1,0 +1,34 @@
+// Module: systems/roster
+// A player leaves (REQ-ROSTER R-ROSTER-8): the seat's drop, input hold and
+// intro end. The lane's waves and base AI go on, as on an unplayed seat.
+
+trigger gt_RosterLeave;
+
+void gf_RosterLeave (int lp_player) {
+    if (!gf_RosterPlayed(lp_player)) {
+        return;
+    }
+    gv_rosterLeaves += 1;
+    if (UnitIsValid(gv_dropPod[lp_player])) {
+        UnitRemove(gv_dropPod[lp_player]);
+    }
+    gv_dropPod[lp_player] = null;
+    gv_dropPending[lp_player] = false;
+    gv_dropRestoreLoops[lp_player] = 0;
+    gf_InputRelease(lp_player);
+    gf_IntroEnd(lp_player);
+    gv_rosterPlayed[lp_player] = false;
+}
+
+bool gt_RosterLeave_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_RosterLeave(EventPlayer());
+    return true;
+}
+
+void gt_RosterLeave_Init () {
+    gt_RosterLeave = TriggerCreate("gt_RosterLeave_Func");
+    TriggerAddEventPlayerLeft(gt_RosterLeave, c_playerAny, c_gameResultUndecided);
+}

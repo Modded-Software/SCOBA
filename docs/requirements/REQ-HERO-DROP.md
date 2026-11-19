@@ -6,24 +6,28 @@ next reinforcement when it dies, in a dedicated drop pod, with the TPS
 camera locked to the pod while it falls. Operator choices the same day: own
 pod unit with a script fall; the hero that died; the camera stays at the
 death spot until the drop; the same unit revives with its level. After
-play: the camera arm was too close to the pod (R-DROP-4). The
-specification lists the state of each requirement and the run that backs
-it.
+play: the camera arm was too close to the pod (R-DROP-4). Revised
+2026-11-18 (operator): every played seat has its own drop
+([REQ-ROSTER](REQ-ROSTER.md)); the hero may come back as a fresh unit with
+its stats carried; a hero that died naturally after a return did not come
+back (R-DROP-8). The specification lists the state of each requirement and
+the run that backs it.
 
 ## 1. Scope
 
 In scope:
 
-- the death of the active hero of player 1;
+- the death of the active hero of each played seat (REQ-ROSTER);
 - the wait until the next reinforcement;
 - the hero's own pod, its fall, and its touchdown;
 - the camera during the wait and the fall;
-- the hero coming back: the same unit, its toggles and control mode.
+- the hero coming back: its type, level, toggles and control mode;
+- every later death of the same seat.
 
 Out of scope:
 
 - a death of the parked hero (hidden and paused, it takes no damage);
-- other players' heroes;
+- unplayed seats (no hero, REQ-ROSTER R-ROSTER-5);
 - a respawn timer of its own: the reinforcement timer is the clock;
 - pod sound and look beyond the stock Terran pod model.
 
@@ -32,7 +36,7 @@ Implementation lives in
 
 ## 2. Definitions
 
-- **Hero**: the unit player 1 controls (`gv_heroActive`, `gv_tPSUNIT[1]`).
+- **Hero**: the unit a played seat controls (`gv_tPSUNIT[p]`).
 - **Reinforcement**: an expiry of the spawn timer `gv_sPAWNTIMER` (every
   40 s), when the lane spawns drop.
 - **Pod**: the hero's own drop pod unit (`SCOBAHeroPod`).
@@ -45,11 +49,13 @@ Implementation lives in
 | --- | --- |
 | R-DROP-1 | When the hero dies, it MUST wait for the next reinforcement. A reinforcement while the hero lives MUST NOT drop a pod. |
 | R-DROP-2 | While the hero waits, the camera MUST stay where the hero died. |
-| R-DROP-3 | At the next reinforcement one pod MUST appear above a point of player 1's spawn region and fall to the ground, never rising, in about 2.2 s, on the stock pod fall curve. The pod MUST be the hero's own: no reinforcement unit rides in it. |
+| R-DROP-3 | At the next reinforcement one pod MUST appear above a point of the seat's spawn region and fall to the ground, never rising, in about 2.2 s, on the stock pod fall curve. The pod MUST be the hero's own: no reinforcement unit rides in it. |
 | R-DROP-4 | While the pod falls, the camera MUST be locked to the pod: on its point, with the pod height in the camera height offset in the same loop time as the pod, and an arm long enough for the pod model. Revised 2026-11-16: an arm of 8 was too close. |
 | R-DROP-5 | At touchdown the pod MUST hit the ground as a reinforcement pod does (crush impacts, quake) and open. |
-| R-DROP-6 | At touchdown the same hero unit MUST come back alive at the pod with full life, its level, its Attack and Chase toggles, and its control mode (TPS or Point & Click). The camera MUST return to the hero with the hero arm and no pod height. |
+| R-DROP-6 | At touchdown the hero MUST come back alive at the pod: same unit type, full life, its level, its Attack and Chase toggles, and its control mode (TPS or Point & Click). It MAY be a fresh unit (operator 2026-11-18). The camera MUST return to the hero with the hero arm and no pod height. |
 | R-DROP-7 | While the hero waits or the pod falls, the hero switch MUST NOT change the hero. |
+| R-DROP-8 | Every death of a returned hero MUST start the same wait and drop again, with no limit on the count. |
+| R-DROP-9 | One seat's death, wait, fall and return MUST NOT change another seat's hero, camera or input. |
 
 ## 4. Acceptance
 

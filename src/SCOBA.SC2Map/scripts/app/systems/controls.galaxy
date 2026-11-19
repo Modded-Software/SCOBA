@@ -1,5 +1,22 @@
 // Module: systems/controls
 
+// Heroes: Tosh and Kerrigan. Every other controlled unit (the Alt+3 SCV,
+// the Alt+4 Viking) is a regular unit.
+bool gf_UnitIsHero (unit lp_unit) {
+    string lv_t = UnitGetType(lp_unit);
+
+    return lv_t == "ToshSCOBA" || lv_t == "Tosh" || lv_t == "KerriganSCOBA" || lv_t == "Kerrigan";
+}
+
+// Regular units (operator 2026-11-18): always Point & Click, never TPS; a
+// right hold orbits the camera only, no facing lock, no strafe or
+// backpedal; WASD turns the unit to its travel direction.
+bool gf_ControlRegular (int lp_player) {
+    unit lv_u = gv_tPSUNIT[lp_player];
+
+    return UnitIsValid(lv_u) && !gf_UnitIsHero(lv_u);
+}
+
 bool gf_TpsActive (int lp_player) {
     unit lv_hero;
 
@@ -8,6 +25,9 @@ bool gf_TpsActive (int lp_player) {
     }
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
+        return false;
+    }
+    if (gf_ControlRegular(lp_player)) {
         return false;
     }
     return UnitBehaviorCount(lv_hero, c_SCOBA_TPS_BEHAVIOR) > 0;
@@ -69,8 +89,15 @@ void gf_ControlApply (int lp_player) {
     if (!gf_IsHeroPlayer(lp_player)) {
         return;
     }
-    gv_rOTATEUNIT[lp_player] = (gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player]) || gv_mOUSEMIDDLE[lp_player];
-    gv_rOTATECAMERA[lp_player] = gv_lEFTORBIT[lp_player];
+    if (gf_ControlRegular(lp_player)) {
+        // A right hold orbits the camera as a left hold does (R-PNC-60/61).
+        gv_rOTATEUNIT[lp_player] = gv_mOUSEMIDDLE[lp_player];
+        gv_rOTATECAMERA[lp_player] = gv_lEFTORBIT[lp_player] || (gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player]);
+    }
+    else {
+        gv_rOTATEUNIT[lp_player] = (gv_mOUSERIGHT[lp_player] && gv_rIGHTORBIT[lp_player]) || gv_mOUSEMIDDLE[lp_player];
+        gv_rOTATECAMERA[lp_player] = gv_lEFTORBIT[lp_player];
+    }
     if (gf_TpsActive(lp_player)) {
         lv_relative = !gv_mOUSEMIDDLE[lp_player];
     }
@@ -194,7 +221,17 @@ bool gt_TpsOn_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(UnitGetOwner(EventUnit()))) {
+        return true;
+    }
     lv_player = EventPlayer();
+    if (gf_ControlRegular(lv_player)) {
+        // No TPS for a regular unit: undo the toggle.
+        gv_tpsRefused[lv_player] += 1;
+        gf_PncEnsure(lv_player);
+        return true;
+    }
     gf_ControlModeApply(lv_player);
     return true;
 }
@@ -203,6 +240,10 @@ bool gt_TpsOff_Func (bool testConds, bool runActions) {
     int lv_player;
 
     if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(UnitGetOwner(EventUnit()))) {
         return true;
     }
     lv_player = EventPlayer();

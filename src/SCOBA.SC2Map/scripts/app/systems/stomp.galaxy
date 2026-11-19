@@ -1,0 +1,60 @@
+// Stomp config: what a walking unit type does to the world, one row per
+// unit type, set by call (gf_StompConfig). Read by systems/crush.galaxy
+// (doodad destruction) and systems/quake.galaxy (camera shake, footfall
+// sounds and effects). Footfall effect data (dust, splash, ripple, thump)
+// is generated per model by scripts/footfall/fx.py; the actors play it only
+// while the unit's actor has ScobaFootFx 1, which quake.galaxy sets from
+// lp_fx. A unit whose type leaves the table (a morph) stops at once.
+
+const int c_STOMP_TYPES = 16;
+string[c_STOMP_TYPES] gv_stompType;
+bool[c_STOMP_TYPES] gv_stompCrush;        // removes crushable flora it walks into
+fixed[c_STOMP_TYPES] gv_stompCrushReach;  // unit centre to plant centre
+fixed[c_STOMP_TYPES] gv_stompShake;       // camera shake gain; 0 = none
+fixed[c_STOMP_TYPES] gv_stompStepHz;      // shake footfalls per second at full speed
+bool[c_STOMP_TYPES] gv_stompFx;           // footfall sounds and effects
+int gv_stompCount;
+
+// Row of a unit type, or -1.
+int gf_StompIndex (string lp_type) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < gv_stompCount; lv_i += 1) {
+        if (gv_stompType[lv_i] == lp_type) {
+            return lv_i;
+        }
+    }
+    return -1;
+}
+
+// Adds or replaces the row of lp_type. Returns its row, or -1 if full.
+// lp_crush / lp_crushReach: doodad destruction. lp_shake: camera shake gain
+// (1 = the Goliath's; reach and size still follow the unit radius), with
+// lp_stepHz footfalls per second at full speed. lp_fx: footfall sounds and
+// effects (needs a FOOTFALL_UNITS row for the unit's model and actor).
+int gf_StompConfig (string lp_type, bool lp_crush, fixed lp_crushReach, fixed lp_shake, fixed lp_stepHz, bool lp_fx) {
+    int lv_i = gf_StompIndex(lp_type);
+
+    if (lv_i < 0) {
+        if (gv_stompCount >= c_STOMP_TYPES) {
+            return -1;
+        }
+        lv_i = gv_stompCount;
+        gv_stompCount += 1;
+        gv_stompType[lv_i] = lp_type;
+    }
+    gv_stompCrush[lv_i] = lp_crush;
+    gv_stompCrushReach[lv_i] = lp_crushReach;
+    gv_stompShake[lv_i] = MaxF(0.0, lp_shake);
+    gv_stompStepHz[lv_i] = MaxF(0.0, lp_stepHz);
+    gv_stompFx[lv_i] = lp_fx;
+    return lv_i;
+}
+
+// The map's walkers (operator 2026-11-16: Goliath and Queen; 2026-11-18:
+// the landed Alt+4 Viking gets the Goliath's stomp).
+void gf_StompDefaults () {
+    gf_StompConfig("Goliath", true, 2.5, 1.0, 1.0, true);
+    gf_StompConfig("Queen", true, 2.5, 1.0, 1.0, true);
+    gf_StompConfig("SCOBAVikingHeroAssault", true, 2.5, 1.0, 1.0, true);
+}

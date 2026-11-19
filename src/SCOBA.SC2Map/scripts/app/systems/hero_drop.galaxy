@@ -4,8 +4,8 @@
 // gv_sPAWNTIMER expiry: a SCOBAHeroPod drops as a stock pod: created on
 // the ground, its model plays Birth untouched. The TPS camera follows the
 // Birth root, replayed from the model keys (data/pod_birth). Touchdown: pod
-// impact, the same hero unit revives at the pod with its level, and the pod
-// opens.
+// impact, the hero comes back at the pod (systems/hero_return), and the
+// pod opens. Per seat: every played seat has its own drop (REQ-ROSTER).
 
 // Pod part of the camera height, blended over lp_time with the pod.
 void gf_HeroDropCamera (int lp_player, fixed lp_height, fixed lp_time) {
@@ -25,13 +25,20 @@ void gf_HeroDropTrack (int lp_player) {
     gv_dropSingle[lp_player] = UnitBehaviorCount(lv_hero, c_SCOBA_SINGLE_BEHAVIOR) > 0;
     gv_dropStand[lp_player] = UnitBehaviorCount(lv_hero, c_SCOBA_STAND_BEHAVIOR) > 0;
     gv_dropTps[lp_player] = UnitBehaviorCount(lv_hero, c_SCOBA_TPS_BEHAVIOR) > 0;
+    gf_HeroStatsKeep(lp_player, lv_hero);
+}
+
+// A hero waits for its pod: the dead hero, or the hidden intro hero. The
+// one drop path for both (operator 2026-11-18).
+void gf_HeroDropBegin (int lp_player, unit lp_hero) {
+    gv_dropPending[lp_player] = true;
+    gv_dropHero[lp_player] = lp_hero;
 }
 
 // The hero died (R-DROP-1). The camera stays at the death spot (R-DROP-2).
 void gf_HeroDropDied (int lp_player, unit lp_hero) {
     gv_dropDeaths[lp_player] += 1;
-    gv_dropPending[lp_player] = true;
-    gv_dropHero[lp_player] = lp_hero;
+    gf_HeroDropBegin(lp_player, lp_hero);
     gv_dropDeathAt[lp_player] = UnitGetPosition(lp_hero);
     gf_AimEnd(lp_player);
     gf_StrafeHoldSet(lp_player, false);
@@ -115,33 +122,42 @@ void gf_HeroDropRoot (int lp_player, fixed lp_t) {
 // Aim through the pod with no height offset (the engine has no getter for
 // it, so it cannot be tested). The look ray through the root at height z,
 // pitch p, meets the ground z / tan(p) further along the yaw: that is the
-// target. The arm grows by z / sin(p), so the eye stays c_DROP_CAM_DISTANCE
-// behind the pod on its own line. Target, yaw, pitch, distance: all read
-// back by the engine getters.
+// target. The arm grows by z / sin(p), so the eye stays c_DROP_POD_ARM
+// behind the pod on its own line. Then the side arm moves the whole camera
+// c_DROP_CAM_SIDE to the right of the travel (yaw - 90). Target, yaw,
+// pitch, distance: all read back by the engine getters.
+point gf_HeroDropSide (point lp_at, fixed lp_yaw) {
+    return PointWithOffsetPolar(lp_at, c_DROP_CAM_SIDE, lp_yaw - 90.0);
+}
+
 void gf_HeroDropAim (int lp_player, fixed lp_time) {
     fixed lv_z = gv_dropRootZ[lp_player];
     fixed lv_p = c_POD_BIRTH_PITCH;
     point lv_t = PointWithOffsetPolar(gv_dropRootAt[lp_player], lv_z * Cos(lv_p) / Sin(lv_p), gv_dropTravel[lp_player]);
 
+    lv_t = gf_HeroDropSide(lv_t, gv_dropTravel[lp_player]);
+
     gv_dropAimAt[lp_player] = lv_t;
-    gv_dropAimDist[lp_player] = c_DROP_CAM_DISTANCE + lv_z / Sin(lv_p);
+    gv_dropAimDist[lp_player] = c_DROP_POD_ARM + lv_z / Sin(lv_p);
     CameraPan(lp_player, lv_t, lp_time, 0.0, 0.0, false);
     CameraSetValue(lp_player, c_cameraValueDistance, gv_dropAimDist[lp_player], lp_time, 0.0, 0.0);
 }
 
-// The next reinforcement: a stock pod drop at lp_at, the camera on its
-// Birth root (R-DROP-3, R-DROP-4).
-void gf_HeroDropStartAt (int lp_player, point lp_at) {
+// The pod of a waiting hero: a stock pod drop at lp_at, the camera on its
+// Birth root (R-DROP-3, R-DROP-4). Called by the reinforcement drop
+// (systems/spawns) and the intro deploy. Nothing when no hero waits.
+void gf_HeroDropStart (int lp_player, point lp_at) {
     unit lv_pod;
 
     if (!gv_dropPending[lp_player] || UnitIsValid(gv_dropPod[lp_player])) {
         return;
     }
+    gf_InputHold(lp_player);
     // As libVCMI_gf_CreateDropPod (voidcampaignmissionlib): create, then
     // Birth on the default slot, non-looping, default time.
-    // Facing from the camera: the pod's travel direction (facing +
-    // c_POD_BIRTH_TRAVEL) is the camera yaw, so it falls along the view.
-    gv_dropTravel[lp_player] = CameraGetYaw(lp_player);
+    // The pod's travel direction (facing + c_POD_BIRTH_TRAVEL) is the
+    // camera yaw, so it falls along the view; the yaw is fixed.
+    gv_dropTravel[lp_player] = c_DROP_YAW;
     UnitCreate(1, c_DROP_POD_UNIT, c_unitCreateIgnorePlacement, lp_player, lp_at, gv_dropTravel[lp_player] - c_POD_BIRTH_TRAVEL);
     lv_pod = UnitLastCreated();
     if (!UnitIsValid(lv_pod)) {
@@ -165,7 +181,8 @@ void gf_HeroDropStartAt (int lp_player, point lp_at) {
     gf_HeroDropRoot(lp_player, 0.0);
     CameraFollowUnitGroup(lp_player, UnitGroupEmpty(), false, false);
     gv_cameraDistanceDesired[lp_player] = c_DROP_CAM_DISTANCE;
-    // Behind the pod on its line: same yaw, the descent pitch, no blend.
+    // Behind the pod on its line, on the side arm: same yaw, the descent
+    // pitch, no blend.
     CameraSetValue(lp_player, c_cameraValueYaw, gv_dropTravel[lp_player], 0.0, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValuePitch, c_POD_BIRTH_PITCH, 0.0, 0.0, 0.0);
     gf_HeroDropAim(lp_player, 0.0);
@@ -173,10 +190,10 @@ void gf_HeroDropStartAt (int lp_player, point lp_at) {
     // over the fall. No engine getter for the player FOV: operator check.
     CameraSetValue(lp_player, c_cameraValueFieldOfView, c_DROP_FOV_START, 0.0, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValueFieldOfView, c_DROP_FOV_END, c_DROP_FALL, 0.0, 0.0);
-    // Near and far DOF, focus on the pod (c_DROP_CAM_DISTANCE in front of
+    // Near and far DOF, focus on the pod (c_DROP_POD_ARM in front of
     // the eye), the intro's falloffs (operator 2026-11-17).
     CameraSetValue(lp_player, c_cameraValueDepthOfField, 1.0, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFocalDepth, c_DROP_CAM_DISTANCE, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFocalDepth, c_DROP_POD_ARM, 0.0, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValueFalloffStartNear, c_INTRO_DOF_NEAR_START, 0.0, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValueFalloffEndNear, c_INTRO_DOF_NEAR_END, 0.0, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValueFalloffStart, c_INTRO_DOF_FAR_START, 0.0, 0.0, 0.0);
@@ -185,29 +202,9 @@ void gf_HeroDropStartAt (int lp_player, point lp_at) {
     gf_HeroDropCamera(lp_player, 0.0, 0.0);
 }
 
-void gf_HeroDropStart (int lp_player) {
-    if (!gv_dropPending[lp_player] || UnitIsValid(gv_dropPod[lp_player])) {
-        return;
-    }
-    gf_HeroDropStartAt(lp_player, gf_DropPodPoint(gv_sPAWNLOCATIONS[lp_player], null, null));
-}
-
-// The intro deploy (SPEC-INTRO 3.9): the living, hidden hero comes down in
-// its pod at lp_at. Toggles: the defaults of a game without intro.
-void gf_HeroDropDeploy (int lp_player, unit lp_hero, point lp_at) {
-    if (gv_dropPending[lp_player] || UnitIsValid(gv_dropPod[lp_player]) || !UnitIsValid(lp_hero)) {
-        return;
-    }
-    gv_dropPending[lp_player] = true;
-    gv_dropIntro[lp_player] = true;
-    gv_dropHero[lp_player] = lp_hero;
-    gv_dropSingle[lp_player] = true;
-    gv_dropStand[lp_player] = true;
-    gv_dropTps[lp_player] = false;
-    gf_HeroDropStartAt(lp_player, lp_at);
-}
-
-// Touchdown (R-DROP-5, R-DROP-6): the same hero unit, alive at the pod.
+// Touchdown (R-DROP-5, R-DROP-6): the hero alive at the pod. A dead hero
+// comes back as a fresh unit (systems/hero_return); the intro hero never
+// died and is shown.
 void gf_HeroDropLand (int lp_player) {
     unit lv_pod = gv_dropPod[lp_player];
     unit lv_hero = gv_dropHero[lp_player];
@@ -218,17 +215,15 @@ void gf_HeroDropLand (int lp_player) {
     CameraSetValue(lp_player, c_cameraValuePitch, c_DROP_LAND_PITCH, 0.5, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValueDistance, c_DROP_CAM_DISTANCE, 0.5, 0.0, 0.0);
     gf_PodImpactNow(lv_at);
-    if (gv_dropIntro[lp_player]) {
-        // The intro hero never died: shown and unpaused, not revived.
-        gf_HeroReveal(lv_hero);
+    // Facing: the drop yaw (the camera yaw of every drop); no camera read.
+    if (!UnitIsAlive(lv_hero)) {
+        lv_hero = gf_HeroReturn(lp_player, lv_hero, lv_at, c_DROP_YAW);
+        gv_dropHero[lp_player] = lv_hero;
     }
-    else {
-        UnitRevive(lv_hero);
-    }
-    // The engine revives with 1 life (herodrop/20261116-224935).
+    gf_HeroReveal(lv_hero);
     UnitSetPropertyFixed(lv_hero, c_unitPropLifePercent, 100.0);
     UnitSetPosition(lv_hero, lv_at, false);
-    UnitSetFacing(lv_hero, CameraGetYaw(lp_player), 0.0);
+    UnitSetFacing(lv_hero, c_DROP_YAW, 0.0);
     gv_dropPending[lp_player] = false;
     gv_dropPod[lp_player] = null;
     gv_dropLandings[lp_player] += 1;
@@ -237,7 +232,9 @@ void gf_HeroDropLand (int lp_player) {
     // loops (gf_HeroDropRestore), through their commands.
     gv_dropRestoreLoops[lp_player] = c_DROP_RESTORE_LOOPS;
     CameraPan(lp_player, lv_at, 0.0, -1, 10.0, false);
-    gf_HeroBind(lv_hero);
+    // Input back before the bind: the bind sends the control mode.
+    gf_InputRelease(lp_player);
+    gf_HeroBindPlayer(lp_player, lv_hero);
     // The bind starts in Point & Click (gf_PncEnsure); the TPS mode the
     // hero had comes back after it.
     if (gv_dropTps[lp_player]) {
@@ -246,10 +243,8 @@ void gf_HeroDropLand (int lp_player) {
     }
     // The pod opens: its death clip opens the doors.
     UnitKill(lv_pod);
-    if (gv_dropIntro[lp_player]) {
-        gv_dropIntro[lp_player] = false;
-        gf_IntroEnd(lp_player);
-    }
+    // Ends the intro if one runs (it checks).
+    gf_IntroEnd(lp_player);
 }
 
 // The toggles the hero had (R-DROP-6), after the revive. gf_ToggleSet
@@ -317,34 +312,40 @@ void gf_HeroDropStep (int lp_player) {
     gf_HeroDropAim(lp_player, MaxF(lv_next - lv_t, c_DROP_TICK));
 }
 
+// One trigger for every seat (R-DROP-8, R-DROP-9): the active hero of a
+// played seat died. Only hero types come back; the Alt+3/Alt+4 test bodies
+// of player 1 get no pod.
 bool gt_HeroDropDeath_Func (bool testConds, bool runActions) {
     unit lv_unit = EventUnit();
+    int lv_p = UnitGetOwner(lv_unit);
 
     if (!runActions) {
         return true;
     }
-    if (lv_unit != gv_heroActive || !gv_heroSwitchReady || gv_dropPending[1]) {
+    if (!gf_RosterPlayed(lv_p) || lv_unit != gv_tPSUNIT[lv_p] || gv_dropPending[lv_p] || !gf_UnitIsHero(lv_unit)) {
         return true;
     }
-    gf_HeroDropDied(1, lv_unit);
-    return true;
-}
-
-bool gt_HeroDropReinforce_Func (bool testConds, bool runActions) {
-    if (!runActions) {
+    if (lv_p == 1 && !gv_heroSwitchReady) {
         return true;
     }
-    gf_HeroDropStart(1);
+    gf_HeroDropDied(lv_p, lv_unit);
     return true;
 }
 
 bool gt_HeroDropTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+
     if (!runActions) {
         return true;
     }
-    gf_HeroDropRestore(1);
-    gf_HeroDropTrack(1);
-    gf_HeroDropStep(1);
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        if (!gf_RosterPlayed(lv_p)) {
+            continue;
+        }
+        gf_HeroDropRestore(lv_p);
+        gf_HeroDropTrack(lv_p);
+        gf_HeroDropStep(lv_p);
+    }
     return true;
 }
 
@@ -352,8 +353,6 @@ void gt_HeroDrop_Init () {
     gf_PodBirthLoad();
     gt_HeroDropDeath = TriggerCreate("gt_HeroDropDeath_Func");
     TriggerAddEventUnitDied(gt_HeroDropDeath, null);
-    gt_HeroDropReinforce = TriggerCreate("gt_HeroDropReinforce_Func");
-    TriggerAddEventTimer(gt_HeroDropReinforce, gv_sPAWNTIMER);
     gt_HeroDropTick = TriggerCreate("gt_HeroDropTick_Func");
     TriggerAddEventTimePeriodic(gt_HeroDropTick, c_DROP_TICK, c_timeGame);
 }

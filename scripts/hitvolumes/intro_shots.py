@@ -59,6 +59,8 @@ class Shot(NamedTuple):
     # far x arm past the focus, full at 3 x that (lower = stronger).
     near: float = 1.0
     far: float = 0.0
+    # Focal distance; 0 = the shot's arm (dist0). Near falloffs scale with it.
+    focus: float = 0.0
 
 
 def dolly_k() -> float:
@@ -72,6 +74,17 @@ def dolly_dist(fov: float) -> float:
 BC = (103.8, 153.2)
 X = (125.3, 118.8)
 HYBRID = (194.4, 193.1)
+# S4 eye exactly at (193.5, 164.5), height 10.2 (operator 2026-11-18),
+# looking at the Hybrid (ground + 3). Yaw, pitch and arm from the built
+# terrain: Hybrid ground 8.76, so target height 11.76.
+S4_EYE = (193.5, 164.5)
+S4_EYE_Z = 10.2
+S4_TZ = 3.0
+S4_GROUND = 8.76
+_S4_FLAT = math.hypot(HYBRID[0] - S4_EYE[0], HYBRID[1] - S4_EYE[1])
+S4_YAW = round(math.degrees(math.atan2(HYBRID[1] - S4_EYE[1], HYBRID[0] - S4_EYE[0])), 2)
+S4_PITCH = round(math.degrees(math.atan2(S4_EYE_Z - (S4_GROUND + S4_TZ), _S4_FLAT)), 2)
+S4_DIST = round(math.hypot(_S4_FLAT, S4_EYE_Z - (S4_GROUND + S4_TZ)), 2)
 HIVE = (21.0, 9.0)
 NYDUS = (59.0, 59.0)
 PSI = (240.0, 248.0)
@@ -82,7 +95,8 @@ PREDATOR = (177.84, 135.15)
 # Third jungle spot (operator 2026-11-17): the Predator pair at (117.7,
 # 157.1) and (116.1, 166.5), passed on the east, north, 8 s at 2.5 cells/s.
 JUNGLE_START = (120.0, 150.0)
-JUNGLE_END = (120.0, 170.0)
+# S8 ends 0.5 s earlier at the same 2.5 cells/s (operator 2026-11-18): 7.5 s, 1.25 cells short of 170.
+JUNGLE_END = (120.0, 168.75)
 BRAMBLE = (194.85, 162.8)  # S4 eye: survey spot 3 cells back along the yaw (operator 2026-11-17)
 # S1: the eye sits at the Brakk mob boss (Objects) and looks at the
 # battlecruiser (operator 2026-11-17). Target = eye + arm along the yaw.
@@ -90,6 +104,10 @@ BRAKK = (14.9558, 113.3615)
 BRAKK_YAW = round(math.degrees(math.atan2(BC[1] - BRAKK[1], BC[0] - BRAKK[0])), 2)
 S1_D0, S1_D1 = 8.0, 14.0
 S1_Z = 14.0  # target height: the eye looks up from below it and must clear the ridge
+# S1 focus far out (operator 2026-11-18, option 2): the Zerus trees ahead are
+# 26..58 from the eye, the BC about 97. Focus 60, near 2.0: full near blur
+# closer than 37.5, fading out by 56; the BC beyond stays sharp.
+S1_FOCUS = 60.0
 
 
 def _ahead(d: float, pitch: float) -> tuple[float, float]:
@@ -110,14 +128,16 @@ S2_GROUND = (4.16, 4.17)
 ABSOLUTE = {"S2 Line": (WATER + 1.2, WATER + 1.2)}
 
 SHOTS: tuple[Shot, ...] = (
-    Shot("S1 Pride", 12, "E", *S1_T0, *S1_T1, S1_Z, S1_Z, BRAKK_YAW, BRAKK_YAW, S1_P0, S1_P1, S1_D0, S1_D1, 50, 40, False, VAR_NONE),
+    Shot("S1 Pride", 12, "E", *S1_T0, *S1_T1, S1_Z, S1_Z, BRAKK_YAW, BRAKK_YAW, S1_P0, S1_P1, S1_D0, S1_D1, 50, 40, False, VAR_NONE, 2.0, 0.0, S1_FOCUS),  # more near DOF (operator 2026-11-18)
     Shot("S2 Line", 12, "L", 119.6, 113.1, 131.0, 124.5, round(WATER + 1.2 - S2_GROUND[0], 2), round(WATER + 1.2 - S2_GROUND[1], 2), 135, 135, 6, 6, 16, 16, 50, 50, True, VAR_TARGET),
     Shot("S3 Map", 10, "E", *X, *X, 0, 0, 45, 75, 80, 80, 150, 150, 22, 22, False, VAR_NONE, 1.3),
-    Shot("S4 Brambles", 6, "E", *HYBRID, *HYBRID, 3, 3, 90.8, 90.8, -6.0, -6.0, 30.5, 30.5, 70, 45, False, VAR_NONE),
+    Shot("S4 Brambles", 6, "E", *HYBRID, *HYBRID, S4_TZ, S4_TZ, S4_YAW, S4_YAW, S4_PITCH, S4_PITCH, S4_DIST, S4_DIST, 70, 45, False, VAR_NONE),
     Shot("S5 Shackled", 4, "E", *HYBRID, *HYBRID, 4, 4, 90.8, 90.8, 8, 8, 18, 12, 48, 44, False, VAR_NONE, 0.3, 0.15),
-    Shot("S6 Overmind", 6, "A", *HIVE, *HIVE, 3, 3, 205, 245, 18, 18, 66, 66, 55, 55, False, VAR_YAW, 0.1, 0.3),
-    Shot("S7 Worm", 3, "O", *NYDUS, *NYDUS, 6, 12, 225, 225, -20, -35, 9, 9, 80, 80, False, VAR_NONE, 2.0),
-    Shot("S8 Jungle", 8, "L", *JUNGLE_START, *JUNGLE_END, 2, 2, 90, 90, 12, 12, 6, 6, 60, 60, False, VAR_NONE, 2.0, 1.5),
+    # S6 orbit at half the rate (operator 2026-11-18): 20 degrees in 6 s, was 40.
+    Shot("S6 Overmind", 6, "A", *HIVE, *HIVE, 3, 3, 215, 235, 18, 18, 66, 66, 55, 55, False, VAR_YAW, 1.5, 0.3),  # near DOF: 4.0 was too much (operator 2026-11-18)
+    # S7 4 s longer (operator 2026-11-18: +2 s, then +2 s): the pitch up over 7 s, was 3.
+    Shot("S7 Worm", 7, "O", *NYDUS, *NYDUS, 6, 12, 225, 225, -20, -35, 9, 9, 80, 80, False, VAR_NONE, 6.0),  # near DOF up (operator 2026-11-18: 2.0, 4.0, then 6.0)
+    Shot("S8 Jungle", 7.5, "L", *JUNGLE_START, *JUNGLE_END, 2, 2, 90, 90, 12, 12, 6, 6, 60, 60, False, VAR_NONE, 2.0, 1.5),
     Shot("S9 Decimator", 8, "Z", *PSI, *PSI, 4, 4, 45, 45, 10, 10, DOLLY_DIST, round(dolly_dist(24), 1), 70, 24, False, VAR_NONE, 2.0),
 )
 # The crash zoom. Its target is the hero drop point, set at SPACE.
@@ -212,7 +232,7 @@ def galaxy() -> str:
         f"const int c_INTRO_VAR_YAW = {VAR_YAW};",
     ]
     fields = ("length", "x0", "y0", "x1", "y1", "z0", "z1", "yaw0", "yaw1", "pitch0", "pitch1", "dist0", "dist1", "fov0", "fov1", "near", "far")
-    for name in fields:
+    for name in fields + ("focus",):
         lines.append(f"fixed[{n}] gv_introRow_{name};")
     for name in ("ease", "variant"):
         lines.append(f"int[{n}] gv_introRow_{name};")
@@ -222,6 +242,7 @@ def galaxy() -> str:
         lines.append(f"    // {s.name}")
         for name in fields:
             lines.append(f"    gv_introRow_{name}[{i}] = {_f(s._asdict()[name])};")
+        lines.append(f"    gv_introRow_focus[{i}] = {_f(s.focus or s.dist0)};")
         lines.append(f"    gv_introRow_ease[{i}] = c_INTRO_EASE_{s.ease};")
         lines.append(f"    gv_introRow_variant[{i}] = {s.variant};")
         lines.append(f"    gv_introRow_dof[{i}] = {'true' if s.dof else 'false'};")

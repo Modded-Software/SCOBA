@@ -19,7 +19,7 @@ from collections import Counter
 from pathlib import Path
 from typing import NamedTuple
 
-from footprints.catalog import append_catalog
+from mapgen.footprints.catalog import append_catalog
 
 from . import border, config, crush, gates, hazard_paint, treevary
 from . import scene as scene_mod

@@ -1,0 +1,205 @@
+// baseai flight group, hero Viking feel (operator 2026-11-18): camera
+// refollow (systems/camera/refollow), turn-in-place clip (systems/turn_anim),
+// landed speed, footfall dust and splash (scripts/footfall/fx.py +
+// systems/quake ScobaFootGround).
+// Runs after gf_BlLandGroup: the Viking is player 1's bound unit, flying.
+
+void gf_BeCamBreak () {
+    CameraFollowUnitGroup(1, UnitGroupEmpty(), false, false);
+    CameraPan(1, Point(20.0, 20.0), 0.0, -1, 10.0, false);
+}
+
+void gf_BeCamState (string lp_s, string lp_k, int lp_n0) {
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Refollows", gv_camRefollows[1] - lp_n0);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Reason", gv_camRefollowReason[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "Follows", gf_CameraFollowsHero(1));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Dist100", FixedToInt(DistanceBetweenPoints(CameraGetTarget(1), UnitGetPosition(gv_tPSUNIT[1])) * 100.0));
+}
+
+void gf_BeCam (string lp_s) {
+    int lv_n;
+
+    Wait(1.0, c_timeGame);
+    // Negative: an intact follow is left alone.
+    lv_n = gv_camRefollows[1];
+    Wait(1.0, c_timeGame);
+    gf_BeCamState(lp_s, "camNeg", lv_n);
+    // Lost follow (as after an alert jump): restored.
+    lv_n = gv_camRefollows[1];
+    gf_BeCamBreak();
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "camLostBefore", gf_CameraFollowsHero(1));
+    Wait(1.0, c_timeGame);
+    gf_BeCamState(lp_s, "camLost", lv_n);
+    // Negative: a hero drop owns the camera.
+    gv_dropPending[1] = true;
+    lv_n = gv_camRefollows[1];
+    gf_BeCamBreak();
+    Wait(1.0, c_timeGame);
+    gf_BeCamState(lp_s, "camDrop", lv_n);
+    gv_dropPending[1] = false;
+    lv_n = gv_camRefollows[1];
+    Wait(1.0, c_timeGame);
+    gf_BeCamState(lp_s, "camAfter", lv_n);
+}
+
+// Turn in place by 180 (script turn, at the data rate): clip on mid-turn,
+// off after, at the configured time scale.
+void gf_BeTurn (string lp_s, string lp_k) {
+    unit lv_u = gv_tPSUNIT[1];
+    int lv_a = gv_turnAnimStarts;
+    int lv_b = gv_turnAnimStops;
+
+    gv_turnAnimScaleSent = -1.0;
+    UnitIssueOrder(lv_u, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    gf_UnitTurn(lv_u, UnitGetFacing(lv_u) + 180.0, 0.0);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "OnMid", gv_turnAnimOn[1]);
+    Wait(2.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "OnEnd", gv_turnAnimOn[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Starts", gv_turnAnimStarts - lv_a);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Stops", gv_turnAnimStops - lv_b);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Scale100", FixedToInt(gv_turnAnimScaleSent * 100.0));
+}
+
+// Footfall actors by name in the walking unit's scope, 48 ticks: the
+// actor text per tick (empty: no actor; run 20261118-165726 showed real
+// sound actors this way). The profile counts the non-empty ticks.
+void gf_BeFxSeen (string lp_s, string lp_k, unit lp_u, string lp_p) {
+    actorscope lv_sc;
+    int lv_t;
+
+    for (lv_t = 1; lv_t <= 48; lv_t += 1) {
+        Wait(0.0625, c_timeGame);
+        lv_sc = ActorScopeFromUnit(lp_u);
+        BankValueSetFromText(gv_dbgBank, lp_s, lp_k + "D" + IntToString(lv_t), ActorGetText(ActorFromScope(lv_sc, lp_p + "FootDust1")));
+        BankValueSetFromText(gv_dbgBank, lp_s, lp_k + "W" + IntToString(lv_t), ActorGetText(ActorFromScope(lv_sc, lp_p + "FootSplash1")));
+        BankValueSetFromText(gv_dbgBank, lp_s, lp_k + "S" + IntToString(lv_t), ActorGetText(ActorFromScope(lv_sc, lp_p + "FootSound1")));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Ground", gv_quakeGroundLast);
+}
+
+// A point with dry (lp_wet false) or wet ground on every cell of a 20 x 6
+// strip east of it (the walk: about 10), else the map centre. Run
+// 20261118-173015: a 10-step check missed dry cells inside water.
+point gf_BePoint (bool lp_wet) {
+    point lv_c = RegionGetCenter(RegionPlayableMap());
+    point lv_p;
+    int lv_x;
+    int lv_y;
+    int lv_k;
+    int lv_j;
+    bool lv_ok;
+
+    for (lv_y = -12; lv_y <= 12; lv_y += 1) {
+        for (lv_x = -12; lv_x <= 12; lv_x += 1) {
+            lv_p = PointWithOffset(lv_c, IntToFixed(lv_x) * 8.0, IntToFixed(lv_y) * 8.0);
+            lv_ok = true;
+            for (lv_k = 0; lv_k <= 20 && lv_ok; lv_k += 1) {
+                for (lv_j = -3; lv_j <= 3; lv_j += 1) {
+                    if (gf_QuakeInWater(PointWithOffset(lv_p, IntToFixed(lv_k), IntToFixed(lv_j))) != lp_wet) {
+                        lv_ok = false;
+                    }
+                }
+            }
+            if (lv_ok) {
+                return lv_p;
+            }
+        }
+    }
+    return lv_c;
+}
+
+// The bound unit walks east from lp_at; its footfall actors are sampled.
+void gf_BeWalk (string lp_s, string lp_k, point lp_at, string lp_p) {
+    unit lv_u = gv_tPSUNIT[1];
+    int lv_a;
+
+    UnitSetPosition(lv_u, lp_at, false);
+    UnitSetFacing(lv_u, 0.0, 0.0);
+    Wait(1.0, c_timeGame);
+    lv_a = gv_turnAnimStarts;
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "InWater", gf_QuakeInWater(lp_at));
+    UnitIssueOrder(lv_u, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(lp_at, 40.0, 0.0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    gf_BeFxSeen(lp_s, lp_k, lv_u, lp_p);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "TurnOn", gv_turnAnimOn[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "TurnStarts", gv_turnAnimStarts - lv_a);
+    UnitIssueOrder(lv_u, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+}
+
+// Control: a Goliath walks the same strip (the Viking stands at its end).
+void gf_BeGoliath (string lp_s, string lp_k, point lp_at) {
+    point lv_c = lp_at;
+    unit lv_g;
+
+    UnitCreate(1, "Goliath", 0, 1, lv_c, 0.0);
+    lv_g = UnitLastCreated();
+    Wait(1.0, c_timeGame);
+    UnitIssueOrder(lv_g, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(lv_c, 40.0, 0.0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    gf_BeFxSeen(lp_s, lp_k, lv_g, "Goliath");
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "InWater", gf_QuakeInWater(UnitGetPosition(lv_g)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Slot", gf_QuakeSlotOf(lv_g));
+    if (gf_QuakeSlotOf(lv_g) >= 0) {
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "Wet", gv_quakeWet[gf_QuakeSlotOf(lv_g)]);
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "At", IntToString(FixedToInt(PointGetX(lv_c))) + "," + IntToString(FixedToInt(PointGetY(lv_c))) + ">" + IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_g)))) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_g)))));
+    UnitRemove(lv_g);
+}
+
+// Landed speed: the hero's speed property vs a stock VikingAssault's, and
+// the hero's real walk over 2 s (engine) vs its property.
+void gf_BeSpeed (string lp_s) {
+    unit lv_u = gv_tPSUNIT[1];
+    point lv_at = gf_BePoint(false);
+    point lv_a;
+    unit lv_v;
+
+    UnitCreate(1, "VikingAssault", 0, 1, PointWithOffset(lv_at, 0.0, 12.0), 0.0);
+    lv_v = UnitLastCreated();
+    UnitSetPosition(lv_u, lv_at, false);
+    UnitSetFacing(lv_u, 0.0, 0.0);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "spHero100", FixedToInt(UnitGetPropertyFixed(lv_u, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "spStock100", FixedToInt(UnitGetPropertyFixed(lv_v, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0));
+    UnitRemove(lv_v);
+    lv_a = UnitGetPosition(lv_u);
+    UnitIssueOrder(lv_u, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(lv_a, 60.0, 0.0)), c_orderQueueReplace);
+    Wait(1.0, c_timeGame);
+    lv_a = UnitGetPosition(lv_u);
+    Wait(2.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "spHeroWalk100", FixedToInt(DistanceBetweenPoints(lv_a, UnitGetPosition(lv_u)) * 100.0));
+    UnitIssueOrder(lv_u, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+}
+
+void gf_BeFeelGroup (string lp_s) {
+    unit lv_u = gv_tPSUNIT[1];
+    point lv_dry = gf_BePoint(false);
+    point lv_wet = gf_BePoint(true);
+
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "feelBound", lv_u == gv_heroViking);
+    BankValueSetFromString(gv_dbgBank, lp_s, "feelType", UnitGetType(lv_u));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "feelDryOk", !gf_QuakeInWater(lv_dry));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "feelWetOk", gf_QuakeInWater(lv_wet));
+    gf_BeCam(lp_s);
+    gf_BeTurn(lp_s, "taFly");
+    // Negative: flying, no footfall actors.
+    gf_BeWalk(lp_s, "fxFly", lv_dry, "VikingHero");
+    UnitIssueOrder(lv_u, Order(AbilityCommand("SCOBAHeroAssaultMode", 0)), c_orderQueueReplace);
+    Wait(4.0, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lp_s, "feelLandType", UnitGetType(lv_u));
+    gf_BeTurn(lp_s, "taLand");
+    gf_BeSpeed(lp_s);
+    gf_BeWalk(lp_s, "fxDry", lv_dry, "VikingHero");
+    gf_BeWalk(lp_s, "fxWet", lv_wet, "VikingHero");
+    // The Viking off the strip, so the Goliath walks it unblocked.
+    UnitSetPosition(lv_u, RegionGetCenter(RegionPlayableMap()), false);
+    Wait(0.5, c_timeGame);
+    gf_BeGoliath(lp_s, "fxGDry", lv_dry);
+    UnitSetPosition(lv_u, RegionGetCenter(RegionPlayableMap()), false);
+    UnitIssueOrder(lv_u, Order(AbilityCommand("SCOBAHeroFighterMode", 0)), c_orderQueueReplace);
+    Wait(4.0, c_timeGame);
+}

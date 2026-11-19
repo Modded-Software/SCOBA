@@ -31,10 +31,12 @@ void gf_HdReset (string lp_section, bool lp_auto) {
         UnitRemove(gv_dropPod[1]);
     }
     gv_dropPod[1] = null;
+    // A dead hero (an aborted scenario) comes back as the drop does.
     if (!UnitIsAlive(lv_hero)) {
-        UnitRevive(lv_hero);
+        lv_hero = gf_HeroReturn(1, lv_hero, gv_dbgAnchor, 0.0);
     }
     gv_dropPending[1] = false;
+    gf_InputRelease(1);
     gf_HeroDropCamera(1, 0.0, 0.0);
     if (gv_heroActive != lv_hero) {
         gf_HeroBind(lv_hero);
@@ -67,11 +69,20 @@ void gf_HdSnap (string lp_section, string lp_tag) {
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "TpsMode", gf_TpsActive(1));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Deaths", gv_dropDeaths[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Pods", gv_dropPods[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamYaw100", FixedToInt(CameraGetYaw(1) * 100.0));
+    // The input hold (intro and drop): script flag and the engine trigger state.
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "InputHeld", gv_inputHeld[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "InputHeld2", gv_inputHeld[2]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "CursorTrigOn", TriggerIsEnabled(gt_CursorStart));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "TurnTickOn", TriggerIsEnabled(gt_CameraTurnTick));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Landings", gv_dropLandings[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Blocked", gv_dropSwitchBlocked[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Life", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropLife, c_unitPropCurrent)));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LifeMax", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropLifeMax, c_unitPropCurrent)));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Tag", UnitGetTag(lv_hero));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Type", UnitGetType(lv_hero));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Returns", gv_heroReturns[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LifeMaxBase", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropLifeMax, c_unitPropNormal)));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Level", gv_lEVEL[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "SavedTps", gv_dropTps[1]);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Single", UnitBehaviorCount(lv_hero, c_SCOBA_SINGLE_BEHAVIOR));
@@ -86,7 +97,175 @@ void gf_HdSnap (string lp_section, string lp_tag) {
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamToDeath100", gf_HdDist100(CameraGetTarget(1), gv_dropDeathAt[1]));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroToPod100", gf_HdDist100(UnitGetPosition(lv_hero), gv_dropAt[1]));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroToDeath100", gf_HdDist100(UnitGetPosition(lv_hero), gv_dropDeathAt[1]));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Valid", UnitIsValid(lv_hero));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Hidden", UnitTestState(lv_hero, c_unitStateHidden));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Paused", UnitTestState(lv_hero, c_unitStatePaused));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "PodValid", UnitIsValid(gv_dropPod[1]));
     BankSave(gv_dbgBank);
+}
+
+// Waits for the pod to come and land, at most 8 s.
+void gf_HdPodCycle () {
+    int lv_i;
+
+    gf_HdReinforce();
+    for (lv_i = 0; lv_i < 32 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    for (lv_i = 0; lv_i < 96 && UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+}
+
+// A death by damage from an enemy unit (operator: died naturally). The
+// source is a Zergling of player 4 next to the hero, removed after.
+bool gf_HdDamageKill (unit lp_hero) {
+    unit lv_src;
+    bool lv_dead;
+
+    UnitCreate(1, "Zergling", c_unitCreateIgnorePlacement, 4, PointWithOffset(UnitGetPosition(lp_hero), 1.0, 0.0), 0.0);
+    lv_src = UnitLastCreated();
+    UnitDamage(lv_src, "AutoTurret", lp_hero, 100000.0);
+    Wait(0.0625, c_timeGame);
+    lv_dead = !UnitIsAlive(lp_hero);
+    UnitRemove(lv_src);
+    if (!lv_dead) {
+        UnitKill(lp_hero);
+    }
+    return lv_dead;
+}
+
+// Three deaths in a row, each with its own pod (operator 2026-11-18: the
+// hero did not come back after the second death). Each touchdown: alive,
+// shown, not paused, bound, the old unit gone. A spent stat point (life
+// max) is carried (raw base value before and after).
+void gf_HdTwice () {
+    string lv_s = "drop_twice";
+    unit lv_old;
+    int lv_n;
+
+    gf_HdReset(lv_s, true);
+    UnitSetPropertyFixed(gv_heroTosh, c_unitPropLifeMax, UnitGetPropertyFixed(gv_heroTosh, c_unitPropLifeMax, c_unitPropNormal) + 50.0);
+    Wait(0.25, c_timeGame);
+    gf_HdSnap(lv_s, "t0");
+    for (lv_n = 1; lv_n <= 3; lv_n += 1) {
+        lv_old = gv_heroTosh;
+        BankValueSetFromFlag(gv_dbgBank, lv_s, "dead" + IntToString(lv_n) + "ByDamage", gf_HdDamageKill(lv_old));
+        Wait(0.4375, c_timeGame);
+        BankValueSetFromFlag(gv_dbgBank, lv_s, "dead" + IntToString(lv_n) + "OldValid", UnitIsValid(lv_old));
+        gf_HdSnap(lv_s, "dead" + IntToString(lv_n));
+        gf_HdPodCycle();
+        Wait(1.0, c_timeGame);
+        BankValueSetFromFlag(gv_dbgBank, lv_s, "back" + IntToString(lv_n) + "OldValid", UnitIsValid(lv_old));
+        gf_HdSnap(lv_s, "back" + IntToString(lv_n));
+    }
+}
+
+// Seat 2 played by the harness (one client): its hero dies, the wave drops
+// its pod, it comes back (R-DROP-9, R-ROSTER-6). Negative: seat 1's hero,
+// input hold and camera yaw do not change.
+void gf_HdSeat2 () {
+    string lv_s = "drop_seat2";
+    unit lv_one;
+    unit lv_two;
+    unit lv_back;
+    fixed lv_yaw;
+    int lv_i;
+    bool lv_held1 = false;
+    bool lv_held2 = false;
+
+    gf_HdReset(lv_s, true);
+    lv_one = gv_heroTosh;
+    gf_RosterPlay(2, true);
+    lv_two = gf_RosterHeroCreate(2);
+    gf_HeroBindPlayer(2, lv_two);
+    Wait(0.5, c_timeGame);
+    lv_yaw = CameraGetYaw(1);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "t0Valid2", UnitIsValid(lv_two));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "t0Bound2", gv_tPSUNIT[2] == lv_two);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "t0Owner2", UnitGetOwner(lv_two));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "deadByDamage2", gf_HdDamageKill(lv_two));
+    Wait(0.4375, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "deadPending2", gv_dropPending[2]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "deadPending1", gv_dropPending[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "deadDeaths2", gv_dropDeaths[2]);
+    gf_HdReinforce();
+    // Lane 2 drops after lane 1 (each lane pod waits): poll for its pod.
+    for (lv_i = 0; lv_i < 240 && !UnitIsValid(gv_dropPod[2]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen2", UnitIsValid(gv_dropPod[2]));
+    for (lv_i = 0; lv_i < 96 && UnitIsValid(gv_dropPod[2]); lv_i += 1) {
+        lv_held1 = lv_held1 || gv_inputHeld[1];
+        lv_held2 = lv_held2 || gv_inputHeld[2];
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    Wait(1.0, c_timeGame);
+    lv_back = gv_tPSUNIT[2];
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "fallHeld1", lv_held1);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "fallHeld2", lv_held2);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "backAlive2", UnitIsAlive(lv_back));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "backNew2", lv_back != lv_two);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "backOldValid2", UnitIsValid(lv_two));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "backOwner2", UnitGetOwner(lv_back));
+    BankValueSetFromString(gv_dbgBank, lv_s, "backType2", UnitGetType(lv_back));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "backSeatHero2", gv_rosterHero[2] == lv_back);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "backLandings2", gv_dropLandings[2]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "backHeld2", gv_inputHeld[2]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "backToPod100", gf_HdDist100(UnitGetPosition(lv_back), gv_dropAt[2]));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "backToSpawn100", gf_HdDist100(UnitGetPosition(lv_back), RegionGetCenter(gv_sPAWNLOCATIONS[2])));
+    // Seat 1 untouched.
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "oneSame", gv_tPSUNIT[1] == lv_one && gv_heroTosh == lv_one);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "oneAlive", UnitIsAlive(lv_one));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "onePods", gv_dropPods[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "oneYawDelta100", FixedToInt(AbsF(CameraGetYaw(1) - lv_yaw) * 100.0));
+    BankSave(gv_dbgBank);
+    // Free the seat again.
+    gf_RosterPlay(2, false);
+    if (UnitIsValid(lv_back)) {
+        UnitRemove(lv_back);
+    }
+    gv_tPSUNIT[2] = null;
+    gv_rosterHero[2] = null;
+}
+
+// Seat 2 leaves while its pod falls (R-ROSTER-8, simulated with
+// gf_RosterLeave: one client). Negative: no landing, no hold, no pod later.
+void gf_HdLeave () {
+    string lv_s = "drop_leave";
+    unit lv_two;
+    int lv_landings;
+    int lv_i;
+
+    gf_HdReset(lv_s, true);
+    gf_RosterPlay(2, true);
+    lv_two = gf_RosterHeroCreate(2);
+    gf_HeroBindPlayer(2, lv_two);
+    Wait(0.5, c_timeGame);
+    UnitKill(lv_two);
+    Wait(0.5, c_timeGame);
+    lv_landings = gv_dropLandings[2];
+    gf_HdReinforce();
+    for (lv_i = 0; lv_i < 240 && !UnitIsValid(gv_dropPod[2]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(gv_dropPod[2]));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "heldBefore", gv_inputHeld[2]);
+    Wait(0.5, c_timeGame);
+    gf_RosterLeave(2);
+    Wait(3.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "podAfter", UnitIsValid(gv_dropPod[2]));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "heldAfter", gv_inputHeld[2]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "pendingAfter", gv_dropPending[2]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "playedAfter", gf_RosterPlayed(2));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "landingsDelta", gv_dropLandings[2] - lv_landings);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "leaves", gv_rosterLeaves);
+    BankSave(gv_dbgBank);
+    if (UnitIsValid(gv_tPSUNIT[2])) {
+        UnitRemove(gv_tPSUNIT[2]);
+    }
+    gv_tPSUNIT[2] = null;
+    gv_rosterHero[2] = null;
 }
 
 // Negative: a reinforcement while the hero lives drops no pod (R-DROP-1).
@@ -137,15 +316,17 @@ void gf_HdDrop () {
     BankValueSetFromString(gv_dbgBank, lv_s, "podAt100", IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_pod)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_pod)) * 100.0)));
     BankValueSetFromInt(gv_dbgBank, lv_s, "podFacing100", FixedToInt(UnitGetFacing(lv_pod) * 100.0));
     // Per loop: ms since the pod's create loop, engine pod unit height,
-    // applied camera height, engine camera target x,y, hero alive.
+    // applied camera height, engine camera target x,y, hero alive, engine
+    // camera yaw and distance (x100).
     for (lv_i = 0; lv_i < 64 && UnitIsValid(gv_dropPod[1]); lv_i += 1) {
         lv_ms = FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_dropStartAt[1]) * 1000.0);
-        lv_trace = lv_trace + IntToString(lv_ms) + ":" + IntToString(FixedToInt(UnitGetHeight(lv_pod) * 100.0)) + "/" + IntToString(FixedToInt(gv_cameraHeightApplied[1] * 100.0)) + "/" + IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 100.0)) + "/" + IntToString(BoolToInt(UnitIsAlive(lv_hero))) + " ";
+        lv_trace = lv_trace + IntToString(lv_ms) + ":" + IntToString(FixedToInt(UnitGetHeight(lv_pod) * 100.0)) + "/" + IntToString(FixedToInt(gv_cameraHeightApplied[1] * 100.0)) + "/" + IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 100.0)) + "/" + IntToString(BoolToInt(UnitIsAlive(lv_hero))) + "/" + IntToString(FixedToInt(CameraGetYaw(1) * 100.0)) + "/" + IntToString(FixedToInt(CameraGetDistance(1) * 100.0)) + " ";
         if (gf_HdDist100(CameraGetTarget(1), gv_dropRootAt[1]) > 200) {
             lv_far += 1;
         }
         if (lv_i == 8) {
             BankValueSetFromInt(gv_dbgBank, lv_s, "midCamDist100", FixedToInt(CameraGetDistance(1) * 100.0));
+            gf_HdSnap(lv_s, "tfall");
         }
         if (lv_i < 4) {
             BankValueSetFromString(gv_dbgBank, lv_s, "camXY" + IntToString(lv_i), IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 10.0)) + "," + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 10.0)) + " dist=" + IntToString(FixedToInt(CameraGetDistance(1) * 100.0)));
@@ -181,6 +362,9 @@ bool gt_HeroDropTest_Func (bool testConds, bool runActions) {
     BankSave(gv_dbgBank);
     gf_HdAlive();
     gf_HdDrop();
+    gf_HdTwice();
+    gf_HdSeat2();
+    gf_HdLeave();
     gf_HdTps(false);
     gf_DbgReset("drop_end", false, true);
     BankValueSetFromInt(gv_dbgBank, "drop_end", "RealClicks", gv_dbgRealClicks);

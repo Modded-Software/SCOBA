@@ -1,0 +1,159 @@
+// Module: systems/base/base_ai
+// The stock melee AI for the lane players (REQ-BASE-AI, SPEC-BASE-AI 4.2,
+// 4.4). The race scripts (AIMeleeTerr, AIMeleeZerg, ...) come with
+// TriggerLibs/Computer, as in the co-op library.
+
+include "TriggerLibs/Computer"
+
+// A script unit: the AI must not order it, must not put it in a wave, and
+// it uses no supply (R-BASE-20, R-BASE-21).
+void gf_BaseAiExclude (unit lp_unit) {
+    if (!UnitIsValid(lp_unit)) {
+        return;
+    }
+    AISetUnitScriptControlled(lp_unit, true);
+    AIRemoveUnitFromAnyWaves(lp_unit);
+    UnitSetState(lp_unit, c_unitStateUsingSupply, false);
+    gv_baseAiExcluded += 1;
+}
+
+void gf_BaseAiExcludeGroup (unitgroup lp_group) {
+    UnitGroupLoopBegin(lp_group);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        gf_BaseAiExclude(UnitGroupLoopCurrent());
+    }
+    UnitGroupLoopEnd();
+}
+
+// The stock melee start (R-BASE-27): AIMeleeStart declares town one at
+// PlayerStartLocation, which the build places (scripts/mapgen/melee_map.py).
+void gf_BaseAiStart (int lp_player) {
+    PlayerSetDifficulty(lp_player, c_BASE_AI_DIFFICULTY);
+    AIMeleeStart(lp_player);
+    gv_baseAiStarted[lp_player] = true;
+}
+
+// The AI plays this unit: owner has a base AI and it is no script unit.
+bool gf_BaseAiUnitIsAi (unit lp_unit) {
+    return UnitIsValid(lp_unit) && gf_BaseAiIsAiPlayer(UnitGetOwner(lp_unit)) && !AIIsScriptControlled(lp_unit);
+}
+
+point gf_BaseAiCentre () {
+    return Point(128.0, 128.0);
+}
+
+// lp_r from lp_at, lp_deg off the direction away from the map centre.
+point gf_BaseAiAway (point lp_at, fixed lp_r, fixed lp_deg) {
+    return PointWithOffsetPolar(lp_at, lp_r, AngleBetweenPoints(gf_BaseAiCentre(), lp_at) + lp_deg);
+}
+
+string gf_BaseAiHallType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "CommandCenter";
+    }
+    return "Hatchery";
+}
+
+string gf_BaseAiWorkerType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "SCV";
+    }
+    return "Drone";
+}
+
+// A melee start for lp_player at lp_at: hall, 12 workers, 50 minerals
+// (R-BASE-9..11). The 8 fields and 2 geysers are placed map units at the
+// start point (scripts/mapgen/resources, R-BASE-26). Returns the hall.
+unit gf_BaseAiBaseAt (int lp_player, point lp_at) {
+    unit lv_hall;
+    point lv_h;
+
+    UnitCreate(1, gf_BaseAiHallType(lp_player), 0, lp_player, lp_at, 270.0);
+    lv_hall = UnitLastCreated();
+    gv_baseAiHall[lp_player] = lv_hall;
+    if (!UnitIsValid(lv_hall)) {
+        return null;
+    }
+    lv_h = UnitGetPosition(lv_hall);
+    // No start Overlord: Overlords are off (gf_BaseAiSupplyInit).
+    UnitCreate(c_BASE_AI_WORKERS, gf_BaseAiWorkerType(lp_player), 0, lp_player, PointWithOffsetPolar(lv_h, 4.0, AngleBetweenPoints(lv_h, gf_BaseAiCentre())), 0.0);
+    PlayerModifyPropertyInt(lp_player, c_playerPropMinerals, c_playerPropOperSetTo, c_BASE_AI_MINERALS);
+    PlayerModifyPropertyInt(lp_player, c_playerPropVespene, c_playerPropOperSetTo, 0);
+    return lv_hall;
+}
+
+// Supply (operator 2026-11-18): no Supply Depots, no Overlords; every
+// player has the maximum supply. Set at the first lane and kept every
+// c_SUPPLY_TICK, so a lost town hall does not lower it.
+const int c_SUPPLY_MAX = 200;
+const fixed c_SUPPLY_TICK = 5.0;
+trigger gt_BaseAiSupply;
+bool gv_baseAiSupplyOn;
+
+void gf_BaseAiSupplySet () {
+    int lv_p;
+
+    for (lv_p = 1; lv_p < c_BASE_AI_PLAYERS; lv_p += 1) {
+        PlayerModifyPropertyInt(lv_p, c_playerPropSuppliesLimit, c_playerPropOperSetTo, c_SUPPLY_MAX);
+        PlayerModifyPropertyInt(lv_p, c_playerPropSuppliesMade, c_playerPropOperSetTo, c_SUPPLY_MAX);
+    }
+}
+
+bool gt_BaseAiSupply_Func (bool testConds, bool runActions) {
+    if (runActions) {
+        gf_BaseAiSupplySet();
+    }
+    return true;
+}
+
+void gf_BaseAiSupplyInit () {
+    int lv_p;
+
+    if (gv_baseAiSupplyOn) {
+        return;
+    }
+    gv_baseAiSupplyOn = true;
+    for (lv_p = 1; lv_p < c_BASE_AI_PLAYERS; lv_p += 1) {
+        TechTreeUnitAllow(lv_p, "SupplyDepot", false);
+        TechTreeUnitAllow(lv_p, "Overlord", false);
+    }
+    gf_BaseAiSupplySet();
+    gt_BaseAiSupply = TriggerCreate("gt_BaseAiSupply_Func");
+    TriggerAddEventTimePeriodic(gt_BaseAiSupply, c_SUPPLY_TICK, c_timeGame);
+}
+
+// Every unit lp_player owns: a script unit (R-BASE-20). Placed structures
+// (the Supply Depots, R-BASE-29) stay with the AI.
+void gf_BaseAiExcludePlayer (int lp_player) {
+    gf_BaseAiExcludeGroup(UnitGroup(null, lp_player, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile) | (1 << c_targetFilterStructure), (1 << (c_targetFilterDead - 32))), 0));
+}
+
+// One lane: its owner's script units are excluded first, so the new base
+// stays with the AI; then the base, then the AI.
+void gf_BaseAiCreateLane (int lp_lane) {
+    int lv_owner = gf_BaseAiLaneOwner(lp_lane);
+
+    if (lv_owner <= 0 || gv_baseAiStarted[lv_owner]) {
+        return;
+    }
+    // The site table, the geyser amounts and the supply rule exist before
+    // the first AI starts (once).
+    gf_BaseSitesCreate();
+    gf_BaseAiSupplyInit();
+    gf_BaseAiExcludePlayer(lv_owner);
+    if (gf_BaseAiBaseAt(lv_owner, PlayerStartLocation(lv_owner)) == null) {
+        return;
+    }
+    gf_BaseAiStart(lv_owner);
+}
+
+void gf_BaseAiInit () {
+    int lv_lane;
+
+    if (!c_BASE_AI_ENABLED) {
+        return;
+    }
+    for (lv_lane = 1; lv_lane <= c_BASE_AI_LANES; lv_lane += 1) {
+        gf_BaseAiCreateLane(lv_lane);
+    }
+}

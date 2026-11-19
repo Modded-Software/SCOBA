@@ -66,6 +66,14 @@ class ActorAlertTests(unittest.TestCase):
     def test_other_actor_warning_does_not(self):
         self.assertEqual(self._failures(self.BENIGN), 0)
 
+    # As the game wrote it in "2026-11-18 17.03.19 Alerts.txt": an event
+    # with two IsStatus terms, dropped at load (no footfall dust).
+    DROPPED = ('USER 0 0.000 0.063 CActorUnit[Goliath] Has event without a triggering message. '
+               'Event[Terms "" Send "Create GoliathFootDust1"]\n')
+
+    def test_dropped_actor_event_fails_the_run(self):
+        self.assertEqual(self._failures(self.DROPPED), 1)
+
 
 class LogTests(unittest.TestCase):
     def test_latest_script_error(self):

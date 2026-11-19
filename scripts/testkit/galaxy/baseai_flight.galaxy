@@ -1,0 +1,438 @@
+// Test harness: baseai group "flight". The Alt+4 Viking (PNC only), no AI
+// lanes. Speed: W held and LMB+RMB held against a plain engine move order
+// and the unit's speed property. Height: four engine methods for climb and
+// stop, traced every game tick, so the flight design rests on measured
+// engine behavior. scripts/testkit/profiles/baseai.py asserts.
+
+const fixed c_BF_TICK = 0.0625;
+const int c_BF_TICKS = 16;                // 1 s trace
+const fixed c_BF_BASE = 10.0;              // reset height above ground
+const fixed c_BF_SPEED_WARM = 1.0;         // accelerate first
+const fixed c_BF_SPEED_SPAN = 2.0;         // then measure
+
+trigger gt_BfForward;
+trigger gt_BfMouse;
+
+bool gt_BfForward_Func (bool testConds, bool runActions) {
+    gf_ForwardBegin(1);
+    return true;
+}
+
+bool gt_BfMouse_Func (bool testConds, bool runActions) {
+    gf_MouseForwardStart(1);
+    return true;
+}
+
+fixed gf_BfHeight () {
+    unit lv_w = gv_heroViking;
+
+    return UnitGetHeight(lv_w) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_w));
+}
+
+// Reset: instant height, no blend running, no order.
+void gf_BfReset () {
+    UnitIssueOrder(gv_heroViking, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    UnitSetHeight(gv_heroViking, c_BF_BASE, 0.0);
+    UnitSetPropertyFixed(gv_heroViking, c_unitPropHeight, c_BF_BASE);
+    Wait(1.0, c_timeGame);
+}
+
+// Height and c_unitPropHeight each tick, lp_n ticks: "h100/prop100 ...".
+string gf_BfTrace (int lp_n) {
+    string lv_out = "";
+    int lv_i;
+
+    for (lv_i = 1; lv_i <= lp_n; lv_i += 1) {
+        Wait(c_BF_TICK, c_timeGame);
+        lv_out = lv_out + IntToString(FixedToInt(gf_BfHeight() * 100.0)) + "/";
+        lv_out = lv_out + IntToString(FixedToInt(UnitGetPropertyFixed(gv_heroViking, c_unitPropHeight, c_unitPropCurrent) * 100.0)) + " ";
+    }
+    return lv_out;
+}
+
+// Method A/B: one blend up, stopped after 0.5 s by UnitSetHeight(h, 0)
+// (A) or by the height property (B). Trace: 8 ticks blend, 16 after stop.
+void gf_BfBlendStop (string lp_s, string lp_key, bool lp_prop) {
+    string lv_t;
+    fixed lv_h;
+
+    gf_BfReset();
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Start100", FixedToInt(gf_BfHeight() * 100.0));
+    UnitSetHeight(gv_heroViking, c_BF_BASE + 10.0, 2.0);
+    lv_t = gf_BfTrace(8);
+    lv_h = gf_BfHeight();
+    if (lp_prop) {
+        UnitSetPropertyFixed(gv_heroViking, c_unitPropHeight, lv_h);
+    }
+    else {
+        UnitSetHeight(gv_heroViking, lv_h, 0.0);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Stop100", FixedToInt(lv_h * 100.0));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Blend", lv_t);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "After", gf_BfTrace(c_BF_TICKS));
+}
+
+// Method C/D: per tick +0.5, by the property (C) or a one-tick blend (D),
+// 16 ticks, then nothing. Trace each tick, then 16 ticks after.
+void gf_BfPerTick (string lp_s, string lp_key, bool lp_prop) {
+    string lv_t = "";
+    fixed lv_h;
+    int lv_i;
+
+    gf_BfReset();
+    lv_h = gf_BfHeight();
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Start100", FixedToInt(lv_h * 100.0));
+    for (lv_i = 1; lv_i <= c_BF_TICKS; lv_i += 1) {
+        lv_h = lv_h + 0.5;
+        if (lp_prop) {
+            UnitSetPropertyFixed(gv_heroViking, c_unitPropHeight, lv_h);
+        }
+        else {
+            UnitSetHeight(gv_heroViking, lv_h, c_BF_TICK);
+        }
+        Wait(c_BF_TICK, c_timeGame);
+        lv_t = lv_t + IntToString(FixedToInt(gf_BfHeight() * 100.0)) + " ";
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Climb", lv_t);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "After", gf_BfTrace(c_BF_TICKS));
+}
+
+// Method E/F: one long blend up (+10 over 2 s); after 0.5 s a second timed
+// blend: E to the current height over one tick (stop?), F down -10 over
+// 2 s (reverse?). Height property traced, 8 ticks then 16 after.
+void gf_BfBlendReplace (string lp_s, string lp_key, bool lp_reverse) {
+    string lv_t;
+    fixed lv_h;
+
+    gf_BfReset();
+    lv_h = UnitGetPropertyFixed(gv_heroViking, c_unitPropHeight, c_unitPropCurrent);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Start100", FixedToInt(lv_h * 100.0));
+    UnitSetHeight(gv_heroViking, lv_h + 10.0, 2.0);
+    lv_t = gf_BfTrace(8);
+    lv_h = UnitGetPropertyFixed(gv_heroViking, c_unitPropHeight, c_unitPropCurrent);
+    if (lp_reverse) {
+        UnitSetHeight(gv_heroViking, lv_h - 10.0, 2.0);
+    }
+    else {
+        UnitSetHeight(gv_heroViking, lv_h, c_BF_TICK);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Stop100", FixedToInt(lv_h * 100.0));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Blend", lv_t);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "After", gf_BfTrace(c_BF_TICKS));
+}
+
+// Method G (removed): CatalogFieldValueSet on unit "Height" at run time is
+// denied ("Core: access denied", run flight17 ScriptError, 2026-11-18).
+
+// Space held with key repeat: every tick a release then a press (as a
+// repeating key may send). 1 s; the climb must still be c_FLIGHT_RATE.
+void gf_BfRepeat (string lp_s) {
+    fixed lv_h0;
+    int lv_i;
+
+    gf_BfReset();
+    lv_h0 = gf_FlightHeight(1);
+    gv_flightUp[1] = true;
+    gf_FlightDirSet(1);
+    for (lv_i = 1; lv_i <= c_BF_TICKS; lv_i += 1) {
+        Wait(c_BF_TICK, c_timeGame);
+        gv_flightUp[1] = false;
+        gf_FlightDirSet(1);
+        gv_flightUp[1] = true;
+        gf_FlightDirSet(1);
+    }
+    gv_flightUp[1] = false;
+    gf_FlightDirSet(1);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "repeatClimb100", FixedToInt((gf_FlightHeight(1) - lv_h0) * 100.0));
+}
+
+point gv_bfStart;
+
+// Ground speed x100 over c_BF_SPEED_SPAN after c_BF_SPEED_WARM. Raw: the
+// position each 0.25 s, the move order and the current speed at the end.
+int gf_BfSpan (string lp_s, string lp_key) {
+    point lv_a;
+    string lv_t = "";
+    int lv_i;
+
+    Wait(c_BF_SPEED_WARM, c_timeGame);
+    lv_a = UnitGetPosition(gv_heroViking);
+    for (lv_i = 1; lv_i <= 8; lv_i += 1) {
+        Wait(c_BF_SPEED_SPAN / 8.0, c_timeGame);
+        lv_t = lv_t + gf_BaXY100(UnitGetPosition(gv_heroViking)) + " ";
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Path", gf_BaXY100(lv_a) + " | " + lv_t);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "Move", UnitOrderHasAbil(gv_heroViking, "move"));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Cur100", FixedToInt(UnitGetPropertyFixed(gv_heroViking, c_unitPropMovementSpeedCurrent, c_unitPropCurrent) * 100.0));
+    return FixedToInt(DistanceBetweenPoints(lv_a, UnitGetPosition(gv_heroViking)) / c_BF_SPEED_SPAN * 100.0);
+}
+
+// Back to the start point, stopped.
+void gf_BfHome () {
+    UnitIssueOrder(gv_heroViking, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    UnitSetPosition(gv_heroViking, gv_bfStart, false);
+    Wait(1.0, c_timeGame);
+}
+
+void gf_BfSpeed (string lp_s) {
+    unit lv_w = gv_heroViking;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, "speedProp100", FixedToInt(UnitGetPropertyFixed(lv_w, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "speedNormal100", FixedToInt(UnitGetPropertyFixed(lv_w, c_unitPropMovementSpeed, c_unitPropNormal) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "speedTosh100", FixedToInt(UnitGetPropertyFixed(gv_heroTosh, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "speedData100", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_w), "Speed", 1)) * 100.0));
+    // The map centre: room for 3 s at full speed in every direction.
+    gv_bfStart = RegionGetCenter(RegionPlayableMap());
+    gf_BfHome();
+    BankValueSetFromInt(gv_dbgBank, lp_s, "camYaw", FixedToInt(CameraGetYaw(1)));
+    // W held: the key flags as the key triggers set them, own thread.
+    gv_kEYFORWARD[1] = true;
+    gv_fORWARD[1] = true;
+    TriggerExecute(gt_BfForward, false, false);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "speedW100", gf_BfSpan(lp_s, "W"));
+    gv_kEYFORWARD[1] = false;
+    gv_fORWARD[1] = false;
+    Wait(0.5, c_timeGame);
+    gf_BfHome();
+    // LMB+RMB held.
+    TriggerExecute(gt_BfMouse, false, false);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "speedMouse100", gf_BfSpan(lp_s, "M"));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "mouseForward", gv_mOUSEFORWARD[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "forward", gv_fORWARD[1]);
+    gf_MouseForwardStop(1);
+    Wait(0.5, c_timeGame);
+    gf_BfHome();
+    // Free mode (TPS off, command 1): the free-mode step path.
+    UnitIssueOrder(lv_w, Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "freeTps", gf_TpsActive(1));
+    gv_kEYFORWARD[1] = true;
+    gv_fORWARD[1] = true;
+    TriggerExecute(gt_BfForward, false, false);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "speedFree100", gf_BfSpan(lp_s, "F"));
+    gv_kEYFORWARD[1] = false;
+    gv_fORWARD[1] = false;
+    Wait(0.5, c_timeGame);
+    gf_BfHome();
+    // TPS on (command 0) on a regular unit: refused (operator 2026-11-18).
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "tpsOnOrder", UnitIssueOrder(lv_w, Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace));
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "backTps", gf_TpsActive(1));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "tpsBehavior", UnitBehaviorCount(lv_w, c_SCOBA_TPS_BEHAVIOR));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "tpsRefused", gv_tpsRefused[1]);
+}
+
+// Right hold with W on a regular unit: camera orbit only. The camera yaw
+// is 90 off the unit facing; the unit must travel along its own facing
+// and face its travel direction, with no strafe hold and no turn lock.
+void gf_BfRightHold (string lp_s) {
+    unit lv_w = gv_heroViking;
+    point lv_a;
+    fixed lv_f;
+    string lv_t;
+    int lv_i;
+
+    gf_BfHome();
+    lv_f = UnitGetFacing(lv_w);
+    CameraSetValue(1, c_cameraValueYaw, lv_f + 90.0, 0.0, -1, 10);
+    Wait(0.5, c_timeGame);
+    gv_mOUSERIGHT[1] = true;
+    gv_rIGHTORBIT[1] = true;
+    gf_ControlApply(1);
+    gv_kEYFORWARD[1] = true;
+    gv_fORWARD[1] = true;
+    TriggerExecute(gt_BfForward, false, false);
+    lv_t = "";
+    for (lv_i = 1; lv_i <= 6; lv_i += 1) {
+        Wait(0.25, c_timeGame);
+        lv_t = lv_t + IntToString(FixedToInt(UnitGetFacing(lv_w))) + " ";
+        if (lv_i == 2) {
+            lv_a = UnitGetPosition(lv_w);
+        }
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, "rhFacingTrace", lv_t);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "rhFacing0", FixedToInt(lv_f));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "rhCamYaw", FixedToInt(CameraGetYaw(1)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "rhTravel", FixedToInt(AngleBetweenPoints(lv_a, UnitGetPosition(lv_w))));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "rhFacing", FixedToInt(UnitGetFacing(lv_w)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "rhDist100", FixedToInt(DistanceBetweenPoints(lv_a, UnitGetPosition(lv_w)) * 100.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "rhStrafe", gv_holdStrafe[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "rhRotateUnit", gv_rOTATEUNIT[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "rhRotateCamera", gv_rOTATECAMERA[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "rhNoTurn", UnitBehaviorCount(lv_w, c_SCOBA_NO_TURN_BEHAVIOR));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "rhTps", gf_TpsActive(1));
+    gv_kEYFORWARD[1] = false;
+    gv_fORWARD[1] = false;
+    gv_mOUSERIGHT[1] = false;
+    gv_rIGHTORBIT[1] = false;
+    gf_ControlApply(1);
+    Wait(0.5, c_timeGame);
+}
+
+// The two vista Overlords (Objects, player 8): the special type, alive,
+// at their data height. Stock Overlords anywhere are counted (want 0).
+void gf_BfVista (string lp_s) {
+    unitgroup lv_g = UnitGroup("SCOBAVistaOverlord", c_playerAny, null, null, 0);
+    unit lv_u;
+    string lv_t = "";
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, "vistaCount", UnitGroupCount(lv_g, c_unitCountAlive));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "vistaStock", UnitGroupCount(UnitGroup("Overlord", c_playerAny, null, null, 0), c_unitCountAlive));
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        lv_t = lv_t + IntToString(UnitGetOwner(lv_u)) + "@" + IntToString(FixedToInt(UnitGetPropertyFixed(lv_u, c_unitPropHeight, c_unitPropCurrent) * 100.0)) + " ";
+    }
+    UnitGroupLoopEnd();
+    BankValueSetFromString(gv_dbgBank, lp_s, "vistaOwnerHeight", lv_t);
+}
+
+// Land (SCOBAHeroAssaultMode) and lift (SCOBAHeroFighterMode). After each morph: the type,
+// and whether a transition model actor is left on the unit (want none).
+// The probe itself is checked by controls: "pre" (no morph yet) and a
+// stock Viking landed the same way ("stockLand").
+void gf_BfMorphProbe (string lp_s, string lp_key, unit lp_u) {
+    actorscope lv_a = ActorScopeFromUnit(lp_u);
+    string lv_t = "";
+    int lv_i;
+
+    for (lv_i = 1; lv_i <= UnitAbilityCount(lp_u); lv_i += 1) {
+        lv_t = lv_t + UnitAbilityGet(lp_u, lv_i) + " ";
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Abils", lv_t);
+
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Type", UnitGetType(lp_u));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "AssaultMorph", ActorFromScope(lv_a, "AssaultMorphModel") != null);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "FighterMorph", ActorFromScope(lv_a, "FighterMorphModel") != null);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Speed100", FixedToInt(UnitGetPropertyFixed(lp_u, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Height100", FixedToInt((UnitGetHeight(lp_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lp_u))) * 100.0));
+}
+
+void gf_BfMorph (string lp_s, string lp_key, unit lp_u, string lp_abil) {
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "Order", UnitIssueOrder(lp_u, Order(AbilityCommand(lp_abil, 0)), c_orderQueueReplace));
+    Wait(5.0, c_timeGame);
+    gf_BfMorphProbe(lp_s, lp_key, lp_u);
+}
+
+// Regular unit: Chase always Move. Stand after the switch, Stand forced on
+// (must be undone), then a ground right click must move the unit.
+void gf_BfChase (string lp_s) {
+    unit lv_w = gv_heroViking;
+    point lv_a;
+
+    gf_BfHome();
+    BankValueSetFromInt(gv_dbgBank, lp_s, "chaseStand0", UnitBehaviorCount(lv_w, c_SCOBA_STAND_BEHAVIOR));
+    gf_ChaseStandSet(lv_w, true);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "chaseStand1", UnitBehaviorCount(lv_w, c_SCOBA_STAND_BEHAVIOR));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "chaseRefused", gv_chaseRefused[1]);
+    lv_a = UnitGetPosition(lv_w);
+    gf_RightClickExecute(1, PointWithOffsetPolar(lv_a, 20.0, UnitGetFacing(lv_w)), null);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "chaseMoveOrder", UnitOrderHasAbil(lv_w, "move"));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "chaseMoved100", FixedToInt(DistanceBetweenPoints(lv_a, UnitGetPosition(lv_w)) * 100.0));
+    gf_BfHome();
+}
+
+// Regular unit: A / D do nothing (operator 2026-11-18). The real key path
+// (gf_SideBegin / gf_SideEnd). Idle: no flag, no move, no turn. Moving: the
+// release must not stop the move order.
+void gf_BfSideKey (string lp_s, string lp_k, bool lp_left) {
+    unit lv_w = gv_heroViking;
+    point lv_a;
+    fixed lv_f;
+
+    gf_BfHome();
+    lv_a = UnitGetPosition(lv_w);
+    lv_f = UnitGetFacing(lv_w);
+    gf_SideBegin(1, lp_left);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "Flag", gv_lEFT[1] || gv_rIGHT[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Moved100", FixedToInt(DistanceBetweenPoints(lv_a, UnitGetPosition(lv_w)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Turn", FixedToInt(AbsF(ModF(UnitGetFacing(lv_w) - lv_f + 540.0, 360.0) - 180.0)));
+    gf_SideEnd(1, lp_left);
+    UnitIssueOrder(lv_w, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(lv_a, 30.0, lv_f)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    gf_SideBegin(1, lp_left);
+    Wait(0.25, c_timeGame);
+    gf_SideEnd(1, lp_left);
+    Wait(0.25, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "MoveKept", UnitOrderHasAbil(lv_w, "move"));
+    gf_BfHome();
+}
+
+// Positive control: a hero (Tosh) still moves on A (gf_SideBegin runs its
+// loop in its own thread). Raw: camera yaw, travel angle, distance.
+trigger gt_BfSide;
+
+bool gt_BfSide_Func (bool testConds, bool runActions) {
+    gf_SideBegin(1, true);
+    return true;
+}
+
+void gf_BfHeroSide (string lp_s) {
+    unit lv_t = gv_heroTosh;
+    point lv_a;
+
+    gf_HeroSwitchTo(lv_t);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "heroSideRegular", gf_ControlRegular(1));
+    lv_a = UnitGetPosition(lv_t);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "heroSideYaw", FixedToInt(CameraGetYaw(1)));
+    TriggerExecute(gt_BfSide, false, false);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "heroSideFlag", gv_lEFT[1]);
+    gf_SideEnd(1, true);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "heroSideDist100", FixedToInt(DistanceBetweenPoints(lv_a, UnitGetPosition(lv_t)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "heroSideTravel", FixedToInt(AngleBetweenPoints(lv_a, UnitGetPosition(lv_t))));
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "heroSideEndFlag", gv_lEFT[1]);
+    gf_HeroSwitchTo(gv_heroViking);
+    Wait(1.0, c_timeGame);
+}
+
+void gf_BaFlightGroup () {
+    string lv_s = "ba_flight";
+    unit lv_stock;
+
+    gt_BfForward = TriggerCreate("gt_BfForward_Func");
+    gt_BfMouse = TriggerCreate("gt_BfMouse_Func");
+    gt_BfSide = TriggerCreate("gt_BfSide_Func");
+    gf_BfVista(lv_s);
+    gf_BaWraithUp(lv_s);
+    gf_BfSpeed(lv_s);
+    gf_BfRightHold(lv_s);
+    gf_BfChase(lv_s);
+    gf_BfSideKey(lv_s, "sideA", true);
+    gf_BfSideKey(lv_s, "sideD", false);
+    // The real Space / Ctrl path (systems/flight), then the engine probes.
+    gf_BfReset();
+    gf_BaFlight(lv_s);
+    gf_BfRepeat(lv_s);
+    gf_BfBlendStop(lv_s, "mA", false);
+    gf_BfBlendStop(lv_s, "mB", true);
+    gf_BfPerTick(lv_s, "mC", true);
+    gf_BfPerTick(lv_s, "mD", false);
+    gf_BfBlendReplace(lv_s, "mE", false);
+    gf_BfBlendReplace(lv_s, "mF", true);
+    gf_BfReset();
+    gf_BaVikingForm(lv_s, "vikEnd");
+    gf_BfHeroSide(lv_s);
+    // Last: landing changes the hero's type.
+    gf_BfHome();
+    gf_BfMorphProbe(lv_s, "pre", gv_heroViking);
+    UnitCreate(1, "VikingFighter", 0, 1, PointWithOffset(gv_bfStart, 6.0, 0.0), 0.0);
+    lv_stock = UnitLastCreated();
+    gf_BfMorphProbe(lv_s, "stockPre", lv_stock);
+    // Negative: the hero has no stock AssaultMode (it would land as stock).
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "heroStockAbil", UnitAbilityCheck(gv_heroViking, "AssaultMode", false));
+    UnitIssueOrder(lv_stock, Order(AbilityCommand("AssaultMode", 0)), c_orderQueueReplace);
+    gf_BfMorph(lv_s, "land", gv_heroViking, "SCOBAHeroAssaultMode");
+    gf_BfMorphProbe(lv_s, "stockLand", lv_stock);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "landStockAbil", UnitAbilityCheck(gv_heroViking, "FighterMode", false));
+    gf_BfMorph(lv_s, "lift", gv_heroViking, "SCOBAHeroFighterMode");
+    UnitRemove(lv_stock);
+    gf_BlLandGroup(lv_s);
+    gf_BeFeelGroup(lv_s);
+}

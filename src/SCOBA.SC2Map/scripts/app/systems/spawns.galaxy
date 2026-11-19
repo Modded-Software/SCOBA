@@ -26,9 +26,17 @@ point gf_DropPodPoint (region lp_region, point lp_usedA, point lp_usedB) {
     return lv_best;
 }
 
+// Wave units are script units: the base AI of their owner leaves them
+// alone (REQ-BASE-AI R-BASE-20).
 unitgroup gf_CreateSpawnGroup (int lp_count, string lp_type, int lp_player, point lp_point) {
+    unitgroup lv_group;
+
     libNtve_gf_CreateUnitsAtPoint2(lp_count, lp_type, 0, lp_player, lp_point);
-    return UnitLastCreatedGroup();
+    lv_group = UnitLastCreatedGroup();
+    if (gf_BaseAiIsAiPlayer(lp_player)) {
+        gf_BaseAiExcludeGroup(lv_group);
+    }
+    return lv_group;
 }
 
 void gf_OrderSpawnGroup (unitgroup lp_group, int lp_side, int lp_lane) {
@@ -41,8 +49,7 @@ void gf_OrderSpawnGroup (unitgroup lp_group, int lp_side, int lp_lane) {
 }
 
 bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
-    int auto58D71E67_ae;
-    int auto58D71E67_ai;
+    int lv_map;
 
     // Variable Declarations
     int lv_playerIndex;
@@ -59,14 +66,16 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    auto58D71E67_ae = 6;
-    auto58D71E67_ai = 1;
-    lv_playerIndex = 4;
-    for ( ; ( (auto58D71E67_ai >= 0 && lv_playerIndex <= auto58D71E67_ae) || (auto58D71E67_ai <= 0 && lv_playerIndex >= auto58D71E67_ae) ) ; lv_playerIndex += auto58D71E67_ai ) {
-        lv_lane = lv_playerIndex - 3;
-        lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], null, null);
-        lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, null);
-        lv_podC = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, lv_podB);
+    // Zerg lanes (core/roster): waves of the seat; lv_lane is the gate lane.
+    for (lv_map = 1; lv_map <= c_ROSTER_LANES; lv_map += 1) {
+        if (gf_RosterTerran(lv_map)) {
+            continue;
+        }
+        lv_playerIndex = gf_RosterSeat(lv_map);
+        lv_lane = lv_map - 3;
+        lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], null, null);
+        lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, null);
+        lv_podC = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, lv_podB);
 
         lv_group = gf_CreateSpawnGroup(8, "Zergling", lv_playerIndex, lv_podA);
         gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_podA);
@@ -82,8 +91,7 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
 
         lv_group = gf_CreateSpawnGroup(2, "Roach", lv_playerIndex, lv_podC);
         if ((TechTreeUnitCount(lv_playerIndex, "Queen", c_techCountQueuedOrBetter) == 0)) {
-            libNtve_gf_CreateUnitsAtPoint2(1, "Queen", 0, lv_playerIndex, lv_podC);
-            UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
+            UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Queen", lv_playerIndex, lv_podC));
         }
         gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_podC);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podC, lv_group, false, lv_playerIndex);
@@ -99,8 +107,7 @@ void gt_ZerusSpawn_Init () {
 }
 
 bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
-    int autoA973637F_ae;
-    int autoA973637F_ai;
+    int lv_map;
 
     // Variable Declarations
     int lv_playerIndex;
@@ -116,26 +123,33 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
         return true;
     }
 
-    autoA973637F_ae = 3;
-    autoA973637F_ai = 1;
-    lv_playerIndex = 1;
-    for ( ; ( (autoA973637F_ai >= 0 && lv_playerIndex <= autoA973637F_ae) || (autoA973637F_ai <= 0 && lv_playerIndex >= autoA973637F_ae) ) ; lv_playerIndex += autoA973637F_ai ) {
-        lv_lane = lv_playerIndex;
-        lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], null, null);
-        lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_playerIndex], lv_podA, null);
+    // Terran lanes (core/roster): waves of the seat; lv_lane is the gate lane.
+    for (lv_map = 1; lv_map <= c_ROSTER_LANES; lv_map += 1) {
+        if (!gf_RosterTerran(lv_map)) {
+            continue;
+        }
+        lv_playerIndex = gf_RosterSeat(lv_map);
+        lv_lane = lv_map;
+        lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], null, null);
+        lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, null);
+        // A waiting hero drops with this wave, off the two lane pods
+        // (systems/hero_drop; nothing when no hero waits). Before the lane
+        // pods: libVCMI_gf_CreateDropPod waits, and a hero that dies in
+        // that wait must not get this wave's pod (herodrop/20261118-190259).
+        if (gf_RosterPlayed(lv_playerIndex)) {
+            gf_HeroDropStart(lv_playerIndex, gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, lv_podB));
+        }
 
         lv_group = gf_CreateSpawnGroup(4, "Marine", lv_playerIndex, lv_podA);
         if ((TechTreeUnitCount(lv_playerIndex, "Goliath", c_techCountQueuedOrBetter) == 0)) {
-            libNtve_gf_CreateUnitsAtPoint2(1, "Goliath", 0, lv_playerIndex, lv_podA);
-            UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
+            UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Goliath", lv_playerIndex, lv_podA));
         }
         gf_PodImpactQueue(libVCMI_ge_DropPodRace_Terran, lv_podA);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podA, lv_group, true, lv_playerIndex);
         gf_OrderSpawnGroup(lv_group, 1, lv_lane);
 
         lv_group = gf_CreateSpawnGroup(2, "Marauder", lv_playerIndex, lv_podB);
-        libNtve_gf_CreateUnitsAtPoint2(1, "Firebat", 0, lv_playerIndex, lv_podB);
-        UnitGroupAddUnitGroup(lv_group, UnitLastCreatedGroup());
+        UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Firebat", lv_playerIndex, lv_podB));
         gf_PodImpactQueue(libVCMI_ge_DropPodRace_Terran, lv_podB);
         libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podB, lv_group, true, lv_playerIndex);
         gf_OrderSpawnGroup(lv_group, 1, lv_lane);

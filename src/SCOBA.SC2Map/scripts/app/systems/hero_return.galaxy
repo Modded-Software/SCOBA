@@ -1,0 +1,149 @@
+// Module: systems/hero_return
+// The hero comes back at its pod (REQ-HERO-DROP R-DROP-6, R-DROP-8;
+// SPEC-HERO-DROP 3): a fresh unit of the dead hero's type, no UnitRevive
+// (F14: a revived hero was removed on its next death; F15: the death clip
+// rate stayed). Carried: level and XP (script), the stat points spent
+// (current unit properties, kept every loop while alive), the learned abilities,
+// the toggles and the control mode (systems/hero_drop).
+
+const int c_HERO_STATS = 5;
+
+fixed[16][c_HERO_STATS] gv_heroStat;   // current values while alive
+bool[16] gv_heroStatSeen;
+int[16] gv_heroReturns;                // fresh units made, for tests
+
+int gf_HeroStatProp (int lp_i) {
+    if (lp_i == 0) { return c_unitPropLifeMax; }
+    if (lp_i == 1) { return c_unitPropLifeRegen; }
+    if (lp_i == 2) { return c_unitPropEnergyMax; }
+    if (lp_i == 3) { return c_unitPropEnergyRegen; }
+    return c_unitPropMovementSpeed;
+}
+
+// The hero abilities at map start (app/init and every return).
+void gf_HeroAbilitiesDefault (unit lp_hero) {
+    UnitAbilityEnable(lp_hero, "SCOBAAutoAttackStatus", true);
+    UnitAbilityShow(lp_hero, "SCOBAAutoAttackStatus", true);
+    UnitAbilityEnable(lp_hero, "SCOBAAutoAttackToggle", true);
+    UnitAbilityShow(lp_hero, "SCOBAAutoAttackToggle", true);
+    UnitAbilityEnable(lp_hero, "SCOBATPSToggle", true);
+    UnitAbilityShow(lp_hero, "SCOBATPSToggle", true);
+    UnitAbilityEnable(lp_hero, "SCOBARightClickToggle", true);
+    UnitAbilityShow(lp_hero, "SCOBARightClickToggle", true);
+    UnitAbilityEnable(lp_hero, "heal", false);
+    UnitAbilityShow(lp_hero, "heal", false);
+    UnitAbilityEnable(lp_hero, "GuardianShield", false);
+    UnitAbilityShow(lp_hero, "GuardianShield", false);
+    UnitAbilityEnable(lp_hero, "InvulnerabilityShield", false);
+    UnitAbilityShow(lp_hero, "InvulnerabilityShield", false);
+    UnitAbilityEnable(lp_hero, "BuildingStasis", false);
+    UnitAbilityShow(lp_hero, "BuildingStasis", false);
+    UnitAbilityEnable(lp_hero, "Frenzy", false);
+    UnitAbilityShow(lp_hero, "Frenzy", false);
+    UnitAbilityEnable(lp_hero, "SummonCompanion", false);
+    UnitAbilityShow(lp_hero, "SummonCompanion", false);
+    UnitAbilityEnable(lp_hero, "VoodooShield", false);
+    UnitAbilityShow(lp_hero, "VoodooShield", false);
+    UnitAbilityEnable(lp_hero, "BlindingCloud", false);
+    UnitAbilityShow(lp_hero, "BlindingCloud", false);
+    UnitAbilityEnable(lp_hero, "DisablingCloud", false);
+    UnitAbilityShow(lp_hero, "DisablingCloud", false);
+    UnitAbilityEnable(lp_hero, "ZeratulBlink", false);
+    UnitAbilityShow(lp_hero, "ZeratulBlink", false);
+    UnitAbilityEnable(lp_hero, "RogueGhostCloak", false);
+    UnitAbilityShow(lp_hero, "RogueGhostCloak", false);
+    UnitAbilityEnable(lp_hero, "BansheeCloak", false);
+    UnitAbilityShow(lp_hero, "BansheeCloak", false);
+    UnitAbilityEnable(lp_hero, "PoisonNova", false);
+    UnitAbilityShow(lp_hero, "PoisonNova", false);
+    UnitAbilityEnable(lp_hero, "Siphon", false);
+    UnitAbilityShow(lp_hero, "Siphon", false);
+    UnitAbilityEnable(lp_hero, "Irradiate", false);
+    UnitAbilityShow(lp_hero, "Irradiate", false);
+    UnitAbilityEnable(lp_hero, "KarassPsiStorm", false);
+    UnitAbilityShow(lp_hero, "KarassPsiStorm", false);
+    UnitAbilityEnable(lp_hero, "HydraliskFrenzy", false);
+    UnitAbilityShow(lp_hero, "HydraliskFrenzy", false);
+    UnitAbilityEnable(lp_hero, "HeroNuclearStrike", false);
+    UnitAbilityShow(lp_hero, "HeroNuclearStrike", false);
+    UnitAbilityEnable(lp_hero, "ZHybridGravitonPrison", false);
+    UnitAbilityShow(lp_hero, "ZHybridGravitonPrison", false);
+    UnitAbilityEnable(lp_hero, "ForceField", false);
+    UnitAbilityShow(lp_hero, "ForceField", false);
+    UnitAbilityEnable(lp_hero, "TemporalField", false);
+    UnitAbilityShow(lp_hero, "TemporalField", false);
+    UnitAbilityEnable(lp_hero, "StunningBlast", false);
+    UnitAbilityShow(lp_hero, "StunningBlast", false);
+    UnitAbilityEnable(lp_hero, "ArtanisVortex", false);
+    UnitAbilityShow(lp_hero, "ArtanisVortex", false);
+    UnitAbilityEnable(lp_hero, "ZHybridPsionicShockwave", false);
+    UnitAbilityShow(lp_hero, "ZHybridPsionicShockwave", false);
+}
+
+// Every loop while the hero lives (gf_HeroDropTrack).
+void gf_HeroStatsKeep (int lp_player, unit lp_hero) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < c_HERO_STATS; lv_i += 1) {
+        // Current: a spent point sets the current value; normal keeps the
+        // data value (herodrop/20261118-202228: life max 350 current, 300 normal).
+        gv_heroStat[lp_player][lv_i] = UnitGetPropertyFixed(lp_hero, gf_HeroStatProp(lv_i), c_unitPropCurrent);
+    }
+    gv_heroStatSeen[lp_player] = true;
+}
+
+void gf_HeroStatsApply (int lp_player, unit lp_hero) {
+    int lv_i;
+
+    if (!gv_heroStatSeen[lp_player]) {
+        return;
+    }
+    for (lv_i = 0; lv_i < c_HERO_STATS; lv_i += 1) {
+        UnitSetPropertyFixed(lp_hero, gf_HeroStatProp(lv_i), gv_heroStat[lp_player][lv_i]);
+    }
+}
+
+// Learned abilities. gv_abilitiesButtons is one table for all players
+// (SPEC-ROSTER known limit), so every seat gets the learned set.
+void gf_HeroAbilitiesLearned (unit lp_hero) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < gv_nAbilitiesButtons; lv_i += 1) {
+        if (gv_abilitiesButtons[lv_i].lv_learned) {
+            UnitAbilityEnable(lp_hero, gv_abilitiesButtons[lv_i].lv_ability, true);
+            UnitAbilityShow(lp_hero, gv_abilitiesButtons[lv_i].lv_ability, true);
+        }
+    }
+}
+
+// A fresh hero of lp_old's type at lp_at for lp_player; lp_old is removed.
+// Player 1's switch handles (gv_heroTosh, gv_heroKerrigan) follow it.
+unit gf_HeroReturn (int lp_player, unit lp_old, point lp_at, fixed lp_facing) {
+    unit lv_new;
+    string lv_type = UnitGetType(lp_old);
+
+    UnitCreate(1, lv_type, c_unitCreateIgnorePlacement, lp_player, lp_at, lp_facing);
+    lv_new = UnitLastCreated();
+    if (!UnitIsValid(lv_new)) {
+        return lp_old;
+    }
+    gv_heroReturns[lp_player] += 1;
+    gf_HeroAbilitiesDefault(lv_new);
+    gf_HeroAbilitiesLearned(lv_new);
+    gf_HeroStatsApply(lp_player, lv_new);
+    UnitSetPropertyFixed(lv_new, c_unitPropLifePercent, 100.0);
+    UnitSetPropertyFixed(lv_new, c_unitPropEnergyPercent, 100.0);
+    if (lp_player == 1 && lp_old == gv_heroTosh) {
+        gv_heroTosh = lv_new;
+    }
+    if (lp_player == 1 && lp_old == gv_heroKerrigan) {
+        gv_heroKerrigan = lv_new;
+    }
+    if (lp_old == gv_rosterHero[lp_player]) {
+        gv_rosterHero[lp_player] = lv_new;
+    }
+    if (UnitIsValid(lp_old)) {
+        UnitRemove(lp_old);
+    }
+    return lv_new;
+}

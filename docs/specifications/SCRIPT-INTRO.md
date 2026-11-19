@@ -78,7 +78,7 @@ flat-ish (long lens), S6 deep, S7 deep and distorted, S8 deep to flat.
 
 ### OPEN: From black
 
-Black. The Zerus theme starts. Fade in over 1.5 s into S1. First pass
+Black. The Zerus theme starts. Fade in over 4 s into S1. First pass
 only.
 
 ### S1: THE PRIDE (12 s, awe)
@@ -233,8 +233,8 @@ loop frame to the SPACE press.
 
 ## 6. Deploy
 
-1. **SPACE.** The prompt goes in the same loop. The theme fades out.
-   No music from here on.
+1. **SPACE.** The prompt goes in the same loop. The theme plays on
+   through the snap and the ride (operator 2026-11-18).
 2. **The snap (0.35 s).** Hard cut to a high view over the hero's drop
    point: yaw 225, pitch 55, distance 60, lens 60. Crash zoom: lens 60 to
    12 in 0.3 s, fast in, hard stop. The only crash zoom in the intro (P9).
@@ -242,11 +242,12 @@ loop frame to the SPACE press.
    drop does it: pod height 40, camera locked to the pod, arm 20.
 4. **Touchdown.** Impact, quake, the pod opens. The letterbox slides away
    over 0.5 s. The UI comes back. Tosh stands at the pod. Control is the
-   player's.
+   player's. The theme fades out; no music from here on.
 
 ## 7. Not in this script
 
 - Sound design beyond the theme: none.
-- Music after deploy: none (operator, 2026-11-17).
+- Music after touchdown: none (operator, 2026-11-17; moved from deploy to
+  touchdown 2026-11-18).
 - Text other than the prompt: none.
 - Camera roll: none. The quake owns roll.

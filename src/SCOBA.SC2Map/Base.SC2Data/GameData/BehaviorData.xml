@@ -621,4 +621,12 @@
         <EditorCategories value="AbilityorEffectType:Units"/>
         <DamageResponse Chance="1" Location="Attacker" ModifyFraction="0" TargetFilters="-;Neutral,Enemy"/>
     </CBehaviorBuff>
+    <!-- Mineral fields 4x stock (operator 2026-11-18: much more per pile).
+         The capacity caps the amount: a script set above 1500 is ignored
+         (baseai macro run 20261118-120956). Geysers: systems/base/base_sites. -->
+    <CBehaviorResource id="MineralFieldMinerals">
+        <Capacity value="6000"/>
+        <Contents value="6000"/>
+        <DepletionThreshold value="3000"/>
+    </CBehaviorResource>
 </Catalog>

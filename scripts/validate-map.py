@@ -18,9 +18,14 @@ from animation_tokens import normalized_animation_name, validate_animation_name
 from hdtex.check import check_hd_textures
 from flora.build import check_flora
 from flora.config import MARKER as FLORA_MARKER
-from footprints.build import check_scaled_footprints
+from mapgen.footprints.build import check_scaled_footprints
+from mapgen.melee_map import check as check_melee_map
+from mapgen.resources.build import check as check_resources
+from mapgen.player_slots import check as check_player_slots
+from mapgen.player_slots import check_script as check_roster_script
+from input_gate_check import gated as check_input_gate
 from validate_aim_shot import TOSH_CLOCK, check_aim_shot_data, check_aim_shot_script
-from validate_assets import check_control_icons, check_footfall_fx, check_skybox_flip, check_stamp
+from validate_assets import check_actor_events, check_control_icons, check_footfall_fx, check_skybox_flip, check_stamp
 from jumpanim.validate import check_jump
 from validate_slow_deaths import check_slow_deaths
 from hitvolumes.validate_pod_actor import check_pod_actor
@@ -468,6 +473,7 @@ def main() -> int:
     check_control_icons(map_dir)
     check_skybox_flip(map_dir)
     check_footfall_fx(map_dir)
+    check_actor_events(map_dir)
     check_animation_names(map_dir)
     for problem in animation_actor_problems(map_dir, GAMEPLAY_ACTORS):
         fail(problem)
@@ -477,6 +483,16 @@ def main() -> int:
         fail(problem)
     check_hd_textures(map_dir)
     for problem in check_scaled_footprints(map_dir):
+        fail(problem)
+    for problem in check_player_slots(map_dir):
+        fail(problem)
+    for problem in check_melee_map(map_dir):
+        fail(problem)
+    for problem in check_resources(map_dir):
+        fail(problem)
+    for problem in check_roster_script(galaxy_text(map_dir)):
+        fail(problem)
+    for problem in check_input_gate(galaxy_text(map_dir)):
         fail(problem)
     # A build with SC2_NO_FLORA=1 has no flora marker and no flora to check.
     if (map_dir / FLORA_MARKER).exists():

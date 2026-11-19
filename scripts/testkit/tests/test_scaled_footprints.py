@@ -10,13 +10,13 @@ from unittest import mock
 
 import numpy as np
 
-from footprints import config
-from footprints.build import apply_scaled_footprints, check_scaled_footprints
-from footprints.blocker import build_blocker
-from footprints.catalog import tree_actor_id
-from footprints.config import MARKER, REPORT
-from footprints.raster import close_pinches, trace
-from footprints.slices import engine_quarter_turns, feet_slices, residual_rotation, segments_world
+from mapgen.footprints import config
+from mapgen.footprints.build import apply_scaled_footprints, check_scaled_footprints
+from mapgen.footprints.blocker import build_blocker
+from mapgen.footprints.catalog import tree_actor_id
+from mapgen.footprints.config import MARKER, REPORT
+from mapgen.footprints.raster import close_pinches, trace
+from mapgen.footprints.slices import engine_quarter_turns, feet_slices, residual_rotation, segments_world
 
 STEP = 0.0025
 COUNT = 80

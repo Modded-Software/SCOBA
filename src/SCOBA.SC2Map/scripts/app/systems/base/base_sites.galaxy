@@ -1,0 +1,39 @@
+// Module: systems/base/base_sites
+// Resource lines (SPEC-BASE-AI 4.7a, R-BASE-26): the build places every
+// mineral field and geyser as a map unit (scripts/mapgen/resources), so the stock
+// AI sees them as expansions at map load. No script makes a resource.
+// The build also writes the site table (data/base_sites: names, hall
+// points), read here for the tests.
+// Every pile holds 4 times its stock amount: mineral fields by data
+// (capacity), geysers by c_SITE_RES_MULT here, at map init.
+
+const int c_SITE_RES_MULT = 4;            // operator: "substantially" more
+
+int gv_siteFields;                       // placed piles found at init, tests
+int gv_siteGeysers;
+bool gv_sitesMade;
+
+// Stock amount times c_SITE_RES_MULT.
+void gf_SiteFill (unit lp_u) {
+    int lv_n = UnitGetPropertyInt(lp_u, c_unitPropResources, c_unitPropCurrent);
+
+    UnitSetPropertyInt(lp_u, c_unitPropResources, lv_n * c_SITE_RES_MULT);
+}
+
+// Once, at map init, before any AI starts.
+void gf_BaseSitesCreate () {
+    unitgroup lv_g;
+    int lv_i;
+
+    if (gv_sitesMade) {
+        return;
+    }
+    gv_sitesMade = true;
+    gf_BaseSitesLoad();
+    gv_siteFields = UnitGroupCount(UnitGroup("MineralField", c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), c_unitCountAll);
+    lv_g = UnitGroup("VespeneGeyser", c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+    gv_siteGeysers = UnitGroupCount(lv_g, c_unitCountAll);
+    for (lv_i = 1; lv_i <= gv_siteGeysers; lv_i += 1) {
+        gf_SiteFill(UnitGroupUnit(lv_g, lv_i));
+    }
+}

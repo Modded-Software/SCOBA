@@ -19,11 +19,11 @@ from pathlib import Path
 import numpy as np
 
 from project_root import project_root
-from footprints.blocker import build_blocker
-from footprints.config import SAMPLES_PER_SUB, SUB
-from footprints.placement import tree_outlines
-from footprints.raster import mesh_samples
-from footprints.slices import feet_slices, load_slices, segments_world
+from mapgen.footprints.blocker import build_blocker
+from mapgen.footprints.config import SAMPLES_PER_SUB, SUB
+from mapgen.footprints.placement import tree_outlines
+from mapgen.footprints.raster import mesh_samples
+from mapgen.footprints.slices import feet_slices, load_slices, segments_world
 
 ROOT = project_root()
 DEFAULT_OBJECTS = ROOT / "out" / "SCOBA256.SC2Map" / "Objects"

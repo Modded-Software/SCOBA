@@ -26,7 +26,7 @@ footprint at 3x scale.
 
 ## 3. Mesh slices
 
-`scripts/footprints/measure.py` (`uv run python -m footprints.measure` from
+`scripts/mapgen/footprints/measure.py` (`uv run python -m footprints.measure` from
 `scripts/`) reads the models with `tools/stormex` and
 the vendored `m3addon`. It cuts the mesh triangles at 80 heights (step 0.0025
 model units) and writes `scripts/data/footprint_slices.json` (committed).
@@ -34,7 +34,7 @@ Re-run only when the game models change.
 
 ## 4. Blocker shape
 
-`scripts/footprints/`, per placed object:
+`scripts/mapgen/footprints/`, per placed object:
 
 - Take the slices in the feet band, world z `FEET_LOW`=0.05 to `FEET_HIGH`=0.35,
   divided by the scale. Raise `FEET_LOW` to shrink root-plate blockers.
@@ -54,7 +54,7 @@ Re-run only when the game models change.
 - Spores: a disk at the origin with the area of the solid core, plus matching
   Place/Check cell rows (`disk_cells`).
 
-Code: package `scripts/footprints/` (`config`, `slices`, `raster`, `catalog`,
+Code: package `scripts/mapgen/footprints/` (`config`, `slices`, `raster`, `catalog`,
 `blocker`, `placement`, `build`).
 
 Fit checks (R-FP-07), against the eroded mesh: covered ≥ `MIN_MESH_COVERED`

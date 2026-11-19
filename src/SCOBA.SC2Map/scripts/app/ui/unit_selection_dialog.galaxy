@@ -60,10 +60,15 @@ void gf_UnitSelectionDialogUpdateToolTip (int lp_iPlayer) {
     }
 }
 
-void gf_UnitSelectionDialogShow (int lp_iPlayer) {
-    // Implementation
+// Tooltips and points label, without changing visibility.
+void gf_UnitSelectionDialogRefresh (int lp_iPlayer) {
     gf_UnitSelectionDialogUpdateToolTip(lp_iPlayer);
     libNtve_gf_SetDialogItemText(gv_userSelectionLabel, (StringExternal("Param/Value/75E1E0B5") + IntToText(gv_availableStatPoints[lp_iPlayer])), PlayerGroupSingle(lp_iPlayer));
+}
+
+void gf_UnitSelectionDialogShow (int lp_iPlayer) {
+    // Implementation
+    gf_UnitSelectionDialogRefresh(lp_iPlayer);
     DialogSetVisible(gv_userSelectionDialog, PlayerGroupSingle(lp_iPlayer), true);
 }
 
@@ -142,63 +147,58 @@ void gf_AddUnitButton (int lp_statGet, int lp_statSet, string lp_icon, text lp_t
     gv_nUnitButtons += 1;
 }
 
+// Spends one stat point on button lp_iButton. At 0 points it spends
+// nothing and returns false. The panel stays open, also after the last
+// point (REQ-UI-PANELS R-UI-3).
+bool gf_UnitSelectionSpend (int lp_player, int lp_iButton) {
+    int lv_hpBar = gf_BossBarId(lp_player, 1);
+    int lv_nrgBar = gf_BossBarId(lp_player, 2);
+    int lv_stat = gv_unitButtons[lp_iButton].lv_statSet;
+
+    if ((gv_availableStatPoints[lp_player] <= 0)) {
+        UIClearMessages(PlayerGroupSingle(lp_player), c_messageAreaAll);
+        UIDisplayMessage(PlayerGroupSingle(lp_player), c_messageAreaSubtitle, StringToText("No stat points"));
+        return false;
+    }
+    if ((lv_stat == c_unitPropLifeMax) || (lv_stat == c_unitPropEnergyMax)) {
+        gv_sTATLEVEL[lp_player][lp_iButton] += 1;
+        UnitSetPropertyFixed(gv_tPSUNIT[lp_player], lv_stat, gf_GetLifeandEnergyStatFormula(lp_player, lp_iButton));
+        libNtve_gf_SetBossBarMaximumValue(lv_hpBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lp_player], c_unitPropLifeMax, c_unitPropCurrent)), true);
+        libNtve_gf_SetBossBarBoss(lv_hpBar, gv_tPSUNIT[lp_player], true);
+        libNtve_gf_SetBossBarMaximumValue(lv_nrgBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lp_player], c_unitPropEnergyMax, c_unitPropCurrent)), true);
+    }
+    if ((lv_stat == c_unitPropLifeRegen) || (lv_stat == c_unitPropEnergyRegen)) {
+        UnitSetPropertyFixed(gv_tPSUNIT[lp_player], lv_stat, gf_GetRegenStatFormula(lp_player, lp_iButton));
+        libNtve_gf_SetBossBarMaximumValue(lv_nrgBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lp_player], c_unitPropEnergyMax, c_unitPropCurrent)), true);
+    }
+    if (lv_stat == c_unitPropMovementSpeed) {
+        UnitSetPropertyFixed(gv_tPSUNIT[lp_player], lv_stat, gf_GetMovementStatFormula(lp_player, lp_iButton));
+    }
+    gf_UnitSelectionDialogUpdateToolTip(lp_player);
+    gv_availableStatPoints[lp_player] -= 1;
+    libNtve_gf_SetDialogItemText(gv_userSelectionLabel, (StringExternal("Param/Value/6E52D896") + IntToText(gv_availableStatPoints[lp_player])), PlayerGroupSingle(lp_player));
+    libNtve_gf_SetDialogItemText(gv_singleButtonLabel, IntToText(gv_availableStatPoints[lp_player]), PlayerGroupSingle(lp_player));
+    return true;
+}
+
 bool gt_UserSelectionDialogCallback_Func (bool testConds, bool runActions) {
-    int autoC19D252A_ae;
-    int autoC19D252A_ai;
-
-    // Variable Declarations
-    int lv_localPlayer;
-    int lv_localHPBar;
-    int lv_localNRGBar;
-    int lv_localXPBar;
     int lv_iButton;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-    lv_localHPBar = gf_BossBarId(lv_localPlayer, 1);
-    lv_localNRGBar = gf_BossBarId(lv_localPlayer, 2);
-    lv_localXPBar = gf_BossBarId(lv_localPlayer, 3);
 
     // Actions
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
-    autoC19D252A_ae = gv_nUnitButtons;
-    autoC19D252A_ai = 1;
-    lv_iButton = 0;
-    for ( ; ( (autoC19D252A_ai >= 0 && lv_iButton <= autoC19D252A_ae) || (autoC19D252A_ai <= 0 && lv_iButton >= autoC19D252A_ae) ) ; lv_iButton += autoC19D252A_ai ) {
+    for (lv_iButton = 0; lv_iButton < gv_nUnitButtons; lv_iButton += 1) {
         if ((EventDialogControl() == gv_userSelectionButtons[lv_iButton])) {
-            if (((gv_unitButtons[lv_iButton].lv_statSet == c_unitPropLifeMax) || (gv_unitButtons[lv_iButton].lv_statSet == c_unitPropEnergyMax))) {
-                gv_sTATLEVEL[lv_localPlayer][lv_iButton] += 1;
-                UnitSetPropertyFixed(gv_tPSUNIT[lv_localPlayer], gv_unitButtons[lv_iButton].lv_statSet, gf_GetLifeandEnergyStatFormula(lv_localPlayer, lv_iButton));
-                libNtve_gf_SetBossBarMaximumValue(lv_localHPBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropLifeMax, c_unitPropCurrent)), true);
-                libNtve_gf_SetBossBarBoss(lv_localHPBar, gv_tPSUNIT[lv_localPlayer], true);
-                libNtve_gf_SetBossBarMaximumValue(lv_localNRGBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropEnergyMax, c_unitPropCurrent)), true);
-            }
-
-            if (((gv_unitButtons[lv_iButton].lv_statSet == c_unitPropLifeRegen) || (gv_unitButtons[lv_iButton].lv_statSet == c_unitPropEnergyRegen))) {
-                UnitSetPropertyFixed(gv_tPSUNIT[lv_localPlayer], gv_unitButtons[lv_iButton].lv_statSet, gf_GetRegenStatFormula(lv_localPlayer, lv_iButton));
-                libNtve_gf_SetBossBarMaximumValue(lv_localNRGBar, FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropEnergyMax, c_unitPropCurrent)), true);
-            }
-
-            if (((gv_unitButtons[lv_iButton].lv_statSet == c_unitPropMovementSpeed))) {
-                UnitSetPropertyFixed(gv_tPSUNIT[lv_localPlayer], gv_unitButtons[lv_iButton].lv_statSet, gf_GetMovementStatFormula(lv_localPlayer, lv_iButton));
-            }
-
-            if ((gv_availableStatPoints[lv_localPlayer] == 1)) {
-                gf_UnitSelectionDialogUpdateToolTip(lv_localPlayer);
-                gv_availableStatPoints[lv_localPlayer] -= 1;
-                DialogSetVisible(gv_userSelectionDialog, PlayerGroupSingle(lv_localPlayer), false);
-            }
-            else {
-                gf_UnitSelectionDialogUpdateToolTip(lv_localPlayer);
-                gv_availableStatPoints[lv_localPlayer] -= 1;
-                libNtve_gf_SetDialogItemText(gv_userSelectionLabel, (StringExternal("Param/Value/6E52D896") + IntToText(gv_availableStatPoints[lv_localPlayer])), PlayerGroupSingle(lv_localPlayer));
-            }
+            gf_UnitSelectionSpend(EventPlayer(), lv_iButton);
             Wait(0.125, c_timeReal);
+            break;
         }
-
     }
     return true;
 }

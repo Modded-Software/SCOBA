@@ -159,7 +159,7 @@ def _insert_init_calls(text: str, calls: tuple[str, ...]) -> str:
 INTRO_FILE = Path("scripts") / "app" / "core" / "intro.galaxy"
 INTRO_ON = "const bool c_INTRO_ENABLED = true;"
 INTRO_OFF = "const bool c_INTRO_ENABLED = false;"
-INTRO_PROFILES = ("intro",)
+INTRO_PROFILES = ("intro", "dropview")  # dropview: the deploy as in game
 
 
 def patch_intro(root: Path, profile: str) -> None:
@@ -170,6 +170,21 @@ def patch_intro(root: Path, profile: str) -> None:
         raise SystemExit(f"{INTRO_FILE}: expected one '{INTRO_ON}'")
     if profile not in INTRO_PROFILES:
         path.write_text(text.replace(INTRO_ON, INTRO_OFF), encoding="utf-8")
+
+
+BASE_AI_FILE = Path("scripts") / "app" / "core" / "base_ai.galaxy"
+BASE_AI_ON = "const bool c_BASE_AI_ENABLED = true;"
+BASE_AI_OFF = "const bool c_BASE_AI_ENABLED = false;"
+
+
+def patch_base_ai(root: Path) -> None:
+    """Map-init base AI off in every profile (SPEC-BASE-AI 6); a harness
+    that needs bases builds them itself."""
+    path = root / BASE_AI_FILE
+    text = path.read_text(encoding="utf-8")
+    if text.count(BASE_AI_ON) != 1:
+        raise SystemExit(f"{BASE_AI_FILE}: expected one '{BASE_AI_ON}'")
+    path.write_text(text.replace(BASE_AI_ON, BASE_AI_OFF), encoding="utf-8")
 
 
 def build_instrumented_map(spec: TestMapSpec) -> Path:
@@ -187,6 +202,7 @@ def build_instrumented_map(spec: TestMapSpec) -> Path:
     shutil.copytree(spec.source, spec.output)
     patch_map_options(spec.output, spec.options)
     patch_intro(spec.output, spec.profile)
+    patch_base_ai(spec.output)
     if spec.patch is not None:
         spec.patch(spec.output)
     patch_mapinfo(spec.output / "MapInfo")

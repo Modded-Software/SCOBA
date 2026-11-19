@@ -14,8 +14,8 @@ from typing import NamedTuple
 
 import numpy as np
 
-from footprints.catalog import attr, catalog_bodies, shape_of
-from footprints.slices import engine_quarter_turns
+from mapgen.footprints.catalog import attr, catalog_bodies, shape_of
+from mapgen.footprints.slices import engine_quarter_turns
 
 from . import config
 from .grid import disk_cells
@@ -166,6 +166,19 @@ def tree_grid(trees: list[Tree], n: int) -> np.ndarray:
     return grid
 
 
+def site_halls(map_dir: Path) -> list[tuple[float, float]]:
+    """Hall points of the resource lines (scripts/mapgen/resources report), if any."""
+    path = Path(map_dir) / config.SITE_REPORT
+    if not path.exists():
+        return []
+    out = []
+    for row in path.read_text(encoding="utf-8").splitlines():
+        if row.startswith("line "):
+            x, y = row.split()[-1].split(",")
+            out.append((float(x), float(y)))
+    return out
+
+
 def load(map_dir: Path, n: int = config.MAP_CELLS) -> Scene:
     map_dir = Path(map_dir)
     objects = (map_dir / "Objects").read_text(encoding="utf-8")
@@ -181,6 +194,9 @@ def load(map_dir: Path, n: int = config.MAP_CELLS) -> Scene:
             raise ValueError(f"{map_dir / 'Regions'} has no region {name!r}")
         r = regions[name]
         rows, cols = disk_cells(r.x, r.y, r.radius + config.KEEP_SPAWN, keepout.shape)
+        keepout[rows, cols] = True
+    for x, y in site_halls(map_dir):
+        rows, cols = disk_cells(x, y, config.KEEP_HALL, keepout.shape)
         keepout[rows, cols] = True
     ids = [int(v) for v in re.findall(r'\bId="(\d+)"', objects)]
     return Scene(trees, units, keepout, tree_grid(trees, n), max(ids, default=0) + 1, regions)

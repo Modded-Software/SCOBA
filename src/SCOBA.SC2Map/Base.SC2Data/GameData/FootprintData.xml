@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<Catalog>
+    <!-- 4x4 SupplyDepot footprints: the stock liberty Footprint2x2Contour,
+         Footprint2x2 and Footprint2x2Underground scaled x2. Raised and
+         lowered match (the AI places depots with c_canLower). Area as stock
+         Footprint4x4Contour. -->
+    <CFootprint id="Footprint4x4DepotContour">
+        <Layers index="Check" Area="-2,-2,2,2">
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+        </Layers>
+        <Layers index="Place" Area="-2,-2,2,2">
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+        </Layers>
+        <Shape>
+            <Radius value="2.2361"/>
+            <Offsets value="-2,1;-1,2;1,2;2,1;2,-1;1,-2;-1,-2;-2,-1"/>
+            <Borders value="7,0,2;0,1,2;1,2,2;2,3,2;3,4,2;4,5,2;5,6,2;6,7,2"/>
+        </Shape>
+    </CFootprint>
+    <CFootprint id="Footprint4x4Depot">
+        <Layers index="Check" Area="-2,-2,2,2">
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+        </Layers>
+        <Layers index="Place" Area="-2,-2,2,2">
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+        </Layers>
+        <Shape>
+            <Radius value="2.8286"/>
+            <Offsets value="-2,-2;-2,2;2,2;2,-2"/>
+            <Borders value="3,0,2;0,1,2;1,2,2;2,3,2"/>
+        </Shape>
+    </CFootprint>
+    <CFootprint id="Footprint4x4Underground">
+        <Layers index="Check" Area="-2,-2,2,2">
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+        </Layers>
+        <Layers index="Place" Area="-2,-2,2,2">
+            <Sets index="0">
+                <Positive index="GroundNoSpawn" value="0"/>
+                <Positive index="Dense" value="1"/>
+            </Sets>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+            <Rows value="xxxx"/>
+        </Layers>
+        <Shape>
+            <Radius value="2.2361"/>
+            <Offsets value="-2,1;-1,2;1,2;2,1;2,-1;1,-2;-1,-2;-2,-1"/>
+            <Borders value="7,0,1;0,1,1;1,2,1;2,3,1;3,4,1;4,5,1;5,6,1;6,7,1"/>
+        </Shape>
+    </CFootprint>
+    <!-- 8x8 Command Center family (operator 2026-11-18: stock 5x5 -> 8x8).
+         The stock liberty Footprint5x5Contour / Footprint5x5DropOff with
+         the same layers: not near resources, drop-off placement. -->
+    <CFootprint id="Footprint8x8CCContour">
+        <Layers index="Check" Area="-4,-4,4,4">
+            <Sets index="0">
+                <Negative index="NearResources" value="1"/>
+            </Sets>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+        </Layers>
+        <Layers index="Place" Area="-4,-4,4,4">
+            <Sets index="0">
+                <Positive index="DropOff" value="1"/>
+            </Sets>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+        </Layers>
+        <Shape>
+            <Radius value="4.3081"/>
+            <Offsets value="-1.6,-4;-4,-1.6;-4,1.6;-1.6,4;1.6,4;4,1.6;4,-1.6;1.6,-4"/>
+            <Borders value="7,0,2;0,1,2;1,2,2;2,3,2;3,4,2;4,5,2;5,6,2;6,7,2"/>
+        </Shape>
+    </CFootprint>
+    <CFootprint id="Footprint8x8CCDropOff">
+        <Layers index="Check" Area="-4,-4,4,4">
+            <Sets index="0">
+                <Negative index="NearResources" value="1"/>
+            </Sets>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+        </Layers>
+        <Layers index="Place" Area="-4,-4,4,4">
+            <Sets index="0">
+                <Positive index="DropOff" value="1"/>
+            </Sets>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+            <Rows value="xxxxxxxx"/>
+        </Layers>
+        <Shape>
+            <Radius value="5.6569"/>
+            <Offsets value="-4,-4;-4,4;4,4;4,-4"/>
+            <Borders value="3,0,2;0,1,2;1,2,2;2,3,2"/>
+        </Shape>
+    </CFootprint>
+</Catalog>

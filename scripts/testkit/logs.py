@@ -14,6 +14,10 @@ FAIL_WORDS = (
     # A unit actor that is not created draws the engine's stand-in sphere
     # (podbirth/20261117-105245: "Unable to create unit actor").
     "unable to create", "sphere unit",
+    # The engine dropped an actor event at load (two IsStatus terms; the
+    # footfall dust never played, 2026-11-18): data that does nothing
+    # and reports nothing.
+    "without a triggering message",
 )
 SKIP_PREFIXES = (
     "StarCraft II",

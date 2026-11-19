@@ -125,9 +125,13 @@ bool gt_HudMapClick_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
     if (EventDialogControl() == gv_hudMapButton[c_HUD_SLOT_MODE]) {
         lv_hero = gv_tPSUNIT[lv_player];
-        if (!UnitIsValid(lv_hero)) {
+        if (!UnitIsValid(lv_hero) || gf_ControlRegular(lv_player)) {
             return true;
         }
         // The same command the card button issued: On enters Actions, Off leaves.

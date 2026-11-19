@@ -1,0 +1,148 @@
+// Module: systems/turn_anim
+// Operator 2026-11-18: the landed Viking showed no turn animation while
+// turning in place. Its model has no turn clip (VikingAssault.m3: Stand,
+// Walk, Attack, ... only) and the engine plays none. At 90 deg/s
+// (systems/turn_rate) the turn is visible, so: while a configured unit
+// turns and does not move, its actor plays a clip (the walk) on its own
+// anim name; it is cleared when the turn ends or the unit moves. The walk
+// carries the footfall events, so the stomp effects play on the turn too.
+// Config: gf_TurnAnimConfig(type, anim, timeScale). Bound hero units only.
+// Operator 2026-11-18: the clip at its own speed was too fast for the slow
+// turn; it plays at least 2x slower (time scale 0.5).
+
+const int c_TURN_ANIM_ROWS = 8;
+const string c_TURN_ANIM_NAME = "ScobaTurn";
+const fixed c_TURN_ANIM_MIN = 0.5;      // deg per tick that counts as turning
+const fixed c_TURN_ANIM_MOVED = 0.02;   // ground distance per tick that counts as moving
+const int c_TURN_ANIM_HOLD = 3;         // still ticks before the clip ends (no flicker)
+
+trigger gt_TurnAnimTick;
+
+int gv_turnAnimRows;
+string[c_TURN_ANIM_ROWS] gv_turnAnimType;
+string[c_TURN_ANIM_ROWS] gv_turnAnimClip;
+fixed[c_TURN_ANIM_ROWS] gv_turnAnimScale;
+fixed gv_turnAnimScaleSent = -1.0;   // last time scale sent, for tests
+
+unit[c_SCOBA_HERO_LAST + 1] gv_turnAnimUnit;
+fixed[c_SCOBA_HERO_LAST + 1] gv_turnAnimFacing;
+point[c_SCOBA_HERO_LAST + 1] gv_turnAnimPos;
+bool[c_SCOBA_HERO_LAST + 1] gv_turnAnimOn;
+int[c_SCOBA_HERO_LAST + 1] gv_turnAnimStill;
+int gv_turnAnimStarts;   // for tests
+int gv_turnAnimStops;
+
+int gf_TurnAnimRow (string lp_type) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < gv_turnAnimRows; lv_i += 1) {
+        if (gv_turnAnimType[lv_i] == lp_type) {
+            return lv_i;
+        }
+    }
+    return -1;
+}
+
+// Adds or replaces a row. An empty clip turns the type off.
+void gf_TurnAnimConfig (string lp_type, string lp_anim, fixed lp_scale) {
+    int lv_r = gf_TurnAnimRow(lp_type);
+
+    if (lv_r < 0) {
+        if (gv_turnAnimRows >= c_TURN_ANIM_ROWS) {
+            return;
+        }
+        lv_r = gv_turnAnimRows;
+        gv_turnAnimRows += 1;
+        gv_turnAnimType[lv_r] = lp_type;
+    }
+    gv_turnAnimClip[lv_r] = lp_anim;
+    gv_turnAnimScale[lv_r] = lp_scale;
+}
+
+void gf_TurnAnimDefaults () {
+    gf_TurnAnimConfig("SCOBAVikingHeroAssault", "Walk", 0.5);
+}
+
+// lp_r: the unit's row (on), or -1 (off).
+void gf_TurnAnimSet (int lp_player, unit lp_u, int lp_r, bool lp_on) {
+    actor lv_a;
+
+    if (lp_on == gv_turnAnimOn[lp_player]) {
+        return;
+    }
+    gv_turnAnimOn[lp_player] = lp_on;
+    if (lp_on) {
+        lv_a = libNtve_gf_MainActorofUnit(lp_u);
+        ActorSend(lv_a, "AnimPlay " + c_TURN_ANIM_NAME + " " + gv_turnAnimClip[lp_r] + " PlayForever 0.150000");
+        ActorSend(lv_a, "AnimSetTimeScale " + c_TURN_ANIM_NAME + " " + FixedToString(gv_turnAnimScale[lp_r], 6));
+        gv_turnAnimScaleSent = gv_turnAnimScale[lp_r];
+        gv_turnAnimStarts += 1;
+    }
+    else {
+        if (UnitIsValid(lp_u)) {
+            ActorSend(libNtve_gf_MainActorofUnit(lp_u), "AnimClear " + c_TURN_ANIM_NAME + " 0.150000");
+        }
+        gv_turnAnimStops += 1;
+    }
+}
+
+void gf_TurnAnimStep (int lp_player) {
+    unit lv_u = gv_tPSUNIT[lp_player];
+    int lv_r;
+    fixed lv_turn;
+    fixed lv_moved;
+
+    if (lv_u != gv_turnAnimUnit[lp_player]) {
+        gf_TurnAnimSet(lp_player, gv_turnAnimUnit[lp_player], -1, false);
+        gv_turnAnimUnit[lp_player] = lv_u;
+        gv_turnAnimStill[lp_player] = 0;
+        if (UnitIsValid(lv_u)) {
+            gv_turnAnimFacing[lp_player] = UnitGetFacing(lv_u);
+            gv_turnAnimPos[lp_player] = UnitGetPosition(lv_u);
+        }
+        return;
+    }
+    if (!UnitIsValid(lv_u)) {
+        return;
+    }
+    lv_r = gf_TurnAnimRow(UnitGetType(lv_u));
+    lv_turn = AbsF(gf_AnimYawDelta(gv_turnAnimFacing[lp_player], UnitGetFacing(lv_u)));
+    lv_moved = DistanceBetweenPoints(gv_turnAnimPos[lp_player], UnitGetPosition(lv_u));
+    gv_turnAnimFacing[lp_player] = UnitGetFacing(lv_u);
+    gv_turnAnimPos[lp_player] = UnitGetPosition(lv_u);
+    if (lv_r < 0 || gv_turnAnimClip[lv_r] == "" || lv_moved >= c_TURN_ANIM_MOVED) {
+        // Moving: the engine's walk plays. Not configured: nothing.
+        gv_turnAnimStill[lp_player] = 0;
+        gf_TurnAnimSet(lp_player, lv_u, -1, false);
+        return;
+    }
+    if (lv_turn >= c_TURN_ANIM_MIN) {
+        gv_turnAnimStill[lp_player] = 0;
+        gf_TurnAnimSet(lp_player, lv_u, lv_r, true);
+        return;
+    }
+    gv_turnAnimStill[lp_player] += 1;
+    if (gv_turnAnimStill[lp_player] >= c_TURN_ANIM_HOLD) {
+        gf_TurnAnimSet(lp_player, lv_u, -1, false);
+    }
+}
+
+bool gt_TurnAnimTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        if (gf_IsHeroPlayer(lv_p)) {
+            gf_TurnAnimStep(lv_p);
+        }
+    }
+    return true;
+}
+
+void gt_TurnAnim_Init () {
+    gf_TurnAnimDefaults();
+    gt_TurnAnimTick = TriggerCreate("gt_TurnAnimTick_Func");
+    TriggerAddEventTimePeriodic(gt_TurnAnimTick, 0.0625, c_timeGame);
+}

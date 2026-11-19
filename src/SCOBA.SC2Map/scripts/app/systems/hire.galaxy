@@ -1,0 +1,124 @@
+// Module: systems/hire
+// Hire (REQ-BASE-AI R-HIRE-1..6): a hero player buys an allied base-AI
+// army unit for its own mineral and gas cost. The unit becomes the
+// player's unit, so the AI stops ordering it and Order works on it. One
+// button: "Hire" on a hireable unit, "Order" on an own unit.
+
+const int c_HIRE_OK = 0;
+const int c_HIRE_NO_UNIT = 1;
+const int c_HIRE_NOT_HERO = 2;      // the buyer is not a wallet player
+const int c_HIRE_OWN = 3;           // already the buyer's unit
+const int c_HIRE_NOT_AI = 4;        // owner has no base AI
+const int c_HIRE_NOT_ALLY = 5;
+const int c_HIRE_SCRIPT = 6;        // a script unit (waves, medics, ...)
+const int c_HIRE_KIND = 7;          // structure, worker, hero, no cost
+const int c_HIRE_POOR = 8;
+
+int[16] gv_hireCount;               // hires per player (tests)
+int[16] gv_hireLast;                // last gf_HireCheck result per player (tests)
+
+int gf_HireMinerals (unit lp_unit) {
+    return UnitTypeGetCost(UnitGetType(lp_unit), c_unitCostMinerals);
+}
+
+int gf_HireVespene (unit lp_unit) {
+    return UnitTypeGetCost(UnitGetType(lp_unit), c_unitCostVespene);
+}
+
+int gf_HireCheck (int lp_player, unit lp_unit) {
+    int lv_owner;
+    string lv_type;
+
+    if (!UnitIsValid(lp_unit)) {
+        return c_HIRE_NO_UNIT;
+    }
+    if (!gf_WalletPlayer(lp_player)) {
+        return c_HIRE_NOT_HERO;
+    }
+    lv_owner = UnitGetOwner(lp_unit);
+    if (lv_owner == lp_player) {
+        return c_HIRE_OWN;
+    }
+    if (!gf_BaseAiIsAiPlayer(lv_owner)) {
+        return c_HIRE_NOT_AI;
+    }
+    if (libNtve_gf_PlayerIsEnemy(lp_player, lv_owner, libNtve_ge_PlayerRelation_Ally) == false) {
+        return c_HIRE_NOT_ALLY;
+    }
+    if (AIIsScriptControlled(lp_unit)) {
+        return c_HIRE_SCRIPT;
+    }
+    lv_type = UnitGetType(lp_unit);
+    if (UnitTypeTestAttribute(lv_type, c_unitAttributeStructure) || UnitTypeTestFlag(lv_type, c_unitFlagWorker)) {
+        return c_HIRE_KIND;
+    }
+    if (gf_HeroPlayerFromUnit(lp_unit) != 0 || (gf_HireMinerals(lp_unit) + gf_HireVespene(lp_unit)) <= 0) {
+        return c_HIRE_KIND;
+    }
+    if (PlayerGetPropertyInt(lp_player, c_playerPropMinerals) < gf_HireMinerals(lp_unit)) {
+        return c_HIRE_POOR;
+    }
+    if (PlayerGetPropertyInt(lp_player, c_playerPropVespene) < gf_HireVespene(lp_unit)) {
+        return c_HIRE_POOR;
+    }
+    return c_HIRE_OK;
+}
+
+// Shown as "Hire": the unit could be hired, with enough money or not.
+bool gf_HireOffered (int lp_player, unit lp_unit) {
+    int lv_check = gf_HireCheck(lp_player, lp_unit);
+
+    return (lv_check == c_HIRE_OK || lv_check == c_HIRE_POOR);
+}
+
+bool gf_HireExecute (int lp_player, unit lp_unit) {
+    int lv_check = gf_HireCheck(lp_player, lp_unit);
+
+    gv_hireLast[lp_player] = lv_check;
+    if (lv_check != c_HIRE_OK) {
+        if (lv_check == c_HIRE_POOR) {
+            UIDisplayMessage(PlayerGroupSingle(lp_player), c_messageAreaError, StringToText("Not enough minerals or gas"));
+        }
+        return false;
+    }
+    PlayerModifyPropertyInt(lp_player, c_playerPropMinerals, c_playerPropOperSubtract, gf_HireMinerals(lp_unit));
+    PlayerModifyPropertyInt(lp_player, c_playerPropVespene, c_playerPropOperSubtract, gf_HireVespene(lp_unit));
+    AIRemoveUnitFromAnyWaves(lp_unit);
+    UnitIssueOrder(lp_unit, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    UnitSetOwner(lp_unit, lp_player, true);
+    UnitSetCustomValue(lp_unit, c_HIRE_MARK, 1.0);
+    gv_hireCount[lp_player] += 1;
+    gf_HireButtonApply(lp_player);
+    return true;
+}
+
+// The Order dialog for the current target: "Hire m/g" on a hireable unit,
+// "Order" on an own unit, hidden otherwise.
+void gf_HireButtonApply (int lp_player) {
+    unit lv_unit = gv_unitTarget[lp_player];
+    bool lv_own = UnitIsValid(lv_unit) && (UnitGetOwner(lv_unit) == lp_player);
+    bool lv_hire = gf_HireOffered(lp_player, lv_unit);
+    text lv_label = StringToText("Order");
+    text lv_tip = StringToText("Order this unit");
+
+    if (lv_hire) {
+        lv_label = StringToText("Hire " + IntToString(gf_HireMinerals(lv_unit)) + "/" + IntToString(gf_HireVespene(lv_unit)));
+        lv_tip = StringToText("Hire this unit for its minerals and gas");
+    }
+    libNtve_gf_SetDialogItemText(gv_sCOBAOrderButton, lv_label, PlayerGroupSingle(lp_player));
+    libNtve_gf_SetDialogItemTooltip(gv_sCOBAOrderButton, lv_tip, PlayerGroupSingle(lp_player));
+    DialogSetVisible(gv_sCOBAOrderDialog, PlayerGroupSingle(lp_player), lv_own || lv_hire);
+}
+
+// The F key and the button: hire a hireable target, else Order.
+void gf_OrderPress (int lp_player) {
+    unit lv_unit = gv_unitTarget[lp_player];
+
+    if (gv_sCOBAOrderMode[lp_player] == false && gf_HireOffered(lp_player, lv_unit)) {
+        gf_HireExecute(lp_player, lv_unit);
+        libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, false, PlayerGroupSingle(lp_player));
+        return;
+    }
+    gf_OrderToggle(lp_player);
+    libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, gv_sCOBAOrderMode[lp_player], PlayerGroupSingle(lp_player));
+}

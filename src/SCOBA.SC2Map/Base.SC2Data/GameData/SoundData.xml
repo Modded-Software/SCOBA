@@ -3,4 +3,18 @@
     <CSound id="SporeCannon_AttackLaunch">
         <Volume value="-96.000000,-96.000000"/>
     </CSound>
+    <!-- Intro theme (operator 2026-11-18). The build encodes
+         res/audio/SCOBA_IntroTheme.wav to Assets\Sounds\SCOBA_IntroTheme.ogg.
+         Played with SoundPlay per seat (systems/intro_flow). -->
+    <CSound id="SCOBAIntroTheme" parent="MUSIC">
+        <AssetArray File="Assets\Sounds\SCOBA_IntroTheme.ogg" FacialGroup=""/>
+        <!-- Loops until touchdown (operator 2026-11-18). -->
+        <LoopCount value="-1"/>
+    </CSound>
+    <!-- Psi Destroyer hum for intro shot S9 (operator 2026-11-18): the stock
+         dome ambience loop (swarm.sc2campaign), 2D so the 42-cell dolly
+         does not roll it off (stock rolloff: volume 0 at 30). -->
+    <CSound id="SCOBAPsiHum" parent="PsiDecimator_Amb_Lp">
+        <Mode value="2D"/>
+    </CSound>
 </Catalog>

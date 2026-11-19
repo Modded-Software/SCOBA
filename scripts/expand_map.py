@@ -13,18 +13,21 @@ from pathlib import Path
 from attack_cooldown_link import apply as apply_attack_cooldown_link
 from bootstrap_galaxy import write_bootstrap
 from character_anim_assets import generate as generate_character_anim
-from doodad_occlusion import disable_doodad_occlusion
-from expand_helpers import clone_cells, read, upsample_grid, write
+from doodad_occlusion import disable_doodad_occlusion, disable_unit_silhouettes
+from expand_helpers import clone_cells, expand_texture_masks, import_audio, read, upsample_grid, write
 from hdtex.inject import apply_hd_textures
+from mapgen.melee_map import apply as apply_melee_map
+from mapgen.player_slots import apply as apply_player_slots
 from project_root import project_root
 from props_expand import expand_props
+from mapgen.resources.build import apply as apply_resources
 from flora.build import apply_flora
 from flora.lift import lift_doodads, sink_trees
-from footprints.build import apply_scaled_footprints
+from mapgen.footprints.build import apply_scaled_footprints
 from skybox_flip import generate as generate_skybox_flip
 from footfall.fx import generate as generate_footfall_fx
 from slow_death_assets import generate as generate_slow_deaths
-from spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
+from mapgen.spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
 from strip_gui_triggers import strip_triggers
 from water_splashes import apply as apply_water_splashes
 
@@ -144,64 +147,6 @@ def expand_sync_texture_info(src: Path, dst: Path) -> None:
     struct.pack_into("<4sIIII", out, 0, magic, version, NEW_CELLS, NEW_CELLS, sets)
     out[20 : 20 + len(names)] = names
     out[20 + len(names) :] = clone_cells(body, w, h, cell_size)
-    write(dst, bytes(out))
-
-
-def unpack_tile(tile: bytes) -> list[int]:
-    cells = []
-    for row in range(64):
-        for col in range(32):
-            b = tile[row * 32 + col]
-            cells.append(b >> 4)
-            cells.append(b & 0x0F)
-    return cells
-
-
-def pack_tile(cells: list[int]) -> bytes:
-    out = bytearray(2048)
-    for row in range(64):
-        for col in range(32):
-            a = cells[row * 64 + col * 2]
-            b = cells[row * 64 + col * 2 + 1]
-            out[row * 32 + col] = ((a & 0x0F) << 4) | (b & 0x0F)
-    return bytes(out)
-
-
-def expand_texture_masks(src: Path, dst: Path) -> None:
-    data = read(src)
-    magic, version, reserved, w, h = struct.unpack_from("<4sIIII", data, 0)
-    assert magic == b"MASK" and version == 102 and w == 1024 and h == 1024
-    old_tiles = 16
-    new_tiles = 32
-    tile_size = 2048
-    layer_size = old_tiles * old_tiles * tile_size
-    out = bytearray(64 + 8 * new_tiles * new_tiles * tile_size)
-    out[:64] = data[:64]
-    struct.pack_into("<4sIIII", out, 0, magic, version, reserved, 2048, 2048)
-    write_pos = 64
-    for layer in range(8):
-        base = 64 + layer * layer_size
-        for ty in range(new_tiles):
-            for tx in range(new_tiles):
-                old_tx = tx // 2
-                old_ty = ty // 2
-                old_tile = data[
-                    base
-                    + (old_ty * old_tiles + old_tx) * tile_size :
-                    base
-                    + (old_ty * old_tiles + old_tx + 1) * tile_size
-                ]
-                cells = unpack_tile(old_tile)
-                dx = (tx % 2) * 32
-                dy = (ty % 2) * 32
-                scaled = [0] * (64 * 64)
-                for y in range(64):
-                    for x in range(64):
-                        sx = dx + x // 2
-                        sy = dy + y // 2
-                        scaled[y * 64 + x] = cells[sy * 64 + sx]
-                out[write_pos : write_pos + tile_size] = pack_tile(scaled)
-                write_pos += tile_size
     write(dst, bytes(out))
 
 
@@ -459,6 +404,7 @@ def main() -> int:
     shutil.copytree(src, dst)
     (dst / "t3SyncHeightMap").unlink(missing_ok=True)
     expand_mapinfo(src / "MapInfo", dst / "MapInfo")
+    apply_player_slots(dst)
     expand_terrain_xml(src / "t3Terrain.xml", dst / "t3Terrain.xml")
     expand_heightmap(src / "t3HeightMap", dst / "t3HeightMap")
     expand_cell_flags(src / "t3CellFlags", dst / "t3CellFlags")
@@ -473,23 +419,27 @@ def main() -> int:
     expand_water(src / "t3Water", dst / "t3Water")
     scale_xml_objects(src / "Objects", dst / "Objects")
     scale_xml_regions(src / "Regions", dst / "Regions")
+    apply_melee_map(dst)
     strip_triggers(dst)
     write_bootstrap(dst)
     expand_minimap(src / "Minimap.tga", dst / "Minimap.tga")
     if os.environ.get("SC2_NO_WATER_SPLASHES") != "1":
         apply_water_splashes(dst)
     apply_attack_cooldown_link(dst)
-    for generate in (generate_character_anim, generate_slow_deaths, generate_skybox_flip, generate_footfall_fx):
+    for generate in (generate_character_anim, generate_slow_deaths, generate_skybox_flip, generate_footfall_fx, import_audio):
         generate(dst, False)
     if os.environ.get("SC2_NO_PROPS") != "1":
         expand_props(dst)
     if os.environ.get("SC2_NO_SPORES") != "1":
         scale_spores(dst)
+    # R-BASE-31: resource lines first (all trees and units are in place by
+    # now), then tree blockers at the fitted tree spots, then flora.
+    apply_resources(dst)
     apply_scaled_footprints(dst)
     if os.environ.get("SC2_NO_FLORA") != "1":
         apply_flora(dst)
     # Occlusion is disabled after every step that places doodads: a doodad model added later would fade when it hides a unit.
-    for step in (lift_doodads, sink_trees, disable_doodad_occlusion, scale_psi_destroyer, slow_psi_destroyer_animations, apply_hd_textures):
+    for step in (lift_doodads, sink_trees, disable_doodad_occlusion, disable_unit_silhouettes, scale_psi_destroyer, slow_psi_destroyer_animations, apply_hd_textures):
         step(dst)
     if args.out is None:
         old = root / "out" / ".build-old"

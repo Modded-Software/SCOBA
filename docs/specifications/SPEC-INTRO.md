@@ -17,7 +17,7 @@ Code exists. `[tested]` entries passed in run `intro/20261117-024914`
 | ID | State | Backed by |
 | --- | --- | --- |
 | R-INTRO-1 | [tested] | `boot`: `earlyState` LOOP, `firstCutMs` 625 (< 1500); `t0` State 1 |
-| R-INTRO-2 | [tested] [operator] | `boot t0/t1/t6`: `Dialogs` 0 (14 dialogs checked, 10 kept), `Cinematic` true; how it looks: AC-INTRO-1 |
+| R-INTRO-2 | [tested] [operator] | `boot t0/t1/t6`: `Dialogs` 0 (15 dialogs checked, incl. the wallet HUD), `Cinematic` true; how it looks: AC-INTRO-1 |
 | R-INTRO-3 | [tested] | `wrap`: `Shot` 7 → 0, `Pass` +1, S8 cut at 3.0 s; `shots` S2 and S6 pass 1 read the variant values |
 | R-INTRO-4 | [tested] | `shots`: engine yaw, pitch, distance per row inside windows; FOV, target and height from script state against the table. The engine target is raw only (F13) |
 | R-INTRO-5 | [host] | `test_intro_shots.py`: eye clearance, bounds, S1/S2 absolute heights on the survey ground |
@@ -28,9 +28,10 @@ Code exists. `[tested]` entries passed in run `intro/20261117-024914`
 | R-INTRO-10 | [implemented] [operator] | `deploy`: injected SPACE; countdown trace `321`, zoom 2.5..4 s after SPACE (`gf_IntroCountStep`); one `SCOBAHeroPod` at the drop point; pod height from 40, never rising. Not verified after the fall revert (2026-11-17); the pod looks broken (operator); the snap and the pod look: AC-INTRO-6 |
 | R-INTRO-11 | [tested] | `deploy`: `JumpPresses` 0, `Pods` 1, `SpaceIgnored` 2; `boot treinf`: `Pods` 0 |
 | R-INTRO-12 | [tested] | `deploy tland/tafter`: alive, shown, `Direct` 1, `Single` 1, `Stand` 1, `TpsMode` false, `Cinematic` false, `Dialogs` 10, `TrigOn` 41, state DONE |
-| R-INTRO-13 | [tested] | `boot`: 5 Terran and 10 Zerg seeded at X; both sides hurt by 6 s; `laneUnits6` 0 |
+| R-INTRO-13 | [tested] | `intro/20261118-203746` `boot` (meet 13.5 s, both hurt by 19.2 s in `20261118-203358`): 5 Terran and 10 Zerg seeded `c_INTRO_SEED_BACK` (50) back; at 1 s none hurt and both centers > 16 from X (negative); polled until both have a unit within 16 of X and both are hurt, at most 40 s; `laneUnits6` 0 |
 | R-INTRO-14 | [tested] | `boot t6`: `Clock100` 600, `SpawnLeft100` 3350 |
-| R-INTRO-15 | [tested] [operator] | `boot`: `MusicValid`, `SilenceValid` true (in game, `CatalogEntryIsValid`), `Music` true; `deploy`: `Music` false from SPACE on; audible and muted: AC-INTRO-7 |
+| R-INTRO-15 | [tested] [operator] | `boot`: `MusicValid`, `SilenceValid` true (in game, `CatalogEntryIsValid`), `Music` true; `deploy`: `Music` true in ZOOM and FALL, false at touchdown; audible and muted: AC-INTRO-7. Per-seat music: [tested], `intro/20261118-203746` `seats` (`Music` per seat). |
+| R-INTRO-16 | [tested] | `intro/20261118-203746` group `seats` (`testkit/galaxy/intro_seats.galaxy`): seat 2 deploys and lands; seat 1 stays in LOOP with prompt, music, cinematic, hold, hidden hero, and the same pod count (negative case). Design: state and camera arrays per seat (`gv_introState[p]` ...), `gt_IntroDeploy` with `c_playerAny` and `EventPlayer()`, dialogs and prompt per player group, the seed once (SPEC-ROSTER 3.4). |
 
 ## 2. Facts
 
@@ -75,9 +76,10 @@ Unconfirmed. Each has a probe that records raw values.
 | `scripts/hitvolumes/intro_shots.py` | The shot table. Single source. Writes `data/intro_shots.galaxy`. Also the host checks' input. |
 | `scripts/app/data/intro_shots.galaxy` | Generated. Shot arrays. Never hand-edited. |
 | `scripts/app/core/intro.galaxy` | Constants, states, globals. `c_INTRO_ENABLED`. |
-| `scripts/app/systems/intro.galaxy` | Loop, tick, prompt, UI hide and restore, creep seed, music, deploy. |
-| `scripts/app/systems/hero_drop.galaxy` | New entry `gf_HeroDropDeploy`; touchdown reveals a living hero. |
-| `scripts/testkit/galaxy/intro.galaxy`, `profiles/intro.py` | Tests. |
+| `scripts/app/systems/intro.galaxy` | Per seat: shots, camera, prompt, UI hide and restore, creep seed, countdown. |
+| `scripts/app/systems/intro_flow.galaxy` | Per seat: start, deploy, fall, end, tick; the triggers (`gt_IntroDeploy` on `c_playerAny`). |
+| `scripts/app/systems/hero_drop.galaxy` | `gf_HeroDropBegin` and `gf_HeroDropStart`, the same path as the revive drop. |
+| `scripts/testkit/galaxy/intro.galaxy`, `intro_seats.galaxy`, `profiles/intro.py` | Tests. |
 | `scripts/testkit/tests/test_intro_shots.py` | Host tests on the table. |
 
 ### 3.2 States
@@ -108,10 +110,23 @@ At map init, after `gt_MapInit` binds the hero and after
    shows again (`gf_IntroDialogsEnforce`). `systems/xp.galaxy` skips its
    stats and abilities show for player 1 while `gv_introActive`.
 3. Hero: hidden, paused, not selectable, at its start cell. Not killed.
-4. `CinematicFade` in from black over 1.5 s.
-5. `CatalogEntryIsValid(c_gameCatalogSoundtrack, …)` for the music and
-   `Music_Silence`, kept for tests. `SoundtrackPlay(all,
-   c_soundtrackCategoryMusic, "ZZerus01MusicMain", any, any, true)`.
+4. `CinematicFade` in from black over 4 s (`c_INTRO_FADE_IN`, operator 2026-11-18).
+5. `CatalogEntryIsValid` for the theme and the hum (sound catalog) and
+   `Music_Silence` (soundtrack catalog), kept for tests. `Music_Silence`
+   becomes the default soundtrack for all. Each seat then gets
+   `SoundPlay("SCOBAIntroTheme")`, kept in `gv_introMusicSound[p]`. The
+   soundtrack route did not play (operator 2026-11-18). `SCOBAIntroTheme` is
+   a SoundData sound (parent `MUSIC`, `LoopCount` -1: it loops until touchdown), file
+   `Assets\Sounds\SCOBA_IntroTheme.ogg`. The build encodes
+   `res/audio/*.wav` to Ogg Vorbis there (`import_audio`,
+   `scripts/expand_helpers.py`, cache `out/audio`).
+   S9 hum: `gf_IntroCut` calls `gf_IntroHum`, on for row 8 (S9), off on
+   any other cut, at deploy and at touchdown. Sound `SCOBAPsiHum`: the
+   stock `PsiDecimator_Amb_Lp` loop, mode 2D (operator 2026-11-18).
+   S4 quiet: `gf_IntroQuiet` sets the seat's Doodad sound channel to 15 %
+   in S4 (the caged Ultralisk's stock idle sounds,
+   `Doodad_HybridUltraliskShackled_*`) and back to 100 % on any other
+   cut, at deploy and at touchdown (operator 2026-11-18).
 6. Creep seed (3.7).
 7. Prompt shown. Shot 0, pass 0.
 
@@ -129,11 +144,11 @@ target − distance × (cos pitch × (cos yaw, sin yaw), −sin pitch).
 | S1 Pride | 12 | E | eye at the Brakk (14.96, 113.36), looking at the BC (103.8, 153.2) | 14 | 24.15 | −25 → −45 | 8 → 14 | 50 → 40 | off | none |
 | S2 Line | 12 | L | (119.6, 113.1) → (131.0, 124.5) | 8.35 | 135 | 6 | 16 | 50 | on, focus 16 | target reversed |
 | S3 Map | 10 | E | (125.3, 118.8) | ground | 45 → 75 | 80 | 150 | 22 | off | none |
-| S4 Brambles | 6 | E | (194.4, 193.1) | ground + 3 | 90.8 | −6.0 | 30.5 | 70 → 45 | off | none |
+| S4 Brambles | 6 | E | (194.4, 193.1); eye exactly at (193.5, 164.5, 10.2) (operator 2026-11-18) | ground + 3 | 88.2 | −3.12 | 28.66 | 70 → 45 | off | none |
 | S5 Shackled | 4 | E | (194.4, 193.1) | ground + 4 | 90.8 | 8 | 18 → 12 | 48 → 44 | off | none |
-| S6 Overmind | 6 | A | (21.0, 9.0) | ground + 3 | 205 → 245 | 18 | 66 | 55 | off | yaw reversed |
-| S7 Worm | 3 | O | (59.0, 59.0) | ground + 6 → + 12 | 225 | −20 → −35 | 9 | 80 | off | none |
-| S8 Jungle | 8 | L | (120.0, 150.0) → (120.0, 170.0), Terran jungle | ground + 2 | 90 | 12 | 6 | 60 | off | none |
+| S6 Overmind | 6 | A | (21.0, 9.0) | ground + 3 | 215 → 235 (half rate, operator 2026-11-18) | 18 | 66 | 55 | off | yaw reversed |
+| S7 Worm | 7 (operator 2026-11-18: was 3, then 5) | O | (59.0, 59.0) | ground + 6 → + 12 | 225 | −20 → −35 | 9 | 80 | off | none |
+| S8 Jungle | 7.5 (operator 2026-11-18: was 8) | L | (120.0, 150.0) → (120.0, 168.75), Terran jungle, 2.5 cells/s | ground + 2 | 90 | 12 | 6 | 60 | off | none |
 | S9 Decimator | 8 | Z | (240.0, 248.0) | ground + 4 | 45 | 10 | from FOV | 70 → 24 | off | none |
 | Zoom | 0.35 | C | hero drop point | ground | 225 | 55 | 60 | 60 → 12 | off | none |
 
@@ -190,7 +205,7 @@ No units are seeded on lanes 2 and 3. The spawn timer is not changed.
 
 ### 3.8 Input gates
 
-At start, 41 triggers are disabled (`gf_IntroTrigger`): jump, the move
+At start, 43 triggers are disabled (`gf_IntroTrigger`): jump, the move
 keys, order key and button, order cancel, target clicks, unit click,
 hero switch, TPS toggle, zoom, cursor and orbit keys, the abilities and
 stats dialog keys, and the camera writers. Their `TriggerIsEnabled`
@@ -202,23 +217,23 @@ reach it either.
 
 SPACE (`TriggerAddEventKeyPressed`, player 1, `c_keySpace`) in `LOOP`:
 
-1. State `ZOOM`. Prompt hidden. `SoundtrackStop(all,
-   c_soundtrackCategoryMusic, true)`, then `SoundtrackPlay` of
-   `Music_Silence` as the default (the Void campaign pattern);
-   `gv_introMusic` = false. No music plays after this (O-INTRO-1 closed).
+1. State `ZOOM`. Prompt hidden. The theme plays on (operator 2026-11-18).
+   At touchdown `gf_IntroEnd` calls `gf_IntroMusicStop`: `SoundStop` of the
+   seat's theme, with fade; `gv_introMusic` = false. No music plays after touchdown (O-INTRO-1).
 2. Drop point = `gf_DropPodPoint(gv_sPAWNLOCATIONS[1], null, null)`.
-3. Cut to the Zoom row on the drop point. Crash zoom over 0.3 s.
-4. At 0.35 s: state `FALL`; `gf_HeroDropDeploy(1, point)`.
+3. Cut to the Zoom row on the drop point, at the drop yaw `c_DROP_YAW`
+   and the drop's side arm. Crash zoom over 0.3 s.
+4. At 0.35 s: state `FALL`; `gf_HeroDropBegin(1, hero)`, then
+   `gf_HeroDropStart(1, point)`.
 
-`gf_HeroDropDeploy(player, hero, at)` sets `gv_dropPending`,
-`gv_dropHero` = the hero, `gv_dropIntro` = true, the defaults single and
-stand true, TPS false, and calls `gf_HeroDropStartAt(player, at)`, split
-from `gf_HeroDropStart`. The fall is the hero drop fall, unchanged.
+The intro deploy is the hero drop, one path (operator 2026-11-18; SPEC-HERO-DROP
+3): no intro branch in the drop. The toggles are the ones the drop keeps
+from the living hero. The input hold (`gf_InputHold`) taken at intro start
+is the drop's hold.
 
-Touchdown (`gf_HeroDropLand`): if `gv_dropIntro`, the hero is alive and
-hidden. `gf_HeroReveal` shows, unpauses and moves it to the pod;
-`UnitRevive` is not called. After `UnitKill(pod)` the intro ends
-(`gf_IntroEnd`):
+Touchdown (`gf_HeroDropLand`): the hero is alive, so `UnitRevive` is not
+called; `gf_HeroReveal` shows and unpauses it; it moves to the pod; the
+input is released. After `UnitKill(pod)` the intro ends (`gf_IntroEnd`):
 
 - `CinematicMode(player 1, false, 0.5)`;
 - `UISetMode(all, c_uiModeConsole, 0.5)`, minimap panel shown;
@@ -279,11 +294,12 @@ jumps to a shot time, so groups stay near one minute.
 
 | Group | Scenario | Asserts | Negative case |
 | --- | --- | --- | --- |
-| `boot` | Map start, no input. | State LOOP by 0.2 s; dialogs hidden; `Cinematic` 1; hero hidden, paused, not selectable; prompt visible; `Music` 1; creep at X at 1 s; damage both sides by 6 s; clock and spawn timer advance. | No units added near regions 7, 9; a reinforcement fired by the harness drops no hero pod; no hero orders. |
-| `shots` | For each row and variant: goto at u = 0.1, 0.5, 0.9; read one loop after. | Engine yaw, pitch (0..360, F13), distance within ±2° / ±2° / ±3 % of the eased value; script target, FOV and height against the table; `Dof` per row; S8 invariant on engine distance. Raw engine target and ground recorded (F13, F14). | `Dof` 0 outside S2. |
-| `wrap` | Goto S8 at t = 5.5, wait 1 s. | `Shot` 0, `Pass` +1; S2 next reads the variant. | No cut before the row length (± 2 loops). |
+| `boot` | Map start, no input. | State LOOP by 0.2 s; dialogs hidden; `Cinematic` 1; hero hidden, paused, not selectable; prompt visible; `Music` 1; seed groups polled until both reach X and both are hurt (at most 40 s); clock and spawn timer advance. | At 1 s no seed unit hurt and both group centers > 16 from X; no units added near regions 7, 9; a reinforcement fired by the harness drops no hero pod; no hero orders. |
+| `shots` | For each row and variant: goto at u = 0.1, 0.5, 0.9; read two loops after. Table window: 4 loops (two waits, event order, the tick's one-loop lead). | Engine yaw, pitch (0..360, F13), distance within ±2° / ±2° / ±3 % of the eased value; script target, FOV and height against the table; `Dof` per row; S8 invariant on engine distance. Raw engine target and ground recorded (F13, F14). | `Dof` 0 outside S2. |
+| `wrap` | Goto the last shot (S9) 0.5 s before its end, wait 1 s. | `Shot` 0, `Pass` +1; S2 next reads the variant; `Hum` 1 in S9. | No cut before the row length (± 2 loops); `Hum` 0 after the cut to S1. |
 | `gate` | In S3: inject W for 1 s, `1`, `F`, mouse-free; read state. | Hero position unchanged, no order, state LOOP, camera values still the row's. | Each key, one at a time. |
-| `deploy` | Inject SPACE in S5. Inject SPACE again in ZOOM and in FALL. | ZOOM seen, FALL ≤ 0.4 s after SPACE; one pod; fall trace as `herodrop`; at touchdown hero alive at the pod, `Direct` 1, defaults; `Cinematic` 0; dialogs and triggers restored; DONE; `Dof` 0. | `JumpPresses` 0; `Pods` 1 after both extra SPACEs; prompt hidden from SPACE on; `Music` 0 from SPACE on. |
+| `seats` | Harness plays seat 2, starts its intro, presses its deploy. | Seat 2: LOOP, FALL with pod, DONE; hold, cinematic; music on in FALL, off at the end; hero shown and alive. | Seat 1 through seat 2's fall and touchdown: LOOP, active, held, cinematic, music, prompt, hero hidden, no deploy, no pod. |
+| `deploy` | Inject SPACE in S5, a second 150 ms later (countdown). A third timed from the measured key latency to reach the engine 1 s into FALL. | Countdown 2.5..4 s from the engine press (`gv_introCountAt`); third press arrived in FALL (`thirdState` 3); ZOOM seen, FALL ≤ 0.4 s after the zoom start; one pod; fall trace as `herodrop`; at touchdown hero alive at the pod, `Direct` 1, defaults; `Cinematic` 0; dialogs and triggers restored; DONE; `Dof` 0. | `JumpPresses` 0; `Pods` 1 after both extra SPACEs; prompt hidden from SPACE on; `Music` 1 in ZOOM and FALL, 0 at touchdown. |
 
 Key injection uses `scripts/testkit/input_driver.py`. No mouse input.
 
@@ -295,6 +311,12 @@ run, with the intro off (3.11).
 ## 5. Known limits
 
 - Tree and doodad occlusion is not checked (O-INTRO-3).
+- No unit silhouettes behind buildings (operator 2026-11-18). Build step
+  `disable_unit_silhouettes` (`scripts/doodad_occlusion.py`) sets
+  `Occlusion` None on every model whose Occlusion resolves to Show or is
+  unset, in the dependencies (`scripts/data/silhouette_models.json`, from
+  `doodad_occlusion.py --refresh`) and in the map. Engine assumption: an
+  unset Occlusion draws a silhouette. The look is an operator check.
 - FOV and height offset have no engine getter (F5). They are checked
   through script state; the dolly zoom through engine distance.
 - The engine target cannot be read in the intro (F13). The framed target
@@ -319,13 +341,29 @@ All on 2026-11-17, each `failures: 0`.
 Host: `testkit.tests.test_intro_shots` and `testkit.tests.test_profiles`,
 24 tests OK.
 
+2026-11-18, per-seat intro (R-INTRO-16):
+
+- `intro/20261118-202955` (`seats`): all 35 seat checks pass; 4 boot seed
+  failures (stale test: seed groups start 50 back, R-INTRO-13 revised).
+- `intro/20261118-203358` (full): 30 failures, down from 34. Seed and
+  seats pass. Left: 26 `dof` (every scene has near DOF, the test expects
+  the far flag: the per-shot DOF work of the other session), S9 table
+  distance 133.99 against 133.94 (window missed the tick's lead), countdown
+  5750 ms (measured from the host request, which includes the host key latency), `tafter
+  JumpPresses` 1 (the third SPACE reached the engine after touchdown). The
+  last three are test fixes; rerun below.
+- `intro/20261118-203746` (full): 27 failures, all 27 `dof` (above, not
+  this change). Countdown 3000 ms from the engine press; key latency
+  2812 ms raw; third SPACE arrived in FALL (`thirdState` 3), `JumpPresses`
+  0; S9 table distance passes. No ScriptError.
+
 ## DOF (operator 2026-11-17)
 
-- Every intro scene has near DOF (`gf_IntroSceneDof`): focus = the shot's
+- Every intro scene has near DOF (`gf_IntroSceneDof`): focus = the shot's `focus` or else its
   arm d, near falloffs (1..6) x d / 16 / (0.5 x the shot's `near`):
   falloffs are distances from the focal plane, smaller = more blur. Shot `far` > 0: far blur from far x d past the focus,
-  full at 3 x that. S3: near 1.3. S9: near 2.0. S5: near 0.3, far 0.15. S6 (huge hive): near 0.1,
-  far 0.3. S7: near 2.0. S8: near 2.0, far 1.5.
+  full at 3 x that. S1: near 2.0, focus 60 instead of the arm (operator 2026-11-18: blur the trees 26..58 ahead; the BC at about 97 stays sharp). A row's `focus` (0 = arm) sets the focal depth and scales its near falloffs. S3: near 1.3. S9: near 2.0. S5: near 0.3, far 0.15. S6 (Overmind orbit): near 1.5
+  (operator 2026-11-18: 4.0 was too much), far 0.3. S7: near 6.0 (operator 2026-11-18: 2.0, 4.0, then 6.0). S8: near 2.0, far 1.5.
   Far DOF (4..18) only on rows flagged `dof`; other rows push it past the far clip.
 - The hero drop has near and far DOF: focus `c_DROP_CAM_DISTANCE` (the pod),
   near 1..6, far 4..18. The in-game DOF tick takes over after touchdown.

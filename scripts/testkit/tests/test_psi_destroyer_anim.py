@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from project_root import project_root
-from spore_scale import (
+from mapgen.spore_scale import (
     DEFAULT_ANIM_SPEED,
     PSI_DESTROYER_ANIM_MARKER,
     PSI_DESTROYER_ANIM_SLOWDOWN,

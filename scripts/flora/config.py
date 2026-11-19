@@ -119,6 +119,10 @@ SPAWN_REGIONS = (
     "Tosh Spawn", "Kerrigan Spawn", "Nova Spawn", "Raynor Spawn", "Stukov Spawn", "Dehaka Spawn", "Zerg", "Terran",
 )
 KEEP_SPAWN = 4.0
+# Resource lines (scripts/mapgen/resources, R-BASE-7): a disc at each hall listed in
+# the report. The piles are placed units, so they keep out as units do.
+SITE_REPORT = "base_sites_report.txt"
+KEEP_HALL = 7.0
 # Zerg accent structures belong to this player.
 ZERG_PLAYER = "8"
 SLOPE_COST = 4.0

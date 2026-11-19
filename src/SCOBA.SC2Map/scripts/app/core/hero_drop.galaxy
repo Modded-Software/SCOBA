@@ -24,6 +24,17 @@ const fixed c_DROP_TICK = 0.0625;     // one game loop
 // Camera arm behind the pod while it falls. The pod (actor scale 4.5) is
 // much larger than the hero arm (1.5); operator 2026-11-16: 8 was too close.
 const fixed c_DROP_CAM_DISTANCE = 20.0;
+// Arm from the eye to the pod while it falls (operator 2026-11-18: closer
+// than 20; herodrop/20261118-184252). The touchdown keeps c_DROP_CAM_DISTANCE.
+const fixed c_DROP_POD_ARM = 12.0;
+// Side arm, as the TPS aim shoulder: the whole camera sits this far to the
+// right of the pod's travel; the pod shows left of center (operator
+// 2026-11-18: the camera was right behind the pod).
+const fixed c_DROP_CAM_SIDE = 4.0;
+// Camera yaw of every drop: the pod faces yaw - c_POD_BIRTH_TRAVEL. Fixed
+// (operator 2026-11-18: the intro drop at 225 and a drop at 135 looked
+// right, a drop at 90 did not; herodrop/20261118-184252).
+const fixed c_DROP_YAW = 225.0;
 const fixed c_DROP_FOV_START = 30.0;   // drop camera FOV at the Birth start (deg), narrow
 const fixed c_DROP_FOV_END = 90.0;    // drop camera FOV at touchdown (deg), wide
 const fixed c_DROP_CLIP_DRIFT = 0.15; // re-anchor the drop clock past this (s)
@@ -32,12 +43,10 @@ const fixed c_DROP_CLIP_DRIFT = 0.15; // re-anchor the drop clock past this (s)
 const int c_DROP_RESTORE_LOOPS = 8;
 
 trigger gt_HeroDropDeath;
-trigger gt_HeroDropReinforce;
 trigger gt_HeroDropTick;
 
-bool[8] gv_dropPending;      // the hero is dead and waits for a reinforcement
-bool[8] gv_dropIntro;        // the pod is the intro deploy: the hero is alive and hidden (SPEC-INTRO 3.9)
-unit[8] gv_dropHero;         // the dead hero
+bool[8] gv_dropPending;      // a hero waits for its pod: dead, or the hidden intro hero
+unit[8] gv_dropHero;         // the waiting hero
 unit[8] gv_dropPod;          // the pod in its fall, null when there is none
 point[8] gv_dropDeathAt;     // where the hero died
 point[8] gv_dropAt;          // where the pod lands

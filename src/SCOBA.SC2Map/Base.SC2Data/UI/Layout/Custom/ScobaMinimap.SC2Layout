@@ -37,6 +37,9 @@
             <Anchor side="Right" relative="$parent" pos="Max" offset="0"/>
             <Width val="300"/>
             <Height val="300"/>
+            <!-- Operator 2026-11-18: no camera jumps from minimap clicks.
+                 The minimap only displays; it takes no mouse input. -->
+            <AcceptsMouse val="false"/>
         </Frame>
 
         <Frame type="Button" name="PingButton">

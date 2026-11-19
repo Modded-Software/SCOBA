@@ -19,8 +19,13 @@ more FootfallUnit row:
   footstep event (splash in water, dust elsewhere, the sound always) and
   the script's "Signal ScobaRipple" (idle ripples at every foot).
 
-The water state comes from systems/quake.galaxy (StatusSet ScobaInWater):
-the engine's own water detection never fired for these units.
+The script (systems/quake.galaxy) sets two actor statuses; each event tests
+one (the engine drops an event with two IsStatus terms at map load):
+- ScobaFootGround: 0 effects off, 1 dry ground (dust), 2 in water (splash).
+  The engine's own water detection never fired for these units.
+- ScobaFootFx: 1 effects on (sound, thumps, ripples).
+Whether a unit type plays the effects at all is runtime config,
+gf_StompConfig (systems/stomp.galaxy). Shake and doodad crushing too.
 """
 
 from __future__ import annotations
@@ -45,10 +50,14 @@ import m3
 from footfall import m3_footfalls
 
 MARKER = ".footfall_fx"
-MARKER_VERSION = "4\n"  # 4: engine squibs off; 3: per-foot engine water check removed
+MARKER_VERSION = "7\n"  # 7: one IsStatus per event (ScobaFootGround); 6: thumps; 5: ScobaFootFx gate, model/actor ids; 4: engine squibs off
 EXTRACT_ROOT = Path("/mnt/ws-fast/sc2res/tmp")  # operator: extract into ws-fast
 NO_ADDON = 0xFFFF
-STATUS = "ScobaInWater"
+STATUS = "ScobaFootGround"  # dust / splash gate (script, systems/quake.galaxy)
+GROUND_OFF = 0  # effects off
+GROUND_DRY = 1  # effects on, dry ground: dust
+GROUND_WET = 2  # effects on, in water: splash
+FX_STATUS = "ScobaFootFx"  # 1: footfall effects on (script, gf_StompConfig)
 RIPPLE_SIGNAL = "ScobaRipple"
 DROP_OP = "SOpHigherOfTerrainAndWater"
 
@@ -75,7 +84,7 @@ class Sound(NamedTuple):
 
 
 class FootfallUnit(NamedTuple):
-    unit: str  # CUnit / CActorUnit / CModel id
+    unit: str  # name key of the generated entries (and default model/actor id)
     entry: str  # stock m3 in CASC
     target: Path  # model path inside the map
     feet: tuple[Foot, ...]
@@ -84,9 +93,22 @@ class FootfallUnit(NamedTuple):
     ripple: tuple[float, float]  # scale range of WaterRippleMedium
     sound: Sound
     clip: str = "Walk"
+    model: str = ""  # CModel id that gets the footstep events; default unit
+    actors: tuple[str, ...] = ()  # CActorUnit ids that play the effects; default (unit,)
+    thumps: tuple[str, ...] = ()  # extra stock CSound ids layered on every footstep
+
+    @property
+    def model_id(self) -> str:
+        return self.model or self.unit
+
+    @property
+    def actor_ids(self) -> tuple[str, ...]:
+        return self.actors or (self.unit,)
 
 
 HEAVY = Sound(tuple(f"Assets\\Sounds\\MonsterHuge_BaseFootstepFS0{i}.wav" for i in range(1, 9)), (0.0, 2.0), (-2.0, 0.0))
+# Operator 2026-11-18: the hero Viking's thump louder than the Goliath's.
+HEAVIER = Sound(HEAVY.files, (4.0, 6.0), (-4.0, -2.0))
 LIGHT = Sound(tuple(f"Assets\\Sounds\\StoneZealot_Footstep0{i}.wav" for i in range(1, 10)), (-8.0, -5.0), (0.0, 2.0))
 
 FOOTFALL_UNITS = (
@@ -115,6 +137,25 @@ FOOTFALL_UNITS = (
         splash=(0.75, 0.9),
         ripple=(0.7, 0.7),
         sound=LIGHT,
+    ),
+    # Landed Alt+4 hero Viking (operator 2026-11-18): the Goliath's thump,
+    # dust, splash and ripple, louder (Thor_Land layered) and sized x2 for
+    # its feet (model 0.85 x actor 3 = 2.55 vs the Goliath's 1.4). Its stock Ref_Hardpoint
+    # Left/Right are on the arms, so the feet are indexed. Foot bones: the
+    # lowest point of each leg in Walk (Bone_Box30 0.077, Bone_Box42 0.075);
+    # Walk comes from the m3 (VikingAssault_SwarmAnims.m3a: Stand Dance only).
+    FootfallUnit(
+        unit="VikingHero",
+        entry=r"mods\liberty.sc2mod\base.sc2assets\assets\units\terran\vikingassault\vikingassault.m3",
+        target=Path("Assets") / "Units" / "Terran" / "VikingAssault" / "VikingAssault.m3",
+        feet=(Foot("Bone_Box30", "01"), Foot("Bone_Box42", "02")),
+        dust=(2.5, 3.0),
+        splash=(2.5, 3.0),
+        ripple=(2.0, 2.0),
+        sound=HEAVIER,
+        model="VikingAssault",
+        actors=("SCOBAVikingHeroAssault",),
+        thumps=("Thor_Land",),
     ),
 )
 
@@ -293,25 +334,43 @@ def fx_actors_xml(spec: FootfallUnit) -> str:
             f'        <HostSiteOps Ops="{op} {DROP_OP}"/>\n'
             "    </CActorSound>\n"
         )
+        for k, sound in enumerate(spec.thumps):
+            out += (
+                f'    <CActorSound id="{u}FootThump{k + 1}_{i + 1}" parent="SoundOneShot">\n'
+                f'        <Sound value="{sound}"/>\n'
+                f'        <HostSiteOps Ops="{op} {DROP_OP}"/>\n'
+                "    </CActorSound>\n"
+            )
     return out
 
 
-def unit_on_xml(spec: FootfallUnit) -> str:
-    """Splash in water (ScobaInWater, set by the script), dust elsewhere."""
+def unit_on_xml(spec: FootfallUnit, actor: str) -> str:
+    """Splash in water, dust on dry ground (ScobaFootGround 2 / 1, set by
+    the script; 0 when the effects are off). Sound, thumps and ripples need
+    ScobaFootFx 1 (the script sets it per unit from its stomp config,
+    systems/stomp.galaxy, gf_StompConfig lp_fx)."""
     u = spec.unit
-    out = f'        <On Terms="ActorCreation" Send="StatusSet {STATUS} 0"/>\n'
+    out = f'        <On Terms="ActorCreation" Send="StatusSet {STATUS} {GROUND_OFF}"/>\n'
+    out += f'        <On Terms="ActorCreation" Send="StatusSet {FX_STATUS} 0"/>\n'
     # Engine ripples off (stock Queen activates them on birth): the script's
     # ripples, which check water above the ground, are the only ones.
     out += f'        <On Terms="ActorCreation" Send="TerrainSquibDeactivate"/>\n'
-    out += f'        <On Terms="UnitBirth.{u}" Send="TerrainSquibDeactivate"/>\n'
+    out += f'        <On Terms="UnitBirth.{actor}" Send="TerrainSquibDeactivate"/>\n'
+    # One IsStatus per event: the engine dropped events with two at map load
+    # ("Has event without a triggering message", every run since 2026-11-18
+    # 15:36; no dust or splash). The ground status holds both conditions.
+    on = f"IsStatus {FX_STATUS} 1"
     for i in range(len(spec.feet)):
-        ev = f"ModelEvent; ModelEventName {event_name(i)}"
+        foot = f"ModelEvent; ModelEventName {event_name(i)}"
+        ev = f"{foot}; {on}"
         out += (
-            f'        <On Terms="{ev}; IsStatus {STATUS} 1" Send="Create {u}FootSplash{i + 1}"/>\n'
-            f'        <On Terms="{ev}; IsStatus {STATUS} 0" Send="Create {u}FootDust{i + 1}"/>\n'
+            f'        <On Terms="{foot}; IsStatus {STATUS} {GROUND_WET}" Send="Create {u}FootSplash{i + 1}"/>\n'
+            f'        <On Terms="{foot}; IsStatus {STATUS} {GROUND_DRY}" Send="Create {u}FootDust{i + 1}"/>\n'
             f'        <On Terms="{ev}" Send="Create {u}FootSound{i + 1}"/>\n'
-            f'        <On Terms="Signal.*.{RIPPLE_SIGNAL}" Send="Create {u}FootRipple{i + 1}"/>\n'
+            f'        <On Terms="Signal.*.{RIPPLE_SIGNAL}; {on}" Send="Create {u}FootRipple{i + 1}"/>\n'
         )
+        for k in range(len(spec.thumps)):
+            out += f'        <On Terms="{ev}" Send="Create {u}FootThump{k + 1}_{i + 1}"/>\n'
     return out
 
 
@@ -344,7 +403,7 @@ def append(text: str, entries: str) -> str:
 def write_data(root: Path, spec: FootfallUnit, times: list[list[float]]) -> None:
     data = root / "Base.SC2Data" / "GameData"
     models = data / "ModelData.xml"
-    text = merge_block(catalog(models), "CModel", spec.unit, model_events_xml(spec, times))
+    text = merge_block(catalog(models), "CModel", spec.model_id, model_events_xml(spec, times))
     models.write_text(append(text, fx_models_xml(spec)), encoding="utf-8")
     sounds = data / "SoundData.xml"
     sounds.write_text(append(catalog(sounds), sound_xml(spec)), encoding="utf-8")
@@ -353,7 +412,9 @@ def write_data(root: Path, spec: FootfallUnit, times: list[list[float]]) -> None
         methods = data / "AttachMethodData.xml"
         methods.write_text(append(catalog(methods), filters), encoding="utf-8")
     actors = data / "ActorData.xml"
-    text = merge_block(catalog(actors), "CActorUnit", spec.unit, unit_on_xml(spec))
+    text = catalog(actors)
+    for actor in spec.actor_ids:
+        text = merge_block(text, "CActorUnit", actor, unit_on_xml(spec, actor))
     actors.write_text(append(text, fx_actors_xml(spec)), encoding="utf-8")
 
 

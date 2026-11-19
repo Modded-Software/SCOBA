@@ -8,6 +8,53 @@
     <!--        </Cost>-->
     <!--        <CmdButtonArray index="Execute" DefaultButtonFace="DehakaHeal"/>-->
     <!--    </CAbilEffectInstant-->
+    <!-- Hero Viking morph pair (operator 2026-11-18): copies of the stock
+         AssaultMode / FighterMode with hero unit types, so lift-off returns
+         SCOBAVikingHero (speed 16), not a stock VikingFighter (2.75). -->
+    <CAbilMorph id="SCOBAHeroAssaultMode">
+        <AbilSetId value="AssaultMode"/>
+        <EditorCategories value="Race:Terran,AbilityorEffectType:Units"/>
+        <CmdButtonArray index="Execute" DefaultButtonFace="AssaultMode">
+            <Flags index="ToSelection" value="1"/>
+        </CmdButtonArray>
+        <Flags index="IgnoreFacing" value="1"/>
+        <Flags index="IgnorePlacement" value="0"/>
+        <InfoArray Unit="SCOBAVikingHeroAssault" CollideRange="3.75" RandomDelayMax="0.5">
+            <SectionArray index="Actor">
+                <DurationArray index="Duration" value="2.34"/>
+            </SectionArray>
+            <SectionArray index="Mover">
+                <DurationArray index="Delay" value="0.533"/>
+                <DurationArray index="Duration" value="1.2"/>
+            </SectionArray>
+            <SectionArray index="Stats">
+                <DurationArray index="Duration" value="2.34"/>
+            </SectionArray>
+        </InfoArray>
+    </CAbilMorph>
+    <CAbilMorph id="SCOBAHeroFighterMode">
+        <AbilSetId value="FighterMode"/>
+        <EditorCategories value="Race:Terran,AbilityorEffectType:Units"/>
+        <CmdButtonArray index="Execute" DefaultButtonFace="FighterMode" Requirements="UseFighterMode">
+            <Flags index="ToSelection" value="1"/>
+        </CmdButtonArray>
+        <Flags index="IgnoreFacing" value="1"/>
+        <InfoArray Unit="SCOBAVikingHero" RandomDelayMax="0.5">
+            <SectionArray index="Actor">
+                <DurationArray index="Duration" value="2.333"/>
+            </SectionArray>
+            <SectionArray index="Collide">
+                <DurationArray index="Delay" value="1.5"/>
+            </SectionArray>
+            <SectionArray index="Mover">
+                <DurationArray index="Delay" value="0.6"/>
+                <DurationArray index="Duration" value="0.85"/>
+            </SectionArray>
+            <SectionArray index="Stats">
+                <DurationArray index="Duration" value="2.333"/>
+            </SectionArray>
+        </InfoArray>
+    </CAbilMorph>
     <CAbilEffectTarget id="DehakaLeap">
         <Range index="0" value="4"/>
         <ArcSlop value="3.999"/>

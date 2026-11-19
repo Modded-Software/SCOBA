@@ -1,5 +1,8 @@
 // Module: systems/hero_switch
 
+const string c_HERO_VIKING_TYPE = "SCOBAVikingHero";
+const fixed c_HERO_VIKING_CAM_DIST = 6.0;
+
 string gf_UnitActorId (unit lp_unit) {
     string lv_type;
 
@@ -20,7 +23,7 @@ bool gf_HeroIsParked (unit lp_unit) {
     if (!gv_heroSwitchReady || lp_unit == gv_heroActive) {
         return false;
     }
-    return lp_unit == gv_heroTosh || lp_unit == gv_heroKerrigan;
+    return lp_unit == gv_heroTosh || lp_unit == gv_heroKerrigan || lp_unit == gv_heroScv || lp_unit == gv_heroViking;
 }
 
 void gf_HeroPark (unit lp_unit) {
@@ -54,48 +57,64 @@ void gf_HeroApplyToggles (unit lp_unit) {
     UnitAbilityShow(lp_unit, "SCOBAAutoAttackStatus", true);
     UnitAbilityEnable(lp_unit, "SCOBAAutoAttackToggle", true);
     UnitAbilityShow(lp_unit, "SCOBAAutoAttackToggle", true);
-    UnitAbilityEnable(lp_unit, "SCOBATPSToggle", true);
-    UnitAbilityShow(lp_unit, "SCOBATPSToggle", true);
+    // TPS for heroes only (gf_ControlRegular).
+    UnitAbilityEnable(lp_unit, "SCOBATPSToggle", gf_UnitIsHero(lp_unit));
+    UnitAbilityShow(lp_unit, "SCOBATPSToggle", gf_UnitIsHero(lp_unit));
+    // Chase toggle: heroes only. Enabled on all, so script can force Move.
     UnitAbilityEnable(lp_unit, "SCOBARightClickToggle", true);
-    UnitAbilityShow(lp_unit, "SCOBARightClickToggle", true);
+    UnitAbilityShow(lp_unit, "SCOBARightClickToggle", gf_UnitIsHero(lp_unit));
 }
 
-void gf_HeroApplyCamera (unit lp_unit) {
+void gf_HeroApplyCamera (int lp_player, unit lp_unit) {
     if (!UnitIsValid(lp_unit)) {
         return;
     }
     if (UnitGetType(lp_unit) == "Tosh" || UnitGetType(lp_unit) == "ToshSCOBA") {
-        CameraSetValue(1, c_cameraValueDistance, 1.5, 0.5, -1, 10);
-        gv_cameraDistanceDesired[1] = 1.5;
-        CameraSetValue(1, c_cameraValueHeightOffset, c_SCOBA_CAMERA_HEIGHT_OFFSET, 0.5, -1, 10);
-        CameraUseHeightSmoothing(1, false);
+        CameraSetValue(lp_player, c_cameraValueDistance, 1.5, 0.5, -1, 10);
+        gv_cameraDistanceDesired[lp_player] = 1.5;
+    }
+    else if (lp_unit == gv_heroViking) {
+        // By handle, not type: it holds after the SCOBAHeroAssaultMode morph.
+        CameraSetValue(lp_player, c_cameraValueDistance, c_HERO_VIKING_CAM_DIST, 0.5, -1, 10);
+        gv_cameraDistanceDesired[lp_player] = c_HERO_VIKING_CAM_DIST;
     }
     else {
-        CameraSetValue(1, c_cameraValueDistance, 2.5, 0.5, -1, 10);
-        gv_cameraDistanceDesired[1] = 2.5;
-        CameraSetValue(1, c_cameraValueHeightOffset, c_SCOBA_CAMERA_HEIGHT_OFFSET, 0.5, -1, 10);
-        CameraUseHeightSmoothing(1, false);
+        CameraSetValue(lp_player, c_cameraValueDistance, 2.5, 0.5, -1, 10);
+        gv_cameraDistanceDesired[lp_player] = 2.5;
     }
-    CameraFollowUnitGroup(1, libNtve_gf_ConvertUnitToUnitGroup(lp_unit), true, false);
+    // Base offset plus the active terms; a flyer adds its flight height.
+    gf_CameraHeightApply(lp_player, 0.5);
+    CameraUseHeightSmoothing(lp_player, false);
+    CameraFollowUnitGroup(lp_player, libNtve_gf_ConvertUnitToUnitGroup(lp_unit), true, false);
 }
 
-// Makes lp_hero player 1's hero: script state, toggles shown, direct
-// control, camera, selection. Used by the hero switch and the hero drop.
-void gf_HeroBind (unit lp_hero) {
-    gv_heroActive = lp_hero;
-    gv_tPSUNIT[1] = lp_hero;
-    gf_CombatSyncRoot(1);
-    gf_AnimReset(1);
+// Makes lp_hero lp_player's hero: script state, toggles shown, direct
+// control, camera, selection. Used by the hero switch and the hero return.
+void gf_HeroBindPlayer (int lp_player, unit lp_hero) {
+    if (lp_player == 1) {
+        gv_heroActive = lp_hero;
+    }
+    gv_tPSUNIT[lp_player] = lp_hero;
+    if (gf_RosterPlayed(lp_player) && lp_player != 1) {
+        gv_rosterHero[lp_player] = lp_hero;
+    }
+    gf_CombatSyncRoot(lp_player);
+    gf_AnimReset(lp_player);
     gf_HeroApplyToggles(lp_hero);
     UnitBehaviorRemove(lp_hero, "UnitDirectControl", 1);
     UnitBehaviorAdd(lp_hero, "UnitDirectControl", lp_hero, 1);
     UnitSetState(lp_hero, c_unitStateStatusBar, false);
     UnitXPGainEnable(lp_hero, null, true);
-    gf_ControlApply(1);
-    gf_PncEnsure(1);
-    gf_HeroApplyCamera(lp_hero);
-    UnitClearSelection(1);
-    UnitSelect(lp_hero, 1, true);
+    gf_ControlApply(lp_player);
+    gf_PncEnsure(lp_player);
+    gf_HeroApplyCamera(lp_player, lp_hero);
+    UnitClearSelection(lp_player);
+    UnitSelect(lp_hero, lp_player, true);
+}
+
+// Player 1's hero switch (the developer bodies).
+void gf_HeroBind (unit lp_hero) {
+    gf_HeroBindPlayer(1, lp_hero);
 }
 
 void gf_HeroSwitchTo (unit lp_target) {
@@ -142,7 +161,8 @@ void gf_HeroSwitchTo (unit lp_target) {
     UnitSetFacing(lp_target, lv_facing, 0.0);
     gf_HeroReveal(lp_target);
     gf_AttackSingleSet(lp_target, UnitBehaviorCount(lv_old, c_SCOBA_SINGLE_BEHAVIOR) > 0);
-    gf_ChaseStandSet(lp_target, UnitBehaviorCount(lv_old, c_SCOBA_STAND_BEHAVIOR) > 0);
+    // Regular units: Chase is always Move (operator 2026-11-18).
+    gf_ChaseStandSet(lp_target, gf_UnitIsHero(lp_target) && UnitBehaviorCount(lv_old, c_SCOBA_STAND_BEHAVIOR) > 0);
     gf_HeroBind(lp_target);
 }
 
@@ -174,7 +194,48 @@ void gf_HeroUnitsReplace () {
     UnitRemove(lv_oldTosh);
     UnitRemove(lv_oldKerrigan);
     UnitSelect(gv_heroTosh, 1, true);
-    UnitSelect(gv_heroKerrigan, 2, true);
+    // Kerrigan is a player 1 developer body (Alt+2), not a seat hero.
+    gf_RosterHeroesCreate();
+}
+
+// Seat heroes (R-ROSTER-5): player 1 keeps the placed Tosh; every other
+// played seat gets its seat hero at its lane spawn. An unplayed seat 1
+// loses the placed Tosh. The map init loop binds a selected hero.
+void gf_RosterHeroesCreate () {
+    int lv_lane;
+    int lv_p;
+    string lv_type;
+
+    for (lv_lane = 1; lv_lane <= c_ROSTER_LANES; lv_lane += 1) {
+        lv_p = gf_RosterSeat(lv_lane);
+        lv_type = gf_RosterHeroType(lv_lane);
+        gv_rosterHero[lv_p] = null;
+        if (lv_p == 1) {
+            if (gf_RosterPlayed(1)) {
+                gv_rosterHero[1] = gv_heroTosh;
+            }
+            else if (UnitIsValid(gv_heroTosh)) {
+                UnitRemove(gv_heroTosh);
+                gv_heroTosh = null;
+            }
+            continue;
+        }
+        if (!gf_RosterPlayed(lv_p) || lv_type == "") {
+            continue;
+        }
+        gf_RosterHeroCreate(lv_lane);
+        UnitSelect(gv_rosterHero[lv_p], lv_p, true);
+    }
+}
+
+// The seat hero of lp_lane at its spawn (map init; tests that play a seat).
+unit gf_RosterHeroCreate (int lp_lane) {
+    int lv_p = gf_RosterSeat(lp_lane);
+
+    UnitCreate(1, gf_RosterHeroType(lp_lane), 0, lv_p, RegionGetCenter(gv_sPAWNLOCATIONS[lp_lane]), 225.0);
+    gv_rosterHero[lv_p] = UnitLastCreated();
+    gf_HeroAbilitiesDefault(gv_rosterHero[lv_p]);
+    return gv_rosterHero[lv_p];
 }
 
 void gf_HeroSwitchInit () {
@@ -191,11 +252,30 @@ void gf_HeroSwitchInit () {
     }
     gv_tPSUNIT[1] = gv_heroTosh;
     gf_HeroPark(gv_heroKerrigan);
+    // Alt+3: an SCV to place and inspect buildings, parked like Kerrigan.
+    if (!UnitIsValid(gv_heroScv)) {
+        UnitCreate(1, "SCV", 0, 1, gv_heroPark, 0.0);
+        gv_heroScv = UnitLastCreated();
+    }
+    // The test bodies cannot die: no revive, no pod for them.
+    UnitSetState(gv_heroScv, c_unitStateInvulnerable, true);
+    gf_HeroPark(gv_heroScv);
+    // Alt+4: a Viking (flight mode) to watch the map from the air in TPS.
+    if (!UnitIsValid(gv_heroViking)) {
+        UnitCreate(1, c_HERO_VIKING_TYPE, 0, 1, gv_heroPark, 0.0);
+        gv_heroViking = UnitLastCreated();
+    }
+    UnitSetState(gv_heroViking, c_unitStateInvulnerable, true);
+    gf_HeroPark(gv_heroViking);
     gv_heroSwitchReady = true;
 }
 
 bool gt_HeroSwitchTosh_Func (bool testConds, bool runActions) {
     if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(1)) {
         return true;
     }
     gf_HeroSwitchTo(gv_heroTosh);
@@ -206,11 +286,43 @@ bool gt_HeroSwitchKerrigan_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(1)) {
+        return true;
+    }
     gf_HeroSwitchTo(gv_heroKerrigan);
     return true;
 }
 
+bool gt_HeroSwitchScv_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(1)) {
+        return true;
+    }
+    gf_HeroSwitchTo(gv_heroScv);
+    return true;
+}
+
+bool gt_HeroSwitchViking_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(1)) {
+        return true;
+    }
+    gf_HeroSwitchTo(gv_heroViking);
+    return true;
+}
+
 void gt_HeroSwitch_Init () {
+    gt_HeroSwitchViking = TriggerCreate("gt_HeroSwitchViking_Func");
+    TriggerAddEventKeyPressed(gt_HeroSwitchViking, 1, c_key4, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateRequire);
+    gt_HeroSwitchScv = TriggerCreate("gt_HeroSwitchScv_Func");
+    TriggerAddEventKeyPressed(gt_HeroSwitchScv, 1, c_key3, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateRequire);
     gt_HeroSwitchTosh = TriggerCreate("gt_HeroSwitchTosh_Func");
     TriggerAddEventKeyPressed(gt_HeroSwitchTosh, 1, c_key1, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateRequire);
     gt_HeroSwitchKerrigan = TriggerCreate("gt_HeroSwitchKerrigan_Func");

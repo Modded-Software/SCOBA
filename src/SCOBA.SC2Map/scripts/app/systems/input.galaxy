@@ -8,8 +8,11 @@ bool gt_OrderKey_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
-    gf_OrderToggle(lv_player);
-    libNtve_gf_SetDialogItemToggled(gv_sCOBAOrderButton, gv_sCOBAOrderMode[lv_player], PlayerGroupSingle(lv_player));
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
+    gf_OrderPress(lv_player);
     return true;
 }
 
@@ -25,6 +28,10 @@ bool gt_OrderCancel_Func (bool testConds, bool runActions) {
     lv_player = EventPlayer();
 
     if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
         return true;
     }
     if (gv_sCOBAOrderMode[lv_player] == true) {
@@ -49,8 +56,12 @@ bool gt_OrderButton_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
     if (EventDialogControl() == gv_sCOBAOrderButton) {
-        gf_OrderToggle(lv_player);
+        gf_OrderPress(lv_player);
     }
     return true;
 }

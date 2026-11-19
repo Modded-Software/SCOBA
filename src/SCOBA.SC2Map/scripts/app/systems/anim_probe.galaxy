@@ -464,6 +464,10 @@ bool gt_AnimProbeToggle_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(1)) {
+        return true;
+    }
     if (gv_bPROBE) {
         gf_ProbeDisable(1);
     }

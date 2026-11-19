@@ -1,0 +1,102 @@
+// Module: core/roster
+// The player roster (REQ-ROSTER, SPEC-ROSTER 3.1): per lane its seat, team,
+// base owner, human seat flag and seat hero. The only place that names a
+// lane's players by number. scripts/mapgen/player_slots.py holds the same table
+// for the player records and the lobby; the validator checks both agree.
+
+const int c_ROSTER_LANES = 6;
+const int c_ROSTER_PLAYERS = 16;
+const string c_ROSTER_TERRAN_HERO = "ToshSCOBA";
+
+bool[c_ROSTER_PLAYERS] gv_rosterPlayed;     // a person took this human seat
+unit[c_ROSTER_PLAYERS] gv_rosterHero;       // the seat hero (a played seat)
+int gv_rosterLeaves;                        // players that left, for tests
+
+// Lane -> computer base owner (R-ROSTER-2).
+int gf_RosterOwner (int lp_lane) {
+    if (lp_lane == 1) { return 9; }
+    if (lp_lane == 2) { return 11; }
+    if (lp_lane == 3) { return 12; }
+    if (lp_lane == 4) { return 10; }
+    if (lp_lane == 5) { return 13; }
+    if (lp_lane == 6) { return 14; }
+    return 0;
+}
+
+// Lane -> seat: the player of the lane's waves and hero.
+int gf_RosterSeat (int lp_lane) {
+    if (lp_lane < 1 || lp_lane > c_ROSTER_LANES) {
+        return 0;
+    }
+    return lp_lane;
+}
+
+bool gf_RosterTerran (int lp_lane) {
+    return lp_lane >= 1 && lp_lane <= 3;
+}
+
+// Humans play Terran only (operator 2026-11-18, O-ROSTER-1).
+bool gf_RosterHumanSeat (int lp_lane) {
+    return gf_RosterTerran(lp_lane);
+}
+
+// The seat hero type, "" for no hero.
+string gf_RosterHeroType (int lp_lane) {
+    if (gf_RosterHumanSeat(lp_lane)) {
+        return c_ROSTER_TERRAN_HERO;
+    }
+    return "";
+}
+
+// The lane of a seat or a base owner, 0 for none.
+int gf_RosterLaneOf (int lp_player) {
+    int lv_lane;
+
+    for (lv_lane = 1; lv_lane <= c_ROSTER_LANES; lv_lane += 1) {
+        if (gf_RosterSeat(lv_lane) == lp_player || gf_RosterOwner(lv_lane) == lp_player) {
+            return lv_lane;
+        }
+    }
+    return 0;
+}
+
+bool gf_RosterIsOwner (int lp_player) {
+    int lv_lane = gf_RosterLaneOf(lp_player);
+
+    return lv_lane > 0 && gf_RosterOwner(lv_lane) == lp_player;
+}
+
+bool gf_RosterIsSeat (int lp_player) {
+    int lv_lane = gf_RosterLaneOf(lp_player);
+
+    return lv_lane > 0 && gf_RosterSeat(lv_lane) == lp_player;
+}
+
+// A played seat: has a hero, a pod, a wallet, an intro (R-ROSTER-5).
+bool gf_RosterPlayed (int lp_player) {
+    if (lp_player < 0 || lp_player >= c_ROSTER_PLAYERS) {
+        return false;
+    }
+    return gv_rosterPlayed[lp_player];
+}
+
+// Tests: play or free a human seat without a person (one client).
+void gf_RosterPlay (int lp_player, bool lp_on) {
+    int lv_lane = gf_RosterLaneOf(lp_player);
+
+    if (lv_lane == 0 || gf_RosterSeat(lv_lane) != lp_player || !gf_RosterHumanSeat(lv_lane)) {
+        return;
+    }
+    gv_rosterPlayed[lp_player] = lp_on;
+}
+
+// Map init: a human seat a person took.
+void gf_RosterInit () {
+    int lv_lane;
+    int lv_p;
+
+    for (lv_lane = 1; lv_lane <= c_ROSTER_LANES; lv_lane += 1) {
+        lv_p = gf_RosterSeat(lv_lane);
+        gv_rosterPlayed[lv_p] = gf_RosterHumanSeat(lv_lane) && PlayerType(lv_p) == c_playerTypeUser && PlayerStatus(lv_p) == c_playerStatusActive;
+    }
+}

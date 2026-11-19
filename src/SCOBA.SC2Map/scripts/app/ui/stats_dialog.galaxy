@@ -13,15 +13,14 @@ void gf_InitializeLevelingInterface () {
     gf_AbilitiesSelectionDialogCreate();
 }
 
+// Called on every XP award. An open stats panel stays open and is
+// refreshed; a closed one stays closed (REQ-UI-PANELS R-UI-1, R-UI-2).
 void gf_ShowStasLevelingInterface (int lp_iPlayer) {
     // Implementation
     if ((DialogIsVisible(gv_userSelectionDialog, lp_iPlayer) == true)) {
-        DialogSetVisible(gv_userSelectionDialog, PlayerGroupAll(), false);
-        gf_SBDialogShowStatsButton(lp_iPlayer);
+        gf_UnitSelectionDialogRefresh(lp_iPlayer);
     }
-    else {
-        gf_SBDialogShowStatsButton(lp_iPlayer);
-    }
+    gf_SBDialogShowStatsButton(lp_iPlayer);
 }
 
 fixed gf_GetLifeandEnergyStatFormula (int lp_localPlayer, int lp_iButton) {
@@ -74,19 +73,28 @@ void gf_SBDialogShowStatsButton (int lp_iPlayer) {
     DialogSetVisible(gv_singleButtonDialog, PlayerGroupSingle(lp_iPlayer), true);
 }
 
+// HUD stats button: open or close the stats panel of one player (R-UI-4).
+void gf_StatsPanelToggle (int lp_player) {
+    if ((DialogIsVisible(gv_userSelectionDialog, lp_player) == true)) {
+        DialogSetVisible(gv_userSelectionDialog, PlayerGroupSingle(lp_player), false);
+    }
+    else {
+        gf_UnitSelectionDialogShow(lp_player);
+    }
+}
+
 bool gt_SBDialogStatsCallback_Func (bool testConds, bool runActions) {
     // Actions
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     if ((EventDialogControl() == gv_singleButtonButton)) {
-        if ((DialogIsVisible(gv_userSelectionDialog, EventPlayer()) == true)) {
-            DialogSetVisible(gv_userSelectionDialog, PlayerGroupSingle(EventPlayer()), false);
-        }
-        else {
-            gf_UnitSelectionDialogShow(EventPlayer());
-        }
+        gf_StatsPanelToggle(EventPlayer());
     }
     if ((EventDialogControl() == gv_singleButtonButtonInventory)) {
         UIDisplayMessage(PlayerGroupSingle(EventPlayer()), c_messageAreaSubtitle, StringToText("Inventory coming soon"));

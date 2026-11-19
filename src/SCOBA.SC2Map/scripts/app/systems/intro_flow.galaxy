@@ -1,0 +1,290 @@
+// Module: systems/intro_flow
+// Intro flow and triggers, per seat (R-INTRO-16), split from systems/intro.
+
+// --- Flow --------------------------------------------------------------
+
+// A seat with an intro: a played seat (core/roster), intro on.
+bool gf_IntroSeat (int lp_player) {
+    return gf_IntroEnabled() && gf_RosterPlayed(lp_player);
+}
+
+// Map init: black, cinematic mode, input held, for every played seat.
+void gf_IntroPrepare () {
+    int lv_p;
+
+    gf_RosterInit();
+    for (lv_p = 0; lv_p < 16; lv_p += 1) {
+        gv_introState[lv_p] = c_INTRO_OFF;
+        gv_introCamGap[lv_p] = -1.0;
+        gv_introCountAt[lv_p] = -1.0;
+    }
+    if (!gf_IntroEnabled()) {
+        return;
+    }
+    CinematicFade(false, 0.0, c_fadeStyleNormal, Color(0,0,0), 0.0, false);
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        if (!gf_IntroSeat(lv_p)) {
+            continue;
+        }
+        gv_introState[lv_p] = c_INTRO_LOOP;
+        gv_introActive[lv_p] = true;
+        CinematicMode(PlayerGroupSingle(lv_p), true, 0.0);
+        gv_introCinematic[lv_p] = true;
+        // No CameraLockInput (SPEC-TPS: it kept the cursor captured). The
+        // seat's input is held, and gt_IntroTick writes its camera.
+        gf_InputHold(lv_p);
+    }
+}
+
+void gf_IntroHeroHide (unit lp_hero) {
+    if (!UnitIsValid(lp_hero)) {
+        return;
+    }
+    UnitIssueOrder(lp_hero, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    libNtve_gf_PauseUnit(lp_hero, true);
+    UnitSetState(lp_hero, c_unitStateSelectable, false);
+    UnitSetState(lp_hero, c_unitStateHighlightable, false);
+    UnitSetState(lp_hero, c_unitStateHidden, true);
+}
+
+// One seat's loop starts: its hero out of the world, its dialogs hidden,
+// its prompt shown, the first cut.
+void gf_IntroStartSeat (int lp_player) {
+    if (gv_introState[lp_player] != c_INTRO_LOOP) {
+        return;
+    }
+    gf_IntroHeroHide(gv_tPSUNIT[lp_player]);
+    UnitClearSelection(lp_player);
+    gf_IntroDialogsHide(lp_player);
+    CameraFollowUnitGroup(lp_player, UnitGroupEmpty(), false, false);
+    CameraUseHeightSmoothing(lp_player, false);
+    gv_introHumOn[lp_player] = false;
+    SoundPlay(SoundLink(c_INTRO_MUSIC, c_soundIndexAny), PlayerGroupSingle(lp_player), 100.0, 0.0);
+    gv_introMusicSound[lp_player] = SoundLastPlayed();
+    gv_introMusic[lp_player] = true;
+    DialogSetVisible(gv_introPrompt, PlayerGroupSingle(lp_player), true);
+    gv_introPass[lp_player] = 0;
+    gf_IntroCut(lp_player, 0, 0.0);
+}
+
+// End of gt_MapInit: the heroes are bound, the dialogs exist. The world
+// parts (music, creep seed, prompt dialog) once; then every seat.
+void gf_IntroStart () {
+    int lv_p;
+    bool lv_any = false;
+
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        lv_any = lv_any || gv_introState[lv_p] == c_INTRO_LOOP;
+    }
+    if (!lv_any) {
+        return;
+    }
+    gv_introMusicValid = CatalogEntryIsValid(c_gameCatalogSound, c_INTRO_MUSIC);
+    gv_introHumValid = CatalogEntryIsValid(c_gameCatalogSound, c_INTRO_PSI_HUM);
+    gv_introSilenceValid = CatalogEntryIsValid(c_gameCatalogSoundtrack, c_INTRO_SILENCE);
+    // Silence as the default soundtrack: no stock track under the theme or
+    // after it (the Void campaign's own pattern). The theme starts per seat.
+    SoundtrackStop(PlayerGroupAll(), c_soundtrackCategoryMusic, false);
+    SoundtrackPlay(PlayerGroupAll(), c_soundtrackCategoryMusic, c_INTRO_SILENCE, c_soundtrackCueAny, c_soundtrackIndexAny, true);
+    gf_IntroSeed();
+    gf_IntroPromptCreate();
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        gf_IntroStartSeat(lv_p);
+    }
+    CinematicFade(true, c_INTRO_FADE_IN, c_fadeStyleNormal, Color(0,0,0), 0.0, false);
+    TriggerEnable(gt_IntroTick, true);
+    TriggerEnable(gt_IntroPulse, true);
+}
+
+// SPACE in the loop (R-INTRO-10): a countdown on the seat's prompt line,
+// then its deploy (operator 2026-11-17). The loop keeps playing; more
+// presses are ignored.
+void gf_IntroDeployPress (int lp_player) {
+    if (gv_introState[lp_player] != c_INTRO_LOOP || gv_introCuts[lp_player] == 0 || gv_introCountAt[lp_player] >= 0.0) {
+        gv_introSpaceIgnored[lp_player] += 1;
+        return;
+    }
+    gv_introCountAt[lp_player] = TimerGetElapsed(gv_sCOBA_Clock);
+    gv_introCountShown[lp_player] = 0;
+    DialogControlFadeTransparency(gv_introPromptLabel, PlayerGroupSingle(lp_player), 0.0, 0.0);
+    gf_IntroCountStep(lp_player);
+}
+
+// Each tick while counting: "Deploying in n..." (one line), deploy at 0.
+void gf_IntroCountStep (int lp_player) {
+    int lv_n = c_INTRO_COUNT - FixedToInt(TimerGetElapsed(gv_sCOBA_Clock) - gv_introCountAt[lp_player]);
+
+    if (lv_n <= 0) {
+        gv_introCountAt[lp_player] = -1.0;
+        gf_IntroDeployGo(lp_player);
+        return;
+    }
+    if (lv_n != gv_introCountShown[lp_player]) {
+        gv_introCountShown[lp_player] = lv_n;
+        gv_introCountTrace[lp_player] = gv_introCountTrace[lp_player] + IntToString(lv_n);
+        libNtve_gf_SetDialogItemText(gv_introPromptLabel, StringToText("Deploying in " + IntToString(lv_n) + "..."), PlayerGroupSingle(lp_player));
+    }
+}
+
+void gf_IntroDeployGo (int lp_player) {
+    gv_introDeploys[lp_player] += 1;
+    gv_introState[lp_player] = c_INTRO_ZOOM;
+    gf_IntroPromptHide(lp_player);
+    // The theme plays on through the zoom and the fall; it stops at
+    // touchdown (gf_IntroMusicStop, operator 2026-11-18). The S9 hum stops;
+    // the S4 Doodad channel is back.
+    gf_IntroHum(lp_player, false);
+    gf_IntroQuiet(lp_player, false);
+    gv_introDropAt[lp_player] = gf_DropPodPoint(gv_sPAWNLOCATIONS[gf_RosterLaneOf(lp_player)], null, null);
+    gv_introZoomStart[lp_player] = TimerGetElapsed(gv_sCOBA_Clock);
+    gv_introShot[lp_player] = c_INTRO_ROW_ZOOM;
+    gv_introCuts[lp_player] += 1;
+    gf_IntroDofSet(lp_player, false);
+    gf_IntroApply(lp_player, c_INTRO_ROW_ZOOM, 0.0, 0.0);
+}
+
+// End of the crash zoom: the seat's hero pod falls (hero drop).
+void gf_IntroFall (int lp_player) {
+    // gt_IntroTick goes on: in FALL it only keeps the dialogs hidden.
+    gv_introState[lp_player] = c_INTRO_FALL;
+    // Rest lens; yaw, pitch and arm come from the drop (chase on the pod's line).
+    CameraSetValue(lp_player, c_cameraValueFieldOfView, c_SCOBA_REST_FOV, 0.0, 0.0, 0.0);
+    gv_introFov[lp_player] = c_SCOBA_REST_FOV;
+    gv_introPitch[lp_player] = c_POD_BIRTH_PITCH;
+    gf_HeroDropBegin(lp_player, gv_tPSUNIT[lp_player]);
+    gf_HeroDropStart(lp_player, gv_introDropAt[lp_player]);
+}
+
+// No music after touchdown (O-INTRO-1), for this seat: the theme fades out.
+// The default soundtrack is already silence (gf_IntroStart).
+void gf_IntroMusicStop (int lp_player) {
+    if (!gv_introMusic[lp_player]) {
+        return;
+    }
+    SoundStop(gv_introMusicSound[lp_player], true);
+    gv_introMusic[lp_player] = false;
+}
+
+bool gf_IntroAnyActive () {
+    int lv_p;
+
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        if (gv_introActive[lv_p]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Touchdown (R-INTRO-12). Called by gf_HeroDropLand after the hero bind,
+// and on leave. This seat only (R-INTRO-16).
+void gf_IntroEnd (int lp_player) {
+    if (lp_player < 0 || lp_player >= 16 || !gv_introActive[lp_player]) {
+        return;
+    }
+    gf_IntroPromptHide(lp_player);
+    gf_IntroHum(lp_player, false);
+    gf_IntroQuiet(lp_player, false);
+    gf_IntroMusicStop(lp_player);
+    gf_IntroDofSet(lp_player, false);
+    gf_IntroDialogsRestore(lp_player);
+    gf_InputRelease(lp_player);
+    CinematicMode(PlayerGroupSingle(lp_player), false, c_INTRO_LETTERBOX_OUT);
+    gv_introCinematic[lp_player] = false;
+    // Game UI and minimap back (hidden at map init, app/init).
+    UISetMode(PlayerGroupSingle(lp_player), c_uiModeConsole, c_INTRO_LETTERBOX_OUT);
+    UISetFrameVisible(PlayerGroupSingle(lp_player), c_syncFrameTypeMinimapPanel, true);
+    gv_introState[lp_player] = c_INTRO_DONE;
+    gv_introActive[lp_player] = false;
+    if (!gf_IntroAnyActive()) {
+        TriggerEnable(gt_IntroTick, false);
+        TriggerEnable(gt_IntroPulse, false);
+    }
+}
+
+// --- Triggers ----------------------------------------------------------
+
+bool gt_IntroPrepare_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_IntroPrepare();
+    return true;
+}
+
+void gf_IntroTickSeat (int lp_player) {
+    if (!gv_introActive[lp_player]) {
+        return;
+    }
+    gf_IntroDialogsEnforce(lp_player);
+    if (gv_introSent[lp_player] != null && (gv_introState[lp_player] == c_INTRO_LOOP || gv_introState[lp_player] == c_INTRO_ZOOM)) {
+        gv_introCamRead[lp_player] = CameraGetTarget(lp_player);
+        gv_introCamGap[lp_player] = DistanceBetweenPoints(gv_introCamRead[lp_player], gv_introSent[lp_player]);
+    }
+    if (gv_introState[lp_player] == c_INTRO_LOOP) {
+        gf_IntroLoopStep(lp_player);
+        if (gv_introCountAt[lp_player] >= 0.0) {
+            gf_IntroCountStep(lp_player);
+        }
+    }
+    else if (gv_introState[lp_player] == c_INTRO_ZOOM) {
+        gf_IntroZoomStep(lp_player);
+    }
+}
+
+bool gt_IntroTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        gf_IntroTickSeat(lv_p);
+    }
+    return true;
+}
+
+bool gt_IntroDeploy_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_IntroDeployPress(EventPlayer());
+    return true;
+}
+
+// The prompt pulses for every seat in its loop and not counting.
+bool gt_IntroPulse_Func (bool testConds, bool runActions) {
+    int lv_p;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        if (gv_introState[lv_p] != c_INTRO_LOOP || gv_introCountAt[lv_p] >= 0.0) {
+            continue;
+        }
+        gv_introPromptLow[lv_p] = !gv_introPromptLow[lv_p];
+        if (gv_introPromptLow[lv_p]) {
+            DialogControlFadeTransparency(gv_introPromptLabel, PlayerGroupSingle(lv_p), c_INTRO_PULSE, c_INTRO_PULSE_HIGH);
+        }
+        else {
+            DialogControlFadeTransparency(gv_introPromptLabel, PlayerGroupSingle(lv_p), c_INTRO_PULSE, c_INTRO_PULSE_LOW);
+        }
+    }
+    return true;
+}
+
+void gt_Intro_Init () {
+    gf_IntroShotsLoad();
+    gt_IntroPrepare = TriggerCreate("gt_IntroPrepare_Func");
+    TriggerAddEventMapInit(gt_IntroPrepare);
+    gt_IntroTick = TriggerCreate("gt_IntroTick_Func");
+    TriggerAddEventTimePeriodic(gt_IntroTick, c_INTRO_TICK, c_timeGame);
+    TriggerEnable(gt_IntroTick, false);
+    gt_IntroPulse = TriggerCreate("gt_IntroPulse_Func");
+    TriggerAddEventTimePeriodic(gt_IntroPulse, c_INTRO_PULSE, c_timeGame);
+    TriggerEnable(gt_IntroPulse, false);
+    // Every seat's own SPACE (R-INTRO-16).
+    gt_IntroDeploy = TriggerCreate("gt_IntroDeploy_Func");
+    TriggerAddEventKeyPressed(gt_IntroDeploy, c_playerAny, c_keySpace, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}

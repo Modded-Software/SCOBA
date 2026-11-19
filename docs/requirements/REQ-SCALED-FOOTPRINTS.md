@@ -9,7 +9,7 @@ specification lists the state of each requirement and the run that backs it.
 
 The map build scales placed props: Zerus trees go to 2x-8x
 (`scripts/props_expand.py`), and spore cannons and spore crawlers go to 3x
-(`scripts/spore_scale.py`). A placed Scale only scales the mesh. The pathing
+(`scripts/mapgen/spore_scale.py`). A placed Scale only scales the mesh. The pathing
 footprint stays at its stock size, so units walk into large trees and spores.
 
 In scope: Zerus trees (`ZerusTree`), `SporeCannon`, `SporeCrawler`.

@@ -28,7 +28,7 @@ void gf_TurnToYaw (int lp_player, fixed lp_yaw) {
     }
     gv_animTurnTarget[lp_player] = lp_yaw;
     gv_animHasTurnTarget[lp_player] = true;
-    UnitSetFacing(lv_hero, lp_yaw, c_ANIM_TURN_DURATION);
+    gf_UnitTurn(lv_hero, lp_yaw, c_ANIM_TURN_DURATION);
 }
 void gf_AnimFacingTick (int lp_player) {
     unit lv_hero;
@@ -43,7 +43,7 @@ void gf_AnimFacingTick (int lp_player) {
             return;
         }
         lv_yaw = CameraGetYaw(lp_player);
-        UnitSetFacing(lv_hero, lv_yaw, c_ANIM_AIM_TURN_DURATION);
+        gf_UnitTurn(lv_hero, lv_yaw, c_ANIM_AIM_TURN_DURATION);
         gv_animTurnTarget[lp_player] = lv_yaw;
         gv_animHasTurnTarget[lp_player] = true;
         return;

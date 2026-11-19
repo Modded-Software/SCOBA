@@ -101,7 +101,7 @@ void gf_UnitTargetSet (int lp_player, unit lp_unit) {
         }
     }
     gv_unitTarget[lp_player] = lp_unit;
-    DialogSetVisible(gv_sCOBAOrderDialog, PlayerGroupSingle(lp_player), (UnitIsValid(lp_unit) && (UnitGetOwner(lp_unit) == lp_player)));
+    gf_HireButtonApply(lp_player);
     if (!UnitIsValid(lp_unit)) {
         libNtve_gf_ShowHideBossBar(false, lv_bar);
         return;
@@ -295,6 +295,10 @@ bool gt_TargetClick_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
     if (!gf_IsHeroPlayer(lv_player)) {
         return true;
     }
@@ -361,6 +365,10 @@ bool gt_TargetRelease_Func (bool testConds, bool runActions) {
 
     lv_player = EventPlayer();
     if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
         return true;
     }
     if (!gf_IsHeroPlayer(lv_player)) {

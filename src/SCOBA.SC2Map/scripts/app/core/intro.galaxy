@@ -15,10 +15,21 @@ const int c_INTRO_FALL = 3;
 const int c_INTRO_DONE = 4;
 
 const fixed c_INTRO_TICK = 0.0625;          // one game loop
-const fixed c_INTRO_FADE_IN = 1.5;
+const fixed c_INTRO_FADE_IN = 4.0;   // operator 2026-11-18: was 1.5
 const fixed c_INTRO_LETTERBOX_OUT = 0.5;
-const string c_INTRO_MUSIC = "ZZerus01MusicMain";
-const string c_INTRO_SILENCE = "Music_Silence";   // default music after deploy: none
+// Intro theme: a SoundData sound, played per seat with SoundPlay (operator
+// 2026-11-18: the soundtrack did not play). File res/audio/SCOBA_IntroTheme.wav.
+const string c_INTRO_MUSIC = "SCOBAIntroTheme";
+// S9 (row 8): the Psi Destroyer hum plays for the whole shot (operator 2026-11-18).
+const string c_INTRO_PSI_HUM = "SCOBAPsiHum";
+const int c_INTRO_ROW_PSI = 8;
+// S4 (row 3): the caged Ultralisk's idle sounds (stock
+// Doodad_HybridUltraliskShackled_*, category Doodad) way down (operator
+// 2026-11-18). The seat's Doodad channel volume, percent.
+const int c_INTRO_ROW_CAGED = 3;
+const fixed c_INTRO_CAGED_VOLUME = 15.0;
+const fixed c_INTRO_CAGED_FADE = 0.25;
+const string c_INTRO_SILENCE = "Music_Silence";   // default music after touchdown: none
 
 // Prompt (SPEC-INTRO 3.10).
 const int c_INTRO_PROMPT_W = 900;
@@ -46,8 +57,8 @@ const fixed c_INTRO_SEED_OFFSET = 3.5;
 const fixed c_INTRO_SEED_BACK = 50.0;  // seed groups start this far back toward their spawns
 
 // Map dialogs hidden in the intro, and the triggers off in it.
-const int c_INTRO_DIALOGS = 14;
-const int c_INTRO_TRIGGERS = 41;
+const int c_INTRO_DIALOGS = 15;
+const int c_INTRO_TRIGGERS = 43;
 
 // The pod ride (FALL): the pitch gt_MapInit gives the hero camera.
 const fixed c_INTRO_FALL_PITCH = 30.0;
@@ -57,43 +68,47 @@ trigger gt_IntroTick;
 trigger gt_IntroDeploy;
 trigger gt_IntroPulse;
 
-int gv_introState;
-bool gv_introActive;          // LOOP, ZOOM, FALL
-int gv_introShot;             // row of the shot on screen
-int gv_introPass;
-fixed gv_introShotStart;      // gv_sCOBA_Clock at the cut
-fixed gv_introZoomStart;
-point gv_introDropAt;
+int[16] gv_introState;
+bool[16] gv_introActive;          // LOOP, ZOOM, FALL
+int[16] gv_introShot;             // row of the shot on screen
+int[16] gv_introPass;
+fixed[16] gv_introShotStart;      // gv_sCOBA_Clock at the cut
+fixed[16] gv_introZoomStart;
+point[16] gv_introDropAt;
 int gv_introPrompt;           // dialog
 int gv_introPromptLabel;
-bool gv_introPromptLow;       // pulse direction
-bool[c_INTRO_DIALOGS] gv_introDialogKept;
-int gv_introDialogReshown;    // dialogs the game showed in the intro, hidden again
-bool[c_INTRO_TRIGGERS] gv_introTriggerKept;
+bool[16] gv_introPromptLow;       // pulse direction
+bool[16][c_INTRO_DIALOGS] gv_introDialogKept;
+int[16] gv_introDialogReshown;    // dialogs the game showed in the intro, hidden again
 // Script state for tests: the values last written to the camera.
-point gv_introTarget;
-fixed gv_introYaw;
-fixed gv_introPitch;
-fixed gv_introDist;
-fixed gv_introFov;
-fixed gv_introHeight;         // height offset written
-fixed gv_introGround;         // ground under the target (U3)
-bool gv_introDof;
+point[16] gv_introTarget;
+fixed[16] gv_introYaw;
+fixed[16] gv_introPitch;
+fixed[16] gv_introDist;
+fixed[16] gv_introFov;
+fixed[16] gv_introHeight;         // height offset written
+fixed[16] gv_introGround;         // ground under the target (U3)
+bool[16] gv_introDof;
 // Engine target, read at each tick: the loop after the last pan, the one
 // loop CameraGetTarget reads right (SPEC-HERO-DROP F6). Gap to what was sent.
-point gv_introSent;
-point gv_introCamRead;
-fixed gv_introCamGap = -1.0;
-bool gv_introMusic;
-bool gv_introMusicValid;      // the soundtrack id resolves in the loaded catalogs (U5)
+point[16] gv_introSent;
+point[16] gv_introCamRead;
+fixed[16] gv_introCamGap;
+bool[16] gv_introMusic;
+sound[16] gv_introMusicSound;
+bool[16] gv_introHumOn;       // the S9 hum is playing (tests)
+bool[16] gv_introQuiet;       // the S4 Doodad channel is down (tests)
+sound[16] gv_introHum;
+bool gv_introHumValid;        // the hum sound id resolves (tests)
+bool gv_introMusicValid;      // the music sound id resolves in the loaded catalogs (U5)
 bool gv_introSilenceValid;
-bool gv_introCinematic;
-int gv_introCuts;
+bool[16] gv_introCinematic;
+int[16] gv_introCuts;
 int gv_introSeeded;
 unitgroup gv_introSeedTerran;
 unitgroup gv_introSeedZerg;
-int gv_introDeploys;
-fixed gv_introCountAt = -1.0;  // countdown start (clock); -1: not counting
-int gv_introCountShown;        // the number on the prompt line
-string gv_introCountTrace;     // numbers shown, in order (tests)
-int gv_introSpaceIgnored;
+int[16] gv_introDeploys;
+fixed[16] gv_introCountAt;  // countdown start (clock); -1: not counting
+int[16] gv_introCountShown;        // the number on the prompt line
+string[16] gv_introCountTrace;     // numbers shown, in order (tests)
+int[16] gv_introSpaceIgnored;

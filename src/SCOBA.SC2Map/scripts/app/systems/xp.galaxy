@@ -54,10 +54,7 @@ void gf_AwardExperience (int lp_player, int lp_amount) {
         gv_lEVEL[lp_player] += 1;
         gv_availableStatPoints[lp_player] += 3;
         libNtve_gf_SendActorMessageToUnit(gv_tPSUNIT[lp_player], "AnimPlay WarpIn");
-        TextTagCreate((StringToText("LEVEL ") + IntToText(gv_lEVEL[lp_player])), 18, UnitGetPosition(gv_tPSUNIT[lp_player]), 2.0, true, false, PlayerGroupSingle(lp_player));
-        TextTagSetColor(TextTagLastCreated(), c_textTagColorText, Color(100.00, 85.00, 20.00));
-        TextTagSetVelocity(TextTagLastCreated(), 0.0, 90.0);
-        TextTagSetTime(TextTagLastCreated(), c_textTagTimeDuration, 2.0);
+        // No "LEVEL n" floating text (operator 2026-11-18); the XP bar shows the level.
         if ((DialogIsVisible(gv_abilitiesSelectionDialog, lp_player) == true)) {
             if ((gf_CanLevelAbility(gv_lEVEL[lp_player]) == true) && (gv_lEVEL[lp_player] <= 15)) {
                 gv_availableAbilityPoints[lp_player] += 1;
@@ -86,7 +83,7 @@ void gf_AwardExperience (int lp_player, int lp_amount) {
     libNtve_gf_SetBossBarMaximumValue(lv_xpBar, lv_threshold, true);
     libNtve_gf_ShowHideBossBar(false, lv_xpBar);
     // The intro hides the map dialogs; they come back at touchdown (R-INTRO-2).
-    if (lp_player == 1 && gv_introActive) {
+    if (gv_introActive[lp_player]) {
         return;
     }
     gf_ShowStasLevelingInterface(lp_player);

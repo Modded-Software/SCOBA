@@ -1,5 +1,5 @@
-// Module: systems/camera_dof
-// In-game camera DOF (REQ-CAMERA-DOF), split from systems/camera.
+// Module: systems/camera/dof
+// In-game camera DOF (REQ-CAMERA-DOF), split from systems/camera/camera.
 
 // In-game DOF (REQ-CAMERA-DOF). Max strength = the intro DOF
 // (c_INTRO_DOF_*): near 1..6, far 4..18, at the focus (the camera arm).
@@ -13,7 +13,7 @@ void gf_CameraDofApply (int lp_player) {
     fixed lv_kf;
     bool lv_aim;
 
-    if (gv_introActive || UnitIsValid(gv_dropPod[lp_player]) || !UnitIsValid(gv_tPSUNIT[lp_player])) {
+    if (gv_introActive[lp_player] || UnitIsValid(gv_dropPod[lp_player]) || !UnitIsValid(gv_tPSUNIT[lp_player])) {
         return;
     }
     lv_d = CameraGetDistance(lp_player);

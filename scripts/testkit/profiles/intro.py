@@ -25,7 +25,7 @@ from .herodrop import birth_follow
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
-GROUPS = ("boot", "shots", "wrap", "gate", "deploy")
+GROUPS = ("boot", "shots", "wrap", "gate", "seats", "deploy")
 LOOP_MS = 62.5
 STATE_LOOP, STATE_ZOOM, STATE_FALL, STATE_DONE = 1, 2, 3, 4
 ANGLE_TOL = 2.0       # degrees, engine against script
@@ -51,10 +51,12 @@ def map_spec() -> TestMapSpec:
         bank_names=PROFILE_BANKS["intro"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "intro_seats.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "intro.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/intro/common",
+            "scripts/test/intro/intro_seats",
             "scripts/test/intro/intro",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_IntroTest_Init();"),
@@ -135,25 +137,37 @@ def check_boot(checks) -> None:
         checks.false(s, t, "Selectable")
         checks.false(s, t, "Selected")
         checks.eq(s, t, "Orders", 0)
-        checks.eq(s, t, "TrigOn", 0)
-        checks.false(s, t, "JumpKeyOn")
+        # Per-player hold: player 1 held, no trigger disabled, player 2 not held.
+        checks.true(s, t, "InputHeld")
+        checks.false(s, t, "InputHeld2")
+        checks.eq(s, t, "TrigOn", checks.value(s, t, "TrigAll"))
+        checks.true(s, t, "JumpKeyOn")
         checks.true(s, t, "TickOn")
         # R-INTRO-15: the theme plays; the id resolves (U5).
         checks.true(s, t, "Music")
         checks.true(s, t, "MusicValid")
+        checks.true(s, t, "HumValid")
         checks.true(s, t, "SilenceValid")
     print(f"{s} raw dialog masks t0={checks.value(s, 't0', 'DialogMask')} t1={checks.value(s, 't1', 'DialogMask')} t6={checks.value(s, 't6', 'DialogMask')} reshown t6={checks.value(s, 't6', 'DialogReshown')}")
     checks.gt(s, "t0", "DialogsKept", 0)
-    checks.gt(s, "t0", "TrigKept", 0)
+    checks.gt(s, "t0", "TrigAll", 0)
     for key in ("HeroX10", "HeroY10"):
         checks.eq(s, "t6", key, checks.value(s, "t0", key))
-    # R-INTRO-13: both groups at the X at 1 s, both hurt by 6 s.
+    # R-INTRO-13: both groups start back from the X, walk in, meet at the X
+    # and fight there.
     checks.eq(s, "", "seeded", SEED_TERRAN + SEED_ZERG)
     checks.eq(s, "", "seedTerran", SEED_TERRAN)
     checks.eq(s, "", "seedZerg", SEED_ZERG)
-    checks.gt(s, "", "t1TerranSeedAtX", 0)
-    checks.gt(s, "", "t1ZergSeedAtX", 0)
-    print(f"{s} raw t1 near X: terran={checks.value(s, '', 't1TerranAtX')} zerg={checks.value(s, '', 't1ZergAtX')}")
+    print(f"{s} raw seed t1ToX10 terran={checks.value(s, '', 't1TerranToX10')} zerg={checks.value(s, '', 't1ZergToX10')} "
+          f"meetMs={checks.value(s, '', 'meetMs')} fightMs={checks.value(s, '', 'fightMs')} "
+          f"t1 near X: terran={checks.value(s, '', 't1TerranAtX')} zerg={checks.value(s, '', 't1ZergAtX')}")
+    # Negative: no fight at the start (operator 2026-11-17).
+    checks.eq(s, "", "t1TerranHurt100", 0)
+    checks.eq(s, "", "t1ZergHurt100", 0)
+    checks.gt(s, "", "t1TerranToX10", 160)
+    checks.gt(s, "", "t1ZergToX10", 160)
+    checks.gt(s, "", "meetMs", -1)
+    checks.lt(s, "", "fightMs", 640 * 62)
     checks.gt(s, "", "t6TerranHurt100", 0)
     checks.gt(s, "", "t6ZergHurt100", 0)
     # Negative: no extra units on the other lanes.
@@ -171,8 +185,10 @@ def check_boot(checks) -> None:
 
 
 def _shot_row(shot: S.Shot, pass_: int, u: float) -> tuple[list[S.Sample], float]:
-    """Table samples over the window the script value can come from."""
-    span = 3 * (LOOP_MS / 1000.0) / shot.length
+    """Table samples over the window the script value can come from: the
+    goto, two waited loops, one loop of event order, and the tick's one-loop
+    lead (systems/intro.galaxy gf_IntroTickSeat: lv_t + c_INTRO_TICK)."""
+    span = 4 * (LOOP_MS / 1000.0) / shot.length
     return [S.sample(shot, min(1.0, u + span * k / 6), pass_ == 1) for k in range(7)], span
 
 
@@ -202,6 +218,10 @@ def check_shots(checks) -> None:
                 shot_i, pass_i, eyaw, epitch, edist, syaw, spitch, sdist, sfov, sh, sground, dof, tgt, tx, ty, ex, ey, gap = v
                 print(f"shots {key} raw {raw}")
                 name = f"shots {shot.name} p{pass_} u{u10 / 10:.1f}"
+                # Scene sound: Doodad channel down in S4 only; hum in S9 only
+                # (operator 2026-11-18). Script flags; the loudness is an operator check.
+                _report(checks, f"{name} quiet", bool(section.get(key + "Quiet")) == shot.name.startswith("S4"), f"quiet={section.get(key + 'Quiet')}")
+                _report(checks, f"{name} hum", bool(section.get(key + "Hum")) == shot.name.startswith("S9"), f"hum={section.get(key + 'Hum')}")
                 _report(checks, f"{name} row", shot_i == row and pass_i == pass_, f"shot={shot_i} pass={pass_i}")
                 # R-INTRO-4: the engine follows the script values.
                 _report(checks, f"{name} engine yaw", _angle(eyaw / 100, syaw / 100) <= ANGLE_TOL, f"engine={eyaw / 100} script={syaw / 100}")
@@ -240,6 +260,9 @@ def check_wrap(checks) -> None:
     checks.eq(s, "t0", "Shot", len(S.SHOTS) - 1)
     checks.eq(s, "t1", "Shot", 0)
     checks.eq(s, "t1", "Pass", (checks.value(s, "t0", "Pass") or 0) + 1)
+    # The Psi Destroyer hum: on in S9, off after the cut to S1 (2026-11-18).
+    checks.true(s, "t0", "Hum")
+    checks.false(s, "t1", "Hum")
     length = checks.value(s, "", "s7LenMs") or 0
     checks.between(s, "", "s7Ms", length - 2 * LOOP_MS, length + 3 * LOOP_MS)
     checks.eq(s, "", "afterS7", 7)
@@ -256,7 +279,8 @@ def check_gate(checks) -> None:
         checks.false(s, t, "OrderMode")
         checks.true(s, t, "HeroIsTosh")
         checks.true(s, t, "Hidden")
-        checks.eq(s, t, "TrigOn", 0)
+        checks.true(s, t, "InputHeld")
+        checks.eq(s, t, "TrigOn", checks.value(s, t, "TrigAll"))
         yaw, syaw = checks.value(s, t, "CamYaw100"), checks.value(s, t, "InYaw100")
         dist, sdist = checks.value(s, t, "CamDist100"), checks.value(s, t, "InDist100")
         ok = None not in (yaw, syaw, dist, sdist) and _angle(yaw / 100, syaw / 100) <= ANGLE_TOL and abs(dist - sdist) <= DIST_TOL * sdist
@@ -270,10 +294,18 @@ def check_deploy(checks) -> None:
     # Countdown 3, 2, 1 on the prompt line, then the zoom (~3 s after SPACE).
     checks.eq(s, "", "countTrace", "321")
     count_ms = checks.value(s, "", "countMs") or 0
-    print(f"{s} raw countMs={count_ms}")
+    # countMs: from the engine's press (gv_introCountAt) to the zoom;
+    # requestMs adds the host's key latency (raw only).
+    print(f"{s} raw countMs={count_ms} requestMs={checks.value(s, '', 'requestMs')} keyLatencyMs={checks.value(s, '', 'keyLatencyMs')} thirdState={checks.value(s, '', 'thirdState')}")
+    # The third press reached the engine in FALL; else the no-jump check
+    # below would test the wrong state.
+    checks.true(s, "", "thirdSent")
+    checks.eq(s, "", "thirdState", STATE_FALL)
     _report(checks, f"{s} zoom starts about 3 s after SPACE", 2500 <= count_ms <= 4000, f"ms={count_ms}")
     checks.false(s, "tzoom", "Prompt")  # negative: the countdown line is gone
-    checks.false(s, "tzoom", "Music")
+    # The theme plays on after SPACE; it stops at touchdown (2026-11-18).
+    checks.true(s, "tzoom", "Music")
+    checks.true(s, "tfall", "Music")
     checks.eq(s, "tzoom", "Deploys", 1)
     zoom = checks.value(s, "", "zoom") or ""
     print(f"{s} raw zoom {zoom}")
@@ -302,14 +334,15 @@ def check_deploy(checks) -> None:
         checks.eq(s, t, "Direct", 1)
         checks.false(s, t, "Cinematic")
         checks.eq(s, t, "Dialogs", checks.value("boot", "t0", "DialogsKept"))
-        checks.eq(s, t, "TrigOn", checks.value("boot", "t0", "TrigKept"))
+        checks.false(s, t, "InputHeld")
+        checks.eq(s, t, "TrigOn", checks.value(s, t, "TrigAll"))
         checks.true(s, t, "JumpKeyOn")
         checks.false(s, t, "TickOn")
         checks.false(s, t, "Dof")
         checks.false(s, t, "Music")
         checks.false(s, t, "Prompt")
         checks.false(s, t, "Pending")
-        checks.false(s, t, "DropIntro")
+        checks.false(s, t, "InputHeld")
         checks.true(s, t, "HeroTps")
         checks.eq(s, t, "Pods", pods + 1)
         checks.eq(s, t, "Landings", landings + 1)
@@ -328,6 +361,43 @@ def check_deploy(checks) -> None:
     checks.gt(s, "tafter", "SpaceIgnored", (checks.value(s, "t0", "SpaceIgnored") or 0) + 1)
 
 
+def check_seats(checks) -> None:
+    """R-INTRO-16: seat 2 deploys and lands; seat 1 stays in its loop."""
+    s = "seats"
+    keys = ("State", "Active", "Held", "Cinematic", "Music", "Prompt", "Deploys", "Pods", "HeroHidden", "HeroAlive")
+    for t in ("t0", "tfall", "tdone"):
+        for p in (1, 2):
+            print(f"{s} raw {t}p{p}: " + " ".join(f"{k}={checks.value(s, f'{t}p{p}', k)}" for k in keys))
+    print(f"{s} raw fallSeen={checks.value(s, '', 'fallSeen')} doneMs={checks.value(s, '', 'doneMs')}")
+    for p in (1, 2):
+        checks.eq(s, f"t0p{p}", "State", STATE_LOOP)
+        checks.true(s, f"t0p{p}", "Held")
+        checks.true(s, f"t0p{p}", "Prompt")
+    checks.true(s, "", "fallSeen")
+    checks.false(s, "tfallp2", "Prompt")
+    checks.true(s, "tfallp2", "Music")  # on until touchdown (2026-11-18)
+    checks.true(s, "tfallp2", "Held")
+    checks.eq(s, "tdonep2", "State", STATE_DONE)
+    checks.false(s, "tdonep2", "Active")
+    checks.false(s, "tdonep2", "Held")
+    checks.false(s, "tdonep2", "Cinematic")
+    checks.false(s, "tdonep2", "Music")
+    checks.true(s, "tdonep2", "HeroAlive")
+    checks.false(s, "tdonep2", "HeroHidden")
+    checks.gt(s, "tdonep2", "Pods", 0)
+    # Negative: seat 1 untouched by seat 2's deploy, fall and touchdown.
+    for t in ("tfall", "tdone"):
+        checks.eq(s, f"{t}p1", "State", STATE_LOOP)
+        checks.true(s, f"{t}p1", "Active")
+        checks.true(s, f"{t}p1", "Held")
+        checks.true(s, f"{t}p1", "Cinematic")
+        checks.true(s, f"{t}p1", "Music")
+        checks.true(s, f"{t}p1", "Prompt")
+        checks.true(s, f"{t}p1", "HeroHidden")
+        checks.eq(s, f"{t}p1", "Deploys", checks.value(s, "t0p1", "Deploys"))
+        checks.eq(s, f"{t}p1", "Pods", checks.value(s, "t0p1", "Pods"))
+
+
 def check(ctx, data: dict, checks) -> None:
     for error in ctx.errors:
         print(f"{error} FAIL")
@@ -342,6 +412,8 @@ def check(ctx, data: dict, checks) -> None:
         check_wrap(checks)
     if group in ("all", "gate"):
         check_gate(checks)
+    if group in ("all", "seats"):
+        check_seats(checks)
     if group in ("all", "deploy"):
         check_deploy(checks)
 

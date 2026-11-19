@@ -167,9 +167,36 @@
             <LayoutButtons index="16" Face="NeoSteelFrame" Requirements="UseNeoSteelFrame"/>
         </CardLayouts>
     </CUnit>
+    <!-- Command Center family: 8x8 (stock 5x5), FootprintData.xml. The
+         morphs (Orbital, Planetary) keep the same size. -->
     <CUnit id="CommandCenter">
         <LifeStart value="15000"/>
         <LifeMax value="15000"/>
+        <Food value="15"/>
+        <Footprint value="Footprint8x8CCContour"/>
+        <PlacementFootprint value="Footprint8x8CCDropOff"/>
+    </CUnit>
+    <CUnit id="CommandCenterFlying">
+        <Food value="15"/>
+    </CUnit>
+    <CUnit id="OrbitalCommand">
+        <Food value="15"/>
+        <Footprint value="Footprint8x8CCContour"/>
+        <PlacementFootprint value="Footprint8x8CCDropOff"/>
+    </CUnit>
+    <CUnit id="OrbitalCommandFlying">
+        <Food value="15"/>
+    </CUnit>
+    <CUnit id="PlanetaryFortress">
+        <Food value="15"/>
+        <Footprint value="Footprint8x8CCContour"/>
+        <PlacementFootprint value="Footprint8x8CCDropOff"/>
+    </CUnit>
+    <CUnit id="Hatchery">
+        <Food value="6"/>
+    </CUnit>
+    <CUnit id="Lair">
+        <Food value="6"/>
     </CUnit>
     <CUnit id="DukesRevenge">
         <Height value="60"/>
@@ -247,6 +274,7 @@
         </CardLayouts>
     </CUnit>
     <CUnit id="Hive">
+        <Food value="6"/>
         <FlagArray index="Invulnerable" value="1"/>
         <FlagArray index="Untargetable" value="1"/>
         <Collide index="Ground" value="0"/>
@@ -505,6 +533,13 @@
     <CUnit id="Overlord">
         <Height value="64"/>
     </CUnit>
+    <!-- The two vista Overlords (Objects, player 8): a special type, so the
+         Overlord tech-tree block and the max-supply rule do not touch them.
+         They give no supply. -->
+    <CUnit id="SCOBAVistaOverlord" parent="Overlord">
+        <Height value="64"/>
+        <Food value="0"/>
+    </CUnit>
     <CUnit id="Overseer">
         <Height value="7"/>
     </CUnit>
@@ -592,8 +627,11 @@
         <LifeMax value="2000"/>
     </CUnit>
     <CUnit id="SupplyDepot">
-        <Footprint value="Footprint6x6Contour"/>
-        <PlacementFootprint value="Footprint6x6"/>
+        <Footprint value="Footprint4x4DepotContour"/>
+        <PlacementFootprint value="Footprint4x4Depot"/>
+    </CUnit>
+    <CUnit id="SupplyDepotLowered">
+        <Footprint value="Footprint4x4Underground"/>
     </CUnit>
     <CUnit id="Thor">
         <Radius value="3"/>
@@ -763,6 +801,45 @@
         <!-- Stock MengskWraithA and MengskWraithG: removed on create, as
              for SCOBAMutalisk. -->
         <WeaponArray Link="SCOBAWraithA"/>
+    </CUnit>
+    <!-- Alt+3/Alt+4 test bodies (systems/hero_switch). The Wraith: stock
+         MengskWraith, height x2, speed 16 (operator 2026-11-18, lowered
+         from the air creeps' 22.5), acceleration as the map's SCOBAWraith,
+         with the SCOBA toggles so TPS works. No User1: air creeps ignore it. -->
+    <!-- Alt+4 hero (operator 2026-11-18): a Viking in flight mode, not a
+         Wraith. Its own morph pair (AbilData SCOBAHero*Mode) lands it as
+         SCOBAVikingHeroAssault and lifts it back to SCOBAVikingHero, so the
+         air speed 12 holds after lift-off (operator 2026-11-18: 16, then 12).
+         Stock slot 3 is AssaultMode. -->
+    <CUnit id="SCOBAVikingHero" parent="VikingFighter">
+        <Height value="7.5"/>
+        <Speed value="12"/>
+        <Acceleration value="15.75"/>
+        <AbilArray index="3" Link="SCOBAHeroAssaultMode"/>
+        <AbilArray Link="SCOBAAutoAttackStatus"/>
+        <AbilArray Link="SCOBAAutoAttackToggle"/>
+        <AbilArray Link="SCOBARightClickToggle"/>
+        <AbilArray Link="SCOBATPSToggle"/>
+        <CardLayouts index="0">
+            <LayoutButtons index="5" Face="AssaultMode" Type="AbilCmd" AbilCmd="SCOBAHeroAssaultMode,Execute" Row="2" Column="1"/>
+        </CardLayouts>
+    </CUnit>
+    <!-- Landed hero Viking. Stock slot 3 is FighterMode. Slow turns, also
+         in place (operator 2026-11-18; stock in-place rate 999.8). Script
+         turns follow these rates too (systems/turn_rate). -->
+    <CUnit id="SCOBAVikingHeroAssault" parent="VikingAssault">
+        <!-- Operator 2026-11-18: stock VikingAssault 2.25 + 25 %. -->
+        <Speed value="2.8125"/>
+        <TurningRate value="90"/>
+        <StationaryTurningRate value="90"/>
+        <AbilArray index="3" Link="SCOBAHeroFighterMode"/>
+        <AbilArray Link="SCOBAAutoAttackStatus"/>
+        <AbilArray Link="SCOBAAutoAttackToggle"/>
+        <AbilArray Link="SCOBARightClickToggle"/>
+        <AbilArray Link="SCOBATPSToggle"/>
+        <CardLayouts index="0">
+            <LayoutButtons index="5" Face="FighterMode" Type="AbilCmd" AbilCmd="SCOBAHeroFighterMode,Execute" Row="2" Column="0"/>
+        </CardLayouts>
     </CUnit>
     <!-- SCOBAWraithA keeps the stock launch effects, so its missiles are the
          stock ammo units (swarm.sc2campaign). Their mover is set to

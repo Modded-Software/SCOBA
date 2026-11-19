@@ -58,7 +58,7 @@ def check_footfall_fx(map_dir: Path) -> None:
     """Every footfall unit (scripts/footfall/fx.py): attach points on the foot
     bones, a footstep event per foot, and every actor, model, sound and
     filter the unit actor refers to."""
-    from footfall.fx import FOOTFALL_UNITS, event_name, m3
+    from footfall.fx import FOOTFALL_UNITS, FX_STATUS, STATUS, event_name, m3
 
     data = map_dir / "Base.SC2Data" / "GameData"
     models = ET.parse(data / "ModelData.xml").getroot()
@@ -86,24 +86,54 @@ def check_footfall_fx(map_dir: Path) -> None:
             fail(f"{u} attach point addon count mismatch")
         if len(model.absoluteInverseBoneRestPositions) != len(model.bones):
             fail(f"{u} rest pose count mismatch")
-        cmodel = models.find(f"CModel[@id='{u}']")
+        cmodel = models.find(f"CModel[@id='{spec.model_id}']")
         names = {e.find("Name").get("value") for e in cmodel.findall("Events")} if cmodel is not None else set()
         for i in range(len(spec.feet)):
             if event_name(i) not in names:
-                fail(f"CModel {u} has no {event_name(i)} event")
+                fail(f"CModel {spec.model_id} has no {event_name(i)} event")
         for kind in ("Dust", "Splash", "Ripple"):
             if models.find(f"CModel[@id='{u}Foot{kind}']") is None:
                 fail(f"missing CModel {u}Foot{kind}")
         if sounds.find(f"CSound[@id='{u}Footstep']") is None:
             fail(f"missing CSound {u}Footstep")
-        unit_actor = actors.find(f"CActorUnit[@id='{u}']")
-        if unit_actor is None:
-            fail(f"missing CActorUnit {u}")
         defined = {e.get("id") for e in actors}
-        for on in unit_actor.findall("On"):
-            send = on.get("Send", "")
-            if send.startswith("Create ") and send.split(" ", 1)[1] not in defined:
-                fail(f"{u} creates undefined actor {send.split(' ', 1)[1]}")
+        for actor in spec.actor_ids:
+            unit_actor = actors.find(f"CActorUnit[@id='{actor}']")
+            if unit_actor is None:
+                fail(f"missing CActorUnit {actor}")
+            ons = unit_actor.findall("On")
+            for on in ons:
+                send = on.get("Send", "")
+                if send.startswith("Create ") and send.split(" ", 1)[1] not in defined:
+                    fail(f"{actor} creates undefined actor {send.split(' ', 1)[1]}")
+            # Every footfall effect is gated by the script's stomp config:
+            # dust and splash by the ground status, the rest by the fx status.
+            for on in ons:
+                send = on.get("Send", "")
+                if not send.startswith(f"Create {u}Foot"):
+                    continue
+                kind = STATUS if send.startswith((f"Create {u}FootDust", f"Create {u}FootSplash")) else FX_STATUS
+                if f"IsStatus {kind} " not in on.get("Terms", ""):
+                    fail(f"{actor} footfall effect without the {kind} gate: {send}")
+
+
+def double_status_terms(root: ET.Element) -> list[str]:
+    """Actor events with more than one IsStatus term. The engine drops such
+    an event at map load ("Has event without a triggering message"; the
+    footfall dust never played, 2026-11-18)."""
+    bad = []
+    for actor in root:
+        for on in actor.findall("On"):
+            terms = [t.strip() for t in on.get("Terms", "").split(";")]
+            if sum(1 for t in terms if t.lstrip("!").startswith("IsStatus ")) > 1:
+                bad.append(f"{actor.get('id')}: {on.get('Terms')} -> {on.get('Send')}")
+    return bad
+
+
+def check_actor_events(map_dir: Path) -> None:
+    root = ET.parse(map_dir / "Base.SC2Data" / "GameData" / "ActorData.xml").getroot()
+    for line in double_status_terms(root):
+        fail(f"actor event with two IsStatus terms (dropped by the engine): {line}")
 
 
 def check_stamp(map_dir: Path) -> None:

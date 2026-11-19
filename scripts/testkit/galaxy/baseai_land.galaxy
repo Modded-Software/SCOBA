@@ -1,0 +1,259 @@
+// Test harness: baseai group "flight", landing probe. The Alt+4 Viking lands
+// (SCOBAHeroAssaultMode) after Space / Ctrl flight and over other terrain.
+// Raw per 0.125 s through the morph: height above the ground under the
+// unit, the height property, the ground height. Operator report 2026-11-18:
+// the landed model floats; the descent fights the morph animation.
+// scripts/testkit/profiles/baseai_viking.py asserts.
+
+const int c_BL_SAMPLES = 32;          // 4 s at 0.125 s
+const fixed c_BL_SAMPLE = 0.125;
+
+// Terrain probe: on a grid of 32, a Marine's engine z against the height
+// natives. Raw "x,y:marine/ground/air/point/cliff" (x100, cliff as is).
+void gf_BlTerrain (string lp_s) {
+    point lv_lo = RegionGetBoundsMin(RegionPlayableMap());
+    point lv_hi = RegionGetBoundsMax(RegionPlayableMap());
+    string lv_t = "";
+    unit lv_m;
+    point lv_p;
+    fixed lv_x;
+    fixed lv_y;
+
+    UnitCreate(1, "Marine", 0, 1, RegionGetCenter(RegionPlayableMap()), 0.0);
+    lv_m = UnitLastCreated();
+    UnitSetState(lv_m, c_unitStateInvulnerable, true);
+    for (lv_x = PointGetX(lv_lo) + 16.0; lv_x < PointGetX(lv_hi); lv_x += 32.0) {
+        for (lv_y = PointGetY(lv_lo) + 16.0; lv_y < PointGetY(lv_hi); lv_y += 32.0) {
+            lv_p = Point(lv_x, lv_y);
+            if (PointPathingPassable(lv_p)) {
+                UnitSetPosition(lv_m, lv_p, false);
+                Wait(0.0625, c_timeGame);
+                lv_t = lv_t + IntToString(FixedToInt(lv_x)) + "," + IntToString(FixedToInt(lv_y)) + ":";
+                lv_t = lv_t + IntToString(FixedToInt(UnitGetHeight(lv_m) * 100.0)) + "/";
+                lv_t = lv_t + IntToString(FixedToInt(WorldHeight(c_heightMapGround, lv_p) * 100.0)) + "/";
+                lv_t = lv_t + IntToString(FixedToInt(WorldHeight(c_heightMapAir, lv_p) * 100.0)) + "/";
+                lv_t = lv_t + IntToString(FixedToInt(PointGetHeight(lv_p) * 100.0)) + "/";
+                lv_t = lv_t + IntToString(CliffLevel(lv_p)) + " ";
+            }
+        }
+    }
+    UnitRemove(lv_m);
+    BankValueSetFromString(gv_dbgBank, lp_s, "lfTerrain", lv_t);
+}
+
+fixed gf_BlAbove (unit lp_u) {
+    return UnitGetHeight(lp_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lp_u));
+}
+
+// Space (lp_dir 1) or Ctrl (-1) held lp_secs through the flight path.
+void gf_BlFly (int lp_dir, fixed lp_secs) {
+    if (lp_dir == 0) {
+        return;
+    }
+    gv_flightUp[1] = lp_dir > 0;
+    gv_flightDown[1] = lp_dir < 0;
+    gf_FlightDirSet(1);
+    Wait(lp_secs, c_timeGame);
+    gv_flightUp[1] = false;
+    gv_flightDown[1] = false;
+    gf_FlightDirSet(1);
+    Wait(0.5, c_timeGame);
+}
+
+// Engine height trace of one landing order on lp_u, 4 s.
+string gf_BlTrace (unit lp_u, string lp_abil) {
+    string lv_t = "";
+    int lv_i;
+
+    UnitIssueOrder(lp_u, Order(AbilityCommand(lp_abil, 0)), c_orderQueueReplace);
+    for (lv_i = 1; lv_i <= c_BL_SAMPLES; lv_i += 1) {
+        Wait(c_BL_SAMPLE, c_timeGame);
+        lv_t = lv_t + IntToString(FixedToInt(gf_BlAbove(lp_u) * 100.0)) + "/";
+        lv_t = lv_t + IntToString(FixedToInt(UnitGetPropertyFixed(lp_u, c_unitPropHeight, c_unitPropCurrent) * 100.0)) + " ";
+    }
+    return lv_t;
+}
+
+// Start at lp_from, fly (lp_dir, lp_secs), move to lp_to, land, trace, lift.
+void gf_BlLand (string lp_s, string lp_k, point lp_from, point lp_to, int lp_dir, fixed lp_secs) {
+    unit lv_w = gv_heroViking;
+
+    UnitIssueOrder(lv_w, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    UnitSetPosition(lv_w, lp_from, false);
+    Wait(1.0, c_timeGame);
+    gf_BlFly(lp_dir, lp_secs);
+    if (DistanceBetweenPoints(lp_from, lp_to) > 0.5) {
+        UnitIssueOrder(lv_w, OrderTargetingPoint(AbilityCommand("move", 0), lp_to), c_orderQueueReplace);
+        Wait(DistanceBetweenPoints(lp_from, lp_to) / 8.0 + 1.5, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Ground100", FixedToInt(WorldHeight(c_heightMapGround, UnitGetPosition(lv_w)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Pre100", FixedToInt(gf_BlAbove(lv_w) * 100.0));
+    gv_flightLandAbove = -1.0;
+    gv_flightLandRest = -1.0;
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Trace", gf_BlTrace(lv_w, "SCOBAHeroAssaultMode"));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Probe100", FixedToInt(gv_flightLandAbove * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Rest100", FixedToInt(gv_flightLandRest * 100.0));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Type", UnitGetType(lv_w));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Final100", FixedToInt(gf_BlAbove(lv_w) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Prop100", FixedToInt(UnitGetPropertyFixed(lv_w, c_unitPropHeight, c_unitPropCurrent) * 100.0));
+    UnitIssueOrder(lv_w, Order(AbilityCommand("SCOBAHeroFighterMode", 0)), c_orderQueueReplace);
+    Wait(4.0, c_timeGame);
+}
+
+// Stomp (systems/stomp, quake, crush) on the hero Viking. The nearest
+// standing crushable plant to lp_c, at least lp_skip index on; -1 if none.
+int gf_BlPlant (point lp_c, int lp_skip) {
+    int lv_best = -1;
+    fixed lv_d = 1000.0;
+    int lv_i;
+
+    for (lv_i = 0; lv_i < c_CRUSH_COUNT; lv_i += 1) {
+        if (lv_i != lp_skip && !gv_crushGone[lv_i] && DistanceBetweenPoints(lp_c, Point(gv_crushX[lv_i], gv_crushY[lv_i])) < lv_d) {
+            lv_d = DistanceBetweenPoints(lp_c, Point(gv_crushX[lv_i], gv_crushY[lv_i]));
+            lv_best = lv_i;
+        }
+    }
+    return lv_best;
+}
+
+// One stomp case: start 6 west of plant lp_i, walk 12 east through it.
+// Raw: slot, fx sends, the peak camera shake of player 1, plant gone.
+void gf_BlStompWalk (string lp_s, string lp_k, int lp_i) {
+    unit lv_w = gv_heroViking;
+    point lv_p = Point(gv_crushX[lp_i], gv_crushY[lp_i]);
+    fixed lv_peak = 0.0;
+    int lv_fx;
+    int lv_t;
+
+    UnitIssueOrder(lv_w, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    UnitSetPosition(lv_w, PointWithOffset(lv_p, -6.0, 0.0), false);
+    Wait(1.0, c_timeGame);
+    lv_fx = gv_quakeFxSent;
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Type", UnitGetType(lv_w));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Slot", gf_QuakeSlotOf(lv_w));
+    UnitIssueOrder(lv_w, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(lv_p, 6.0, 0.0)), c_orderQueueReplace);
+    for (lv_t = 1; lv_t <= 64; lv_t += 1) {
+        Wait(0.0625, c_timeGame);
+        lv_peak = MaxF(lv_peak, AbsF(gv_quakeHeight[1]));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Moved100", FixedToInt(DistanceBetweenPoints(PointWithOffset(lv_p, -6.0, 0.0), UnitGetPosition(lv_w)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "FxSent", gv_quakeFxSent - lv_fx);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Shake10k", FixedToInt(lv_peak * 10000.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "Crushed", gv_crushGone[lp_i]);
+}
+
+void gf_BlStomp (string lp_s) {
+    point lv_c = RegionGetCenter(RegionPlayableMap());
+    int lv_a = gf_BlPlant(lv_c, -1);
+    int lv_b;
+    int lv_n;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, "stRow", gf_StompIndex("SCOBAVikingHeroAssault"));
+    if (lv_a < 0) {
+        return;
+    }
+    lv_b = gf_BlPlant(Point(gv_crushX[lv_a], gv_crushY[lv_a]) , lv_a);
+    lv_n = gf_BlPlant(Point(gv_crushX[lv_b] + 30.0, gv_crushY[lv_b]), lv_a);
+    // Flying: not a stomp row. No slot, no shake, no crush.
+    gf_BlStompWalk(lp_s, "stFly", lv_a);
+    // Landed, default config: slot, fx on, shake, crush.
+    UnitIssueOrder(gv_heroViking, Order(AbilityCommand("SCOBAHeroAssaultMode", 0)), c_orderQueueReplace);
+    Wait(4.0, c_timeGame);
+    gf_BlStompWalk(lp_s, "stLand", lv_b);
+    // Landed, all off by call: no fx sends, no shake, no crush.
+    gf_StompConfig("SCOBAVikingHeroAssault", false, 2.5, 0.0, 1.0, false);
+    if (lv_n == lv_b) {
+        lv_n = gf_BlPlant(lv_c, lv_b);
+    }
+    gf_BlStompWalk(lp_s, "stOff", lv_n);
+    gf_StompDefaults();
+    UnitIssueOrder(gv_heroViking, Order(AbilityCommand("SCOBAHeroFighterMode", 0)), c_orderQueueReplace);
+    Wait(4.0, c_timeGame);
+    // Lifted again: the slot is freed.
+    BankValueSetFromInt(gv_dbgBank, lp_s, "stLiftSlot", gf_QuakeSlotOf(gv_heroViking));
+}
+
+// Facing change of lp_u from lp_f0, degrees (0-180).
+int gf_BlTurned (unit lp_u, fixed lp_f0) {
+    return FixedToInt(AbsF(ModF(UnitGetFacing(lp_u) - lp_f0 + 540.0, 360.0) - 180.0));
+}
+
+// Turn rate (operator 2026-11-18: slow, also in place). Engine: a move
+// order straight behind, 0.5 s and 3 s. Script: gf_UnitTurn by 180.
+void gf_BlTurn (string lp_s, string lp_k) {
+    unit lv_w = gv_heroViking;
+    fixed lv_f;
+
+    UnitIssueOrder(lv_w, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(1.0, c_timeGame);
+    lv_f = UnitGetFacing(lv_w);
+    UnitIssueOrder(lv_w, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(lv_w), 12.0, lv_f + 180.0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Order05", gf_BlTurned(lv_w, lv_f));
+    Wait(2.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Order3", gf_BlTurned(lv_w, lv_f));
+    UnitIssueOrder(lv_w, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    lv_f = UnitGetFacing(lv_w);
+    gf_UnitTurn(lv_w, lv_f + 180.0, 0.0);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Script05", gf_BlTurned(lv_w, lv_f));
+    Wait(2.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Script3", gf_BlTurned(lv_w, lv_f));
+}
+
+// Footfall actors: baseai_feel.galaxy gf_BeFxSeen (ActorGetText).
+
+// Landing impact (systems/stomp_land) of one order: fired count, wait to
+// touchdown, peak camera shake of player 1 over 1.5 s after the order + 3 s.
+void gf_BlImpact (string lp_s, string lp_k, string lp_abil) {
+    int lv_f = gv_stompLandFired;
+    fixed lv_peak = 0.0;
+    int lv_t;
+
+    gv_stompLandWaited = -1.0;
+    UnitIssueOrder(gv_heroViking, Order(AbilityCommand(lp_abil, 0)), c_orderQueueReplace);
+    for (lv_t = 1; lv_t <= 72; lv_t += 1) {
+        Wait(0.0625, c_timeGame);
+        lv_peak = MaxF(lv_peak, AbsF(gv_quakeHeight[1]));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Fired", gv_stompLandFired - lv_f);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Waited100", FixedToInt(gv_stompLandWaited * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Shake10k", FixedToInt(lv_peak * 10000.0));
+}
+
+void gf_BlFeel (string lp_s) {
+    point lv_c = RegionGetCenter(RegionPlayableMap());
+
+    UnitIssueOrder(gv_heroViking, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    UnitSetPosition(gv_heroViking, lv_c, false);
+    Wait(1.0, c_timeGame);
+    gf_BlTurn(lp_s, "tnFly");
+    gf_BlImpact(lp_s, "imLand", "SCOBAHeroAssaultMode");
+    gf_BlTurn(lp_s, "tnLand");
+    gf_BlImpact(lp_s, "imLift", "SCOBAHeroFighterMode");
+    // All off by call: no shake.
+    gf_StompLandConfig("SCOBAHeroAssaultMode", 0.0, 0, 0.0, 0.0, 0.0, 0.0, "");
+    gf_BlImpact(lp_s, "imOff", "SCOBAHeroAssaultMode");
+    gf_StompLandDefaults();
+    UnitIssueOrder(gv_heroViking, Order(AbilityCommand("SCOBAHeroFighterMode", 0)), c_orderQueueReplace);
+    Wait(4.0, c_timeGame);
+}
+
+void gf_BlLandGroup (string lp_s) {
+    point lv_c = RegionGetCenter(RegionPlayableMap());
+
+    // The engine ground is flat (the build drops t3SyncHeightMap; run
+    // 20261118-145950: Marine z, ground, cliff equal at 52 points). Raw only.
+    gf_BlTerrain(lp_s);
+    gf_BlLand(lp_s, "lfFlat0", lv_c, lv_c, 0, 0.0);
+    gf_BlLand(lp_s, "lfFlatUp", lv_c, lv_c, 1, 1.0);
+    gf_BlLand(lp_s, "lfMove", lv_c, PointWithOffset(lv_c, 40.0, 0.0), 1, 1.0);
+    gf_BlLand(lp_s, "lfDown", lv_c, lv_c, -1, 1.0);
+    // Control: a stock Viking's own landing trace (the morph's shape).
+    UnitCreate(1, "VikingFighter", 0, 1, PointWithOffset(lv_c, 6.0, 0.0), 0.0);
+    BankValueSetFromString(gv_dbgBank, lp_s, "lfStockTrace", gf_BlTrace(UnitLastCreated(), "AssaultMode"));
+    UnitRemove(UnitLastCreated());
+    gf_BlStomp(lp_s);
+    gf_BlFeel(lp_s);
+}

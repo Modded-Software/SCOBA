@@ -39,7 +39,7 @@ class TableTest(unittest.TestCase):
             self.assertEqual(S.check(Path(tmp)), [])
 
     def test_lengths(self) -> None:
-        self.assertAlmostEqual(S.LOOP_LENGTH, 69.0)  # S8 jungle and S9 8 s (operator 2026-11-17)
+        self.assertAlmostEqual(S.LOOP_LENGTH, 72.5)  # S7 7 s, S8 7.5 s (operator 2026-11-18)
         for shot in S.SHOTS:
             self.assertGreaterEqual(shot.length, 3.0, shot.name)
         self.assertLessEqual(S.ZOOM.length, 0.4)  # R-INTRO-10
@@ -226,10 +226,12 @@ class TerrainTest(unittest.TestCase):
         bad = s7._replace(pitch0=-60, pitch1=-60, z0=0.5, z1=0.5, dist0=30, dist1=30)
         self.assertLess(self.clearance(bad, False), CLEARANCE)
 
-    def test_s4_looks_from_the_bramble_at_the_hybrid(self) -> None:
+    def test_s4_eye_at_the_operator_point(self) -> None:
+        # Eye exactly at (193.5, 164.5, 10.2), looking at the Hybrid (2026-11-18).
         s4 = next(s for s in S.SHOTS if s.name.startswith("S4"))
-        bx, by = S.BRAMBLE
-        ez = self.surface(bx, by) + 1.0
+        bx, by = S.S4_EYE
+        self.assertAlmostEqual(self.ground(s4.x0, s4.y0), S.S4_GROUND, delta=0.05)
+        ez = S.S4_EYE_Z
         tz = self.ground(s4.x0, s4.y0) + s4.z0
         dx, dy = s4.x0 - bx, s4.y0 - by
         flat = math.hypot(dx, dy)

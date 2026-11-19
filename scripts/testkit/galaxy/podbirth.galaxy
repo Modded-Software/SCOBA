@@ -116,11 +116,12 @@ void gf_PbDrop () {
     BankValueSetFromInt(gv_dbgBank, lv_s, "camBase100", FixedToInt(c_SCOBA_CAMERA_HEIGHT_OFFSET * 100.0));
     UnitKill(gv_heroTosh);
     Wait(c_DROP_TICK, c_timeGame);
-    // A yaw that is not the default: the pod facing must follow it.
+    // A yaw off the drop yaw: the drop must not follow it (fixed c_DROP_YAW).
     CameraSetValue(1, c_cameraValueYaw, 135.0, 0.0, 0.0, 0.0);
     Wait(c_DROP_TICK, c_timeGame);
     BankValueSetFromInt(gv_dbgBank, lv_s, "yawBefore100", FixedToInt(CameraGetYaw(1) * 100.0));
-    gf_HeroDropStart(1);
+    gf_HeroDropStart(1, gf_DropPodPoint(gv_sPAWNLOCATIONS[1], null, null));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "dropYaw100", FixedToInt(c_DROP_YAW * 100.0));
     BankValueSetFromInt(gv_dbgBank, lv_s, "travel100", FixedToInt(gv_dropTravel[1] * 100.0));
     lv_pod = gv_dropPod[1];
     BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(lv_pod));

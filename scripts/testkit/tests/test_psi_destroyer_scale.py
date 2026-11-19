@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from project_root import project_root
-from spore_scale import (
+from mapgen.spore_scale import (
     PSI_DESTROYER_MARKER,
     PSI_DESTROYER_SCALE,
     PSI_DESTROYER_UNITS,
@@ -128,7 +128,7 @@ class BuiltMapTest(unittest.TestCase):
     @unittest.skipUnless(BUILT_OBJECTS.is_file(), "built map is absent")
     def test_built_units_outside_the_step_keep_source_scale(self) -> None:
         # Spores have their own scale step, so they are excluded here.
-        from spore_scale import SPORE_UNITS
+        from mapgen.spore_scale import SPORE_UNITS
 
         source = unit_scales(SRC_OBJECTS.read_text(encoding="utf-8"))
         built = unit_scales(BUILT_OBJECTS.read_text(encoding="utf-8"))

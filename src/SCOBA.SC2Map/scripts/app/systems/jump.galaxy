@@ -458,6 +458,14 @@ bool gt_JumpKey_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
+    // A flyer has no jump: Space climbs (systems/flight).
+    if (gf_FlightIs(EventPlayer())) {
+        return true;
+    }
     gf_JumpPress(EventPlayer());
     return true;
 }

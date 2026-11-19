@@ -1,4 +1,6 @@
-// Ground shake ("seismic waves") from walking crushers (Goliath, Queen).
+// Ground shake ("seismic waves") from walking units of the stomp table
+// (systems/stomp, gf_StompConfig: gain and step rate per type), and their
+// footfall effect switch (actor status ScobaFootFx) and water state.
 // Every crusher adds a stepped wave to each hero player's camera: height jolt
 // plus a jagged roll. Amplitude grows with the unit's size and current speed
 // and falls off with distance to that player's hero, to 0 at a range that
@@ -13,7 +15,7 @@ const fixed c_QUAKE_ROLL_PER_HEIGHT = 8.0;    // degrees of roll per unit of jol
 // Operator 2026-11-16: one shake per footfall (1 Hz). Each shake is a fast
 // vibration that fades out: the sign flips every tick (8 Hz, the fastest the
 // 16 Hz tick allows) and the size drops by c_QUAKE_STEP_DECAY per tick.
-const fixed c_QUAKE_STEP_HZ = 1.0;            // footfalls per second at full speed
+// Footfalls per second: per type, gv_stompStepHz (systems/stomp).
 const fixed c_QUAKE_STEP_DECAY = 0.6;         // share kept each tick (fade-out)
 const fixed c_QUAKE_STEP_SHIFT = 0.5;         // operator: walker shake was half a step out of phase
 const fixed c_QUAKE_HEIGHT_MAX = 0.06;
@@ -57,11 +59,17 @@ fixed gf_QuakeMove (unit lp_u) {
 
 // One footfall, -1..1: a hard jolt on the footfall tick, then a vibration
 // that flips sign every tick and fades by c_QUAKE_STEP_DECAY per tick.
-fixed gf_QuakeStep (fixed lp_cycles) {
+// lp_hz: footfalls per second at full speed.
+fixed gf_QuakeStep (fixed lp_cycles, fixed lp_hz) {
     fixed lv_frac = lp_cycles - IntToFixed(FixedToInt(lp_cycles));
-    int lv_tick = FixedToInt(lv_frac / (c_QUAKE_PERIOD * c_QUAKE_STEP_HZ));
+    int lv_tick;
     fixed lv_level = 1.0;
     int lv_k;
+
+    if (lp_hz <= 0.0) {
+        return 0.0;
+    }
+    lv_tick = FixedToInt(lv_frac / (c_QUAKE_PERIOD * lp_hz));
 
     for (lv_k = 0; lv_k < lv_tick; lv_k += 1) {
         lv_level *= -c_QUAKE_STEP_DECAY;
@@ -77,12 +85,17 @@ fixed gf_QuakeSide (fixed lp_cycles) {
     return -1.0;
 }
 
-// Crusher registry. A Goliath or Queen gets a slot when first seen alive and
-// loses it on its death event (gt_QuakeDeath), so a dead unit never shakes.
-// Each slot keeps its own step phase, advanced once per tick by the unit's
-// speed, so a speed change never skips or repeats a footfall.
+// Walker registry. A unit of a stomp row gets a slot when first seen alive
+// and loses it on its death event (gt_QuakeDeath), or when its type is no
+// longer the row's (a morph, e.g. the hero Viking lifting off), so a dead or
+// morphed unit never shakes. Each slot keeps its own step phase, advanced
+// once per tick by the unit's speed, so a speed change never skips or
+// repeats a footfall.
 const int c_QUAKE_UNITS = 64;
+const fixed c_QUAKE_STATUS_PERIOD = 0.5;  // actor statuses re-sent (a morph makes a new actor)
 unit[c_QUAKE_UNITS] gv_quakeUnit;
+int[c_QUAKE_UNITS] gv_quakeRow;           // stomp row (systems/stomp)
+fixed[c_QUAKE_UNITS] gv_quakeStatusAt;
 fixed[c_QUAKE_UNITS] gv_quakePhase;
 fixed[c_QUAKE_UNITS] gv_quakeMoveNow;
 trigger gt_QuakeDeath;
@@ -102,8 +115,14 @@ int gf_QuakeSlotOf (unit lp_u) {
     return -1;
 }
 
-void gf_QuakeRegisterType (string lp_type) {
-    unitgroup lv_g = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+// Frees slot lp_s.
+void gf_QuakeFree (int lp_s) {
+    gv_quakeUnit[lp_s] = null;
+    gv_quakeMoveNow[lp_s] = 0.0;
+}
+
+void gf_QuakeRegisterType (int lp_row) {
+    unitgroup lv_g = UnitGroup(gv_stompType[lp_row], c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
     int lv_n = UnitGroupCount(lv_g, c_unitCountAll);
     int lv_i;
     int lv_s;
@@ -119,7 +138,9 @@ void gf_QuakeRegisterType (string lp_type) {
             return;  // registry full
         }
         gv_quakeUnit[lv_s] = lv_u;
-        gv_quakeWet[lv_s] = false;  // the actor starts with ScobaInWater 0
+        gv_quakeRow[lv_s] = lp_row;
+        gv_quakeStatusAt[lv_s] = 0.0;  // statuses go out on the first advance
+        gv_quakeWet[lv_s] = false;  // the actor starts with ScobaFootGround 0 (off)
         gv_quakeRippleAt[lv_s] = 0.0;
         // Own start phase per unit (from its tag), so units do not step in sync.
         gv_quakePhase[lv_s] = IntToFixed(ModI(UnitGetTag(lv_u), 100)) / 100.0;
@@ -132,8 +153,7 @@ bool gt_QuakeDeath_Func (bool testConds, bool runActions) {
     if (!runActions || (lv_s < 0)) {
         return true;
     }
-    gv_quakeUnit[lv_s] = null;
-    gv_quakeMoveNow[lv_s] = 0.0;
+    gf_QuakeFree(lv_s);
     gv_quakeRemoved += 1;
     return true;
 }
@@ -144,7 +164,7 @@ bool gt_QuakeDeath_Func (bool testConds, bool runActions) {
 // script-timed version lagged the feet. The engine's water detection never
 // fired for these units, so the script decides "in water" (generated water
 // rects in data/flora_crush.galaxy, ground below the surface), sets the actor
-// status ScobaInWater, and signals idle ripples ("Signal ScobaRipple": the
+// status ScobaFootGround, and signals idle ripples ("Signal ScobaRipple": the
 // actor creates one ripple per foot). Unit-agnostic: any registered crusher.
 const fixed c_WATER_RIPPLE_MIN = 0.4;  // seconds between ripples per foot
 const fixed c_WATER_RIPPLE_MAX = 0.8;
@@ -246,21 +266,37 @@ bool gf_QuakeFootprintInWater (unit lp_u) {
     return true;
 }
 
-// Footfall splashes use the centre test (ScobaInWater); idle ripples need
-// water above the ground under the whole footprint (operator 2026-11-16:
-// ripples showed on dry ground and where the water is below the ground).
+// Dust / splash gate: actor status ScobaFootGround, 0 effects off, 1 dry
+// ground (dust), 2 in water (splash). One status for both conditions: the
+// engine drops an actor event with two IsStatus terms (scripts/footfall/fx.py).
+const int c_FOOT_GROUND_OFF = 0;
+const int c_FOOT_GROUND_DRY = 1;
+const int c_FOOT_GROUND_WET = 2;
+int gv_quakeGroundLast = -1;  // last ScobaFootGround value sent, for tests
+
+void gf_QuakeGroundSend (int lp_s, actor lp_a) {
+    int lv_g = c_FOOT_GROUND_OFF;
+
+    if (gv_stompFx[gv_quakeRow[lp_s]]) {
+        lv_g = c_FOOT_GROUND_DRY;
+        if (gv_quakeWet[lp_s]) {
+            lv_g = c_FOOT_GROUND_WET;
+        }
+    }
+    ActorSend(lp_a, "StatusSet ScobaFootGround " + IntToString(lv_g));
+    gv_quakeGroundLast = lv_g;
+}
+
+// Footfall splashes use the centre test; idle ripples need water above the
+// ground under the whole footprint (operator 2026-11-16: ripples showed on
+// dry ground and where the water is below the ground).
 void gf_QuakeWater (int lp_s, unit lp_u) {
     actor lv_a = libNtve_gf_MainActorofUnit(lp_u);
     bool lv_wet = gf_QuakeInWater(UnitGetPosition(lp_u));
 
     if (lv_wet != gv_quakeWet[lp_s]) {
         gv_quakeWet[lp_s] = lv_wet;
-        if (lv_wet) {
-            ActorSend(lv_a, "StatusSet ScobaInWater 1");
-        }
-        else {
-            ActorSend(lv_a, "StatusSet ScobaInWater 0");
-        }
+        gf_QuakeGroundSend(lp_s, lv_a);
     }
     if (!lv_wet || (GameGetMissionTime() < gv_quakeRippleAt[lp_s])) {
         return;
@@ -273,26 +309,55 @@ void gf_QuakeWater (int lp_s, unit lp_u) {
     gv_quakeRipples += 1;
 }
 
-// Once per tick: register new crushers, drop invalid ones, advance phases.
+// Footfall effect switch and water state on the unit's current actor,
+// re-sent every c_QUAKE_STATUS_PERIOD: a morph creates a new actor, which
+// starts with both statuses 0 (scripts/footfall/fx.py).
+int gv_quakeFxSent;  // ScobaFootFx 1 sends, for tests
+
+void gf_QuakeStatus (int lp_s, unit lp_u) {
+    actor lv_a;
+
+    if (GameGetMissionTime() < gv_quakeStatusAt[lp_s]) {
+        return;
+    }
+    gv_quakeStatusAt[lp_s] = GameGetMissionTime() + c_QUAKE_STATUS_PERIOD;
+    lv_a = libNtve_gf_MainActorofUnit(lp_u);
+    if (gv_stompFx[gv_quakeRow[lp_s]]) {
+        ActorSend(lv_a, "StatusSet ScobaFootFx 1");
+        gv_quakeFxSent += 1;
+    }
+    else {
+        ActorSend(lv_a, "StatusSet ScobaFootFx 0");
+    }
+    gf_QuakeGroundSend(lp_s, lv_a);
+}
+
+// Once per tick: register new walkers, drop dead or morphed ones, advance phases.
 void gf_QuakeAdvance () {
     int lv_s;
+    int lv_r;
     unit lv_u;
 
-    gf_QuakeRegisterType("Goliath");
-    gf_QuakeRegisterType("Queen");
+    for (lv_r = 0; lv_r < gv_stompCount; lv_r += 1) {
+        gf_QuakeRegisterType(lv_r);
+    }
     for (lv_s = 0; lv_s < c_QUAKE_UNITS; lv_s += 1) {
         lv_u = gv_quakeUnit[lv_s];
         if (lv_u == null) {
             continue;
         }
         if (!UnitIsAlive(lv_u)) {
-            gv_quakeUnit[lv_s] = null;  // backstop if the death event was missed
-            gv_quakeMoveNow[lv_s] = 0.0;
+            gf_QuakeFree(lv_s);  // backstop if the death event was missed
+            continue;
+        }
+        if (UnitGetType(lv_u) != gv_stompType[gv_quakeRow[lv_s]]) {
+            gf_QuakeFree(lv_s);  // morphed out of its row
             continue;
         }
         gf_QuakeWater(lv_s, lv_u);
+        gf_QuakeStatus(lv_s, lv_u);
         gv_quakeMoveNow[lv_s] = gf_QuakeMove(lv_u);
-        gv_quakePhase[lv_s] += c_QUAKE_PERIOD * c_QUAKE_STEP_HZ * gv_quakeMoveNow[lv_s];
+        gv_quakePhase[lv_s] += c_QUAKE_PERIOD * gv_stompStepHz[gv_quakeRow[lv_s]] * gv_quakeMoveNow[lv_s];
     }
 }
 
@@ -308,11 +373,11 @@ void gf_QuakeAddUnits (int lp_p, point lp_at) {
         if (lv_u == null) {
             continue;
         }
-        lv_amp = gf_QuakeAmp(DistanceBetweenPoints(lp_at, UnitGetPosition(lv_u)), UnitGetPropertyFixed(lv_u, c_unitPropRadius, c_unitPropCurrent), gv_quakeMoveNow[lv_s]);
+        lv_amp = gv_stompShake[gv_quakeRow[lv_s]] * gf_QuakeAmp(DistanceBetweenPoints(lp_at, UnitGetPosition(lv_u)), UnitGetPropertyFixed(lv_u, c_unitPropRadius, c_unitPropCurrent), gv_quakeMoveNow[lv_s]);
         if (lv_amp <= 0.0) {
             continue;
         }
-        lv_step = lv_amp * gf_QuakeStep(gv_quakePhase[lv_s] + c_QUAKE_STEP_SHIFT);
+        lv_step = lv_amp * gf_QuakeStep(gv_quakePhase[lv_s] + c_QUAKE_STEP_SHIFT, gv_stompStepHz[gv_quakeRow[lv_s]]);
         gv_quakeHeight[lp_p] += lv_step;
         gv_quakeRoll[lp_p] += c_QUAKE_ROLL_PER_HEIGHT * lv_step * gf_QuakeSide(gv_quakePhase[lv_s] + c_QUAKE_STEP_SHIFT);
     }
@@ -386,8 +451,12 @@ bool gt_QuakeTick_Func (bool testConds, bool runActions) {
     }
     gf_QuakeAdvance();
     for (lv_p = 1; lv_p < c_QUAKE_PLAYERS; lv_p += 1) {
+        // Input hold of this player (systems/input_hold).
+        if (gf_InputHeld(lv_p)) {
+            continue;
+        }
         // Players with a hero only; no player-type gate (it skipped the operator's slot).
-        if ((PlayerStatus(lv_p) != c_playerStatusActive) || (gv_tPSUNIT[lv_p] == null)) {
+        if ((PlayerStatus(lv_p) != c_playerStatusActive) || !UnitIsValid(gv_tPSUNIT[lv_p])) {
             continue;
         }
         // CameraGetTarget is not the TPS camera (read 108+ next to a Goliath); the hero is.

@@ -1,7 +1,7 @@
 // Module: systems/medic
 
 void gf_MedicSpawn (int lp_player) {
-    if (!gf_IsHeroPlayer(lp_player)) {
+    if (!gf_RosterPlayed(lp_player)) {
         return;
     }
     if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
@@ -9,6 +9,9 @@ void gf_MedicSpawn (int lp_player) {
     }
     libNtve_gf_CreateUnitsWithDefaultFacing(1, "Medic", 0, lp_player, PointWithOffset(UnitGetPosition(gv_tPSUNIT[lp_player]), 2.0, 2.0));
     gv_sCOBAMedic[lp_player] = UnitLastCreated();
+    if (gf_BaseAiIsAiPlayer(lp_player)) {
+        gf_BaseAiExclude(gv_sCOBAMedic[lp_player]);
+    }
     UnitIssueOrder(gv_sCOBAMedic[lp_player], OrderTargetingUnit(AbilityCommand("move", 0), gv_tPSUNIT[lp_player]), c_orderQueueReplace);
 }
 

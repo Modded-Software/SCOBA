@@ -42,6 +42,11 @@ bool gt_StandBehaviorChange_Func (bool testConds, bool runActions) {
     if (lv_player < c_SCOBA_HERO_FIRST || lv_player > c_SCOBA_HERO_LAST) {
         return true;
     }
+    // Regular units: Chase is always Move. Stand turned on is undone.
+    if (!gf_UnitIsHero(EventUnit()) && UnitBehaviorCount(EventUnit(), c_SCOBA_STAND_BEHAVIOR) > 0) {
+        gv_chaseRefused[lv_player] += 1;
+        gf_ChaseStandSet(EventUnit(), false);
+    }
     gf_CombatSyncRoot(lv_player);
     return true;
 }

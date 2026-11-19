@@ -17,6 +17,7 @@ from footfall.fx import (
     sound_xml,
     unit_on_xml,
 )
+from validate_assets import double_status_terms
 
 
 class Desc:
@@ -114,7 +115,27 @@ class AddPointsTest(unittest.TestCase):
 class TableTest(unittest.TestCase):
     def test_goliath_two_feet_queen_six(self):
         feet = {spec.unit: len(spec.feet) for spec in FOOTFALL_UNITS}
-        self.assertEqual(feet, {"Goliath": 2, "Queen": 6})
+        self.assertEqual(feet, {"Goliath": 2, "Queen": 6, "VikingHero": 2})
+
+    def test_viking_hero_is_goliath_stomp_on_own_ids(self):
+        goliath, viking = (next(s for s in FOOTFALL_UNITS if s.unit == u) for u in ("Goliath", "VikingHero"))
+        # Goliath's sound files, louder, plus a layered thump; effects larger.
+        self.assertEqual(viking.sound.files, goliath.sound.files)
+        self.assertGreater(viking.sound.volume[0], goliath.sound.volume[1])
+        self.assertEqual(viking.thumps, ("Thor_Land",))
+        self.assertGreater(viking.dust[0], goliath.dust[1])
+        ons = parse('<CActorUnit id="V">' + unit_on_xml(viking, "V") + "</CActorUnit>").find("CActorUnit").findall("On")
+        thumps = [o for o in ons if "FootThump" in o.get("Send")]
+        self.assertEqual(len(thumps), len(viking.feet))
+        self.assertTrue(all("IsStatus ScobaFootFx 1" in o.get("Terms") for o in thumps))
+        defined = {e.get("id") for e in parse(fx_actors_xml(viking))}
+        self.assertLessEqual({o.get("Send").split(" ", 1)[1] for o in thumps}, defined)
+        self.assertEqual(viking.model_id, "VikingAssault")
+        self.assertEqual(viking.actor_ids, ("SCOBAVikingHeroAssault",))
+        # Indexed feet: the stock Left/Right hardpoints are on the arms.
+        self.assertEqual([f.tag for f in viking.feet], ["01", "02"])
+        # Defaults: the name key is the model and actor id.
+        self.assertEqual((goliath.model_id, goliath.actor_ids), ("Goliath", ("Goliath",)))
 
     def test_queen_lighter_and_smaller_than_goliath(self):
         goliath, queen = (next(s for s in FOOTFALL_UNITS if s.unit == u) for u in ("Goliath", "Queen"))
@@ -153,23 +174,47 @@ class XmlTest(unittest.TestCase):
 
     def test_every_created_actor_is_defined(self):
         defined = {e.get("id") for e in parse(fx_actors_xml(self.spec))}
-        ons = parse('<CActorUnit id="Queen">' + unit_on_xml(self.spec) + "</CActorUnit>").find("CActorUnit").findall("On")
+        ons = parse('<CActorUnit id="Queen">' + unit_on_xml(self.spec, "Queen") + "</CActorUnit>").find("CActorUnit").findall("On")
         created = {o.get("Send").split(" ", 1)[1] for o in ons if o.get("Send").startswith("Create ")}
         self.assertTrue(created)
         self.assertLessEqual(created, defined)
 
     def test_splash_only_in_water_dust_only_dry_sound_always(self):
-        ons = parse('<CActorUnit id="Queen">' + unit_on_xml(self.spec) + "</CActorUnit>").find("CActorUnit").findall("On")
+        ons = parse('<CActorUnit id="Queen">' + unit_on_xml(self.spec, "Queen") + "</CActorUnit>").find("CActorUnit").findall("On")
         first = [o for o in ons if f"ModelEventName {event_name(0)}" in o.get("Terms")]
         by_send = {o.get("Send"): o.get("Terms") for o in first}
-        self.assertIn("IsStatus ScobaInWater 1", by_send["Create QueenFootSplash1"])
-        self.assertIn("IsStatus ScobaInWater 0", by_send["Create QueenFootDust1"])
-        self.assertNotIn("IsStatus", by_send["Create QueenFootSound1"])
+        self.assertIn("IsStatus ScobaFootGround 2", by_send["Create QueenFootSplash1"])
+        self.assertIn("IsStatus ScobaFootGround 1", by_send["Create QueenFootDust1"])
+        self.assertNotIn("ScobaFootGround", by_send["Create QueenFootSound1"])
         # Negative: no engine water-material gate (it stopped all splashes).
         self.assertFalse([o for o in ons if "TerrainPhysicsMaterial" in o.get("Terms")])
 
+    def test_every_effect_needs_the_script_switch(self):
+        ons = parse('<CActorUnit id="Queen">' + unit_on_xml(self.spec, "Queen") + "</CActorUnit>").find("CActorUnit").findall("On")
+        effects = [o for o in ons if o.get("Send").startswith("Create QueenFoot")]
+        self.assertEqual(len(effects), 4 * len(self.spec.feet))
+        for o in effects:
+            gate = "IsStatus ScobaFootGround " if ("FootDust" in o.get("Send") or "FootSplash" in o.get("Send")) else "IsStatus ScobaFootFx 1"
+            self.assertIn(gate, o.get("Terms"))
+        # The actor starts with both switches off.
+        starts = {o.get("Send") for o in ons if o.get("Terms") == "ActorCreation"}
+        self.assertIn("StatusSet ScobaFootFx 0", starts)
+        self.assertIn("StatusSet ScobaFootGround 0", starts)
+
+    def test_one_status_term_per_event(self):
+        # The engine drops an event with two IsStatus terms at map load
+        # ("Has event without a triggering message", 2026-11-18).
+        for spec in FOOTFALL_UNITS:
+            root = parse(f'<CActorUnit id="{spec.unit}">' + unit_on_xml(spec, spec.unit) + "</CActorUnit>")
+            self.assertEqual(double_status_terms(root), [], spec.unit)
+
+    def test_double_status_check_finds_a_bad_event(self):
+        bad = parse('<CActorUnit id="X"><On Terms="ModelEvent; IsStatus A 1; IsStatus B 0" Send="Create D"/>'
+                    '<On Terms="ModelEvent; IsStatus A 1" Send="Create E"/></CActorUnit>')
+        self.assertEqual(double_status_terms(bad), ["X: ModelEvent; IsStatus A 1; IsStatus B 0 -> Create D"])
+
     def test_engine_ripples_switched_off(self):
-        ons = parse('<CActorUnit id="Queen">' + unit_on_xml(self.spec) + "</CActorUnit>").find("CActorUnit").findall("On")
+        ons = parse('<CActorUnit id="Queen">' + unit_on_xml(self.spec, "Queen") + "</CActorUnit>").find("CActorUnit").findall("On")
         off = {o.get("Terms") for o in ons if o.get("Send") == "TerrainSquibDeactivate"}
         self.assertEqual(off, {"ActorCreation", "UnitBirth.Queen"})
 

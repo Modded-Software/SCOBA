@@ -10,7 +10,8 @@ sequence. Operator choices the same day:
 - the world is live behind the shots; at 00:00 two creep groups already
   fight at the center X, and only there;
 - letterbox bars, provisional (O-INTRO-2);
-- a Zerus theme plays during the loop, and stops at deploy: no music
+- the SCOBA intro theme plays during the loop and the drop, and stops at
+  touchdown: no music
   after deploy;
 - depth of field on one tracking shot only.
 
@@ -22,7 +23,8 @@ The implementation and the state of each requirement are in
 
 In scope:
 
-- the intro loop for player 1, from map start to SPACE;
+- the intro loop for each played seat (REQ-ROSTER), from map start to
+  that seat's SPACE (operator 2026-11-18: each player has their own);
 - the shot list, its order, timing and camera values;
 - the prompt line;
 - the creep fight at the center X at 00:00;
@@ -32,7 +34,7 @@ In scope:
 
 Out of scope:
 
-- players other than player 1;
+- unplayed seats;
 - a skip or replay option;
 - camera collision with trees and doodads (terrain and water only);
 - the look of each shot: an operator check (section 4).
@@ -56,7 +58,7 @@ Out of scope:
 | ID | Requirement |
 | --- | --- |
 | R-INTRO-1 | At map start the intro MUST run for player 1 before any input. The view opens from black. |
-| R-INTRO-2 | During the intro no game UI MUST show: no engine UI frames, no map dialogs (boss bars, player bars, HUD buttons, order dialog). Letterbox bars MUST show. |
+| R-INTRO-2 | During the intro no game UI MUST show: no engine UI frames, no map dialogs (boss bars, player bars, HUD buttons, order dialog, resources HUD). Letterbox bars MUST show. |
 | R-INTRO-3 | The loop MUST play the shots in table order and restart after the last one, until SPACE. Odd passes MUST play the variant of each shot that has one (reversed move). |
 | R-INTRO-4 | Each shot MUST follow its table row: target, height, yaw, pitch, distance, field of view, length and easing. |
 | R-INTRO-5 | In every shot, at every moment, the eye MUST stay at least 0.5 above the ground or water under it, and the target inside the camera bounds. |
@@ -67,9 +69,10 @@ Out of scope:
 | R-INTRO-10 | SPACE during the loop MUST start a 3 s countdown on the prompt line, one line: "Deploying in 3...", "Deploying in 2...", "Deploying in 1..." (operator 2026-11-17). The loop keeps playing; further SPACE presses are ignored. Then the deploy MUST: hide the prompt; cut to a high view of the hero's drop point and crash-zoom onto it in at most 0.4 s; cut to the hero pod fall of REQ-HERO-DROP (R-DROP-3, R-DROP-4); land it as R-DROP-5. |
 | R-INTRO-11 | The SPACE press that deploys MUST NOT make the hero jump. A second SPACE during the deploy MUST NOT drop a second pod. A reinforcement during the loop MUST NOT drop the hero pod. |
 | R-INTRO-12 | At touchdown the hero MUST stand alive at the pod, bound as R-DROP-6, in the control mode and toggles a game without intro starts with. Letterbox MUST go, the game UI MUST come back as before the intro, input and camera control MUST return to the player. |
-| R-INTRO-13 | At 00:00 one Terran creep group and one Zerg creep group MUST stand at the center X and fight. After the fight the survivors MUST go on along the center lane. No other lane MUST get extra units. |
+| R-INTRO-13 | At 00:00 one Terran creep group and one Zerg creep group MUST start back from the center X, toward their own spawns, so they do not fight at once (operator 2026-11-17). They MUST walk to the X and fight there. After the fight the survivors MUST go on along the center lane. No other lane MUST get extra units. |
 | R-INTRO-14 | The world MUST run during the intro: game clock, spawn timer, waves and fights as without intro. |
-| R-INTRO-15 | A Zerus theme MUST start with the intro. SPACE (deploy) MUST stop it. No music MUST play after deploy. |
+| R-INTRO-15 | The SCOBA intro theme (`res/audio/SCOBA_IntroTheme.wav`) MUST start with the intro. It MUST play on after SPACE, through the countdown, the zoom and the pod fall. The pod's touchdown MUST stop it. No music MUST play after touchdown. Per seat: the music stops for the seat that lands only (changed 2026-11-18 by the operator: was a Zerus theme stopped at SPACE). |
+| R-INTRO-16 | Each played seat MUST have its own intro state, prompt, countdown, camera and deploy. One seat's SPACE, deploy and touchdown MUST NOT change another seat's intro. The world parts (creep seed, center fight) MUST run once per game. |
 
 ## 4. Acceptance
 
@@ -90,7 +93,7 @@ Operator checks. A person judges them; no test claims them.
 
 | ID | Point |
 | --- | --- |
-| O-INTRO-1 | Closed 2026-11-17: the operator chose no music after deploy. The soundtrack stops at SPACE (R-INTRO-15). |
+| O-INTRO-1 | Closed 2026-11-17: the operator chose no music after deploy. Changed 2026-11-18: the soundtrack stops at touchdown (R-INTRO-15). |
 | O-INTRO-2 | Letterbox is provisional. A later choice may drop it. |
 | O-INTRO-3 | Tree and doodad occlusion is not tested (AC-INTRO-2). |
 | O-INTRO-4 | A skip of the loop on later games, and the intro on a hero death, are not asked for. |

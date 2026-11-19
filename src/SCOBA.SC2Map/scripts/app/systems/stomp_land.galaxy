@@ -1,0 +1,116 @@
+// Landing impact, set by call (gf_StompLandConfig): when a unit uses the
+// configured ability (e.g. the hero Viking's SCOBAHeroAssaultMode), the
+// script waits for its touchdown, probed as height above the ground, then
+// plays the crush impact chain (gf_CrushImpactAt) at the unit and around
+// it, a camera shake impulse (gf_QuakeImpulse) and a sound. Operator
+// 2026-11-18: a massive impact and a loud thump when the Viking lands.
+
+const int c_STOMP_LANDS = 8;
+const fixed c_STOMP_LAND_TICK = 0.0625;
+const fixed c_STOMP_LAND_WAIT = 4.0;      // give up when not down by then
+const fixed c_STOMP_LAND_GROUND = 0.05;   // touchdown: height above ground
+const fixed c_STOMP_LAND_VOLUME = 100.0;
+
+string[c_STOMP_LANDS] gv_stompLandAbil;
+fixed[c_STOMP_LANDS] gv_stompLandSize;     // crush chain base scale
+int[c_STOMP_LANDS] gv_stompLandHits;       // extra impacts around the unit
+fixed[c_STOMP_LANDS] gv_stompLandSpread;   // their distance, up to this
+fixed[c_STOMP_LANDS] gv_stompLandRadius;   // shake reach: 12 x this
+fixed[c_STOMP_LANDS] gv_stompLandGain;     // shake strength; 0 = none
+fixed[c_STOMP_LANDS] gv_stompLandLife;     // shake seconds
+string[c_STOMP_LANDS] gv_stompLandSound;   // CSound id; "" = none
+int gv_stompLandCount;
+trigger gt_StompLand;
+int gv_stompLandFired;        // impacts played, for tests
+fixed gv_stompLandWaited;     // seconds from the order to the touchdown, for tests
+
+int gf_StompLandIndex (string lp_abil) {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < gv_stompLandCount; lv_i += 1) {
+        if (gv_stompLandAbil[lv_i] == lp_abil) {
+            return lv_i;
+        }
+    }
+    return -1;
+}
+
+// Adds or replaces the landing impact of ability lp_abil. Returns its row,
+// or -1 if full. lp_size: impact scale (drop pods use 3); lp_hits impacts
+// within lp_spread around the unit; shake as gf_QuakeImpulse.
+int gf_StompLandConfig (string lp_abil, fixed lp_size, int lp_hits, fixed lp_spread, fixed lp_radius, fixed lp_gain, fixed lp_life, string lp_sound) {
+    int lv_i = gf_StompLandIndex(lp_abil);
+
+    if (lv_i < 0) {
+        if (gv_stompLandCount >= c_STOMP_LANDS) {
+            return -1;
+        }
+        lv_i = gv_stompLandCount;
+        gv_stompLandCount += 1;
+        gv_stompLandAbil[lv_i] = lp_abil;
+        TriggerAddEventUnitAbility(gt_StompLand, null, AbilityCommand(lp_abil, 0), c_unitAbilStageExecute, false);
+    }
+    gv_stompLandSize[lv_i] = lp_size;
+    gv_stompLandHits[lv_i] = lp_hits;
+    gv_stompLandSpread[lv_i] = lp_spread;
+    gv_stompLandRadius[lv_i] = lp_radius;
+    gv_stompLandGain[lv_i] = lp_gain;
+    gv_stompLandLife[lv_i] = lp_life;
+    gv_stompLandSound[lv_i] = lp_sound;
+    return lv_i;
+}
+
+// The impact of row lp_r at lp_at.
+void gf_StompLandAt (int lp_r, point lp_at) {
+    int lv_k;
+
+    if (gv_stompLandSize[lp_r] > 0.0) {
+        gf_CrushImpactAt(lp_at, gv_stompLandSize[lp_r]);
+        for (lv_k = 0; lv_k < gv_stompLandHits[lp_r]; lv_k += 1) {
+            gf_CrushImpactAt(PointWithOffsetPolar(lp_at, RandomFixed(0.25, 1.0) * gv_stompLandSpread[lp_r], RandomFixed(0.0, 360.0)), gv_stompLandSize[lp_r]);
+        }
+    }
+    if (gv_stompLandGain[lp_r] > 0.0) {
+        gf_QuakeImpulse(lp_at, gv_stompLandRadius[lp_r], gv_stompLandGain[lp_r], gv_stompLandLife[lp_r]);
+    }
+    if (gv_stompLandSound[lp_r] != "") {
+        SoundPlayAtPointForPlayer(SoundLink(gv_stompLandSound[lp_r], -1), c_maxPlayers, PlayerGroupAll(), lp_at, 0.0, c_STOMP_LAND_VOLUME, 0.0);
+    }
+    gv_stompLandFired += 1;
+}
+
+bool gt_StompLand_Func (bool testConds, bool runActions) {
+    unit lv_u = EventUnit();
+    int lv_r = gf_StompLandIndex(AbilityCommandGetAbility(EventUnitAbility()));
+    fixed lv_t = 0.0;
+
+    if (!runActions || lv_r < 0) {
+        return true;
+    }
+    // Touchdown: the height above the ground under the unit, probed each tick.
+    while (lv_t < c_STOMP_LAND_WAIT) {
+        Wait(c_STOMP_LAND_TICK, c_timeGame);
+        lv_t += c_STOMP_LAND_TICK;
+        if (!UnitIsAlive(lv_u)) {
+            return true;
+        }
+        if (UnitGetHeight(lv_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_u)) <= c_STOMP_LAND_GROUND) {
+            gv_stompLandWaited = lv_t;
+            gf_StompLandAt(lv_r, UnitGetPosition(lv_u));
+            return true;
+        }
+    }
+    return true;
+}
+
+// The map's landings. Operator 2026-11-18: the hero Viking lands with a
+// massive impact and a loud thump, smaller than a drop pod's (pod: scale 3,
+// 6 hits within 8; scale 4 was too large).
+void gf_StompLandDefaults () {
+    gf_StompLandConfig("SCOBAHeroAssaultMode", 1.5, 3, 3.0, 3.0, 3.0, 2.5, "Thor_Land");
+}
+
+void gt_StompLand_Init () {
+    gt_StompLand = TriggerCreate("gt_StompLand_Func");
+    gf_StompLandDefaults();
+}

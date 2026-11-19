@@ -130,7 +130,7 @@ const fixed c_ANIM_MOVE_TURN_DURATION = 0.01;
 const string c_SCOBA_TPS_BEHAVIOR = "SCOBATPSBehavior";
 const fixed c_SCOBA_REST_FOV = 75.0;
 const fixed c_SCOBA_ZOOM_FOV = 25.0;
-// In-game DOF (REQ-CAMERA-DOF, systems/camera.galaxy).
+// In-game DOF (REQ-CAMERA-DOF, systems/camera/camera.galaxy).
 const fixed c_CAM_DOF_NEAR_MIN_ARM = 1.0;   // near DOF 0 here (R-DOF-1)
 const fixed c_CAM_DOF_FAR_MIN_ARM = 3.0;    // far DOF 0 below this (R-DOF-3)
 const fixed c_CAM_DOF_MAX_ARM = 40.0;       // max zoom: full strength

@@ -48,12 +48,14 @@ int gf_ItTriggersOn () {
     return lv_n;
 }
 
-int gf_ItTriggersKept () {
+// The gated triggers (gf_IntroTrigger): all stay on with the per-player
+// hold (core/input_hold); none is disabled.
+int gf_ItTriggersAll () {
     int lv_i;
     int lv_n = 0;
 
     for (lv_i = 0; lv_i < c_INTRO_TRIGGERS; lv_i += 1) {
-        if (gf_IntroTrigger(lv_i) != null && gv_introTriggerKept[lv_i]) {
+        if (gf_IntroTrigger(lv_i) != null) {
             lv_n += 1;
         }
     }
@@ -67,7 +69,7 @@ int gf_ItDialogMask () {
     int lv_mask = 0;
 
     for (lv_i = 0; lv_i < c_INTRO_DIALOGS; lv_i += 1) {
-        lv_d = gf_IntroDialog(lv_i);
+        lv_d = gf_IntroDialog(1, lv_i);
         if (lv_d != c_invalidDialogId && DialogIsVisible(lv_d, 1)) {
             lv_mask = lv_mask | (1 << lv_i);
         }
@@ -80,7 +82,7 @@ int gf_ItDialogsKept () {
     int lv_n = 0;
 
     for (lv_i = 0; lv_i < c_INTRO_DIALOGS; lv_i += 1) {
-        if (gv_introDialogKept[lv_i]) {
+        if (gv_introDialogKept[1][lv_i]) {
             lv_n += 1;
         }
     }
@@ -121,25 +123,28 @@ void gf_ItSnap (string lp_s, string lp_t) {
     unit lv_hero = gv_heroActive;
 
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Ms", gf_ItMs());
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "State", gv_introState);
-    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Active", gv_introActive);
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Shot", gv_introShot);
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Pass", gv_introPass);
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Cuts", gv_introCuts);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "State", gv_introState[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Active", gv_introActive[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Shot", gv_introShot[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Pass", gv_introPass[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Cuts", gv_introCuts[1]);
     // Engine count of hero pod units in the whole map.
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "HeroPodUnits", UnitGroupCount(UnitGroup(c_DROP_POD_UNIT, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), c_unitCountAll));
-    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Cinematic", gv_introCinematic);
-    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Music", gv_introMusic);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Cinematic", gv_introCinematic[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Music", gv_introMusic[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "MusicValid", gv_introMusicValid);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Hum", gv_introHumOn[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Quiet", gv_introQuiet[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "HumValid", gv_introHumValid);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "SilenceValid", gv_introSilenceValid);
-    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Dof", gv_introDof);
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Dialogs", gf_IntroDialogsVisible());
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Dof", gv_introDof[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Dialogs", gf_IntroDialogsVisible(1));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "DialogsKept", gf_ItDialogsKept());
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "DialogMask", gf_ItDialogMask());
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "DialogReshown", gv_introDialogReshown);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "DialogReshown", gv_introDialogReshown[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Prompt", gv_introPrompt != c_invalidDialogId && DialogIsVisible(gv_introPrompt, 1));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "TrigOn", gf_ItTriggersOn());
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "TrigKept", gf_ItTriggersKept());
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "TrigAll", gf_ItTriggersAll());
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "JumpKeyOn", TriggerIsEnabled(gt_JumpKey));
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "TickOn", TriggerIsEnabled(gt_IntroTick));
     // Hero.
@@ -166,20 +171,21 @@ void gf_ItSnap (string lp_s, string lp_t) {
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Pods", gv_dropPods[1]);
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Landings", gv_dropLandings[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Pending", gv_dropPending[1]);
-    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "DropIntro", gv_dropIntro[1]);
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Deploys", gv_introDeploys);
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "SpaceIgnored", gv_introSpaceIgnored);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "InputHeld", gv_inputHeld[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "InputHeld2", gv_inputHeld[2]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Deploys", gv_introDeploys[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "SpaceIgnored", gv_introSpaceIgnored[1]);
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "JumpPresses", gv_jumpPresses[1]);
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "JumpStarts", gv_jumpStarts[1]);
     // Camera: engine getters and script values.
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "CamYaw100", gf_It100(CameraGetYaw(1)));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "CamPitch100", gf_It100(CameraGetPitch(1)));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "CamDist100", gf_It100(CameraGetDistance(1)));
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "CamToIn100", gf_ItDist100(CameraGetTarget(1), gv_introTarget));
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "InYaw100", gf_It100(gv_introYaw));
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "InPitch100", gf_It100(gv_introPitch));
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "InDist100", gf_It100(gv_introDist));
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "InFov100", gf_It100(gv_introFov));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "CamToIn100", gf_ItDist100(CameraGetTarget(1), gv_introTarget[1]));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "InYaw100", gf_It100(gv_introYaw[1]));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "InPitch100", gf_It100(gv_introPitch[1]));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "InDist100", gf_It100(gv_introDist[1]));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "InFov100", gf_It100(gv_introFov[1]));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "CamDesired100", gf_It100(gv_cameraDistanceDesired[1]));
     // World.
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Clock100", gf_It100(TimerGetElapsed(gv_sCOBA_Clock)));
@@ -193,6 +199,8 @@ void gf_ItBoot (int lp_earlyState, int lp_firstCutMs) {
     point lv_x = RegionGetCenter(gv_xLOCATIONS[1]);
     int lv_terran = UnitGroupCount(gv_introSeedTerran, c_unitCountAlive);
     int lv_zerg = UnitGroupCount(gv_introSeedZerg, c_unitCountAlive);
+    int lv_i;
+    int lv_meetMs = -1;
 
     BankValueSetFromInt(gv_dbgBank, lv_s, "earlyState", lp_earlyState);
     BankValueSetFromInt(gv_dbgBank, lv_s, "firstCutMs", lp_firstCutMs);
@@ -206,8 +214,21 @@ void gf_ItBoot (int lp_earlyState, int lp_firstCutMs) {
     BankValueSetFromInt(gv_dbgBank, lv_s, "t1ZergAtX", gf_ItNear(4, lv_x));
     BankValueSetFromInt(gv_dbgBank, lv_s, "t1TerranSeedAtX", UnitGroupCount(UnitGroupFilterRegion(gv_introSeedTerran, RegionCircle(lv_x, 16.0), 0), c_unitCountAlive));
     BankValueSetFromInt(gv_dbgBank, lv_s, "t1ZergSeedAtX", UnitGroupCount(UnitGroupFilterRegion(gv_introSeedZerg, RegionCircle(lv_x, 16.0), 0), c_unitCountAlive));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "t1TerranHurt100", gf_ItGroupHurt(gv_introSeedTerran, lv_terran));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "t1ZergHurt100", gf_ItGroupHurt(gv_introSeedZerg, lv_zerg));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "t1TerranToX10", FixedToInt(DistanceBetweenPoints(UnitGroupCenterOfGroup(gv_introSeedTerran), lv_x) * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "t1ZergToX10", FixedToInt(DistanceBetweenPoints(UnitGroupCenterOfGroup(gv_introSeedZerg), lv_x) * 10.0));
     gf_ItSnap(lv_s, "t1");
-    Wait(5.0, c_timeGame);
+    // The groups start c_INTRO_SEED_BACK back and walk in: poll, at most
+    // 40 s, until both have a unit at X and both are hurt.
+    for (lv_i = 0; lv_i < 640 && (lv_meetMs < 0 || gf_ItGroupHurt(gv_introSeedTerran, lv_terran) <= 0 || gf_ItGroupHurt(gv_introSeedZerg, lv_zerg) <= 0); lv_i += 1) {
+        if (lv_meetMs < 0 && UnitGroupCount(UnitGroupFilterRegion(gv_introSeedTerran, RegionCircle(lv_x, 16.0), 0), c_unitCountAlive) > 0 && UnitGroupCount(UnitGroupFilterRegion(gv_introSeedZerg, RegionCircle(lv_x, 16.0), 0), c_unitCountAlive) > 0) {
+            lv_meetMs = lv_i * 62;
+        }
+        Wait(c_INTRO_TICK, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "meetMs", lv_meetMs);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "fightMs", lv_i * 62);
     BankValueSetFromInt(gv_dbgBank, lv_s, "t6TerranHurt100", gf_ItGroupHurt(gv_introSeedTerran, lv_terran));
     BankValueSetFromInt(gv_dbgBank, lv_s, "t6ZergHurt100", gf_ItGroupHurt(gv_introSeedZerg, lv_zerg));
     BankValueSetFromInt(gv_dbgBank, lv_s, "laneUnits6", gf_ItLaneUnits());
@@ -223,17 +244,19 @@ void gf_ItBoot (int lp_earlyState, int lp_firstCutMs) {
 void gf_ItShotSample (int lp_row, int lp_pass, int lp_u10) {
     string lv_k = "s" + IntToString(lp_row) + "p" + IntToString(lp_pass) + "u" + IntToString(lp_u10);
 
-    gf_IntroGoto(lp_row, gv_introRow_length[lp_row] * IntToFixed(lp_u10) / 10.0, lp_pass);
+    gf_IntroGoto(1, lp_row, gv_introRow_length[lp_row] * IntToFixed(lp_u10) / 10.0, lp_pass);
     Wait(2.0 * c_INTRO_TICK, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, "shots", lv_k + "Quiet", gv_introQuiet[1]);
+    BankValueSetFromFlag(gv_dbgBank, "shots", lv_k + "Hum", gv_introHumOn[1]);
     BankValueSetFromString(gv_dbgBank, "shots", lv_k,
-        IntToString(gv_introShot) + "/" + IntToString(gv_introPass)
+        IntToString(gv_introShot[1]) + "/" + IntToString(gv_introPass[1])
         + "/" + IntToString(gf_It100(CameraGetYaw(1))) + "/" + IntToString(gf_It100(CameraGetPitch(1))) + "/" + IntToString(gf_It100(CameraGetDistance(1)))
-        + "/" + IntToString(gf_It100(gv_introYaw)) + "/" + IntToString(gf_It100(gv_introPitch)) + "/" + IntToString(gf_It100(gv_introDist))
-        + "/" + IntToString(gf_It100(gv_introFov)) + "/" + IntToString(gf_It100(gv_introHeight)) + "/" + IntToString(gf_It100(gv_introGround))
-        + "/" + IntToString(BoolToInt(gv_introDof)) + "/" + IntToString(gf_ItDist100(CameraGetTarget(1), gv_introTarget))
-        + "/" + IntToString(FixedToInt(PointGetX(gv_introTarget) * 100.0)) + "/" + IntToString(FixedToInt(PointGetY(gv_introTarget) * 100.0))
+        + "/" + IntToString(gf_It100(gv_introYaw[1])) + "/" + IntToString(gf_It100(gv_introPitch[1])) + "/" + IntToString(gf_It100(gv_introDist[1]))
+        + "/" + IntToString(gf_It100(gv_introFov[1])) + "/" + IntToString(gf_It100(gv_introHeight[1])) + "/" + IntToString(gf_It100(gv_introGround[1]))
+        + "/" + IntToString(BoolToInt(gv_introDof[1])) + "/" + IntToString(gf_ItDist100(CameraGetTarget(1), gv_introTarget[1]))
+        + "/" + IntToString(FixedToInt(PointGetX(gv_introTarget[1]) * 100.0)) + "/" + IntToString(FixedToInt(PointGetY(gv_introTarget[1]) * 100.0))
         + "/" + IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 100.0)) + "/" + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 100.0))
-        + "/" + IntToString(gf_It100(gv_introCamGap)));
+        + "/" + IntToString(gf_It100(gv_introCamGap[1])));
 }
 
 void gf_ItShots () {
@@ -273,19 +296,19 @@ void gf_ItWrap () {
     int lv_i;
     int lv_start;
 
-    gf_IntroGoto(c_INTRO_SHOTS - 1, gv_introRow_length[c_INTRO_SHOTS - 1] - 0.5, 0);
+    gf_IntroGoto(1, c_INTRO_SHOTS - 1, gv_introRow_length[c_INTRO_SHOTS - 1] - 0.5, 0);
     gf_ItSnap(lv_s, "t0");
     Wait(1.0, c_timeGame);
     gf_ItSnap(lv_s, "t1");
     // Negative: no cut before the row length.
-    gf_IntroGoto(6, 0.0, 0);
+    gf_IntroGoto(1, 6, 0.0, 0);
     lv_start = gf_ItMs();
-    for (lv_i = 0; lv_i < 80 && gv_introShot == 6; lv_i += 1) {
+    for (lv_i = 0; lv_i < 80 && gv_introShot[1] == 6; lv_i += 1) {
         Wait(c_INTRO_TICK, c_timeGame);
     }
     BankValueSetFromInt(gv_dbgBank, lv_s, "s7Ms", gf_ItMs() - lv_start);
     BankValueSetFromInt(gv_dbgBank, lv_s, "s7LenMs", FixedToInt(gv_introRow_length[6] * 1000.0));
-    BankValueSetFromInt(gv_dbgBank, lv_s, "afterS7", gv_introShot);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "afterS7", gv_introShot[1]);
     BankSave(gv_dbgBank);
 }
 
@@ -293,7 +316,7 @@ void gf_ItWrap () {
 void gf_ItGate () {
     string lv_s = "gate";
 
-    gf_IntroGoto(2, 1.0, 0);
+    gf_IntroGoto(1, 2, 1.0, 0);
     Wait(2.0 * c_INTRO_TICK, c_timeGame);
     gf_ItSnap(lv_s, "t0");
     gf_ItHost("w", 1000, 0);
@@ -307,6 +330,31 @@ void gf_ItGate () {
     gf_ItSnap(lv_s, "tf");
 }
 
+// The third SPACE must reach the engine in FALL. The host's key latency
+// (first press: request to gv_introCountAt) is measured, and the press is
+// sent so it lands about 1 s into the fall: countdown, zoom (0.4 s), 1 s.
+fixed gv_itReqAt = -1.0;     // clock at the first request
+fixed gv_itKeyAt = -1.0;     // clock at the first press in the engine
+bool gv_itThirdSent;
+int gv_itThirdIgnored = -1;  // SpaceIgnored when the third was sent
+int gv_itThirdState = -1;    // intro state when the third arrived
+
+void gf_ItThirdTick () {
+    fixed lv_now = TimerGetElapsed(gv_sCOBA_Clock);
+
+    if (gv_itKeyAt < 0.0 && gv_introCountAt[1] >= 0.0) {
+        gv_itKeyAt = gv_introCountAt[1];
+    }
+    if (!gv_itThirdSent && gv_itKeyAt >= 0.0 && lv_now >= gv_itKeyAt + IntToFixed(c_INTRO_COUNT) + 1.4 - (gv_itKeyAt - gv_itReqAt)) {
+        gv_itThirdSent = true;
+        gv_itThirdIgnored = gv_introSpaceIgnored[1];
+        gf_ItHost("space", 60, 0);
+    }
+    if (gv_itThirdSent && gv_itThirdState < 0 && gv_introSpaceIgnored[1] > gv_itThirdIgnored) {
+        gv_itThirdState = gv_introState[1];
+    }
+}
+
 // SPACE: zoom, pod fall, touchdown (R-INTRO-10, 11, 12, 15).
 void gf_ItDeploy () {
     string lv_s = "deploy";
@@ -317,23 +365,33 @@ void gf_ItDeploy () {
     int lv_fallMs;
     int lv_pressAt;
 
-    gf_IntroGoto(4, 1.0, 0);
+    gf_IntroGoto(1, 4, 1.0, 0);
     Wait(2.0 * c_INTRO_TICK, c_timeGame);
     gf_ItSnap(lv_s, "t0");
-    // Two presses 150 ms apart: the second lands in ZOOM or early FALL.
+    // Two presses 150 ms apart: the second lands in the countdown.
+    gv_itReqAt = TimerGetElapsed(gv_sCOBA_Clock);
     gf_ItHost("space,space", 60, 150);
     lv_pressAt = gf_ItMs();
-    for (lv_i = 0; lv_i < 80 && gv_introState == c_INTRO_LOOP; lv_i += 1) {
+    // The engine's press time: gf_IntroDeployPress keeps it in
+    // gv_introCountAt (the host's key latency is not part of the countdown).
+    for (lv_i = 0; lv_i < 160 && gv_introState[1] == c_INTRO_LOOP; lv_i += 1) {
+        gf_ItThirdTick();
         Wait(c_INTRO_TICK, c_timeGame);
     }
     lv_space = gf_ItMs();
-    BankValueSetFromInt(gv_dbgBank, lv_s, "seenState", gv_introState);
-    BankValueSetFromString(gv_dbgBank, lv_s, "countTrace", gv_introCountTrace);
-    BankValueSetFromInt(gv_dbgBank, lv_s, "countMs", lv_space - lv_pressAt);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "seenState", gv_introState[1]);
+    BankValueSetFromString(gv_dbgBank, lv_s, "countTrace", gv_introCountTrace[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "requestMs", lv_space - lv_pressAt);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "countMs", -1);
+    if (gv_itKeyAt >= 0.0) {
+        BankValueSetFromInt(gv_dbgBank, lv_s, "countMs", FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_itKeyAt) * 1000.0));
+        BankValueSetFromInt(gv_dbgBank, lv_s, "keyLatencyMs", FixedToInt((gv_itKeyAt - gv_itReqAt) * 1000.0));
+    }
     gf_ItSnap(lv_s, "tzoom");
     // Per loop: ms since ZOOM was seen, state, script FOV, engine distance.
-    for (lv_i = 0; lv_i < 16 && gv_introState == c_INTRO_ZOOM; lv_i += 1) {
-        lv_trace = lv_trace + IntToString(gf_ItMs() - lv_space) + ":" + IntToString(gv_introState) + "/" + IntToString(gf_It100(gv_introFov)) + "/" + IntToString(gf_It100(CameraGetDistance(1))) + " ";
+    for (lv_i = 0; lv_i < 16 && gv_introState[1] == c_INTRO_ZOOM; lv_i += 1) {
+        lv_trace = lv_trace + IntToString(gf_ItMs() - lv_space) + ":" + IntToString(gv_introState[1]) + "/" + IntToString(gf_It100(gv_introFov[1])) + "/" + IntToString(gf_It100(CameraGetDistance(1))) + " ";
+        gf_ItThirdTick();
         Wait(c_INTRO_TICK, c_timeGame);
     }
     lv_fallMs = gf_ItMs() - lv_space;
@@ -343,24 +401,31 @@ void gf_ItDeploy () {
     lv_pod = gv_dropPod[1];
     BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(lv_pod));
     BankValueSetFromString(gv_dbgBank, lv_s, "podType", UnitGetType(lv_pod));
-    BankValueSetFromInt(gv_dbgBank, lv_s, "podToDrop100", gf_ItDist100(UnitGetPosition(lv_pod), gv_introDropAt));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podToDrop100", gf_ItDist100(UnitGetPosition(lv_pod), gv_introDropAt[1]));
     // Engine pod position and facing: the host recomputes the Birth root.
     BankValueSetFromString(gv_dbgBank, lv_s, "podAt100", IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_pod)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_pod)) * 100.0)));
     BankValueSetFromInt(gv_dbgBank, lv_s, "podFacing100", FixedToInt(UnitGetFacing(lv_pod) * 100.0));
     BankValueSetFromInt(gv_dbgBank, lv_s, "camBase100", FixedToInt(c_SCOBA_CAMERA_HEIGHT_OFFSET * 100.0));
-    // A third press in FALL.
-    gf_ItHost("space", 60, 0);
     // Per loop: ms since the pod's create loop, engine pod unit height,
-    // applied camera height, engine camera target x,y, hero hidden.
+    // applied camera height, engine camera target x,y, hero hidden, engine
+    // camera yaw and distance (x100).
     lv_trace = "";
     for (lv_i = 0; lv_i < 64 && UnitIsValid(gv_dropPod[1]); lv_i += 1) {
-        lv_trace = lv_trace + IntToString(FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_dropStartAt[1]) * 1000.0)) + ":" + IntToString(FixedToInt(UnitGetHeight(lv_pod) * 100.0)) + "/" + IntToString(FixedToInt(gv_cameraHeightApplied[1] * 100.0)) + "/" + IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 100.0)) + "/" + IntToString(BoolToInt(UnitTestState(gv_heroActive, c_unitStateHidden))) + " ";
+        lv_trace = lv_trace + IntToString(FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_dropStartAt[1]) * 1000.0)) + ":" + IntToString(FixedToInt(UnitGetHeight(lv_pod) * 100.0)) + "/" + IntToString(FixedToInt(gv_cameraHeightApplied[1] * 100.0)) + "/" + IntToString(FixedToInt(PointGetX(CameraGetTarget(1)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(CameraGetTarget(1)) * 100.0)) + "/" + IntToString(BoolToInt(UnitTestState(gv_heroActive, c_unitStateHidden))) + "/" + IntToString(FixedToInt(CameraGetYaw(1) * 100.0)) + "/" + IntToString(FixedToInt(CameraGetDistance(1) * 100.0)) + " ";
+        gf_ItThirdTick();
         Wait(c_DROP_TICK, c_timeGame);
     }
     BankValueSetFromString(gv_dbgBank, lv_s, "fall", lv_trace);
     // Ground reference for the pod unit height: the hero stands at the pod.
     BankValueSetFromInt(gv_dbgBank, lv_s, "landHeroH100", FixedToInt(UnitGetHeight(gv_heroActive) * 100.0));
     gf_ItSnap(lv_s, "tland");
+    // The third press may still be on its way: wait for it, at most 4 s.
+    for (lv_i = 0; lv_i < 64 && gv_itThirdState < 0; lv_i += 1) {
+        gf_ItThirdTick();
+        Wait(c_INTRO_TICK, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "thirdSent", gv_itThirdSent);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "thirdState", gv_itThirdState);
     Wait(1.0, c_timeGame);
     gf_ItSnap(lv_s, "tafter");
 }
@@ -374,8 +439,8 @@ bool gt_IntroTest_Func (bool testConds, bool runActions) {
         return true;
     }
     Wait(c_INTRO_TICK, c_timeGame);
-    lv_early = gv_introState;
-    for (lv_i = 0; lv_i < 160 && gv_introCuts == 0; lv_i += 1) {
+    lv_early = gv_introState[1];
+    for (lv_i = 0; lv_i < 160 && gv_introCuts[1] == 0; lv_i += 1) {
         Wait(c_INTRO_TICK, c_timeGame);
     }
     lv_firstCut = gf_ItMs();
@@ -398,6 +463,10 @@ bool gt_IntroTest_Func (bool testConds, bool runActions) {
     }
     if (gf_DbgGroup("gate")) {
         gf_ItGate();
+    }
+    // Before deploy: the deploy ends seat 1's intro.
+    if (gf_DbgGroup("seats")) {
+        gf_ItSeats();
     }
     if (gf_DbgGroup("deploy")) {
         gf_ItDeploy();

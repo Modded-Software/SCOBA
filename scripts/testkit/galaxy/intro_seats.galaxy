@@ -1,0 +1,60 @@
+// Intro per seat (R-INTRO-16). One client: the harness plays seat 2 and
+// starts its intro, then seat 2 deploys. Seat 1 must stay in its loop.
+
+void gf_ItSeatSnap (string lp_s, string lp_t) {
+    int lv_p;
+    string lv_k;
+
+    for (lv_p = 1; lv_p <= 2; lv_p += 1) {
+        lv_k = lp_t + "p" + IntToString(lv_p);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "State", gv_introState[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Active", gv_introActive[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Held", gv_inputHeld[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Cinematic", gv_introCinematic[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Music", gv_introMusic[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Prompt", gv_introPrompt != c_invalidDialogId && DialogIsVisible(gv_introPrompt, lv_p));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Deploys", gv_introDeploys[lv_p]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Pods", gv_dropPods[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "HeroHidden", UnitTestState(gv_tPSUNIT[lv_p], c_unitStateHidden));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "HeroAlive", UnitIsAlive(gv_tPSUNIT[lv_p]));
+    }
+    BankSave(gv_dbgBank);
+}
+
+void gf_ItSeats () {
+    string lv_s = "seats";
+    unit lv_two;
+    int lv_i;
+    bool lv_fallSeen = false;
+
+    gf_RosterPlay(2, true);
+    lv_two = gf_RosterHeroCreate(2);
+    gf_HeroBindPlayer(2, lv_two);
+    gv_introState[2] = c_INTRO_LOOP;
+    gv_introActive[2] = true;
+    gv_introCinematic[2] = true;
+    gf_InputHold(2);
+    gf_IntroStartSeat(2);
+    Wait(0.5, c_timeGame);
+    gf_ItSeatSnap(lv_s, "t0");
+    gf_IntroDeployPress(2);
+    // Countdown 3 s, zoom, fall 2.2 s: at most 15 s to touchdown.
+    for (lv_i = 0; lv_i < 240 && gv_introState[2] != c_INTRO_DONE; lv_i += 1) {
+        if (!lv_fallSeen && gv_introState[2] == c_INTRO_FALL && UnitIsValid(gv_dropPod[2])) {
+            lv_fallSeen = true;
+            gf_ItSeatSnap(lv_s, "tfall");
+        }
+        Wait(c_INTRO_TICK, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "fallSeen", lv_fallSeen);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "doneMs", lv_i * 62);
+    Wait(0.5, c_timeGame);
+    gf_ItSeatSnap(lv_s, "tdone");
+    // Free seat 2 again.
+    gf_RosterPlay(2, false);
+    if (UnitIsValid(gv_tPSUNIT[2])) {
+        UnitRemove(gv_tPSUNIT[2]);
+    }
+    gv_tPSUNIT[2] = null;
+    gv_rosterHero[2] = null;
+}

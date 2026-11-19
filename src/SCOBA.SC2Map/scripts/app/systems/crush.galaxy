@@ -1,10 +1,10 @@
-// Crushable flora: Goliaths and Queens remove the generated flora they walk into.
+// Crushable flora: the stomp rows with crush on (systems/stomp, gf_StompConfig)
+// remove the generated flora they walk into, within the row's reach.
 // The table (data/flora_crush) lists the placed crushable doodads by bucket.
 // Each removed plant gets a debris model; models are destroyed after
 // c_CRUSH_DEBRIS_LIFE. Counters are read by the crush test profile.
 
 const fixed c_CRUSH_PERIOD = 0.25;
-const fixed c_CRUSH_REACH = 2.5;  // walker centre to plant centre
 const fixed c_CRUSH_PICK = 0.3;  // removal circle around one plant
 // Operator pick (2026-11-16): three clips together, sized by gv_crushS.
 const string c_CRUSH_DEBRIS = "PhysicsImpactDustMassive";
@@ -147,7 +147,7 @@ bool gt_CrushLate_Func (bool testConds, bool runActions) {
     return true;
 }
 
-void gf_CrushAround (point lp_at) {
+void gf_CrushAround (point lp_at, fixed lp_reach) {
     int lv_bx = FixedToInt(PointGetX(lp_at) / c_CRUSH_BUCKET);
     int lv_by = FixedToInt(PointGetY(lp_at) / c_CRUSH_BUCKET);
     int lv_x;
@@ -159,7 +159,7 @@ void gf_CrushAround (point lp_at) {
         for (lv_x = MaxI(0, lv_bx - 1); lv_x <= MinI(c_CRUSH_GRID - 1, lv_bx + 1); lv_x += 1) {
             lv_b = lv_y * c_CRUSH_GRID + lv_x;
             for (lv_i = gv_crushStart[lv_b]; lv_i < gv_crushStart[lv_b] + gv_crushLen[lv_b]; lv_i += 1) {
-                if (!gv_crushGone[lv_i] && DistanceBetweenPoints(lp_at, Point(gv_crushX[lv_i], gv_crushY[lv_i])) <= c_CRUSH_REACH) {
+                if (!gv_crushGone[lv_i] && DistanceBetweenPoints(lp_at, Point(gv_crushX[lv_i], gv_crushY[lv_i])) <= lp_reach) {
                     gf_CrushPlant(lv_i);
                 }
             }
@@ -167,8 +167,9 @@ void gf_CrushAround (point lp_at) {
     }
 }
 
-void gf_CrushType (string lp_type) {
-    unitgroup lv_g = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+// Every live unit of stomp row lp_row crushes within its reach.
+void gf_CrushType (int lp_row) {
+    unitgroup lv_g = UnitGroup(gv_stompType[lp_row], c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
     int lv_n = UnitGroupCount(lv_g, c_unitCountAll);
     int lv_i;
     unit lv_u;
@@ -176,18 +177,24 @@ void gf_CrushType (string lp_type) {
     for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
         lv_u = UnitGroupUnit(lv_g, lv_i);
         if (UnitIsAlive(lv_u)) {
-            gf_CrushAround(UnitGetPosition(lv_u));
+            gf_CrushAround(UnitGetPosition(lv_u), gv_stompCrushReach[lp_row]);
         }
     }
 }
 
 bool gt_CrushTick_Func (bool testConds, bool runActions) {
+    int lv_r;
+
     if (!runActions) {
         return true;
     }
     if (c_CRUSH_COUNT > 0) {
-        gf_CrushType("Goliath");
-        gf_CrushType("Queen");
+        // The crushers are the stomp rows with lp_crush (systems/stomp).
+        for (lv_r = 0; lv_r < gv_stompCount; lv_r += 1) {
+            if (gv_stompCrush[lv_r]) {
+                gf_CrushType(lv_r);
+            }
+        }
     }
     gf_CrushDebrisSweep();
     return true;

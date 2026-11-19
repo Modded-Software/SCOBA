@@ -92,15 +92,14 @@ bool gf_CanLevelAbility (int lp_numberToCheck) {
     }
 }
 
+// Called on every XP award. An open abilities panel stays open and is
+// refreshed; a closed one stays closed (REQ-UI-PANELS R-UI-1, R-UI-2).
 void gf_ShowAbilityLevelingInterface (int lp_iPlayer) {
     // Implementation
     if ((DialogIsVisible(gv_abilitiesSelectionDialog, lp_iPlayer) == true)) {
-        gf_AbilitiesSelectionDialogHide();
-        gf_SBDialogShowAbilitiesButton(lp_iPlayer);
+        gf_AbilitiesSelectionDialogRefresh(lp_iPlayer);
     }
-    else {
-        gf_SBDialogShowAbilitiesButton(lp_iPlayer);
-    }
+    gf_SBDialogShowAbilitiesButton(lp_iPlayer);
 }
 
 void gf_SBDialogShowAbilitiesButton (int lp_iPlayer) {

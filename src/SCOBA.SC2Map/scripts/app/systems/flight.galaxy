@@ -1,0 +1,212 @@
+// Module: systems/flight
+// A flying bound unit (the Alt+4 Viking): no jump. Space held climbs,
+// Ctrl held descends, between c_FLIGHT_MIN and c_FLIGHT_MAX.
+// Engine (baseai flight group, run 20261118-104231): a running
+// UnitSetHeight blend cannot be stopped, neither by UnitSetHeight(h, 0)
+// nor by the height property. One-tick blends stop exactly. So: while a
+// key is held, every game tick one UnitSetHeight to the next step over one
+// tick; on release no call, the last one-tick blend ends at the target.
+// Camera: the same target over the same tick, so it moves with the unit.
+
+const fixed c_FLIGHT_MIN = 2.0;
+const fixed c_FLIGHT_MAX = 60.0;
+const fixed c_FLIGHT_RATE = 4.0;         // height per game second (operator 2026-11-18, was 8)
+const fixed c_FLIGHT_TICK = 0.0625;      // one game tick
+
+trigger gt_FlightUpPress;
+trigger gt_FlightUpRelease;
+trigger gt_FlightDownPress;
+trigger gt_FlightDownRelease;
+trigger gt_FlightTick;
+
+int[c_SCOBA_HERO_LAST + 1] gv_flightDir;       // +1 up, -1 down, 0 hold
+bool[c_SCOBA_HERO_LAST + 1] gv_flightUp;
+bool[c_SCOBA_HERO_LAST + 1] gv_flightDown;
+bool[c_SCOBA_HERO_LAST + 1] gv_flightMoving;   // a step was issued this tick
+fixed[c_SCOBA_HERO_LAST + 1] gv_flightTarget;  // height of the last step
+fixed gv_flightLandAbove;                       // last landing: probed height above ground
+fixed gv_flightLandRest;                        // last landing: the flyer's data height
+
+bool gf_FlightIs (int lp_player) {
+    unit lv_u;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return false;
+    }
+    lv_u = gv_tPSUNIT[lp_player];
+    return UnitIsValid(lv_u) && UnitFilterMatch(lv_u, lp_player, UnitFilter((1 << c_targetFilterAir), 0, 0, 0));
+}
+
+// The flying bound unit's real height above the ground under it (engine,
+// mid-step included). 0 for a ground unit.
+fixed gf_FlightHeight (int lp_player) {
+    unit lv_u = gv_tPSUNIT[lp_player];
+
+    if (!gf_FlightIs(lp_player)) {
+        return 0.0;
+    }
+    return UnitGetHeight(lv_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_u));
+}
+
+// Camera lift: the step target while climbing or descending (the unit
+// reaches it at the end of the same tick), else the real height.
+fixed gf_FlightCamHeight (int lp_player) {
+    if (!gf_FlightIs(lp_player)) {
+        return 0.0;
+    }
+    if (gv_flightMoving[lp_player]) {
+        return gv_flightTarget[lp_player];
+    }
+    return gf_FlightHeight(lp_player);
+}
+
+// Key state to direction. The tick does the moving.
+void gf_FlightDirSet (int lp_player) {
+    int lv_dir = 0;
+
+    if (gv_flightUp[lp_player] && !gv_flightDown[lp_player]) {
+        lv_dir = 1;
+    }
+    if (gv_flightDown[lp_player] && !gv_flightUp[lp_player]) {
+        lv_dir = -1;
+    }
+    // Start from the real height only when idle. A key repeat (release and
+    // press inside one step) keeps the running target, so the climb is not
+    // thrown back to the lagging mid-step height.
+    if (lv_dir != 0 && gv_flightDir[lp_player] == 0 && !gv_flightMoving[lp_player]) {
+        gv_flightTarget[lp_player] = gf_FlightHeight(lp_player);
+    }
+    gv_flightDir[lp_player] = lv_dir;
+}
+
+// One game tick of flight: one step over one tick, clamped to the limits.
+void gf_FlightStep (int lp_player) {
+    fixed lv_to;
+
+    gv_flightMoving[lp_player] = false;
+    if (gv_flightDir[lp_player] == 0) {
+        return;
+    }
+    lv_to = gv_flightTarget[lp_player] + IntToFixed(gv_flightDir[lp_player]) * c_FLIGHT_RATE * c_FLIGHT_TICK;
+    lv_to = MinF(c_FLIGHT_MAX, MaxF(c_FLIGHT_MIN, lv_to));
+    if (lv_to == gv_flightTarget[lp_player]) {
+        return;
+    }
+    gv_flightTarget[lp_player] = lv_to;
+    gv_flightMoving[lp_player] = true;
+    UnitSetHeight(gv_tPSUNIT[lp_player], lv_to, c_FLIGHT_TICK);
+}
+
+bool gt_FlightUpPress_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (gv_flightUp[EventPlayer()]) {
+        return true;  // key repeat: already climbing
+    }
+    gv_flightUp[EventPlayer()] = true;
+    gf_FlightDirSet(EventPlayer());
+    return true;
+}
+
+bool gt_FlightUpRelease_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gv_flightUp[EventPlayer()] = false;
+    gf_FlightDirSet(EventPlayer());
+    return true;
+}
+
+bool gt_FlightDownPress_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (gv_flightDown[EventPlayer()]) {
+        return true;  // key repeat: already descending
+    }
+    gv_flightDown[EventPlayer()] = true;
+    gf_FlightDirSet(EventPlayer());
+    return true;
+}
+
+bool gt_FlightDownRelease_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gv_flightDown[EventPlayer()] = false;
+    gf_FlightDirSet(EventPlayer());
+    return true;
+}
+
+// Every game tick: the step, then the camera to the same height over the
+// same tick.
+bool gt_FlightTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        if (gf_FlightIs(lv_p)) {
+            gf_FlightStep(lv_p);
+            gf_CameraHeightApply(lv_p, c_FLIGHT_TICK);
+        }
+        else {
+            gv_flightDir[lv_p] = 0;
+            gv_flightMoving[lv_p] = false;
+        }
+    }
+    return true;
+}
+
+// Landing (SCOBAHeroAssaultMode). The morph descends only by the flyer's
+// data height; the rest of a Space / Ctrl offset stayed on the landed unit
+// (run 20261118-144819: climb +4, landed at +4). At each landing: stop any
+// flight move, probe the height above the ground under the unit now, and
+// blend it to the data height before the morph's own descent starts.
+const fixed c_FLIGHT_LAND_BLEND = 0.5;   // AbilData mover delay is 0.533
+
+trigger gt_FlightLand;
+
+bool gt_FlightLand_Func (bool testConds, bool runActions) {
+    unit lv_u = EventUnit();
+    int lv_p;
+    fixed lv_rest;
+    fixed lv_above;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        if (gv_tPSUNIT[lv_p] == lv_u) {
+            gv_flightUp[lv_p] = false;
+            gv_flightDown[lv_p] = false;
+            gv_flightDir[lv_p] = 0;
+            gv_flightMoving[lv_p] = false;
+        }
+    }
+    lv_rest = StringToFixed(CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_u), "Height", UnitGetOwner(lv_u)));
+    lv_above = UnitGetHeight(lv_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_u));
+    gv_flightLandAbove = lv_above;
+    gv_flightLandRest = lv_rest;
+    if (AbsF(lv_above - lv_rest) > 0.05) {
+        UnitSetHeight(lv_u, lv_rest, c_FLIGHT_LAND_BLEND);
+    }
+    return true;
+}
+
+void gt_Flight_Init () {
+    gt_FlightLand = TriggerCreate("gt_FlightLand_Func");
+    TriggerAddEventUnitAbility(gt_FlightLand, null, AbilityCommand("SCOBAHeroAssaultMode", 0), c_unitAbilStageExecute, false);
+    gt_FlightUpPress = TriggerCreate("gt_FlightUpPress_Func");
+    TriggerAddEventKeyPressed(gt_FlightUpPress, c_playerAny, c_keySpace, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_FlightUpRelease = TriggerCreate("gt_FlightUpRelease_Func");
+    TriggerAddEventKeyPressed(gt_FlightUpRelease, c_playerAny, c_keySpace, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_FlightDownPress = TriggerCreate("gt_FlightDownPress_Func");
+    TriggerAddEventKeyPressed(gt_FlightDownPress, c_playerAny, c_keyControl, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_FlightDownRelease = TriggerCreate("gt_FlightDownRelease_Func");
+    TriggerAddEventKeyPressed(gt_FlightDownRelease, c_playerAny, c_keyControl, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_FlightTick = TriggerCreate("gt_FlightTick_Func");
+    TriggerAddEventTimePeriodic(gt_FlightTick, c_FLIGHT_TICK, c_timeGame);
+}

@@ -45,13 +45,27 @@ void gf_StrafeHoldSync (int lp_player) {
     if (gv_sCOBAOrderMode[lp_player]) {
         lv_on = false;
     }
+    // Regular units never strafe: they face their travel direction.
+    if (gf_ControlRegular(lp_player)) {
+        lv_on = false;
+    }
     gf_StrafeHoldSet(lp_player, lv_on);
+}
+
+// A target the unit can fly or walk to: a flyer needs only the playable
+// map, a ground unit the ground pathing.
+bool gf_AimMoveReachable (int lp_player, unit lp_u, point lp_p, fixed lp_dist) {
+    if (gf_FlightIs(lp_player)) {
+        return RegionContainsPoint(RegionPlayableMap(), lp_p);
+    }
+    return PointPathingPassable(lp_p) && UnitPathableToPoint(lp_u, lp_p, 0.0, lp_dist);
 }
 
 void gf_AimMoveStep (int lp_player, fixed lp_angle) {
     unit lv_hero;
     point lv_next;
     fixed lv_dist;
+    fixed lv_retarget;
     bool lv_need;
 
     if (!gf_StrafeMoveActive(lp_player)) {
@@ -62,6 +76,7 @@ void gf_AimMoveStep (int lp_player, fixed lp_angle) {
         return;
     }
     gf_CombatSetRoot(lp_player, false);
+    lv_retarget = gf_MoveRetargetDist(lv_hero);
     lv_need = false;
     if (!gv_animHasMoveTarget[lp_player]) {
         lv_need = true;
@@ -69,7 +84,7 @@ void gf_AimMoveStep (int lp_player, fixed lp_angle) {
     if (!lv_need && !UnitOrderHasAbil(lv_hero, "move")) {
         lv_need = true;
     }
-    if (!lv_need && DistanceBetweenPoints(UnitGetPosition(lv_hero), gv_animMoveTarget[lp_player]) <= c_ANIM_MOVE_RETARGET) {
+    if (!lv_need && DistanceBetweenPoints(UnitGetPosition(lv_hero), gv_animMoveTarget[lp_player]) <= lv_retarget) {
         lv_need = true;
     }
     if (!lv_need && AbsF(gf_AnimYawDelta(gv_animMoveHeading[lp_player], lp_angle)) >= c_ANIM_MOVE_HEADING) {
@@ -77,21 +92,21 @@ void gf_AimMoveStep (int lp_player, fixed lp_angle) {
     }
     // A right hold turns with the same call as a middle hold.
     if (gv_holdStrafe[lp_player]) {
-        UnitSetFacing(lv_hero, CameraGetYaw(lp_player), c_ANIM_MOVE_TURN_DURATION);
+        gf_UnitTurn(lv_hero, CameraGetYaw(lp_player), c_ANIM_MOVE_TURN_DURATION);
     }
     else {
-        UnitSetFacing(lv_hero, CameraGetYaw(lp_player), c_ANIM_AIM_TURN_DURATION);
+        gf_UnitTurn(lv_hero, CameraGetYaw(lp_player), c_ANIM_AIM_TURN_DURATION);
     }
     if (lv_need) {
-        lv_dist = c_ANIM_MOVE_TARGET;
-        while (lv_dist >= (c_ANIM_MOVE_RETARGET * 3.0)) {
+        lv_dist = gf_MoveTargetDist(lv_hero);
+        while (lv_dist >= (lv_retarget * 3.0)) {
             lv_next = PointWithOffsetPolar(UnitGetPosition(lv_hero), lv_dist, lp_angle);
-            if (PointPathingPassable(lv_next) && UnitPathableToPoint(lv_hero, lv_next, 0.0, lv_dist)) {
+            if (gf_AimMoveReachable(lp_player, lv_hero, lv_next, lv_dist)) {
                 break;
             }
-            lv_dist = lv_dist - c_ANIM_MOVE_RETARGET;
+            lv_dist = lv_dist - lv_retarget;
         }
-        if (lv_dist >= (c_ANIM_MOVE_RETARGET * 3.0)) {
+        if (lv_dist >= (lv_retarget * 3.0)) {
             UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), lv_next), c_orderQueueReplace);
             gv_animMoveTarget[lp_player] = lv_next;
             gv_animMoveHeading[lp_player] = lp_angle;
@@ -118,6 +133,10 @@ bool gt_AimMoveTick_Func (bool testConds, bool runActions) {
         return true;
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        // Input hold of this player (systems/input_hold).
+        if (gf_InputHeld(lv_player)) {
+            continue;
+        }
         if (!gf_StrafeMoveActive(lv_player)) {
             continue;
         }

@@ -1,0 +1,445 @@
+// Base AI macro group (REQ-BASE-AI). The six lane owners start as at map
+// init (gf_BaseAiCreateLane), waves and air creeps run. Every 60 s, per
+// owner: the gf_BaPlayerSnap reads plus AI internals, raw, so a stalled
+// owner shows where it stops. scripts/testkit/profiles/baseai.py decides.
+
+const int c_BA_MACRO_LANES = 6;
+const int c_BA_MACRO_SNAPS = 8;          // t60 .. t480
+const fixed c_BA_NEAR_R = 20.0;          // enemies near the hall
+
+string gf_BaFoodType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "SupplyDepot";
+    }
+    return "Overlord";
+}
+
+string gf_BaMakerType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "Barracks";
+    }
+    return "SpawningPool";
+}
+
+string gf_BaFighterType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "Marine";
+    }
+    return "Zergling";
+}
+
+// Units the AI made to fight: no structure, worker, Overlord, Egg, Larva,
+// and no script unit (the excluded pre-placed units).
+bool gf_BaIsFighter (unit lp_u) {
+    string lv_t = UnitGetType(lp_u);
+
+    if (UnitTypeTestAttribute(lv_t, c_unitAttributeStructure) || UnitTypeTestFlag(lv_t, c_unitFlagWorker)) {
+        return false;
+    }
+    if (lv_t == "Overlord" || lv_t == "OverlordCocoon" || lv_t == "Egg" || lv_t == "Larva" || lv_t == "MULE") {
+        return false;
+    }
+    // Wave drop pods (systems/spawns) are no army.
+    if (lv_t == "TerranDropPod" || lv_t == "ZergDropPod" || lv_t == "ZergDropPodCreep") {
+        return false;
+    }
+    return !AIIsScriptControlled(lp_u);
+}
+
+string gf_BaStr (string lp_v) {
+    if (lp_v == "" || lp_v == null) {
+        return "none";
+    }
+    return lp_v;
+}
+
+int gf_BaFlagInt (bool lp_b) {
+    if (lp_b) {
+        return 1;
+    }
+    return 0;
+}
+
+// Raw state of every fighter maker (Barracks / Hatchery): script control
+// (excluded from the AI), under construction, orders, first queue item.
+void gf_BaMakersRaw (string lp_s, string lp_k, int lp_player) {
+    unitgroup lv_g = UnitGroup(gf_BaMakerType(lp_player), lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    string lv_out = "";
+    unit lv_u;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        lv_out = lv_out + "[sc=" + IntToString(gf_BaFlagInt(AIIsScriptControlled(lv_u)));
+        lv_out = lv_out + " uc=" + IntToString(gf_BaFlagInt(UnitTestState(lv_u, c_unitStateUnderConstruction)));
+        lv_out = lv_out + " ord=" + IntToString(UnitOrderCount(lv_u));
+        lv_out = lv_out + " q1=" + IntToString(UnitQueueItemCount(lv_u, 1));
+        lv_out = lv_out + " qi=" + gf_BaStr(UnitQueueItemGet(lv_u, 1, 1)) + "]";
+    }
+    UnitGroupLoopEnd();
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "MakersRaw", lv_out);
+}
+
+bool gf_BaIsHallType (string lp_t) {
+    return lp_t == "CommandCenter" || lp_t == "CommandCenterFlying" || lp_t == "OrbitalCommand"
+        || lp_t == "OrbitalCommandFlying" || lp_t == "PlanetaryFortress"
+        || lp_t == "Hatchery" || lp_t == "Lair" || lp_t == "Hive";
+}
+
+// Distance x100 from lp_at to the nearest expansion site.
+int gf_BaSiteNearest100 (point lp_at) {
+    fixed lv_best = 9999.0;
+    int lv_i;
+
+    for (lv_i = 0; lv_i < gv_siteCount; lv_i += 1) {
+        if (gv_siteAt[lv_i] != null && DistanceBetweenPoints(lp_at, gv_siteAt[lv_i]) < lv_best) {
+            lv_best = DistanceBetweenPoints(lp_at, gv_siteAt[lv_i]);
+        }
+    }
+    return FixedToInt(lv_best * 100.0);
+}
+
+// Town halls of lp_player (built or building): count, and each hall's
+// nearest expansion site and distance, "name@d100 ...".
+void gf_BaHalls (string lp_s, string lp_k, int lp_player) {
+    unitgroup lv_g = UnitGroup(null, lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    int lv_n = 0;
+    int lv_i;
+    int lv_best;
+    fixed lv_d;
+    fixed lv_bestD;
+    string lv_at = "";
+    unit lv_u;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        if (!gf_BaIsHallType(UnitGetType(lv_u))) {
+            continue;
+        }
+        lv_n += 1;
+        lv_best = -1;
+        lv_bestD = 9999.0;
+        for (lv_i = 0; lv_i < gv_siteCount; lv_i += 1) {
+            if (gv_siteAt[lv_i] == null) {
+                continue;
+            }
+            lv_d = DistanceBetweenPoints(UnitGetPosition(lv_u), gv_siteAt[lv_i]);
+            if (lv_d < lv_bestD) {
+                lv_bestD = lv_d;
+                lv_best = lv_i;
+            }
+        }
+        lv_d = DistanceBetweenPoints(UnitGetPosition(lv_u), gv_baAt[lp_player]);
+        if (lv_d < lv_bestD) {
+            lv_at = lv_at + "main@" + IntToString(FixedToInt(lv_d * 100.0)) + " ";
+        }
+        else {
+            lv_at = lv_at + gv_siteName[lv_best] + "@" + IntToString(FixedToInt(lv_bestD * 100.0)) + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Halls", lv_n);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "HallsAt", lv_at);
+}
+
+// The expansion sites (systems/base/base_sites) and the pile amounts.
+void gf_BaSites (string lp_s) {
+    int lv_i;
+    unit lv_f;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, "siteCount", gv_siteCount);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "siteFields", gv_siteFields);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "siteGeysers", gv_siteGeysers);
+    for (lv_i = 0; lv_i < gv_siteCount; lv_i += 1) {
+        BankValueSetFromString(gv_dbgBank, lp_s, "site" + IntToString(lv_i), gv_siteName[lv_i] + "=" + gf_BaXY100(gv_siteAt[lv_i]));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, "site" + IntToString(lv_i) + "Ok", gv_siteAt[lv_i] != null);
+    }
+    lv_f = UnitGroupClosestToPoint(UnitGroup("MineralField", 0, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), gv_baAt[9]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "mainFieldRes", UnitGetPropertyInt(lv_f, c_unitPropResources, c_unitPropCurrent));
+    lv_f = UnitGroupClosestToPoint(UnitGroup("VespeneGeyser", 0, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), gv_baAt[9]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "mainGeyserRes", UnitGetPropertyInt(lv_f, c_unitPropResources, c_unitPropCurrent));
+    if (gv_siteAt[0] != null) {
+        lv_f = UnitGroupClosestToPoint(UnitGroup("MineralField", 0, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), gv_siteAt[0]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, "siteFieldRes", UnitGetPropertyInt(lv_f, c_unitPropResources, c_unitPropCurrent));
+        lv_f = UnitGroupClosestToPoint(UnitGroup("VespeneGeyser", 0, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), gv_siteAt[0]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, "siteGeyserRes", UnitGetPropertyInt(lv_f, c_unitPropResources, c_unitPropCurrent));
+    }
+    // Stock amounts, for the ratio.
+    BankValueSetFromInt(gv_dbgBank, lp_s, "resMult", c_SITE_RES_MULT);
+}
+
+// Pathing around a hall, 4 directions at lp_d: how many are blocked.
+int gf_BaHallBlocked (unit lp_hall, fixed lp_d) {
+    int lv_n = 0;
+    int lv_i;
+    point lv_at = UnitGetPosition(lp_hall);
+
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        if (!PointPathingPassable(PointWithOffsetPolar(lv_at, lp_d, IntToFixed(lv_i) * 90.0))) {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}
+
+// The Command Center footprint, catalog and engine pathing (8x8: half 4).
+void gf_BaHallFootprint (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player);
+    unit lv_hall = gv_baseAiHall[lp_player];
+
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallType", UnitGetType(lv_hall));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallFoot", CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_hall), "Footprint", lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallPlace", CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_hall), "PlacementFootprint", lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HallBlocked35", gf_BaHallBlocked(lv_hall, 3.5));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HallBlocked46", gf_BaHallBlocked(lv_hall, 4.6));
+}
+
+void gf_BaFighters (string lp_s, string lp_k, int lp_player) {
+    unitgroup lv_g = UnitGroup(null, lp_player, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    int lv_n = 0;
+    string lv_types = "";
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (!gf_BaIsFighter(UnitGroupLoopCurrent())) {
+            continue;
+        }
+        lv_n += 1;
+        if (StringLength(lv_types) < c_BA_TYPES_MAX) {
+            lv_types = lv_types + UnitGetType(UnitGroupLoopCurrent()) + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Fighters", lv_n);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "FighterTypes", lv_types);
+}
+
+int gf_BaEnemiesNear (int lp_player, point lp_at) {
+    unitgroup lv_g = UnitGroup(null, c_playerAny, RegionCircle(lp_at, c_BA_NEAR_R), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    int lv_n = 0;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (PlayerGetAlliance(lp_player, c_allianceIdPassive, UnitGetOwner(UnitGroupLoopCurrent()))) {
+            continue;
+        }
+        if (UnitGetOwner(UnitGroupLoopCurrent()) == 0 || UnitGetOwner(UnitGroupLoopCurrent()) == lp_player) {
+            continue;
+        }
+        lv_n += 1;
+    }
+    UnitGroupLoopEnd();
+    return lv_n;
+}
+
+// Town states of slots 0..7, "s0 s1 ...": -1 invalid, 0 unused, 1 claimed,
+// 2 building, 3 established.
+string gf_BaTownStates (int lp_player) {
+    string lv_out = "";
+    int lv_i;
+
+    for (lv_i = 0; lv_i < 8; lv_i += 1) {
+        lv_out = lv_out + IntToString(AIGetTownState(lp_player, lv_i)) + " ";
+    }
+    return lv_out;
+}
+
+// What the stock melee scripts read (SPEC-BASE-AI A11 to A13, F19 to F21).
+void gf_BaMeleeRaw (string lp_s, string lp_k, int lp_player) {
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "StartLoc100", gf_BaXY100(PlayerStartLocation(lp_player)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "GroundStartLocs", AIGetUserInt(lp_player, c_numGroundStartLocs));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "TotalStartLocs", AIGetTotalStartLocs());
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "NumEnemies", AIGetNumEnemies(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "NumAllies", AIGetNumAllies(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "NumTeams", AIGetNumTeams());
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "EnemyBuildings", AINumEnemyBuildings(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "OpeningType", AIGetUserInt(lp_player, c_openingBuildType));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "BuildIndex", AIGetUserInt(lp_player, c_currentBuildIndex));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "MainState", AIState(lp_player, e_mainState));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "AttackState", AIState(lp_player, e_attackState));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "WaveMain", AIWaveUnitCount(AIWaveGet(lp_player, c_waveMain)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "WaveAttack", AIWaveUnitCount(AIWaveGet(lp_player, c_waveAttack)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "WaveAttackState", AIWaveState(AIWaveGet(lp_player, c_waveAttack)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "TownStates", gf_BaTownStates(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "MineralsLeft", AIGetMineralAmountLeft(lp_player, c_townMax));
+}
+
+// AI internals, raw (natives in core ai.galaxy).
+void gf_BaAiSnap (string lp_s, string lp_tag, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player) + lp_tag;
+    unit lv_hall = gv_baseAiHall[lp_player];
+    unit lv_obst = AIGetObstruction(lp_player);
+
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "HallAlive", UnitIsAlive(lv_hall));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HallLife", FixedToInt(UnitGetPropertyFixed(lv_hall, c_unitPropLife, c_unitPropCurrent)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Queue", AIGetInternalBuildQueueCount(lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Obstruction", gf_BaStr(UnitGetType(lv_obst)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "TownAt100", gf_BaXY100(AIGetTownLocation(lp_player, c_townOne)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Threats", UnitGroupCount(AIGetTownThreats(lp_player, c_townOne), c_unitCountAlive));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "EnemiesNear", gf_BaEnemiesNear(lp_player, gv_baAt[lp_player]));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "MissFood", gf_BaStr(AIDefaultGetFirstMissingReq(lp_player, gf_BaFoodType(lp_player))));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "MissMaker", gf_BaStr(AIDefaultGetFirstMissingReq(lp_player, gf_BaMakerType(lp_player))));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "MissFighter", gf_BaStr(AIDefaultGetFirstMissingReq(lp_player, gf_BaFighterType(lp_player))));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "FighterMaker", gf_BaStr(AIDefaultGetMaker(lp_player, gf_BaFighterType(lp_player))));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Makers", TechTreeUnitCount(lp_player, gf_BaMakerType(lp_player), c_techCountCompleteOnly));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Excluded", gv_baseAiExcluded);
+    // Zerg supply: larva to make from, eggs, Overlords done and coming.
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Larva", TechTreeUnitCount(lp_player, "Larva", c_techCountCompleteOnly));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Eggs", TechTreeUnitCount(lp_player, "Egg", c_techCountCompleteOnly));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Food", TechTreeUnitCount(lp_player, gf_BaFoodType(lp_player), c_techCountCompleteOnly));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "FoodQueued", TechTreeUnitCount(lp_player, gf_BaFoodType(lp_player), c_techCountQueuedOrBetter));
+    gf_BaFighters(lp_s, lv_k, lp_player);
+    gf_BaHalls(lp_s, lv_k, lp_player);
+    // Expansion gate of the stock fast-expand (meleehighai *HDFastExpand).
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "NearbyOpen", AIHasNearbyOpenExpansion(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "NextTownSlot", AIGetNextUnusedTownSlot(lp_player));
+    gf_BaMeleeRaw(lp_s, lv_k, lp_player);
+    gf_BaLiveSnap(lp_s, lv_k, lp_player);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "SiteNearest100", gf_BaSiteNearest100(gv_baAt[lp_player]));
+    gf_BaMakersRaw(lp_s, lv_k, lp_player);
+    // Terran depots, raised + lowered, done and coming.
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "DepotsQueued", TechTreeUnitCount(lp_player, "SupplyDepot", c_techCountQueuedOrBetter) + TechTreeUnitCount(lp_player, "SupplyDepotLowered", c_techCountQueuedOrBetter));
+}
+
+void gf_BaMacroSnap (string lp_s, string lp_tag) {
+    int lv_lane;
+    int lv_p;
+
+    for (lv_lane = 1; lv_lane <= c_BA_MACRO_LANES; lv_lane += 1) {
+        lv_p = gf_BaseAiLaneOwner(lv_lane);
+        gf_BaPlayerSnap(lp_s, lp_tag, lv_p);
+        gf_BaAiSnap(lp_s, lp_tag, lv_p);
+    }
+    BankSave(gv_dbgBank);
+}
+
+void gf_BaFlightSnap (string lp_s, string lp_tag) {
+    unit lv_w = gv_heroViking;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "H100", FixedToInt((UnitGetHeight(lv_w) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_w))) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Flight100", FixedToInt(gf_FlightHeight(1) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Cam100", FixedToInt(gv_cameraHeightApplied[1] * 100.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "FlightIs", gf_FlightIs(1));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "JumpPhase", gv_jumpPhase[1]);
+}
+
+// Space held climbs, Ctrl held descends (the key triggers' flags), and the
+// camera offset follows. Key events need a real key: the flags are set here.
+// Raw: height above ground every 0.25 s for lp_n samples, one string.
+void gf_BaFlightTrace (string lp_s, string lp_key, int lp_n) {
+    string lv_out = "";
+    int lv_i;
+
+    for (lv_i = 1; lv_i <= lp_n; lv_i += 1) {
+        Wait(0.25, c_timeGame);
+        lv_out = lv_out + IntToString(FixedToInt(gf_FlightHeight(1) * 100.0)) + " ";
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key, lv_out);
+}
+
+void gf_BaFlight (string lp_s) {
+    BankValueSetFromInt(gv_dbgBank, lp_s, "camBase100", FixedToInt(c_SCOBA_CAMERA_HEIGHT_OFFSET * 100.0));
+    gf_BaFlightSnap(lp_s, "fly0");
+    gv_flightUp[1] = true;
+    gf_FlightDirSet(1);
+    gf_BaFlightTrace(lp_s, "traceUp", 4);
+    gv_flightUp[1] = false;
+    gf_FlightDirSet(1);
+    gf_BaFlightTrace(lp_s, "traceHoldUp", 4);
+    gf_BaFlightSnap(lp_s, "flyUp");
+    gv_flightDown[1] = true;
+    gf_FlightDirSet(1);
+    gf_BaFlightTrace(lp_s, "traceDown", 4);
+    gv_flightDown[1] = false;
+    gf_FlightDirSet(1);
+    gf_BaFlightTrace(lp_s, "traceHoldDown", 4);
+    gf_BaFlightSnap(lp_s, "flyDown");
+}
+
+// The Alt+4 Viking's form: flight mode is the SCOBAVikingHero type
+// (Mover Fly); landed it is SCOBAVikingHeroAssault.
+void gf_BaVikingForm (string lp_s, string lp_key) {
+    string lv_t = UnitGetType(gv_heroViking);
+
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Type", lv_t);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Mover", CatalogFieldValueGet(c_gameCatalogUnit, lv_t, "Mover", 1));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Height100", FixedToInt(UnitGetPropertyFixed(gv_heroViking, c_unitPropHeight, c_unitPropCurrent) * 100.0));
+}
+
+// Switch player 1 to the Alt+4 Viking. A TPS-on order is tried: a regular
+// unit refuses it (PNC only). Raw preconditions recorded.
+void gf_BaWraithUp (string lp_s) {
+    int lv_i = 0;
+
+    // Map init binds the heroes after a real-time wait: wait for it here,
+    // bounded, so the switch does not race it.
+    while (!gv_heroSwitchReady && lv_i < 100) {
+        Wait(0.1, c_timeGame);
+        lv_i += 1;
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "switchWaitTicks", lv_i);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "wraithValid", UnitIsValid(gv_heroViking));
+    BankValueSetFromString(gv_dbgBank, lp_s, "wraithType", UnitGetType(gv_heroViking));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "switchReady", gv_heroSwitchReady);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "dropPending", gv_dropPending[1]);
+    BankValueSetFromString(gv_dbgBank, lp_s, "activeBefore", UnitGetType(gv_heroActive));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "toshValid", UnitIsValid(gv_heroTosh));
+    gf_HeroSwitchTo(gv_heroViking);
+    BankValueSetFromString(gv_dbgBank, lp_s, "activeAfter", UnitGetType(gv_heroActive));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "wraithTpsBefore", gf_TpsActive(1));
+    if (!gf_TpsActive(1)) {
+        BankValueSetFromFlag(gv_dbgBank, lp_s, "wraithTpsOrder", UnitIssueOrder(gv_heroViking, Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace));
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "wraithHasToggle", UnitAbilityExists(gv_heroViking, "SCOBATPSToggle"));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "wraithActive", gv_heroActive == gv_heroViking);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "wraithTps", gf_TpsActive(1));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "wraithTpsBehavior", UnitBehaviorCount(gv_heroViking, c_SCOBA_TPS_BEHAVIOR));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "wraithIsTpsUnit", gv_tPSUNIT[1] == gv_heroViking);
+    gf_BaVikingForm(lp_s, "vikStart");
+}
+
+void gf_BaMacro () {
+    string lv_s = "ba_macro";
+    int lv_lane;
+    int lv_p;
+    int lv_i;
+
+    for (lv_lane = 1; lv_lane <= c_BA_MACRO_LANES; lv_lane += 1) {
+        lv_p = gf_BaseAiLaneOwner(lv_lane);
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Lane"), lv_lane);
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Type"), PlayerType(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Status"), PlayerStatus(lv_p));
+        BankValueSetFromString(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Race"), PlayerRace(lv_p));
+        gf_BaseAiCreateLane(lv_lane);
+        gf_BaLiveWatch(lv_p);
+        gv_baHall[lv_p] = gv_baseAiHall[lv_p];
+        gv_baAt[lv_p] = UnitGetPosition(gv_baseAiHall[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Started"), gv_baseAiStarted[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lv_s, gf_BaKey(lv_p, "HallValid"), UnitIsValid(gv_baseAiHall[lv_p]));
+        BankValueSetFromString(gv_dbgBank, lv_s, gf_BaKey(lv_p, "HallAt100"), gf_BaXY100(gv_baAt[lv_p]));
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Difficulty"), PlayerDifficulty(lv_p));
+        if (PlayerRace(lv_p) == "Terr") {
+            gf_BaHallFootprint(lv_s, lv_p);
+            gf_BaLiveSitePlace(lv_s, gf_BaKey(lv_p, ""), lv_p);
+        }
+    }
+    // The operator watches from the Alt+4 Wraith in TPS. The checks read AI
+    // engine state only, so operator input does not touch them.
+    gf_BaSites(lv_s);
+    gf_BaWraithUp(lv_s);
+    gf_BaFlight(lv_s);
+    gf_BaMacroSnap(lv_s, "t1");
+    for (lv_i = 1; lv_i <= c_BA_MACRO_SNAPS; lv_i += 1) {
+        Wait(60.0, c_timeGame);
+        gf_BaMacroSnap(lv_s, "t" + IntToString(60 * lv_i));
+    }
+    // After the Orbital / Planetary morphs: still 8x8.
+    for (lv_lane = 1; lv_lane <= c_BA_MACRO_LANES; lv_lane += 1) {
+        lv_p = gf_BaseAiLaneOwner(lv_lane);
+        if (PlayerRace(lv_p) == "Terr" && UnitIsAlive(gv_baseAiHall[lv_p])) {
+            gf_BaHallFootprint("ba_macro_end", lv_p);
+        }
+    }
+}

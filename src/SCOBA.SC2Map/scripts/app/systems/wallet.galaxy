@@ -1,0 +1,162 @@
+// Module: systems/wallet
+// Hero minerals and gas (REQ-BASE-AI R-WALLET-*): each hero starts with
+// 100 minerals and 100 gas, a kill pays the killing player a random bounty
+// from the victim's max life, shields and energy, and the amounts show at
+// the top centre of the screen. The money is the player's own resource
+// property, so hiring (systems/hire) spends it.
+
+const int c_WALLET_START_MINERALS = 100;
+const int c_WALLET_START_VESPENE = 100;
+// Bounty: value V = max life + max shields + max energy of the victim.
+const fixed c_BOUNTY_MINERALS_LO = 0.10;
+const fixed c_BOUNTY_MINERALS_HI = 0.30;
+const fixed c_BOUNTY_VESPENE_LO = 0.05;
+const fixed c_BOUNTY_VESPENE_HI = 0.15;
+const int c_WALLET_HUD_W = 360;
+const int c_WALLET_HUD_H = 36;
+const int c_WALLET_HUD_Y = 8;          // above the target bar (boss bar at 50)
+
+int gv_walletDialog = c_invalidDialogId;
+int gv_walletLabel = c_invalidDialogControlId;
+int[16] gv_bountyCount;                // paid bounties per player (tests)
+int[16] gv_bountyMinerals;             // last bounty per player (tests)
+int[16] gv_bountyVespene;
+int[16] gv_bountyValue;                // last victim value V (tests)
+text[16] gv_walletHudText;             // last HUD text per player (tests)
+trigger gt_Bounty;
+trigger gt_WalletHud;
+
+// The played seats (core/roster, R-ROSTER-5): an unplayed seat has no wallet.
+bool gf_WalletPlayer (int lp_player) {
+    return gf_RosterPlayed(lp_player);
+}
+
+int gf_UnitBountyValue (unit lp_unit) {
+    fixed lv_v = UnitGetPropertyFixed(lp_unit, c_unitPropLifeMax, c_unitPropCurrent);
+
+    lv_v += UnitGetPropertyFixed(lp_unit, c_unitPropShieldsMax, c_unitPropCurrent);
+    lv_v += UnitGetPropertyFixed(lp_unit, c_unitPropEnergyMax, c_unitPropCurrent);
+    return FixedToInt(lv_v);
+}
+
+// The stock top-bar resource icons (core assets.txt
+// UI/ResourceIconNoBackground0, _1_Terr, _1_Zerg).
+const string c_WALLET_ICON_MINERALS = "Assets\\Textures\\icon-mineral-nobg.dds";
+const string c_WALLET_ICON_GAS_TERRAN = "Assets\\Textures\\icon-gas-terran-nobg.dds";
+const string c_WALLET_ICON_GAS_ZERG = "Assets\\Textures\\icon-gas-zerg_nobg.dds";
+const int c_WALLET_ICON_SIZE = 24;
+
+string gf_WalletGasIcon (int lp_player) {
+    if (PlayerRace(lp_player) == "Zerg") {
+        return c_WALLET_ICON_GAS_ZERG;
+    }
+    return c_WALLET_ICON_GAS_TERRAN;
+}
+
+// absolutemiddle: the icon centred on the text line, not on its baseline
+// (operator 2026-11-18).
+string gf_WalletIcon (string lp_path) {
+    return "<img path=\"" + lp_path + "\" alignment=\"absolutemiddle\" width=\"" + IntToString(c_WALLET_ICON_SIZE) + "\" height=\"" + IntToString(c_WALLET_ICON_SIZE) + "\"/>";
+}
+
+void gf_WalletHudUpdate (int lp_player) {
+    text lv_t;
+
+    if (!gf_WalletPlayer(lp_player) || gv_walletLabel == c_invalidDialogControlId) {
+        return;
+    }
+    lv_t = StringToText(gf_WalletIcon(c_WALLET_ICON_MINERALS) + " " + IntToString(PlayerGetPropertyInt(lp_player, c_playerPropMinerals))
+        + "     " + gf_WalletIcon(gf_WalletGasIcon(lp_player)) + " " + IntToString(PlayerGetPropertyInt(lp_player, c_playerPropVespene)));
+    gv_walletHudText[lp_player] = lv_t;
+    libNtve_gf_SetDialogItemText(gv_walletLabel, lv_t, PlayerGroupSingle(lp_player));
+}
+
+void gf_WalletHudCreate () {
+    int lv_p;
+
+    DialogCreate(c_WALLET_HUD_W, c_WALLET_HUD_H, c_anchorTop, 0, c_WALLET_HUD_Y, true);
+    gv_walletDialog = DialogLastCreated();
+    DialogSetImageVisible(gv_walletDialog, false);
+    libNtve_gf_CreateDialogItemLabel(gv_walletDialog, c_WALLET_HUD_W, c_WALLET_HUD_H, c_anchorCenter, 0, 0, StringToText(""), Color(100,100,100), false, 0.0);
+    gv_walletLabel = DialogControlLastCreated();
+    libNtve_gf_SetDialogItemStyle(gv_walletLabel, "SCOBAHudLine", PlayerGroupAll());
+    DialogSetVisible(gv_walletDialog, PlayerGroupAll(), false);
+    for (lv_p = 1; lv_p <= 6; lv_p += 1) {
+        if (gf_WalletPlayer(lv_p)) {
+            DialogSetVisible(gv_walletDialog, PlayerGroupSingle(lv_p), true);
+            gf_WalletHudUpdate(lv_p);
+        }
+    }
+}
+
+void gf_WalletInit () {
+    int lv_p;
+
+    for (lv_p = 1; lv_p <= 6; lv_p += 1) {
+        if (gf_WalletPlayer(lv_p)) {
+            PlayerModifyPropertyInt(lv_p, c_playerPropMinerals, c_playerPropOperSetTo, c_WALLET_START_MINERALS);
+            PlayerModifyPropertyInt(lv_p, c_playerPropVespene, c_playerPropOperSetTo, c_WALLET_START_VESPENE);
+        }
+    }
+    gf_WalletHudCreate();
+}
+
+// Pays lp_player for killing lp_victim; returns false when it pays nothing.
+bool gf_BountyPay (int lp_player, unit lp_victim) {
+    int lv_owner;
+    int lv_v;
+    int lv_m;
+    int lv_g;
+
+    if (!gf_WalletPlayer(lp_player) || !UnitIsValid(lp_victim)) {
+        return false;
+    }
+    lv_owner = UnitGetOwner(lp_victim);
+    if (lv_owner == lp_player || libNtve_gf_PlayerIsEnemy(lp_player, lv_owner, libNtve_ge_PlayerRelation_Enemy) == false) {
+        return false;
+    }
+    lv_v = gf_UnitBountyValue(lp_victim);
+    lv_m = FixedToInt(IntToFixed(lv_v) * RandomFixed(c_BOUNTY_MINERALS_LO, c_BOUNTY_MINERALS_HI));
+    lv_g = FixedToInt(IntToFixed(lv_v) * RandomFixed(c_BOUNTY_VESPENE_LO, c_BOUNTY_VESPENE_HI));
+    PlayerModifyPropertyInt(lp_player, c_playerPropMinerals, c_playerPropOperAdd, lv_m);
+    PlayerModifyPropertyInt(lp_player, c_playerPropVespene, c_playerPropOperAdd, lv_g);
+    gv_bountyCount[lp_player] += 1;
+    gv_bountyMinerals[lp_player] = lv_m;
+    gv_bountyVespene[lp_player] = lv_g;
+    gv_bountyValue[lp_player] = lv_v;
+    return true;
+}
+
+bool gt_Bounty_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_BountyPay(libNtve_gf_KillingPlayer(), EventUnit());
+    return true;
+}
+
+bool gt_WalletHud_Func (bool testConds, bool runActions) {
+    int lv_p = EventPlayer();
+
+    if (!runActions) {
+        return true;
+    }
+    // The event fires for every player, AI owners 9 and 10 too: past the
+    // end of the per-hero arrays (unit[8] gv_unitTarget).
+    if (!gf_WalletPlayer(lv_p)) {
+        return true;
+    }
+    gf_WalletHudUpdate(lv_p);
+    if (UnitIsValid(gv_unitTarget[lv_p])) {
+        gf_HireButtonApply(lv_p);
+    }
+    return true;
+}
+
+void gt_Wallet_Init () {
+    gt_Bounty = TriggerCreate("gt_Bounty_Func");
+    TriggerAddEventUnitDied(gt_Bounty, null);
+    gt_WalletHud = TriggerCreate("gt_WalletHud_Func");
+    TriggerAddEventPlayerPropChange(gt_WalletHud, c_playerAny, c_playerPropMinerals);
+    TriggerAddEventPlayerPropChange(gt_WalletHud, c_playerAny, c_playerPropVespene);
+}

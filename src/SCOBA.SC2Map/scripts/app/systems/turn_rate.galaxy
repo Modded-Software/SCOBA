@@ -1,0 +1,35 @@
+// Script turns at the unit's data turn rate (operator 2026-11-18: the landed
+// hero Viking turns slowly, also in place). Every script facing change of a
+// controlled unit goes through gf_UnitTurn: the blend lasts at least the
+// turn angle over the type's rate, the lower of UnitData TurningRate and
+// StationaryTurningRate (degrees per second). Stock rates are ~1000, so
+// those units keep their fixed blend times.
+
+string gv_turnRateType;   // one-entry cache: type and its rate
+fixed gv_turnRate;
+
+fixed gf_UnitTurnRate (unit lp_u) {
+    string lv_t = UnitGetType(lp_u);
+    fixed lv_move;
+    fixed lv_still;
+
+    if (lv_t != gv_turnRateType) {
+        lv_move = StringToFixed(CatalogFieldValueGet(c_gameCatalogUnit, lv_t, "TurningRate", UnitGetOwner(lp_u)));
+        lv_still = StringToFixed(CatalogFieldValueGet(c_gameCatalogUnit, lv_t, "StationaryTurningRate", UnitGetOwner(lp_u)));
+        gv_turnRate = MinF(lv_move, lv_still);
+        gv_turnRateType = lv_t;
+    }
+    return gv_turnRate;
+}
+
+// Turn lp_u to lp_angle over lp_duration, or slower if its rate demands.
+void gf_UnitTurn (unit lp_u, fixed lp_angle, fixed lp_duration) {
+    fixed lv_rate = gf_UnitTurnRate(lp_u);
+    fixed lv_delta = AbsF(ModF(lp_angle - UnitGetFacing(lp_u) + 540.0, 360.0) - 180.0);
+
+    if (lv_rate > 0.0) {
+        UnitSetFacing(lp_u, lp_angle, MaxF(lp_duration, lv_delta / lv_rate));
+        return;
+    }
+    UnitSetFacing(lp_u, lp_angle, lp_duration);
+}

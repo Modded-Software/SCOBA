@@ -1,0 +1,191 @@
+// UI panel tests (REQ-UI-PANELS). Stats and abilities panels of player 1:
+// XP and level-ups must not close them; a closed panel stays closed.
+// Visibility is read from the engine with DialogIsVisible.
+trigger gt_UiTest;
+
+int gf_UiVis (int lp_dialog) {
+    return BoolToInt(DialogIsVisible(lp_dialog, 1));
+}
+
+// Reset: both panels closed, no points, no XP, no enemies.
+void gf_UiReset () {
+    DialogSetVisible(gv_userSelectionDialog, PlayerGroupSingle(1), false);
+    gf_AbilitiesSelectionDialogHide(1);
+    gv_availableStatPoints[1] = 0;
+    gv_availableAbilityPoints[1] = 0;
+    gv_xP[1] = 0;
+    gf_DbgClearEnemies();
+    Wait(0.25, c_timeGame);
+}
+
+void gf_UiSnap (string lp_s, string lp_t) {
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Stats", gf_UiVis(gv_userSelectionDialog));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Abil", gf_UiVis(gv_abilitiesSelectionDialog));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Col", gf_UiVis(gv_abilitiesSelectionAdditionalColumnDialog));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "StatsBtn", gf_UiVis(gv_singleButtonDialog));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "AbilBtn", gf_UiVis(gv_singleButtonDialogAbilities));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "StatPts", gv_availableStatPoints[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "AbilPts", gv_availableAbilityPoints[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Level", gv_lEVEL[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Xp", gv_xP[1]);
+    BankSave(gv_dbgBank);
+}
+
+int gf_UiThreshold () {
+    return (gv_lEVEL[1] * 298) + PowI(2.0, gv_lEVEL[1]);
+}
+
+// Ten small XP awards, 0.25 s apart: the rate of a fight, no level-up.
+void gf_UiTrickle () {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < 10; lv_i += 1) {
+        gf_AwardExperience(1, 1);
+        Wait(0.25, c_timeGame);
+    }
+}
+
+// Stats open, XP without level-up: stays open (R-UI-1).
+void gf_UiXpStats () {
+    gf_UiReset();
+    gf_StatsPanelToggle(1);
+    gf_UiSnap("xp_stats", "open");
+    gf_UiTrickle();
+    Wait(0.5, c_timeGame);
+    gf_UiSnap("xp_stats", "after");
+}
+
+// Stats open, level-up: stays open, 3 points added (R-UI-1).
+void gf_UiLvlStats () {
+    gf_UiReset();
+    gf_StatsPanelToggle(1);
+    gf_UiSnap("lvl_stats", "open");
+    gf_AwardExperience(1, gf_UiThreshold());
+    Wait(0.5, c_timeGame);
+    gf_UiSnap("lvl_stats", "after");
+}
+
+// Abilities open, XP and a level-up: panel and key column stay open (R-UI-1).
+void gf_UiAbil () {
+    gf_UiReset();
+    gf_AbilitiesPanelToggle(1);
+    gf_UiSnap("abil", "open");
+    gf_UiTrickle();
+    gf_UiSnap("abil", "xp");
+    gf_AwardExperience(1, gf_UiThreshold());
+    Wait(0.5, c_timeGame);
+    gf_UiSnap("abil", "lvl");
+}
+
+// Negative: closed panels stay closed on XP and level-up; the HUD
+// buttons show (R-UI-2).
+void gf_UiClosed () {
+    gf_UiReset();
+    gf_UiSnap("closed", "before");
+    gf_UiTrickle();
+    gf_AwardExperience(1, gf_UiThreshold());
+    Wait(0.5, c_timeGame);
+    gf_UiSnap("closed", "after");
+}
+
+// Negative: player 2 levelling does not touch the panels of player 1 (R-UI-4).
+void gf_UiOther () {
+    gf_UiReset();
+    gf_StatsPanelToggle(1);
+    gf_AbilitiesPanelToggle(1);
+    gf_UiSnap("other", "open");
+    gf_ShowStasLevelingInterface(2);
+    gf_ShowAbilityLevelingInterface(2);
+    gf_AwardExperience(2, 5000);
+    gf_AbilitiesSelectionDialogHide(2);
+    Wait(0.5, c_timeGame);
+    gf_UiSnap("other", "after");
+}
+
+// Spend: the last point keeps the panel open; at 0 points a spend does
+// nothing (R-UI-3).
+void gf_UiSpend () {
+    gf_UiReset();
+    gv_availableStatPoints[1] = 2;
+    gf_StatsPanelToggle(1);
+    BankValueSetFromInt(gv_dbgBank, "spend", "first", BoolToInt(gf_UnitSelectionSpend(1, 4)));
+    BankValueSetFromInt(gv_dbgBank, "spend", "last", BoolToInt(gf_UnitSelectionSpend(1, 4)));
+    Wait(0.25, c_timeGame);
+    gf_UiSnap("spend", "last");
+    BankValueSetFromInt(gv_dbgBank, "spend", "empty", BoolToInt(gf_UnitSelectionSpend(1, 4)));
+    Wait(0.25, c_timeGame);
+    gf_UiSnap("spend", "empty");
+}
+
+// The HUD buttons and the close button still open and close (R-UI-4).
+void gf_UiToggle () {
+    gf_UiReset();
+    gf_StatsPanelToggle(1);
+    gf_UiSnap("toggle", "statsOn");
+    gf_StatsPanelToggle(1);
+    gf_UiSnap("toggle", "statsOff");
+    gf_AbilitiesPanelToggle(1);
+    gf_UiSnap("toggle", "abilOn");
+    gf_AbilitiesPanelToggle(1);
+    gf_UiSnap("toggle", "abilOff");
+    gf_AbilitiesPanelToggle(1);
+    gf_AbilitiesSelectionDialogHide(1);
+    gf_UiSnap("toggle", "abilClose");
+}
+
+// Integration: the hero kills a zergling; the kill awards XP through the
+// engine damage and death events. Both panels stay open (R-UI-1).
+void gf_UiKill () {
+    int lv_i;
+    unit lv_enemy;
+
+    gf_UiReset();
+    gf_DbgReset("kill", true, true);
+    gf_StatsPanelToggle(1);
+    gf_AbilitiesPanelToggle(1);
+    gf_UiSnap("kill", "open");
+    lv_enemy = gf_DbgSpawnOne("kill", 3.0, 20.0);
+    for (lv_i = 0; lv_i < 64; lv_i += 1) {
+        if (!UnitIsAlive(lv_enemy)) {
+            break;
+        }
+        Wait(0.125, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, "kill", "enemyDead", BoolToInt(!UnitIsAlive(lv_enemy)));
+    Wait(1.0, c_timeGame);
+    gf_UiSnap("kill", "after");
+    gf_DbgClearEnemies();
+}
+
+bool gt_UiTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAUITEST", 1);
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "ui");
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    BankValueSetFromInt(gv_dbgBank, "meta", "hero", BoolToInt(UnitIsValid(gv_tPSUNIT[1])));
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "ui_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_UiXpStats();
+    gf_UiLvlStats();
+    gf_UiAbil();
+    gf_UiClosed();
+    gf_UiOther();
+    gf_UiSpend();
+    gf_UiToggle();
+    gf_UiKill();
+    gf_UiReset();
+    BankValueSetFromInt(gv_dbgBank, "ui_end", "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_UiTest_Init () {
+    gt_UiTest = TriggerCreate("gt_UiTest_Func");
+    TriggerAddEventMapInit(gt_UiTest);
+}

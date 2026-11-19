@@ -21,6 +21,7 @@ PROFILE_OUTPUTS = {
     "fxgallery": ROOT / "out" / "SCOBA256_fxgallery.SC2Map",
     "waterprobe": ROOT / "out" / "SCOBA256_waterprobe.SC2Map",
     "dissolveview": ROOT / "out" / "SCOBA256_dissolveview.SC2Map",
+    "dropview": ROOT / "out" / "SCOBA256_dropview.SC2Map",
     "jump": ROOT / "out" / "SCOBA256_jumptest.SC2Map",
     "herodrop": ROOT / "out" / "SCOBA256_herodroptest.SC2Map",
     "intro": ROOT / "out" / "SCOBA256_introtest.SC2Map",
@@ -28,6 +29,9 @@ PROFILE_OUTPUTS = {
     "aimdof": ROOT / "out" / "SCOBA256_aimdof.SC2Map",
     "skyduel": ROOT / "out" / "SCOBA256_skyduel.SC2Map",
     "aircreep": ROOT / "out" / "SCOBA256_aircreep.SC2Map",
+    "ui": ROOT / "out" / "SCOBA256_uitest.SC2Map",
+    "baseai": ROOT / "out" / "SCOBA256_baseai.SC2Map",
+    "roster": ROOT / "out" / "SCOBA256_roster.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -47,6 +51,7 @@ PROFILE_BANKS = {
     "fxgallery": (),
     "waterprobe": ("SCOBAWATERPROBE",),
     "dissolveview": ("SCOBADISSOLVE",),
+    "dropview": ("SCOBADROPVIEW",),
     "jump": ("SCOBAJUMPTEST",),
     "herodrop": ("SCOBAHERODROP",),
     "intro": ("SCOBAINTRO",),
@@ -54,6 +59,9 @@ PROFILE_BANKS = {
     "aimdof": ("SCOBAAIMDOF",),
     "skyduel": ("SCOBASKYDUEL",),
     "aircreep": ("SCOBAAIRCREEP",),
+    "ui": ("SCOBAUITEST",),
+    "baseai": ("SCOBABASEAI",),
+    "roster": ("SCOBAROSTER",),
 }
 
 
@@ -121,4 +129,13 @@ def profile_module(name):
     if name == "aircreep":
         from . import aircreep
         return aircreep
+    if name == "ui":
+        from . import ui
+        return ui
+    if name == "baseai":
+        from . import baseai
+        return baseai
+    if name == "roster":
+        from . import roster
+        return roster
     raise SystemExit(f"unknown test profile: {name}")

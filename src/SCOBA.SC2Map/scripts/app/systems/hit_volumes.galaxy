@@ -256,6 +256,19 @@ fixed gf_HvRayBox (int lp_s) {
     return MaxF(lv_min, 0.0);
 }
 
+// Map types that use a stock type's measured volume (same model, same
+// scale). Called after gf_HvLoad.
+void gf_HvAlias (string lp_alias, string lp_name) {
+    if (DataTableValueExists(true, "HV_" + lp_name)) {
+        DataTableSetInt(true, "HV_" + lp_alias, DataTableGetInt(true, "HV_" + lp_name));
+    }
+}
+
+void gf_HvAliases () {
+    // The two vista Overlords: the Overlord model at the Overlord scale.
+    gf_HvAlias("SCOBAVistaOverlord", "Overlord");
+}
+
 // The volume index of a unit type, or -1. A type without a volume is
 // counted and reported once.
 int gf_HvTypeIndex (string lp_type) {

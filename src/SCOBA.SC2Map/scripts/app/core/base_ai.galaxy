@@ -1,0 +1,37 @@
+// Module: core/base_ai
+// Bases and the stock melee AI (REQ-BASE-AI, SPEC-BASE-AI). Constants and
+// state. Each lane has one computer base owner (core/roster); the seats
+// have no base and no AI. Players 9 to 14 are made computer players by
+// the build (scripts/mapgen/player_slots.py).
+
+// Off in every test profile but baseai (scripts/testkit/map_builder.py).
+const bool c_BASE_AI_ENABLED = true;
+
+const int c_BASE_AI_LANES = 6;
+const int c_BASE_AI_WORKERS = 12;
+const int c_BASE_AI_MINERALS = 50;
+const int c_BASE_AI_DIFFICULTY = 10;     // c_skirChInsane, "Cheater Insane"
+const int c_BASE_AI_PLAYERS = 16;
+const fixed c_BASE_AI_FIELD_R = 7.0;     // hall centre to a mineral field
+const fixed c_BASE_AI_GEYSER_R = 7.5;    // hall centre to a geyser
+
+// Unit custom value index set to 1 on a hired unit (systems/hire).
+const int c_HIRE_MARK = 0;
+
+int gv_baseAiExcluded;                   // gf_BaseAiExclude calls (tests read it)
+bool[c_BASE_AI_PLAYERS] gv_baseAiStarted;
+unit[c_BASE_AI_PLAYERS] gv_baseAiHall;
+
+// Lane -> computer base owner (core/roster).
+int gf_BaseAiLaneOwner (int lp_lane) {
+    return gf_RosterOwner(lp_lane);
+}
+
+bool gf_HireIsHired (unit lp_unit) {
+    return UnitIsValid(lp_unit) && UnitGetCustomValue(lp_unit, c_HIRE_MARK) == 1.0;
+}
+
+// A player the base AI plays (the six lane base owners).
+bool gf_BaseAiIsAiPlayer (int lp_player) {
+    return gf_RosterIsOwner(lp_player);
+}

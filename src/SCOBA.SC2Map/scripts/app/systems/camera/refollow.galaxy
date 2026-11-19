@@ -1,0 +1,100 @@
+// Module: systems/camera/refollow
+// Operator 2026-11-18: Space sometimes moved the camera to a command centre
+// and it never followed the hero again. Space is also the stock AlertRecall
+// hotkey, and a camera jump ends the follow; nothing restored it (operator
+// bank SCOBACAMDBG: camera 12,8, hero 194,176). The cause is a hypothesis:
+// no test can press the real hotkey.
+// Fix: alert recall targets are cleared; a camera jump (alert, idle worker,
+// town, selection) re-follows the hero at once; a watchdog re-follows when
+// the camera lost the hero by any other way. Not during the intro or a
+// hero drop, which own the camera.
+
+const fixed c_REFOLLOW_PERIOD = 0.25;
+// Camera target this far from the hero: lost. A following camera sat 10.4
+// off the flying Viking (run 20261118-163821), plus lag at speed 16.
+const fixed c_REFOLLOW_LOST = 40.0;
+
+trigger gt_CameraRefollowMove;
+trigger gt_CameraRefollowTick;
+
+int[c_SCOBA_HERO_LAST + 1] gv_camRefollows;        // re-follows done, for tests
+int[c_SCOBA_HERO_LAST + 1] gv_camRefollowReason;   // last cause: move reason, or -2 watchdog
+
+bool gf_CameraRefollowOwned (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    if (!gf_IsHeroPlayer(lp_player) || !UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
+        return false;
+    }
+    // A pod in flight owns the camera too (herodrop 20261118-175226: the
+    // refollow pulled the camera off the pod).
+    if (gv_introActive[lp_player] || gv_dropPending[lp_player] || UnitIsValid(gv_dropPod[lp_player])) {
+        return false;
+    }
+    return !UnitTestState(lv_hero, c_unitStateHidden);
+}
+
+// The follow the hero should have: the hero, plus the aim proxy in aim.
+bool gf_CameraFollowsHero (int lp_player) {
+    unitgroup lv_g = CameraFollowUnitGroupGet(lp_player);
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    if (!UnitGroupHasUnit(lv_g, lv_hero)) {
+        return false;
+    }
+    return DistanceBetweenPoints(CameraGetTarget(lp_player), UnitGetPosition(lv_hero)) <= c_REFOLLOW_LOST;
+}
+
+void gf_CameraRefollow (int lp_player, int lp_reason) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+    unitgroup lv_g = libNtve_gf_ConvertUnitToUnitGroup(lv_hero);
+
+    if (gv_aIMACTIVE[lp_player] && UnitIsValid(gv_aimCameraProxy[lp_player])) {
+        UnitGroupAdd(lv_g, gv_aimCameraProxy[lp_player]);
+    }
+    CameraPan(lp_player, UnitGetPosition(lv_hero), 0.0, -1, 10.0, false);
+    CameraFollowUnitGroup(lp_player, lv_g, true, false);
+    gv_camRefollows[lp_player] += 1;
+    gv_camRefollowReason[lp_player] = lp_reason;
+}
+
+bool gt_CameraRefollowMove_Func (bool testConds, bool runActions) {
+    int lv_p = EventPlayer();
+    int lv_r = EventCameraMoveReason();
+
+    if (!runActions) {
+        return true;
+    }
+    if (lv_r != c_cameraMoveReasonAlert && lv_r != c_cameraMoveReasonIdleWorker && lv_r != c_cameraMoveReasonTown && lv_r != c_cameraMoveReasonSelection) {
+        return true;
+    }
+    if (!gf_CameraRefollowOwned(lv_p)) {
+        return true;
+    }
+    gf_CameraRefollow(lv_p, lv_r);
+    return true;
+}
+
+bool gt_CameraRefollowTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        if (gf_CameraRefollowOwned(lv_p)) {
+            UIAlertClear(lv_p);
+            if (!gf_CameraFollowsHero(lv_p)) {
+                gf_CameraRefollow(lv_p, -2);
+            }
+        }
+    }
+    return true;
+}
+
+void gt_CameraRefollow_Init () {
+    gt_CameraRefollowMove = TriggerCreate("gt_CameraRefollowMove_Func");
+    TriggerAddEventCameraMove(gt_CameraRefollowMove, c_playerAny, c_cameraMoveReasonAny);
+    gt_CameraRefollowTick = TriggerCreate("gt_CameraRefollowTick_Func");
+    TriggerAddEventTimePeriodic(gt_CameraRefollowTick, c_REFOLLOW_PERIOD, c_timeGame);
+}

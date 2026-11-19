@@ -1,14 +1,40 @@
 // Module: systems/movement
 
+// Move targets scale with the bound unit's own speed, so a fast unit (the
+// 22.5 Wraith) never reaches its target and slows between orders. The old
+// fixed values stay the floor: the heroes (speed ~3) are unchanged.
+// Free mode: a ground unit keeps the 0.5 step; a flyer leads by 0.5 s
+// (a 2-tick lead measured uneven, 16.3 of 22.5: run 20261118-111454).
+const fixed c_MOVE_STEP = 0.5;            // free-mode step, ground
+const fixed c_MOVE_STEP_TIME = 0.5;       // free-mode step of a flyer, s ahead
+const fixed c_MOVE_TARGET_TIME = 2.0;     // strafe target: 2 s ahead
+const fixed c_MOVE_RETARGET_TIME = 0.25;  // strafe retarget: 0.25 s before it
+
+fixed gf_MoveSpeed (unit lp_u) {
+    return UnitGetPropertyFixed(lp_u, c_unitPropMovementSpeed, c_unitPropCurrent);
+}
+
+fixed gf_MoveTargetDist (unit lp_u) {
+    return MaxF(c_ANIM_MOVE_TARGET, gf_MoveSpeed(lp_u) * c_MOVE_TARGET_TIME);
+}
+
+fixed gf_MoveRetargetDist (unit lp_u) {
+    return MaxF(c_ANIM_MOVE_RETARGET, gf_MoveSpeed(lp_u) * c_MOVE_RETARGET_TIME);
+}
+
 void gf_CombatMoveStep (int lp_player, fixed lp_angle) {
     unit lv_hero;
     point lv_next;
+    fixed lv_step = c_MOVE_STEP;
 
     lv_hero = gv_tPSUNIT[lp_player];
     if (!UnitIsValid(lv_hero)) {
         return;
     }
-    lv_next = PointWithOffsetPolar(UnitGetPosition(lv_hero), 0.5, lp_angle);
+    if (gf_FlightIs(lp_player)) {
+        lv_step = MaxF(c_MOVE_STEP, gf_MoveSpeed(lv_hero) * c_MOVE_STEP_TIME);
+    }
+    lv_next = PointWithOffsetPolar(UnitGetPosition(lv_hero), lv_step, lp_angle);
     UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), lv_next), c_orderQueueReplace);
 }
 
@@ -68,7 +94,7 @@ void gf_ForwardBegin (int lp_player) {
         }
         else {
             gf_CombatMoveStep(lp_player, lv_angle);
-            UnitSetFacing(gv_tPSUNIT[lp_player], lv_angle, c_ANIM_MOVE_TURN_DURATION);
+            gf_UnitTurn(gv_tPSUNIT[lp_player], lv_angle, c_ANIM_MOVE_TURN_DURATION);
             Wait(0.01, c_timeGame);
         }
     }
@@ -109,6 +135,10 @@ bool gt_ForwardStart_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     if (gv_sCOBAOrderMode[lv_localPlayer] == true) {
         return true;
@@ -135,6 +165,10 @@ bool gt_ForwardEnd_Func (bool testConds, bool runActions) {
 
     // Actions
     if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
         return true;
     }
 
@@ -164,6 +198,10 @@ bool gt_BackwardStart_Func (bool testConds, bool runActions) {
 
     // Actions
     if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
         return true;
     }
 
@@ -197,7 +235,7 @@ bool gt_BackwardStart_Func (bool testConds, bool runActions) {
         }
         else {
             gf_CombatMoveStep(lv_localPlayer, lv_angle);
-            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, c_ANIM_MOVE_TURN_DURATION);
+            gf_UnitTurn(gv_tPSUNIT[lv_localPlayer], lv_angle, c_ANIM_MOVE_TURN_DURATION);
             Wait(0.01, c_timeGame);
         }
     }
@@ -220,6 +258,10 @@ bool gt_BackwardEnd_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     gv_bACKWARD[lv_localPlayer] = false;
     UnitBehaviorRemove(gv_tPSUNIT[lv_localPlayer], "VileAcidSlowEffectsLevel2", 1);
@@ -235,48 +277,81 @@ void gt_BackwardEnd_Init () {
     TriggerAddEventKeyPressed(gt_BackwardEnd, c_playerAny, gv_mOVEBACKWARD, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
 }
 
-bool gt_LeftStart_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
+bool gf_SideHeld (int lp_player, bool lp_left) {
+    if (lp_left) {
+        return gv_lEFT[lp_player];
+    }
+    return gv_rIGHT[lp_player];
+}
+
+void gf_SideSet (int lp_player, bool lp_left, bool lp_on) {
+    if (lp_left) {
+        gv_lEFT[lp_player] = lp_on;
+    }
+    else {
+        gv_rIGHT[lp_player] = lp_on;
+    }
+}
+
+// A (lp_left) / D held. Left is +90 from the yaw, right -90; W / S bend it
+// 45 toward forward / back. Regular units: no A/D (operator 2026-11-18:
+// the keys clash with the ability-panel hotkeys).
+void gf_SideBegin (int lp_player, bool lp_left) {
+    fixed lv_side = 90.0;
     fixed lv_angle;
 
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
-    if (!runActions) {
-        return true;
+    if (gv_sCOBAOrderMode[lp_player] == true || gf_ControlRegular(lp_player)) {
+        return;
+    }
+    if (!lp_left) {
+        lv_side = -90.0;
     }
 
-    if (gv_sCOBAOrderMode[lv_localPlayer] == true) {
-        return true;
-    }
-
-    gv_lEFT[lv_localPlayer] = true;
-    gf_CombatSetRoot(lv_localPlayer, false);
-    while ((gv_lEFT[lv_localPlayer] == true)) {
-        if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
-            lv_angle = (CameraGetYaw(lv_localPlayer) + 90.0);
+    gf_SideSet(lp_player, lp_left, true);
+    gf_CombatSetRoot(lp_player, false);
+    while (gf_SideHeld(lp_player, lp_left) && !gf_ControlRegular(lp_player)) {
+        if (((gv_rOTATEUNIT[lp_player] == true) || (gv_rOTATECAMERA[lp_player] == false))) {
+            lv_angle = (CameraGetYaw(lp_player) + lv_side);
         }
         else {
-            lv_angle = (UnitGetFacing(gv_tPSUNIT[lv_localPlayer]) + 90.0);
+            lv_angle = (UnitGetFacing(gv_tPSUNIT[lp_player]) + lv_side);
         }
-        if ((gv_fORWARD[lv_localPlayer] == true)) {
-            lv_angle = (lv_angle - 45.0);
-        }
-
-        if ((gv_bACKWARD[lv_localPlayer] == true)) {
-            lv_angle = (lv_angle + 45.0);
+        if ((gv_fORWARD[lp_player] == true)) {
+            lv_angle = (lv_angle - lv_side / 2.0);
         }
 
-        if (gf_StrafeMoveActive(lv_localPlayer)) {
-            gf_StrafeLoopStep(lv_localPlayer);
+        if ((gv_bACKWARD[lp_player] == true)) {
+            lv_angle = (lv_angle + lv_side / 2.0);
+        }
+
+        if (gf_StrafeMoveActive(lp_player)) {
+            gf_StrafeLoopStep(lp_player);
         }
         else {
-            gf_CombatMoveStep(lv_localPlayer, lv_angle);
-            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, c_ANIM_MOVE_TURN_DURATION);
+            gf_CombatMoveStep(lp_player, lv_angle);
+            gf_UnitTurn(gv_tPSUNIT[lp_player], lv_angle, c_ANIM_MOVE_TURN_DURATION);
             Wait(0.01, c_timeGame);
         }
+    }
+}
+
+// A / D released. Only a press that set the flag stops movement, so the
+// key on a regular unit does not stop its order.
+void gf_SideEnd (int lp_player, bool lp_left) {
+    if (!gf_SideHeld(lp_player, lp_left)) {
+        return;
+    }
+    gf_SideSet(lp_player, lp_left, false);
+    if (!gf_MovementKeyHeld(lp_player)) {
+        gf_AimMoveStop(lp_player);
+        gf_CombatSyncRoot(lp_player);
+    }
+}
+
+bool gt_LeftStart_Func (bool testConds, bool runActions) {
+    // Input hold of this player (systems/input_hold).
+    if (runActions && !gf_InputHeld(EventPlayer())) {
+        gf_SideBegin(EventPlayer(), true);
     }
     return true;
 }
@@ -287,21 +362,9 @@ void gt_LeftStart_Init () {
 }
 
 bool gt_LeftEnd_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
-    if (!runActions) {
-        return true;
-    }
-
-    gv_lEFT[lv_localPlayer] = false;
-    if (!gf_MovementKeyHeld(lv_localPlayer)) {
-        gf_AimMoveStop(lv_localPlayer);
-        gf_CombatSyncRoot(lv_localPlayer);
+    // Input hold of this player (systems/input_hold).
+    if (runActions && !gf_InputHeld(EventPlayer())) {
+        gf_SideEnd(EventPlayer(), true);
     }
     return true;
 }
@@ -312,47 +375,9 @@ void gt_LeftEnd_Init () {
 }
 
 bool gt_RightStart_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
-    fixed lv_angle;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
-    if (!runActions) {
-        return true;
-    }
-
-    if (gv_sCOBAOrderMode[lv_localPlayer] == true) {
-        return true;
-    }
-
-    gv_rIGHT[lv_localPlayer] = true;
-    gf_CombatSetRoot(lv_localPlayer, false);
-    while ((gv_rIGHT[lv_localPlayer] == true)) {
-        if (((gv_rOTATEUNIT[lv_localPlayer] == true) || (gv_rOTATECAMERA[lv_localPlayer] == false))) {
-            lv_angle = (CameraGetYaw(lv_localPlayer) - 90.0);
-        }
-        else {
-            lv_angle = (UnitGetFacing(gv_tPSUNIT[lv_localPlayer]) - 90.0);
-        }
-        if ((gv_fORWARD[lv_localPlayer] == true)) {
-            lv_angle = (lv_angle + 45.0);
-        }
-
-        if ((gv_bACKWARD[lv_localPlayer] == true)) {
-            lv_angle = (lv_angle - 45.0);
-        }
-
-        if (gf_StrafeMoveActive(lv_localPlayer)) {
-            gf_StrafeLoopStep(lv_localPlayer);
-        }
-        else {
-            gf_CombatMoveStep(lv_localPlayer, lv_angle);
-            UnitSetFacing(gv_tPSUNIT[lv_localPlayer], lv_angle, c_ANIM_MOVE_TURN_DURATION);
-            Wait(0.01, c_timeGame);
-        }
+    // Input hold of this player (systems/input_hold).
+    if (runActions && !gf_InputHeld(EventPlayer())) {
+        gf_SideBegin(EventPlayer(), false);
     }
     return true;
 }
@@ -363,21 +388,9 @@ void gt_RightStart_Init () {
 }
 
 bool gt_RightEnd_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
-    if (!runActions) {
-        return true;
-    }
-
-    gv_rIGHT[lv_localPlayer] = false;
-    if (!gf_MovementKeyHeld(lv_localPlayer)) {
-        gf_AimMoveStop(lv_localPlayer);
-        gf_CombatSyncRoot(lv_localPlayer);
+    // Input hold of this player (systems/input_hold).
+    if (runActions && !gf_InputHeld(EventPlayer())) {
+        gf_SideEnd(EventPlayer(), false);
     }
     return true;
 }

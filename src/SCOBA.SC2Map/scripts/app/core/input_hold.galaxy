@@ -1,0 +1,15 @@
+// Module: core/input_hold
+// Input hold per player (REQ-ROSTER R-ROSTER-6, SPEC-ROSTER 3.4): the intro
+// and the hero drop hold one player's input. Every gated trigger checks
+// gf_InputHeld(player) first; no trigger is disabled, so one player's hold
+// never mutes another. Logic: systems/input_hold.
+
+bool[16] gv_inputHeld;
+int[16] gv_inputHolds;       // holds taken, for tests
+
+bool gf_InputHeld (int lp_player) {
+    if (lp_player < 0 || lp_player >= 16) {
+        return false;
+    }
+    return gv_inputHeld[lp_player];
+}

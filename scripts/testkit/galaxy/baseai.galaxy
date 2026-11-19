@@ -1,0 +1,452 @@
+// Base AI harness (REQ-BASE-AI, SPEC-BASE-AI 6). Raw engine values only;
+// scripts/testkit/profiles/baseai.py decides.
+//
+// Group probe (SPEC-BASE-AI 3, A1-A8): a harness-made base for the
+// the base owners of lanes 2 (Terran) and 5 (Zerg) (core/roster), at their
+// start locations, then gf_BaseAiStart (stock AIMeleeStart). Reads
+// at 60 and 120 game seconds.
+
+trigger gt_BaseAiTest;
+
+const int c_BA_PROBE_N = 2;
+const fixed c_BA_FIELD_R = 7.0;     // hall centre to a mineral field
+const fixed c_BA_GEYSER_R = 7.5;    // hall centre to a geyser
+const fixed c_BA_MARINE_R = 10.0;   // hall centre to the A5 Marines, toward the map centre
+const int c_BA_TYPES_MAX = 400;     // raw type lists are cut here
+
+int[c_BA_PROBE_N] gv_baP;
+int[c_BA_PROBE_N] gv_baRegion;
+unit[16] gv_baHall;
+point[16] gv_baAt;
+unit gv_baMarineOut;                // A5: excluded
+unit gv_baMarineIn;                 // A5: control, not excluded
+point gv_baMarineOutAt;
+point gv_baMarineInAt;
+
+string gf_BaSupplyType (int lp_player);
+string gf_BaAllWorkerOrders (int lp_player);
+string gf_BaBuildOrder (int lp_player);
+void gf_BaMacro ();                 // scripts/testkit/galaxy/baseai_macro.galaxy
+void gf_BaFlightGroup ();           // scripts/testkit/galaxy/baseai_flight.galaxy
+
+int gf_Ba100 (fixed lp_v) {
+    return FixedToInt(lp_v * 100.0);
+}
+
+string gf_BaXY100 (point lp_p) {
+    if (lp_p == null) {
+        return "null";
+    }
+    return IntToString(gf_Ba100(PointGetX(lp_p))) + "," + IntToString(gf_Ba100(PointGetY(lp_p)));
+}
+
+string gf_BaKey (int lp_player, string lp_key) {
+    return "p" + IntToString(lp_player) + lp_key;
+}
+
+point gf_BaMapCentre () {
+    return Point(128.0, 128.0);
+}
+
+// lp_r from lp_at, lp_deg off the direction away from the map centre.
+point gf_BaAway (point lp_at, fixed lp_r, fixed lp_deg) {
+    return PointWithOffsetPolar(lp_at, lp_r, AngleBetweenPoints(gf_BaMapCentre(), lp_at) + lp_deg);
+}
+
+string gf_BaHallType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "CommandCenter";
+    }
+    return "Hatchery";
+}
+
+string gf_BaWorkerType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "SCV";
+    }
+    return "Drone";
+}
+
+void gf_BaOrder (string lp_s, string lp_key, unit lp_u) {
+    order lv_o;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Orders", UnitOrderCount(lp_u));
+    lv_o = UnitOrder(lp_u, 0);
+    if (lv_o == null) {
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "O0", "");
+        return;
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "O0", AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o)));
+}
+
+// The base of one probe player: hall, 8 fields, 2 geysers, 12 workers,
+// one Overlord for Zerg, 50 minerals, 0 vespene.
+void gf_BaBase (string lp_s, int lp_player, point lp_at) {
+    int lv_i;
+    int lv_fields = 0;
+    int lv_geysers = 0;
+    unit lv_hall;
+    point lv_h;
+
+    UnitCreate(1, gf_BaHallType(lp_player), 0, lp_player, lp_at, 270.0);
+    lv_hall = UnitLastCreated();
+    gv_baHall[lp_player] = lv_hall;
+    BankValueSetFromFlag(gv_dbgBank, lp_s, gf_BaKey(lp_player, "HallValid"), UnitIsValid(lv_hall));
+    if (!UnitIsValid(lv_hall)) {
+        gv_baAt[lp_player] = lp_at;
+        return;
+    }
+    lv_h = UnitGetPosition(lv_hall);
+    gv_baAt[lp_player] = lv_h;
+    BankValueSetFromString(gv_dbgBank, lp_s, gf_BaKey(lp_player, "HallAt100"), gf_BaXY100(lv_h));
+    BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lp_player, "HallMoved100"), gf_Ba100(DistanceBetweenPoints(lv_h, lp_at)));
+    for (lv_i = 0; lv_i < 8; lv_i += 1) {
+        UnitCreate(1, "MineralField", 0, 0, gf_BaAway(lv_h, c_BA_FIELD_R, -56.0 + 16.0 * IntToFixed(lv_i)), 0.0);
+        if (UnitIsValid(UnitLastCreated())) {
+            lv_fields += 1;
+        }
+    }
+    for (lv_i = 0; lv_i < 2; lv_i += 1) {
+        UnitCreate(1, "VespeneGeyser", 0, 0, gf_BaAway(lv_h, c_BA_GEYSER_R, -80.0 + 160.0 * IntToFixed(lv_i)), 0.0);
+        if (UnitIsValid(UnitLastCreated())) {
+            lv_geysers += 1;
+        }
+    }
+    UnitCreate(c_BASE_AI_WORKERS, gf_BaWorkerType(lp_player), 0, lp_player, PointWithOffsetPolar(lv_h, 4.0, AngleBetweenPoints(lv_h, gf_BaMapCentre())), 0.0);
+    if (PlayerRace(lp_player) == "Zerg") {
+        UnitCreate(1, "Overlord", 0, lp_player, PointWithOffsetPolar(lv_h, 3.0, AngleBetweenPoints(lv_h, gf_BaMapCentre())), 0.0);
+    }
+    PlayerModifyPropertyInt(lp_player, c_playerPropMinerals, c_playerPropOperSetTo, c_BASE_AI_MINERALS);
+    PlayerModifyPropertyInt(lp_player, c_playerPropVespene, c_playerPropOperSetTo, 0);
+    BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lp_player, "Fields"), lv_fields);
+    BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lp_player, "Geysers"), lv_geysers);
+}
+
+// Type list of a player's units, cut at c_BA_TYPES_MAX. lp_kind: 0 all,
+// 1 structures, 2 neither structure nor worker.
+string gf_BaTypes (int lp_player, int lp_kind) {
+    unitgroup lv_g = UnitGroup(null, lp_player, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    string lv_out = "";
+    string lv_t;
+    bool lv_structure;
+    bool lv_worker;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_t = UnitGetType(UnitGroupLoopCurrent());
+        lv_structure = UnitTypeTestAttribute(lv_t, c_unitAttributeStructure);
+        lv_worker = UnitTypeTestFlag(lv_t, c_unitFlagWorker);
+        if ((lp_kind == 1 && !lv_structure) || (lp_kind == 2 && (lv_structure || lv_worker))) {
+            continue;
+        }
+        if (StringLength(lv_out) < c_BA_TYPES_MAX) {
+            lv_out = lv_out + lv_t + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+    return lv_out;
+}
+
+int gf_BaCount (int lp_player, int lp_kind) {
+    unitgroup lv_g = UnitGroup(null, lp_player, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    int lv_n = 0;
+    string lv_t;
+    bool lv_structure;
+    bool lv_worker;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_t = UnitGetType(UnitGroupLoopCurrent());
+        lv_structure = UnitTypeTestAttribute(lv_t, c_unitAttributeStructure);
+        lv_worker = UnitTypeTestFlag(lv_t, c_unitFlagWorker);
+        if ((lp_kind == 1 && !lv_structure) || (lp_kind == 2 && (lv_structure || lv_worker))) {
+            continue;
+        }
+        lv_n += 1;
+    }
+    UnitGroupLoopEnd();
+    return lv_n;
+}
+
+// Farthest own structure from the hall (A8).
+int gf_BaStructureSpread100 (int lp_player) {
+    unitgroup lv_g = UnitGroup(null, lp_player, RegionEntireMap(), UnitFilter((1 << c_targetFilterStructure), 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    fixed lv_max = 0.0;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_max = MaxF(lv_max, DistanceBetweenPoints(UnitGetPosition(UnitGroupLoopCurrent()), gv_baAt[lp_player]));
+    }
+    UnitGroupLoopEnd();
+    return gf_Ba100(lv_max);
+}
+
+// Worker orders, raw: the first three workers' first order ability.
+string gf_BaWorkerOrders (int lp_player) {
+    unitgroup lv_g = UnitGroup(gf_BaWorkerType(lp_player), lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 3);
+    string lv_out = "";
+    order lv_o;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_o = UnitOrder(UnitGroupLoopCurrent(), 0);
+        if (lv_o == null) {
+            lv_out = lv_out + "none ";
+        }
+        else {
+            lv_out = lv_out + AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o)) + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+    return lv_out;
+}
+
+// Raw AI placement for the supply structure (0x08000000 = c_canLower,
+// buildai.galaxy c_makeLowerable) and a standard one, plus tech allow.
+void gf_BaPlacement (string lp_s, string lp_k, int lp_player) {
+    point lv_h;
+
+    if (PlayerRace(lp_player) != "Terr" || !UnitIsValid(gv_baHall[lp_player])) {
+        return;
+    }
+    lv_h = UnitGetPosition(gv_baHall[lp_player]);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "PlaceDepotLow", gf_BaXY100(AIGetBuildingPlacement(lp_player, lv_h, "SupplyDepot", 0x08000000)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "PlaceDepotStd", gf_BaXY100(AIGetBuildingPlacement(lp_player, lv_h, "SupplyDepot", 0)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "PlaceRax", gf_BaXY100(AIGetBuildingPlacement(lp_player, lv_h, "Barracks", 0)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "PlaceDepotNear", gf_BaXY100(AIPlacementNearbyFindTest(lp_player, lv_h, 20.0, "SupplyDepot")));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "DepotAllowed", TechTreeUnitIsAllowed(lp_player, "SupplyDepot"));
+}
+
+void gf_BaPlayerSnap (string lp_s, string lp_tag, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player) + lp_tag;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Workers", TechTreeUnitCount(lp_player, gf_BaWorkerType(lp_player), c_techCountCompleteOnly));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Minerals", PlayerGetPropertyInt(lp_player, c_playerPropMinerals));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Vespene", PlayerGetPropertyInt(lp_player, c_playerPropVespene));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "MinCollected", PlayerGetPropertyInt(lp_player, c_playerPropMineralsCollected));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "GasCollected", PlayerGetPropertyInt(lp_player, c_playerPropVespeneCollected));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "SupplyUsed", PlayerGetPropertyInt(lp_player, c_playerPropSuppliesUsed));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "SupplyMade", PlayerGetPropertyInt(lp_player, c_playerPropSuppliesMade));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Structures", gf_BaCount(lp_player, 1));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Army", gf_BaCount(lp_player, 2));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "StructureTypes", gf_BaTypes(lp_player, 1));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "ArmyTypes", gf_BaTypes(lp_player, 2));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Spread100", gf_BaStructureSpread100(lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "WorkerOrders", gf_BaWorkerOrders(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Difficulty", PlayerDifficulty(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "TownState", AIGetTownState(lp_player, c_townOne));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Supply", TechTreeUnitCount(lp_player, gf_BaSupplyType(lp_player), c_techCountQueuedOrBetter));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "SupplyLow", TechTreeUnitCount(lp_player, "SupplyDepotLowered", c_techCountQueuedOrBetter));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "AllWorkerOrders", gf_BaAllWorkerOrders(lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "BuildOrder", gf_BaBuildOrder(lp_player));
+    gf_BaPlacement(lp_s, lv_k, lp_player);
+}
+
+// The first worker build order, raw: command index, target, distance
+// from the hall (x100).
+string gf_BaBuildOrder (int lp_player) {
+    unitgroup lv_g = UnitGroup(gf_BaWorkerType(lp_player), lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    string lv_out = "none";
+    order lv_o;
+    point lv_at;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_o = UnitOrder(UnitGroupLoopCurrent(), 0);
+        if (lv_o == null || lv_out != "none") {
+            continue;
+        }
+        if (AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o)) != "TerranBuild" && AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o)) != "ZergBuild") {
+            continue;
+        }
+        lv_at = OrderGetTargetPosition(lv_o);
+        lv_out = IntToString(AbilityCommandGetCommand(OrderGetAbilityCommand(lv_o))) + "@" + gf_BaXY100(lv_at);
+        if (lv_at != null) {
+            lv_out = lv_out + " d" + IntToString(gf_Ba100(DistanceBetweenPoints(lv_at, gv_baAt[lp_player])));
+        }
+        lv_out = lv_out + " scv@" + gf_BaXY100(UnitGetPosition(UnitGroupLoopCurrent()));
+    }
+    UnitGroupLoopEnd();
+    return lv_out;
+}
+
+string gf_BaSupplyType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "SupplyDepot";
+    }
+    return "Overlord";
+}
+
+// Distinct first-order abilities of all workers, raw.
+string gf_BaAllWorkerOrders (int lp_player) {
+    unitgroup lv_g = UnitGroup(gf_BaWorkerType(lp_player), lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    string lv_out = " ";
+    string lv_a;
+    order lv_o;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_o = UnitOrder(UnitGroupLoopCurrent(), 0);
+        lv_a = "none";
+        if (lv_o != null) {
+            lv_a = AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o));
+        }
+        if (StringFind(lv_out, " " + lv_a + " ", c_stringCase) == c_stringNotFound) {
+            lv_out = lv_out + lv_a + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+    return lv_out;
+}
+
+// A5: one unit's AI state and how far it moved from lp_at.
+void gf_BaUnitAi (string lp_s, string lp_key, unit lp_u, point lp_at) {
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "Valid", UnitIsValid(lp_u));
+    if (!UnitIsValid(lp_u)) {
+        return;
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "Script", AIIsScriptControlled(lp_u));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "InWave", AIUnitGetWave(lp_u) != null);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Moved100", gf_Ba100(DistanceBetweenPoints(UnitGetPosition(lp_u), lp_at)));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "UsingSupply", UnitTestState(lp_u, c_unitStateUsingSupply));
+    gf_BaOrder(lp_s, lp_key, lp_u);
+}
+
+// Every unit the probe players own before their base exists: script
+// units, excluded as map init will do (SPEC 4.2).
+void gf_BaExcludeExisting () {
+    int lv_i;
+
+    for (lv_i = 0; lv_i < c_BA_PROBE_N; lv_i += 1) {
+        gf_BaseAiExcludePlayer(gv_baP[lv_i]);
+    }
+}
+
+// A6 supply reads and the A5 pair, for the Terran probe owner after its AI started.
+void gf_BaMarines (string lp_s) {
+    int lv_p = gv_baP[0];
+    point lv_at = PointWithOffsetPolar(gv_baAt[lv_p], c_BA_MARINE_R, AngleBetweenPoints(gv_baAt[lv_p], gf_BaMapCentre()));
+    int lv_before = PlayerGetPropertyInt(lv_p, c_playerPropSuppliesUsed);
+
+    UnitCreate(1, "Marine", 0, lv_p, lv_at, 0.0);
+    gv_baMarineOut = UnitLastCreated();
+    UnitCreate(1, "Marine", 0, lv_p, PointWithOffset(lv_at, 2.0, 0.0), 0.0);
+    gv_baMarineIn = UnitLastCreated();
+    Wait(0.0625, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "supplyBefore", lv_before);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "supplyMade2", PlayerGetPropertyInt(lv_p, c_playerPropSuppliesUsed));
+    gf_BaseAiExclude(gv_baMarineOut);
+    Wait(0.0625, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "supplyExcluded1", PlayerGetPropertyInt(lv_p, c_playerPropSuppliesUsed));
+    gv_baMarineOutAt = UnitGetPosition(gv_baMarineOut);
+    gv_baMarineInAt = UnitGetPosition(gv_baMarineIn);
+}
+
+void gf_BaProbe () {
+    string lv_s = "ba_probe";
+    int lv_i;
+    int lv_p;
+    point lv_start;
+
+    gv_baP[0] = gf_RosterOwner(2);  gv_baRegion[0] = 3;
+    gv_baP[1] = gf_RosterOwner(5);  gv_baRegion[1] = 5;
+    // Lane base owners from the build (scripts/mapgen/player_slots.py).
+    for (lv_p = 9; lv_p <= 14; lv_p += 1) {
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Type"), PlayerType(lv_p));
+        BankValueSetFromString(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Race"), PlayerRace(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Status"), PlayerStatus(lv_p));
+    }
+    // The units that exist before the bases are script units: exclude them
+    // first, so the new workers and halls stay with the AI. The medics
+    // spawn 2 s after map init (systems/medic).
+    Wait(3.0, c_timeGame);
+    gf_BaExcludeExisting();
+    BankValueSetFromInt(gv_dbgBank, lv_s, "excludedAtStart", gv_baseAiExcluded);
+    for (lv_i = 0; lv_i < c_BA_PROBE_N; lv_i += 1) {
+        lv_p = gv_baP[lv_i];
+        lv_start = PlayerStartLocation(lv_p);
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Type"), PlayerType(lv_p));
+        BankValueSetFromString(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Race"), PlayerRace(lv_p));
+        BankValueSetFromString(gv_dbgBank, lv_s, gf_BaKey(lv_p, "StartLoc100"), gf_BaXY100(lv_start));
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "DiffBefore"), PlayerDifficulty(lv_p));
+        // The build's start location (R-BASE-24); its lane region is recorded.
+        BankValueSetFromString(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Region100"), gf_BaXY100(RegionGetCenter(RegionFromId(gv_baRegion[lv_i]))));
+        gf_BaBase(lv_s, lv_p, lv_start);
+    }
+    for (lv_i = 0; lv_i < c_BA_PROBE_N; lv_i += 1) {
+        lv_p = gv_baP[lv_i];
+        gf_BaseAiStart(lv_p);
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "DiffAfter"), PlayerDifficulty(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lv_s, gf_BaKey(lv_p, "AiDiff"), AIPlayerDifficulty(lv_p));
+        gf_BaPlayerSnap(lv_s, "t0", lv_p);
+    }
+    BankSave(gv_dbgBank);
+    Wait(1.0, c_timeGame);
+    gf_BaMarines(lv_s);
+    for (lv_i = 0; lv_i < c_BA_PROBE_N; lv_i += 1) {
+        gf_BaPlayerSnap(lv_s, "t1", gv_baP[lv_i]);
+    }
+    BankSave(gv_dbgBank);
+    Wait(59.0, c_timeGame);
+    for (lv_i = 0; lv_i < c_BA_PROBE_N; lv_i += 1) {
+        gf_BaPlayerSnap(lv_s, "t60", gv_baP[lv_i]);
+    }
+    gf_BaUnitAi(lv_s, "t60Out", gv_baMarineOut, gv_baMarineOutAt);
+    gf_BaUnitAi(lv_s, "t60In", gv_baMarineIn, gv_baMarineInAt);
+    BankSave(gv_dbgBank);
+    Wait(60.0, c_timeGame);
+    for (lv_i = 0; lv_i < c_BA_PROBE_N; lv_i += 1) {
+        gf_BaPlayerSnap(lv_s, "t120", gv_baP[lv_i]);
+    }
+    gf_BaUnitAi(lv_s, "t120Out", gv_baMarineOut, gv_baMarineOutAt);
+    gf_BaUnitAi(lv_s, "t120In", gv_baMarineIn, gv_baMarineInAt);
+    BankSave(gv_dbgBank);
+    Wait(60.0, c_timeGame);
+    for (lv_i = 0; lv_i < c_BA_PROBE_N; lv_i += 1) {
+        gf_BaPlayerSnap(lv_s, "t180", gv_baP[lv_i]);
+    }
+    BankSave(gv_dbgBank);
+}
+
+bool gt_BaseAiTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(0.5, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBABASEAI", 1);
+    gv_bINPUTLOG = false;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "baseai");
+    BankValueSetFromString(gv_dbgBank, "meta", "group", gv_dbgGroup);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "ba_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    if (gf_DbgGroup("probe")) {
+        // No reinforcement waves and no air creeps: they would fight the bases.
+        TimerPause(gv_sPAWNTIMER, true);
+        TimerPause(gv_airCreepTimer, true);
+        TriggerEnable(gt_AirCreepTick, false);
+        gf_BaProbe();
+    }
+    else if (gf_DbgGroup("macro")) {
+        // Real conditions: waves and air creeps keep running.
+        gf_BaMacro();
+    }
+    else if (gf_DbgGroup("flight")) {
+        // Only the Wraith: no waves, no air creeps near it.
+        TimerPause(gv_sPAWNTIMER, true);
+        TimerPause(gv_airCreepTimer, true);
+        TriggerEnable(gt_AirCreepTick, false);
+        gf_BaFlightGroup();
+    }
+    BankValueSetFromInt(gv_dbgBank, "ba_end", "RealClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_BaseAiTest_Init () {
+    gt_BaseAiTest = TriggerCreate("gt_BaseAiTest_Func");
+    TriggerAddEventMapInit(gt_BaseAiTest);
+}

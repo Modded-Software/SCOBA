@@ -17,6 +17,7 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
+from .herodrop import CAM_DISTANCE as CAM_ARM
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
@@ -156,7 +157,7 @@ def check_drop(checks) -> None:
     _report(checks, f"{s} script and Birth in sync", bool(offs) and max(abs(o) for o in offs) <= SYNC_TOL_MS, f"max|off|={max((abs(o) for o in offs), default=None)}")
     # Camera aimed through the pod, engine reads only: the look ray from
     # the eye (target, yaw, pitch, distance) passes the Birth root at the
-    # clip time, c_DROP_CAM_DISTANCE in front of the eye.
+    # clip time, c_DROP_POD_ARM in front of the eye.
     px, py = (int(v) for v in str(checks.value(s, "", "podAt100") or "0,0").split(","))
     facing = (checks.value(s, "", "podFacing100") or 0) / 100.0
     off = []
@@ -201,19 +202,22 @@ def check_drop(checks) -> None:
         _report(checks, f"{s} even camera speed on leg {lo}-{hi}", ok, f"min={min(steps or [0])} max={max(steps or [0])}")
     # Eye behind the pod on its line: arm = 20 + ray from root to ground.
     ang, pitch_d, _, _ = pod_birth.travel()
-    want0 = 20.0 + pod_birth.world(0, 0)[2] / math.sin(math.radians(pitch_d))
+    want0 = CAM_ARM + pod_birth.world(0, 0)[2] / math.sin(math.radians(pitch_d))
     d0 = yp_rows[0][2] if yp_rows else 0
     _report(checks, f"{s} arm reaches the pod start", abs(d0 - want0) <= 6.0, f"dist={d0} want~{want0:.1f}")
-    # Facing from the camera: pod facing = camera yaw - travel offset, so
-    # the pod falls along the view (engine facing and engine yaw).
+    # Fixed drop yaw (c_DROP_YAW): pod facing = drop yaw - travel offset,
+    # whatever the camera yaw was (engine facing and engine yaw).
     angle, pitch, _, _ = pod_birth.travel()
-    yaw0 = (checks.value(s, "", "yawBefore100") or 0) / 100.0
+    before = (checks.value(s, "", "yawBefore100") or 0) / 100.0
+    yaw0 = (checks.value(s, "", "dropYaw100") or 0) / 100.0
     want = _wrap(yaw0 - angle)
     got = _wrap(facing)
-    print(f"{s} raw yawBefore={yaw0} travel={(checks.value(s, '', 'travel100') or 0) / 100.0} facing={facing} want={want}")
-    _report(checks, f"{s} pod facing = camera yaw - travel offset", abs(_wrap(got - want)) <= 1.0, f"facing={got:.2f} want={want:.2f}")
-    # Negative: the facing is not the stock default (the yaw was moved off it).
-    _report(checks, f"{s} camera yaw was off the default", abs(_wrap(yaw0 - 225.0)) > 10.0 or abs(_wrap(yaw0)) > 10.0, f"yaw={yaw0}")
+    print(f"{s} raw yawBefore={before} dropYaw={yaw0} travel={(checks.value(s, '', 'travel100') or 0) / 100.0} facing={facing} want={want}")
+    _report(checks, f"{s} pod facing = drop yaw - travel offset", abs(_wrap(got - want)) <= 1.0, f"facing={got:.2f} want={want:.2f}")
+    # Negative: the camera yaw before was off the drop yaw, and the facing
+    # did not follow it.
+    _report(checks, f"{s} camera yaw before was off the drop yaw", abs(_wrap(before - yaw0)) > 10.0, f"before={before} drop={yaw0}")
+    _report(checks, f"{s} pod facing ignores the camera yaw", abs(_wrap(got - _wrap(before - angle))) > 10.0, f"facing={got:.2f} fromBefore={_wrap(before - angle):.2f}")
     # The camera chases on the pod's line: engine yaw = travel, pitch = descent.
     bad_yaw = [(r[0], y) for r, (y, _, _) in zip(rows, yp_rows) if r[1] - r[2] < pod_birth.LAND_MS and abs(_wrap(y - yaw0)) > 2.0]
     bad_pitch = [(r[0], pt) for r, (_, pt, _) in zip(rows, yp_rows) if r[1] - r[2] < pod_birth.LAND_MS and abs(_wrap(pt - pitch)) > 2.0]
@@ -223,7 +227,7 @@ def check_drop(checks) -> None:
     # The camera eye is on the pod's line behind it: target on the root
     # (checked above) plus yaw and pitch along the path.
     # Negative: a camera on the landing spot at arm 20 does not see the pod start.
-    neg = _ray_gap(_eye(px / 100.0, py / 100.0, yaw0, pitch_d, 20.0), yaw0, pitch_d, _root(0, facing, px, py))
+    neg = _ray_gap(_eye(px / 100.0, py / 100.0, yaw0, pitch_d, CAM_ARM), yaw0, pitch_d, _root(0, facing, px, py))
     _report(checks, f"{s} negative: plain arm 20 misses the pod start", neg > 10.0, f"gap={neg:.1f}")
     # Negative: the unit is never lifted; the model does the fall.
     ground = checks.value(s, "", "groundH100") or 0

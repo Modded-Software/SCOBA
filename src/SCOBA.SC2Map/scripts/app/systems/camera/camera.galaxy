@@ -1,11 +1,18 @@
-// Module: systems/camera
+// Module: systems/camera/camera
 
 // The one writer of the TPS camera height offset while a quake, a jump or a
 // hero drop is active: base + quake shake + jump elevation (R-JUMP-17) +
 // pod height (R-DROP-4). lp_time blends to the value; the jump and the drop
 // pass their per-loop height time so camera and unit move together.
+// A flying bound unit's flight height: the camera follows the unit's ground
+// point, so the offset lifts it to the unit. 0 for ground units (a jump
+// has its own term).
+fixed gf_CameraUnitLift (int lp_player) {
+    return gf_FlightCamHeight(lp_player);  // systems/flight; 0 on the ground
+}
+
 void gf_CameraHeightApply (int lp_player, fixed lp_time) {
-    fixed lv_height = c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player] + gv_dropCamHeight[lp_player];
+    fixed lv_height = c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player] + gv_dropCamHeight[lp_player] + gf_CameraUnitLift(lp_player);
 
     // Velocity 0, deceleration 0: a plain linear blend over lp_time. The old
     // (-1, 10) carried velocity and eased out, and lagged the jump (operator).
@@ -37,6 +44,10 @@ bool gt_CameraFollowDistance_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     if (gv_cameraDistanceDesired[lv_localPlayer] <= 0.0) {
         gv_cameraDistanceDesired[lv_localPlayer] = CameraGetDistance(lv_localPlayer);
@@ -61,6 +72,10 @@ bool gt_CameraDebugMove_Func (bool testConds, bool runActions) {
     int lv_player;
 
     if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
         return true;
     }
     lv_player = EventPlayer();
@@ -127,6 +142,10 @@ bool gt_ZoomEnd_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     gv_cAMERAFOV[lv_localPlayer] = c_SCOBA_REST_FOV;
     CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, c_SCOBA_REST_FOV, 0.5, -1, 10.0);
@@ -149,6 +168,10 @@ bool gt_ZoomStart_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     gv_cAMERAFOV[lv_localPlayer] = c_SCOBA_ZOOM_FOV;
     CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, c_SCOBA_ZOOM_FOV, 0.5, -1, 10.0);
@@ -169,6 +192,10 @@ bool gt_CursorStart_Func (bool testConds, bool runActions) {
 
     // Actions
     if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
         return true;
     }
 
@@ -218,6 +245,10 @@ bool gt_CursorEnd_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
 
     if (gf_TpsActive(lv_localPlayer)) {
         gf_TpsMouseUp(lv_localPlayer, EventMouseClickedButton());
@@ -254,6 +285,10 @@ bool gt_LeftOrbitStart_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
     lv_player = EventPlayer();
     if (!gf_IsHeroPlayer(lv_player)) {
         return true;
@@ -284,6 +319,10 @@ bool gt_RightOrbitStart_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
     lv_player = EventPlayer();
     if (!gf_IsHeroPlayer(lv_player)) {
         return true;
@@ -306,118 +345,6 @@ void gt_RightOrbitStart_Init () {
     TriggerAddEventMouseMoved(gt_RightOrbitStart, c_playerAny);
 }
 
-fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {
-    fixed lv_pitch;
-    fixed lv_yaw;
-    fixed lv_horiz;
-    fixed lv_tx;
-    fixed lv_ty;
-    fixed lv_tz;
-    fixed lv_offset;
-    fixed lv_ex;
-    fixed lv_ey;
-    fixed lv_ez;
-    fixed lv_fraction;
-    fixed lv_sampleZ;
-    fixed lv_safe;
-    int lv_seg;
-    point lv_target;
-    point lv_eye;
-    point lv_sample;
-
-    if (lp_desired <= 0.0) {
-        return 0.0;
-    }
-    lv_pitch = CameraGetPitch(lp_player);
-    if (lv_pitch > 180.0) {
-        lv_pitch = lv_pitch - 360.0;
-    }
-    lv_yaw = CameraGetYaw(lp_player);
-    lv_horiz = Cos(lv_pitch) * lp_desired;
-    lv_target = CameraGetTarget(lp_player);
-    lv_eye = PointWithOffsetPolar(lv_target, lv_horiz, lv_yaw + 180.0);
-    lv_tx = PointGetX(lv_target);
-    lv_ty = PointGetY(lv_target);
-    lv_tz = PointGetHeight(lv_target);
-    if (lv_tz < WorldHeight(c_heightMapGround, lv_target)) {
-        lv_tz = WorldHeight(c_heightMapGround, lv_target);
-    }
-    lv_offset = gv_iMMORTAL;
-    if (UnitGetType(gv_tPSUNIT[lp_player]) == "Tosh" || UnitGetType(gv_tPSUNIT[lp_player]) == "ToshSCOBA") {
-        lv_offset = gv_mARINE;
-    }
-    // Operator 2026-11-16: clamp, never snap. The camera keeps the longest
-    // distance (up to the desired one) at which the eye itself stays
-    // c_CAM_GROUND_MARGIN above the terrain, so it slides along the ground.
-    // Terrain between eye and hero no longer pulls it in.
-    lv_ex = PointGetX(lv_eye);
-    lv_ey = PointGetY(lv_eye);
-    lv_ez = lv_tz + lv_offset + (Sin(lv_pitch) * lp_desired);
-    for (lv_seg = c_CAM_CLAMP_STEPS; lv_seg >= 1; lv_seg -= 1) {
-        lv_fraction = IntToFixed(lv_seg) / IntToFixed(c_CAM_CLAMP_STEPS);
-        lv_sample = Point(lv_tx + ((lv_ex - lv_tx) * lv_fraction), lv_ty + ((lv_ey - lv_ty) * lv_fraction));
-        lv_sampleZ = lv_tz + lv_offset + ((lv_ez - lv_tz - lv_offset) * lv_fraction);
-        if ((lv_sampleZ >= (WorldHeight(c_heightMapGround, lv_sample) + c_CAM_GROUND_MARGIN))) {
-            return lp_desired * lv_fraction;
-        }
-    }
-    lv_safe = lp_desired / IntToFixed(c_CAM_CLAMP_STEPS);
-    return lv_safe;
-}
-
-void gf_CameraCollisionApply (int lp_player) {
-    fixed lv_desired;
-    fixed lv_current;
-    fixed lv_safe;
-
-    if (!UnitIsValid(gv_tPSUNIT[lp_player]) || gv_cameraCollisionOff[lp_player]) {
-        return;
-    }
-    // The hero drop owns the arm while its pod falls (podbirth/20261117-114618:
-    // the clamp reset the arm to 20 between drop loops, 125 -> 20 -> 101).
-    if (UnitIsValid(gv_dropPod[lp_player])) {
-        return;
-    }
-    if (gv_cameraDistanceDesired[lp_player] <= 0.0) {
-        gv_cameraDistanceDesired[lp_player] = CameraGetDistance(lp_player);
-    }
-    lv_desired = gv_cameraDistanceDesired[lp_player];
-    lv_current = CameraGetDistance(lp_player);
-    lv_safe = gf_CameraSafeDistance(lp_player, lv_desired);
-    // Follow the clamp both ways every tick in small steps: in fast (the eye
-    // must not enter the ground), out slowly; no all-or-nothing restore.
-    if ((AbsF(lv_safe - gv_cameraDistanceApplied[lp_player]) <= c_CAM_CLAMP_DEADBAND) && (AbsF(lv_current - lv_safe) <= c_CAM_CLAMP_DEADBAND)) {
-        return;
-    }
-    if ((lv_safe < lv_current)) {
-        CameraSetValue(lp_player, c_cameraValueDistance, lv_safe, c_SCOBA_COLLISION_CLAMP_BLEND, -1, 10);
-    }
-    else {
-        CameraSetValue(lp_player, c_cameraValueDistance, lv_safe, c_SCOBA_COLLISION_RESTORE_BLEND, -1, 10);
-    }
-    gv_cameraDistanceApplied[lp_player] = lv_safe;
-    if (gv_aIMACTIVE[lp_player]) {
-        gv_aimDbgClamps[lp_player] += 1;
-    }
-}
-
-bool gt_CameraCollisionTick_Func (bool testConds, bool runActions) {
-    int lv_player;
-
-    if (!runActions) {
-        return true;
-    }
-    for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
-        gf_CameraCollisionApply(lv_player);
-    }
-    return true;
-}
-
-void gt_CameraCollisionTick_Init () {
-    gt_CameraCollisionTick = TriggerCreate("gt_CameraCollisionTick_Func");
-    TriggerAddEventTimePeriodic(gt_CameraCollisionTick, 0.02, c_timeGame);
-}
-
 bool gt_CameraTurnTick_Func (bool testConds, bool runActions) {
     int lv_player;
 
@@ -425,6 +352,10 @@ bool gt_CameraTurnTick_Func (bool testConds, bool runActions) {
         return true;
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
+        // Input hold of this player (systems/input_hold).
+        if (gf_InputHeld(lv_player)) {
+            continue;
+        }
         gf_StrafeHoldSync(lv_player);
         if (!gf_StrafeHoldMoving(lv_player) && (gv_holdStrafe[lv_player] || (!gf_TpsActive(lv_player) && gv_rOTATEUNIT[lv_player])) && UnitIsValid(gv_tPSUNIT[lv_player])) {
             gf_TurnToYaw(lv_player, CameraGetYaw(lv_player));

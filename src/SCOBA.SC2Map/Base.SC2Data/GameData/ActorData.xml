@@ -220,6 +220,28 @@
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="20.000000"/>
     </CActorUnit>
+    <!-- Vista Overlord (SCOBAVistaOverlord): the Overlord look above. Parent
+         is the GenericUnitBase template: a non-template parent fails to
+         create (engine stand-in sphere, see SCOBAVikingHero). Model explicit. -->
+    <CActorUnit id="SCOBAVistaOverlord" parent="GenericUnitBase" unitName="SCOBAVistaOverlord">
+        <Model value="Overlord"/>
+        <Scale value="20.000000"/>
+        <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
+        <DeathArray index="Normal" ModelLink="OverlordDeath" SoundLink=""/>
+        <PortraitModel value="OverlordPortrait"/>
+        <BarOffset value="70"/>
+        <NameOffset value="70"/>
+        <UnitIcon value="Assets\Textures\btn-unit-zerg-overlord.dds"/>
+        <HeroIcon value="Assets\Textures\btn-unit-zerg-overlord.dds"/>
+        <GroupIcon>
+            <Image value="Assets\Textures\Wireframe-Zerg-Overlord.dds"/>
+        </GroupIcon>
+        <Wireframe>
+            <Image value="Assets\Textures\Wireframe-Zerg-Overlord.dds"/>
+        </Wireframe>
+        <LifeArmorIcon value="Assets\Textures\btn-upgrade-zerg-flyercarapace-level0.dds"/>
+        <Aliases value="_UnitLarge"/>
+    </CActorUnit>
     <!--                                                                                         -->
     <!-- Perdition Turret ...................................................................... -->
     <!--                                                                                         -->
@@ -320,6 +342,9 @@
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <Scale value="2.500000,2.500000,3.500000"/>
         <!--DeathArray index="Normal" SoundLink=""/-->
+    </CActorUnit>
+    <CActorUnit id="SupplyDepotLowered">
+        <Scale value="2.500000,2.500000,3.500000"/>
     </CActorUnit>
     <!--                                                                                         -->
     <!-- Terran Drop Pod (Art) ................................................................. -->
@@ -600,5 +625,108 @@
         <LifeArmorIcon value="Assets\Textures\btn-upgrade-terran-shipplatinglevel0.dds"/>
         <!-- No SOpBankerWraith: it lives in liberty.sc2campaign. -->
         <Aliases value="_UnitLarge"/>
+    </CActorUnit>
+    <!-- The stock landing transition model is destroyed only on MorphFrom
+         VikingAssault / VikingFighter. Landing from SCOBAVikingHero left it
+         behind as a static second model (operator report 2026-11-18). -->
+    <CActorUnit id="AssaultMorphModel">
+        <On Terms="AbilMorph.*.Finish; MorphFrom SCOBAVikingHero" Send="Destroy"/>
+        <!-- Hero morph pair (SCOBAHeroAssaultMode / SCOBAHeroFighterMode). -->
+        <On Terms="AbilMorph.*.Start; MorphTo SCOBAVikingHeroAssault" Send="Create"/>
+        <On Terms="AbilMorph.*.Start; MorphTo SCOBAVikingHeroAssault" Send="SetScale 3.000000"/>
+        <On Terms="AbilMorph.*.Start; MorphTo SCOBAVikingHeroAssault" Send="AnimPlay Start Morph,Start PlayForever"/>
+        <On Terms="AbilMorph.*.Finish; MorphFrom SCOBAVikingHeroAssault" Send="Destroy"/>
+    </CActorUnit>
+    <CActorUnit id="FighterMorphModel">
+        <On Terms="AbilMorph.*.Start; MorphTo SCOBAVikingHero" Send="Create"/>
+        <On Terms="AbilMorph.*.Start; MorphTo SCOBAVikingHero" Send="SetScale 3.000000"/>
+        <On Terms="AbilMorph.*.Start; MorphTo SCOBAVikingHero" Send="AnimPlay End Morph,End PlayForever,NonLooping"/>
+        <On Terms="AbilMorph.*.Finish; MorphFrom SCOBAVikingHero" Send="Destroy"/>
+        <On Terms="AbilMorph.*.Finish; MorphFrom SCOBAVikingHeroAssault" Send="Destroy"/>
+    </CActorUnit>
+    <!-- Landed hero Viking: the stock VikingAssault look at 3x scale (operator
+         2026-11-18), on the GenericUnitBase template (a non-template parent
+         fails to create). -->
+    <CActorUnit id="SCOBAVikingHeroAssault" parent="GenericUnitBase" unitName="SCOBAVikingHeroAssault">
+        <Model value="VikingAssault"/>
+        <Scale value="3.000000"/>
+        <DeathArray index="Normal" ModelLink="VikingAssaultDeath" SoundLink="Viking_Explode"/>
+        <DeathArray index="Blast" AnimProps="Death,Blast" ModelLink="VikingAssaultDeath"/>
+        <WalkAnimMoveSpeed value="2.5468"/>
+        <PortraitModel value="VikingFighterPortrait"/>
+        <BarWidth value="70"/>
+        <BarOffset value="70"/>
+        <UnitIcon value="Assets\Textures\btn-unit-terran-vikingassault.dds"/>
+        <HeroIcon value="Assets\Textures\btn-unit-terran-vikingassault.dds"/>
+        <GroupIcon>
+            <Image value="Assets\Textures\Wireframe-Terran-Viking-Assault.dds"/>
+        </GroupIcon>
+        <Wireframe>
+            <Image value="Assets\Textures\Wireframe-Terran-Viking-Assault.dds"/>
+        </Wireframe>
+        <SoundArray index="Ready" value="Viking_Ready"/>
+        <SoundArray index="Help" value="Viking_Help"/>
+        <SoundArray index="What" value="Viking_What"/>
+        <SoundArray index="Yes" value="Viking_Yes"/>
+        <SoundArray index="Attack" value="Viking_Attack"/>
+        <SoundArray index="Pissed" value="Viking_Pissed"/>
+        <AbilSoundArray AbilCmd="SCOBAHeroFighterMode,Execute" Sound="Viking_FighterModeVO"/>
+        <LifeArmorIcon value="Assets\Textures\btn-upgrade-terran-shipplatinglevel0.dds"/>
+        <UnitFlags index="StandAnimBirthVariation" value="0"/>
+        <On Terms="AbilMorph.*.Finish; MorphTo SCOBAVikingHeroAssault" Send="Create"/>
+        <On Terms="AbilMorph.*.Finish; MorphTo SCOBAVikingHeroAssault" Target="FlyerHelperSplat" Send="Destroy"/>
+        <On Terms="AbilMorph.*.Start; MorphFrom SCOBAVikingHeroAssault" Send="Destroy"/>
+        <On Terms="Abil.attack.ReadyStart" Send="AnimGroupApply Ready"/>
+        <On Terms="WeaponStart.*.AttackStart; WeaponTargetElevation GE 20.000000" Send="AnimBracketStart Attack Attack,Superior"/>
+        <On Terms="WeaponStart.*.AttackStart; WeaponTargetElevation LE -20.000000" Send="AnimBracketStart Attack Attack,Inferior"/>
+        <On Terms="WeaponStart.*.AttackStart" Send="AnimBracketStart Attack Attack"/>
+        <On Terms="WeaponStop.*.AttackStop" Send="AnimBracketStop Attack"/>
+        <On Terms="Abil.attack.ReadyStop" Send="AnimGroupRemove Ready"/>
+        <On Terms="UnitPortrait.*.Configure" Target="::PortraitGameSelf" Send="AnimClear Visor 0.000000"/>
+        <Aliases value="_UnitMedium"/>
+        <Macros value="UnloadDropAnim"/>
+    </CActorUnit>
+    <!-- Alt+4 Viking (SCOBAVikingHero): the stock VikingFighter look at 3x scale.
+         Parent is the GenericUnitMorph template, as for the stock actor:
+         parent="VikingFighter" (not a default="1" template) failed to create
+         and drew the engine stand-in sphere (runs 20261118-125304, -125505). The
+         stock VikingFighter fields are copied; the model is explicit. -->
+    <CActorUnit id="SCOBAVikingHero" parent="GenericUnitMorph" unitName="SCOBAVikingHero">
+        <Model value="VikingFighter"/>
+        <Scale value="3.000000"/>
+        <On Terms="Abil.SCOBAHeroAssaultMode.Start" Send="AnimPlay Morph Morph"/>
+        <Baselines index="Walk" BlendIn="1.500000" BlendOut="2.000000"/>
+        <DeathArray index="Normal" ModelLink="VikingFighterDeath" SoundLink="Viking_Explode"/>
+        <Macros value="AssaultModeAnim"/>
+        <Macros value="UnloadDropAnim"/>
+        <PortraitModel value="VikingFighterPortrait"/>
+        <AcceptedTransfers index="Status" value="0"/>
+        <BarWidth value="70"/>
+        <BarOffset value="50"/>
+        <NameOffset value="50"/>
+        <UnitIcon value="Assets\Textures\btn-unit-terran-vikingfighter.dds"/>
+        <HeroIcon value="Assets\Textures\btn-unit-terran-vikingfighter.dds"/>
+        <GroupIcon>
+            <Image value="Assets\Textures\Wireframe-Terran-Viking-Fighter.dds"/>
+        </GroupIcon>
+        <Wireframe>
+            <Image value="Assets\Textures\Wireframe-Terran-Viking-Fighter.dds"/>
+        </Wireframe>
+        <SoundArray index="Ready" value="Viking_Ready"/>
+        <SoundArray index="Help" value="Viking_Help"/>
+        <SoundArray index="What" value="Viking_What"/>
+        <SoundArray index="Yes" value="Viking_Yes"/>
+        <SoundArray index="Attack" value="Viking_Attack"/>
+        <SoundArray index="Pissed" value="Viking_Pissed"/>
+        <SoundArray index="Movement" value="Viking_FighterMovement"/>
+        <AbilSoundArray AbilCmd="SCOBAHeroAssaultMode,Execute" Sound="Viking_AssaultModeVO"/>
+        <LifeArmorIcon value="Assets\Textures\btn-upgrade-terran-shipplatinglevel0.dds"/>
+        <!-- Stock VikingFighter lines first left out of the copy. Without the
+             FlyerHelper decrement the landed model floated (operator report
+             2026-11-18; the engine height read 0, run 20261118-140607). -->
+        <HostSiteOps Ops="SOpBankerViking"/>
+        <On Terms="ActorDestruction; HasStatus FlyerHelper" Send="StatusDecrement FlyerHelper"/>
+        <On Terms="UnitPortrait.*.Configure" Target="::PortraitGameSelf" Send="AnimPlay Visor Morph,Stand PlayForever 0.000000"/>
+        <Aliases value="_UnitMedium"/>
     </CActorUnit>
 </Catalog>

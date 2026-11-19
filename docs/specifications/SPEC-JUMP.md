@@ -106,7 +106,7 @@ Run results go in section 7.
 
 ### 3.2 Camera (R-JUMP-17)
 
-- `gf_CameraHeightApply(player, time)` in `systems/camera.galaxy` writes
+- `gf_CameraHeightApply(player, time)` in `systems/camera/camera.galaxy` writes
   `c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight + gv_jumpCamHeight` and
   stores it in `gv_cameraHeightApplied`.
 - The write is a linear blend: `CameraSetValue(..., time, 0, 0)`
@@ -236,7 +236,7 @@ modes. The old `DehakaJump` trigger and preload entry are removed.
 | --- | --- |
 | `src/.../core/jump.galaxy` | Constants and state. |
 | `src/.../systems/jump.galaxy` | Press, curve, step, base pick, clips, camera part, thump, triggers. |
-| `src/.../systems/camera.galaxy` | `gf_CameraHeightApply`. |
+| `src/.../systems/camera/camera.galaxy` | `gf_CameraHeightApply`. |
 | `src/.../systems/quake.galaxy` | Writes the height through `gf_CameraHeightApply`. |
 | `src/.../systems/animation_bracket.galaxy` | Guard in `gf_AnimFullSet`. |
 | `src/.../systems/animation_fsm.galaxy` | `gf_JumpAnimInvalidate` in `gf_AnimReset`. |
