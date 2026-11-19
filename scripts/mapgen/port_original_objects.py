@@ -3,9 +3,12 @@
 
 Compares the Objects file of two packed maps: the base (default: original/
 as committed at HEAD) and the edited map (default: original/SCOBA.SC2Map).
-Objects are matched by Id. Removed objects are deleted from src/Objects and
-changed Position attributes are copied. Every other kind of change, and any
-src/ object that does not match the base, stops the script with no write.
+Objects are matched by Id. Removed objects are deleted from src/Objects,
+changed Position attributes are copied, objects whose Flag children changed
+are replaced by the edited element, and added objects are appended as the
+editor wrote them. --skip ID leaves one object's change out. Every other
+kind of change, any src/ object that does not match the base, and any added
+Id already in src/ stops the script with no write.
 
 Run: PYTHONPATH=scripts uv run python -m mapgen.port_original_objects
 """
@@ -30,11 +33,26 @@ EDITED = ROOT / "original" / "SCOBA.SC2Map"
 PORTABLE = {"Position"}
 
 
-def objects_from_archive(path: Path) -> dict[str, ET.Element]:
+def objects_text(path: Path) -> str:
+    """Objects of a packed map, or of an unpacked map folder."""
+    if path.is_dir():
+        return (path / "Objects").read_bytes().decode("utf-8")
     data = mpyq.MPQArchive(str(path)).read_file("Objects")
     if data is None:
         raise SystemExit(f"no Objects in {path}")
-    return {el.get("Id"): el for el in ET.fromstring(data)}
+    return data.decode("utf-8")
+
+
+def parse_objects(text: str) -> dict[str, ET.Element]:
+    return {el.get("Id"): el for el in ET.fromstring(text.encode("utf-8"))}
+
+
+def objects_from_archive(path: Path) -> dict[str, ET.Element]:
+    return parse_objects(objects_text(path))
+
+
+def kids(el: ET.Element) -> list[tuple[str, dict[str, str]]]:
+    return [(c.tag, dict(c.attrib)) for c in el]
 
 
 def base_from_git(rev: str) -> Path:
@@ -46,7 +64,7 @@ def base_from_git(rev: str) -> Path:
 
 def element_span(text: str, oid: str) -> tuple[int, int]:
     """Span of the element with this Id, including its indent and line end."""
-    m = re.search(rf'^[ \t]*<(Object\w+) Id="{re.escape(oid)}"[^>]*?(/?)>', text, re.M)
+    m = re.search(rf'^[ \t]*<(\w+) [^>]*?\bId="{re.escape(oid)}"[^>]*?(/?)>', text, re.M)
     if not m:
         raise SystemExit(f"Id {oid} not found in {SRC_OBJECTS}")
     end = m.end()
@@ -61,34 +79,44 @@ def element_span(text: str, oid: str) -> tuple[int, int]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", type=Path, help="base packed map (default: original/ at --rev)")
+    parser.add_argument("--base", type=Path, help="base packed map or unpacked folder (default: original/ at --rev)")
     parser.add_argument("--rev", default="HEAD", help="git revision for the default base")
     parser.add_argument("--edited", type=Path, default=EDITED)
     parser.add_argument("--check", action="store_true", help="report only, write nothing")
+    parser.add_argument("--skip", action="append", default=[], metavar="ID", help="leave this object's change out (repeatable)")
     args = parser.parse_args()
 
     base = objects_from_archive(args.base or base_from_git(args.rev))
-    edited = objects_from_archive(args.edited)
+    edited_text = objects_text(args.edited)
+    edited = parse_objects(edited_text)
     src_text = SRC_OBJECTS.read_bytes().decode("utf-8")
-    src = {el.get("Id"): el for el in ET.fromstring(src_text.encode("utf-8"))}
+    src = parse_objects(src_text)
+    skip = set(args.skip)
+    unknown = skip - (set(base) | set(edited))
+    if unknown:
+        raise SystemExit(f"--skip Ids not in base or edited map: {sorted(unknown)}")
 
-    added = sorted(set(edited) - set(base))
-    if added:
-        raise SystemExit(f"added objects are not supported: {added}")
-    removed = sorted(set(base) - set(edited))
+    added = sorted(set(edited) - set(base) - skip)
+    taken = [oid for oid in added if oid in src]
+    if taken:
+        raise SystemExit(f"added Ids already in src/: {taken}")
+    removed = sorted(set(base) - set(edited) - skip)
     moved: dict[str, str] = {}
-    for oid in sorted(set(base) & set(edited)):
+    reflagged: list[str] = []
+    for oid in sorted((set(base) & set(edited)) - skip):
         a, b = base[oid], edited[oid]
         diff = {k for k in a.attrib.keys() | b.attrib.keys() if a.get(k) != b.get(k)}
         if diff - PORTABLE:
             raise SystemExit(f"Id {oid}: unsupported attribute change {sorted(diff - PORTABLE)}")
-        if [ET.tostring(c) for c in a] != [ET.tostring(c) for c in b]:
-            raise SystemExit(f"Id {oid}: child elements changed")
-        if diff:
+        if kids(a) != kids(b):
+            if {tag for tag, _ in kids(a) + kids(b)} - {"Flag"}:
+                raise SystemExit(f"Id {oid}: non-Flag child elements changed")
+            reflagged.append(oid)
+        elif diff:
             moved[oid] = b.get("Position")
 
-    for oid in removed + sorted(moved):
-        if oid not in src or src[oid].attrib != base[oid].attrib:
+    for oid in removed + sorted(moved) + reflagged:
+        if oid not in src or src[oid].attrib != base[oid].attrib or kids(src[oid]) != kids(base[oid]):
             raise SystemExit(f"Id {oid}: src/ object differs from base, refusing to port")
 
     for oid in removed:
@@ -97,7 +125,15 @@ def main() -> int:
     for oid, pos in sorted(moved.items()):
         el = base[oid]
         print(f"move   {oid} {el.tag} {el.get('UnitType') or el.get('Type')} {el.get('Position')} -> {pos}")
-    print(f"removed={len(removed)} moved={len(moved)}")
+    for oid in reflagged:
+        el = edited[oid]
+        print(f"flags  {oid} {el.tag} {el.get('Type')} {[c.get('Index') for c in el]} at {el.get('Position')}")
+    for oid in added:
+        el = edited[oid]
+        print(f"add    {oid} {el.tag} {el.get('UnitType') or el.get('Type')} at {el.get('Position')}")
+    for oid in sorted(skip):
+        print(f"skip   {oid}")
+    print(f"removed={len(removed)} moved={len(moved)} reflagged={len(reflagged)} added={len(added)} skipped={len(skip)}")
     if args.check:
         return 0
 
@@ -106,16 +142,38 @@ def main() -> int:
         head = src_text[start:end]
         new = re.sub(r'Position="[^"]*"', f'Position="{pos}"', head, count=1)
         src_text = src_text[:start] + new + src_text[end:]
+    newline = "\r\n" if "\r\n" in src_text else "\n"
+    for oid in reflagged:
+        start, end = element_span(src_text, oid)
+        e_start, e_end = element_span(edited_text, oid)
+        block = edited_text[e_start:e_end].replace("\r\n", "\n").rstrip("\n") + "\n"
+        src_text = src_text[:start] + block.replace("\n", newline) + src_text[end:]
     for oid in removed:
         start, end = element_span(src_text, oid)
         src_text = src_text[:start] + src_text[end:]
+    if added:
+        blocks = []
+        for oid in added:
+            start, end = element_span(edited_text, oid)
+            block = edited_text[start:end].replace("\r\n", "\n").rstrip("\n") + "\n"
+            blocks.append(block.replace("\n", newline))
+        close = src_text.rfind("</PlacedObjects>")
+        if close < 0:
+            raise SystemExit("no </PlacedObjects> in src/ Objects")
+        src_text = src_text[:close] + "".join(blocks) + src_text[close:]
 
-    result = {el.get("Id"): el for el in ET.fromstring(src_text.encode("utf-8"))}
-    if set(result) != set(src) - set(removed):
+    result = parse_objects(src_text)
+    if set(result) != (set(src) - set(removed)) | set(added):
         raise SystemExit("result Id set is wrong, nothing written")
     for oid, pos in moved.items():
         if result[oid].get("Position") != pos:
             raise SystemExit(f"Id {oid}: position not applied, nothing written")
+    for oid in reflagged:
+        if result[oid].attrib != edited[oid].attrib or kids(result[oid]) != kids(edited[oid]):
+            raise SystemExit(f"Id {oid}: flags not applied, nothing written")
+    for oid in added:
+        if ET.tostring(result[oid]).strip() != ET.tostring(edited[oid]).strip():
+            raise SystemExit(f"Id {oid}: added object differs from the edited map, nothing written")
     SRC_OBJECTS.write_bytes(src_text.encode("utf-8"))
     print(f"wrote {SRC_OBJECTS}")
     return 0

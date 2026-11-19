@@ -24,5 +24,7 @@ Implements REQ-LANE-GATES.
 - Spawn (`spawns.galaxy`): each unit attack-moves to a random point in its
   side's gate, then (queued) a random point in its X region.
 - X region (`camera.galaxy` X triggers): attack-move to a random point in the
-  enemy side's gate, then a random point in the enemy spawn region.
+  enemy side's gate, then a random point in the enemy spawn region. The
+  side is `gf_RosterTerranPlayer(owner)`, by the roster lane (REQ-ROSTER
+  R-ROSTER-9): an empty seat has no race.
 - Random gate point: uniform over the circle area.

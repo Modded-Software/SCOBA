@@ -146,6 +146,12 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-82 | While aiming, a left click MUST NOT change the UI target. A unit that is already the UI target stays the UI target. |
 | R-TPS-83 | Switching between TPS and Point & Click MUST leave no input, aim, cursor, or crosshair state from the previous mode active. |
 
+### 3.9 Camera by unit height
+
+| ID | Requirement |
+| --- | --- |
+| R-TPS-90 | Added 2026-11-19 by the operator. The TPS and Point & Click camera target height above the ground and the default camera arm MUST follow the bound unit's height. Tosh MUST keep 0.9 and 1.5. Every other unit MUST scale both by its height divided by Tosh's. The heights MUST come from the model bounds by a build script, at the scale the unit has in game. A unit with no measured height MUST use Tosh's values. The Viking keeps its own arm. A morph (Viking landing and lift) MUST switch to the new form's height. |
+
 ## 4. Open Points
 
 The operator has not decided these. The specification names the assumption it
@@ -187,3 +193,4 @@ uses for each.
 | AC-TPS-22 | Aiming, hold W, left click: one shot fires and the hero keeps its walking speed. |
 | AC-TPS-23 | Aiming, left click the sky and an enemy out of range: the shot launches, and no hit effect shows or sounds. Left click the ground in range: the hit effect shows. |
 | AC-TPS-24 | Free-cursor state, no button held, move the mouse: the cursor moves; the camera does not scroll and does not turn. |
+| AC-TPS-25 | Switch Tosh, Kerrigan, SCV (Alt+1, 2, 3): each one is framed the same way, the camera looking at the same part of the body from the same relative distance. Alt+4, land the Viking: the camera rises to the landed body, it does not sink to the ground. |

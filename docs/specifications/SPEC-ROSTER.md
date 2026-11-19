@@ -18,6 +18,7 @@ States: `[planned]` = not built; `[built]` = code exists, no test passed;
 | R-ROSTER-5 | [tested] | `roster/20261118-201457` `rs_seats`: seat 1 hero and wallet; seats 2..6 no hero, no wallet, no pod; every lane's wave made and ordered. Base AI per owner: `baseai` |
 | R-ROSTER-6 | [tested] | `herodrop/20261118-202228` `drop_seat2`: seat 2 death, pod, fresh return owned by 2; seat 1 hero same, alive, not held, yaw unchanged |
 | R-ROSTER-7 | [built] | the touchdown facing is `c_DROP_YAW`, not the camera yaw. No build check yet |
+| R-ROSTER-9 | [tested] | `roster/20261119-175106` `rs_gate`: seats 1, 2, 3 and 5 head for the enemy spawn past the X; before the fix (`roster/20261119-174828`) seats 2, 3 (race `''`) turned to their own spawn |
 | R-ROSTER-8 | [tested] | `herodrop/20261118-202228` `drop_leave`: `gf_RosterLeave(2)` mid-fall: pod gone, hold off, not pending, not played, no landing. The engine leave event: operator (AC-ROSTER-1) |
 
 ## 2. Facts
@@ -28,6 +29,7 @@ States: `[planned]` = not built; `[built]` = code exists, no test passed;
 | F2 | Source Attributes (controller 500): slots 0, 1, 7, 8 `Open`; slots 2 to 6 `Comp`, locked. | `Attributes` |
 | F3 | Waves are made for the seat player (lane N: player N), not for the base owner. | `systems/spawns.galaxy` |
 | F4 | The map places `Tosh` for player 1 and `Kerrigan` for player 4. | `Objects` |
+| F5 | An empty seat has `PlayerRace` `''` (seats 2, 3: type 0, status 0). Side by race sent their units back from the X to their own spawn. | `roster/20261119-174828` `rs_gate` |
 
 ## 3. Design
 
@@ -44,7 +46,9 @@ States: `[planned]` = not built; `[built]` = code exists, no test passed;
 
 - `gf_RosterOwner(lane)`, `gf_RosterSeat(lane)`, `gf_RosterTerran(lane)`,
   `gf_RosterHumanSeat(lane)`, `gf_RosterHeroType(lane)`,
-  `gf_RosterLaneOf(player)` (a seat or a base owner), `gf_RosterIsOwner(player)`.
+  `gf_RosterLaneOf(player)` (a seat or a base owner), `gf_RosterIsOwner(player)`,
+  `gf_RosterTerranPlayer(player)` (side by lane; corners 7, 8 by race;
+  used by the X orders and the intro seed, R-ROSTER-9).
 - `gv_rosterPlayed[p]`: set at map init for a human seat with
   `PlayerType` user and `PlayerStatus` active. Tests set it with
   `gf_RosterPlay(p, on)`.
@@ -72,9 +76,9 @@ States: `[planned]` = not built; `[built]` = code exists, no test passed;
 
 | Module | Job |
 | --- | --- |
-| `systems/hero_drop` | Per seat: one death trigger for all played seats (`gf_UnitIsHero`); the wave calls `gf_HeroDropStart(p, at)`; the pod, its clock and its camera shot. Fixed yaw `c_DROP_YAW`. |
+| `systems/hero_drop` | Per seat: one death trigger for all played seats (`gf_UnitIsHero`); the wave calls `gf_HeroDropGo(p, podA, podB)`; the drop sequence per seat (SPEC-HERO-DROP 3a): scene, zoom, pod, its clock and its camera shot, touchdown. Fixed yaw `c_DROP_YAW`. |
 | `systems/hero_return` | Touchdown: a fresh hero unit of the dead hero's type at the pod; current stat values (`c_unitPropCurrent`) and learned abilities carried; the dead unit removed; `gf_HeroBindPlayer(p, unit)`. No `UnitRevive`. |
-| `core/input_hold`, `systems/intro_ui` | `gv_inputHeld[p]`. Every gated trigger checks `gf_InputHeld(player)` first; no trigger is disabled. |
+| `core/input_hold`, `systems/scene` | `gv_inputHeld[p]`, written only by the scene (`gf_SceneEnter`, `gf_SceneLeave`). Every gated trigger checks `gf_InputHeld(player)` first; no trigger is disabled. |
 | camera guards | No separate owner module. The writers read the seat's own state: `camera_refollow` (intro, pending, pod), `camera_dof` (intro, pod), `camera` clamp (pod), all `[p]`. |
 | `systems/intro`, `intro_flow` | State, prompt, countdown, shot per seat; Space per seat (`EventPlayer()`). Scenery (seed units, prompt dialog) once for the game. |
 
@@ -88,6 +92,7 @@ releases the input, ends the intro, removes the pod.
 | Profile | Scenario | Asserts | Negative case |
 | --- | --- | --- | --- |
 | `roster` | `table` | Owners 9..14 computer with race; alliances per team | No cross-team ally |
+| `roster` | `gate` | Seats 1, 2, 3 Marine and seat 5 Zergling move into their X; the X trigger's last order targets the enemy spawn (raw race, orders, position) | Own spawn, or no order past the X in 90 s |
 | `roster` | `seats` | Seat 1 hero valid; waves of seats 2, 3 created and ordered | Seats 2, 3: no hero, no pod, wallet 0 |
 | `herodrop` | `drop_seat2` | Seat 2 played by the harness: death, wave, pod, return | Seat 1 input, camera owner, hero unchanged |
 | `herodrop` | `drop_twice` | Three deaths by enemy damage, three fresh returns, type and life max kept | Old unit gone; no removal after a later death |
@@ -143,3 +148,5 @@ Two clients and the lobby are operator checks (AC-ROSTER-1, 2).
   `podbirth/20261118-191358` (pod camera checks older than the fixed-yaw
   drop camera); `baseai/20261118-204818` (`probe`) 1, see SPEC-BASE-AI 9.
   Host: 145 tests OK; galaxy lint 145 files OK.
+- `roster/20261119-174828` (`gate`, old side by race): 2 failures, seats 2, 3 `Dest` -1 (own spawn). F5.
+- `roster/20261119-175106` (`gate`, side by roster): 0 failures. Operator 2026-11-19 (macro keep-open run): "creep retreating seems fixed".

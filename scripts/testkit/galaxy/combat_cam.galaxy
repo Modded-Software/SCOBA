@@ -1,0 +1,63 @@
+// Combat harness: camera by unit height (R-TPS-90). Included before
+// combat.galaxy, which defines gf_DbgUseKerrigan and calls the group.
+
+void gf_DbgUseKerrigan ();
+
+// Camera by unit height (R-TPS-90): the bound unit, its measured height,
+// the applied target height and its parts, the desired arm, and the
+// engine's camera distance.
+void gf_DbgCamSnap (string lp_s) {
+    unit lv_u = gv_tPSUNIT[1];
+
+    BankValueSetFromString(gv_dbgBank, lp_s, "type", UnitGetType(lv_u));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "height1000", FixedToInt(gf_CameraUnitHeight(lv_u) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "ref1000", FixedToInt(c_CAM_HEIGHT_REFERENCE * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "applied1000", FixedToInt(gv_cameraHeightApplied[1] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "parts1000", FixedToInt((gv_quakeHeight[1] + gv_jumpCamHeight[1] + gv_dropCamHeight[1] + gf_CameraUnitLift(1)) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "desired1000", FixedToInt(gv_cameraDistanceDesired[1] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "engineDist1000", FixedToInt(CameraGetDistance(1) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "safeDist1000", FixedToInt(gf_CameraSafeDistance(1, gv_cameraDistanceDesired[1]) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "pickOz1000", FixedToInt((PointGetHeight(UnitGetPosition(lv_u)) + gf_CameraTargetOffset(lv_u)) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "groundZ1000", FixedToInt(PointGetHeight(UnitGetPosition(lv_u)) * 1000.0));
+    BankSave(gv_dbgBank);
+}
+
+void gf_DbgCamHeightGroup () {
+    // Unit: an invalid unit falls back to the reference (Tosh) values.
+    BankValueSetFromInt(gv_dbgBank, "cam_null", "offset1000", FixedToInt(gf_CameraTargetOffset(null) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, "cam_null", "arm1000", FixedToInt(gf_CameraArm(null) * 1000.0));
+
+    // Kerrigan: her height scales the target height and the arm.
+    gf_DbgReset("cam_kerrigan", false, true);
+    gf_DbgUseKerrigan();
+    Wait(1.0, c_timeGame);
+    gf_DbgCamSnap("cam_kerrigan");
+
+    // Tosh after a switch back: the old fixed 0.9 and 1.5.
+    gf_DbgReset("cam_tosh", false, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgCamSnap("cam_tosh");
+
+    // SCV: a regular unit, its own height.
+    gf_DbgReset("cam_scv", false, true);
+    gf_HeroSwitchTo(gv_heroScv);
+    Wait(1.5, c_timeGame);
+    gf_DbgCamSnap("cam_scv");
+
+    // Viking: flying form, then landed by the hero morph. The landed form
+    // gets its own height, not the flyer's or Tosh's (operator 2026-11-19).
+    gf_DbgReset("cam_viking_air", false, true);
+    gf_HeroSwitchTo(gv_heroViking);
+    Wait(1.5, c_timeGame);
+    gf_DbgCamSnap("cam_viking_air");
+    gf_DbgReset("cam_viking_land", false, true);
+    gf_HeroSwitchTo(gv_heroViking);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, "cam_viking_land", "typeBefore", UnitGetType(gv_tPSUNIT[1]));
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBAHeroAssaultMode", 0)), c_orderQueueReplace);
+    Wait(5.0, c_timeGame);
+    gf_DbgCamSnap("cam_viking_land");
+    // Lift again so the next run starts from the flying form.
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBAHeroFighterMode", 0)), c_orderQueueReplace);
+    Wait(4.0, c_timeGame);
+}

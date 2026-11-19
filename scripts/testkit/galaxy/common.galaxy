@@ -337,3 +337,29 @@ void gf_DbgPoseStart (string lp_section) {
     BankValueSetFromInt(gv_dbgBank, lp_section, "NoPitchSamples", 0);
     BankValueSetFromInt(gv_dbgBank, lp_section, "OrderSamples", 0);
 }
+
+// The drop crash zoom (SPEC-HERO-DROP 3a), per loop until it ends: ms
+// since the zoom start, script FOV and arm, engine pitch, yaw and distance
+// (x100). Raw rows for profiles/herodrop.py zoom_follow (herodrop, intro).
+string gf_DbgZoomTrace (int lp_player) {
+    string lv_trace = "";
+    int lv_i;
+
+    for (lv_i = 0; lv_i < 16 && gv_dropPhase[lp_player] == c_DROP_PHASE_ZOOM; lv_i += 1) {
+        lv_trace = lv_trace + IntToString(FixedToInt((TimerGetElapsed(gv_sCOBA_Clock) - gv_dropZoomStart[lp_player]) * 1000.0)) + ":" + IntToString(FixedToInt(gv_dropZoomFov[lp_player] * 100.0)) + "/" + IntToString(FixedToInt(gv_dropZoomDist[lp_player] * 100.0)) + "/" + IntToString(FixedToInt(CameraGetPitch(lp_player) * 100.0)) + "/" + IntToString(FixedToInt(CameraGetYaw(lp_player) * 100.0)) + "/" + IntToString(FixedToInt(CameraGetDistance(lp_player) * 100.0)) + " ";
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    return lv_trace;
+}
+
+// The drop scene and phase (SPEC-HERO-DROP 3a, 3b), for every profile.
+void gf_DbgSceneSnap (string lp_section, string lp_tag, int lp_player) {
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "SceneDrop", gf_SceneHas(lp_player, c_SCENE_DROP));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "SceneIntro", gf_SceneHas(lp_player, c_SCENE_INTRO));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Cinematic", gf_SceneActive(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "SceneEnters", gv_sceneEnters[lp_player]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Dialogs", gf_SceneDialogsVisible(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "DialogReshown", gv_sceneDialogReshown[lp_player]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Phase", gv_dropPhase[lp_player]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Zooms", gv_dropZooms[lp_player]);
+}

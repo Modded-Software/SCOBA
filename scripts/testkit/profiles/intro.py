@@ -21,13 +21,15 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .herodrop import birth_follow
+from .herodrop import birth_follow, scene_on
+from .herodrop_zoom import PHASES, zoom_follow
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
 GROUPS = ("boot", "shots", "wrap", "gate", "seats", "deploy")
 LOOP_MS = 62.5
-STATE_LOOP, STATE_ZOOM, STATE_FALL, STATE_DONE = 1, 2, 3, 4
+STATE_LOOP, STATE_DROP, STATE_DONE = 1, 2, 3
+PHASE_ZOOM, PHASE_FALL = 2, 3  # drop phases (core/hero_drop.galaxy)
 ANGLE_TOL = 2.0       # degrees, engine against script
 DIST_TOL = 0.03       # share, engine against script
 FIRST_CUT_MS = 1500   # gt_MapInit waits 0.5 s real time before the intro starts
@@ -289,32 +291,39 @@ def check_gate(checks) -> None:
 
 def check_deploy(checks) -> None:
     s = "deploy"
-    # R-INTRO-10: SPACE starts the zoom; the prompt and the music go.
-    checks.eq(s, "", "seenState", STATE_ZOOM)
+    # R-INTRO-10: SPACE starts the drop sequence; the prompt goes.
+    checks.eq(s, "", "seenState", STATE_DROP)
+    checks.eq(s, "tzoom", "Phase", PHASE_ZOOM)
+    checks.eq(s, "t0", "Phase", 0)  # negative: no drop in the loop
     # Countdown 3, 2, 1 on the prompt line, then the zoom (~3 s after SPACE).
     checks.eq(s, "", "countTrace", "321")
     count_ms = checks.value(s, "", "countMs") or 0
     # countMs: from the engine's press (gv_introCountAt) to the zoom;
     # requestMs adds the host's key latency (raw only).
     print(f"{s} raw countMs={count_ms} requestMs={checks.value(s, '', 'requestMs')} keyLatencyMs={checks.value(s, '', 'keyLatencyMs')} thirdState={checks.value(s, '', 'thirdState')}")
-    # The third press reached the engine in FALL; else the no-jump check
-    # below would test the wrong state.
+    # The third press reached the engine in the drop; else the no-jump
+    # check below would test the wrong state.
     checks.true(s, "", "thirdSent")
-    checks.eq(s, "", "thirdState", STATE_FALL)
+    checks.eq(s, "", "thirdState", STATE_DROP)
     _report(checks, f"{s} zoom starts about 3 s after SPACE", 2500 <= count_ms <= 4000, f"ms={count_ms}")
     checks.false(s, "tzoom", "Prompt")  # negative: the countdown line is gone
     # The theme plays on after SPACE; it stops at touchdown (2026-11-18).
     checks.true(s, "tzoom", "Music")
     checks.true(s, "tfall", "Music")
     checks.eq(s, "tzoom", "Deploys", 1)
-    zoom = checks.value(s, "", "zoom") or ""
-    print(f"{s} raw zoom {zoom}")
-    fovs = [int(r.split(":")[1].split("/")[1]) for r in zoom.split()]
-    _report(checks, f"{s} crash zoom narrows the lens", len(fovs) >= 2 and fovs[-1] < fovs[0], f"fov100={fovs}")
+    # R-DROP-10: the drop's own zoom, checked as in herodrop drop_main.
+    zoom_follow(checks, s)
     checks.lt(s, "", "zoomToFallMs", ZOOM_MAX_MS)
-    checks.eq(s, "tfall", "State", STATE_FALL)
+    checks.eq(s, "tfall", "State", STATE_DROP)
+    checks.eq(s, "tfall", "Phase", PHASE_FALL)
+    checks.eq(s, "", "phases", PHASES)
     checks.true(s, "", "podSeen")
     checks.eq(s, "", "podType", "SCOBAHeroPod")
+    # The same drop scene as a revive (R-DROP-10), over the intro's own.
+    for t in ("tzoom", "tfall"):
+        scene_on(checks, s, t, True)
+        checks.true(s, t, "SceneIntro")
+    checks.false(s, "t0", "SceneDrop")  # negative: not before SPACE
     checks.lt(s, "", "podToDrop100", 100)
     # The stock drop; the camera on the Birth root (SPEC-HERO-DROP 3).
     fall = birth_follow(checks, s, checks.value(s, "", "landHeroH100") or 0)
@@ -333,6 +342,9 @@ def check_deploy(checks) -> None:
         checks.true(s, t, "Selectable")
         checks.eq(s, t, "Direct", 1)
         checks.false(s, t, "Cinematic")
+        checks.false(s, t, "SceneDrop")
+        checks.false(s, t, "SceneIntro")
+        checks.eq(s, t, "Phase", 0)
         checks.eq(s, t, "Dialogs", checks.value("boot", "t0", "DialogsKept"))
         checks.false(s, t, "InputHeld")
         checks.eq(s, t, "TrigOn", checks.value(s, t, "TrigAll"))
@@ -364,7 +376,7 @@ def check_deploy(checks) -> None:
 def check_seats(checks) -> None:
     """R-INTRO-16: seat 2 deploys and lands; seat 1 stays in its loop."""
     s = "seats"
-    keys = ("State", "Active", "Held", "Cinematic", "Music", "Prompt", "Deploys", "Pods", "HeroHidden", "HeroAlive")
+    keys = ("State", "Active", "Held", "Cinematic", "Phase", "Music", "Prompt", "Deploys", "Pods", "HeroHidden", "HeroAlive")
     for t in ("t0", "tfall", "tdone"):
         for p in (1, 2):
             print(f"{s} raw {t}p{p}: " + " ".join(f"{k}={checks.value(s, f'{t}p{p}', k)}" for k in keys))
@@ -377,7 +389,10 @@ def check_seats(checks) -> None:
     checks.false(s, "tfallp2", "Prompt")
     checks.true(s, "tfallp2", "Music")  # on until touchdown (2026-11-18)
     checks.true(s, "tfallp2", "Held")
+    checks.true(s, "tfallp2", "Cinematic")
+    checks.eq(s, "tfallp2", "Phase", PHASE_FALL)
     checks.eq(s, "tdonep2", "State", STATE_DONE)
+    checks.eq(s, "tdonep2", "Phase", 0)
     checks.false(s, "tdonep2", "Active")
     checks.false(s, "tdonep2", "Held")
     checks.false(s, "tdonep2", "Cinematic")
@@ -391,6 +406,7 @@ def check_seats(checks) -> None:
         checks.true(s, f"{t}p1", "Active")
         checks.true(s, f"{t}p1", "Held")
         checks.true(s, f"{t}p1", "Cinematic")
+        checks.eq(s, f"{t}p1", "Phase", 0)
         checks.true(s, f"{t}p1", "Music")
         checks.true(s, f"{t}p1", "Prompt")
         checks.true(s, f"{t}p1", "HeroHidden")

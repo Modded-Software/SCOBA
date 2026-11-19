@@ -2,7 +2,8 @@
 
 Targets come from the built map: the largest tree, the tree whose blocker sits
 farthest from its origin (lean), a thin tree, a tree whose rotation is far from
-a quarter turn, and one SporeCannon and one SporeCrawler.
+a quarter turn, one SporeCannon, one SporeCrawler, and the caged ultralisk
+(HybridUltraliskShackled, 8x8 square blocker).
 
 Per target, from its generated Shape placed the way the fprot probe found
 (quarter-turn snap, position rounded to 0.5):
@@ -46,7 +47,7 @@ OTHER_RADIUS = 1.0
 HERO_SLACK = 0.6
 WALK_MARGIN = 3.0
 MAX_PROBES = 16
-SECTIONS = ("tree_large", "tree_lean", "tree_thin", "tree_turned", "spore_cannon", "spore_crawler")
+SECTIONS = ("tree_large", "tree_lean", "tree_thin", "tree_turned", "spore_cannon", "spore_crawler", "cage_ultralisk")
 
 Polygon = tuple[tuple[float, float], ...]
 
@@ -260,7 +261,7 @@ def pick_targets(every: list[Obstacle], map_dir: Path = BUILT) -> dict[str, Obst
     for name, key in (("tree_lean", lean), ("tree_thin", lambda o: -o.area), ("tree_turned", off_quarter)):
         rest = [o for o in trees if o not in picks.values()]
         picks[name] = max(rest, key=lambda o: (key(o), o.ident))
-    for unit, section in (("SporeCannon", "spore_cannon"), ("SporeCrawler", "spore_crawler")):
+    for unit, section in (("SporeCannon", "spore_cannon"), ("SporeCrawler", "spore_crawler"), ("HybridUltraliskShackled", "cage_ultralisk")):
         candidates = [o for o in usable if o.kind == unit]
         if not candidates:
             raise SystemExit(f"treepath: no usable {unit}")

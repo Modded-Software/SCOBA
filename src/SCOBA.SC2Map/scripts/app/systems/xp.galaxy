@@ -82,8 +82,8 @@ void gf_AwardExperience (int lp_player, int lp_amount) {
     libNtve_gf_SetBossBarCurrentValue(lv_xpBar, gv_xP[lp_player], true);
     libNtve_gf_SetBossBarMaximumValue(lv_xpBar, lv_threshold, true);
     libNtve_gf_ShowHideBossBar(false, lv_xpBar);
-    // The intro hides the map dialogs; they come back at touchdown (R-INTRO-2).
-    if (gv_introActive[lp_player]) {
+    // The scene hides the map dialogs; they come back at touchdown (R-INTRO-2).
+    if (gf_SceneActive(lp_player)) {
         return;
     }
     gf_ShowStasLevelingInterface(lp_player);

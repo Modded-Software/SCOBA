@@ -809,9 +809,9 @@
   "CommandCenter": {
    "actor": "CommandCenter",
    "actorScale": [
-    3.0,
-    3.0,
-    3.5
+    3.6,
+    3.6,
+    4.2
    ],
    "m3": "Assets\\Buildings\\Terran\\CommandCenterEx1\\CommandCenterEx1.m3",
    "model": "CommandCenter",
@@ -820,129 +820,129 @@
     0.8,
     0.8
    ],
-   "reach": 8.2646,
+   "reach": 9.9175,
    "scale": [
-    2.4,
-    2.4,
-    2.8
+    2.88,
+    2.88,
+    3.36
    ],
    "shapes": [
     {
      "c": [
-      3.4815,
+      4.1778,
       0.0,
-      3.7867
+      4.544
      ],
      "k": "sphere",
-     "r": 2.4687
+     "r": 2.9625
     },
     {
      "c": [
-      -3.5613,
+      -4.2735,
       0.0,
-      3.7914
+      4.5496
      ],
      "k": "sphere",
-     "r": 2.4687
+     "r": 2.9625
     },
     {
      "a": [
-      -1.1187,
-      -1.1106,
-      6.2927
+      -1.3425,
+      -1.3327,
+      7.5513
      ],
      "b": [
-      1.0144,
-      -1.1106,
-      6.2927
+      1.2173,
+      -1.3327,
+      7.5513
      ],
      "k": "capsule",
-     "r": 2.8162
+     "r": 3.3795
     },
     {
      "a": [
-      -0.9647,
-      1.1393,
-      6.2927
+      -1.1576,
+      1.3672,
+      7.5513
      ],
      "b": [
-      0.8604,
-      1.1393,
-      6.2927
+      1.0324,
+      1.3672,
+      7.5513
      ],
      "k": "capsule",
-     "r": 2.996
+     "r": 3.5952
     },
     {
      "c": [
-      -0.0152,
-      -0.0564,
-      4.5922
+      -0.0182,
+      -0.0676,
+      5.5106
      ],
      "k": "sphere",
-     "r": 1.9919
+     "r": 2.3902
     },
     {
      "c": [
-      0.0518,
-      -0.839,
-      4.632
+      0.0622,
+      -1.0068,
+      5.5583
      ],
      "k": "sphere",
-     "r": 3.1084
+     "r": 3.7301
     },
     {
      "a": [
       0.0,
-      2.6885,
-      4.2933
+      3.2262,
+      5.152
      ],
      "b": [
       0.0,
-      -1.2832,
-      4.2933
+      -1.5399,
+      5.152
      ],
      "k": "capsule",
-     "r": 4.6122
+     "r": 5.5347
     },
     {
      "a": [
-      2.1974,
-      -1.7434,
-      3.1897
+      2.6369,
+      -2.0921,
+      3.8276
      ],
      "b": [
-      2.1974,
-      2.0966,
-      3.1897
+      2.6369,
+      2.5159,
+      3.8276
      ],
      "k": "capsule",
-     "r": 4.76
+     "r": 5.712
     },
     {
      "a": [
-      -2.2294,
-      -1.8374,
-      3.0838
+      -2.6752,
+      -2.2049,
+      3.7006
      ],
      "b": [
-      -2.2294,
-      2.0026,
-      3.0838
+      -2.6752,
+      2.4031,
+      3.7006
      ],
      "k": "capsule",
-     "r": 4.76
+     "r": 5.712
     },
     {
      "c": [
       0.0,
-      -0.1505,
-      0.5121
+      -0.1806,
+      0.6145
      ],
      "h": [
-      5.64,
-      5.8109,
-      0.5121
+      6.768,
+      6.9731,
+      0.6145
      ],
      "k": "box",
      "u": [
@@ -965,8 +965,12 @@
     }
    ],
    "source": "fuzzy",
-   "zmax": 9.2887,
-   "zmin": -7.602
+   "zmax": 11.1465,
+   "zmin": -9.1224
+  },
+  "CommandCenterFlying": {
+   "reason": "no actor or model file",
+   "source": "none"
   },
   "DukesRevenge": {
    "actor": "DukesRevenge",
@@ -1704,6 +1708,95 @@
    "source": "fuzzy",
    "zmax": 6.2953,
    "zmin": -11.2828
+  },
+  "Hatchery": {
+   "actor": "Hatchery",
+   "actorScale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "m3": "Assets\\Buildings\\Zerg\\HatcheryEx1MP\\HatcheryEx1MP.m3",
+   "model": "Hatchery",
+   "modelScale": [
+    0.85,
+    0.85,
+    0.85
+   ],
+   "reach": 3.3066,
+   "scale": [
+    0.85,
+    0.85,
+    0.85
+   ],
+   "shapes": [
+    {
+     "c": [
+      0.0,
+      0.0,
+      0.2772
+     ],
+     "k": "sphere",
+     "r": 2.5284
+    },
+    {
+     "c": [
+      0.0,
+      0.0,
+      1.455
+     ],
+     "k": "sphere",
+     "r": 1.6317
+    },
+    {
+     "c": [
+      1.3023,
+      -1.8324,
+      0.9037
+     ],
+     "k": "sphere",
+     "r": 1.0586
+    },
+    {
+     "c": [
+      1.8598,
+      0.8492,
+      0.9034
+     ],
+     "k": "sphere",
+     "r": 1.0586
+    },
+    {
+     "c": [
+      -0.0106,
+      2.0019,
+      0.767
+     ],
+     "k": "sphere",
+     "r": 0.833
+    },
+    {
+     "c": [
+      -2.005,
+      0.7349,
+      0.7705
+     ],
+     "k": "sphere",
+     "r": 1.0098
+    },
+    {
+     "c": [
+      -1.4322,
+      -1.6901,
+      0.7912
+     ],
+     "k": "sphere",
+     "r": 1.0586
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 3.0867,
+   "zmin": -2.2512
   },
   "Hellion": {
    "actor": "Hellion",
@@ -3263,6 +3356,95 @@
    "reason": "no actor or model file",
    "source": "none"
   },
+  "Lair": {
+   "actor": "Lair",
+   "actorScale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "m3": "Assets\\Buildings\\Zerg\\HatcheryEx1MP\\HatcheryEx1MP.m3",
+   "model": "Lair",
+   "modelScale": [
+    0.85,
+    0.85,
+    0.85
+   ],
+   "reach": 3.3066,
+   "scale": [
+    0.85,
+    0.85,
+    0.85
+   ],
+   "shapes": [
+    {
+     "c": [
+      0.0,
+      0.0,
+      0.2772
+     ],
+     "k": "sphere",
+     "r": 2.5284
+    },
+    {
+     "c": [
+      0.0,
+      0.0,
+      1.455
+     ],
+     "k": "sphere",
+     "r": 1.6317
+    },
+    {
+     "c": [
+      1.3023,
+      -1.8324,
+      0.9037
+     ],
+     "k": "sphere",
+     "r": 1.0586
+    },
+    {
+     "c": [
+      1.8598,
+      0.8492,
+      0.9034
+     ],
+     "k": "sphere",
+     "r": 1.0586
+    },
+    {
+     "c": [
+      -0.0106,
+      2.0019,
+      0.767
+     ],
+     "k": "sphere",
+     "r": 0.833
+    },
+    {
+     "c": [
+      -2.005,
+      0.7349,
+      0.7705
+     ],
+     "k": "sphere",
+     "r": 1.0098
+    },
+    {
+     "c": [
+      -1.4322,
+      -1.6901,
+      0.7912
+     ],
+     "k": "sphere",
+     "r": 1.0586
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 3.0867,
+   "zmin": -2.2512
+  },
   "Leviathan": {
    "actor": "Leviathan",
    "actorScale": [
@@ -3742,6 +3924,14 @@
    "zmax": 151.3039,
    "zmin": -139.0505
   },
+  "MengskWraithAirWeaponLeft": {
+   "reason": "no actor or model file",
+   "source": "none"
+  },
+  "MengskWraithAirWeaponRight": {
+   "reason": "no actor or model file",
+   "source": "none"
+  },
   "MercCompound": {
    "actor": "MercCompound",
    "actorScale": [
@@ -3785,6 +3975,12 @@
    "source": "fuzzy",
    "zmax": 2.6229,
    "zmin": -1.5861
+  },
+  "MineralField": {
+   "actor": "MineralField",
+   "model": "MineralField",
+   "reason": "model file not found: Assets\\Buildings\\Resources\\CrystalsLow\\CrystalsLow.m3",
+   "source": "none"
   },
   "Mitosaurus": {
    "actor": "Mitosaurus",
@@ -4135,6 +4331,172 @@
    "zmax": 184.7427,
    "zmin": -33.3427
   },
+  "OrbitalCommand": {
+   "actor": "OrbitalCommand",
+   "actorScale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "m3": "Assets\\Buildings\\Terran\\CommandCenterEx1\\CommandCenterEx1.m3",
+   "model": "CommandCenter",
+   "modelScale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "reach": 2.7535,
+   "scale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "shapes": [
+    {
+     "c": [
+      1.1605,
+      0.0,
+      1.0819
+     ],
+     "k": "sphere",
+     "r": 0.7053
+    },
+    {
+     "c": [
+      -1.1871,
+      0.0,
+      1.0832
+     ],
+     "k": "sphere",
+     "r": 0.7053
+    },
+    {
+     "a": [
+      -0.3729,
+      -0.3702,
+      1.7979
+     ],
+     "b": [
+      0.3381,
+      -0.3702,
+      1.7979
+     ],
+     "k": "capsule",
+     "r": 0.8046
+    },
+    {
+     "a": [
+      -0.3216,
+      0.3798,
+      1.7979
+     ],
+     "b": [
+      0.2868,
+      0.3798,
+      1.7979
+     ],
+     "k": "capsule",
+     "r": 0.856
+    },
+    {
+     "c": [
+      -0.0051,
+      -0.0188,
+      1.3121
+     ],
+     "k": "sphere",
+     "r": 0.5691
+    },
+    {
+     "c": [
+      0.0173,
+      -0.2797,
+      1.3234
+     ],
+     "k": "sphere",
+     "r": 0.8881
+    },
+    {
+     "a": [
+      0.0,
+      0.8962,
+      1.2267
+     ],
+     "b": [
+      0.0,
+      -0.4277,
+      1.2267
+     ],
+     "k": "capsule",
+     "r": 1.3178
+    },
+    {
+     "a": [
+      0.7325,
+      -0.5811,
+      0.9113
+     ],
+     "b": [
+      0.7325,
+      0.6989,
+      0.9113
+     ],
+     "k": "capsule",
+     "r": 1.36
+    },
+    {
+     "a": [
+      -0.7431,
+      -0.6125,
+      0.8811
+     ],
+     "b": [
+      -0.7431,
+      0.6675,
+      0.8811
+     ],
+     "k": "capsule",
+     "r": 1.36
+    },
+    {
+     "c": [
+      0.0,
+      -0.0502,
+      0.1463
+     ],
+     "h": [
+      1.88,
+      1.937,
+      0.1463
+     ],
+     "k": "box",
+     "u": [
+      [
+       1.0,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       1.0,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       1.0
+      ]
+     ]
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 2.8496,
+   "zmin": -2.557
+  },
+  "OrbitalCommandFlying": {
+   "reason": "no actor or model file",
+   "source": "none"
+  },
   "Overlord": {
    "actor": "Overlord",
    "actorScale": [
@@ -4284,6 +4646,168 @@
   "PerditionTurretUnderground": {
    "reason": "no actor or model file",
    "source": "none"
+  },
+  "PlanetaryFortress": {
+   "actor": "PlanetaryFortress",
+   "actorScale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "m3": "Assets\\Buildings\\Terran\\CommandCenterEx1\\CommandCenterEx1.m3",
+   "model": "CommandCenter",
+   "modelScale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "reach": 2.7535,
+   "scale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "shapes": [
+    {
+     "c": [
+      1.1605,
+      0.0,
+      1.0819
+     ],
+     "k": "sphere",
+     "r": 0.7053
+    },
+    {
+     "c": [
+      -1.1871,
+      0.0,
+      1.0832
+     ],
+     "k": "sphere",
+     "r": 0.7053
+    },
+    {
+     "a": [
+      -0.3729,
+      -0.3702,
+      1.7979
+     ],
+     "b": [
+      0.3381,
+      -0.3702,
+      1.7979
+     ],
+     "k": "capsule",
+     "r": 0.8046
+    },
+    {
+     "a": [
+      -0.3216,
+      0.3798,
+      1.7979
+     ],
+     "b": [
+      0.2868,
+      0.3798,
+      1.7979
+     ],
+     "k": "capsule",
+     "r": 0.856
+    },
+    {
+     "c": [
+      -0.0051,
+      -0.0188,
+      1.3121
+     ],
+     "k": "sphere",
+     "r": 0.5691
+    },
+    {
+     "c": [
+      0.0173,
+      -0.2797,
+      1.3234
+     ],
+     "k": "sphere",
+     "r": 0.8881
+    },
+    {
+     "a": [
+      0.0,
+      0.8962,
+      1.2267
+     ],
+     "b": [
+      0.0,
+      -0.4277,
+      1.2267
+     ],
+     "k": "capsule",
+     "r": 1.3178
+    },
+    {
+     "a": [
+      0.7325,
+      -0.5811,
+      0.9113
+     ],
+     "b": [
+      0.7325,
+      0.6989,
+      0.9113
+     ],
+     "k": "capsule",
+     "r": 1.36
+    },
+    {
+     "a": [
+      -0.7431,
+      -0.6125,
+      0.8811
+     ],
+     "b": [
+      -0.7431,
+      0.6675,
+      0.8811
+     ],
+     "k": "capsule",
+     "r": 1.36
+    },
+    {
+     "c": [
+      0.0,
+      -0.0502,
+      0.1463
+     ],
+     "h": [
+      1.88,
+      1.937,
+      0.1463
+     ],
+     "k": "box",
+     "u": [
+      [
+       1.0,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       1.0,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       1.0
+      ]
+     ]
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 2.8496,
+   "zmin": -2.557
   },
   "Predator": {
    "actor": "Predator",
@@ -4986,6 +5510,241 @@
    "zmax": 6.0579,
    "zmin": -1.4705
   },
+  "SCOBAOvermind": {
+   "actor": "SCOBAOvermind",
+   "actorScale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "m3": "Assets\\Doodads\\LiveOvermind\\LiveOvermind.m3",
+   "model": "SCOBAOvermind",
+   "modelScale": [
+    6.8,
+    6.8,
+    6.8
+   ],
+   "reach": 97.6176,
+   "scale": [
+    6.8,
+    6.8,
+    6.8
+   ],
+   "shapes": [
+    {
+     "c": [
+      -0.7636,
+      -7.3096,
+      16.8166
+     ],
+     "h": [
+      52.1272,
+      65.7852,
+      33.2177
+     ],
+     "k": "box",
+     "u": [
+      [
+       1.0,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       1.0,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       1.0
+      ]
+     ]
+    }
+   ],
+   "source": "bounds",
+   "zmax": 107.0848,
+   "zmin": -73.4516
+  },
+  "SCOBAVikingHero": {
+   "actor": "SCOBAVikingHero",
+   "actorScale": [
+    3.0,
+    3.0,
+    3.0
+   ],
+   "m3": "Assets\\Units\\Terran\\VikingFighter\\VikingFighter.m3",
+   "model": "VikingFighter",
+   "modelScale": [
+    0.85,
+    0.85,
+    0.85
+   ],
+   "reach": 3.4305,
+   "scale": [
+    2.55,
+    2.55,
+    2.55
+   ],
+   "shapes": [
+    {
+     "c": [
+      0.0,
+      -0.1096,
+      0.3004
+     ],
+     "k": "sphere",
+     "r": 2.6803
+    },
+    {
+     "c": [
+      0.0,
+      -0.3273,
+      -0.3393
+     ],
+     "k": "sphere",
+     "r": 3.1032
+    },
+    {
+     "c": [
+      -1.4132,
+      0.3958,
+      0.5701
+     ],
+     "k": "sphere",
+     "r": 1.2147
+    },
+    {
+     "c": [
+      1.3607,
+      0.3958,
+      0.5701
+     ],
+     "k": "sphere",
+     "r": 1.2147
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 2.9807,
+   "zmin": -3.4425
+  },
+  "SCOBAVikingHeroAssault": {
+   "actor": "SCOBAVikingHeroAssault",
+   "actorScale": [
+    3.0,
+    3.0,
+    3.0
+   ],
+   "m3": "Assets\\Units\\Terran\\VikingAssault\\VikingAssault.m3",
+   "model": "VikingAssault",
+   "modelScale": [
+    0.85,
+    0.85,
+    0.85
+   ],
+   "reach": 2.8537,
+   "scale": [
+    2.55,
+    2.55,
+    2.55
+   ],
+   "shapes": [
+    {
+     "a": [
+      -1.6418,
+      0.3185,
+      1.8705
+     ],
+     "b": [
+      -1.6418,
+      -1.6249,
+      1.8759
+     ],
+     "k": "capsule",
+     "r": 0.5438
+    },
+    {
+     "a": [
+      1.5431,
+      0.3185,
+      1.8705
+     ],
+     "b": [
+      1.5431,
+      -1.6249,
+      1.8759
+     ],
+     "k": "capsule",
+     "r": 0.5438
+    },
+    {
+     "a": [
+      -0.0128,
+      0.1576,
+      0.4044
+     ],
+     "b": [
+      -0.0128,
+      0.1576,
+      1.7345
+     ],
+     "k": "capsule",
+     "r": 2.4091
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 4.1436,
+   "zmin": -2.0047
+  },
+  "SCOBAVistaOverlord": {
+   "actor": "SCOBAVistaOverlord",
+   "actorScale": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "m3": "Assets\\Units\\Zerg\\Overlord\\Overlord.m3",
+   "model": "Overlord",
+   "modelScale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "reach": 19.7644,
+   "scale": [
+    16.0,
+    16.0,
+    16.0
+   ],
+   "shapes": [
+    {
+     "a": [
+      0.0,
+      -1.7947,
+      10.7266
+     ],
+     "b": [
+      0.0,
+      2.6827,
+      -6.5983
+     ],
+     "k": "capsule",
+     "r": 14.9528
+    },
+    {
+     "c": [
+      0.5141,
+      13.0285,
+      5.5833
+     ],
+     "k": "sphere",
+     "r": 6.7258
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 25.6794,
+   "zmin": -21.5511
+  },
   "SCOBAWraith": {
    "actor": "SCOBAWraith",
    "actorScale": [
@@ -5303,6 +6062,152 @@
    ],
    "m3": "Assets\\Buildings\\Terran\\SupplyDepotEx1\\SupplyDepotEx1.m3",
    "model": "SupplyDepot",
+   "modelScale": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "reach": 3.3002,
+   "scale": [
+    1.5,
+    1.5,
+    2.1
+   ],
+   "shapes": [
+    {
+     "c": [
+      0.0897,
+      -0.0009,
+      1.0328
+     ],
+     "h": [
+      1.5794,
+      1.8802,
+      1.754
+     ],
+     "k": "box",
+     "u": [
+      [
+       1.0,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       1.0,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       1.0
+      ]
+     ]
+    },
+    {
+     "c": [
+      -0.0423,
+      -0.026,
+      0.2245
+     ],
+     "h": [
+      1.8985,
+      2.2938,
+      0.2424
+     ],
+     "k": "box",
+     "u": [
+      [
+       1.0,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       1.0,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       1.0
+      ]
+     ]
+    },
+    {
+     "c": [
+      -0.0356,
+      -0.026,
+      0.2245
+     ],
+     "h": [
+      2.6461,
+      1.5139,
+      0.2424
+     ],
+     "k": "box",
+     "u": [
+      [
+       1.0,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       1.0,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       1.0
+      ]
+     ]
+    },
+    {
+     "c": [
+      0.0613,
+      -0.077,
+      0.2245
+     ],
+     "h": [
+      1.1114,
+      2.9929,
+      0.2424
+     ],
+     "k": "box",
+     "u": [
+      [
+       1.0,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       1.0,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       1.0
+      ]
+     ]
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 4.0504,
+   "zmin": -2.9773
+  },
+  "SupplyDepotLowered": {
+   "actor": "SupplyDepotLowered",
+   "actorScale": [
+    2.5,
+    2.5,
+    3.5
+   ],
+   "m3": "Assets\\Buildings\\Terran\\SupplyDepotEx1\\SupplyDepotEx1.m3",
+   "model": "SupplyDepotLowered",
    "modelScale": [
     0.6,
     0.6,
@@ -5785,6 +6690,185 @@
    "source": "fuzzy",
    "zmax": 5.1374,
    "zmin": -0.6092
+  },
+  "VespeneGeyser": {
+   "actor": "VespeneGeyser",
+   "actorScale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "m3": "Assets\\Buildings\\Resources\\VespeneGeyser_Ex2\\VespeneGeyser_Ex2_Low.m3",
+   "model": "VespeneGeyser",
+   "modelScale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "reach": 1.7551,
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "shapes": [
+    {
+     "a": [
+      -0.4913,
+      0.1934,
+      0.2125
+     ],
+     "b": [
+      0.4843,
+      0.6212,
+      0.3073
+     ],
+     "k": "capsule",
+     "r": 0.9674
+    },
+    {
+     "c": [
+      0.1886,
+      -0.6455,
+      0.0327
+     ],
+     "k": "sphere",
+     "r": 0.8325
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 1.2747,
+   "zmin": -0.7998
+  },
+  "VikingAssault": {
+   "actor": "VikingAssault",
+   "actorScale": [
+    3.0,
+    3.0,
+    3.0
+   ],
+   "m3": "Assets\\Units\\Terran\\VikingAssault\\VikingAssault.m3",
+   "model": "VikingAssault",
+   "modelScale": [
+    0.85,
+    0.85,
+    0.85
+   ],
+   "reach": 2.8537,
+   "scale": [
+    2.55,
+    2.55,
+    2.55
+   ],
+   "shapes": [
+    {
+     "a": [
+      -1.6418,
+      0.3185,
+      1.8705
+     ],
+     "b": [
+      -1.6418,
+      -1.6249,
+      1.8759
+     ],
+     "k": "capsule",
+     "r": 0.5438
+    },
+    {
+     "a": [
+      1.5431,
+      0.3185,
+      1.8705
+     ],
+     "b": [
+      1.5431,
+      -1.6249,
+      1.8759
+     ],
+     "k": "capsule",
+     "r": 0.5438
+    },
+    {
+     "a": [
+      -0.0128,
+      0.1576,
+      0.4044
+     ],
+     "b": [
+      -0.0128,
+      0.1576,
+      1.7345
+     ],
+     "k": "capsule",
+     "r": 2.4091
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 4.1436,
+   "zmin": -2.0047
+  },
+  "VikingFighter": {
+   "actor": "VikingFighter",
+   "actorScale": [
+    3.0,
+    3.0,
+    3.0
+   ],
+   "m3": "Assets\\Units\\Terran\\VikingFighter\\VikingFighter.m3",
+   "model": "VikingFighter",
+   "modelScale": [
+    0.85,
+    0.85,
+    0.85
+   ],
+   "reach": 3.4305,
+   "scale": [
+    2.55,
+    2.55,
+    2.55
+   ],
+   "shapes": [
+    {
+     "c": [
+      0.0,
+      -0.1096,
+      0.3004
+     ],
+     "k": "sphere",
+     "r": 2.6803
+    },
+    {
+     "c": [
+      0.0,
+      -0.3273,
+      -0.3393
+     ],
+     "k": "sphere",
+     "r": 3.1032
+    },
+    {
+     "c": [
+      -1.4132,
+      0.3958,
+      0.5701
+     ],
+     "k": "sphere",
+     "r": 1.2147
+    },
+    {
+     "c": [
+      1.3607,
+      0.3958,
+      0.5701
+     ],
+     "k": "sphere",
+     "r": 1.2147
+    }
+   ],
+   "source": "fuzzy",
+   "zmax": 2.9807,
+   "zmin": -3.4425
   },
   "WarpPrismPhasing": {
    "actor": "WarpPrismPhasing",

@@ -9,7 +9,7 @@ from __future__ import annotations
 MELEE_KEYS = ("StartLoc100", "GroundStartLocs", "TotalStartLocs", "NumEnemies", "NumAllies", "NumTeams",
               "EnemyBuildings", "OpeningType", "BuildIndex", "MainState", "AttackState", "WaveMain", "WaveAttack",
               "WaveAttackState", "TownStates", "MineralsLeft", "NearbyOpen", "NextTownSlot",
-              "SupplyUsed", "SupplyLost", "UnitsLost", "AttackEntries", "LostTypes", "LostHalls", "HallTries", "Town1At", "Town1Place")
+              "SupplyUsed", "SupplyLost", "UnitsLost", "AttackEntries", "LostTypes", "LostHalls", "HallTries", "HallTypes", "HallLegOpen", "Town1At", "Town1Place")
 START_TOL_100 = 400          # hall centre within 4 of its start location
 ATTACK_STATE = 3             # e_attackState_Attack (core meleeai.galaxy)
 WAVE_ATTACK = 4              # c_waveStateAttack (core ai.galaxy)
@@ -69,3 +69,11 @@ def check_melee(checks, owners: tuple[int, ...], tags: tuple[str, ...], ok) -> N
     # The loss counter works: an owner that attacked lost units (a fight costs units).
     ok(checks, s, "an attacker lost units (losses counted)", bool(set(attackers) & set(losers)),
        f"attackers={attackers} lost={losers}")
+    # Raw (operator 2026-11-19: ally lane units retreat and hold): the seat
+    # wave units, maxima up to each minute (baseai_live gf_BaLiveSeatWatch).
+    for t in tags[1:]:
+        sec = f"ba_seats_{t}"
+        for seat in (1, 2, 3):
+            k = f"seat{seat}"
+            print(f"{sec} raw {k}: " + " ".join(f"{n}={checks.value(sec, k, n)!r}" for n in (
+                "Type", "Race", "UnitsMax", "InWaveMax", "IdleMax", "HomeMax", "Abils", "WaveAt", "Units")))

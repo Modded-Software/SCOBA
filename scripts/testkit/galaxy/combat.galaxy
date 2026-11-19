@@ -49,7 +49,7 @@ void gf_DbgAutoRun (string lp_section, fixed lp_dx, fixed lp_wait) {
 }
 
 // Pose hold (R-PNC-80). The sample helpers are in common.galaxy.
-void gf_DbgUseKerrigan ();
+// gf_DbgUseKerrigan is declared in combat_cam.galaxy (included first).
 
 // "len/rem" ms of the attack bracket on the hero's main actor.
 string gf_DbgAttackClip (bool lp_scaled) {
@@ -471,6 +471,9 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
         gf_DbgReset("psiblast_single", false, true);
         gf_DbgUseKerrigan();
         gf_DbgSingleShots("psiblast_single", 3.0);
+    }
+    if (gf_DbgGroup("camheight")) {
+        gf_DbgCamHeightGroup();
     }
 
     gf_DbgReset("done", false, true);

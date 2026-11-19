@@ -68,7 +68,9 @@ unit gf_BaseAiBaseAt (int lp_player, point lp_at) {
     unit lv_hall;
     point lv_h;
 
-    UnitCreate(1, gf_BaseAiHallType(lp_player), 0, lp_player, lp_at, 270.0);
+    // At the start point itself: its measured footprint (R-FP-10) overlaps
+    // the fields, and a placement search moved it (macro run 20261119-135805).
+    UnitCreate(1, gf_BaseAiHallType(lp_player), c_unitCreateIgnorePlacement, lp_player, lp_at, 270.0);
     lv_hall = UnitLastCreated();
     gv_baseAiHall[lp_player] = lv_hall;
     if (!UnitIsValid(lv_hall)) {

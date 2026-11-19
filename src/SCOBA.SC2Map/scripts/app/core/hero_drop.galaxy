@@ -25,8 +25,9 @@ const fixed c_DROP_TICK = 0.0625;     // one game loop
 // much larger than the hero arm (1.5); operator 2026-11-16: 8 was too close.
 const fixed c_DROP_CAM_DISTANCE = 20.0;
 // Arm from the eye to the pod while it falls (operator 2026-11-18: closer
-// than 20; herodrop/20261118-184252). The touchdown keeps c_DROP_CAM_DISTANCE.
-const fixed c_DROP_POD_ARM = 12.0;
+// than 20; herodrop/20261118-184252; 2026-11-19: 12 still too long). The
+// touchdown keeps c_DROP_CAM_DISTANCE.
+const fixed c_DROP_POD_ARM = 8.0;
 // Side arm, as the TPS aim shoulder: the whole camera sits this far to the
 // right of the pod's travel; the pod shows left of center (operator
 // 2026-11-18: the camera was right behind the pod).
@@ -42,10 +43,33 @@ const fixed c_DROP_CLIP_DRIFT = 0.15; // re-anchor the drop clock past this (s)
 // Loops after the revive in which the toggles are set again.
 const int c_DROP_RESTORE_LOOPS = 8;
 
+// Phases of the one drop sequence (SPEC-HERO-DROP 3a).
+const int c_DROP_PHASE_IDLE = 0;
+const int c_DROP_PHASE_WAIT = 1;
+const int c_DROP_PHASE_ZOOM = 2;
+const int c_DROP_PHASE_FALL = 3;
+
+// The crash zoom onto the drop point (was the intro's zoom row, values
+// unchanged). Ends on the fall's first frame: yaw c_DROP_YAW, pitch
+// c_POD_BIRTH_PITCH, arm c_DROP_POD_ARM + c_POD_BIRTH_START_Z / sin(pitch).
+const fixed c_DROP_ZOOM_LENGTH = 0.35;
+const fixed c_DROP_ZOOM_MOVE = 0.3;     // eased part, then held
+const fixed c_DROP_ZOOM_PITCH = 55.0;
+const fixed c_DROP_ZOOM_DIST = 60.0;
+const fixed c_DROP_ZOOM_FOV0 = 60.0;
+const fixed c_DROP_ZOOM_FOV1 = 12.0;
+
 trigger gt_HeroDropDeath;
 trigger gt_HeroDropTick;
 
-bool[8] gv_dropPending;      // a hero waits for its pod: dead, or the hidden intro hero
+int[8] gv_dropPhase;         // c_DROP_PHASE_IDLE, WAIT, ZOOM, FALL
+bool[8] gv_dropPending;      // phase WAIT, ZOOM or FALL: a hero waits for its pod
+point[8] gv_dropGoAt;        // the drop point picked by gf_HeroDropGo
+fixed[8] gv_dropZoomStart;   // zoom start, gv_sCOBA_Clock
+fixed[8] gv_dropZoomFov;     // zoom FOV last written (no engine getter), for tests
+fixed[8] gv_dropZoomDist;    // zoom arm last written, for tests
+string[8] gv_dropPhaseTrace; // phases entered, in order, for tests
+int[8] gv_dropZooms;         // zooms started, for tests
 unit[8] gv_dropHero;         // the waiting hero
 unit[8] gv_dropPod;          // the pod in its fall, null when there is none
 point[8] gv_dropDeathAt;     // where the hero died

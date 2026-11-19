@@ -37,10 +37,13 @@ THIN = rect(-0.02, -0.02, 0.02, 0.02)
 DATA = {
     "slice_step": STEP,
     "slice_count": COUNT,
+    "model_scale": {"CommandCenter": [1.0, 1.0, 1.0]},
     "models": {
         "ZerusTree": {str(v): [SQUARE] * COUNT for v in range(15)} | {"1": [ell()] * COUNT, "3": [THIN] * COUNT},
         "SporeCannon": {"0": [rect(-1, -1, 1, 1)] * COUNT},
         "SporeCrawler": {"0": [rect(-0.5, -0.5, 0.5, 0.5)] * COUNT},
+        # Four 2x2 legs at (±3, ±3), the middle empty (R-FP-10).
+        "CommandCenter": {"0": [rect(2, 2, 4, 4) + rect(-4, 2, -2, 4) + rect(-4, -4, -2, -2) + rect(2, -4, 4, -2)] * COUNT},
     },
 }
 
@@ -198,8 +201,8 @@ class ApplyTests(unittest.TestCase):
             footprints = (game / "FootprintData.xml").read_text(encoding="utf-8")
             for actor in set(types.values()):
                 self.assertIn(f'<CActorDoodad id="{actor}" parent="ZerusTree">', (game / "ActorData.xml").read_text(encoding="utf-8"))
-            # One per tree shape, plus the two spores.
-            self.assertEqual(footprints.count("<CFootprint "), len(set(types.values())) + 2)
+            # One per tree shape, plus the two spores, the cage square and the hall (R-FP-10).
+            self.assertEqual(footprints.count("<CFootprint "), len(set(types.values())) + 4)
             units = (game / "UnitData.xml").read_text(encoding="utf-8")
             self.assertNotIn("Footprint5x5Contour", units)
             self.assertIn('<LifeMax value="6000"/>', units)
@@ -240,6 +243,63 @@ class ApplyTests(unittest.TestCase):
             text = re.sub(r'(<CUnit id="SporeCannon">.*?)FootprintScoba[0-9a-f]+', r"\1Footprint5x5Contour", units.read_text(encoding="utf-8"), flags=re.S)
             units.write_text(text, encoding="utf-8")
             self.assertIn("SporeCannon has no generated footprint", check_scaled_footprints(root, DATA))
+
+    def test_caged_ultralisk_gets_8x8_square(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_map(Path(tmp))
+            objects = root / "Objects"
+            objects.write_text(objects.read_text(encoding="utf-8").replace(
+                "</PlacedObjects>",
+                '    <ObjectUnit Id="9" Position="60,60,0" Rotation="5.5" Scale="1,1,1" UnitType="HybridUltraliskShackled" Player="7"/>\n</PlacedObjects>',
+            ), encoding="utf-8")
+            apply_scaled_footprints(root, DATA)
+            game = root / "Base.SC2Data" / "GameData"
+            units = (game / "UnitData.xml").read_text(encoding="utf-8")
+            fp = re.search(r'<CUnit id="HybridUltraliskShackled">\s*<Footprint value="(FootprintScoba[0-9a-f]+)"/>', units)
+            self.assertIsNotNone(fp, units)
+            body = re.search(rf'<CFootprint id="{fp.group(1)}">(.*?)</CFootprint>', (game / "FootprintData.xml").read_text(encoding="utf-8"), re.S).group(1)
+            self.assertIn('<Offsets value="-4,-4;-4,4;4,4;4,-4"/>', body)
+            self.assertEqual(body.count('<Rows value="xxxxxxxx"/>'), 16)  # 8 rows, Check and Place
+            self.assertEqual(body.count('Area="-4,-4,4,4"'), 2)
+            self.assertEqual(check_scaled_footprints(root, DATA), [])
+            actor_path = game / "ActorData.xml"
+            actors = actor_path.read_text(encoding="utf-8")
+            entry = re.search(r'<CActorUnit id="HybridUltraliskShackled">(.*?)</CActorUnit>', actors, re.S)
+            self.assertIsNotNone(entry, actors)
+            self.assertIn('<On Terms="UnitBirth.HybridUltraliskShackled.EditorPlaced" Send="Create BuildingTerrainFlattenEditor"/>', entry.group(1))
+            self.assertIn('Send="Create BuildingTerrainFlatten"/>', entry.group(1))
+            self.assertNotIn("parent=", entry.group(0).split(">", 1)[0])  # merges into the stock actor
+            # Negative case: a missing flatten event is flagged.
+            actor_path.write_text(actors.replace("BuildingTerrainFlattenEditor", "Nothing"), encoding="utf-8")
+            self.assertTrue(any("does not flatten terrain" in p for p in check_scaled_footprints(root, DATA)))
+            actor_path.write_text(actors, encoding="utf-8")
+            # Negative case: the stock footprint back is flagged.
+            (game / "UnitData.xml").write_text(units.replace(fp.group(1), "FootprintNone"), encoding="utf-8")
+            self.assertIn("HybridUltraliskShackled has no generated square footprint", check_scaled_footprints(root, DATA))
+            # The placed unit is not moved or retyped.
+            self.assertIn('Id="9" Position="60,60,0"', objects.read_text(encoding="utf-8"))
+
+    def test_flatten_events_merge_into_existing_actor(self) -> None:
+        # The water splash step writes its own entry for the ultralisk first.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_map(Path(tmp))
+            objects = root / "Objects"
+            objects.write_text(objects.read_text(encoding="utf-8").replace(
+                "</PlacedObjects>",
+                '    <ObjectUnit Id="9" Position="60,60,0" UnitType="HybridUltraliskShackled" Player="7"/>\n</PlacedObjects>',
+            ), encoding="utf-8")
+            actor_path = root / "Base.SC2Data" / "GameData" / "ActorData.xml"
+            actor_path.write_text(ACTORS.replace(
+                "</Catalog>",
+                '    <CActorUnit id="HybridUltraliskShackled">\n        <Macros value="TerrainSquibAnimations"/>\n    </CActorUnit>\n</Catalog>',
+            ), encoding="utf-8")
+            apply_scaled_footprints(root, DATA)
+            actors = actor_path.read_text(encoding="utf-8")
+            self.assertEqual(actors.count('<CActorUnit id="HybridUltraliskShackled">'), 1)
+            entry = re.search(r'<CActorUnit id="HybridUltraliskShackled">(.*?)</CActorUnit>', actors, re.S).group(1)
+            self.assertIn('<Macros value="TerrainSquibAnimations"/>', entry)  # kept
+            self.assertEqual(entry.count("BuildingTerrainFlatten"), 3)
+            self.assertEqual(check_scaled_footprints(root, DATA), [])
 
     def test_fails_without_trees(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

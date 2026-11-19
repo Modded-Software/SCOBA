@@ -28,7 +28,9 @@ from skybox_flip import generate as generate_skybox_flip
 from footfall.fx import generate as generate_footfall_fx
 from slow_death_assets import generate as generate_slow_deaths
 from mapgen.spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
+from mapgen.water_doodads import apply_water_doodads
 from strip_gui_triggers import strip_triggers
+from terrain import sync_height
 from water_splashes import apply as apply_water_splashes
 
 SCALE = 2
@@ -430,6 +432,9 @@ def main() -> int:
         generate(dst, False)
     if os.environ.get("SC2_NO_PROPS") != "1":
         expand_props(dst)
+    # REQ-WATER-DOODADS: positions are in 256-map units by now.
+    if os.environ.get("SC2_NO_WATER_DOODADS") != "1":
+        apply_water_doodads(dst)
     if os.environ.get("SC2_NO_SPORES") != "1":
         scale_spores(dst)
     # R-BASE-31: resource lines first (all trees and units are in place by
@@ -441,6 +446,10 @@ def main() -> int:
     # Occlusion is disabled after every step that places doodads: a doodad model added later would fade when it hides a unit.
     for step in (lift_doodads, sink_trees, disable_doodad_occlusion, disable_unit_silhouettes, scale_psi_destroyer, slow_psi_destroyer_animations, apply_hd_textures):
         step(dst)
+    # Engine ground from the render mesh (terrain/sync_height.py), last:
+    # the ground calibration reads the final trees and lift markers.
+    if sync_height.enabled():
+        sync_height.bake(src, dst)
     if args.out is None:
         old = root / "out" / ".build-old"
         if old.exists():

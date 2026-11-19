@@ -1,0 +1,207 @@
+// Module: systems/scene
+// The cinematic scene per seat (SPEC-HERO-DROP 3b). The intro loop enters
+// it with c_SCENE_INTRO, the drop sequence with c_SCENE_DROP. The first
+// owner turns it on, the last one off. Nothing else writes cinematic mode,
+// the UI mode, the minimap, the map dialogs or the input hold.
+
+bool gf_SceneActive (int lp_player) {
+    if (lp_player < 0 || lp_player >= 16) {
+        return false;
+    }
+    return gv_sceneOwners[lp_player] != 0;
+}
+
+bool gf_SceneHas (int lp_player, int lp_owner) {
+    if (lp_player < 0 || lp_player >= 16) {
+        return false;
+    }
+    return (gv_sceneOwners[lp_player] & lp_owner) != 0;
+}
+
+// Map dialogs of a seat hidden in the scene (R-INTRO-2).
+int gf_SceneDialog (int lp_player, int lp_i) {
+    if (lp_i == 0) { return gv_pbInfoDlg; }
+    if (lp_i == 1) { return gv_pbXpDlg[lp_player]; }
+    if (lp_i == 2) { return gv_pbHpDlg[lp_player]; }
+    if (lp_i == 3) { return gv_pbNrgDlg[lp_player]; }
+    if (lp_i == 4) { return gv_singleButtonDialog; }
+    if (lp_i == 5) { return gv_singleButtonDialogAbilities; }
+    if (lp_i == 6) { return gv_singleButtonDialogInventory; }
+    if (lp_i == 7) { return gv_hudMapDialog[0]; }
+    if (lp_i == 8) { return gv_hudMapDialog[1]; }
+    if (lp_i == 9) { return gv_hudMapDialog[2]; }
+    if (lp_i == 10) { return gv_userSelectionDialog; }
+    if (lp_i == 11) { return gv_abilitiesSelectionDialog; }
+    if (lp_i == 12) { return gv_abilitiesSelectionAdditionalColumnDialog; }
+    if (lp_i == 13) { return gv_sCOBAOrderDialog; }
+    if (lp_i == 14) { return gv_walletDialog; }
+    return c_invalidDialogId;
+}
+
+// Triggers gated by the scene's input hold: player input, and every camera
+// writer (R-INTRO-9, SPEC-INTRO 3.8). Each checks gf_InputHeld; none is
+// disabled. The build checks that (scripts/input_gate_check.py).
+trigger gf_SceneTrigger (int lp_i) {
+    if (lp_i == 0) { return gt_CameraFollowDistance; }
+    if (lp_i == 1) { return gt_CameraDebugMove; }
+    if (lp_i == 2) { return gt_ZoomEnd; }
+    if (lp_i == 3) { return gt_ZoomStart; }
+    if (lp_i == 4) { return gt_CursorStart; }
+    if (lp_i == 5) { return gt_CursorEnd; }
+    if (lp_i == 6) { return gt_LeftOrbitStart; }
+    if (lp_i == 7) { return gt_RightOrbitStart; }
+    if (lp_i == 8) { return gt_CameraTurnTick; }
+    if (lp_i == 9) { return gt_CameraCollisionTick; }
+    if (lp_i == 10) { return gt_AimCameraTick; }
+    if (lp_i == 11) { return gt_AimCursorTick; }
+    if (lp_i == 12) { return gt_AimMoveTick; }
+    if (lp_i == 13) { return gt_ForwardStart; }
+    if (lp_i == 14) { return gt_ForwardEnd; }
+    if (lp_i == 15) { return gt_BackwardStart; }
+    if (lp_i == 16) { return gt_BackwardEnd; }
+    if (lp_i == 17) { return gt_LeftStart; }
+    if (lp_i == 18) { return gt_LeftEnd; }
+    if (lp_i == 19) { return gt_RightStart; }
+    if (lp_i == 20) { return gt_RightEnd; }
+    if (lp_i == 21) { return gt_JumpKey; }
+    if (lp_i == 22) { return gt_OrderKey; }
+    if (lp_i == 23) { return gt_OrderButton; }
+    if (lp_i == 24) { return gt_OrderCancel; }
+    if (lp_i == 25) { return gt_TargetClick; }
+    if (lp_i == 26) { return gt_TargetRelease; }
+    if (lp_i == 27) { return gt_UnitClick[1]; }
+    if (lp_i == 28) { return gt_HeroSwitchTosh; }
+    if (lp_i == 29) { return gt_HeroSwitchKerrigan; }
+    if (lp_i == 30) { return gt_TpsOn; }
+    if (lp_i == 31) { return gt_TpsOff; }
+    if (lp_i == 32) { return gt_KeepHeroSelected; }
+    if (lp_i == 33) { return gt_QuakeTick; }
+    if (lp_i == 34) { return gt_HudMapClick; }
+    if (lp_i == 35) { return gt_SBDialogStatsCallback; }
+    if (lp_i == 36) { return gt_UserSelectionDialogCallback; }
+    if (lp_i == 37) { return gt_SBDialogAbilitiesCallback; }
+    if (lp_i == 38) { return gt_AbilitiesSelectionDialogCallback; }
+    if (lp_i == 39) { return gt_AbilitiesandStatsTriggerDevelopment; }
+    if (lp_i == 40) { return gt_AnimProbeToggle; }
+    if (lp_i == 41) { return gt_HeroSwitchScv; }
+    if (lp_i == 42) { return gt_HeroSwitchViking; }
+    return null;
+}
+
+// Every dialog the seat sees is kept for the restore and hidden. On enter
+// and every loop of the scene (gt_SceneTick).
+void gf_SceneDialogsEnforce (int lp_player) {
+    int lv_i;
+    int lv_d;
+
+    for (lv_i = 0; lv_i < c_SCENE_DIALOGS; lv_i += 1) {
+        lv_d = gf_SceneDialog(lp_player, lv_i);
+        if (lv_d != c_invalidDialogId && DialogIsVisible(lv_d, lp_player)) {
+            gv_sceneDialogKept[lp_player][lv_i] = true;
+            gv_sceneDialogReshown[lp_player] += 1;
+            DialogSetVisible(lv_d, PlayerGroupSingle(lp_player), false);
+        }
+    }
+}
+
+void gf_SceneDialogsRestore (int lp_player) {
+    int lv_i;
+    int lv_d;
+
+    for (lv_i = 0; lv_i < c_SCENE_DIALOGS; lv_i += 1) {
+        lv_d = gf_SceneDialog(lp_player, lv_i);
+        if (lv_d == c_invalidDialogId) {
+            continue;
+        }
+        DialogSetVisible(lv_d, PlayerGroupSingle(lp_player), gv_sceneDialogKept[lp_player][lv_i]);
+    }
+}
+
+// Number of the scene dialogs a seat sees (tests).
+int gf_SceneDialogsVisible (int lp_player) {
+    int lv_i;
+    int lv_d;
+    int lv_n = 0;
+
+    for (lv_i = 0; lv_i < c_SCENE_DIALOGS; lv_i += 1) {
+        lv_d = gf_SceneDialog(lp_player, lv_i);
+        if (lv_d != c_invalidDialogId && DialogIsVisible(lv_d, lp_player)) {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}
+
+// The Dflt camera DOF.
+void gf_SceneDofDefault (int lp_player) {
+    CameraSetValue(lp_player, c_cameraValueDepthOfField, 0.0, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFocalDepth, c_SCENE_DFLT_FOCUS, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFalloffStart, c_SCENE_DFLT_FAR_START, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFalloffEnd, c_SCENE_DFLT_FAR_END, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFalloffStartNear, 0.0, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFalloffEndNear, 0.0, 0.0, 0.0, 0.0);
+}
+
+// On: input held (mouse rotation off), cinematic mode, fullscreen UI,
+// no minimap, dialogs hidden.
+void gf_SceneEnter (int lp_player, int lp_owner) {
+    int lv_i;
+
+    if (lp_player < 0 || lp_player >= 16) {
+        return;
+    }
+    if (gv_sceneOwners[lp_player] != 0) {
+        gv_sceneOwners[lp_player] = gv_sceneOwners[lp_player] | lp_owner;
+        return;
+    }
+    gv_sceneOwners[lp_player] = lp_owner;
+    gv_sceneEnters[lp_player] += 1;
+    gv_inputHeld[lp_player] = true;
+    gv_inputHolds[lp_player] += 1;
+    gf_ControlSendRelative(lp_player, false);
+    CinematicMode(PlayerGroupSingle(lp_player), true, 0.0);
+    UISetMode(PlayerGroupSingle(lp_player), c_uiModeFullscreen, 0.0);
+    UISetFrameVisible(PlayerGroupSingle(lp_player), c_syncFrameTypeMinimapPanel, false);
+    for (lv_i = 0; lv_i < c_SCENE_DIALOGS; lv_i += 1) {
+        gv_sceneDialogKept[lp_player][lv_i] = false;
+    }
+    gf_SceneDialogsEnforce(lp_player);
+}
+
+// Off when the last owner leaves: DOF default, dialogs back, input free,
+// cinematic mode off, console UI, minimap. The caller sends the control
+// mode again (the drop's bind).
+void gf_SceneLeave (int lp_player, int lp_owner) {
+    if (!gf_SceneHas(lp_player, lp_owner)) {
+        return;
+    }
+    gv_sceneOwners[lp_player] = gv_sceneOwners[lp_player] - (gv_sceneOwners[lp_player] & lp_owner);
+    if (gv_sceneOwners[lp_player] != 0) {
+        return;
+    }
+    gf_SceneDofDefault(lp_player);
+    gf_SceneDialogsRestore(lp_player);
+    gv_inputHeld[lp_player] = false;
+    CinematicMode(PlayerGroupSingle(lp_player), false, c_SCENE_LETTERBOX_OUT);
+    UISetMode(PlayerGroupSingle(lp_player), c_uiModeConsole, c_SCENE_LETTERBOX_OUT);
+    UISetFrameVisible(PlayerGroupSingle(lp_player), c_syncFrameTypeMinimapPanel, true);
+}
+
+bool gt_SceneTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = 0; lv_p < 16; lv_p += 1) {
+        if (gv_sceneOwners[lv_p] != 0) {
+            gf_SceneDialogsEnforce(lv_p);
+        }
+    }
+    return true;
+}
+
+void gt_Scene_Init () {
+    gt_SceneTick = TriggerCreate("gt_SceneTick_Func");
+    TriggerAddEventTimePeriodic(gt_SceneTick, c_SCENE_TICK, c_timeGame);
+}

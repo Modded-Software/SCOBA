@@ -78,6 +78,100 @@ Fit checks (R-FP-07), against the eroded mesh: covered ≥ `MIN_MESH_COVERED`
   (`flora.terrain._offset`) adds the sink back. Host test:
   `test_tree_sink.py`.
 - `UnitData.xml`: `SporeCannon`, `SporeCrawler` `Footprint`.
+- Square units (`config.SQUARE_UNITS`, `HybridUltraliskShackled` 8): a fixed
+  8x8 `CFootprint` (Shape square, Check and Place rows) linked in `UnitData.xml`.
+- `ActorData.xml`: the square unit's `CActorUnit` entry gets
+  `config.FLATTEN_EVENTS` appended. The water splash step already writes an
+  entry for the ultralisk; without one, a new entry with no parent merges into
+  the stock actor. The events: unit birth
+  creates core.sc2mod's `BuildingTerrainFlatten` (Normal), `...Instant`
+  (Suppressed) or `...Editor` (EditorPlaced). These deformers use the unit
+  footprint, so the flattened area is the 8x8 square.
+- `check_squares` fails the build check when the footprint link, its shape, or
+  a flatten event is missing.
+- Halls (R-FP-10, `config.HALL_UNITS`): `CommandCenter`, model
+  `CommandCenter` (`CommandCenterEx1.m3`, measured as group
+  `CommandCenter`). The scale is the drawn scale (`hall_scale`): the x of
+  the unit's `CActorUnit` `Scale` in the built `ActorData.xml` (3.6) times
+  the model's ModelData `ScaleMax` (0.8, liberty `CommandCenterBase`),
+  2.88. `measure` resolves the unit along the Void Story data stack
+  (`hitvolumes.resolve`), checks the m3 is the sliced one, and stores
+  `model_scale` in `footprint_slices.json`. Only the triangles whose three
+  vertices are skinned mostly to one `Foot_*` bone are sliced
+  (`measure.MODEL_BONES`), one slice set per foot; each foot is filled
+  apart and clipped to its own box (`mesh_samples(clip=True)`). Before,
+  body triangles and an even-odd fill across the four feet blocked bars
+  at y ±3, x -2..2 (operator 2026-11-19: "weird flying strip patterns
+  that have nothing to do with the round geometry of the 4 feet"). Feet slices as for trees, eroded by `ERODE`, on
+  the 0.5 grid; every 0.5 sub-cell kept (all four legs, not the largest
+  component). The Shape is the outline of these sub-cells on the 0.5
+  grid, exactly as for trees (`hall_sub_rows`, `hall_polygons`): one
+  closed loop per foot, holes filled. Before, the Shape followed whole
+  cells (operator 2026-11-19: "large areas that are empty but blocked
+  and feet still don't match quite"; 40 cells blocked for a foot area of
+  30.5). The Check and Place rows stay whole cells (placement has no
+  finer grid): a cell is set when at least `HALL_SUBCELLS` (2) of its
+  4 sub-cells block; then every corner pinch gets one cell
+  (`close_pinches`). Rows on an odd square centred on the hall origin,
+  `Area` `-h,-h,h+1,h+1` (stock 3x3 style, origin on a cell centre).
+  The engine blocks unit pathing by the Shape, not by Place cells (`hall`
+  run `20261119-134456`: rows only, the Barracks was refused but no cell
+  blocked pathing). `FootprintScobaHall<sha1[:10]>` with the same Check
+  and Place rows becomes the unit `Footprint`; `PlacementFootprint` stays
+  `FootprintSCOBAHall1x1`, so a hall may still stand on a mineral field.
+  The flying forms have no footprint, so lift and land need no script.
+  Not measured, keep `FootprintSCOBAHall1x1`: the Orbital Command (model
+  `OrbitalCommand` is not in the extracted mods) and the Planetary
+  Fortress (model `CommandCenter` at actor scale 1 slices to a solid 5x5
+  with the middle closed, which would stop the drop-off).
+  `check_halls` fails the build check when a hall link is missing.
+  Foot bones `Foot_01..04` at (±1.6, ±1.6) model units, the same in the
+  bind pose and in `Stand`; drawn at about ±4.6. Foot pad vertices at
+  2.88: x -6..-2 and 2..6, y ±3..±7, in model axes. The model is drawn
+  turned by the unit `Facing` minus 270 (the facing at which a model is
+  drawn as authored): every grounded CC reports `UnitGetFacing` -135 =
+  225 (`hall` run `20261119-211246` raw; liberty UnitData says 315), a
+  turn of 45 degrees off the model axes, so the feet stand on the axes at about 6.5, not
+  on the diagonals (operator 2026-11-19, Alt+0 paint: the unturned
+  marks sat 45 degrees off the drawn feet). A structure footprint is
+  not turned by the engine, so the turn is baked in
+  (`config.HALL_FACING`, `MODEL_FORWARD`, `hall_angle`). The `hall`
+  test asserts every grounded CC faces 225. Unproven: 270 as the
+  authored facing (225 against 315 differs by a quarter turn, which
+  maps the four round feet onto each other).
+  `FootprintScobaHall211404f440`: Shape of four loops (12 points) at
+  x ±5.0..±8.0, y -1.5..1.5 and y ±5.0..±8.0, x -1.5..1.5, area 32;
+  rows 17x17, 32 cells; no bar, no ramp; the middle and the diagonals
+  open. Superseded: `FootprintScobaHall10cda09540` (unturned, feet on
+  the diagonals),
+  `FootprintScobaHall786dfd20ab` (same feet, Shape on whole cells),
+  `FootprintScobaHallb775be01c4` (whole mesh,
+  bars and ramp). Before (scale 3.6, actor only,
+  `FootprintScobaHallfd3a42e7cc`): legs at about ±6, 25% too far out
+  (operator 2026-11-19: "do not match where the actual building legs are").
+
+Debug paint (R-FP-11, `scripts/app/systems/debug/hall_paint.galaxy`):
+Alt+0 (player 1) toggles it. Every 1 game s, for each ground town hall
+(up to 16): every 0.5 sub-cell centre within 9 cells (36x36 sub-cells,
+the grid the Shape is traced on) that is not
+`PointPathingPassable` gets a red "x" text tag for player 1 at that
+point; every 0.25 game s a mark shows only when at least 1.0 in front of
+player 1's eye and within 30 of the camera target (a text tag behind the
+camera or far away is drawn at the screen edge or the horizon:
+the operator's screenshot showed strips). Creep was tried: it spills onto the neighbour cells (83 open
+cells around 84 blocked ones at radius 0.5 and at 0.25, `hall` runs
+`20261119-193300`, `-193622`), so it cannot mark one cell. Text tags
+for player 1: "F" green at the four foot
+points, "A" yellow at the foot points at the actor scale alone (3.6),
+"O" blue at the origin. F against A: which scale the engine draws
+(operator 2026-11-19: F still sat on empty ground). Foot point = hall + (bone x, bone y) x
+drawn scale; bones `Foot_01..04` at (1.592 or -1.608, ±1.6) model units;
+drawn scale = the CC actor `Scale` x the model `ScaleMax`, both read from
+the catalogs at run time (`CatalogFieldValueGet`), so a wrong scale shows
+as F marks off the feet. The previous marks are removed before each
+repaint; off removes all marks. The game catalogs give actor Scale
+3.6,3.6,4.2, model `CommandCenter`, `ScaleMax` 0.8: F scale 2.88
+(`hall` run `20261119-193300` raw).
 
 Built map: 334 trees, 249 footprints. Largest trees block about area 75
 (root plate at feet height). `uv run python -m footprints.preview` (from `scripts/`) prints ASCII views.
@@ -97,6 +191,10 @@ Run `out/test-runs/treepath/20261115-133439` (`SC2_HD_TEXTURES=off`),
 | R-FP-05 | [tested] | hero reaches far side (≤ 0.4); path depth inside `Shape` ≤ 0.49 |
 | R-FP-06 | [built] | host tests `test_scaled_footprints.py` |
 | R-FP-07 | [built] | host tests `test_scaled_footprints.py` |
+| R-FP-11 | [tested] | `baseai hall` run `20261119-203139`: on, all 214 engine-blocked 0.5 sub-cells around p9 marked (Miss 0), no open one marked (Extra 0), 640 marks over 3 halls plus 9 per hall (667 tags), F scale 2.88; off, no mark left. The look: operator |
+| R-FP-08 | [built] | host test `test_caged_ultralisk_gets_8x8_square`; in game: `treepath` section `cage_ultralisk`, not run yet |
+| R-FP-09 | [built] | host test checks the actor events; the flattened look is an operator check |
+| R-FP-10 | [tested] | host tests `test_hall_footprints.py`; `baseai hall` run `20261119-203139` (failures 0, `FootprintScobaHall10cda09540`): the engine pathing sampled on the 0.5 grid (36x36 sub-cells) of a built, a created and a landed CC equals the traced feet outline sub-cell for sub-cell; each starting CC covers it. Whether the feet drawn on screen sit on it: operator. Earlier, Shape on whole cells: run `20261119-180620` at 2.88, run `20261119-135358` at 3.6: the engine grid of a built, a created and a landed CC equals the measured cells, the starting CC of p9 blocks every measured cell, origin open, one SCV mines 20 in 25 s, nothing blocked while flying or after death |
 
 That run predates `ERODE`. With `ERODE`, run `20261115-141959` has one
 failure: `tree_thin outerBlocked: got=6 want=0` (tree 8 blocks one 0.25
@@ -111,3 +209,9 @@ implemented, not verified.
 - Spores (operator will test).
 - Groves still leave intended paths open.
 - Sunk large trees (scale > 4) sit right on the ground, not buried.
+- Caged ultralisk: the terrain under its 8x8 footprint looks flat, and the
+  cage model sits on it.
+- Command Center: the blocked cells sit under the visible legs and the ramp
+  faces the way the model does (model -y taken as world -y at facing 270).
+- Debug paint (Alt+0): red x cells against the visible legs; F marks on
+  the visible feet.

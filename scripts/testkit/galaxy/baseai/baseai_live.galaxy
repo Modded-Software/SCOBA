@@ -1,0 +1,331 @@
+// Module: test/baseai_live
+// Live game counters for the macro group (REQ-BASE-AI R-BASE-33, 34).
+// - Losses: every dying AI unit of a base owner adds its type's supply
+//   (UnitTypeGetProperty c_unitPropSuppliesUsed) and one to its owner.
+//   Script units (AIIsScriptControlled) are not AI losses.
+// - Attacks: every c_BA_LIVE_TICK the owner's attack state is read; each
+//   change into e_attackState 3 (core meleeai Attack) counts one entry.
+
+const int c_BA_LIVE_PLAYERS = 16;
+const fixed c_BA_LIVE_TICK = 1.0;
+const int c_BA_ATTACK_STATE = 3;
+
+fixed[c_BA_LIVE_PLAYERS] gv_baLostSupply;
+int[c_BA_LIVE_PLAYERS] gv_baLostUnits;
+int[c_BA_LIVE_PLAYERS] gv_baAttackEntries;
+int[c_BA_LIVE_PLAYERS] gv_baAttackLast;
+bool[c_BA_LIVE_PLAYERS] gv_baLiveOwner;
+string[c_BA_LIVE_PLAYERS] gv_baLostTypes;   // distinct dead types, raw
+string[c_BA_LIVE_PLAYERS] gv_baLostHalls;   // "type@x,y tN" per dead hall
+string[c_BA_LIVE_PLAYERS] gv_baHallTries;   // "x,y tN" per hall build target
+// Raw (run 20261119-173243, p9 legs open at t480): the starting hall's
+// types seen, "type tN" per change; the first second a leg centre was
+// pathable on the ground, "tN type x,y legs=n".
+string[c_BA_LIVE_PLAYERS] gv_baHallTypes;
+string[c_BA_LIVE_PLAYERS] gv_baHallLegOpen;
+string[c_BA_LIVE_PLAYERS] gv_baHallTypeLast;
+// Raw (operator 2026-11-19: the ally lane units retreat and hold): per
+// Terran seat, every second, its living non-structure units, not heroes:
+// the most seen at once in a stock AI wave (AIUnitGetWave), with no
+// order, with a last order target in its own spawn; the order-0
+// abilities seen; the first second one was in an AI wave.
+int[c_BA_LIVE_PLAYERS] gv_baSeatUnits;
+int[c_BA_LIVE_PLAYERS] gv_baSeatInWave;
+int[c_BA_LIVE_PLAYERS] gv_baSeatIdle;
+int[c_BA_LIVE_PLAYERS] gv_baSeatHome;
+string[c_BA_LIVE_PLAYERS] gv_baSeatAbils;
+string[c_BA_LIVE_PLAYERS] gv_baSeatWaveAt;
+const fixed c_BA_LIVE_LEG = 6.5;   // leg centre on each axis: scale 2.88, facing 225 (SPEC-SCALED-FOOTPRINTS 5)
+trigger gt_BaLiveDied;
+trigger gt_BaLiveTick;
+
+const int c_BA_LIVE_TEXT = 400;
+
+bool gf_BaLiveIsHall (string lp_t) {
+    return lp_t == "CommandCenter" || lp_t == "CommandCenterFlying" || lp_t == "OrbitalCommand"
+        || lp_t == "OrbitalCommandFlying" || lp_t == "PlanetaryFortress"
+        || lp_t == "Hatchery" || lp_t == "Lair" || lp_t == "Hive";
+}
+
+void gf_BaLiveNoteType (int lp_p, string lp_t) {
+    string lv_k = " " + lp_t + " ";
+
+    if (StringFind(" " + gv_baLostTypes[lp_p], lv_k, c_stringCase) != c_stringNotFound) {
+        return;
+    }
+    if (StringLength(gv_baLostTypes[lp_p]) < c_BA_LIVE_TEXT) {
+        gv_baLostTypes[lp_p] += lp_t + " ";
+    }
+}
+
+bool gt_BaLiveDied_Func (bool testConds, bool runActions) {
+    unit lv_u = EventUnit();
+    int lv_p = UnitGetOwner(lv_u);
+
+    if (lv_p < 0 || lv_p >= c_BA_LIVE_PLAYERS || !gv_baLiveOwner[lv_p]) {
+        return true;
+    }
+    if (AIIsScriptControlled(lv_u)) {
+        return true;
+    }
+    gf_BaLiveNoteType(lv_p, UnitGetType(lv_u));
+    // A free unit is no loss: Larva "dies" into an Egg, timed Broodlings,
+    // Locusts and MULEs expire (F27: Zerg 76 units lost at 0 supply).
+    if (UnitTypeGetCost(UnitGetType(lv_u), c_unitCostSumMineralsVespene) <= 0) {
+        return true;
+    }
+    gv_baLostSupply[lv_p] += UnitTypeGetProperty(UnitGetType(lv_u), c_unitPropSuppliesUsed);
+    gv_baLostUnits[lv_p] += 1;
+    if (gf_BaLiveIsHall(UnitGetType(lv_u)) && StringLength(gv_baLostHalls[lv_p]) < c_BA_LIVE_TEXT) {
+        gv_baLostHalls[lv_p] += UnitGetType(lv_u) + "@" + gf_BaXY100(UnitGetPosition(lv_u)) + " t" + IntToString(FixedToInt(GameGetMissionTime())) + " ";
+    }
+    return true;
+}
+
+// Leg centres (±c_BA_LIVE_LEG on each axis) of lp_at blocked for ground pathing.
+int gf_BaLiveLegs (point lp_at) {
+    int lv_n = 0;
+    int lv_i;
+    fixed lv_x;
+    fixed lv_y;
+
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        lv_x = 0.0;
+        lv_y = 0.0;
+        if (lv_i == 0) { lv_x = c_BA_LIVE_LEG; }
+        if (lv_i == 1) { lv_x = -c_BA_LIVE_LEG; }
+        if (lv_i == 2) { lv_y = c_BA_LIVE_LEG; }
+        if (lv_i == 3) { lv_y = -c_BA_LIVE_LEG; }
+        if (!PointPathingPassable(PointWithOffset(lp_at, lv_x, lv_y))) {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}
+
+void gf_BaLiveHallWatch (int lp_p) {
+    unit lv_h = gv_baseAiHall[lp_p];
+    string lv_t;
+    string lv_now;
+    int lv_legs;
+
+    if (PlayerRace(lp_p) != "Terr" || !UnitIsAlive(lv_h)) {
+        return;
+    }
+    lv_t = UnitGetType(lv_h);
+    lv_now = " t" + IntToString(FixedToInt(GameGetMissionTime()));
+    if (lv_t != gv_baHallTypeLast[lp_p] && StringLength(gv_baHallTypes[lp_p]) < c_BA_LIVE_TEXT) {
+        gv_baHallTypes[lp_p] += lv_t + lv_now + " ";
+    }
+    gv_baHallTypeLast[lp_p] = lv_t;
+    if (lv_t != "CommandCenter" || gv_baHallLegOpen[lp_p] != "") {
+        return;
+    }
+    lv_legs = gf_BaLiveLegs(UnitGetPosition(lv_h));
+    if (lv_legs < 4) {
+        gv_baHallLegOpen[lp_p] = lv_now + " " + lv_t + " " + gf_BaXY100(UnitGetPosition(lv_h)) + " legs=" + IntToString(lv_legs);
+    }
+}
+
+void gf_BaLiveSeatWatch (int lp_seat) {
+    unitgroup lv_g = UnitGroup(null, lp_seat, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterStructure) | (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    unit lv_u;
+    order lv_o;
+    point lv_tp;
+    string lv_a;
+    int lv_n = 0;
+    int lv_wave = 0;
+    int lv_idle = 0;
+    int lv_home = 0;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        if (gf_UnitIsHero(lv_u)) {
+            continue;
+        }
+        lv_n += 1;
+        if (AIUnitGetWave(lv_u) != null) {
+            lv_wave += 1;
+        }
+        if (UnitOrderCount(lv_u) == 0) {
+            lv_idle += 1;
+            continue;
+        }
+        lv_a = AbilityCommandGetAbility(OrderGetAbilityCommand(UnitOrder(lv_u, 0)));
+        if (StringFind(" " + gv_baSeatAbils[lp_seat], " " + lv_a + " ", c_stringCase) == c_stringNotFound
+            && StringLength(gv_baSeatAbils[lp_seat]) < c_BA_LIVE_TEXT) {
+            gv_baSeatAbils[lp_seat] += lv_a + " ";
+        }
+        lv_o = UnitOrder(lv_u, UnitOrderCount(lv_u) - 1);
+        lv_tp = OrderGetTargetPoint(lv_o);
+        if (lv_tp != null && RegionContainsPoint(gv_sPAWNLOCATIONS[lp_seat], lv_tp)) {
+            lv_home += 1;
+        }
+    }
+    UnitGroupLoopEnd();
+    gv_baSeatUnits[lp_seat] = MaxI(gv_baSeatUnits[lp_seat], lv_n);
+    gv_baSeatInWave[lp_seat] = MaxI(gv_baSeatInWave[lp_seat], lv_wave);
+    gv_baSeatIdle[lp_seat] = MaxI(gv_baSeatIdle[lp_seat], lv_idle);
+    gv_baSeatHome[lp_seat] = MaxI(gv_baSeatHome[lp_seat], lv_home);
+    if (lv_wave > 0 && gv_baSeatWaveAt[lp_seat] == "") {
+        gv_baSeatWaveAt[lp_seat] = "t" + IntToString(FixedToInt(GameGetMissionTime())) + " n=" + IntToString(lv_wave);
+    }
+}
+
+// Raw: each seat unit now, "type@x,y:ability>tx,ty" ("idle" with no
+// order; the target of the last order), at most c_BA_LIVE_TEXT chars.
+string gf_BaLiveSeatList (int lp_seat) {
+    unitgroup lv_g = UnitGroup(null, lp_seat, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterStructure) | (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    unit lv_u;
+    order lv_o;
+    string lv_out = "";
+    string lv_e;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        if (gf_UnitIsHero(lv_u)) {
+            continue;
+        }
+        lv_e = UnitGetType(lv_u) + "@" + gf_BaXY100(UnitGetPosition(lv_u)) + ":";
+        if (UnitOrderCount(lv_u) == 0) {
+            lv_e += "idle";
+        }
+        else {
+            lv_o = UnitOrder(lv_u, UnitOrderCount(lv_u) - 1);
+            lv_e += AbilityCommandGetAbility(OrderGetAbilityCommand(UnitOrder(lv_u, 0))) + ">" + gf_BaXY100(OrderGetTargetPoint(lv_o));
+        }
+        if (StringLength(lv_out) + StringLength(lv_e) < 3 * c_BA_LIVE_TEXT) {
+            lv_out += lv_e + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+    return lv_out;
+}
+
+void gf_BaLiveSeatSnap (string lp_s) {
+    int lv_seat;
+    string lv_k;
+
+    for (lv_seat = 1; lv_seat <= 3; lv_seat += 1) {
+        lv_k = "seat" + IntToString(lv_seat);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Type", PlayerType(lv_seat));
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Race", PlayerRace(lv_seat));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "UnitsMax", gv_baSeatUnits[lv_seat]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "InWaveMax", gv_baSeatInWave[lv_seat]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "IdleMax", gv_baSeatIdle[lv_seat]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HomeMax", gv_baSeatHome[lv_seat]);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Abils", gv_baSeatAbils[lv_seat]);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "WaveAt", gv_baSeatWaveAt[lv_seat]);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Units", gf_BaLiveSeatList(lv_seat));
+    }
+}
+
+// Raw (F27): each new hall build target of a worker, "x,y tN", once per
+// target. Command 0 of TerranBuild / ZergBuild is the town hall.
+void gf_BaLiveHallTry (int lp_p) {
+    unitgroup lv_g = UnitGroup(gf_BaWorkerType(lp_p), lp_p, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    order lv_o;
+    string lv_a;
+    string lv_at;
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_o = UnitOrder(UnitGroupLoopCurrent(), 0);
+        if (lv_o == null) {
+            continue;
+        }
+        lv_a = AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o));
+        if ((lv_a != "TerranBuild" && lv_a != "ZergBuild") || AbilityCommandGetCommand(OrderGetAbilityCommand(lv_o)) != 0) {
+            continue;
+        }
+        lv_at = gf_BaXY100(OrderGetTargetPosition(lv_o));
+        if (StringFind(gv_baHallTries[lp_p], lv_at, c_stringCase) == c_stringNotFound
+            && StringLength(gv_baHallTries[lp_p]) < c_BA_LIVE_TEXT) {
+            gv_baHallTries[lp_p] += lv_at + " t" + IntToString(FixedToInt(GameGetMissionTime())) + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+}
+
+bool gt_BaLiveTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+    int lv_s;
+
+    for (lv_p = 1; lv_p <= 3; lv_p += 1) {
+        if (gv_baSeatAbils[lv_p] == null) {
+            gv_baSeatAbils[lv_p] = "";   // a string global starts null
+            gv_baSeatWaveAt[lv_p] = "";
+        }
+        gf_BaLiveSeatWatch(lv_p);
+    }
+    for (lv_p = 1; lv_p < c_BA_LIVE_PLAYERS; lv_p += 1) {
+        if (!gv_baLiveOwner[lv_p]) {
+            continue;
+        }
+        lv_s = AIState(lv_p, e_attackState);
+        if (lv_s == c_BA_ATTACK_STATE && gv_baAttackLast[lv_p] != c_BA_ATTACK_STATE) {
+            gv_baAttackEntries[lv_p] += 1;
+        }
+        gv_baAttackLast[lv_p] = lv_s;
+        gf_BaLiveHallTry(lv_p);
+        gf_BaLiveHallWatch(lv_p);
+    }
+    return true;
+}
+
+// Count for lp_player from now on.
+void gf_BaLiveWatch (int lp_player) {
+    if (lp_player <= 0 || lp_player >= c_BA_LIVE_PLAYERS) {
+        return;
+    }
+    gv_baLiveOwner[lp_player] = true;
+    gv_baLostTypes[lp_player] = "";   // a string global starts null
+    gv_baLostHalls[lp_player] = "";
+    gv_baHallTries[lp_player] = "";
+    gv_baHallTypes[lp_player] = "";
+    gv_baHallLegOpen[lp_player] = "";
+    gv_baHallTypeLast[lp_player] = "";
+    if (gt_BaLiveDied != null) {
+        return;
+    }
+    gt_BaLiveDied = TriggerCreate("gt_BaLiveDied_Func");
+    TriggerAddEventUnitDied(gt_BaLiveDied, null);
+    gt_BaLiveTick = TriggerCreate("gt_BaLiveTick_Func");
+    TriggerAddEventTimePeriodic(gt_BaLiveTick, c_BA_LIVE_TICK, c_timeGame);
+}
+
+void gf_BaLiveSnap (string lp_s, string lp_k, int lp_player) {
+    point lv_t = AIGetTownLocation(lp_player, 1);
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "SupplyLost", FixedToInt(gv_baLostSupply[lp_player]));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "UnitsLost", gv_baLostUnits[lp_player]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "AttackEntries", gv_baAttackEntries[lp_player]);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "LostTypes", gv_baLostTypes[lp_player]);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "LostHalls", gv_baLostHalls[lp_player]);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "HallTries", gv_baHallTries[lp_player]);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "HallTypes", gv_baHallTypes[lp_player]);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "HallLegOpen", gv_baHallLegOpen[lp_player]);
+    // Raw (F27): the AI's town 1 point and whether a CC fits there.
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Town1At", gf_BaXY100(lv_t));
+    if (lv_t != null) {
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Town1Place", gf_BaXY100(UnitTypePlacementFromPoint("CommandCenter", lp_player, lv_t, 0.0)));
+    }
+}
+
+// Raw (O-BASE-7): where the engine would place a CommandCenter for
+// lp_player at each site centre, with no search (0) and with a search (8).
+// "null" means no legal spot.
+void gf_BaLiveSitePlace (string lp_s, string lp_k, int lp_player) {
+    int lv_i;
+    string lv_k;
+
+    for (lv_i = 0; lv_i < gv_siteCount; lv_i += 1) {
+        lv_k = lp_k + "Site" + IntToString(lv_i);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Name", gv_siteName[lv_i]);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "At", gf_BaXY100(gv_siteAt[lv_i]));
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Place0", gf_BaXY100(UnitTypePlacementFromPoint("CommandCenter", lp_player, gv_siteAt[lv_i], 0.0)));
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Place8", gf_BaXY100(UnitTypePlacementFromPoint("CommandCenter", lp_player, gv_siteAt[lv_i], 8.0)));
+    }
+}

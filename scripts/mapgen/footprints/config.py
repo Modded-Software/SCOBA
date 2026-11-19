@@ -35,5 +35,33 @@ TREE_TYPE = "ZerusTree"
 # variation >= 12 may show its own model or the wrapped one: fill both.
 TREE_VARIATION_COUNT = 12
 SPORE_UNITS = ("SporeCannon", "SporeCrawler")
+# Units with a fixed square blocker, side in cells (operator, 2026-11-19:
+# 8x8 for the caged ultralisk).
+SQUARE_UNITS = {"HybridUltraliskShackled": 8}
+# Square units also flatten the terrain under their footprint, with the stock
+# core.sc2mod deformers that buildings use (UseUnitFootprint). Operator,
+# 2026-11-19.
+FLATTEN_EVENTS = (
+    ("UnitBirth.{u}.Normal", "Create BuildingTerrainFlatten"),
+    ("UnitBirth.{u}.Suppressed", "Create BuildingTerrainFlattenInstant"),
+    ("UnitBirth.{u}.EditorPlaced", "Create BuildingTerrainFlattenEditor"),
+)
+# Halls with a measured leg footprint (R-FP-10): unit -> measured model group.
+# Not here: the Planetary Fortress (model CommandCenter at actor scale 1 slices
+# to a solid 5x5, which would close the drop-off) and the Orbital Command
+# (its model is not extracted). Both keep FootprintSCOBAHall1x1.
+HALL_UNITS = {"CommandCenter": "CommandCenter"}
+# A hall cell blocks when this many of its four 0.5 sub-cells block.
+HALL_SUBCELLS = 2
+# Unit facing in degrees, as the engine reports it in the map: every
+# grounded CC (SCV-built, created, landed, starting) has UnitGetFacing
+# -135 = 225 (baseai hall run 20261119-211246, raw). Liberty UnitData
+# says Facing 315; both are 45 degrees off the model axes. The
+# engine draws the model turned by Facing - MODEL_FORWARD; a structure's
+# footprint is not turned, so the turn is baked into the hall footprint.
+# Operator 2026-11-19: the unturned feet sat 45 degrees off the drawn ones.
+HALL_FACING = {"CommandCenter": 225.0}
+# Facing at which a model is drawn as authored (the default unit Facing).
+MODEL_FORWARD = 270.0
 FOOTPRINT_PREFIX = "FootprintScoba"
 ACTOR_PREFIX = TREE_TYPE + "Fp"

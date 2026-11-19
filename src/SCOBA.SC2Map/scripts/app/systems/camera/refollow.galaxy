@@ -27,8 +27,8 @@ bool gf_CameraRefollowOwned (int lp_player) {
         return false;
     }
     // A pod in flight owns the camera too (herodrop 20261118-175226: the
-    // refollow pulled the camera off the pod).
-    if (gv_introActive[lp_player] || gv_dropPending[lp_player] || UnitIsValid(gv_dropPod[lp_player])) {
+    // refollow pulled the camera off the pod). The scene owns it as well.
+    if (gf_SceneActive(lp_player) || gv_dropPending[lp_player] || UnitIsValid(gv_dropPod[lp_player])) {
         return false;
     }
     return !UnitTestState(lv_hero, c_unitStateHidden);

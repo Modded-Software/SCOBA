@@ -26,8 +26,9 @@ point gv_baMarineInAt;
 string gf_BaSupplyType (int lp_player);
 string gf_BaAllWorkerOrders (int lp_player);
 string gf_BaBuildOrder (int lp_player);
-void gf_BaMacro ();                 // scripts/testkit/galaxy/baseai_macro.galaxy
-void gf_BaFlightGroup ();           // scripts/testkit/galaxy/baseai_flight.galaxy
+void gf_BaMacro ();                 // scripts/testkit/galaxy/baseai/baseai_macro.galaxy
+void gf_BaFlightGroup ();           // scripts/testkit/galaxy/baseai/baseai_flight.galaxy
+void gf_BhHall ();                  // scripts/testkit/galaxy/baseai/baseai_hall.galaxy
 
 int gf_Ba100 (fixed lp_v) {
     return FixedToInt(lp_v * 100.0);
@@ -439,6 +440,13 @@ bool gt_BaseAiTest_Func (bool testConds, bool runActions) {
         TimerPause(gv_airCreepTimer, true);
         TriggerEnable(gt_AirCreepTick, false);
         gf_BaFlightGroup();
+    }
+    else if (gf_DbgGroup("hall")) {
+        // One script hall: no waves, no air creeps near it.
+        TimerPause(gv_sPAWNTIMER, true);
+        TimerPause(gv_airCreepTimer, true);
+        TriggerEnable(gt_AirCreepTick, false);
+        gf_BhHall();
     }
     BankValueSetFromInt(gv_dbgBank, "ba_end", "RealClicks", gv_dbgRealClicks);
     BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);

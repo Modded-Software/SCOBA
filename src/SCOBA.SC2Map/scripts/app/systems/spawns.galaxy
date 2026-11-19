@@ -132,12 +132,12 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
         lv_lane = lv_map;
         lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], null, null);
         lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, null);
-        // A waiting hero drops with this wave, off the two lane pods
-        // (systems/hero_drop; nothing when no hero waits). Before the lane
-        // pods: libVCMI_gf_CreateDropPod waits, and a hero that dies in
-        // that wait must not get this wave's pod (herodrop/20261118-190259).
+        // A waiting hero's drop starts with this wave, off the two lane
+        // pods (systems/hero_drop; nothing when no hero waits). Before the
+        // lane pods: libVCMI_gf_CreateDropPod waits, and a hero that dies in
+        // that wait must not get this wave's drop (herodrop/20261118-190259).
         if (gf_RosterPlayed(lv_playerIndex)) {
-            gf_HeroDropStart(lv_playerIndex, gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, lv_podB));
+            gf_HeroDropGo(lv_playerIndex, lv_podA, lv_podB);
         }
 
         lv_group = gf_CreateSpawnGroup(4, "Marine", lv_playerIndex, lv_podA);

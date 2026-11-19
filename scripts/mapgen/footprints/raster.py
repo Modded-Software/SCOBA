@@ -29,9 +29,11 @@ def inside(points: np.ndarray, seg: np.ndarray) -> np.ndarray:
     return (hits.sum(axis=1) % 2) == 1
 
 
-def mesh_samples(outlines: list[np.ndarray]) -> tuple[np.ndarray, float, float, int, int]:
+def mesh_samples(outlines: list[np.ndarray], clip: bool = False) -> tuple[np.ndarray, float, float, int, int]:
     """Fine samples of the union of outlines on a grid aligned to the sub-cells.
 
+    clip: a sample counts for an outline only inside that outline's box, so
+    an open contour cannot fill along its row beyond its own part (halls).
     Returns (inside mask of samples, x0, y0 of the grid, sub rows, sub cols).
     """
     sub = config.SUB
@@ -52,7 +54,14 @@ def mesh_samples(outlines: list[np.ndarray]) -> tuple[np.ndarray, float, float, 
     points = np.stack([mx.ravel(), my.ravel()], axis=1)
     mask = np.zeros(len(points), dtype=bool)
     for outline in outlines:
-        mask |= inside(points, outline)
+        hit = inside(points, outline)
+        if clip and len(outline):
+            lo_x = min(outline[:, 0].min(), outline[:, 2].min())
+            hi_x = max(outline[:, 0].max(), outline[:, 2].max())
+            lo_y = min(outline[:, 1].min(), outline[:, 3].min())
+            hi_y = max(outline[:, 1].max(), outline[:, 3].max())
+            hit &= (points[:, 0] >= lo_x) & (points[:, 0] <= hi_x) & (points[:, 1] >= lo_y) & (points[:, 1] <= hi_y)
+        mask |= hit
     return mask.reshape(len(gy), len(gx)), x0, y0, rows, cols
 
 

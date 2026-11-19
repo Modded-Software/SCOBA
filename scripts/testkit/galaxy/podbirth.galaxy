@@ -48,7 +48,8 @@ void gf_PbReset (string lp_section) {
         UnitRemove(gv_dropPod[1]);
     }
     gv_dropPod[1] = null;
-    gv_dropPending[1] = false;
+    gf_HeroDropPhase(1, c_DROP_PHASE_IDLE);
+    gf_SceneLeave(1, c_SCENE_DROP);
     gf_HeroDropCamera(1, 0.0, 0.0);
     if (!UnitIsAlive(gv_heroTosh)) {
         UnitRevive(gv_heroTosh);
@@ -102,7 +103,7 @@ void gf_PbNone () {
     BankSave(gv_dbgBank);
 }
 
-// Integration: the real drop (death, gf_HeroDropStart). Per loop: script
+// Integration: the real drop (death, gf_HeroDropGo, zoom, fall). Per loop: script
 // ms since the map's start stamp, the harness's own engine clip read
 // (len/rem), the map's clip time (ms, -1 = miss), the map's read and miss
 // counts, applied camera height, camera target x,y (x100), pod unit height.
@@ -120,7 +121,11 @@ void gf_PbDrop () {
     CameraSetValue(1, c_cameraValueYaw, 135.0, 0.0, 0.0, 0.0);
     Wait(c_DROP_TICK, c_timeGame);
     BankValueSetFromInt(gv_dbgBank, lv_s, "yawBefore100", FixedToInt(CameraGetYaw(1) * 100.0));
-    gf_HeroDropStart(1, gf_DropPodPoint(gv_sPAWNLOCATIONS[1], null, null));
+    gf_HeroDropGo(1, null, null);
+    // The pod comes at the end of the zoom (c_DROP_ZOOM_LENGTH).
+    for (lv_i = 0; lv_i < 16 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
     BankValueSetFromInt(gv_dbgBank, lv_s, "dropYaw100", FixedToInt(c_DROP_YAW * 100.0));
     BankValueSetFromInt(gv_dbgBank, lv_s, "travel100", FixedToInt(gv_dropTravel[1] * 100.0));
     lv_pod = gv_dropPod[1];

@@ -1,0 +1,78 @@
+// Ground probe (terrain/sync_height.py): engine ground against the render
+// ground. Per sample point: WorldHeight ground and air. At hill and valley
+// spots: a Marine's height, then the hero Viking flying there.
+// Points come from the generated ground_points.galaxy.
+
+trigger gt_GroundTest;
+int gv_gtN;
+
+void gf_GroundPoints ();
+void gf_GroundSpots ();
+
+void gf_GtSample (int lp_k, fixed lp_x, fixed lp_y) {
+    point lv_p = Point(lp_x, lp_y);
+    string lv_key = "s" + IntToString(lp_k);
+
+    BankValueSetFromFixed(gv_dbgBank, "grid", lv_key + "Ground", WorldHeight(c_heightMapGround, lv_p));
+    BankValueSetFromFixed(gv_dbgBank, "grid", lv_key + "Air", WorldHeight(c_heightMapAir, lv_p));
+    gv_gtN += 1;
+}
+
+// A Marine stands at the spot: its height is the engine ground under it.
+void gf_GtMarine (string lp_s, fixed lp_x, fixed lp_y) {
+    point lv_p = Point(lp_x, lp_y);
+    unit lv_u;
+
+    UnitCreate(1, "Marine", c_unitCreateIgnorePlacement, 1, lv_p, 0.0);
+    lv_u = UnitLastCreated();
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "marineH", UnitGetHeight(lv_u));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "marinePosZ", PointGetHeight(UnitGetPosition(lv_u)));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "ground", WorldHeight(c_heightMapGround, UnitGetPosition(lv_u)));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "x", PointGetX(UnitGetPosition(lv_u)));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "y", PointGetY(UnitGetPosition(lv_u)));
+    UnitRemove(lv_u);
+    BankSave(gv_dbgBank);
+}
+
+// The hero Viking (flying) moved to the spot: height, flight part, camera.
+void gf_GtViking (string lp_s, fixed lp_x, fixed lp_y) {
+    unit lv_u = gv_tPSUNIT[1];
+    point lv_p = Point(lp_x, lp_y);
+
+    UnitSetPosition(lv_u, lv_p, false);
+    Wait(2.0, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lp_s, "vType", UnitGetType(lv_u));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "vH", UnitGetHeight(lv_u));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "vGround", WorldHeight(c_heightMapGround, UnitGetPosition(lv_u)));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "vAir", WorldHeight(c_heightMapAir, UnitGetPosition(lv_u)));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "vFlight", gf_FlightHeight(1));
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "vCamApplied", gv_cameraHeightApplied[1]);
+    BankValueSetFromFixed(gv_dbgBank, lp_s, "vCamTargetZ", PointGetHeight(CameraGetTarget(1)));
+    BankSave(gv_dbgBank);
+}
+
+bool gt_GroundTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAGROUND", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_GroundPoints();
+    BankValueSetFromInt(gv_dbgBank, "meta", "count", gv_gtN);
+    BankSave(gv_dbgBank);
+    gf_GroundSpots();
+    BankValueSetFromInt(gv_dbgBank, "meta", "realClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_GroundTest_Init () {
+    gt_GroundTest = TriggerCreate("gt_GroundTest_Func");
+    TriggerAddEventMapInit(gt_GroundTest);
+}

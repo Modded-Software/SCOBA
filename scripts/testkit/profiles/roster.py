@@ -90,6 +90,20 @@ def check_seats(checks) -> None:
     checks.eq(s, "t1p1", "Pods", checks.value(s, "t0p1", "Pods"))
 
 
+def check_gate(checks) -> None:
+    """R-ROSTER-9: past the X, every seat's unit heads for the enemy spawn."""
+    s = "rs_gate"
+    print(f"{s} raw waitMs={checks.value(s, '', 'waitMs')}")
+    for i in range(4):
+        k = f"c{i}"
+        print(f"{s} raw {k}: " + " ".join(f"{key}={checks.value(s, k, key)!r}" for key in (
+            "Seat", "Race", "Dest", "Orders", "At100")))
+    for i in range(4):
+        # 1: enemy spawn. -1 (own spawn, the retreat) and 0 (no order past
+        # the X) both fail.
+        checks.eq(s, f"c{i}", "Dest", 1)
+
+
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="roster",
@@ -119,6 +133,7 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("meta", "", "done", 1)
     checks.eq("rs_end", "", "RealClicks", 0)
     check_table(checks)
+    check_gate(checks)
     check_seats(checks)
 
 

@@ -10,7 +10,8 @@ void gf_ItSeatSnap (string lp_s, string lp_t) {
         BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "State", gv_introState[lv_p]);
         BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Active", gv_introActive[lv_p]);
         BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Held", gv_inputHeld[lv_p]);
-        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Cinematic", gv_introCinematic[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Cinematic", gf_SceneActive(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Phase", gv_dropPhase[lv_p]);
         BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Music", gv_introMusic[lv_p]);
         BankValueSetFromFlag(gv_dbgBank, lp_s, lv_k + "Prompt", gv_introPrompt != c_invalidDialogId && DialogIsVisible(gv_introPrompt, lv_p));
         BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Deploys", gv_introDeploys[lv_p]);
@@ -32,15 +33,14 @@ void gf_ItSeats () {
     gf_HeroBindPlayer(2, lv_two);
     gv_introState[2] = c_INTRO_LOOP;
     gv_introActive[2] = true;
-    gv_introCinematic[2] = true;
-    gf_InputHold(2);
+    gf_SceneEnter(2, c_SCENE_INTRO);
     gf_IntroStartSeat(2);
     Wait(0.5, c_timeGame);
     gf_ItSeatSnap(lv_s, "t0");
     gf_IntroDeployPress(2);
     // Countdown 3 s, zoom, fall 2.2 s: at most 15 s to touchdown.
     for (lv_i = 0; lv_i < 240 && gv_introState[2] != c_INTRO_DONE; lv_i += 1) {
-        if (!lv_fallSeen && gv_introState[2] == c_INTRO_FALL && UnitIsValid(gv_dropPod[2])) {
+        if (!lv_fallSeen && gv_introState[2] == c_INTRO_DROP && gv_dropPhase[2] == c_DROP_PHASE_FALL && UnitIsValid(gv_dropPod[2])) {
             lv_fallSeen = true;
             gf_ItSeatSnap(lv_s, "tfall");
         }

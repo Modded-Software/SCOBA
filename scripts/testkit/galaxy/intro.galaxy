@@ -40,36 +40,36 @@ int gf_ItTriggersOn () {
     int lv_i;
     int lv_n = 0;
 
-    for (lv_i = 0; lv_i < c_INTRO_TRIGGERS; lv_i += 1) {
-        if (gf_IntroTrigger(lv_i) != null && TriggerIsEnabled(gf_IntroTrigger(lv_i))) {
+    for (lv_i = 0; lv_i < c_SCENE_TRIGGERS; lv_i += 1) {
+        if (gf_SceneTrigger(lv_i) != null && TriggerIsEnabled(gf_SceneTrigger(lv_i))) {
             lv_n += 1;
         }
     }
     return lv_n;
 }
 
-// The gated triggers (gf_IntroTrigger): all stay on with the per-player
+// The gated triggers (gf_SceneTrigger): all stay on with the per-player
 // hold (core/input_hold); none is disabled.
 int gf_ItTriggersAll () {
     int lv_i;
     int lv_n = 0;
 
-    for (lv_i = 0; lv_i < c_INTRO_TRIGGERS; lv_i += 1) {
-        if (gf_IntroTrigger(lv_i) != null) {
+    for (lv_i = 0; lv_i < c_SCENE_TRIGGERS; lv_i += 1) {
+        if (gf_SceneTrigger(lv_i) != null) {
             lv_n += 1;
         }
     }
     return lv_n;
 }
 
-// Bit i: intro dialog i visible to player 1 (raw, for failures).
+// Bit i: scene dialog i visible to player 1 (raw, for failures).
 int gf_ItDialogMask () {
     int lv_i;
     int lv_d;
     int lv_mask = 0;
 
-    for (lv_i = 0; lv_i < c_INTRO_DIALOGS; lv_i += 1) {
-        lv_d = gf_IntroDialog(1, lv_i);
+    for (lv_i = 0; lv_i < c_SCENE_DIALOGS; lv_i += 1) {
+        lv_d = gf_SceneDialog(1, lv_i);
         if (lv_d != c_invalidDialogId && DialogIsVisible(lv_d, 1)) {
             lv_mask = lv_mask | (1 << lv_i);
         }
@@ -81,8 +81,8 @@ int gf_ItDialogsKept () {
     int lv_i;
     int lv_n = 0;
 
-    for (lv_i = 0; lv_i < c_INTRO_DIALOGS; lv_i += 1) {
-        if (gv_introDialogKept[1][lv_i]) {
+    for (lv_i = 0; lv_i < c_SCENE_DIALOGS; lv_i += 1) {
+        if (gv_sceneDialogKept[1][lv_i]) {
             lv_n += 1;
         }
     }
@@ -130,7 +130,9 @@ void gf_ItSnap (string lp_s, string lp_t) {
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Cuts", gv_introCuts[1]);
     // Engine count of hero pod units in the whole map.
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "HeroPodUnits", UnitGroupCount(UnitGroup(c_DROP_POD_UNIT, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), c_unitCountAll));
-    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Cinematic", gv_introCinematic[1]);
+    // Scene and drop phase: Cinematic, Dialogs, DialogReshown, SceneDrop,
+    // SceneIntro, SceneEnters, Phase, Zooms (common.galaxy).
+    gf_DbgSceneSnap(lp_s, lp_t, 1);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Music", gv_introMusic[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "MusicValid", gv_introMusicValid);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Hum", gv_introHumOn[1]);
@@ -138,10 +140,8 @@ void gf_ItSnap (string lp_s, string lp_t) {
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "HumValid", gv_introHumValid);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "SilenceValid", gv_introSilenceValid);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Dof", gv_introDof[1]);
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Dialogs", gf_IntroDialogsVisible(1));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "DialogsKept", gf_ItDialogsKept());
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "DialogMask", gf_ItDialogMask());
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "DialogReshown", gv_introDialogReshown[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Prompt", gv_introPrompt != c_invalidDialogId && DialogIsVisible(gv_introPrompt, 1));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "TrigOn", gf_ItTriggersOn());
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "TrigAll", gf_ItTriggersAll());
@@ -330,7 +330,7 @@ void gf_ItGate () {
     gf_ItSnap(lv_s, "tf");
 }
 
-// The third SPACE must reach the engine in FALL. The host's key latency
+// The third SPACE must reach the engine in the drop. The host's key latency
 // (first press: request to gv_introCountAt) is measured, and the press is
 // sent so it lands about 1 s into the fall: countdown, zoom (0.4 s), 1 s.
 fixed gv_itReqAt = -1.0;     // clock at the first request
@@ -388,20 +388,18 @@ void gf_ItDeploy () {
         BankValueSetFromInt(gv_dbgBank, lv_s, "keyLatencyMs", FixedToInt((gv_itKeyAt - gv_itReqAt) * 1000.0));
     }
     gf_ItSnap(lv_s, "tzoom");
-    // Per loop: ms since ZOOM was seen, state, script FOV, engine distance.
-    for (lv_i = 0; lv_i < 16 && gv_introState[1] == c_INTRO_ZOOM; lv_i += 1) {
-        lv_trace = lv_trace + IntToString(gf_ItMs() - lv_space) + ":" + IntToString(gv_introState[1]) + "/" + IntToString(gf_It100(gv_introFov[1])) + "/" + IntToString(gf_It100(CameraGetDistance(1))) + " ";
-        gf_ItThirdTick();
-        Wait(c_INTRO_TICK, c_timeGame);
+    // The drop's own zoom (common.galaxy), the same rows as herodrop.
+    BankValueSetFromString(gv_dbgBank, lv_s, "zoom", gf_DbgZoomTrace(1));
+    for (lv_i = 0; lv_i < 16 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
     }
     lv_fallMs = gf_ItMs() - lv_space;
-    BankValueSetFromString(gv_dbgBank, lv_s, "zoom", lv_trace);
     BankValueSetFromInt(gv_dbgBank, lv_s, "zoomToFallMs", lv_fallMs);
     gf_ItSnap(lv_s, "tfall");
     lv_pod = gv_dropPod[1];
     BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(lv_pod));
     BankValueSetFromString(gv_dbgBank, lv_s, "podType", UnitGetType(lv_pod));
-    BankValueSetFromInt(gv_dbgBank, lv_s, "podToDrop100", gf_ItDist100(UnitGetPosition(lv_pod), gv_introDropAt[1]));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podToDrop100", gf_ItDist100(UnitGetPosition(lv_pod), gv_dropGoAt[1]));
     // Engine pod position and facing: the host recomputes the Birth root.
     BankValueSetFromString(gv_dbgBank, lv_s, "podAt100", IntToString(FixedToInt(PointGetX(UnitGetPosition(lv_pod)) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(UnitGetPosition(lv_pod)) * 100.0)));
     BankValueSetFromInt(gv_dbgBank, lv_s, "podFacing100", FixedToInt(UnitGetFacing(lv_pod) * 100.0));
@@ -416,6 +414,7 @@ void gf_ItDeploy () {
         Wait(c_DROP_TICK, c_timeGame);
     }
     BankValueSetFromString(gv_dbgBank, lv_s, "fall", lv_trace);
+    BankValueSetFromString(gv_dbgBank, lv_s, "phases", gv_dropPhaseTrace[1]);
     // Ground reference for the pod unit height: the hero stands at the pod.
     BankValueSetFromInt(gv_dbgBank, lv_s, "landHeroH100", FixedToInt(UnitGetHeight(gv_heroActive) * 100.0));
     gf_ItSnap(lv_s, "tland");

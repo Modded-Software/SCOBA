@@ -299,7 +299,7 @@ void gf_AnimTargetPitchTick (int lp_player) {
     }
     lv_pitch = c_ANIM_AIM_PITCH_REST;
     if (UnitIsValid(lv_target)) {
-        lv_dz = UnitGetHeight(lv_target) - UnitGetHeight(lv_hero);
+        lv_dz = gf_UnitWorldZ(lv_target) - gf_UnitWorldZ(lv_hero);
         lv_dist = DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_target));
         if (lv_dist > 0.01) {
             lv_pitch = c_ANIM_AIM_PITCH_REST + ATan2(lv_dz, lv_dist);

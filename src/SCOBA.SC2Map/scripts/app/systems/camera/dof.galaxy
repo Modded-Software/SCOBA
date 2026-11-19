@@ -13,7 +13,7 @@ void gf_CameraDofApply (int lp_player) {
     fixed lv_kf;
     bool lv_aim;
 
-    if (gv_introActive[lp_player] || UnitIsValid(gv_dropPod[lp_player]) || !UnitIsValid(gv_tPSUNIT[lp_player])) {
+    if (gf_SceneActive(lp_player) || UnitIsValid(gv_dropPod[lp_player]) || !UnitIsValid(gv_tPSUNIT[lp_player])) {
         return;
     }
     lv_d = CameraGetDistance(lp_player);

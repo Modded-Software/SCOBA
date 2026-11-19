@@ -330,7 +330,8 @@ void gf_DbgTpsLook (unit lp_unit, fixed lp_extraYaw) {
     for (lv_i = 0; lv_i < 3; lv_i += 1) {
         lv_from = gf_AimCameraFocus(1);
         CameraSetValue(1, c_cameraValueYaw, AngleBetweenPoints(lv_from, lv_to) + lp_extraYaw, 0.0, -1, 10);
-        CameraSetValue(1, c_cameraValuePitch, ATan2(c_SCOBA_CAMERA_HEIGHT_OFFSET - c_DBG_TPS_LOOK_HEIGHT, DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
+        // World heights: the ground under hero and unit differs on a slope.
+        CameraSetValue(1, c_cameraValuePitch, ATan2((gf_UnitWorldZ(gv_tPSUNIT[1]) + gf_CameraTargetOffset(gv_tPSUNIT[1])) - (gf_UnitWorldZ(lp_unit) + c_DBG_TPS_LOOK_HEIGHT), DistanceBetweenPoints(lv_from, lv_to)), 0.0, -1, 10);
         Wait(0.15, c_timeGame);
     }
     Wait(0.25, c_timeGame);

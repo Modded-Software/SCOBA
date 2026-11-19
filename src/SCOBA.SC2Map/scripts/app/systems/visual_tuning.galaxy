@@ -171,8 +171,8 @@ bool gt_VisualTuning_Func (bool testConds, bool runActions) {
     gf_TripleDeathTime("Zergling");
     gf_ScaleDeathTimePlayer(7, "MengskBC", 100.0);
     gf_ScaleDeathTimePlayer(8, "Leviathan", 100.0);
-    // Pride of Augustgrad: starts at 1250 of 100000 (operator 2026-11-18: was 1000).
-    gf_SetUnitLifePercent("MengskBC", 0.0125);
+    // Pride of Augustgrad: starts at 1500 of 100000 (operator 2026-11-18: 1000, 1250, then 1500).
+    gf_SetUnitLifePercent("MengskBC", 0.015);
     gf_FaceTypeAtType("Leviathan", "MengskBC");
     gf_HideType("Leviathan");
     // The MengskBC north and east of X Center (region 8): twice the unit's

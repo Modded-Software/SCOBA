@@ -11,19 +11,21 @@ import os
 from pathlib import Path
 
 from mapgen import player_slots
+from mapgen.footprints.hall import hall_footprint_id
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .baseai_feel import check_feel_extra
+from .baseai_hall import HALL_PLACE, check_hall, check_legs, hall_rows, show_grid
 from .baseai_melee import check_growth, check_melee
 from .baseai_viking import check_right_hold, check_side_keys, check_viking_form, check_viking_morph
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
-GROUPS = ("probe", "macro", "flight")
+GROUPS = ("probe", "macro", "flight", "hall")
 # "all" runs these; macro (about 5 min, waves on) runs by name only.
-ALL_GROUPS = ("probe",)
+ALL_GROUPS = ("probe", "hall")
 # Lane owners (core/roster.galaxy, scripts/mapgen/player_slots.py): lane 1..6.
 MACRO_OWNERS = tuple(player_slots.LANES[lane][1] for lane in range(1, 7))
 MACRO_TAGS = ("t1", "t60", "t120", "t180", "t240", "t300", "t360", "t420", "t480")
@@ -186,26 +188,29 @@ def check_flight(checks, s: str) -> None:
 
 # --- macro ------------------------------------------------------------------
 TERRAN_OWNERS = MACRO_OWNERS[:3]
-HALL_FOOT = "Footprint8x8CCContour"
-HALL_PLACE = "Footprint8x8CCDropOff"
+# Not measured, no blocking (SPEC-SCALED-FOOTPRINTS 5): the morphs.
+HALL_FOOT_UNMEASURED = "FootprintSCOBAHall1x1"
 
 
 def check_hall_footprint(checks) -> None:
-    """Command Center family 8x8 (stock 5x5): catalog and engine pathing,
-    at the start and after the morphs."""
+    """R-BASE-30, R-FP-10: the Command Center blocks its measured cells (legs);
+    the middle stays open. The Orbital Command is not measured."""
     for s in ("ba_macro", "ba_macro_end"):
         for p in TERRAN_OWNERS:
             k = f"p{p}"
             print(f"{s} raw {k} hall: " + " ".join(f"{n}={checks.value(s, k, n)}" for n in
-                                                  ("HallType", "HallFoot", "HallPlace", "HallBlocked35",
-                                                   "HallBlocked46")))
-            checks.eq(s, k, "HallFoot", HALL_FOOT)
+                                                  ("HallType", "HallAt100", "HallFoot", "HallPlace", "HallBlocked10",
+                                                   "HallRefused", "HallHub")))
+            print(show_grid(checks, s, k + "Hall", f"{s} raw {k} hall grid"))
             checks.eq(s, k, "HallPlace", HALL_PLACE)
-            # Inside half 4: blocked in all 4 directions (a 5x5 leaves 3.5 open).
-            checks.eq(s, k, "HallBlocked35", 4)
-            # Negative: not bigger than 8x8, open somewhere just outside.
-            _ok(checks, s, f"{k} open outside 8x8", (checks.value(s, k, "HallBlocked46") or 0) < 4,
-                f"blocked46={checks.value(s, k, 'HallBlocked46')}")
+            # Units walk under the middle.
+            checks.eq(s, k, "HallBlocked10", 0)
+            if checks.value(s, k, "HallType") == "CommandCenter":
+                checks.eq(s, k, "HallFoot", hall_footprint_id(hall_rows()))
+                # Minerals and buildings may block more cells: every measured cell is blocked.
+                check_legs(checks, s, k + "Hall", exact=False)
+            else:
+                checks.eq(s, k, "HallFoot", HALL_FOOT_UNMEASURED)
 
 
 SUPPLY_MAX = 200           # c_SUPPLY_MAX, systems/base/base_ai
@@ -376,6 +381,7 @@ CHECKS = {
     "probe": check_probe,
     "macro": check_macro,
     "flight": check_flight_group,
+    "hall": check_hall,
 }
 
 
@@ -413,12 +419,13 @@ def map_spec() -> TestMapSpec:
         bank_names=PROFILE_BANKS["baseai"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "baseai.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "baseai_live.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "baseai_macro.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "baseai_land.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "baseai_feel.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "baseai_flight.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_live.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_macro.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_land.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_feel.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_flight.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_hall.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/baseai/common",
@@ -428,6 +435,7 @@ def map_spec() -> TestMapSpec:
             "scripts/test/baseai/baseai_land",
             "scripts/test/baseai/baseai_feel",
             "scripts/test/baseai/baseai_flight",
+            "scripts/test/baseai/baseai_hall",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_BaseAiTest_Init();"),
     )

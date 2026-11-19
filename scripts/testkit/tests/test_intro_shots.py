@@ -39,13 +39,12 @@ class TableTest(unittest.TestCase):
             self.assertEqual(S.check(Path(tmp)), [])
 
     def test_lengths(self) -> None:
-        self.assertAlmostEqual(S.LOOP_LENGTH, 72.5)  # S7 7 s, S8 7.5 s (operator 2026-11-18)
+        self.assertAlmostEqual(S.LOOP_LENGTH, 72.0)  # S7 7 s, S8 7 s (operator 2026-11-18)
         for shot in S.SHOTS:
             self.assertGreaterEqual(shot.length, 3.0, shot.name)
-        self.assertLessEqual(S.ZOOM.length, 0.4)  # R-INTRO-10
 
     def test_dof_in_s2_only(self) -> None:
-        self.assertEqual([s.name for s in S.SHOTS + (S.ZOOM,) if s.dof], ["S2 Line"])
+        self.assertEqual([s.name for s in S.SHOTS if s.dof], ["S2 Line"])
 
     def test_dolly_zoom_keeps_the_subject_size(self) -> None:
         s8 = next(s for s in S.SHOTS if s.ease == "Z")
@@ -69,10 +68,9 @@ class TableTest(unittest.TestCase):
                 self.assertGreaterEqual(e, prev - 1e-12, code)  # monotonic
                 prev = e
         self.assertEqual(S.ease("S", 0.7), 0.0)
-        # C: eased over CRASH_MOVE, then held at 1.
-        self.assertAlmostEqual(S.ease("C", S.CRASH_MOVE / S.ZOOM.length, S.ZOOM.length), 1.0)
-        self.assertAlmostEqual(S.ease("C", 1.0, S.ZOOM.length), 1.0)
-        self.assertLess(S.ease("C", 0.5 * S.CRASH_MOVE / S.ZOOM.length, S.ZOOM.length), 1.0)
+        # Negative case: the crash easing left the table (core/hero_drop).
+        with self.assertRaises(ValueError):
+            S.ease("C", 0.5)
 
     def test_arc_is_continuous(self) -> None:
         r = S.ARC_RAMP
@@ -113,9 +111,11 @@ class TableTest(unittest.TestCase):
     def test_galaxy_rows(self) -> None:
         text = S.galaxy()
         self.assertIn(f"const int c_INTRO_SHOTS = {len(S.SHOTS)};", text)
-        self.assertIn(f"gv_introRow_dof[{len(S.SHOTS)}] = false;", text)
+        self.assertIn(f"gv_introRow_dof[{len(S.SHOTS) - 1}] = false;", text)
         self.assertIn("gv_introRow_dof[1] = true;", text)
         self.assertIn("gv_introRow_ease[8] = c_INTRO_EASE_Z;", text)
+        # Negative case: no row past the shots (the zoom row is gone).
+        self.assertNotIn(f"gv_introRow_dof[{len(S.SHOTS)}]", text)
 
 
 class IntroPatchTest(unittest.TestCase):
@@ -216,9 +216,6 @@ class TerrainTest(unittest.TestCase):
         for shot in S.SHOTS:
             for odd in (False, True):
                 self.assertGreaterEqual(self.clearance(shot, odd), CLEARANCE, f"{shot.name} odd={odd}")
-
-    def test_crash_zoom_clears_over_the_spawn(self) -> None:
-        self.assertGreaterEqual(self.clearance(S.ZOOM, False, (176.7, 174.3)), CLEARANCE)
 
     def test_clearance_catches_a_shot_in_the_ground(self) -> None:
         # Negative case: S7 looking up steeply from far away puts the eye under the ground.

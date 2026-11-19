@@ -1,0 +1,224 @@
+// Module: systems/hall_paint
+// Debug paint of the town hall blockers (REQ-SCALED-FOOTPRINTS R-FP-11,
+// SPEC-SCALED-FOOTPRINTS 5). Alt+0 (player 1) toggles it. Every
+// c_HALL_PAINT_TICK, around each ground town hall: a red "x" on every
+// 0.5 sub-cell the engine blocks for ground pathing (the grid the
+// footprint Shape is traced on), "F" at the four model foot points at
+// the drawn scale, "O" at the origin. Off removes every
+// mark. Creep spilled onto neighbour cells (runs 20261119-193300, -193622).
+
+const int c_HALL_PAINT_HALLS = 16;
+const int c_HALL_PAINT_R = 18;                // 0.5 sub-cells each way: 9 cells
+const int c_HALL_PAINT_CELLS = 4000;          // marked sub-cells
+const fixed c_HALL_PAINT_TICK = 1.0;          // game s
+const int c_HALL_PAINT_TAGS = 4200;           // sub-cell marks plus 9 per hall
+// A text tag behind the camera is drawn at the screen edge (operator
+// screenshot 2026-11-19: strips at the top and bottom). Every
+// c_HALL_PAINT_VIEW_TICK each mark is shown only in front of the eye.
+const fixed c_HALL_PAINT_VIEW_TICK = 0.25;    // game s
+const fixed c_HALL_PAINT_FRONT = 1.0;         // world units in front of the eye
+const fixed c_HALL_PAINT_NEAR = 30.0;         // world units from the camera target
+// Marks per hall: O, four F (actor x model scale), four A (actor scale only;
+// operator 2026-11-19: F still sat on empty ground; which one is on the feet).
+const int c_HALL_PAINT_PER_HALL = 9;
+// Foot bones Foot_01..04 of CommandCenterEx1.m3, model units (cc_pose,
+// SPEC-SCALED-FOOTPRINTS 5): x 1.592 or -1.608, y ±1.6.
+const fixed c_HALL_PAINT_FOOT_XP = 1.592;
+const fixed c_HALL_PAINT_FOOT_XN = -1.608;
+const fixed c_HALL_PAINT_FOOT_Y = 1.6;
+const fixed c_HALL_PAINT_FORWARD = 270.0;     // facing at which a model is drawn as authored
+
+bool gv_hallPaintOn;
+trigger gt_HallPaintKey;
+trigger gt_HallPaintTick;
+point[c_HALL_PAINT_CELLS] gv_hallPaintCell;   // marked cells of the last paint (tests)
+int gv_hallPaintCells;
+int[c_HALL_PAINT_TAGS] gv_hallPaintTag;
+point[c_HALL_PAINT_TAGS] gv_hallPaintTagAt;
+trigger gt_HallPaintView;
+int gv_hallPaintShown;                        // marks shown by the last view pass (tests)
+int gv_hallPaintTags;
+int gv_hallPaintHalls;                        // halls of the last paint (tests)
+fixed gv_hallPaintScale;                      // drawn scale of the last CC (tests)
+
+bool gf_HallPaintIsHall (unit lp_u) {
+    string lv_t = UnitGetType(lp_u);
+
+    return lv_t == "CommandCenter" || lv_t == "OrbitalCommand" || lv_t == "PlanetaryFortress";
+}
+
+// The first value of a catalog vector ("3.6,3.6,4.2"), 1 when empty.
+fixed gf_HallPaintFirst (string lp_v) {
+    string lv_w = StringWord(StringReplaceWord(lp_v, ",", " ", c_stringReplaceAll, c_stringCase), 1);
+
+    if (lv_w == "") {
+        return 1.0;
+    }
+    return StringToFixed(lv_w);
+}
+
+// Drawn xy scale of a hall type: its actor Scale x its model ScaleMax,
+// read from the catalogs, so a wrong build scale shows as F off the feet.
+fixed gf_HallPaintScale (string lp_type) {
+    string lv_model = CatalogFieldValueGet(c_gameCatalogActor, lp_type, "Model", 1);
+
+    return gf_HallPaintFirst(CatalogFieldValueGet(c_gameCatalogActor, lp_type, "Scale", 1))
+        * gf_HallPaintFirst(CatalogFieldValueGet(c_gameCatalogModel, lv_model, "ScaleMax", 1));
+}
+
+void gf_HallPaintClear () {
+    int lv_i;
+
+    gv_hallPaintCells = 0;
+    for (lv_i = 0; lv_i < gv_hallPaintTags; lv_i += 1) {
+        TextTagDestroy(gv_hallPaintTag[lv_i]);
+    }
+    gv_hallPaintTags = 0;
+}
+
+void gf_HallPaintTag (string lp_text, point lp_at, color lp_c) {
+    if (gv_hallPaintTags >= c_HALL_PAINT_TAGS) {
+        return;
+    }
+    TextTagCreate(StringToText(lp_text), 16, lp_at, 0.0, true, false, PlayerGroupSingle(1));
+    TextTagSetColor(TextTagLastCreated(), c_textTagColorText, lp_c);
+    gv_hallPaintTag[gv_hallPaintTags] = TextTagLastCreated();
+    gv_hallPaintTagAt[gv_hallPaintTags] = lp_at;
+    gv_hallPaintTags += 1;
+}
+
+// One foot mark: model point (lp_x, lp_y) x lp_s, turned by lp_turn degrees.
+void gf_HallPaintFoot (string lp_text, point lp_at, fixed lp_x, fixed lp_y, fixed lp_s, fixed lp_turn, color lp_c) {
+    fixed lv_c = Cos(lp_turn);
+    fixed lv_n = Sin(lp_turn);
+
+    gf_HallPaintTag(lp_text, PointWithOffset(lp_at, (lp_x * lv_c - lp_y * lv_n) * lp_s, (lp_x * lv_n + lp_y * lv_c) * lp_s), lp_c);
+}
+
+// Four foot marks at lp_s around lp_at, turned as the engine draws the
+// model: unit facing - c_HALL_PAINT_FORWARD (operator 2026-11-19: the
+// unturned marks sat 45 degrees off the drawn feet; the CC faces 225).
+void gf_HallPaintFeet (string lp_text, point lp_at, fixed lp_s, fixed lp_turn, color lp_c) {
+    gf_HallPaintFoot(lp_text, lp_at, c_HALL_PAINT_FOOT_XP, c_HALL_PAINT_FOOT_Y, lp_s, lp_turn, lp_c);
+    gf_HallPaintFoot(lp_text, lp_at, c_HALL_PAINT_FOOT_XN, c_HALL_PAINT_FOOT_Y, lp_s, lp_turn, lp_c);
+    gf_HallPaintFoot(lp_text, lp_at, c_HALL_PAINT_FOOT_XN, -c_HALL_PAINT_FOOT_Y, lp_s, lp_turn, lp_c);
+    gf_HallPaintFoot(lp_text, lp_at, c_HALL_PAINT_FOOT_XP, -c_HALL_PAINT_FOOT_Y, lp_s, lp_turn, lp_c);
+}
+
+void gf_HallPaintHall (unit lp_hall) {
+    point lv_at = UnitGetPosition(lp_hall);
+    fixed lv_s = gf_HallPaintScale(UnitGetType(lp_hall));
+    fixed lv_a = gf_HallPaintFirst(CatalogFieldValueGet(c_gameCatalogActor, UnitGetType(lp_hall), "Scale", 1));
+    point lv_c;
+    int lv_i;
+    int lv_j;
+
+    if (UnitGetType(lp_hall) == "CommandCenter") {
+        gv_hallPaintScale = lv_s;
+    }
+    for (lv_j = -c_HALL_PAINT_R; lv_j < c_HALL_PAINT_R; lv_j += 1) {
+        for (lv_i = -c_HALL_PAINT_R; lv_i < c_HALL_PAINT_R; lv_i += 1) {
+            // Centres of the 0.5 sub-cells (the grid the Shape is traced on).
+            lv_c = PointWithOffset(lv_at, (IntToFixed(lv_i) + 0.5) * 0.5, (IntToFixed(lv_j) + 0.5) * 0.5);
+            if (PointPathingPassable(lv_c) || gv_hallPaintCells >= c_HALL_PAINT_CELLS) {
+                continue;
+            }
+            gf_HallPaintTag("x", lv_c, Color(100.0, 0.0, 0.0));
+            gv_hallPaintCell[gv_hallPaintCells] = lv_c;
+            gv_hallPaintCells += 1;
+        }
+    }
+    gf_HallPaintTag("O", lv_at, Color(30.0, 60.0, 100.0));
+    gf_HallPaintFeet("F", lv_at, lv_s, UnitGetFacing(lp_hall) - c_HALL_PAINT_FORWARD, Color(0.0, 100.0, 0.0));
+    gf_HallPaintFeet("A", lv_at, lv_a, UnitGetFacing(lp_hall) - c_HALL_PAINT_FORWARD, Color(100.0, 100.0, 0.0));
+}
+
+// Show a mark only when it is at least c_HALL_PAINT_FRONT in front of
+// player 1's eye (camera target minus distance x cos(pitch) along the yaw).
+void gf_HallPaintView () {
+    point lv_t = CameraGetTarget(1);
+    fixed lv_yaw = CameraGetYaw(1);
+    fixed lv_back = CameraGetDistance(1) * Cos(CameraGetPitch(1));
+    fixed lv_fx = Cos(lv_yaw);
+    fixed lv_fy = Sin(lv_yaw);
+    fixed lv_ex = PointGetX(lv_t) - lv_fx * lv_back;
+    fixed lv_ey = PointGetY(lv_t) - lv_fy * lv_back;
+    bool lv_show;
+    int lv_i;
+
+    gv_hallPaintShown = 0;
+    for (lv_i = 0; lv_i < gv_hallPaintTags; lv_i += 1) {
+        lv_show = (PointGetX(gv_hallPaintTagAt[lv_i]) - lv_ex) * lv_fx + (PointGetY(gv_hallPaintTagAt[lv_i]) - lv_ey) * lv_fy >= c_HALL_PAINT_FRONT
+            && DistanceBetweenPoints(gv_hallPaintTagAt[lv_i], lv_t) <= c_HALL_PAINT_NEAR;
+        TextTagShow(gv_hallPaintTag[lv_i], PlayerGroupSingle(1), lv_show);
+        if (lv_show) {
+            gv_hallPaintShown += 1;
+        }
+    }
+}
+
+void gf_HallPaintNow () {
+    unitgroup lv_g = UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter((1 << c_targetFilterStructure), 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    unit lv_u;
+
+    gf_HallPaintClear();
+    gv_hallPaintHalls = 0;
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        lv_u = UnitGroupLoopCurrent();
+        if (!gf_HallPaintIsHall(lv_u) || gv_hallPaintHalls >= c_HALL_PAINT_HALLS) {
+            continue;
+        }
+        gf_HallPaintHall(lv_u);
+        gv_hallPaintHalls += 1;
+    }
+    UnitGroupLoopEnd();
+    gf_HallPaintView();
+}
+
+void gf_HallPaintSet (bool lp_on) {
+    gv_hallPaintOn = lp_on;
+    if (lp_on) {
+        gf_HallPaintNow();
+        TriggerEnable(gt_HallPaintTick, true);
+        TriggerEnable(gt_HallPaintView, true);
+        return;
+    }
+    TriggerEnable(gt_HallPaintTick, false);
+    TriggerEnable(gt_HallPaintView, false);
+    gf_HallPaintClear();
+    gv_hallPaintShown = 0;
+    gv_hallPaintHalls = 0;
+}
+
+bool gt_HallPaintKey_Func (bool testConds, bool runActions) {
+    if (runActions) {
+        gf_HallPaintSet(!gv_hallPaintOn);
+    }
+    return true;
+}
+
+bool gt_HallPaintTick_Func (bool testConds, bool runActions) {
+    if (runActions && gv_hallPaintOn) {
+        gf_HallPaintNow();
+    }
+    return true;
+}
+
+bool gt_HallPaintView_Func (bool testConds, bool runActions) {
+    if (runActions && gv_hallPaintOn) {
+        gf_HallPaintView();
+    }
+    return true;
+}
+
+void gt_HallPaint_Init () {
+    gt_HallPaintKey = TriggerCreate("gt_HallPaintKey_Func");
+    TriggerAddEventKeyPressed(gt_HallPaintKey, 1, c_key0, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateRequire);
+    gt_HallPaintTick = TriggerCreate("gt_HallPaintTick_Func");
+    TriggerAddEventTimePeriodic(gt_HallPaintTick, c_HALL_PAINT_TICK, c_timeGame);
+    TriggerEnable(gt_HallPaintTick, false);
+    gt_HallPaintView = TriggerCreate("gt_HallPaintView_Func");
+    TriggerAddEventTimePeriodic(gt_HallPaintView, c_HALL_PAINT_VIEW_TICK, c_timeGame);
+    TriggerEnable(gt_HallPaintView, false);
+}

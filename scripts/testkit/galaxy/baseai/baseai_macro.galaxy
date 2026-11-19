@@ -170,30 +170,8 @@ void gf_BaSites (string lp_s) {
 }
 
 // Pathing around a hall, 4 directions at lp_d: how many are blocked.
-int gf_BaHallBlocked (unit lp_hall, fixed lp_d) {
-    int lv_n = 0;
-    int lv_i;
-    point lv_at = UnitGetPosition(lp_hall);
-
-    for (lv_i = 0; lv_i < 4; lv_i += 1) {
-        if (!PointPathingPassable(PointWithOffsetPolar(lv_at, lp_d, IntToFixed(lv_i) * 90.0))) {
-            lv_n += 1;
-        }
-    }
-    return lv_n;
-}
-
-// The Command Center footprint, catalog and engine pathing (8x8: half 4).
-void gf_BaHallFootprint (string lp_s, int lp_player) {
-    string lv_k = "p" + IntToString(lp_player);
-    unit lv_hall = gv_baseAiHall[lp_player];
-
-    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallType", UnitGetType(lv_hall));
-    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallFoot", CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_hall), "Footprint", lp_player));
-    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallPlace", CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_hall), "PlacementFootprint", lp_player));
-    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HallBlocked35", gf_BaHallBlocked(lv_hall, 3.5));
-    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HallBlocked46", gf_BaHallBlocked(lv_hall, 4.6));
-}
+// The hall probes (R-BASE-30) live in baseai_hall.galaxy.
+void gf_BaHallFootprint (string lp_s, int lp_player);
 
 void gf_BaFighters (string lp_s, string lp_k, int lp_player) {
     unitgroup lv_g = UnitGroup(null, lp_player, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
@@ -317,7 +295,7 @@ void gf_BaMacroSnap (string lp_s, string lp_tag) {
 void gf_BaFlightSnap (string lp_s, string lp_tag) {
     unit lv_w = gv_heroViking;
 
-    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "H100", FixedToInt((UnitGetHeight(lv_w) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_w))) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "H100", FixedToInt(UnitGetHeight(lv_w) * 100.0));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Flight100", FixedToInt(gf_FlightHeight(1) * 100.0));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Cam100", FixedToInt(gv_cameraHeightApplied[1] * 100.0));
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "FlightIs", gf_FlightIs(1));
@@ -339,7 +317,7 @@ void gf_BaFlightTrace (string lp_s, string lp_key, int lp_n) {
 }
 
 void gf_BaFlight (string lp_s) {
-    BankValueSetFromInt(gv_dbgBank, lp_s, "camBase100", FixedToInt(c_SCOBA_CAMERA_HEIGHT_OFFSET * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "camBase100", FixedToInt(gf_CameraHeightBase(1) * 100.0));
     gf_BaFlightSnap(lp_s, "fly0");
     gv_flightUp[1] = true;
     gf_FlightDirSet(1);
@@ -434,6 +412,8 @@ void gf_BaMacro () {
     for (lv_i = 1; lv_i <= c_BA_MACRO_SNAPS; lv_i += 1) {
         Wait(60.0, c_timeGame);
         gf_BaMacroSnap(lv_s, "t" + IntToString(60 * lv_i));
+        gf_BaLiveSeatSnap("ba_seats_t" + IntToString(60 * lv_i));
+        BankSave(gv_dbgBank);
     }
     // After the Orbital / Planetary morphs: still 8x8.
     for (lv_lane = 1; lv_lane <= c_BA_MACRO_LANES; lv_lane += 1) {

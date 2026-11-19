@@ -10,7 +10,10 @@ play: the camera arm was too close to the pod (R-DROP-4). Revised
 2026-11-18 (operator): every played seat has its own drop
 ([REQ-ROSTER](REQ-ROSTER.md)); the hero may come back as a fresh unit with
 its stats carried; a hero that died naturally after a return did not come
-back (R-DROP-8). The specification lists the state of each requirement and
+back (R-DROP-8). Revised 2026-11-19 (operator): the revive drop looked
+different from the intro deploy drop (no Birth fall to follow); one drop
+sequence, one code path, no redundancy, not part of the intro (R-DROP-10,
+R-DROP-11). The specification lists the state of each requirement and
 the run that backs it.
 
 ## 1. Scope
@@ -19,7 +22,9 @@ In scope:
 
 - the death of the active hero of each played seat (REQ-ROSTER);
 - the wait until the next reinforcement;
-- the hero's own pod, its fall, and its touchdown;
+- the drop sequence: scene, crash zoom, the hero's own pod, its fall,
+  its touchdown, the scene restored;
+- the intro deploy: it is the same drop sequence (REQ-INTRO R-INTRO-10);
 - the camera during the wait and the fall;
 - the hero coming back: its type, level, toggles and control mode;
 - every later death of the same seat.
@@ -42,6 +47,12 @@ Implementation lives in
 - **Pod**: the hero's own drop pod unit (`SCOBAHeroPod`).
 - **Pod height**: the pod height above the ground, as the engine reports it
   (`UnitGetHeight`).
+- **Drop sequence**: scene on, crash zoom onto the drop point, pod fall,
+  touchdown, scene off. One sequence for every drop.
+- **Scene**: cinematic mode (letterbox), no game UI and no map dialogs,
+  the seat's input held. Shared by the intro loop and the drop sequence.
+- **Starter**: what starts a drop sequence: the intro deploy (SPACE) or a
+  reinforcement while the hero is dead.
 
 ## 3. Requirements
 
@@ -56,12 +67,15 @@ Implementation lives in
 | R-DROP-7 | While the hero waits or the pod falls, the hero switch MUST NOT change the hero. |
 | R-DROP-8 | Every death of a returned hero MUST start the same wait and drop again, with no limit on the count. |
 | R-DROP-9 | One seat's death, wait, fall and return MUST NOT change another seat's hero, camera or input. |
+| R-DROP-10 | Every drop MUST run the one drop sequence (operator 2026-11-19): scene on; crash zoom onto the drop point at the drop yaw, ending on the pod's first frame; the pod fall of R-DROP-3, R-DROP-4; touchdown R-DROP-5, R-DROP-6; scene off. The intro deploy and a revive MUST produce the same scene, zoom, camera values, fall and restore. They MAY differ only in the starter, the drop point's spawn region and the points it avoids, the hero's state before touchdown (hidden or dead), and what the intro owns (its music). |
+| R-DROP-11 | The drop sequence MUST exist once in code, outside the intro (operator 2026-11-19: one code path, zero redundancy). The intro and the reinforcement MUST only start it. No camera, scene or pod call of a drop MUST exist outside it. |
 
 ## 4. Acceptance
 
 | ID | Check |
 | --- | --- |
-| AC-DROP-1 | Die in TPS: the camera holds at the death spot. At the next reinforcement the view jumps to the pod high above the spawn and rides it down. |
+| AC-DROP-1 | Die in TPS: the camera holds at the death spot. At the next reinforcement the letterbox comes in, the view crash-zooms onto the drop point, then rides the pod down, as the intro deploy does. |
+| AC-DROP-4 | The intro deploy and a revive drop look the same: letterbox, no UI, zoom, pod Birth fall, touchdown (`scripts/playtest.sh dropview`). |
 | AC-DROP-2 | The pod fits in the view during the fall and the landing. |
 | AC-DROP-3 | At touchdown the ground shakes, the pod opens, the hero stands at the pod in TPS. |
 

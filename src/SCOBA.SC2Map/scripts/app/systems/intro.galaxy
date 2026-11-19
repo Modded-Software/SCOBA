@@ -1,13 +1,13 @@
 // Module: systems/intro
 // The intro (REQ-INTRO, SPEC-INTRO): a loop of camera shots with no UI and
-// the line "Press SPACE to deploy". SPACE: a 3 s countdown, then a crash zoom on the hero's drop
-// point, then the hero pod fall of the hero drop. Touchdown ends it.
+// the line "Press SPACE to deploy". SPACE: a 3 s countdown, then the hero
+// drop sequence (systems/hero_drop: zoom, fall). Touchdown ends it.
 //
 // Per seat (R-INTRO-16): state, camera, prompt, countdown, deploy. Flow
-// and triggers: systems/intro_flow. Map init (gt_IntroPrepare): black,
-// cinematic mode, the seat's input held. End of gt_MapInit (gf_IntroStart): hero
+// and triggers: systems/intro_flow. Map init (gt_IntroPrepare): black, the
+// scene on (systems/scene). End of gt_MapInit (gf_IntroStart): hero
 // out of the world, dialogs hidden, music, creep seed, prompt, first cut.
-// One trigger writes the camera in the intro (gt_IntroTick).
+// One trigger writes the camera in the loop (gt_IntroTick).
 
 // --- Shots -------------------------------------------------------------
 
@@ -20,7 +20,6 @@ fixed gf_IntroEase (int lp_ease, fixed lp_u, fixed lp_length) {
     fixed lv_u = MinF(MaxF(lp_u, 0.0), 1.0);
     fixed lv_r = c_INTRO_ARC_RAMP;
     fixed lv_v = 1.0 / (1.0 - c_INTRO_ARC_RAMP);
-    fixed lv_w;
 
     if (lp_ease == c_INTRO_EASE_E || lp_ease == c_INTRO_EASE_Z) {
         return gf_IntroSmooth(lv_u);
@@ -40,12 +39,8 @@ fixed gf_IntroEase (int lp_ease, fixed lp_u, fixed lp_length) {
         }
         return lv_v * (lv_u - lv_r / 2.0);
     }
-    if (lp_ease == c_INTRO_EASE_O) {
-        return 1.0 - (1.0 - lv_u) * (1.0 - lv_u) * (1.0 - lv_u);
-    }
-    // c_INTRO_EASE_C: O over c_INTRO_CRASH_MOVE, then held.
-    lv_w = MinF(lv_u * lp_length / c_INTRO_CRASH_MOVE, 1.0);
-    return 1.0 - (1.0 - lv_w) * (1.0 - lv_w) * (1.0 - lv_w);
+    // c_INTRO_EASE_O.
+    return 1.0 - (1.0 - lv_u) * (1.0 - lv_u) * (1.0 - lv_u);
 }
 
 fixed gf_IntroLerp (fixed lp_a, fixed lp_b, fixed lp_e) {
@@ -63,12 +58,7 @@ void gf_IntroDofSet (int lp_player, bool lp_on) {
         CameraSetValue(lp_player, c_cameraValueFalloffEndNear, c_INTRO_DOF_NEAR_END, 0.0, 0.0, 0.0);
         return;
     }
-    CameraSetValue(lp_player, c_cameraValueDepthOfField, 0.0, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFocalDepth, c_INTRO_DFLT_FOCUS, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFalloffStart, c_INTRO_DFLT_FAR_START, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFalloffEnd, c_INTRO_DFLT_FAR_END, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFalloffStartNear, 0.0, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFalloffEndNear, 0.0, 0.0, 0.0, 0.0);
+    gf_SceneDofDefault(lp_player);
 }
 
 // Every intro scene: near DOF (operator 2026-11-17); far DOF only on the
@@ -119,17 +109,7 @@ void gf_IntroApply (int lp_player, int lp_row, fixed lp_u, fixed lp_time) {
     if (lv_odd && gv_introRow_variant[lp_row] == c_INTRO_VAR_YAW) {
         lv_swap = lv_yaw0; lv_yaw0 = lv_yaw1; lv_yaw1 = lv_swap;
     }
-    if (lp_row == c_INTRO_ROW_ZOOM) {
-        // The zoom ends on the drop's first frame: the drop yaw, and the
-        // look ray through the pod's Birth start meets the ground at the
-        // landing spot (SPEC-HERO-DROP 3), moved by the drop's side arm.
-        lv_yaw0 = c_DROP_YAW;
-        lv_yaw1 = c_DROP_YAW;
-        lv_target = gf_HeroDropSide(gv_introDropAt[lp_player], c_DROP_YAW);
-    }
-    else {
-        lv_target = Point(gf_IntroLerp(lv_x0, lv_x1, lv_e), gf_IntroLerp(lv_y0, lv_y1, lv_e));
-    }
+    lv_target = Point(gf_IntroLerp(lv_x0, lv_x1, lv_e), gf_IntroLerp(lv_y0, lv_y1, lv_e));
     gv_introYaw[lp_player] = gf_IntroLerp(lv_yaw0, lv_yaw1, lv_e);
     gv_introTarget[lp_player] = lv_target;
     gv_introPitch[lp_player] = gf_IntroLerp(gv_introRow_pitch0[lp_row], gv_introRow_pitch1[lp_row], lv_e);
@@ -142,11 +122,6 @@ void gf_IntroApply (int lp_player, int lp_row, fixed lp_u, fixed lp_time) {
         gv_introDist[lp_player] = gf_IntroLerp(gv_introRow_dist0[lp_row], gv_introRow_dist1[lp_row], lv_e);
     }
     lv_z = gf_IntroLerp(gv_introRow_z0[lp_row], gv_introRow_z1[lp_row], lv_e);
-    if (lp_row == c_INTRO_ROW_ZOOM) {
-        // No height offset: the arm reaches back to the pod's start.
-        lv_z = c_SCOBA_CAMERA_HEIGHT_OFFSET;
-        gv_introDist[lp_player] = gf_IntroLerp(gv_introRow_dist0[lp_row], c_DROP_POD_ARM + c_POD_BIRTH_START_Z / Sin(c_POD_BIRTH_PITCH), lv_e);
-    }
     // Raw only: reads 0 in this map (SPEC-INTRO F13). The table z is the
     // offset above the ground.
     gv_introGround[lp_player] = WorldHeight(c_heightMapGround, lv_target);
@@ -230,17 +205,6 @@ void gf_IntroLoopStep (int lp_player) {
     gf_IntroApply(lp_player, lv_row, (lv_t + c_INTRO_TICK) / gv_introRow_length[lv_row], c_INTRO_TICK);
 }
 
-void gf_IntroZoomStep (int lp_player) {
-    fixed lv_t = TimerGetElapsed(gv_sCOBA_Clock) - gv_introZoomStart[lp_player];
-    fixed lv_len = gv_introRow_length[c_INTRO_ROW_ZOOM];
-
-    if (lv_t >= lv_len) {
-        gf_IntroFall(lp_player);
-        return;
-    }
-    gf_IntroApply(lp_player, c_INTRO_ROW_ZOOM, (lv_t + c_INTRO_TICK) / lv_len, MinF(c_INTRO_TICK, lv_len - lv_t));
-}
-
 // --- Prompt ------------------------------------------------------------
 
 void gf_IntroPromptCreate () {
@@ -267,7 +231,7 @@ void gf_IntroSeedOrder (unit lp_unit) {
     region lv_dest = gv_sPAWNLOCATIONS[1];
     point lv_gate;
 
-    if (PlayerRace(UnitGetOwner(lp_unit)) == "Terr") {
+    if (gf_RosterTerranPlayer(UnitGetOwner(lp_unit))) {
         lv_side = 0;
         lv_dest = gv_sPAWNLOCATIONS[4];
     }

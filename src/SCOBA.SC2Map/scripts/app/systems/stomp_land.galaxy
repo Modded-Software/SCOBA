@@ -94,7 +94,7 @@ bool gt_StompLand_Func (bool testConds, bool runActions) {
         if (!UnitIsAlive(lv_u)) {
             return true;
         }
-        if (UnitGetHeight(lv_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_u)) <= c_STOMP_LAND_GROUND) {
+        if (UnitGetHeight(lv_u) <= c_STOMP_LAND_GROUND) {
             gv_stompLandWaited = lv_t;
             gf_StompLandAt(lv_r, UnitGetPosition(lv_u));
             return true;

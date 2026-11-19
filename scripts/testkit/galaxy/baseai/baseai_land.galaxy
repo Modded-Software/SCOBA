@@ -42,7 +42,7 @@ void gf_BlTerrain (string lp_s) {
 }
 
 fixed gf_BlAbove (unit lp_u) {
-    return UnitGetHeight(lp_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lp_u));
+    return UnitGetHeight(lp_u);
 }
 
 // Space (lp_dir 1) or Ctrl (-1) held lp_secs through the flight path.

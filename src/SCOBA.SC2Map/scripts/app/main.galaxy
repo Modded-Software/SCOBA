@@ -8,11 +8,14 @@ include "scripts/app/core/jump"
 include "scripts/app/data/pod_birth"
 include "scripts/app/core/hero_drop"
 include "scripts/app/core/input_hold"
+include "scripts/app/core/scene"
 include "scripts/app/core/intro"
 include "scripts/app/data/intro_shots"
 include "scripts/app/core/build_stamp"
 include "scripts/app/data/hit_volumes_size"
 include "scripts/app/header"
+include "scripts/app/data/camera_heights"
+include "scripts/app/systems/camera/camera_height"
 include "scripts/app/core/config"
 include "scripts/app/core/roster"
 include "scripts/app/core/base_ai"
@@ -61,6 +64,7 @@ include "scripts/app/systems/energy_bar"
 include "scripts/app/systems/gui_environment"
 include "scripts/app/systems/input"
 include "scripts/app/systems/hero_switch"
+include "scripts/app/systems/hall_paint"
 include "scripts/app/systems/hero_return"
 include "scripts/app/systems/medic"
 include "scripts/app/systems/movement"
@@ -87,6 +91,7 @@ include "scripts/app/ui/hud_buttons"
 include "scripts/app/ui/player_bars"
 include "scripts/app/ui/stats_dialog"
 include "scripts/app/ui/unit_selection_dialog"
+include "scripts/app/systems/scene"
 include "scripts/app/systems/intro_ui"
 include "scripts/app/systems/intro"
 include "scripts/app/systems/intro_flow"
@@ -95,6 +100,7 @@ void main () {
     InitGlobals();
     gf_HvLoad();
     gf_HvAliases();
+    gf_CamHeightLoad();
     gt_MapInit_Init();
     gt_SetAlliances_Init();
     gt_AbilitiesandStatsTriggerDevelopment_Init();
@@ -121,6 +127,7 @@ void main () {
     gt_TargetClick_Init();
     gt_UnitClick_Init();
     gt_CameraFollowDistance_Init();
+    gt_CameraMorphTick_Init();
     gt_CameraDebugMove_Init();
     gt_CameraDebug_Init();
     gt_RefreshEnergyBar_Init();
@@ -191,6 +198,7 @@ void main () {
     gt_PodImpact_Init();
     gt_StompLand_Init();
     gt_HudMapClick_Init();
+    gt_Scene_Init();
     // Last: it turns off triggers created above (SPEC-INTRO 3.8).
     gt_Intro_Init();
 }

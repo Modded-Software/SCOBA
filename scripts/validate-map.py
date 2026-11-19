@@ -21,9 +21,9 @@ from flora.config import MARKER as FLORA_MARKER
 from mapgen.footprints.build import check_scaled_footprints
 from mapgen.melee_map import check as check_melee_map
 from mapgen.resources.build import check as check_resources
-from mapgen.player_slots import check as check_player_slots
-from mapgen.player_slots import check_script as check_roster_script
+from mapgen.player_slots import check as check_player_slots, check_script as check_roster_script
 from input_gate_check import gated as check_input_gate
+from hitvolumes.drop_path_check import check as check_drop_path
 from validate_aim_shot import TOSH_CLOCK, check_aim_shot_data, check_aim_shot_script
 from validate_assets import check_actor_events, check_control_icons, check_footfall_fx, check_skybox_flip, check_stamp
 from jumpanim.validate import check_jump
@@ -31,6 +31,7 @@ from validate_slow_deaths import check_slow_deaths
 from hitvolumes.validate_pod_actor import check_pod_actor
 from validate_tps_overlay import check_tps_overlay
 from hitvolumes.validate_intro import animation_actor_problems, intro_problems
+from terrain import sync_height
 
 GENERATED_MODELS = [
     Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3",
@@ -158,8 +159,9 @@ def check_dimensions(map_dir: Path) -> None:
     if magic != b"HMAP" or (sx, sy) != (257, 257):
         fail(f"t3HeightMap is not HMAP 257x257: {magic!r} {sx}x{sy}")
 
-    if (map_dir / "t3SyncHeightMap").exists():
-        fail("t3SyncHeightMap must not exist for the 256 map")
+    # Baked from the render ground; absent only with SC2_SYNC_HEIGHT=0.
+    for problem in sync_height.problems(map_dir):
+        fail(problem)
 
     mini = (map_dir / "Minimap.tga").read_bytes()
     width, height = struct.unpack_from("<HH", mini, 12)
@@ -492,7 +494,7 @@ def main() -> int:
         fail(problem)
     for problem in check_roster_script(galaxy_text(map_dir)):
         fail(problem)
-    for problem in check_input_gate(galaxy_text(map_dir)):
+    for problem in [*check_input_gate(galaxy_text(map_dir)), *check_drop_path(map_dir)]:
         fail(problem)
     # A build with SC2_NO_FLORA=1 has no flora marker and no flora to check.
     if (map_dir / FLORA_MARKER).exists():

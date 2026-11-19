@@ -8,7 +8,7 @@ bool gf_IntroSeat (int lp_player) {
     return gf_IntroEnabled() && gf_RosterPlayed(lp_player);
 }
 
-// Map init: black, cinematic mode, input held, for every played seat.
+// Map init: black, and the scene (systems/scene) for every played seat.
 void gf_IntroPrepare () {
     int lv_p;
 
@@ -28,11 +28,9 @@ void gf_IntroPrepare () {
         }
         gv_introState[lv_p] = c_INTRO_LOOP;
         gv_introActive[lv_p] = true;
-        CinematicMode(PlayerGroupSingle(lv_p), true, 0.0);
-        gv_introCinematic[lv_p] = true;
         // No CameraLockInput (SPEC-TPS: it kept the cursor captured). The
-        // seat's input is held, and gt_IntroTick writes its camera.
-        gf_InputHold(lv_p);
+        // scene holds the seat's input, and gt_IntroTick writes its camera.
+        gf_SceneEnter(lv_p, c_SCENE_INTRO);
     }
 }
 
@@ -55,8 +53,9 @@ void gf_IntroStartSeat (int lp_player) {
     }
     gf_IntroHeroHide(gv_tPSUNIT[lp_player]);
     UnitClearSelection(lp_player);
-    gf_IntroDialogsHide(lp_player);
-    CameraFollowUnitGroup(lp_player, UnitGroupEmpty(), false, false);
+    // The dialogs exist now: hidden and kept for the touchdown.
+    gf_SceneDialogsEnforce(lp_player);
+    gf_CameraFollowStop(lp_player);
     CameraUseHeightSmoothing(lp_player, false);
     gv_introHumOn[lp_player] = false;
     SoundPlay(SoundLink(c_INTRO_MUSIC, c_soundIndexAny), PlayerGroupSingle(lp_player), 100.0, 0.0);
@@ -126,33 +125,18 @@ void gf_IntroCountStep (int lp_player) {
     }
 }
 
+// The deploy (R-INTRO-10): the intro's own parts stop, then the hero drop
+// sequence (systems/hero_drop) runs as for every drop: zoom, fall,
+// touchdown. The theme plays on; it stops at touchdown (gf_IntroMusicStop,
+// operator 2026-11-18). The S9 hum stops; the S4 Doodad channel is back.
 void gf_IntroDeployGo (int lp_player) {
     gv_introDeploys[lp_player] += 1;
-    gv_introState[lp_player] = c_INTRO_ZOOM;
+    gv_introState[lp_player] = c_INTRO_DROP;
     gf_IntroPromptHide(lp_player);
-    // The theme plays on through the zoom and the fall; it stops at
-    // touchdown (gf_IntroMusicStop, operator 2026-11-18). The S9 hum stops;
-    // the S4 Doodad channel is back.
     gf_IntroHum(lp_player, false);
     gf_IntroQuiet(lp_player, false);
-    gv_introDropAt[lp_player] = gf_DropPodPoint(gv_sPAWNLOCATIONS[gf_RosterLaneOf(lp_player)], null, null);
-    gv_introZoomStart[lp_player] = TimerGetElapsed(gv_sCOBA_Clock);
-    gv_introShot[lp_player] = c_INTRO_ROW_ZOOM;
-    gv_introCuts[lp_player] += 1;
-    gf_IntroDofSet(lp_player, false);
-    gf_IntroApply(lp_player, c_INTRO_ROW_ZOOM, 0.0, 0.0);
-}
-
-// End of the crash zoom: the seat's hero pod falls (hero drop).
-void gf_IntroFall (int lp_player) {
-    // gt_IntroTick goes on: in FALL it only keeps the dialogs hidden.
-    gv_introState[lp_player] = c_INTRO_FALL;
-    // Rest lens; yaw, pitch and arm come from the drop (chase on the pod's line).
-    CameraSetValue(lp_player, c_cameraValueFieldOfView, c_SCOBA_REST_FOV, 0.0, 0.0, 0.0);
-    gv_introFov[lp_player] = c_SCOBA_REST_FOV;
-    gv_introPitch[lp_player] = c_POD_BIRTH_PITCH;
     gf_HeroDropBegin(lp_player, gv_tPSUNIT[lp_player]);
-    gf_HeroDropStart(lp_player, gv_introDropAt[lp_player]);
+    gf_HeroDropGo(lp_player, null, null);
 }
 
 // No music after touchdown (O-INTRO-1), for this seat: the theme fades out.
@@ -176,8 +160,10 @@ bool gf_IntroAnyActive () {
     return false;
 }
 
-// Touchdown (R-INTRO-12). Called by gf_HeroDropLand after the hero bind,
-// and on leave. This seat only (R-INTRO-16).
+// Touchdown (R-INTRO-12): the intro's own parts end. Called by
+// gf_HeroDropLand before the drop leaves the scene, and on leave. This
+// seat only (R-INTRO-16). The scene restore (UI, dialogs, input) runs when
+// its last owner leaves (systems/scene).
 void gf_IntroEnd (int lp_player) {
     if (lp_player < 0 || lp_player >= 16 || !gv_introActive[lp_player]) {
         return;
@@ -186,14 +172,8 @@ void gf_IntroEnd (int lp_player) {
     gf_IntroHum(lp_player, false);
     gf_IntroQuiet(lp_player, false);
     gf_IntroMusicStop(lp_player);
-    gf_IntroDofSet(lp_player, false);
-    gf_IntroDialogsRestore(lp_player);
-    gf_InputRelease(lp_player);
-    CinematicMode(PlayerGroupSingle(lp_player), false, c_INTRO_LETTERBOX_OUT);
-    gv_introCinematic[lp_player] = false;
-    // Game UI and minimap back (hidden at map init, app/init).
-    UISetMode(PlayerGroupSingle(lp_player), c_uiModeConsole, c_INTRO_LETTERBOX_OUT);
-    UISetFrameVisible(PlayerGroupSingle(lp_player), c_syncFrameTypeMinimapPanel, true);
+    gv_introDof[lp_player] = false;
+    gf_SceneLeave(lp_player, c_SCENE_INTRO);
     gv_introState[lp_player] = c_INTRO_DONE;
     gv_introActive[lp_player] = false;
     if (!gf_IntroAnyActive()) {
@@ -216,19 +196,17 @@ void gf_IntroTickSeat (int lp_player) {
     if (!gv_introActive[lp_player]) {
         return;
     }
-    gf_IntroDialogsEnforce(lp_player);
-    if (gv_introSent[lp_player] != null && (gv_introState[lp_player] == c_INTRO_LOOP || gv_introState[lp_player] == c_INTRO_ZOOM)) {
+    // The intro writes the camera in its loop only; the drop owns it after.
+    if (gv_introState[lp_player] != c_INTRO_LOOP) {
+        return;
+    }
+    if (gv_introSent[lp_player] != null) {
         gv_introCamRead[lp_player] = CameraGetTarget(lp_player);
         gv_introCamGap[lp_player] = DistanceBetweenPoints(gv_introCamRead[lp_player], gv_introSent[lp_player]);
     }
-    if (gv_introState[lp_player] == c_INTRO_LOOP) {
-        gf_IntroLoopStep(lp_player);
-        if (gv_introCountAt[lp_player] >= 0.0) {
-            gf_IntroCountStep(lp_player);
-        }
-    }
-    else if (gv_introState[lp_player] == c_INTRO_ZOOM) {
-        gf_IntroZoomStep(lp_player);
+    gf_IntroLoopStep(lp_player);
+    if (gv_introCountAt[lp_player] >= 0.0) {
+        gf_IntroCountStep(lp_player);
     }
 }
 

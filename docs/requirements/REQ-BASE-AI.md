@@ -119,7 +119,7 @@ data, as on a ladder map. No script may drive its expansion or attacks.
 | R-BASE-27 | The AI MUST be started with the stock `AIMeleeStart(owner)`. |
 | R-BASE-28 | No script MUST call `AIExpand` or set an attack state for an owner. |
 | R-BASE-29 | The six Supply Depots placed in the map source MUST belong to the Terran base owners, two each: 9, 11, 12, one pair per base. Player 7 MUST own none. |
-| R-BASE-30 | The Command Center family keeps its 8x8 footprint (operator 2026-11-18: "leave at 8x8, let's see"). |
+| R-BASE-30 | The Command Center family MUST NOT block pathing and MUST NOT need clear ground around it: units walk under it, and it may stand on a mineral field (operator 2026-11-19, after "Failed to expand there" by player 9). The Command Center model is scaled x1.2 over the earlier 3.0 so small units fit under it. A grounded hall MUST block the cells where its scaled model meets the ground (the legs, R-FP-10), and other buildings MUST NOT overlap them (operator 2026-11-19, after the AI built a Barracks against a hall). Its middle MUST stay open, so workers reach it to drop off cargo (a blocker in the middle stopped mining). Lifted, it blocks nothing; landed, it blocks again where it stands. |
 | R-BASE-31 | Build order (operator 2026-11-18): the build MUST place the sites first. Then every source tree inside a site keep-out MUST move to the nearest free spot, and every placed unit inside one MUST move, each unit alone, to its nearest free cell. Then tree blockers and flora are made. |
 | R-BASE-32 | Mineral fields and geysers MUST spread organically: varied radius, angle and depth per pile, seeded per site, so the same source gives the same layout. Optimal mining distance is not required. |
 

@@ -139,6 +139,111 @@ void gf_RsSeats () {
     gf_RsSeatSnap(lv_s, "t1");
 }
 
+// R-ROSTER-9: a wave unit of a seat walks into the X of its gate lane; the
+// X trigger orders it on. Cases: seats 1 (played), 2, 3 (empty) Terran;
+// seat 5 Zerg. Index 0..3.
+int gf_RsGateSeat (int lp_i) {
+    if (lp_i == 3) { return 5; }
+    return lp_i + 1;
+}
+
+int gf_RsGateLane (int lp_i) {
+    if (lp_i == 3) { return 2; }
+    return lp_i + 1;
+}
+
+string gf_RsXY100 (point lp_p) {
+    return IntToString(FixedToInt(PointGetX(lp_p) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(lp_p) * 100.0));
+}
+
+// The spawn the unit's last order targets: 1 enemy, -1 own, 0 neither.
+int gf_RsGateDest (unit lp_u, int lp_seat, int lp_lane) {
+    int lv_n = UnitOrderCount(lp_u);
+    point lv_t;
+    int lv_own = lp_lane;
+    int lv_enemy = lp_lane + 3;
+
+    if (lv_n <= 0) {
+        return 0;
+    }
+    if (lp_seat > 3) {
+        lv_own = lp_lane + 3;
+        lv_enemy = lp_lane;
+    }
+    lv_t = OrderGetTargetPoint(UnitOrder(lp_u, lv_n - 1));
+    if (lv_t == null) {
+        return 0;
+    }
+    if (RegionContainsPoint(gv_sPAWNLOCATIONS[lv_enemy], lv_t)) {
+        return 1;
+    }
+    if (RegionContainsPoint(gv_sPAWNLOCATIONS[lv_own], lv_t)) {
+        return -1;
+    }
+    return 0;
+}
+
+void gf_RsGate () {
+    string lv_s = "rs_gate";
+    unit[4] lv_u;
+    int[4] lv_dest;
+    int lv_i;
+    int lv_t;
+    int lv_p;
+    int lv_lane;
+    int lv_side;
+    point lv_from;
+    bool lv_done;
+
+    TimerPause(gv_sPAWNTIMER, true);
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        lv_p = gf_RsGateSeat(lv_i);
+        lv_lane = gf_RsGateLane(lv_i);
+        lv_side = 0;
+        if (lv_p <= 3) {
+            lv_side = 1;
+        }
+        // From the seat's own gate (else its spawn), toward the X.
+        lv_from = gv_gateAt[lv_side][lv_lane];
+        if (gv_gateRadius[lv_side][lv_lane] <= 0.0) {
+            lv_from = RegionGetCenter(gv_sPAWNLOCATIONS[gf_RosterLaneOf(lv_p)]);
+        }
+        if (lv_p <= 3) {
+            UnitCreate(1, "Marine", 0, lv_p, lv_from, 0.0);
+        }
+        else {
+            UnitCreate(1, "Zergling", 0, lv_p, lv_from, 0.0);
+        }
+        lv_u[lv_i] = UnitLastCreated();
+        UnitSetState(lv_u[lv_i], c_unitStateInvulnerable, true);
+        UnitIssueOrder(lv_u[lv_i], OrderTargetingPoint(AbilityCommand("move", 0), RegionGetCenter(gv_xLOCATIONS[lv_lane])), c_orderQueueReplace);
+        BankValueSetFromString(gv_dbgBank, lv_s, "c" + IntToString(lv_i) + "Race", PlayerRace(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lv_s, "c" + IntToString(lv_i) + "Seat", lv_p);
+    }
+    // Poll until every unit has its order past the X, at most 90 game s.
+    for (lv_t = 0; lv_t < 360; lv_t += 1) {
+        lv_done = true;
+        for (lv_i = 0; lv_i < 4; lv_i += 1) {
+            lv_dest[lv_i] = gf_RsGateDest(lv_u[lv_i], gf_RsGateSeat(lv_i), gf_RsGateLane(lv_i));
+            if (lv_dest[lv_i] == 0) {
+                lv_done = false;
+            }
+        }
+        if (lv_done) {
+            break;
+        }
+        Wait(0.25, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "waitMs", lv_t * 250);
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        BankValueSetFromInt(gv_dbgBank, lv_s, "c" + IntToString(lv_i) + "Dest", lv_dest[lv_i]);
+        BankValueSetFromInt(gv_dbgBank, lv_s, "c" + IntToString(lv_i) + "Orders", UnitOrderCount(lv_u[lv_i]));
+        BankValueSetFromString(gv_dbgBank, lv_s, "c" + IntToString(lv_i) + "At100", gf_RsXY100(UnitGetPosition(lv_u[lv_i])));
+        UnitRemove(lv_u[lv_i]);
+    }
+    BankSave(gv_dbgBank);
+}
+
 bool gt_RosterTest_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
@@ -151,6 +256,7 @@ bool gt_RosterTest_Func (bool testConds, bool runActions) {
     BankValueSetFromInt(gv_dbgBank, "rs_start", "ready", 1);
     BankSave(gv_dbgBank);
     gf_RsTable();
+    gf_RsGate();
     gf_RsSeats();
     BankValueSetFromInt(gv_dbgBank, "rs_end", "RealClicks", gv_dbgRealClicks);
     BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);

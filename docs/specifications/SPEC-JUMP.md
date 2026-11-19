@@ -107,8 +107,10 @@ Run results go in section 7.
 ### 3.2 Camera (R-JUMP-17)
 
 - `gf_CameraHeightApply(player, time)` in `systems/camera/camera.galaxy` writes
-  `c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight + gv_jumpCamHeight` and
-  stores it in `gv_cameraHeightApplied`.
+  `gf_CameraHeightBase` (the bound unit's target offset, 0.9 for Tosh;
+  SPEC-TPS 5.10) `+ gv_quakeHeight + gv_jumpCamHeight` (plus the drop and
+  flight parts) and stores it in `gv_cameraHeightApplied`. The test harness
+  `camBase100` reads `gf_CameraHeightBase(1)`.
 - The write is a linear blend: `CameraSetValue(..., time, 0, 0)`
   (initial velocity 0, deceleration 0). The first version used `(-1, 10)`
   (carried velocity, eased end), and the operator saw it lag.

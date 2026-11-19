@@ -1,6 +1,6 @@
 """baseai flight group: hero Viking feel (operator 2026-11-18). Camera
 refollow, turn-in-place clip, landed speed, footfall dust and splash.
-Scenarios in scripts/testkit/galaxy/baseai_feel.galaxy."""
+Scenarios in scripts/testkit/galaxy/baseai/baseai_feel.galaxy."""
 
 from __future__ import annotations
 

@@ -1,0 +1,351 @@
+// Test harness: baseai group "hall" (R-BASE-30, R-FP-10, SPEC-BASE-AI 6).
+// The measured Command Center footprint of a script-controlled hall of the
+// first Terran lane owner, at a clear point found here: built by an SCV,
+// killed, created, mined, lifted, landed 20 or more away, killed. Also
+// the owner's starting hall. Raw engine values:
+// the pathing grid of whole cells around the hall.
+// scripts/testkit/profiles/baseai_hall.py compares it with the generated cells.
+
+const int c_BH_SUB = 18;                 // grid half size in 0.5 sub-cells (36x36: 9 cells each way)
+const fixed c_BH_SYNC_WAIT = 2.0;
+const fixed c_BH_LEG = 6.5;              // a leg centre on each axis: scale 2.88, facing 225 (SPEC-SCALED-FOOTPRINTS 5)
+
+// Hall probes, also used by group macro (gf_BaHallFootprint).
+int gf_BaHallBlocked (unit lp_hall, fixed lp_d) {
+    int lv_n = 0;
+    int lv_i;
+    point lv_at = UnitGetPosition(lp_hall);
+
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        if (!PointPathingPassable(PointWithOffsetPolar(lv_at, lp_d, IntToFixed(lv_i) * 90.0))) {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}
+
+// Centre of the 0.5 sub-cell (lp_i, lp_j) of lp_at; sub-cell 0 starts at the point.
+point gf_BaHallSub (point lp_at, int lp_i, int lp_j) {
+    return PointWithOffset(lp_at, (IntToFixed(lp_i) + 0.5) * 0.5, (IntToFixed(lp_j) + 0.5) * 0.5);
+}
+
+// Engine pathing of the 0.5 sub-cells around lp_at (the grid the footprint
+// Shape is traced on): one bank key per row, lp_k + "Grid" + n, top (+y)
+// first, "x" blocked, "." open.
+void gf_BaHallGrid (string lp_s, string lp_k, point lp_at) {
+    string lv_row;
+    int lv_i;
+    int lv_j;
+
+    for (lv_j = c_BH_SUB - 1; lv_j >= -c_BH_SUB; lv_j -= 1) {
+        lv_row = "";
+        for (lv_i = -c_BH_SUB; lv_i < c_BH_SUB; lv_i += 1) {
+            if (PointPathingPassable(gf_BaHallSub(lp_at, lv_i, lv_j))) {
+                lv_row = lv_row + ".";
+            }
+            else {
+                lv_row = lv_row + "x";
+            }
+        }
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Grid" + IntToString(c_BH_SUB - 1 - lv_j), lv_row);
+    }
+}
+
+// Leg centres (±c_BH_LEG on the x and on the y axis) of lp_at where lp_player cannot place a
+// Barracks (range 0).
+int gf_BaLegsRefused (point lp_at, int lp_player) {
+    int lv_n = 0;
+    int lv_i;
+    fixed lv_x;
+    fixed lv_y;
+
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        lv_x = 0.0;
+        lv_y = 0.0;
+        if (lv_i == 0) { lv_x = c_BH_LEG; }
+        if (lv_i == 1) { lv_x = -c_BH_LEG; }
+        if (lv_i == 2) { lv_y = c_BH_LEG; }
+        if (lv_i == 3) { lv_y = -c_BH_LEG; }
+        if (UnitTypePlacementFromPoint("Barracks", lp_player, PointWithOffset(lp_at, lv_x, lv_y), 0.0) == null) {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}
+
+// Grid, legs refused, origin blocked, under lp_k.
+void gf_BaLegSnap (string lp_s, string lp_k, point lp_at, int lp_player) {
+    gf_BaHallGrid(lp_s, lp_k, lp_at);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Refused", gf_BaLegsRefused(lp_at, lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Hub", gf_BaFlagInt(!PointPathingPassable(lp_at)));
+}
+
+// The Command Center footprint, catalog and engine pathing (R-BASE-30, R-FP-10).
+void gf_BaHallFootprint (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player);
+    unit lv_hall = gv_baseAiHall[lp_player];
+
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallType", UnitGetType(lv_hall));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HallFacing", FixedToInt(ModF(UnitGetFacing(lv_hall) + 360.5, 360.0)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallAt100", gf_BaXY100(UnitGetPosition(lv_hall)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallFoot", CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_hall), "Footprint", lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "HallPlace", CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_hall), "PlacementFootprint", lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HallBlocked10", gf_BaHallBlocked(lv_hall, 1.0));
+    gf_BaLegSnap(lp_s, lv_k + "Hall", UnitGetPosition(lv_hall), lp_player);
+}
+
+// The painted marks against engine pathing on the 36x36 sub-cells of
+// lp_at: marked and blocked (Hit), blocked not marked (Miss), marked and
+// open (Extra). One pass over the marks, one over the sub-cells.
+void gf_BhPaintCells (string lp_s, string lp_k, point lp_at) {
+    int lv_i;
+    int lv_j;
+    int lv_k;
+    int lv_hit = 0;
+    int lv_blocked = 0;
+    int lv_extra = 0;
+    int lv_miss;
+    fixed lv_r = IntToFixed(c_BH_SUB) * 0.5;
+    point lv_c;
+
+    for (lv_k = 0; lv_k < gv_hallPaintCells; lv_k += 1) {
+        lv_c = gv_hallPaintCell[lv_k];
+        if (AbsF(PointGetX(lv_c) - PointGetX(lp_at)) >= lv_r || AbsF(PointGetY(lv_c) - PointGetY(lp_at)) >= lv_r) {
+            continue;
+        }
+        if (PointPathingPassable(lv_c)) {
+            lv_extra += 1;
+        }
+        else {
+            lv_hit += 1;
+        }
+    }
+    for (lv_j = -c_BH_SUB; lv_j < c_BH_SUB; lv_j += 1) {
+        for (lv_i = -c_BH_SUB; lv_i < c_BH_SUB; lv_i += 1) {
+            if (!PointPathingPassable(gf_BaHallSub(lp_at, lv_i, lv_j))) {
+                lv_blocked += 1;
+            }
+        }
+    }
+    lv_miss = lv_blocked - lv_hit;
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Hit", lv_hit);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Miss", lv_miss);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Extra", lv_extra);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Halls", gv_hallPaintHalls);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Cells", gv_hallPaintCells);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Tags", gv_hallPaintTags);
+}
+
+// Alt+0 paint on, then off, around lp_player's starting hall.
+void gf_BhPaint (int lp_player) {
+    string lv_s = "ba_hall_paint";
+    point lv_at = UnitGetPosition(gv_baseAiHall[lp_player]);
+
+    BankValueSetFromString(gv_dbgBank, lv_s, "At100", gf_BaXY100(lv_at));
+    BankValueSetFromString(gv_dbgBank, lv_s, "ActorScale", CatalogFieldValueGet(c_gameCatalogActor, "CommandCenter", "Scale", 1));
+    BankValueSetFromString(gv_dbgBank, lv_s, "Model", CatalogFieldValueGet(c_gameCatalogActor, "CommandCenter", "Model", 1));
+    BankValueSetFromString(gv_dbgBank, lv_s, "ModelScaleMax", CatalogFieldValueGet(c_gameCatalogModel, CatalogFieldValueGet(c_gameCatalogActor, "CommandCenter", "Model", 1), "ScaleMax", 1));
+    gf_BhPaintCells(lv_s, "before", lv_at);
+    gf_HallPaintSet(true);
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "Scale100", FixedToInt(gv_hallPaintScale * 100.0));
+    gf_BhPaintCells(lv_s, "on", lv_at);
+    gf_HallPaintSet(false);
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    gf_BhPaintCells(lv_s, "off", lv_at);
+    BankSave(gv_dbgBank);
+}
+
+const fixed c_BH_LAND_AWAY = 20.0;       // the two 19x19 grids do not overlap
+const fixed c_BH_CLEAR = 9.5;            // probe half size around a point
+const fixed c_BH_LIFT_WAIT = 4.0;
+const fixed c_BH_LAND_MAX = 60.0;        // game s
+const fixed c_BH_MINE_WAIT = 25.0;       // several trips of one SCV (5 each)
+
+// Every 1-spaced point of the square of half size c_BH_CLEAR at lp_at is pathable.
+bool gf_BhClear (point lp_at) {
+    fixed lv_x;
+    fixed lv_y;
+
+    for (lv_x = -c_BH_CLEAR; lv_x <= c_BH_CLEAR; lv_x += 1.0) {
+        for (lv_y = -c_BH_CLEAR; lv_y <= c_BH_CLEAR; lv_y += 1.0) {
+            if (!PointPathingPassable(PointWithOffset(lp_at, lv_x, lv_y))) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// The cell centre of lp_p.
+point gf_BhCell (point lp_p) {
+    return Point(IntToFixed(FixedToInt(PointGetX(lp_p))) + 0.5, IntToFixed(FixedToInt(PointGetY(lp_p))) + 0.5);
+}
+
+// A clear cell centre on rings lp_r0..lp_r1 around lp_from, at least lp_away
+// from lp_not (null: no such limit). null when there is none.
+point gf_BhFind (point lp_from, fixed lp_r0, fixed lp_r1, point lp_not, fixed lp_away) {
+    fixed lv_r;
+    fixed lv_a;
+    point lv_p;
+
+    for (lv_r = lp_r0; lv_r <= lp_r1; lv_r += 4.0) {
+        for (lv_a = 0.0; lv_a < 360.0; lv_a += 15.0) {
+            lv_p = gf_BhCell(PointWithOffsetPolar(lp_from, lv_r, lv_a));
+            if ((lp_not == null || DistanceBetweenPoints(lv_p, lp_not) >= lp_away) && gf_BhClear(lv_p)) {
+                return lv_p;
+            }
+        }
+    }
+    return null;
+}
+
+string gf_BhOrder (unit lp_u) {
+    order lv_o = UnitOrder(lp_u, 0);
+
+    if (lv_o == null) {
+        return "none";
+    }
+    return AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o));
+}
+
+void gf_BhSnap (string lp_k, unit lp_hall, point lp_a, point lp_b, int lp_p) {
+    string lv_s = "ba_hall";
+
+    BankValueSetFromInt(gv_dbgBank, lv_s, lp_k + "Alive", gf_BaFlagInt(UnitIsAlive(lp_hall)));
+    if (UnitIsValid(lp_hall)) {
+        BankValueSetFromString(gv_dbgBank, lv_s, lp_k + "Type", UnitGetType(lp_hall));
+        BankValueSetFromInt(gv_dbgBank, lv_s, lp_k + "Facing", FixedToInt(ModF(UnitGetFacing(lp_hall) + 360.5, 360.0)));
+        BankValueSetFromString(gv_dbgBank, lv_s, lp_k + "At100", gf_BaXY100(UnitGetPosition(lp_hall)));
+        BankValueSetFromInt(gv_dbgBank, lv_s, lp_k + "Blocked10", gf_BaHallBlocked(lp_hall, 1.0));
+    }
+    gf_BaLegSnap(lv_s, lp_k + "A", lp_a, lp_p);
+    gf_BaLegSnap(lv_s, lp_k + "B", lp_b, lp_p);
+    BankSave(gv_dbgBank);
+}
+
+unit gf_BhScript (unit lp_u) {
+    if (!UnitIsValid(lp_u)) {
+        return lp_u;
+    }
+    AISetUnitScriptControlled(lp_u, true);
+    AIRemoveUnitFromAnyWaves(lp_u);
+    return lp_u;
+}
+
+// Mining at lp_cc: one SCV, one field 9 south (outside the footprint),
+// c_BH_MINE_WAIT game s. Records minerals collected and the SCV order
+// (R-BASE-30: the hall stays a drop-off).
+void gf_BhMine (string lp_k, unit lp_cc, int lp_p) {
+    string lv_s = "ba_hall";
+    point lv_f = PointWithOffset(UnitGetPosition(lp_cc), 0.0, -11.0);
+    int lv_before = PlayerGetPropertyInt(lp_p, c_playerPropMineralsCollected);
+    unit lv_field;
+    unit lv_scv;
+
+    UnitCreate(1, "MineralField", c_unitCreateIgnorePlacement, 0, lv_f, 0.0);
+    lv_field = UnitLastCreated();
+    UnitCreate(1, "SCV", 0, lp_p, PointWithOffset(lv_f, 2.0, 0.0), 90.0);
+    lv_scv = gf_BhScript(UnitLastCreated());
+    UnitIssueOrder(lv_scv, OrderTargetingUnit(AbilityCommand("SCVHarvest", 0), lv_field), c_orderQueueReplace);
+    Wait(c_BH_MINE_WAIT, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, lp_k + "Mined", PlayerGetPropertyInt(lp_p, c_playerPropMineralsCollected) - lv_before);
+    BankValueSetFromString(gv_dbgBank, lv_s, lp_k + "MineOrder", gf_BhOrder(lv_scv));
+    BankValueSetFromString(gv_dbgBank, lv_s, lp_k + "MineScvAt100", gf_BaXY100(UnitGetPosition(lv_scv)));
+    UnitRemove(lv_scv);
+    UnitRemove(lv_field);
+    BankSave(gv_dbgBank);
+}
+
+void gf_BhHall () {
+    string lv_s = "ba_hall";
+    int lv_p = gf_BaseAiLaneOwner(1);
+    point lv_a = gf_BhFind(PlayerStartLocation(lv_p), 16.0, 120.0, null, 0.0);
+    point lv_b;
+    unit lv_scv;
+    unit lv_cc;
+    fixed lv_t;
+    int lv_lane;
+
+    BankValueSetFromInt(gv_dbgBank, lv_s, "Player", lv_p);
+    BankValueSetFromString(gv_dbgBank, lv_s, "A100", gf_BaXY100(lv_a));
+    BankValueSetFromString(gv_dbgBank, lv_s, "Foot", CatalogFieldValueGet(c_gameCatalogUnit, "CommandCenter", "Footprint", lv_p));
+    if (lv_a == null) {
+        BankSave(gv_dbgBank);
+        return;
+    }
+    lv_b = gf_BhFind(lv_a, c_BH_LAND_AWAY, 60.0, lv_a, c_BH_LAND_AWAY);
+    if (lv_b == null) {
+        BankSave(gv_dbgBank);
+        return;
+    }
+    BankValueSetFromString(gv_dbgBank, lv_s, "B100", gf_BaXY100(lv_b));
+    // Positive control: before any hall, both grids are open and a Barracks
+    // fits at each leg centre.
+    gf_BhSnap("t0", null, lv_a, lv_b, lv_p);
+
+    // Built by an SCV: the footprint from the construction start.
+    PlayerModifyPropertyInt(lv_p, c_playerPropMinerals, c_playerPropOperSetTo, 2000);
+    UnitCreate(1, "SCV", 0, lv_p, PointWithOffset(lv_a, 0.0, -10.0), 90.0);
+    lv_scv = gf_BhScript(UnitLastCreated());
+    BankValueSetFromInt(gv_dbgBank, lv_s, "buildIssued", gf_BaFlagInt(UnitIssueOrder(lv_scv, OrderTargetingPoint(AbilityCommand("TerranBuild", 0), lv_a), c_orderQueueReplace)));
+    Wait(8.0, c_timeGame);
+    lv_cc = UnitGroupClosestToPoint(UnitGroup("CommandCenter", lv_p, RegionCircle(lv_a, 3.0), UnitFilter(0, 0, 0, 0), 0), lv_a);
+    gf_BhScript(lv_cc);
+    BankValueSetFromString(gv_dbgBank, lv_s, "buildScvOrder", gf_BhOrder(lv_scv));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "buildFound", gf_BaFlagInt(UnitIsValid(lv_cc)));
+    gf_BhSnap("built", lv_cc, lv_a, lv_b, lv_p);
+
+    // Killed under construction: nothing left. The builder goes first: a unit
+    // on a leg refuses the Barracks probe (run 20261119-172608).
+    UnitRemove(lv_scv);
+    if (UnitIsValid(lv_cc)) {
+        UnitKill(lv_cc);
+    }
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    gf_BhSnap("builtDead", lv_cc, lv_a, lv_b, lv_p);
+
+    // Created complete.
+    UnitCreate(1, "CommandCenter", 0, lv_p, lv_a, 270.0);
+    lv_cc = gf_BhScript(UnitLastCreated());
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    gf_BhSnap("made", lv_cc, lv_a, lv_b, lv_p);
+    gf_BhMine("made", lv_cc, lv_p);
+
+    // Lift-off: nothing while it flies.
+    UnitIssueOrder(lv_cc, Order(AbilityCommand("CommandCenterLiftOff", 0)), c_orderQueueReplace);
+    Wait(c_BH_LIFT_WAIT, c_timeGame);
+    gf_BhSnap("lifted", lv_cc, lv_a, lv_b, lv_p);
+
+    // Landed 20 or more away: the footprint there, nothing at the old point.
+    BankValueSetFromInt(gv_dbgBank, lv_s, "landIssued", gf_BaFlagInt(UnitIssueOrder(lv_cc, OrderTargetingPoint(AbilityCommand("CommandCenterLand", 0), lv_b), c_orderQueueReplace)));
+    lv_t = 0.0;
+    while (UnitGetType(lv_cc) != "CommandCenter" && lv_t < c_BH_LAND_MAX) {
+        Wait(0.5, c_timeGame);
+        lv_t += 0.5;
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "landSeconds", FixedToInt(lv_t));
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    gf_BhSnap("landed", lv_cc, lv_a, lv_b, lv_p);
+
+    // Killed: nothing left.
+    UnitKill(lv_cc);
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    gf_BhSnap("dead", lv_cc, lv_a, lv_b, lv_p);
+
+    // Last, so their AI does not mine into the counts above: the starting
+    // halls of the Terran lanes 1-3, by the game's lane start
+    // (gf_BaseAiBaseAt), and their start points.
+    for (lv_lane = 1; lv_lane <= 3; lv_lane += 1) {
+        gf_BaseAiCreateLane(lv_lane);
+    }
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    for (lv_lane = 1; lv_lane <= 3; lv_lane += 1) {
+        lv_p = gf_BaseAiLaneOwner(lv_lane);
+        gf_BaHallFootprint(lv_s, lv_p);
+        BankValueSetFromString(gv_dbgBank, lv_s, gf_BaKey(lv_p, "Start100"), gf_BaXY100(PlayerStartLocation(lv_p)));
+    }
+    BankSave(gv_dbgBank);
+    // Debug paint (R-FP-11), last: creep refuses Terran placement.
+    gf_BhPaint(gf_BaseAiLaneOwner(1));
+}

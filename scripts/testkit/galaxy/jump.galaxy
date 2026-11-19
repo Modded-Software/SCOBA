@@ -185,7 +185,7 @@ void gf_JtTrace (string lp_section, bool lp_press, int lp_loops, int lp_act, int
     BankValueSetFromInt(gv_dbgBank, lp_section, "camEnd100", FixedToInt(gv_jumpCamHeight[1] * 100.0));
     // The total written: base + quake + jump at the last write, x100.
     BankValueSetFromInt(gv_dbgBank, lp_section, "camApplied100", FixedToInt(gv_cameraHeightApplied[1] * 100.0));
-    BankValueSetFromInt(gv_dbgBank, lp_section, "camBase100", FixedToInt(c_SCOBA_CAMERA_HEIGHT_OFFSET * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "camBase100", FixedToInt(gf_CameraHeightBase(1) * 100.0));
     BankValueSetFromString(gv_dbgBank, lp_section, "cam", lv_cam);
     BankValueSetFromString(gv_dbgBank, lp_section, "clipLog", gv_jumpClipLog[1]);
     BankValueSetFromString(gv_dbgBank, lp_section, "scaleLog", gv_jumpScaleLog[1]);

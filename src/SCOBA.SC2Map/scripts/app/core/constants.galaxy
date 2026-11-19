@@ -64,9 +64,13 @@ const string c_SCOBA_EFFECT_PSIBLAST = "PsiBlastLaunchMissile";
 const string c_SCOBA_EFFECT_TOSH_AIR = "SCOBAToshAirU";
 const string c_SCOBA_SHOT_TOSH_AIR = "SCOBAToshAirShot";
 const fixed c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT = 1.5;
-// The TPS camera height offset above the followed point. The screen-centre
-// ray passes through that point (pncprobe 20261115-224549, R-TPS-84).
+// The TPS camera height offset above the followed point, for Tosh. The
+// screen-centre ray passes through that point (pncprobe 20261115-224549,
+// R-TPS-84). Other units scale it by their height (R-TPS-90,
+// gf_CameraTargetOffset).
 const fixed c_SCOBA_CAMERA_HEIGHT_OFFSET = 0.9;
+// The default TPS camera arm, for Tosh; scaled the same way (gf_CameraArm).
+const fixed c_SCOBA_CAMERA_ARM = 1.5;
 const fixed c_SCOBA_CROSSHAIR_MIN_RANGE = 0.5;
 const fixed c_SCOBA_CROSSHAIR_MAX_RANGE = 20.0;
 // The unit pick has no practical range: the whole map (256) fits (R-TPS-84).

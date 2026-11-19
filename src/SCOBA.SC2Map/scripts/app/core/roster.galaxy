@@ -72,6 +72,17 @@ bool gf_RosterIsSeat (int lp_player) {
     return lv_lane > 0 && gf_RosterSeat(lv_lane) == lp_player;
 }
 
+// The side of a player (R-ROSTER-9): by the roster lane, so an empty seat
+// (PlayerRace "") keeps its lane's side. Other players (corners 7, 8) by race.
+bool gf_RosterTerranPlayer (int lp_player) {
+    int lv_lane = gf_RosterLaneOf(lp_player);
+
+    if (lv_lane > 0) {
+        return gf_RosterTerran(lv_lane);
+    }
+    return PlayerRace(lp_player) == "Terr";
+}
+
 // A played seat: has a hero, a pod, a wallet, an intro (R-ROSTER-5).
 bool gf_RosterPlayed (int lp_player) {
     if (lp_player < 0 || lp_player >= c_ROSTER_PLAYERS) {

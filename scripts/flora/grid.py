@@ -113,6 +113,8 @@ def disk_cells(x: float, y: float, r: float, shape: tuple[int, int]) -> tuple[np
     h, w = shape
     x0, x1 = max(0, int(math.floor(x - r))), min(w, int(math.ceil(x + r)) + 1)
     y0, y1 = max(0, int(math.floor(y - r))), min(h, int(math.ceil(y + r)) + 1)
+    if x1 <= x0 or y1 <= y0:  # disk wholly off the map
+        return np.zeros(0, dtype=int), np.zeros(0, dtype=int)
     ys, xs = np.mgrid[y0:y1, x0:x1]
     keep = np.hypot(xs + 0.5 - x, ys + 0.5 - y) <= r
     return ys[keep], xs[keep]

@@ -32,6 +32,7 @@ PROFILE_OUTPUTS = {
     "ui": ROOT / "out" / "SCOBA256_uitest.SC2Map",
     "baseai": ROOT / "out" / "SCOBA256_baseai.SC2Map",
     "roster": ROOT / "out" / "SCOBA256_roster.SC2Map",
+    "ground": ROOT / "out" / "SCOBA256_ground.SC2Map",
 }
 
 PROFILE_BANKS = {
@@ -62,6 +63,7 @@ PROFILE_BANKS = {
     "ui": ("SCOBAUITEST",),
     "baseai": ("SCOBABASEAI",),
     "roster": ("SCOBAROSTER",),
+    "ground": ("SCOBAGROUND",),
 }
 
 
@@ -138,4 +140,7 @@ def profile_module(name):
     if name == "roster":
         from . import roster
         return roster
+    if name == "ground":
+        from . import ground
+        return ground
     raise SystemExit(f"unknown test profile: {name}")

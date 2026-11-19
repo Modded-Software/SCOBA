@@ -9,7 +9,7 @@ import numpy as np
 
 from flora import config
 from flora.build import balance_problems, family_problems, objects_xml, Plan
-from flora.grid import distance_to, shortest_path, value_noise
+from flora.grid import disk_cells, distance_to, shortest_path, value_noise
 from flora.lanes import Placed, detours, find_lanes, place_hazards, settle
 from flora.rules import RULES, context
 from flora.scatter import scatter
@@ -237,6 +237,19 @@ class LaneTests(unittest.TestCase):
         hazards, notes = place_hazards(self.lanes, self.terrain, scene)
         self.assertEqual(hazards, [])
         self.assertTrue(notes)
+
+
+class DiskCellsTests(unittest.TestCase):
+    def test_disk_off_the_map_is_empty(self) -> None:
+        # Wide hazard wiggle rings reach past the map edge.
+        for x, y in ((-20.0, 5.0), (5.0, -20.0), (300.0, 5.0), (5.0, 300.0)):
+            rows, cols = disk_cells(x, y, 2.0, (64, 64))
+            self.assertEqual(len(rows), 0)
+            self.assertEqual(len(cols), 0)
+
+    def test_disk_inside_the_map_has_cells(self) -> None:
+        rows, _ = disk_cells(10.0, 10.0, 2.0, (64, 64))
+        self.assertGreater(len(rows), 0)
 
 
 class BuildTests(unittest.TestCase):

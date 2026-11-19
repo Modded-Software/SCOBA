@@ -47,7 +47,7 @@ void gf_GateFromX (unit lp_unit, int lp_lane) {
     if (gf_BaseAiUnitIsAi(lp_unit) || gf_HireIsHired(lp_unit)) {
         return;
     }
-    if (PlayerRace(UnitGetOwner(lp_unit)) == "Terr") {
+    if (gf_RosterTerranPlayer(UnitGetOwner(lp_unit))) {
         gf_GateSend(lp_unit, 0, lp_lane, gv_sPAWNLOCATIONS[lp_lane + 3]);
     }
     else {

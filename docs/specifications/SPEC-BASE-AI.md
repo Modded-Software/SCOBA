@@ -48,7 +48,7 @@ can judge it.
 | R-BASE-32 | [built] | host `test_resources.py`: two plans equal, radii and angle steps vary, hall gap kept |
 | R-BASE-33 | [built] | `macro`: supply used + supply lost grows within every 2 minutes (`baseai_live.galaxy` death counter); an attacker lost units |
 | R-BASE-34 | [built] | `macro`: attackers ≥ 4 by t480, an owner attacks twice (state 3 left and entered again); `at least 3 owners expanded by t480` |
-| R-BASE-30 | [build] | `macro` hall footprint checks (run `20261118-104652`) |
+| R-BASE-30 | [tested] (`hall` `20261119-203139`, `-172941`, `-135358`; earlier script legs: `20261119-115642`, `-121141`, `macro` `-120004`) | `hall` group: the engine pathing grid (36x36 sub-cells of 0.5) of the starting CC covers the measured feet outline; built, created and landed CCs equal them; open while flying and after death; an SCV mines. `macro`: every Terran CC covers the measured cells at t1; the Orbital Command links `FootprintSCOBAHall1x1` |
 
 ## 2. Facts
 
@@ -84,6 +84,13 @@ in the map source (128 cells). The built map doubles them.
 | F26 | Macro run `20261118-230116` (placed piles, 18 lines; the game exited before t480, bank to t420, no crash log): `AIHasNearbyOpenExpansion` true from t1 for 9, 10, 11, 13, 14, false for 12; site table 12 sites, 144 fields, 36 geysers, amounts 6000 / 10000. Zerg 13 and 14 hold a Hatchery at `ZergJungle1B` and `ZergJungle2A` (2.1 from the site point) from t120. Terran 9 and 11: `NearbyOpen` true, ~2900 minerals at t420, no new Command Center, town slot 1 unused. Loss counters: p10 23, p14 20 supply lost by t420; attack entries 1 for 10, 13, 14, 0 for Terran. Terran ChIn depletion thresholds by phase start at 3000 and 7000 minerals left (`terranchin.galaxy` 2815, 2843); the 4x mains start at 48000 (O-BASE-6). | `baseai macro` |
 | F27 | Macro run `20261118-232439` (failures 1): Zerg 10, 13, 14 hold a second Hatchery by t240; attackers 9, 11, 12, 10; every owner enters attack state at most once by t480. `UnitTypePlacementFromPoint("CommandCenter")` returns the site point itself at all six Terran-side sites, BrakkFront and both InfestedTank sites; `null` at the four Zerg jungle sites (Zerg-held or on creep). So the 8x8 footprint fits the placed sites (O-BASE-7 closed for placement). p9 town slot 1: claimed at t360, building at t420, unused at t480: a Command Center was started and then lost. Terran ChIn openings 103, 104, 106 never call `TerranHDFastExpand` (`terranchin.galaxy` 282-570); 107, 108, 109, 113 do. Zerg `UnitsLost` rises with `SupplyLost` 0 (p14 76 units, 0 supply at t480), so the unit counter counts zero-supply deaths. The earlier session macro run started 23:15 lost its runner; its bank is kept only as `/tmp` diagnostics, not as a run. | `baseai macro` |
 | F28 | Macro run `20261118-233712` (failures 1, death types recorded): all six owners reach attack state by t480 (five by t300); none enters it twice. Dead types: Zerg `Larva` from t60 (the Larva → Egg morph fires a death), then `Zergling`, `ZerglingBurrowed`; Terran `Marine`, `MULE`. Drone → building morphs fire no death. p9 town slot 1 again claimed t360, building t420, unused t480, and no hall of p9 died, so the Command Center was never placed. The death counter now skips types with zero mineral + vespene cost (`UnitTypeGetCost`). | `baseai macro` |
+| F29 | Macro run `20261119-105503` (failures 5, CC family `Footprint1x1PlacementOnly`, model x1.2): at t1, all three Terran halls report both footprints `Footprint1x1PlacementOnly` and 0 of 4 directions blocked at 1.0, 3.5 and 4.6. At the end, 0 blocked at 1.0, but 1 of 4 blocked at 3.5 for p9, p11, p12. Run `20261119-110954` measured the cause: the blocked cell (p9, 270°) lies in a `Barracks` the AI built beside the hall; the hall cell itself stays open. Run `20261119-110610` ended at about t150 with the bank incomplete and no ScriptError (SC2 exited; not a result). p9 placed a second Command Center at `TerranJungleLeftA` at t360 (the first Terran town claim that became a hall). SCVs mine: 408-432 minerals collected by t60. Attackers 9, 11, 12; no Zerg owner in attack state by t480; repeats none. | `baseai macro` |
+| F30 | Hall legs. Stock `Footprint1x1PlacementOnly` and a Check-only `Area="0,0,1,1"` footprint both put a created or landed Command Center on a cell corner (128.5 asked, 129.0 placed; land at 116.5 gave 117.0). An empty Place layer with `Area="0,0,1,1"` puts it on the cell centre. Then the 2x2 legs stand at (±4.5, ±4.5) on whole cells and the 1x1 at the origin. Run `20261119-114147`: legs on an SCV-built hall from the construction start, none after it dies under construction, legs on a created hall, none while flying (4 s after lift-off), legs at the landing point 12 west (landed in 15 game s), none left at the old point, none after death. Corners blocked and refused to a Barracks; the middle open at 1.0. An SCV build at the map centre was refunded and the SCV ended on an `attack` order (runs `20261119-113306` to `-113937`); on a ring around the owner start it builds. | `baseai hall` |
+| F31 | Mining with hall legs, run `20261119-115154` (invalid as a run: 12 real mouse clicks): one SCV, one field 7 south, 25 game s. With the four 2x2 legs and a 1x1 at the origin: 0 mined, the SCV held `SCVHarvest` by the field. Legs removed: 10 mined, the SCV reached 2.0 from the origin. Macro `20261119-114359` (stopped by the agent): every Terran owner 0 minerals collected at t60. Operator 2026-11-19: drop the middle 1x1. | `baseai hall` |
+| F32 | Four corner legs, no middle blocker. `hall` run `20261119-115642` (failures 0): one SCV mines 10 in 25 s with the legs and 10 without; legs on build, none after death under construction, on create, none while flying, at the landing point, none at the old point, none after death. `macro` run `20261119-120004` (failures 2, the attack window of F27): every Terran hall has 4 legs, 4 corners blocked and refused to a Barracks, the origin and 1.0 open, at t1 and as `OrbitalCommand` at the end; 420-450 minerals collected by t60; p11 and p12 hold a second Command Center at `TerranJungleLeftA` / `TerranJungleRightB` from t380. Attackers 10, 13, 14; repeats none. | `baseai hall`, `baseai macro` |
+| F33 | Measured hall footprint. The CC model sliced at scale 3.6 near the ground: legs at about ±6 (the script legs sat at ±4.5). As Place cells only, the starting CC of p9 refused a Barracks on its legs but no cell blocked pathing (`hall` run `20261119-134456`); the operator saw no path blocking. With a Shape of one loop per piece, run `20261119-135358` (failures 0): the engine grid of the starting CC covers every measured cell; built, created and landed CCs equal the cells exactly; lifted and dead: all open; origin and 1.0 open; one SCV mines 20 in 25 s (the lane AI is started only after the mining test). | `baseai hall` |
+| F34 | Starting CC moved off its start point. With the measured footprint over the fields, `UnitCreate` searched placement: p12 stood at (164.5, 215.5), not (159, 219) (`macro` run `20261119-135805`). `gf_BaseAiBaseAt` now creates it with `c_unitCreateIgnorePlacement`; the engine still snaps it to the cell centre, +0.5 per axis. `hall` run `20261119-172941` (failures 0): p9, p11, p12 at offset 0.5, every cell blocked. The same run moved the builder SCV removal before the `builtDead` probe; a living SCV on a leg refused the Barracks (run `20261119-172608`, grid open). | `baseai hall` |
+| F35 | Hall legs at the wrong scale and lost on the Orbital morph. (1) The footprint used the actor scale 3.6 only; the engine draws actor x ModelData `ScaleMax` 0.8 = 2.88, so the cells sat at ±6, the legs at ±4.6. Fixed (`hall_scale`); `hall` run `20261119-180620` failures 0. (2) `macro` run `20261119-175309`: no CC lifted; all four leg centres opened at once 35 s (the Orbital morph time) before the type became `OrbitalCommand`: p9 t122/t157, p12 t239/t274, p11 t463 (morph not done at t480). The morph applies the OC footprint `FootprintSCOBAHall1x1` at its start. Open: OC and PF scale (operator). | `baseai hall`, `macro` raw `HallTypes`, `HallLegOpen` |
 | F18 | WASD and LMB+RMB move the bound unit with `move` orders, so at its own engine speed: the Wraith 7.50 = its data speed, Tosh 3.10. | `baseai flight` run `20261118-104517` |
 
 ## 3. Assumptions under test
@@ -227,10 +234,27 @@ when the AI next changes the unit's order (O-BASE-3).
 
 - Supply depot 4x4 (stock 2x2 scaled x2), raised and lowered (operator
   decision: keep). F16: it starves Terran supply. Open.
-- Command Center, Orbital Command, Planetary Fortress: 8x8 (operator
-  2026-11-18; stock 5x5). `Footprint8x8CCContour` and
-  `Footprint8x8CCDropOff` keep the stock layers: not near resources,
-  drop-off placement. The morphs keep the size.
+- Command Center, Orbital Command, Planetary Fortress (R-BASE-30,
+  operator 2026-11-19): `Footprint` and `PlacementFootprint` are
+  `FootprintSCOBAHall1x1`: one Check cell and an empty Place layer (row
+  `.`), both `Area="0,0,1,1"`. The Place layer area puts the origin on a
+  cell centre; no cell is set. Without a Place layer (stock
+  `Footprint1x1PlacementOnly`, or a Check layer only) the hall stood on a
+  cell corner (runs `20261119-113306`, `20261119-113642`). No pathing
+  cell, no `NearResources` check, so a hall may stand on a mineral field
+  and units walk under it. Before: 8x8 (`Footprint8x8CCContour`,
+  `Footprint8x8CCDropOff`, removed); player 9 reported "Failed to
+  expand there". Actor `CommandCenter` scale 3.6, 3.6, 4.2 (was 3.0, 3.0,
+  3.5).
+- Hall legs (R-BASE-30, R-FP-10, SPEC-SCALED-FOOTPRINTS 5): the build
+  slices the CC model at the drawn scale (actor 3.6 x model 0.8) near the ground and writes the
+  blocked cells as the `CommandCenter` `Footprint`
+  (`scripts/mapgen/footprints/hall.py`). The engine applies it from the
+  construction start, drops it with the flying form and applies it again
+  on landing. Replaces the script legs of F30-F32 (four stock
+  `PathingBlocker2x2` at a guessed ±4.5; the measured legs sit at about
+  ±4.6). The Orbital Command and Planetary Fortress are not measured and
+  block nothing (SPEC-SCALED-FOOTPRINTS 5).
 
 ### 4.7a Melee map (R-BASE-24 to 30)
 
@@ -314,7 +338,8 @@ the built map (256 cells).
   `PlayerSetDifficulty` then stock `AIMeleeStart(owner)`.
   `gf_BaseAiStartAt` and the expansion driver (`gt_BaseSitesExpand`) are
   removed.
-- **Not changed.** 8x8 Command Center (R-BASE-30). The 200 supply rule and
+- **Changed 2026-11-19.** The Command Center family has no pathing footprint
+  (R-BASE-30). **Not changed.** The 200 supply rule and
   the depot/Overlord ban stay until `macro` measures them.
 - **Validation.** `scripts/validate-map.py`: six start points, each owner's
   record index, 8+2 resources per site, depot owners.
@@ -391,7 +416,7 @@ the built map (256 cells).
 | `src/SCOBA.SC2Map/scripts/app/systems/base/base_ai.galaxy` | Exclusion, bases, AI start |
 | `src/SCOBA.SC2Map/scripts/app/main.galaxy`, `header.galaxy`, `app/init.galaxy` | Includes, declarations, init order |
 | `spawns.galaxy`, `air_creep.galaxy`, `hero_switch.galaxy`, `hero_drop.galaxy`, `medic.galaxy`, `companion.galaxy`, `aim.galaxy`, `intro.galaxy` | Exclusion calls |
-| `scripts/testkit/galaxy/baseai.galaxy`, `baseai_macro.galaxy`, `baseai_flight.galaxy`, `scripts/testkit/profiles/baseai.py`, `baseai_viking.py` | In-game tests |
+| `scripts/testkit/galaxy/baseai/baseai.galaxy`, `baseai_macro.galaxy`, `baseai_flight.galaxy`, `scripts/testkit/profiles/baseai.py`, `baseai_viking.py` | In-game tests |
 | `scripts/testkit/profiles/registry.py`, `scripts/testkit/map_builder.py`, `scripts/playtest.sh` | Profile, switch, entry point |
 | `scripts/testkit/tests/test_base_sites.py`, `test_base_ai.py` | Host tests |
 | `README.md` | Feature and command list |
@@ -406,7 +431,8 @@ is one bank section. Windows are in game time.
 | `probe` | A1 to A8, with raw values. Runs first, before feature code, on a harness-made base. | The control Marine of A5 is recorded, so the exclusion is measured against a unit that was not excluded. |
 | `sites` | Per site: 8 mineral fields and 2 geysers inside the site radius, alive, owner 0. 13 sites. | No mineral field or geyser outside every site radius. |
 | `start` | Per lane player at 1 game second: 1 town hall of the right type within 2 of its main site point; 12 workers; 1 Overlord for Zerg, 0 for Terran; minerals 50; vespene 0; difficulty 10. | No town hall of the other race for the player. |
-| `macro` | All six lane owners, waves on, 8 game minutes, the operator in the Alt+4 Wraith. Per owner: minerals collected; workers, supply made, makers, fighters at t480; supply used plus supply lost (R-BASE-33: a harness death counter adds `c_unitPropSuppliesUsed` of every dying owner unit) grows within every 2 minutes; an owner whose fighters fell makes new fighters within 2 minutes (`FightersMade` counter). Terran halls: catalog footprints 8x8, pathing blocked at 3.5 in 4 directions, at start and after the morphs. Wraith flight as in `flight`. | Not supply-capped for 2 minutes. Hall pathing open somewhere at 4.6 (not larger than 8x8). |
+| `macro` | All six lane owners, waves on, 8 game minutes, the operator in the Alt+4 Wraith. Per owner: minerals collected; workers, supply made, makers, fighters at t480; supply used plus supply lost (R-BASE-33: a harness death counter adds `c_unitPropSuppliesUsed` of every dying owner unit) grows within every 2 minutes; an owner whose fighters fell makes new fighters within 2 minutes (`FightersMade` counter). Terran halls: a CC links the measured footprint (R-FP-10) and its engine grid blocks every measured cell; an Orbital Command links `FootprintSCOBAHall1x1`; `PlacementFootprint` `FootprintSCOBAHall1x1`. Wraith flight as in `flight`. | Not supply-capped for 2 minutes. Hall: a Barracks refused at the four leg centres (±6, ±6); origin open; none of 4 directions blocked at 1.0 (R-BASE-30). Raw: the grid. |
+| `hall` | The first Terran lane owner, no waves, a script-controlled hall at a clear point A and a landing point B at least 20 away (19x19 pathable each). The engine pathing grid (36x36 sub-cells of 0.5) at A and B against the feet outline the build generates. Before: both open, a Barracks fits at each leg centre. Built by an SCV: grid A equals the cells, legs refuse a Barracks, origin open. Killed under construction: open. Created: equals; one SCV mines from a field 11 south in 25 s. Lift-off (4 s): both open. Land at B (polled up to 60 game s, then 2 s): B equals, A open. Killed: open. Last: lanes 1-3 started by the game path (`gf_BaseAiCreateLane`); each starting CC covers every cell and stands within half a cell per axis of its start point (the cell-centre snap). | Nothing blocked while flying, at the old point, or after death. Origin and 1.0 open on the ground. |
 | `flight` | Alt+4 Viking (regular unit, PNC), no lanes, no waves. W held and LMB+RMB held: ground speed within 10 % of the unit's speed property, which equals its data speed. Space 1 s climbs 4, Ctrl 1 s descends 4 (within 1), camera = base + flight. Land and lift by the hero morph pair: landed type `SCOBAVikingHeroAssault` on the ground; lifted type `SCOBAVikingHero` at speed 12. Raw: the height methods of F17, each form's ability list. | Speed not Tosh's. Height holds after each release. No jump on the flyer. No TPS, no Stand. No stock morph in either hero form; lift is not a stock `VikingFighter`. A / D: no flag, no move, no turn; the release keeps a move order. Control: Tosh on A moves along camera yaw + 90 (within 20). |
 | `macro` raw (A11 to A13) | Per owner at t0 and every minute: `StartLoc100`, `GroundStartLocs`, `TotalStartLocs`, `NumEnemies`, `NumTeams`, `EnemyBuildings`, `OpeningType`, `AttackState`, wave sizes (main, attack), `NearbyOpen`, town state per slot. Asserts: start location equals the hall point; ground start locs > 0; enemies > 0; at least 3 owners hold a hall at a site by t480; at least 4 owners in attack state by t480 and one owner enters it twice (R-BASE-34). | No `AIExpand` call by script (counter stays 0). |
 | `expand` | For one Terran and one Zerg lane player: a town hall inside an expansion site radius within the time limit. The time is recorded. | No town hall of a lane player outside every site radius. |
@@ -468,3 +494,19 @@ AC-BASE-1 to AC-BASE-7 of the requirements. Also:
 | `baseai/20261118-232439` (`macro`, placed piles, loss counters, site placement probe) | failures 1: `an owner attacked 2 times by t480: repeats=[]`. Pass: 12 sites, 144 fields, 36 geysers; start location = hall for all six; `at least 3 owners expanded by t480: expanded=[10, 13, 14]`; `at least 4 owners attacked: attackers=[9, 11, 12, 10]`; `an attacker lost units`; supply growth for all six. F27. |
 | `baseai/20261118-233712` (`macro`, death types, LostHalls) | failures 1: `an owner attacked 2 times by t480: repeats=[]`. Pass: `expanded=[10, 13, 14]`; `attackers=[9, 11, 12, 10, 13, 14]`; losses counted; supply growth for all six. F28. |
 | `baseai/20261118-234729` (`macro`, cost-filtered losses, hall build targets) | failures 3: `expanded=[13, 14]` (p10 attacked from t300, first Hatchery order at t464, at 67.5,54.5); `attackers=[10, 13, 14]`; `repeats=[]`. Terran openings 133, 134, 106: attack wave 9-22 units at t420-t480, `AttackEntries` 0, no town claim. The previous run (openings 103, 104) attacked at t300. Operator 2026-11-18: Terran are slow to claim towns; that is not a fault. Open: the t480 window against random stock openings. |
+| `baseai/20261119-105503` (`macro`, CC family no pathing footprint, model x1.2) | failures 5: `ba_macro_end p9/p11/p12 HallBlocked35: got=1 want=0` (start: 0); `attackers=[9, 11, 12]`; `repeats=[]`. p9 second Command Center at `TerranJungleLeftA` t360. See F29. |
+| `baseai/20261119-110954` (`macro`, hall blocker probe) | failures 3: `ba_macro_end p9 HallBlocked35: got=1 want=0` with `HallBlockers35=270:Barracks` (p11, p12: 0); `attackers=[10, 13, 14]`; `repeats=[]`. p11 second Command Center at `TerranJungleLeftA` t360. |
+| `baseai/20261119-113306`, `-113642`, `-113937` (`hall`, iterations) | failures 14, 10, 7: hall on a cell corner until the empty Place layer; landing longer than 8 s (now polled); SCV build at the map centre refunded. See F30. |
+| `baseai/20261119-114147` (`hall`) | failures 0. 51 PASS. Legs on build, removed on death, on create, removed on lift-off, placed on landing, removed on death. |
+| `baseai/20261119-114359` (`macro`, five legs) | stopped by the agent at about t90: every Terran owner 0 minerals collected at t60 (F31). |
+| `baseai/20261119-115154` (`hall`, mining A/B, five legs) | invalid: `RealClicks` 12. Raw: 0 mined with the legs, 10 without (F31). |
+| `baseai/20261119-115642` (`hall`, four legs) | failures 0, 52 PASS. See F32. |
+| `baseai/20261119-120004` (`macro`, four legs) | failures 2: `attackers=[10, 13, 14]`, `repeats=[]`. All hall checks pass. See F32. |
+| `baseai/20261119-121141` (`hall`, hall probes moved to `baseai_hall.galaxy`) | failures 0, 52 PASS; mining 10 with legs, 10 without. |
+| `baseai/20261119-133928`, `-134150`, `-134456` (`hall`, Place cells only) | 44 failures (no clear point pair), a script error (no lane hall yet), then 11: the CC refuses a Barracks but blocks no pathing (no Shape). F33. |
+| `baseai/20261119-134942`, `-135358` (`hall`, Shape loops) | failures 0 both; the first mining count included the lane AI, so the AI start moved last. F33. |
+| `baseai/20261119-135805` (`macro`) | failures 3: p12 starting CC off its start point (F34); p11 Orbital Command `HallBlocked10=1` (1x1 footprint, open OC/PF question); attack repeats (known). |
+| `baseai/20261119-172213`, `-172608` (`hall`, lanes 1-3) | invalid (RealClicks 1); then failures 1: `builtDeadA Refused` 1, builder SCV still on a leg (F34). |
+| `baseai/20261119-172941` (`hall`) | failures 0. See F34. |
+| `baseai/20261119-175309` (`macro`) | failures 2: p11 `Refused` 3/4 (Orbital morph under way, F35); attack repeats (known). |
+| `baseai/20261119-180620` (`hall`, drawn scale 2.88), `-200703` (per-foot slices, paint), `-203139` (Shape on the 0.5 grid, SPEC-SCALED-FOOTPRINTS 5) | failures 0. See F35. |

@@ -17,7 +17,7 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .herodrop import CAM_DISTANCE as CAM_ARM
+from .herodrop_zoom import CAM_DISTANCE as CAM_ARM
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()

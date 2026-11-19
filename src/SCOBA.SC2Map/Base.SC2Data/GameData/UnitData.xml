@@ -167,30 +167,33 @@
             <LayoutButtons index="16" Face="NeoSteelFrame" Requirements="UseNeoSteelFrame"/>
         </CardLayouts>
     </CUnit>
-    <!-- Command Center family: 8x8 (stock 5x5), FootprintData.xml. The
-         morphs (Orbital, Planetary) keep the same size. -->
+    <!-- Command Center family: no pathing footprint (R-BASE-30, operator
+         2026-11-19). FootprintSCOBAHall1x1: one Check cell, no
+         Place layer, no NearResources check. Units walk under the hall; it
+         may stand on a mineral field; legs: systems/base/hall_legs. The
+         morphs use the same. -->
     <CUnit id="CommandCenter">
         <LifeStart value="15000"/>
         <LifeMax value="15000"/>
         <Food value="15"/>
-        <Footprint value="Footprint8x8CCContour"/>
-        <PlacementFootprint value="Footprint8x8CCDropOff"/>
+        <Footprint value="FootprintSCOBAHall1x1"/>
+        <PlacementFootprint value="FootprintSCOBAHall1x1"/>
     </CUnit>
     <CUnit id="CommandCenterFlying">
         <Food value="15"/>
     </CUnit>
     <CUnit id="OrbitalCommand">
         <Food value="15"/>
-        <Footprint value="Footprint8x8CCContour"/>
-        <PlacementFootprint value="Footprint8x8CCDropOff"/>
+        <Footprint value="FootprintSCOBAHall1x1"/>
+        <PlacementFootprint value="FootprintSCOBAHall1x1"/>
     </CUnit>
     <CUnit id="OrbitalCommandFlying">
         <Food value="15"/>
     </CUnit>
     <CUnit id="PlanetaryFortress">
         <Food value="15"/>
-        <Footprint value="Footprint8x8CCContour"/>
-        <PlacementFootprint value="Footprint8x8CCDropOff"/>
+        <Footprint value="FootprintSCOBAHall1x1"/>
+        <PlacementFootprint value="FootprintSCOBAHall1x1"/>
     </CUnit>
     <CUnit id="Hatchery">
         <Food value="6"/>

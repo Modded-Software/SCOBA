@@ -118,6 +118,7 @@ not repeated here.
 | R-TPS-81 | [tested] attack command in the free-cursor state. A cursor left click in the free-cursor state is [built]. | `controls_attack` |
 | R-TPS-82 | [tested] | `tps` group `target` |
 | R-TPS-83 | [tested] flags after leaving TPS | `tend` of every `tps` scenario |
+| R-TPS-90 | [tested] Tosh, Kerrigan, SCV: applied target height, desired arm, engine camera distance, aim pick eye height; the heights equal the generator's; an invalid unit falls back to Tosh. The framing itself is [operator] (AC-TPS-25). Viking flying and after the landing morph: applied height = its form's offset (+ flight), arm 6. | `combat` group `camheight`, `combat/20261119-131142` (with the Viking), `combat/20261119-120931`; full `combat` on HEAD 0868359 + this change: `combat/20261119-124334` (1 failure, `hold_right_back`, the same on clean HEAD `combat/20261119-123815`) |
 
 ## 5. Design
 
@@ -308,7 +309,8 @@ not repeated here.
 
 - One ray for the reticle, the status bar, the shot and the crosshair ground
   point: `gf_AimPickRay`. Origin `gf_AimCameraFocus` (hero, or the shoulder
-  proxy while aiming) at hero height + `c_SCOBA_CAMERA_HEIGHT_OFFSET` (0.9);
+  proxy while aiming) at hero height + `gf_CameraTargetOffset` (0.9 for
+  Tosh, 5.10);
   direction from the camera yaw and pitch (T13). The old origin, 0.5 aside
   and 1.5 high, never hit a Zergling the engine hovered.
 - The ray starts inside the hero; the pick skips the player's own hero.
@@ -353,6 +355,43 @@ not repeated here.
   (SPEC-POINT-AND-CLICK 5.11, `c_ANIM_ATTACK_RATE_TOSH`). The linger is
   unchanged.
 
+### 5.10 Camera by unit height (R-TPS-90)
+
+- Height of a unit type: the top of its measured hit shapes in
+  `scripts/data/hit_volumes.json` (scale baked in, not the x1.15 pick
+  inflation). Sphere: centre z + r. Capsule: the higher end + r. Box: centre
+  z + the vertical extent of its three half axes.
+- `scripts/hitvolumes/camera_heights.py` writes
+  `data/camera_heights.galaxy`: `c_CAM_HEIGHT_REFERENCE` (ToshSCOBA, 0.9305)
+  and one `gf_CamHeightType` call per type. `--check` and validate-map fail
+  when it is stale. `main` loads it into a data table (`gf_CamHeightLoad`).
+- `systems/camera/camera_height.galaxy`: `gf_CameraUnitHeight` (reference
+  for an invalid or unmeasured unit), `gf_CameraHeightScale` = height /
+  reference, `gf_CameraTargetOffset` = 0.9 x scale, `gf_CameraArm` = 1.5 x
+  scale.
+- Users: `gf_CameraHeightApply` (base of the applied height, then quake,
+  jump, drop, flight), `gf_HeroApplyCamera` and map init (arm and height),
+  `gf_AimPickRay` (eye height), the collision clamp (`gv_mARINE` 1.35 x
+  scale; the old 2.3 for non-Tosh units is gone).
+- The Viking keeps the arm `c_HERO_VIKING_CAM_DIST` 6. Its target offset
+  follows the form: `SCOBAVikingHero` 2.9807 (offset 2.88, plus the flight
+  height), `SCOBAVikingHeroAssault` 4.1436 (offset 4.01). Both measured at
+  the in-game scale 2.55: actor `Scale` 3 x model `ScaleMax` 0.85 (`ScaleMin`
+  is the same 0.85, so the engine has no choice).
+- A morph keeps the unit and changes its type. `gt_CameraMorphTick` (0.125
+  s) writes the height again, over 0.5 s, when the bound unit's type differs
+  from the type of the last write. Before, nothing wrote it after the
+  landing: the camera stayed at the flyer's base with no flight part and
+  looked at the landed Viking's feet (operator 2026-11-19).
+- Build check (`camera_heights.check_map`): every bound unit type
+  (`BODIES`) has a height, and every measured actor scale equals the map's
+  `ActorData` `Scale`. The JSON had no Viking types: it was measured before
+  they existed.
+- Measured values: KerriganSCOBA 1.7813 (offset 1.72, arm 2.87; was 0.9 and
+  2.5), SCV 1.0172 (offset 0.98, arm 1.64; was 0.9 and 2.5).
+- Map init now turns camera height smoothing off for every hero, as the hero
+  switch already did. Before, Kerrigan kept it on at init.
+
 ## 6. Module Structure
 
 | Module | Role |
@@ -363,6 +402,7 @@ not repeated here.
 | `systems/aim_shooting.galaxy` | Crosshair ray (`gf_AimCameraFocus`, `gf_AimPickRay`), pick, proxy, pending shot, `gf_AimShotEffect`, `gf_AimShotPress`. |
 | `systems/hit_volumes.galaxy`, `data/hit_volumes_*.galaxy` | Hit-volume ray tests and generated volume data. |
 | `scripts/hitvolumes/` | Volume measurement, Galaxy generator, host ray reference. |
+| `scripts/hitvolumes/camera_heights.py`, `data/camera_heights.galaxy`, `systems/camera/camera_height.galaxy` | Camera target height and arm by unit height (5.10). |
 | `systems/ui_floaters.galaxy` | UI-layer floaters. |
 | `systems/combat_fsm.galaxy` | `gf_AttackOrder` (Point & Click), root rules. |
 | `systems/combat_cooldown.galaxy` | Weapon effect event: animation, pending shot, single shot. |
@@ -402,6 +442,7 @@ not repeated here.
 | `shot` | Per outcome: shots +1, life, proxy, effect name, cooldown and button clock one loop after the shot, hero position, one text of the right kind. Walking: one shot, the walk keeps its speed. Weapon ranges. | Click while the cooldown runs, click when not aiming: no shot, no text. Walking: never an attack order. Air proxy: not the hit effect. No late damage 2 s after a miss. |
 | `pick` | Medic head, Marine thigh and middle, Ultralisk front, Zergling at 18.5, Overseer body, Hive top, Marine before Hive, Thor chest with aim held (reticle, status bar, shot). | Above the Medic, beside the Marine and Zergling, behind the Ultralisk, under the Overseer, north of the Hive. |
 | `pose` | Attack `auto`, not aiming: upper pose state and target pitch in every sample, standing and strafing; shots repeat; no bracket clear. | Aiming: hold off, aim state. Attack `single`: hold off at once, no shot. `single` with an enemy in range and in the arc: no pose. Torso pitch step 0. |
+| `combat camheight` | Tosh, Kerrigan, SCV, flying Viking, Viking after `SCOBAHeroAssaultMode` after a hero switch: height = generator's, applied height = 0.9 x scale, desired arm = 1.5 x scale (within 0.01), engine distance = arm or clamp (within 0.05), pick eye = ground + offset. Invalid unit: 0.9 and 1.5. Host: `test_camera_heights.py`. | Kerrigan is not on 0.9, not on 1.5 or the old 2.5. Landed Viking: no flight part, height above 2. |
 | `pncprobe point` | Engine and script band centres within 2 degrees, pitch at 3, 5, 8, 12 and yaw at 5, rest and aim. Nothing but hero and target near the lane; Medic parked. | No script pick 4 degrees outside the engine band. |
 
 Floater checks read script counters. They do not prove the text is visible.
@@ -453,6 +494,7 @@ Floater checks read script counters. They do not prove the text is visible.
   with no aiming at all.
 - Aim camera side and field of view.
 - Crosshair pick on large units live (Thor chest, head, arm; Hive top).
+- Camera framing per unit height (AC-TPS-25): Tosh, Kerrigan, SCV.
 
 ## 10. Not Tested
 

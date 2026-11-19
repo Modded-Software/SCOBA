@@ -28,7 +28,9 @@ TREE_SINK = ((6.0, 2.0), (4.0, 1.0))  # operator 2026-11-16: scale > 4 z-1, scal
 WATER_FX_DEPTH = 0.15  # water effects need the surface this far above the visible ground (operator 2026-11-16)
 HAZARD_LIFT = 0.1  # hazards sit this much above GROUND_LIFT (operator 2026-11-16: 1.0, 0.5, 0.3 floated)
 HAZARD_FLAT_RANGE = 0.15  # max ground height spread under a hazard footprint (operator 2026-11-16: 0.4 floated)
-HAZARD_WIGGLE_RINGS = tuple(0.75 * k for k in range(1, 9))  # cells: rings searched around a blocked spot (to 6)
+# Cells: rings searched around a blocked spot, to 12. Was to 6; the terrain
+# edit of 2026-11-19 left 2 of 8 pairs without a flat spot (14 of 16 placed).
+HAZARD_WIGGLE_RINGS = tuple(0.75 * k for k in range(1, 17))
 HAZARD_WIGGLE_STEPS = 16  # points per ring
 HAZARD_PAINT_BLEND = 3.0  # lava paint fades out over this many cells past a hazard (operator: 2-4)
 SHORE_BAND = 3.0  # dry cells this close to water are shore

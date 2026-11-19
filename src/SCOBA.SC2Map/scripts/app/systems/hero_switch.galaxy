@@ -69,18 +69,15 @@ void gf_HeroApplyCamera (int lp_player, unit lp_unit) {
     if (!UnitIsValid(lp_unit)) {
         return;
     }
-    if (UnitGetType(lp_unit) == "Tosh" || UnitGetType(lp_unit) == "ToshSCOBA") {
-        CameraSetValue(lp_player, c_cameraValueDistance, 1.5, 0.5, -1, 10);
-        gv_cameraDistanceDesired[lp_player] = 1.5;
-    }
-    else if (lp_unit == gv_heroViking) {
+    if (lp_unit == gv_heroViking) {
         // By handle, not type: it holds after the SCOBAHeroAssaultMode morph.
         CameraSetValue(lp_player, c_cameraValueDistance, c_HERO_VIKING_CAM_DIST, 0.5, -1, 10);
         gv_cameraDistanceDesired[lp_player] = c_HERO_VIKING_CAM_DIST;
     }
     else {
-        CameraSetValue(lp_player, c_cameraValueDistance, 2.5, 0.5, -1, 10);
-        gv_cameraDistanceDesired[lp_player] = 2.5;
+        // Arm by unit height (R-TPS-90): 1.5 for Tosh.
+        CameraSetValue(lp_player, c_cameraValueDistance, gf_CameraArm(lp_unit), 0.5, -1, 10);
+        gv_cameraDistanceDesired[lp_player] = gf_CameraArm(lp_unit);
     }
     // Base offset plus the active terms; a flyer adds its flight height.
     gf_CameraHeightApply(lp_player, 0.5);

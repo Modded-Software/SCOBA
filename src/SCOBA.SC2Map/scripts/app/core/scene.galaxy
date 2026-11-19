@@ -1,0 +1,27 @@
+// Module: core/scene
+// The cinematic scene per seat (SPEC-HERO-DROP 3b): letterbox, no game UI,
+// no map dialogs, input held. One implementation for the intro loop and
+// the drop sequence. Constants and state. Logic: systems/scene.
+
+// Owners (bits of gv_sceneOwners): the scene is on while any owner holds it.
+const int c_SCENE_INTRO = 1;
+const int c_SCENE_DROP = 2;
+
+const fixed c_SCENE_TICK = 0.0625;          // one game loop
+const fixed c_SCENE_LETTERBOX_OUT = 0.5;
+
+// Map dialogs hidden in the scene, and the triggers gated by its hold.
+const int c_SCENE_DIALOGS = 15;
+const int c_SCENE_TRIGGERS = 43;
+
+// The Dflt camera DOF values, set when the scene ends.
+const fixed c_SCENE_DFLT_FOCUS = 8.0;
+const fixed c_SCENE_DFLT_FAR_START = 0.0003;
+const fixed c_SCENE_DFLT_FAR_END = 8.0;
+
+trigger gt_SceneTick;
+
+int[16] gv_sceneOwners;
+int[16] gv_sceneEnters;            // scenes started (first owner), for tests
+bool[16][c_SCENE_DIALOGS] gv_sceneDialogKept;
+int[16] gv_sceneDialogReshown;     // dialogs the game showed in the scene, hidden again

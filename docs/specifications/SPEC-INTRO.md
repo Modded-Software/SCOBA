@@ -25,7 +25,7 @@ Code exists. `[tested]` entries passed in run `intro/20261117-024914`
 | R-INTRO-7 | [host] [tested] [operator] | host: invariant on the table; `shots S8`: engine distance × tan(script FOV / 2) within 3 %; the look: AC-INTRO-5 |
 | R-INTRO-8 | [tested] [operator] | `boot`: `Prompt` true; `deploy tzoom`: `Prompt` false; legibility: AC-INTRO-3 |
 | R-INTRO-9 | [tested] | `gate tw/t1/tf`: hero position, tag, orders, pods, state unchanged; camera values still the row's; `TrigOn` 0 |
-| R-INTRO-10 | [implemented] [operator] | `deploy`: injected SPACE; countdown trace `321`, zoom 2.5..4 s after SPACE (`gf_IntroCountStep`); one `SCOBAHeroPod` at the drop point; pod height from 40, never rising. Not verified after the fall revert (2026-11-17); the pod looks broken (operator); the snap and the pod look: AC-INTRO-6 |
+| R-INTRO-10 | [planned] [operator] | `deploy`: injected SPACE; countdown trace `321`; the drop sequence starts 2.5..4 s after SPACE (intro state `DROP`, drop phase `ZOOM`); then the drop's own checks (SPEC-HERO-DROP R-DROP-10). Build: the intro holds no drop code (R-DROP-11). The snap and the pod look: AC-INTRO-6 |
 | R-INTRO-11 | [tested] | `deploy`: `JumpPresses` 0, `Pods` 1, `SpaceIgnored` 2; `boot treinf`: `Pods` 0 |
 | R-INTRO-12 | [tested] | `deploy tland/tafter`: alive, shown, `Direct` 1, `Single` 1, `Stand` 1, `TpsMode` false, `Cinematic` false, `Dialogs` 10, `TrigOn` 41, state DONE |
 | R-INTRO-13 | [tested] | `intro/20261118-203746` `boot` (meet 13.5 s, both hurt by 19.2 s in `20261118-203358`): 5 Terran and 10 Zerg seeded `c_INTRO_SEED_BACK` (50) back; at 1 s none hurt and both centers > 16 from X (negative); polled until both have a unit within 16 of X and both are hurt, at most 40 s; `laneUnits6` 0 |
@@ -77,22 +77,25 @@ Unconfirmed. Each has a probe that records raw values.
 | `scripts/app/data/intro_shots.galaxy` | Generated. Shot arrays. Never hand-edited. |
 | `scripts/app/core/intro.galaxy` | Constants, states, globals. `c_INTRO_ENABLED`. |
 | `scripts/app/systems/intro.galaxy` | Per seat: shots, camera, prompt, UI hide and restore, creep seed, countdown. |
-| `scripts/app/systems/intro_flow.galaxy` | Per seat: start, deploy, fall, end, tick; the triggers (`gt_IntroDeploy` on `c_playerAny`). |
-| `scripts/app/systems/hero_drop.galaxy` | `gf_HeroDropBegin` and `gf_HeroDropStart`, the same path as the revive drop. |
+| `scripts/app/systems/intro_flow.galaxy` | Per seat: start, deploy, end, tick; the triggers (`gt_IntroDeploy` on `c_playerAny`). |
+| `scripts/app/systems/intro_ui.galaxy` | `gf_IntroEnabled`. |
+| `scripts/app/systems/scene.galaxy` | The scene the intro loop runs in (SPEC-HERO-DROP 3b): enter at map init, leave in `gf_IntroEnd`. |
+| `scripts/app/systems/hero_drop.galaxy` | The drop sequence. The deploy calls `gf_HeroDropBegin` and `gf_HeroDropGo` only. |
 | `scripts/testkit/galaxy/intro.galaxy`, `intro_seats.galaxy`, `profiles/intro.py` | Tests. |
 | `scripts/testkit/tests/test_intro_shots.py` | Host tests on the table. |
 
 ### 3.2 States
 
-`OFF` → `LOOP` → `ZOOM` → `FALL` → `DONE`. `gv_introState`.
+`OFF` → `LOOP` → `DROP` → `DONE`. `gv_introState`.
 
-- `OFF`: `c_INTRO_ENABLED` false. Nothing runs. The game starts as today.
-- `LOOP`: shots play. SPACE goes to `ZOOM`.
-- `ZOOM`: the crash zoom, 0.35 s. Then `FALL`.
-- `FALL`: the hero pod falls (hero drop code). Touchdown goes to `DONE`.
-- `DONE`: the intro is over. All gates open.
+- `OFF` (0): `c_INTRO_ENABLED` false. Nothing runs. The game starts as today.
+- `LOOP` (1): shots play. SPACE starts the countdown; at 0: `DROP`.
+- `DROP` (2): the hero drop sequence runs (SPEC-HERO-DROP 3a: zoom, fall,
+  touchdown). The intro tick writes nothing. Touchdown calls `gf_IntroEnd`.
+- `DONE` (3): the intro is over.
 
-`gv_introActive` is true in `LOOP`, `ZOOM`, `FALL`.
+`gv_introActive` is true in `LOOP` and `DROP`. Changed 2026-11-19: the
+`ZOOM` and `FALL` states moved to the drop as its phases.
 
 ### 3.3 Start
 
@@ -104,11 +107,13 @@ First action of `gt_MapInit`, before any wait:
 At map init, after `gt_MapInit` binds the hero and after
 `gt_GUIEnvironmentSetup` (F12), in one trigger:
 
-1. `CinematicMode(player 1, true, 0)`. No `CameraLockInput` (F16).
-2. Hide the 14 map dialogs of player 1 (`gf_IntroDialog`). Keep their
-   visibility to restore it. The tick hides any that another trigger
-   shows again (`gf_IntroDialogsEnforce`). `systems/xp.galaxy` skips its
-   stats and abilities show for player 1 while `gv_introActive`.
+1. `gf_SceneEnter(p, c_SCENE_INTRO)` (SPEC-HERO-DROP 3b): input held,
+   `CinematicMode` on, UI fullscreen, minimap hidden. No
+   `CameraLockInput` (F16).
+2. The 15 map dialogs (`gf_SceneDialog`): the scene tick hides any the
+   seat sees and keeps it for the restore (`gf_SceneDialogsEnforce`).
+   `systems/xp.galaxy` skips its stats and abilities show while
+   `gf_SceneActive`.
 3. Hero: hidden, paused, not selectable, at its start cell. Not killed.
 4. `CinematicFade` in from black over 4 s (`c_INTRO_FADE_IN`, operator 2026-11-18).
 5. `CatalogEntryIsValid` for the theme and the hum (sound catalog) and
@@ -148,11 +153,12 @@ target − distance × (cos pitch × (cos yaw, sin yaw), −sin pitch).
 | S5 Shackled | 4 | E | (194.4, 193.1) | ground + 4 | 90.8 | 8 | 18 → 12 | 48 → 44 | off | none |
 | S6 Overmind | 6 | A | (21.0, 9.0) | ground + 3 | 215 → 235 (half rate, operator 2026-11-18) | 18 | 66 | 55 | off | yaw reversed |
 | S7 Worm | 7 (operator 2026-11-18: was 3, then 5) | O | (59.0, 59.0) | ground + 6 → + 12 | 225 | −20 → −35 | 9 | 80 | off | none |
-| S8 Jungle | 7.5 (operator 2026-11-18: was 8) | L | (120.0, 150.0) → (120.0, 168.75), Terran jungle, 2.5 cells/s | ground + 2 | 90 | 12 | 6 | 60 | off | none |
+| S8 Jungle | 7 (operator 2026-11-18: was 8, then 7.5) | L | (120.0, 150.0) → (120.0, 167.5), Terran jungle, 2.5 cells/s | ground + 2 | 90 | 12 | 6 | 60 | off | none |
 | S9 Decimator | 8 | Z | (240.0, 248.0) | ground + 4 | 45 | 10 | from FOV | 70 → 24 | off | none |
-| Zoom | 0.35 | C | hero drop point | ground | 225 | 55 | 60 | 60 → 12 | off | none |
+S2 `z` is water level 7.15 + 1.2. Pass length 72 s.
 
-S2 `z` is water level 7.15 + 1.2. Pass length 59 s.
+The crash zoom is not an intro shot since 2026-11-19: it is the drop
+sequence's `ZOOM` phase, with the same values (SPEC-HERO-DROP 3a).
 
 Easings, `u` = time in shot / length:
 
@@ -163,12 +169,11 @@ Easings, `u` = time in shot / length:
 - `O` out: 1 − (1 − u)³.
 - `Z` dolly zoom: FOV by `E`; distance = 14 × tan 35° / tan(FOV / 2).
   Start 14.0, end 46.1.
-- `C` crash: FOV by `O` over 0.3 s, then held 0.05 s.
 
 ### 3.5 Tick
 
 A periodic trigger every game loop (0.0625 s, as `c_DROP_TICK`). In
-`LOOP` and `ZOOM`:
+`LOOP` only:
 
 1. Shot time `t` = clock − shot start. If `t ≥ length`: next shot (wrap
    to 0, pass +1), `t` = 0, and the cut values go on with duration 0.
@@ -179,10 +184,10 @@ A periodic trigger every game loop (0.0625 s, as `c_DROP_TICK`). In
 4. Script state for tests: `gv_introShot`, `gv_introPass`,
    `gv_introFov`, `gv_introHeight`, `gv_introDof`.
 
-One trigger writes the camera in the intro. The other camera writers are
-among the 41 triggers disabled in the intro (3.8). The hero drop camera
-runs only from `FALL`. The tick stays on in `FALL` for the dialog
-enforce only.
+One trigger writes the camera in the loop. The other camera writers are
+gated by the input hold (3.8). In `DROP` the drop sequence writes the
+camera; the intro tick writes nothing. The dialog enforce is the scene
+tick's (SPEC-HERO-DROP 3b).
 
 ### 3.6 Depth of field
 
@@ -205,7 +210,9 @@ No units are seeded on lanes 2 and 3. The spawn timer is not changed.
 
 ### 3.8 Input gates
 
-At start, 43 triggers are disabled (`gf_IntroTrigger`): jump, the move
+The scene's input hold gates 43 triggers (`gf_SceneTrigger`, SPEC-HERO-DROP
+3b; none is disabled, each checks `gf_InputHeld`; text below is the
+original list): jump, the move
 keys, order key and button, order cancel, target clicks, unit click,
 hero switch, TPS toggle, zoom, cursor and orbit keys, the abilities and
 stats dialog keys, and the camera writers. Their `TriggerIsEnabled`
@@ -217,33 +224,30 @@ reach it either.
 
 SPACE (`TriggerAddEventKeyPressed`, player 1, `c_keySpace`) in `LOOP`:
 
-1. State `ZOOM`. Prompt hidden. The theme plays on (operator 2026-11-18).
-   At touchdown `gf_IntroEnd` calls `gf_IntroMusicStop`: `SoundStop` of the
-   seat's theme, with fade; `gv_introMusic` = false. No music plays after touchdown (O-INTRO-1).
-2. Drop point = `gf_DropPodPoint(gv_sPAWNLOCATIONS[1], null, null)`.
-3. Cut to the Zoom row on the drop point, at the drop yaw `c_DROP_YAW`
-   and the drop's side arm. Crash zoom over 0.3 s.
-4. At 0.35 s: state `FALL`; `gf_HeroDropBegin(1, hero)`, then
-   `gf_HeroDropStart(1, point)`.
+At the end of the countdown (`gf_IntroDeployGo`):
 
-The intro deploy is the hero drop, one path (operator 2026-11-18; SPEC-HERO-DROP
-3): no intro branch in the drop. The toggles are the ones the drop keeps
-from the living hero. The input hold (`gf_InputHold`) taken at intro start
-is the drop's hold.
+1. State `DROP`. Prompt hidden. S9 hum and S4 quiet off. The theme plays
+   on (operator 2026-11-18).
+2. `gf_HeroDropBegin(p, hero)`, then `gf_HeroDropGo(p, null, null)`. That
+   is all the intro does for the drop (R-DROP-11). The drop sequence picks
+   the point, zooms, drops the pod and lands it (SPEC-HERO-DROP 3a).
 
-Touchdown (`gf_HeroDropLand`): the hero is alive, so `UnitRevive` is not
-called; `gf_HeroReveal` shows and unpauses it; it moves to the pod; the
-input is released. After `UnitKill(pod)` the intro ends (`gf_IntroEnd`):
+Touchdown runs the drop's touchdown order. Its intro step,
+`gf_IntroEnd(p)`, ends the intro's own parts only:
 
-- `CinematicMode(player 1, false, 0.5)`;
-- `UISetMode(all, c_uiModeConsole, 0.5)`, minimap panel shown;
-- dialogs back to their kept visibility; the 41 triggers back to their
-  kept state;
-- state `DONE`, `gv_introActive` false.
+- `gf_IntroMusicStop`: `SoundStop` of the seat's theme, with fade;
+  `gv_introMusic` = false. No music plays after touchdown (O-INTRO-1);
+- prompt hidden, hum and quiet off;
+- `gf_SceneLeave(p, c_SCENE_INTRO)`;
+- state `DONE`, `gv_introActive` false; the intro tick and pulse off when
+  no seat is in an intro.
 
-The jump trigger sees `gv_introActive` true on the deploy SPACE and
-returns. A second SPACE in `ZOOM` or `FALL` does nothing. A spawn timer
-expiry in `LOOP` finds `gv_dropPending` false and drops no pod.
+The drop's scene leave right after it restores UI, minimap, dialogs,
+cinematic mode and input, the same as after a revive.
+
+The jump trigger is gated by the input hold on the deploy SPACE. A second
+SPACE outside `LOOP` does nothing. A spawn timer expiry in `LOOP` finds
+the drop in `IDLE` and starts nothing.
 
 ### 3.10 Prompt
 
@@ -299,7 +303,7 @@ jumps to a shot time, so groups stay near one minute.
 | `wrap` | Goto the last shot (S9) 0.5 s before its end, wait 1 s. | `Shot` 0, `Pass` +1; S2 next reads the variant; `Hum` 1 in S9. | No cut before the row length (± 2 loops); `Hum` 0 after the cut to S1. |
 | `gate` | In S3: inject W for 1 s, `1`, `F`, mouse-free; read state. | Hero position unchanged, no order, state LOOP, camera values still the row's. | Each key, one at a time. |
 | `seats` | Harness plays seat 2, starts its intro, presses its deploy. | Seat 2: LOOP, FALL with pod, DONE; hold, cinematic; music on in FALL, off at the end; hero shown and alive. | Seat 1 through seat 2's fall and touchdown: LOOP, active, held, cinematic, music, prompt, hero hidden, no deploy, no pod. |
-| `deploy` | Inject SPACE in S5, a second 150 ms later (countdown). A third timed from the measured key latency to reach the engine 1 s into FALL. | Countdown 2.5..4 s from the engine press (`gv_introCountAt`); third press arrived in FALL (`thirdState` 3); ZOOM seen, FALL ≤ 0.4 s after the zoom start; one pod; fall trace as `herodrop`; at touchdown hero alive at the pod, `Direct` 1, defaults; `Cinematic` 0; dialogs and triggers restored; DONE; `Dof` 0. | `JumpPresses` 0; `Pods` 1 after both extra SPACEs; prompt hidden from SPACE on; `Music` 1 in ZOOM and FALL, 0 at touchdown. |
+| `deploy` | Inject SPACE in S5, a second 150 ms later (countdown). A third timed from the measured key latency to reach the engine 1 s into the fall. | Countdown 2.5..4 s from the engine press (`gv_introCountAt`); intro `DROP` while the drop runs; third press arrived with intro state `DROP`; drop `ZOOM` seen, `FALL` ≤ 0.4 s after the zoom start; the zoom rows and scene flags as `herodrop` (`zoom_follow`); one pod; fall trace as `herodrop`; at touchdown hero alive at the pod, `Direct` 1, defaults; scene off; dialogs and triggers restored; DONE. | `JumpPresses` 0; `Pods` 1 after both extra SPACEs; prompt hidden from SPACE on; `Music` 1 in ZOOM and FALL, 0 at touchdown. |
 
 Key injection uses `scripts/testkit/input_driver.py`. No mouse input.
 
@@ -365,7 +369,8 @@ Host: `testkit.tests.test_intro_shots` and `testkit.tests.test_profiles`,
   full at 3 x that. S1: near 2.0, focus 60 instead of the arm (operator 2026-11-18: blur the trees 26..58 ahead; the BC at about 97 stays sharp). A row's `focus` (0 = arm) sets the focal depth and scales its near falloffs. S3: near 1.3. S9: near 2.0. S5: near 0.3, far 0.15. S6 (Overmind orbit): near 1.5
   (operator 2026-11-18: 4.0 was too much), far 0.3. S7: near 6.0 (operator 2026-11-18: 2.0, 4.0, then 6.0). S8: near 2.0, far 1.5.
   Far DOF (4..18) only on rows flagged `dof`; other rows push it past the far clip.
-- The hero drop has near and far DOF: focus `c_DROP_CAM_DISTANCE` (the pod),
-  near 1..6, far 4..18. The in-game DOF tick takes over after touchdown.
+- The hero drop has near and far DOF: focus `c_DROP_POD_ARM` (the pod),
+  near 1..6, far 4..18. The scene leave sets the default values; the
+  in-game DOF tick takes over after touchdown.
 - How the blur looks is an operator check.
 

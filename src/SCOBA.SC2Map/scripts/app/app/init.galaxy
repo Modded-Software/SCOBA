@@ -75,21 +75,11 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
             CameraSetValue(1, c_cameraValueShadowClip, 64.0, 0.0, -1, 10.0);
             CameraSetValue(1, c_cameraValueFarClip, 16000.0, 0.0, -1, 10.0);
             CameraSetValue(lv_localPlayer, c_cameraValueFieldOfView, c_SCOBA_REST_FOV, 4.0, -1, 10);
-            if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Tosh") || (UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "ToshSCOBA"))) {
-                CameraSetValue(lv_localPlayer, c_cameraValueDistance, 1.5, 0.5, -1, 10);
-                gv_cameraDistanceDesired[lv_localPlayer] = 1.5;
-                CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, c_SCOBA_CAMERA_HEIGHT_OFFSET, 0.5, -1, 10);
-                CameraUseHeightSmoothing(lv_localPlayer, false);
-            }
-
-            if (((UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "Kerrigan") || (UnitGetType(gv_tPSUNIT[lv_localPlayer]) == "KerriganSCOBA"))) {
-                CameraSetValue(lv_localPlayer, c_cameraValueDistance, 2.5, 0.5, -1, 10);
-                gv_cameraDistanceDesired[lv_localPlayer] = 2.5;
-                CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, c_SCOBA_CAMERA_HEIGHT_OFFSET, 0.5, -1, 10);
-            }
-            else {
-                CameraUseHeightSmoothing(lv_localPlayer, false);
-            }
+            // Arm and target height by unit height (R-TPS-90).
+            CameraSetValue(lv_localPlayer, c_cameraValueDistance, gf_CameraArm(gv_tPSUNIT[lv_localPlayer]), 0.5, -1, 10);
+            gv_cameraDistanceDesired[lv_localPlayer] = gf_CameraArm(gv_tPSUNIT[lv_localPlayer]);
+            CameraSetValue(lv_localPlayer, c_cameraValueHeightOffset, gf_CameraTargetOffset(gv_tPSUNIT[lv_localPlayer]), 0.5, -1, 10);
+            CameraUseHeightSmoothing(lv_localPlayer, false);
             gf_ShowStasLevelingInterface(lv_localPlayer);
             gf_ShowAbilityLevelingInterface(lv_localPlayer);
             libNtve_gf_DisplayBossBar(lv_localHPBar, "Assets\\Textures\\btn-ability-terran-heal-color.dds", StringExternal("Param/Value/667BCC52"), FixedToInt(UnitGetPropertyFixed(gv_tPSUNIT[lv_localPlayer], c_unitPropLife, c_unitPropNormal)), PlayerGroupSingle(lv_localPlayer));
@@ -119,6 +109,7 @@ bool gt_MapInit_Func (bool testConds, bool runActions) {
     BankSave(lv_bank);
     gt_ToggleCommands_Init();
     gf_HeroSwitchInit();
+    gt_HallPaint_Init();
     gt_AttackEvent_Init();
     for (lv_localPlayer = 1; lv_localPlayer <= 6; lv_localPlayer += 1) {
         if (UnitIsValid(gv_tPSUNIT[lv_localPlayer])) {

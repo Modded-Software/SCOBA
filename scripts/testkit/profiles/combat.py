@@ -14,13 +14,14 @@ from project_root import project_root
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .bank_checks import _delta, _no_damage, _report, _shots, _still
+from .camheight import check_camheight
 from .pose import check_combat_pose
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 from .tps_shot import shot_clocks
 
 ROOT = project_root()
 
-GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "pose", "kerrigan")
+GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "pose", "kerrigan", "camheight")
 
 
 def selected_group() -> str:
@@ -39,10 +40,12 @@ def map_spec() -> TestMapSpec:
         bank_names=PROFILE_BANKS["combat"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat_cam.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "combat.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/combat/common",
+            "scripts/test/combat/combat_cam",
             "scripts/test/combat/combat",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_DbgTest_Init();"),
@@ -380,6 +383,7 @@ GROUP_CHECKS = {
     "switch": _check_switch,
     "pose": check_combat_pose,
     "kerrigan": _check_kerrigan,
+    "camheight": check_camheight,
 }
 
 

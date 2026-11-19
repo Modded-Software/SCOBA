@@ -1,5 +1,13 @@
 // Module: systems/camera/camera
 
+// Ends every camera follow of a player. CameraFollowUnitGroup with follow
+// false removes the units of the group given; an empty group removes none
+// (herodrop/20261119-170732: the camera kept the dead hero through the
+// drop). So the group the engine holds is removed.
+void gf_CameraFollowStop (int lp_player) {
+    CameraFollowUnitGroup(lp_player, CameraFollowUnitGroupGet(lp_player), false, false);
+}
+
 // The one writer of the TPS camera height offset while a quake, a jump or a
 // hero drop is active: base + quake shake + jump elevation (R-JUMP-17) +
 // pod height (R-DROP-4). lp_time blends to the value; the jump and the drop
@@ -11,13 +19,55 @@ fixed gf_CameraUnitLift (int lp_player) {
     return gf_FlightCamHeight(lp_player);  // systems/flight; 0 on the ground
 }
 
-void gf_CameraHeightApply (int lp_player, fixed lp_time) {
-    fixed lv_height = c_SCOBA_CAMERA_HEIGHT_OFFSET + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player] + gv_dropCamHeight[lp_player] + gf_CameraUnitLift(lp_player);
+// The base is the bound unit's target offset (R-TPS-90): 0.9 for Tosh,
+// scaled by height for the others.
+fixed gf_CameraHeightBase (int lp_player) {
+    return gf_CameraTargetOffset(gv_tPSUNIT[lp_player]);
+}
 
+// The bound unit type of the last height write. A morph keeps the unit and
+// changes its type (Viking landing): gt_CameraMorphTick writes again.
+string[8] gv_cameraHeightType;
+const fixed c_CAMERA_MORPH_BLEND = 0.5;
+trigger gt_CameraMorphTick;
+
+void gf_CameraHeightApply (int lp_player, fixed lp_time) {
+    fixed lv_height = gf_CameraHeightBase(lp_player) + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player] + gv_dropCamHeight[lp_player] + gf_CameraUnitLift(lp_player);
+
+    gv_cameraHeightType[lp_player] = UnitGetType(gv_tPSUNIT[lp_player]);
     // Velocity 0, deceleration 0: a plain linear blend over lp_time. The old
     // (-1, 10) carried velocity and eased out, and lagged the jump (operator).
     CameraSetValue(lp_player, c_cameraValueHeightOffset, lv_height, lp_time, 0.0, 0.0);
     gv_cameraHeightApplied[lp_player] = lv_height;
+}
+
+// Bound unit changed type since the last write (R-TPS-90): write the new
+// base. Only after a first write, so the intro camera is left alone.
+bool gt_CameraMorphTick_Func (bool testConds, bool runActions) {
+    int lv_p;
+    unit lv_u;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_p = c_SCOBA_HERO_FIRST; lv_p <= c_SCOBA_HERO_LAST; lv_p += 1) {
+        lv_u = gv_tPSUNIT[lv_p];
+        if (!UnitIsValid(lv_u) || gv_cameraHeightType[lv_p] == "") {
+            continue;
+        }
+        if (gf_InputHeld(lv_p)) {
+            continue;
+        }
+        if (UnitGetType(lv_u) != gv_cameraHeightType[lv_p]) {
+            gf_CameraHeightApply(lv_p, c_CAMERA_MORPH_BLEND);
+        }
+    }
+    return true;
+}
+
+void gt_CameraMorphTick_Init () {
+    gt_CameraMorphTick = TriggerCreate("gt_CameraMorphTick_Func");
+    TriggerAddEventTimePeriodic(gt_CameraMorphTick, 0.125, c_timeGame);
 }
 
 void gf_CameraZoomApply (int lp_player) {

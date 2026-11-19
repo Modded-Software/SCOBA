@@ -37,10 +37,8 @@ fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {
     if (lv_tz < WorldHeight(c_heightMapGround, lv_target)) {
         lv_tz = WorldHeight(c_heightMapGround, lv_target);
     }
-    lv_offset = gv_iMMORTAL;
-    if (UnitGetType(gv_tPSUNIT[lp_player]) == "Tosh" || UnitGetType(gv_tPSUNIT[lp_player]) == "ToshSCOBA") {
-        lv_offset = gv_mARINE;
-    }
+    // Tosh's clamp offset scaled by unit height (R-TPS-90).
+    lv_offset = gv_mARINE * gf_CameraHeightScale(gv_tPSUNIT[lp_player]);
     // Operator 2026-11-16: clamp, never snap. The camera keeps the longest
     // distance (up to the desired one) at which the eye itself stays
     // c_CAM_GROUND_MARGIN above the terrain, so it slides along the ground.

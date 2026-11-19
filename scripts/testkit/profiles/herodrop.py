@@ -8,7 +8,7 @@ pod looks and sounds is an operator check.
 from __future__ import annotations
 
 import math
-import re
+import os
 from pathlib import Path
 
 from hitvolumes import pod_birth
@@ -16,45 +16,45 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
+from .herodrop_zoom import (
+    ARM_TOL_100,
+    CAM_DISTANCE,
+    CAM_ON_TARGET_100,
+    CAM_PITCH,
+    CAM_SIDE,
+    CAM_YAW,
+    FALL_MS,
+    LAND_MS,
+    LOOP_MS,
+    PHASES,
+    ROOT_TOL_100,
+    UNIT_GROUND_H100,
+    YAW_TOL,
+    _report,
+    _yaw_off,
+    zoom_follow,
+)
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
-# The pod falls in its Birth clip; the camera follows the clip root
-# (scripts/hitvolumes/pod_birth.py). Touchdown: the first loop at or after the land key,
-# times from the pod's create loop.
-FALL_MS = pod_birth.LAND_MS
-LOOP_MS = 62
-# The clip clock is anchored on the engine clip time, which reads up to two
-# loops ahead (SPEC-HERO-DROP R-DROP-3: 2076..2386).
-LAND_MS = (FALL_MS - 2 * LOOP_MS, FALL_MS + 3 * LOOP_MS)
-# The harness reads in the same loop as the drop tick, before or after it:
-# the camera is at the root of this loop or the next. Within that window it
-# must be on the root to 1.0 (XY) and 1.0 (height).
-ROOT_TOL_100 = 100
-UNIT_GROUND_H100 = 5  # pod unit height: on the ground
-CAM_ON_TARGET_100 = 100  # camera target to pod or hero, horizontal
+# One group per scenario (herodrop.galaxy). Only "wave" fires the real wave.
+GROUPS = ("main", "alive", "loop", "seat2", "leave", "wave")
 
 
-def _report(checks, name: str, ok: bool, detail: str) -> None:
-    print(f"{name}: {detail} {'PASS' if ok else 'FAIL'}")
-    if not ok:
-        checks.failures += 1
+def selected_group() -> str:
+    group = os.environ.get("SC2_TEST_GROUP", "all")
+    if group != "all" and group not in GROUPS:
+        raise SystemExit(f"unknown herodrop group: {group}; choose all or one of {', '.join(GROUPS)}")
+    return group
 
 
-def _galaxy_const(rel: str, name: str) -> float:
-    text = (ROOT / "src" / "SCOBA.SC2Map" / rel).read_text(encoding="utf-8")
-    m = re.search(rf"const fixed {name} = (-?[0-9.]+);", text)
-    if m is None:
-        raise SystemExit(f"{rel}: no {name}")
-    return float(m.group(1))
-
-
-CAM_DISTANCE = _galaxy_const("scripts/app/core/hero_drop.galaxy", "c_DROP_POD_ARM")
-CAM_SIDE = _galaxy_const("scripts/app/core/hero_drop.galaxy", "c_DROP_CAM_SIDE")
-CAM_PITCH = _galaxy_const("scripts/app/data/pod_birth.galaxy", "c_POD_BIRTH_PITCH")
-CAM_YAW = _galaxy_const("scripts/app/core/hero_drop.galaxy", "c_DROP_YAW")
-YAW_TOL = 1.0  # degrees
-ARM_TOL_100 = 100
+def scene_on(checks, s: str, t: str, on: bool) -> None:
+    """The drop scene (SPEC-HERO-DROP 3b): owner, cinematic, input, dialogs."""
+    checks.eq(s, t, "SceneDrop", on)
+    checks.eq(s, t, "Cinematic", on)
+    checks.eq(s, t, "InputHeld", on)
+    if on:
+        checks.eq(s, t, "Dialogs", 0)
 
 
 def aim(ms: float, px: float, py: float, facing: float, side: float = CAM_SIDE) -> tuple[float, float, float]:
@@ -70,10 +70,6 @@ def aim(ms: float, px: float, py: float, facing: float, side: float = CAM_SIDE) 
     x = px / 100.0 + wx + ray * math.cos(t) + side * math.cos(r)
     y = py / 100.0 + wy + ray * math.sin(t) + side * math.sin(r)
     return x * 100.0, y * 100.0, (CAM_DISTANCE + z / math.sin(p)) * 100.0
-
-
-def _yaw_off(a: float, b: float) -> float:
-    return abs((a - b + 180.0) % 360.0 - 180.0)
 
 
 def birth_follow(checks, s: str, ground: int) -> list[tuple[int, ...]]:
@@ -167,19 +163,72 @@ def check_alive(checks) -> None:
     checks.true(s, "tend", "Alive")
     checks.eq(s, "tend", "Landings", checks.value(s, "t0", "Landings"))
     checks.eq(s, "tend", "Deaths", checks.value(s, "t0", "Deaths"))
+    checks.eq(s, "tend", "Zooms", checks.value(s, "t0", "Zooms"))
+    checks.eq(s, "tend", "Phase", 0)
+    checks.false(s, "tend", "Cinematic")
+    checks.eq(s, "tend", "HeroPods", 0)
+    checks.eq(s, "tend", "LanePods", 0)
 
 
-def check_twice(checks) -> None:
-    """Three natural deaths in a row; the hero comes back after each as a
-    fresh unit (operator 2026-11-18: not after the second; R-DROP-8)."""
-    s = "drop_twice"
+def check_far(checks) -> None:
+    """The play case (operator 2026-11-19: no Birth on a revive): death far
+    from the spawn, real reinforcement with lane pods. The engine reports
+    Birth on the hero pod every loop of the fall (negative: no misses)."""
+    s = "drop_far"
+    keys = ("deadByDamage", "podSeen", "camToPod100", "deathToPod100", "reads", "misses", "landMs")
+    print(f"{s} raw " + " ".join(f"{k}={checks.value(s, '', k)}" for k in keys))
+    print(f"{s} raw clipTrace={checks.value(s, '', 'clipTrace')}")
+    checks.true(s, "", "podSeen")
+    checks.gt(s, "", "deathToPod100", 3000)
+    checks.eq(s, "", "misses", 0)
+    checks.gt(s, "", "reads", 20)
+    checks.between(s, "", "landMs", *LAND_MS)
+    checks.true(s, "tafter", "Alive")
+
+
+LOOPS = 5
+
+
+def check_loop(checks) -> None:
+    """Five natural deaths in a row (operator 2026-11-19: consistency); the
+    hero comes back after each as a fresh unit (R-DROP-8). Every cycle runs
+    the same sequence: zoom, scene, one hero pod, Birth every loop."""
+    s = "drop_loop"
+    checks.eq(s, "", "loops", LOOPS)
     deaths = checks.value(s, "t0", "Deaths") or 0
     landings = checks.value(s, "t0", "Landings") or 0
     returns = checks.value(s, "t0", "Returns") or 0
+    zooms = checks.value(s, "t0", "Zooms") or 0
+    enters = checks.value(s, "t0", "SceneEnters") or 0
     life_max = checks.value(s, "t0", "LifeMax")
     # The spent point took: current life max above the data value (normal).
     checks.gt(s, "t0", "LifeMax", checks.value(s, "t0", "LifeMaxBase") or 0)
-    for n in (1, 2, 3):
+    checks.eq(s, "", "phases", PHASES * LOOPS)
+    land = []
+    for n in range(1, LOOPS + 1):
+        c = f"c{n}"
+        print(f"{s} raw {c} reads={checks.value(s, '', c + 'reads')} misses={checks.value(s, '', c + 'misses')} landMs={checks.value(s, '', c + 'landMs')}")
+        zoom_follow(checks, s, c + "zoom")
+        checks.eq(s, c + "zoom", "Phase", 2)
+        checks.eq(s, c + "zoom", "Zooms", zooms + n)
+        scene_on(checks, s, c + "zoom", True)
+        scene_on(checks, s, c + "fall", True)
+        checks.eq(s, c + "fall", "Phase", 3)
+        checks.eq(s, c + "fall", "HeroPods", 1)
+        checks.eq(s, c + "fall", "LanePods", 0)
+        checks.eq(s, "", c + "misses", 0)
+        checks.gt(s, "", c + "reads", 20)
+        checks.between(s, "", c + "landMs", *LAND_MS)
+        land.append(checks.value(s, "", c + "landMs") or 0)
+        follow_raw(checks, s, (f"dead{n}", c + "zoom", c + "fall", f"back{n}"))
+        follow_drop(checks, s, (f"dead{n}", c + "zoom", c + "fall"), (f"back{n}",))
+        scene_on(checks, s, f"back{n}", False)
+        checks.eq(s, f"back{n}", "SceneEnters", enters + n)
+        checks.eq(s, f"back{n}", "Phase", 0)
+        checks.eq(s, f"back{n}", "LanePods", 0)
+    # Consistency: the land time of the five cycles within two loops.
+    _report(checks, f"{s} land time consistent", max(land) - min(land) <= 2 * LOOP_MS, f"landMs={land}")
+    for n in range(1, LOOPS + 1):
         d, b = f"dead{n}", f"back{n}"
         print(f"{s} raw {d}ByDamage={checks.value(s, '', d + 'ByDamage')} {d}OldValid={checks.value(s, '', d + 'OldValid')} {b}OldValid={checks.value(s, '', b + 'OldValid')} "
               f"{b}Type={checks.value(s, b, 'Type')} {b}LifeMax={checks.value(s, b, 'LifeMax')}")
@@ -231,21 +280,45 @@ def check_seat2(checks) -> None:
     checks.false(s, "", "fallHeld1")
     checks.true(s, "", "oneSame")
     checks.true(s, "", "oneAlive")
-    checks.eq(s, "", "onePods", checks.value("drop_twice", "back3", "Pods"))
+    checks.eq(s, "", "onePods", checks.value(s, "", "onePods0"))
+    checks.eq(s, "", "lanePods2", 0)
     checks.lt(s, "", "oneYawDelta100", 100)
+
+
+FOLLOW_KEYS = ("FollowN", "FollowHero", "FollowDropHero", "Selected", "SelectedN", "Alive")
+
+
+def follow_raw(checks, s: str, tags) -> None:
+    """Raw engine camera follow and selection per snap (probe)."""
+    for t in tags:
+        print(f"{s} raw follow {t}: " + " ".join(f"{k}={checks.value(s, t, k)}" for k in FOLLOW_KEYS))
+
+
+def follow_drop(checks, s: str, during, after) -> None:
+    """No camera follow from death to touchdown: a followed corpse holds
+    the camera off the pod line (herodrop/20261119-170732). After: the new
+    hero only."""
+    for t in during:
+        checks.eq(s, t, "FollowN", 0)
+        checks.false(s, t, "FollowDropHero")
+    for t in after:
+        checks.eq(s, t, "FollowN", 1)
+        checks.true(s, t, "FollowHero")
 
 
 def check_drop(checks) -> None:
     s = "drop_main"
+    follow_raw(checks, s, ("t0", "tdead", "twait", "tzoom", "tfall", "tland", "tafter"))
+    follow_drop(checks, s, ("tdead", "twait", "tzoom", "tfall"), ("tafter",))
     pods = checks.value(s, "t0", "Pods") or 0
     deaths = checks.value(s, "t0", "Deaths") or 0
     tag, level = checks.value(s, "t0", "Tag"), checks.value(s, "t0", "Level")
     print(f"{s} raw before: tag={tag} level={level} single={checks.value(s, 't0', 'Single')} savedTps={checks.value(s, 'tdead', 'SavedTps')}")
     checks.true(s, "t0", "TpsMode")
-    # One drop path: input held while the pod falls, back after (same as
-    # the intro); the hold is not taken by the death alone.
-    for t, held in (("t0", False), ("twait", False), ("tfall", True), ("tafter", False)):
-        checks.eq(s, t, "InputHeld", held)
+    # One drop sequence (R-DROP-10): the scene on in the zoom and the fall,
+    # off after; the death alone does not enter it (negative).
+    for t, held in (("t0", False), ("twait", False), ("tzoom", True), ("tfall", True), ("tafter", False)):
+        scene_on(checks, s, t, held)
         # Per-player hold: no trigger is disabled; another player is not held.
         checks.true(s, t, "CursorTrigOn")
         checks.true(s, t, "TurnTickOn")
@@ -272,6 +345,18 @@ def check_drop(checks) -> None:
     checks.false(s, "twait", "Alive")
     checks.true(s, "twait", "HeroActive")
     checks.gt(s, "twait", "Blocked", checks.value(s, "tdead", "Blocked") or 0)
+    # R-DROP-10: the zoom starts with the reinforcement, before the pod.
+    checks.eq(s, "twait", "Phase", 1)
+    checks.eq(s, "twait", "Zooms", checks.value(s, "t0", "Zooms") or 0)
+    checks.eq(s, "tzoom", "Phase", 2)
+    checks.eq(s, "tzoom", "Zooms", (checks.value(s, "t0", "Zooms") or 0) + 1)
+    checks.false(s, "tzoom", "PodValid")
+    # Only the pod of interest: one hero pod in the fall, no lane pod ever.
+    checks.eq(s, "tfall", "HeroPods", 1)
+    for t in ("t0", "tzoom", "tfall", "tland", "tafter", "tnext"):
+        checks.eq(s, t, "LanePods", 0)
+    zoom_follow(checks, s)
+    checks.eq(s, "", "phases", PHASES)
     # R-DROP-3: one pod of the hero pod type.
     checks.true(s, "", "podSeen")
     checks.eq(s, "", "podType", "SCOBAHeroPod")
@@ -318,6 +403,12 @@ def check_drop(checks) -> None:
     checks.eq(s, "tnext", "Pods", pods + 1)
     checks.eq(s, "tnext", "Landings", (checks.value(s, "t0", "Landings") or 0) + 1)
     checks.true(s, "tnext", "Alive")
+    # One scene per revive drop; none from the alive reinforcement.
+    checks.eq(s, "tafter", "SceneEnters", (checks.value(s, "t0", "SceneEnters") or 0) + 1)
+    checks.eq(s, "tnext", "SceneEnters", checks.value(s, "tafter", "SceneEnters"))
+    checks.eq(s, "tnext", "Zooms", checks.value(s, "tafter", "Zooms"))
+    checks.false(s, "tnext", "Cinematic")
+    checks.eq(s, "tnext", "Phase", 0)
 
 
 def check_leave(checks) -> None:
@@ -327,6 +418,8 @@ def check_leave(checks) -> None:
         "podSeen", "heldBefore", "podAfter", "heldAfter", "pendingAfter", "playedAfter", "landingsDelta", "leaves")))
     checks.true(s, "", "podSeen")
     checks.true(s, "", "heldBefore")
+    checks.true(s, "", "sceneBefore")
+    checks.false(s, "", "sceneAfter")
     checks.false(s, "", "podAfter")
     checks.false(s, "", "heldAfter")
     checks.false(s, "", "pendingAfter")
@@ -349,7 +442,7 @@ def map_spec() -> TestMapSpec:
             "scripts/test/herodrop/common",
             "scripts/test/herodrop/herodrop",
         ),
-        init_calls=("gt_HeroDropTest_Init();",),
+        init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_HeroDropTest_Init();"),
     )
 
 
@@ -363,11 +456,10 @@ def check(ctx, data: dict, checks) -> None:
         checks.failures += 1
     checks.eq("meta", "", "done", 1)
     checks.eq("drop_end", "", "RealClicks", 0)
-    check_alive(checks)
-    check_drop(checks)
-    check_twice(checks)
-    check_seat2(checks)
-    check_leave(checks)
+    group = selected_group()
+    for name, fn in (("main", check_drop), ("alive", check_alive), ("loop", check_loop), ("seat2", check_seat2), ("leave", check_leave), ("wave", check_far)):
+        if group in ("all", name):
+            fn(checks)
 
 
 def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> TestRunSpec:

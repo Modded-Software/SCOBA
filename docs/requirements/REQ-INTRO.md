@@ -1,7 +1,9 @@
 # REQ-INTRO: Intro Sequence and Deploy
 
 **Date:** 2026-11-17
-**Status:** Stated by the operator on 2026-11-17. The game opens on a loop
+**Status:** Revised 2026-11-19 (operator): the deploy is the hero drop
+sequence of REQ-HERO-DROP, not intro code (R-INTRO-10, R-INTRO-12).
+Stated by the operator on 2026-11-17. The game opens on a loop
 of in-map camera shots of the map's best views, with no UI and one line
 low on screen: "Press SPACE to deploy". SPACE starts the hero drop-pod
 sequence. Operator choices the same day:
@@ -29,8 +31,11 @@ In scope:
 - the prompt line;
 - the creep fight at the center X at 00:00;
 - the music;
-- the deploy: SPACE, crash zoom, the hero pod fall, touchdown;
-- the return to play: UI, input, camera, hero.
+- the deploy: SPACE and the countdown; then the intro starts the hero
+  drop sequence of [REQ-HERO-DROP](REQ-HERO-DROP.md) (R-DROP-10). The
+  crash zoom, the pod fall, touchdown and the return to play (UI, input,
+  camera, hero) belong to that sequence, not to the intro (R-DROP-11,
+  operator 2026-11-19).
 
 Out of scope:
 
@@ -51,7 +56,8 @@ Out of scope:
 - **Center X**: region 8, the center lane crossing, at (125.3, 118.8).
 - **Creep**: lane units: Terran units of player 1 and Zerg units of
   player 4 on the center lane.
-- **Deploy**: what SPACE starts: crash zoom, pod fall, touchdown.
+- **Deploy**: what SPACE starts: the countdown, then the hero drop
+  sequence (REQ-HERO-DROP R-DROP-10).
 
 ## 3. Requirements
 
@@ -66,9 +72,9 @@ Out of scope:
 | R-INTRO-7 | The dolly-zoom shot S8 MUST keep distance × tan(FOV / 2) constant, so its subject keeps its size on screen. |
 | R-INTRO-8 | The line "Press SPACE to deploy" MUST show low on screen during the whole loop, and MUST NOT show outside it. |
 | R-INTRO-9 | During the intro the hero MUST NOT be in the world: hidden, paused, not selectable. Player input MUST NOT move, jump, aim, shoot, order, switch the hero or move the camera. |
-| R-INTRO-10 | SPACE during the loop MUST start a 3 s countdown on the prompt line, one line: "Deploying in 3...", "Deploying in 2...", "Deploying in 1..." (operator 2026-11-17). The loop keeps playing; further SPACE presses are ignored. Then the deploy MUST: hide the prompt; cut to a high view of the hero's drop point and crash-zoom onto it in at most 0.4 s; cut to the hero pod fall of REQ-HERO-DROP (R-DROP-3, R-DROP-4); land it as R-DROP-5. |
+| R-INTRO-10 | SPACE during the loop MUST start a 3 s countdown on the prompt line, one line: "Deploying in 3...", "Deploying in 2...", "Deploying in 1..." (operator 2026-11-17). The loop keeps playing; further SPACE presses are ignored. Then the deploy MUST hide the prompt and start the hero drop sequence (REQ-HERO-DROP R-DROP-10): crash zoom onto the drop point in at most 0.4 s, pod fall, touchdown. The intro MUST NOT contain drop code (R-DROP-11, operator 2026-11-19). |
 | R-INTRO-11 | The SPACE press that deploys MUST NOT make the hero jump. A second SPACE during the deploy MUST NOT drop a second pod. A reinforcement during the loop MUST NOT drop the hero pod. |
-| R-INTRO-12 | At touchdown the hero MUST stand alive at the pod, bound as R-DROP-6, in the control mode and toggles a game without intro starts with. Letterbox MUST go, the game UI MUST come back as before the intro, input and camera control MUST return to the player. |
+| R-INTRO-12 | At touchdown the hero MUST stand alive at the pod, bound as R-DROP-6, in the control mode and toggles a game without intro starts with. Letterbox MUST go, the game UI MUST come back as before the intro, input and camera control MUST return to the player. The drop sequence's scene restore does this, the same as after a revive (R-DROP-10); the intro only ends its own parts (prompt, sounds, state). |
 | R-INTRO-13 | At 00:00 one Terran creep group and one Zerg creep group MUST start back from the center X, toward their own spawns, so they do not fight at once (operator 2026-11-17). They MUST walk to the X and fight there. After the fight the survivors MUST go on along the center lane. No other lane MUST get extra units. |
 | R-INTRO-14 | The world MUST run during the intro: game clock, spawn timer, waves and fights as without intro. |
 | R-INTRO-15 | The SCOBA intro theme (`res/audio/SCOBA_IntroTheme.wav`) MUST start with the intro. It MUST play on after SPACE, through the countdown, the zoom and the pod fall. The pod's touchdown MUST stop it. No music MUST play after touchdown. Per seat: the music stops for the seat that lands only (changed 2026-11-18 by the operator: was a Zerus theme stopped at SPACE). |

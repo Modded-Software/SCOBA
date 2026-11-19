@@ -234,5 +234,9 @@ def run_test(spec: TestRunSpec) -> int:
     )
     print(f"summary: {run_dir / 'summary.txt'}")
     print(f"failures: {failures}")
+    # Operator mode: the game stays open after the checks, to play on it.
+    if os.environ.get("SC2_KEEP_OPEN") == "1":
+        print("SC2_KEEP_OPEN=1: StarCraft II left running", flush=True)
+        return 1 if failures else 0
     kill_sc2()
     return 0 if failures == 0 else 1

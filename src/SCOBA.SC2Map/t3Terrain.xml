@@ -5,7 +5,7 @@
             <cliffSet i="0" name="ZerusCliff1"/>
             <cliffSet i="1" name="ZerusCliff0"/>
         </cliffSetList>
-        <vertData quantizeBias="1.005798e+00" quantizeScale="4.566926e-04" standardHeight="7.981371e+00" name="t3HeightMap"/>
+        <vertData quantizeBias="1.006140e+00" quantizeScale="5.315837e-04" standardHeight="7.981371e+00" name="t3HeightMap"/>
         <masks name="t3TextureMasks"/>
         <textureSetList num="8">
             <textureSet i="0" name="Zerus"/>

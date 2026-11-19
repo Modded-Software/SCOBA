@@ -13,10 +13,10 @@ void gf_RosterLeave (int lp_player) {
         UnitRemove(gv_dropPod[lp_player]);
     }
     gv_dropPod[lp_player] = null;
-    gv_dropPending[lp_player] = false;
+    gf_HeroDropPhase(lp_player, c_DROP_PHASE_IDLE);
     gv_dropRestoreLoops[lp_player] = 0;
-    gf_InputRelease(lp_player);
     gf_IntroEnd(lp_player);
+    gf_SceneLeave(lp_player, c_SCENE_DROP);
     gv_rosterPlayed[lp_player] = false;
 }
 

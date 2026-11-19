@@ -76,13 +76,16 @@ replaces a row (16 rows).
 - `lanes.blocker` rejects spots near water; `HAZARD_SHIFTS` adds shifts of 9, 12, 15.
 - Known: the first lava pair (18 from the crossing) finds no spot on any lane and
   is dropped (15 hazards instead of 18).
+- 2026-11-19: `HAZARD_WIGGLE_RINGS` reaches 12 cells (was 6). After the
+  operator's terrain edit, 2 pairs found no flat spot within 6 cells and the
+  build placed 14 of `HAZARD_TOTAL` 16. With 12 cells all 16 are placed.
 
 ## Tests
 
 - `crushtest` profile: Marine walks 3 plants (none removed), Goliath and Queen
   3 each (all removed).
 - `fxgallery`: operator gallery of candidate clips, not pass/fail.
-- `baseai flight` (stomp, `scripts/testkit/galaxy/baseai_land.galaxy`): the
+- `baseai flight` (stomp, `scripts/testkit/galaxy/baseai/baseai_land.galaxy`): the
   hero Viking walks through a plant. Flying: no slot, no fx send, no shake,
   plant stays. Landed, defaults: slot, fx sends, shake, plant removed.
   Landed, all off by `gf_StompConfig`: no fx send, no shake, plant stays.

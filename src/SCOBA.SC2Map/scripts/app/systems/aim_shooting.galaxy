@@ -86,7 +86,7 @@ void gf_AimPickRay (int lp_player) {
     lv_origin = gf_AimCameraFocus(lp_player);
     gv_aimPickOx = PointGetX(lv_origin);
     gv_aimPickOy = PointGetY(lv_origin);
-    gv_aimPickOz = PointGetHeight(UnitGetPosition(gv_tPSUNIT[lp_player])) + c_SCOBA_CAMERA_HEIGHT_OFFSET;
+    gv_aimPickOz = gf_UnitWorldZ(gv_tPSUNIT[lp_player]) + gf_CameraTargetOffset(gv_tPSUNIT[lp_player]);
     lv_yaw = CameraGetYaw(lp_player);
     lv_pitch = CameraGetPitch(lp_player);
     if (lv_pitch > 180.0) {
@@ -219,7 +219,7 @@ unit gf_TpsProxyPlace (int lp_player) {
     lv_shot = MaxF(lv_min, MinF(lv_max, lv_dist));
     lv_at = PointWithOffsetPolar(lv_from, lv_shot, lv_angle);
     // The ray height at the shot distance, above the ground there.
-    lv_eye = PointGetHeight(lv_from) + c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT;
+    lv_eye = gf_UnitWorldZ(lv_hero) + c_SCOBA_CROSSHAIR_ORIGIN_HEIGHT;
     lv_height = 0.0;
     if (lv_dist >= c_SCOBA_CROSSHAIR_MIN_RANGE) {
         lv_height = lv_eye + ((PointGetHeight(lv_aim) - lv_eye) * (lv_shot / lv_dist)) - WorldHeight(c_heightMapGround, lv_at);

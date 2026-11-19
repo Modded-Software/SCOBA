@@ -303,9 +303,10 @@ fixed gf_HvRayUnit (unit lp_unit, int lp_type, fixed lp_ox, fixed lp_oy, fixed l
     lv_at = UnitGetPosition(lp_unit);
     lv_rx = lp_ox - PointGetX(lv_at);
     lv_ry = lp_oy - PointGetY(lv_at);
-    // A unit position carries no height: a flyer's height is UnitGetHeight
-    // (MengskBC 180, pointZ 0; tps 20261115-213459).
-    lv_rz = lp_oz - (PointGetHeight(lv_at) + UnitGetHeight(lp_unit));
+    // A unit position carries no height: the unit's base is the engine
+    // ground plus UnitGetHeight (MengskBC 180, pointZ 0; tps 20261115-213459;
+    // ground 20261119-141014).
+    lv_rz = lp_oz - gf_UnitWorldZ(lp_unit);
     // The ray misses the sphere that holds the whole volume.
     lv_bound = gv_hvBound[lp_type];
     lv_t = -((lv_rx * lp_dx) + (lv_ry * lp_dy) + (lv_rz * lp_dz));

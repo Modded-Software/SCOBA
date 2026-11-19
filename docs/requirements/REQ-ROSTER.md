@@ -54,6 +54,7 @@ Out of scope:
 | R-ROSTER-6 | Hero state MUST be per seat: active hero, death, drop, return, input hold, camera owner, intro. One seat's state MUST NOT change another seat's. |
 | R-ROSTER-7 | The death, drop, return and intro logic MUST NOT read the camera. (TPS movement reads it by design, O-ROSTER-3.) |
 | R-ROSTER-8 | When a player leaves, their pending drop, held input and intro MUST end. |
+| R-ROSTER-9 | A unit's side (Terran or Zerg) MUST come from the roster table, not from the owner's race. An empty seat has no race (`PlayerRace` is "", roster run 2026-11-18), yet its waves MUST go on to the enemy spawn at the X like a played seat's (operator 2026-11-19: "the ally lanes are retreating and clustering with the army of the macro AI"). |
 
 ## 4. Acceptance
 

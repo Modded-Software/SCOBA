@@ -38,14 +38,17 @@ bool gf_FlightIs (int lp_player) {
 }
 
 // The flying bound unit's real height above the ground under it (engine,
-// mid-step included). 0 for a ground unit.
+// mid-step included). 0 for a ground unit. UnitGetHeight is already above
+// the engine ground (ground run 20261119-140729: a Marine on ground 13.8
+// reads 0, the Viking 7.5); subtracting WorldHeight was only right while
+// the engine ground was flat at 0.
 fixed gf_FlightHeight (int lp_player) {
     unit lv_u = gv_tPSUNIT[lp_player];
 
     if (!gf_FlightIs(lp_player)) {
         return 0.0;
     }
-    return UnitGetHeight(lv_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_u));
+    return UnitGetHeight(lv_u);
 }
 
 // Camera lift: the step target while climbing or descending (the unit
@@ -187,7 +190,7 @@ bool gt_FlightLand_Func (bool testConds, bool runActions) {
         }
     }
     lv_rest = StringToFixed(CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_u), "Height", UnitGetOwner(lv_u)));
-    lv_above = UnitGetHeight(lv_u) - WorldHeight(c_heightMapGround, UnitGetPosition(lv_u));
+    lv_above = UnitGetHeight(lv_u);
     gv_flightLandAbove = lv_above;
     gv_flightLandRest = lv_rest;
     if (AbsF(lv_above - lv_rest) > 0.05) {

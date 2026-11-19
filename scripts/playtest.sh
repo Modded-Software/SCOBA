@@ -45,14 +45,15 @@ actions:
   launch-check           rebuild, launch, and check runtime logs
   combat [group]         rebuild, build combat test map, run one scenario group
                          (idle, single, auto, cancel, wasd, hold, button, switch,
-                         pose, kerrigan) or the full suite when no group is given
+                         pose, kerrigan, camheight) or the full suite when no group is given
   tps [group]            rebuild, build tps test map, run one scenario group
                          (move, cursor, aim, head, target, pick, shot, hold, pose) or the full suite when no group is given
   jump [group]           rebuild, build jump test map, run one scenario group
                          (arc, body, hero) or the full suite when no group is given
   intro [group]          rebuild, build intro test map, run one scenario group
                          (boot, shots, wrap, gate, deploy; boot always runs) or the full suite
-  herodrop               rebuild, build hero drop test map, run it
+  herodrop [group]       rebuild, build hero drop test map, run one scenario group
+                         (main, alive, loop, seat2, leave, wave) or all; only wave fires the real wave
   roster                 rebuild, build roster test map, run it (seats, owners, alliances)
   podbirth               rebuild, build pod Birth test map, run it
   aimdof                 rebuild, sweep 10 aim near-DOF datapoints (operator check)
@@ -72,6 +73,8 @@ actions:
   flora                  rebuild, build flora and lane hazard test map, run it
   crushtest              rebuild, build the grass crush test map, run it
   waterprobe             rebuild, build the water test probe map, run it
+  ground                 rebuild, engine ground vs render ground, flyer over a
+                         hill
   dissolveview           rebuild, build the doodad physics view map, launch it
                          for manual viewing (bank SCOBADISSOLVE)
   dropview               rebuild, build the hero pod watch map, launch it: intro
@@ -80,6 +83,10 @@ actions:
                          the log goes to the SCOBAPNCPROBE bank, section picklog
   build-profile <name>   rebuild, build one profile map, stop
   run-profile <name>     rebuild, build one profile map, run it
+
+environment:
+  SC2_KEEP_OPEN=1        operator mode: check and write the summary as usual,
+                         then leave StarCraft II running to play on
 EOF
 }
 
@@ -131,7 +138,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster) ;;
+        combat|tps|jump|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -175,11 +182,11 @@ case "$ACTION" in
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-and-check.sh"
         ;;
-    combat|tps|jump|intro|aircreep|baseai)
+    combat|tps|jump|intro|aircreep|baseai|herodrop)
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster)
+    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground)
         run_profile "$ACTION"
         ;;
     picklog)
