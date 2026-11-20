@@ -65,6 +65,134 @@
             <Borders value="7,0,1;0,1,1;1,2,1;2,3,1;3,4,1;4,5,1;5,6,1;6,7,1"/>
         </Shape>
     </CFootprint>
+    <!-- 6x6 vespene geyser and gas buildings (R-BASE-35, operator
+         2026-11-20: "double to 6x6, also double that of all refineries").
+         The stock footprints scaled x2: FootprintGeyserRounded (void.sc2mod
+         rows and shape), FootprintGeyserRoundedBuilt (liberty shape) and
+         Footprint3x3CappedGeyser. The solid square is 6x6. The ring of "o"
+         cells (no town hall this near) keeps its stock width of 3. -->
+    <CFootprint id="FootprintScobaGeyser6x6">
+        <Layers index="Check" Area="-6,-6,6,6">
+            <Sets index="0">
+                <Negative index="DropOff" value="1"/>
+                <Negative index="Creep" value="0"/>
+            </Sets>
+            <Sets Character="o">
+                <Negative index="DropOff" value="1"/>
+            </Sets>
+            <Rows value="..oooooooo.."/>
+            <Rows value=".oooooooooo."/>
+            <Rows value="oooooooooooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooooooooooo"/>
+            <Rows value=".oooooooooo."/>
+            <Rows value="..oooooooo.."/>
+        </Layers>
+        <Layers index="Place" Area="-6,-6,6,6">
+            <Sets index="0">
+                <Positive index="NearResources" value="1"/>
+            </Sets>
+            <Sets Character="o">
+                <Positive index="NearResources" value="1"/>
+            </Sets>
+            <Rows value="..oooooooo.."/>
+            <Rows value=".oooooooooo."/>
+            <Rows value="oooooooooooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooooooooooo"/>
+            <Rows value=".oooooooooo."/>
+            <Rows value="..oooooooo.."/>
+        </Layers>
+        <Shape>
+            <Radius value="2.9155"/>
+            <Offsets value="-1,-2;1,-2;-1,2;1,2;-2,-1;-2,1;2,-1;2,1;-2.5,1.5;-1.5,2.5;-2.5,-1.5;1.5,2.5;-1.5,-2.5;2.5,1.5;1.5,-2.5;2.5,-1.5"/>
+            <Borders value="0,12,2;1,0,2;2,3,2;3,11,2;4,5,2;5,8,2;6,15,2;7,6,2;8,9,2;9,2,2;10,4,2;11,13,2;12,10,2;13,7,2;14,1,2;15,14,2"/>
+        </Shape>
+    </CFootprint>
+    <CFootprint id="FootprintScobaGeyser6x6Built">
+        <Layers index="Check" Area="-6,-6,6,6">
+            <Sets index="0">
+                <Negative index="DropOff" value="1"/>
+                <Negative index="Creep" value="0"/>
+            </Sets>
+            <Sets Character="o">
+                <Negative index="DropOff" value="1"/>
+            </Sets>
+            <Rows value="..oooooooo.."/>
+            <Rows value=".oooooooooo."/>
+            <Rows value="oooooooooooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooooooooooo"/>
+            <Rows value=".oooooooooo."/>
+            <Rows value="..oooooooo.."/>
+        </Layers>
+        <Layers index="Place" Area="-6,-6,6,6">
+            <Sets index="0">
+                <Positive index="NearResources" value="1"/>
+            </Sets>
+            <Sets Character="o">
+                <Positive index="NearResources" value="1"/>
+            </Sets>
+            <Rows value="..oooooooo.."/>
+            <Rows value=".oooooooooo."/>
+            <Rows value="oooooooooooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooxxxxxxooo"/>
+            <Rows value="oooooooooooo"/>
+            <Rows value=".oooooooooo."/>
+            <Rows value="..oooooooo.."/>
+        </Layers>
+        <Shape>
+            <Radius value="3.3541"/>
+            <Offsets value="-1.5,-3;1.5,-3;-1.5,3;1.5,3;-3,-1.5;-3,1.5;3,-1.5;3,1.5"/>
+            <Borders value="0,4,2;1,0,2;2,3,2;3,7,2;4,5,2;5,2,2;6,1,2;7,6,2"/>
+        </Shape>
+    </CFootprint>
+    <CFootprint id="FootprintScoba6x6CappedGeyser">
+        <Layers index="Check" Area="-3,-3,3,3">
+            <Sets index="0">
+                <Negative index="Creep" value="0"/>
+            </Sets>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+        </Layers>
+        <Layers index="Place" Area="-3,-3,3,3">
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+            <Rows value="xxxxxx"/>
+        </Layers>
+        <Shape>
+            <Radius value="4.2426"/>
+            <Offsets value="-3,-3;-3,3;3,3;3,-3"/>
+            <Borders value="3,0,2;0,1,2;1,2,2;2,3,2"/>
+        </Shape>
+    </CFootprint>
     <!-- Command Center family (R-BASE-30, operator 2026-11-19): one Check
          cell, no Place layer, so the hall blocks no pathing and needs no
          clear ground. The Area of stock Footprint1x1 puts the origin on a

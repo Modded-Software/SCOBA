@@ -6,8 +6,8 @@
 // other X. A Terran formation has 3 units; a Zerg formation has 4 to 6
 // (random, mean 5). Balance: a side with fewer live air creeps than the
 // enemy gets one more unit per formation, a side with more gets one fewer.
-// No wave at map start. Zerg waves at 10, 30, 50 s;
-// Terran waves at 20, 40, 60 s.
+// Early waves: Zerg at 5 s, Terran at 10 s. Then Zerg waves at 51, 71, 91 s;
+// Terran waves at 61, 81, 101 s.
 // The time is real time, as for the reinforcement timer. At most 32 live air
 // creeps per player.
 
@@ -27,12 +27,26 @@ const string c_AIR_CREEP_ZERG_UNIT = "SCOBAMutalisk";
 const string c_AIR_CREEP_TERRAN_UNIT = "SCOBAWraith";
 const int c_AIR_CREEP_PATROL_CMD = 1;  // "move" ability: 0 move, 1 patrol
 const int c_AIR_CREEP_ARM_TRIES = 16;  // game ticks to wait for the weapon removal
+// Every Mutalisk plays its Birth clip when it appears (operator 2026-11-20).
+const string c_AIR_CREEP_BIRTH_CLIP = "Birth";
+// The first timed wave is the Mutalisks in the first S7 of the intro (the shot
+// that looks up at the Overmind, data/intro_shots), this long after its
+// cut, so their Birth shows (operator 2026-11-20). At height 72 they are
+// out of the S6 frame. Then a slot every c_AIR_CREEP_PHASE: Wraiths,
+// Mutalisks, ...
+const fixed c_AIR_CREEP_FIRST_LEAD = 1.0;
+// The early waves: Mutalisks this long after map start, Wraiths at twice
+// this (operator 2026-11-20: staggered by 5 s, none at 0 s).
+const fixed c_AIR_CREEP_EARLY = 5.0;
 
 timer gv_airCreepTimer;
 int gv_airCreepNextSide;
+bool gv_airCreepFirstDone;  // the first slot ran: the timer is periodic
 int[2] gv_airCreepWaves;    // waves started per side (read by the aircreep test)
 int[2] gv_airCreepSpawned;  // units made per side (read by the aircreep test)
 int gv_airCreepArmTicks;    // ticks the last create waited (read by the aircreep test)
+int[2] gv_airCreepBirths;   // Birth clips started per side (read by the aircreep test)
+unit[2] gv_airCreepLast;    // the last unit made per side (read by the aircreep test)
 // The last wave's balance (read by the aircreep test): per-formation step,
 // the live counts it saw, and the two formation sizes it chose.
 int gv_airCreepLastBalance;
@@ -182,6 +196,12 @@ unit gf_AirCreepCreate (int lp_side, point lp_at) {
     }
     gv_airCreepArmTicks = lv_try;
     UnitSetState(lv_unit, c_unitStateHidden, false);
+    gv_airCreepLast[lp_side] = lv_unit;
+    if (lp_side == c_AIR_CREEP_ZERG) {
+        // Shown first: a hidden unit's actor plays nothing to see.
+        libNtve_gf_PlayAnimation(libNtve_gf_MainActorofUnit(lv_unit), c_animNameDefault, c_AIR_CREEP_BIRTH_CLIP, c_animFlagNonLooping, c_animTimeDefault);
+        gv_airCreepBirths[lp_side] += 1;
+    }
     return lv_unit;
 }
 
@@ -301,14 +321,32 @@ int gf_AirCreepWave (int lp_side) {
     return lv_made;
 }
 
-// Map start: no wave yet. The first slot (c_AIR_CREEP_PHASE later) is the
-// Mutalisks, the next one the Wraiths, then the sides take turns.
+// Map start: nothing at 0 s. One early wave of each side (operator
+// 2026-11-20): the Mutalisks at c_AIR_CREEP_EARLY, the Wraiths at twice
+// that, real time. The timer is armed before them, so they do not delay
+// it. The first slot (in the first S7) is the Mutalisks, the next one the
+// Wraiths, then the sides take turns.
 bool gt_AirCreepStart_Func (bool testConds, bool runActions) {
+    timer lv_clock;
+
     if (!runActions) {
         return true;
     }
     gv_airCreepNextSide = c_AIR_CREEP_ZERG;
-    TimerStart(gv_airCreepTimer, c_AIR_CREEP_PHASE, true, c_timeReal);
+    TimerStart(gv_airCreepTimer, c_INTRO_S7_START + c_AIR_CREEP_FIRST_LEAD, false, c_timeReal);
+    lv_clock = TimerCreate();
+    TimerStart(lv_clock, 3600.0, false, c_timeReal);
+    Wait(c_AIR_CREEP_EARLY, c_timeReal);
+    // The schedule switched off meanwhile (gt_AirCreepTick disabled): no
+    // early wave either.
+    if (TriggerIsEnabled(gt_AirCreepTick)) {
+        gf_AirCreepWave(c_AIR_CREEP_ZERG);
+    }
+    // The Mutalisk wave took some time: wait for the rest only.
+    Wait(2.0 * c_AIR_CREEP_EARLY - TimerGetElapsed(lv_clock), c_timeReal);
+    if (TriggerIsEnabled(gt_AirCreepTick)) {
+        gf_AirCreepWave(c_AIR_CREEP_TERRAN);
+    }
     return true;
 }
 
@@ -320,6 +358,10 @@ bool gt_AirCreepTick_Func (bool testConds, bool runActions) {
         return true;
     }
     gv_airCreepNextSide = 1 - lv_side;
+    if (!gv_airCreepFirstDone) {
+        gv_airCreepFirstDone = true;
+        TimerStart(gv_airCreepTimer, c_AIR_CREEP_PHASE, true, c_timeReal);
+    }
     gf_AirCreepWave(lv_side);
     return true;
 }

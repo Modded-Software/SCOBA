@@ -13,7 +13,7 @@ const int c_BASE_AI_MINERALS = 50;
 const int c_BASE_AI_DIFFICULTY = 10;     // c_skirChInsane, "Cheater Insane"
 const int c_BASE_AI_PLAYERS = 16;
 const fixed c_BASE_AI_FIELD_R = 7.0;     // hall centre to a mineral field
-const fixed c_BASE_AI_GEYSER_R = 7.5;    // hall centre to a geyser
+const fixed c_BASE_AI_GEYSER_R = 10.0;   // hall centre to a geyser
 
 // Unit custom value index set to 1 on a hired unit (systems/hire).
 const int c_HIRE_MARK = 0;

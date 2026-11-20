@@ -25,6 +25,15 @@ working. A test proves a claim only when a program can decide pass or fail.
   test. Those are operator checks. List them as "operator check" in the
   report and do not mark them done.
 
+### Screenshots
+
+- The agent may look at screenshots for scenery only: terrain, water,
+  doodads and other placed props (operator 2026-11-20).
+- Not for anything else. Gameplay behavior, animation, effects, sound,
+  cursor and UI stay as above.
+- A screenshot never decides pass or fail. Report what was seen as "seen in
+  screenshots", with the run and the file names. It is not "verified".
+
 ### What can be verified programmatically
 
 Read these from Galaxy and write them to the bank:

@@ -32,6 +32,7 @@ Code exists. `[tested]` entries passed in run `intro/20261117-024914`
 | R-INTRO-14 | [tested] | `boot t6`: `Clock100` 600, `SpawnLeft100` 3350 |
 | R-INTRO-15 | [tested] [operator] | `boot`: `MusicValid`, `SilenceValid` true (in game, `CatalogEntryIsValid`), `Music` true; `deploy`: `Music` true in ZOOM and FALL, false at touchdown; audible and muted: AC-INTRO-7. Per-seat music: [tested], `intro/20261118-203746` `seats` (`Music` per seat). |
 | R-INTRO-16 | [tested] | `intro/20261118-203746` group `seats` (`testkit/galaxy/intro_seats.galaxy`): seat 2 deploys and lands; seat 1 stays in LOOP with prompt, music, cinematic, hold, hidden hero, and the same pod count (negative case). Design: state and camera arrays per seat (`gv_introState[p]` ...), `gt_IntroDeploy` with `c_playerAny` and `EventPlayer()`, dialogs and prompt per player group, the seed once (SPEC-ROSTER 3.4). |
+| R-INTRO-17 | [host] [tested] [operator] | Host: `test_intro_shots.py`, the tree 2.0 behind the S2 start eye and far from the odd-pass eye (negative); constants in `data/intro_shots.galaxy`. `herodrop spot` `treeSet`: the actor exists (run at the earlier 3.0 and 275 %; not run at the current values). Design: `gf_IntroTreePlace` (`systems/visual_tuning.galaxy`), model actor `ZerusTree` at (132.27, 100.43) (was 3.0 behind, (132.97, 99.73); before that 1.0 behind, (131.56, 101.14)), variation by the actor message `ModelSwap ZerusTree 4`, scale 5 x 5 x 7 (map actor scale 5, z 1.4, times 1.0; was times 2.0, 2.75, 3). Second tree (`gv_introTree2`, `s2_tree2()`): (133.68, 101.84), 2.0 from the first along the first-pass camera path (45 degrees), scale 3.75 x 3.75 x 5.25 (75 %), same variation 4, facing 135 by `libNtve_gf_MakeModelFaceAngle` (the first keeps facing 0). Host: `test_s2_second_tree_down_the_camera_path` (behind the eye at the start, middle and end of the pass). In game: `tree2Set`, not run yet. An actor's facing cannot be read back: the rotation is an operator check. Variation, size and look: operator check |
 
 ## 2. Facts
 
@@ -146,12 +147,12 @@ target − distance × (cos pitch × (cos yaw, sin yaw), −sin pitch).
 
 | Shot | Len | Ease | Target start → end | z start → end | Yaw | Pitch | Dist | FOV | DOF | Variant |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S1 Pride | 12 | E | eye at the Brakk (14.96, 113.36), looking at the BC (103.8, 153.2) | 14 | 24.15 | −25 → −45 | 8 → 14 | 50 → 40 | off | none |
+| S1 Pride | 12 | E | eye 1.0 left of the Brakk (14.96, 113.36) facing (operator 2026-11-20; was 0.5), looking at the BC (103.8, 153.2) from the new eye | 14 | 23.56 | −25 → −45 | 8 → 14 | 50 → 40 | off | none |
 | S2 Line | 12 | L | (119.6, 113.1) → (131.0, 124.5) | 8.35 | 135 | 6 | 16 | 50 | on, focus 16 | target reversed |
-| S3 Map | 10 | E | (125.3, 118.8) | ground | 45 → 75 | 80 | 150 | 22 | off | none |
+| S3 Map | 10 | E | (125.3, 118.8) | ground | 45 → 75 | 80 | 225 (operator 2026-11-18: was 150) | 14.8 (was 22; same framing) | off | none |
 | S4 Brambles | 6 | E | (194.4, 193.1); eye exactly at (193.5, 164.5, 10.2) (operator 2026-11-18) | ground + 3 | 88.2 | −3.12 | 28.66 | 70 → 45 | off | none |
 | S5 Shackled | 4 | E | (194.4, 193.1) | ground + 4 | 90.8 | 8 | 18 → 12 | 48 → 44 | off | none |
-| S6 Overmind | 6 | A | (21.0, 9.0) | ground + 3 | 215 → 235 (half rate, operator 2026-11-18) | 18 | 66 | 55 | off | yaw reversed |
+| S6 Overmind | 6 | A | (21.0, 9.0) | ground + 3 | 215 → 235 (half rate, operator 2026-11-18) | 18 | 99 (operator 2026-11-18: was 66) | 38.3 (was 55; same framing) | off | yaw reversed |
 | S7 Worm | 7 (operator 2026-11-18: was 3, then 5) | O | (59.0, 59.0) | ground + 6 → + 12 | 225 | −20 → −35 | 9 | 80 | off | none |
 | S8 Jungle | 7 (operator 2026-11-18: was 8, then 7.5) | L | (120.0, 150.0) → (120.0, 167.5), Terran jungle, 2.5 cells/s | ground + 2 | 90 | 12 | 6 | 60 | off | none |
 | S9 Decimator | 8 | Z | (240.0, 248.0) | ground + 4 | 45 | 10 | from FOV | 70 → 24 | off | none |
@@ -303,7 +304,7 @@ jumps to a shot time, so groups stay near one minute.
 | `wrap` | Goto the last shot (S9) 0.5 s before its end, wait 1 s. | `Shot` 0, `Pass` +1; S2 next reads the variant; `Hum` 1 in S9. | No cut before the row length (± 2 loops); `Hum` 0 after the cut to S1. |
 | `gate` | In S3: inject W for 1 s, `1`, `F`, mouse-free; read state. | Hero position unchanged, no order, state LOOP, camera values still the row's. | Each key, one at a time. |
 | `seats` | Harness plays seat 2, starts its intro, presses its deploy. | Seat 2: LOOP, FALL with pod, DONE; hold, cinematic; music on in FALL, off at the end; hero shown and alive. | Seat 1 through seat 2's fall and touchdown: LOOP, active, held, cinematic, music, prompt, hero hidden, no deploy, no pod. |
-| `deploy` | Inject SPACE in S5, a second 150 ms later (countdown). A third timed from the measured key latency to reach the engine 1 s into the fall. | Countdown 2.5..4 s from the engine press (`gv_introCountAt`); intro `DROP` while the drop runs; third press arrived with intro state `DROP`; drop `ZOOM` seen, `FALL` ≤ 0.4 s after the zoom start; the zoom rows and scene flags as `herodrop` (`zoom_follow`); one pod; fall trace as `herodrop`; at touchdown hero alive at the pod, `Direct` 1, defaults; scene off; dialogs and triggers restored; DONE. | `JumpPresses` 0; `Pods` 1 after both extra SPACEs; prompt hidden from SPACE on; `Music` 1 in ZOOM and FALL, 0 at touchdown. |
+| `deploy` | Inject SPACE in S5, a second 150 ms later (countdown). A third timed from the measured key latency to reach the engine 1 s into the fall. | Countdown 2.5..4 s from the engine press (`gv_introCountAt`); intro `DROP` while the drop runs; third press arrived with intro state `DROP`; `Beeps` +3 by the deploy (2026-11-20), `BeepValid`; the pod valid in `ARM` and at the zoom start, Birth read before the zoom (`zoom_armed`); `CamHeld` in `ARM`, cleared in `FALL`; `FALL` ≤ 0.5 + 0.4 s after the deploy; the zoom rows and scene flags as `herodrop` (`zoom_follow`); one pod; fall trace as `herodrop`; at touchdown hero alive at the pod, `Direct` 1, toggle defaults; `tafter` TPS, desired arm 1.0, engine distance 0.9..1.05, pitch 0 within 2 (operator 2026-11-20, was Point & Click and 1.5); scene off; dialogs and triggers restored; DONE. | `JumpPresses` 0; `Pods` 1 after both extra SPACEs; prompt hidden from SPACE on; `Music` 1 in ZOOM and FALL, 0 at touchdown; no beep and no camera hold before SPACE. The beep sound is an operator check. |
 
 Key injection uses `scripts/testkit/input_driver.py`. No mouse input.
 

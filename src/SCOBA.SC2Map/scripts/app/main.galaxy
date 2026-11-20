@@ -72,6 +72,7 @@ include "scripts/app/systems/strafe"
 include "scripts/app/systems/orders"
 include "scripts/app/systems/selection"
 include "scripts/app/systems/spawns"
+include "scripts/app/systems/scenery"
 include "scripts/app/systems/hero_drop"
 include "scripts/app/systems/roster"
 include "scripts/app/systems/camera/refollow"
@@ -171,6 +172,7 @@ void main () {
     gt_ZerusSpawn_Init();
     gt_TerranSpawn_Init();
     gt_AirCreep_Init();
+    gt_Scenery_Init();
     gt_HeroDrop_Init();
     gt_RosterLeave_Init();
     gt_XCenterUnitOrders_Init();

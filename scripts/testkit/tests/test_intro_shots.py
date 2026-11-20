@@ -117,6 +117,82 @@ class TableTest(unittest.TestCase):
         # Negative case: no row past the shots (the zoom row is gone).
         self.assertNotIn(f"gv_introRow_dof[{len(S.SHOTS)}]", text)
 
+    def test_s6_pods_in_the_near_view(self) -> None:
+        s6 = S.SHOTS[S.s6_row()]
+        self.assertTrue(s6.name.startswith("S6"))
+        pods = S.s6_pods()
+        self.assertEqual(len(pods), 3)
+        # At the middle of the first pass, when the pods land. Ground taken
+        # as level at the target. Inside half the field of view: the nearest
+        # pod lands at the lower edge (operator 2026-11-20: closer).
+        for yaw in ((s6.yaw0 + s6.yaw1) / 2.0,):
+            ex, ey, ez = S.eye(s6.x0, s6.y0, s6.z0, yaw, s6.pitch0, s6.dist0)
+            for px, py in pods:
+                flat = math.hypot(px - ex, py - ey)
+                side = abs((math.degrees(math.atan2(py - ey, px - ex)) - yaw + 180) % 360 - 180)
+                below = math.degrees(math.atan2(ez, flat)) - s6.pitch0
+                self.assertLess(side, s6.fov0 / 2.0, f"pod ({px}, {py}) yaw {yaw}")
+                self.assertTrue(0.0 < below < s6.fov0 / 2.0, f"pod ({px}, {py}) below {below:.1f}")
+                # Near: closer to the eye than the Overmind.
+                self.assertLess(flat, math.hypot(s6.x0 - ex, s6.y0 - ey) - 10.0)
+        # Negative case: the target (the Overmind, at its height) is on the axis, not below it.
+        ex, ey, ez = S.eye(s6.x0, s6.y0, s6.z0, s6.yaw0, s6.pitch0, s6.dist0)
+        self.assertLess(abs(math.degrees(math.atan2(ez - s6.z0, math.hypot(s6.x0 - ex, s6.y0 - ey))) - s6.pitch0), 0.5)
+        # Apart: at least 8 cells between any two.
+        for i in range(3):
+            for j in range(i + 1, 3):
+                self.assertGreater(math.hypot(pods[i][0] - pods[j][0], pods[i][1] - pods[j][1]), 8.0)
+        text = S.galaxy()
+        self.assertIn("const fixed c_INTRO_S7_START = 50.0000;", text)
+        self.assertIn(f"const int c_INTRO_S6_ROW = {S.s6_row()};", text)
+        self.assertIn(f"gv_introS6PodX[2] = {pods[2][0]:.4f};", text)
+
+    def test_s2_tree_two_cells_behind_the_start_eye(self) -> None:
+        s2 = next(s for s in S.SHOTS if s.name.startswith("S2"))
+        ex, ey, _ = S.eye(s2.x0, s2.y0, s2.z0, s2.yaw0, s2.pitch0, s2.dist0)
+        tx, ty = S.s2_tree()
+        self.assertAlmostEqual(math.hypot(tx - ex, ty - ey), 2.0, delta=0.02)
+        # Behind: farther from the start target than the eye.
+        self.assertGreater(math.hypot(tx - s2.x0, ty - s2.y0), math.hypot(ex - s2.x0, ey - s2.y0))
+        # Negative case: not behind the odd-pass start eye (the swapped target).
+        ox, oy, _ = S.eye(s2.x1, s2.y1, s2.z0, s2.yaw0, s2.pitch0, s2.dist0)
+        self.assertGreater(math.hypot(tx - ox, ty - oy), 5.0)
+        text = S.galaxy()
+        self.assertIn(f"const fixed c_INTRO_TREE_X = {tx:.4f};", text)
+        self.assertIn("const int c_INTRO_TREE_VARIATION = 4;", text)
+        # 100 % of the editor doodad scale (operator 2026-11-20; was 200 %).
+        self.assertIn("const fixed c_INTRO_TREE_SCALE_XY = 5.0000;", text)
+        self.assertIn("const fixed c_INTRO_TREE_SCALE_Z = 7.0000;", text)
+
+    def test_s2_second_tree_down_the_camera_path(self) -> None:
+        # Operator 2026-11-20: 2 cells further down the camera path, still
+        # behind the camera, 75 %, another rotation.
+        s2 = next(s for s in S.SHOTS if s.name.startswith("S2"))
+        tx, ty = S.s2_tree()
+        ux, uy = S.s2_tree2()
+        self.assertAlmostEqual(math.hypot(ux - tx, uy - ty), 2.0, delta=0.02)
+        # Down the path: along the first-pass target move.
+        n = math.hypot(s2.x1 - s2.x0, s2.y1 - s2.y0)
+        along = ((ux - tx) * (s2.x1 - s2.x0) + (uy - ty) * (s2.y1 - s2.y0)) / n
+        self.assertAlmostEqual(along, 2.0, delta=0.02)
+        # Behind the camera over the whole first pass: behind the view
+        # plane of the eye at the start, the middle and the end.
+        a = math.radians(s2.yaw0)
+        for u in (0.0, 0.5, 1.0):
+            ex, ey, _ = S.eye(s2.x0 + (s2.x1 - s2.x0) * u, s2.y0 + (s2.y1 - s2.y0) * u, s2.z0, s2.yaw0, s2.pitch0, s2.dist0)
+            tgx, tgy = s2.x0 + (s2.x1 - s2.x0) * u, s2.y0 + (s2.y1 - s2.y0) * u
+            fn = math.hypot(tgx - ex, tgy - ey)
+            ahead = ((ux - ex) * (tgx - ex) + (uy - ey) * (tgy - ey)) / fn
+            self.assertLess(ahead, -1.9, f"u={u}")
+        # Negative: not on the first tree, not the same size, not the same facing.
+        self.assertNotEqual((ux, uy), (tx, ty))
+        text = S.galaxy()
+        self.assertIn(f"const fixed c_INTRO_TREE2_X = {ux:.4f};", text)
+        self.assertIn("const fixed c_INTRO_TREE2_SCALE_XY = 3.7500;", text)
+        self.assertIn("const fixed c_INTRO_TREE2_SCALE_Z = 5.2500;", text)
+        self.assertIn("const fixed c_INTRO_TREE2_FACING = 135.0000;", text)
+        self.assertNotEqual(S.TREE2_FACING % 360.0, 0.0)
+
 
 class IntroPatchTest(unittest.TestCase):
     """SPEC-INTRO 3.11: the intro is off in every profile map but intro."""
@@ -205,9 +281,13 @@ class TerrainTest(unittest.TestCase):
         s1 = next(s for s in S.SHOTS if s.name.startswith("S1"))
         for x, y, z, yaw, pitch, d in ((s1.x0, s1.y0, s1.z0, s1.yaw0, s1.pitch0, s1.dist0), (s1.x1, s1.y1, s1.z1, s1.yaw1, s1.pitch1, s1.dist1)):
             ex, ey, _ = S.eye(x, y, z, yaw, pitch, d)
-            self.assertLess(math.hypot(ex - S.BRAKK[0], ey - S.BRAKK[1]), 0.5)
+            # The eye is 1.0 left of the Brakk facing (2026-11-20; was 0.5).
+            self.assertLess(math.hypot(ex - S.S1_EYE[0], ey - S.S1_EYE[1]), 0.05)
+            left = math.radians(S.BRAKK_YAW + 90)
+            self.assertAlmostEqual((ex - S.BRAKK[0]) * math.cos(left) + (ey - S.BRAKK[1]) * math.sin(left), 1.0, delta=0.05)
+            # Still aimed at the BC from the new eye.
             to_bc = math.degrees(math.atan2(S.BC[1] - ey, S.BC[0] - ex))
-            self.assertLess(abs((yaw - to_bc + 180) % 360 - 180), 1.0)
+            self.assertLess(abs((yaw - to_bc + 180) % 360 - 180), 0.1)
 
     def test_water_level(self) -> None:
         self.assertAlmostEqual(self.t.water_level, S.WATER, places=2)

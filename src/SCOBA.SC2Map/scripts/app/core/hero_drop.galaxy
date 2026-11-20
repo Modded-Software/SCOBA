@@ -17,16 +17,19 @@ const fixed c_DROP_CLIP_LEN_TOL = 0.05;
 // clock, if the engine never reports Birth (counted in gv_dropClipMisses).
 const fixed c_DROP_LAND_LATE = 1.0;
 // The camera chases the pod on its own line (operator 2026-11-17): yaw =
-// travel direction, pitch = the fast part's descent angle. After touchdown
-// the pitch goes back to the map-start pitch.
-const fixed c_DROP_LAND_PITCH = 30.0;
+// travel direction, pitch = the fast part's descent angle.
+// The hero's start state after every touchdown (operator 2026-11-20): TPS,
+// camera arm at the wheel minimum (1.0), pitch 0 (level, straight ahead).
+// Was pitch 30, the arm by unit height and the mode the hero died in.
+const fixed c_DROP_LAND_PITCH = 0.0;
+const fixed c_DROP_LAND_ARM = 1.0;
 const fixed c_DROP_TICK = 0.0625;     // one game loop
 // Camera arm behind the pod while it falls. The pod (actor scale 4.5) is
 // much larger than the hero arm (1.5); operator 2026-11-16: 8 was too close.
 const fixed c_DROP_CAM_DISTANCE = 20.0;
 // Arm from the eye to the pod while it falls (operator 2026-11-18: closer
-// than 20; herodrop/20261118-184252; 2026-11-19: 12 still too long). The
-// touchdown keeps c_DROP_CAM_DISTANCE.
+// than 20; herodrop/20261118-184252; 2026-11-19: 12 still too long). After
+// touchdown the desired arm is c_DROP_LAND_ARM.
 const fixed c_DROP_POD_ARM = 8.0;
 // Side arm, as the TPS aim shoulder: the whole camera sits this far to the
 // right of the pod's travel; the pod shows left of center (operator
@@ -48,10 +51,24 @@ const int c_DROP_PHASE_IDLE = 0;
 const int c_DROP_PHASE_WAIT = 1;
 const int c_DROP_PHASE_ZOOM = 2;
 const int c_DROP_PHASE_FALL = 3;
+// The pod exists and plays Birth; the camera is not changed until the
+// engine reports Birth (operator 2026-11-20: the view changed before the
+// pod, with no FOV or DOF). Between WAIT and ZOOM.
+const int c_DROP_PHASE_ARM = 4;
+// Birth not reported this long after the create: the zoom starts on the
+// script clock, and the case is counted (gv_dropArmLate).
+const fixed c_DROP_ARM_MAX = 0.5;
+// The pod fall sound at the pod create, for the seat (SoundData
+// SCOBAHeroPodFall; operator 2026-11-20: the drop had no sound).
+const string c_DROP_SOUND = "SCOBAHeroPodFall";
+int[8] gv_dropSounds;        // pod fall sounds played (tests)
+bool gv_dropSoundValid;      // the sound id resolves (tests)
 
 // The crash zoom onto the drop point (was the intro's zoom row, values
-// unchanged). Ends on the fall's first frame: yaw c_DROP_YAW, pitch
-// c_POD_BIRTH_PITCH, arm c_DROP_POD_ARM + c_POD_BIRTH_START_Z / sin(pitch).
+// unchanged). It starts once the pod births and ends on the fall camera at
+// the clip time of its end: yaw c_DROP_YAW, pitch c_POD_BIRTH_PITCH, the
+// Birth root's aim and arm (gv_dropZoomAt1, gv_dropZoomDist1). Drop DOF
+// from its first frame.
 const fixed c_DROP_ZOOM_LENGTH = 0.35;
 const fixed c_DROP_ZOOM_MOVE = 0.3;     // eased part, then held
 const fixed c_DROP_ZOOM_PITCH = 55.0;
@@ -62,7 +79,12 @@ const fixed c_DROP_ZOOM_FOV1 = 12.0;
 trigger gt_HeroDropDeath;
 trigger gt_HeroDropTick;
 
-int[8] gv_dropPhase;         // c_DROP_PHASE_IDLE, WAIT, ZOOM, FALL
+int[8] gv_dropPhase;         // c_DROP_PHASE_IDLE, WAIT, ARM, ZOOM, FALL
+fixed[8] gv_dropArmMs;       // create to the first Birth report, ms (tests)
+int[8] gv_dropArmLate;       // zooms started with Birth not reported (tests)
+fixed[8] gv_dropZoomClip0;   // Birth clip time at the zoom start
+point[8] gv_dropZoomAt1;     // zoom end target: the fall camera at the zoom's end clip time
+fixed[8] gv_dropZoomDist1;   // zoom end arm, the same
 bool[8] gv_dropPending;      // phase WAIT, ZOOM or FALL: a hero waits for its pod
 point[8] gv_dropGoAt;        // the drop point picked by gf_HeroDropGo
 fixed[8] gv_dropZoomStart;   // zoom start, gv_sCOBA_Clock
@@ -74,7 +96,7 @@ unit[8] gv_dropHero;         // the waiting hero
 unit[8] gv_dropPod;          // the pod in its fall, null when there is none
 point[8] gv_dropDeathAt;     // where the hero died
 point[8] gv_dropAt;          // where the pod lands
-fixed[8] gv_dropStartAt;     // fall start, gv_sCOBA_Clock
+fixed[8] gv_dropStartAt;     // pod create (Birth start), gv_sCOBA_Clock
 fixed[8] gv_dropCamHeight;   // pod part of the camera height offset (R-DROP-4)
 fixed[8] gv_dropFacing;      // the pod's facing, read from the engine at create
 fixed[8] gv_dropTravel;      // the fall's travel direction: the camera yaw at create
@@ -94,7 +116,9 @@ int[8] gv_dropClipReads;     // reads that saw Birth
 int[8] gv_dropClipMisses;    // reads that did not (other clip or none)
 bool[8] gv_dropSingle;       // toggles of the hero when it died
 bool[8] gv_dropStand;
-bool[8] gv_dropTps;          // TPS mode when it died; death removes the behavior
+bool[8] gv_dropTpsArm;       // touchdown: set the arm once TPS is on
+int[8] gv_dropTpsOrders;     // TPS-on orders issued at touchdowns (tests)
+bool[8] gv_dropTps;          // TPS mode when it died (recorded only; touchdown always starts in TPS)
 int[8] gv_dropRestoreLoops;  // loops left to set the toggles again
 // For tests.
 int[8] gv_dropDeaths;

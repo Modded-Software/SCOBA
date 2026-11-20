@@ -239,6 +239,28 @@ class LaneTests(unittest.TestCase):
         self.assertTrue(notes)
 
 
+class WaterLevelTests(unittest.TestCase):
+    def test_both_editor_forms(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from flora.terrain import water_levels
+
+        root = Path(tempfile.mkdtemp())
+        game = root / "Base.SC2Data" / "GameData"
+        game.mkdir(parents=True)
+        (game / "WaterData.xml").write_text(
+            '<Catalog>\n'
+            '    <CWater id="Old">\n        <State index="0">\n            <Height value="6.5"/>\n        </State>\n    </CWater>\n'
+            '    <CWater id="BelShir">\n        <State index="0" Height="7.150000" Specularity="56.5"/>\n    </CWater>\n'
+            '    <CWater id="Xil"/>\n'
+            '</Catalog>\n',
+            encoding="utf-8",
+        )
+        levels = water_levels(root)
+        self.assertEqual(levels, {"Old": 6.5, "BelShir": 7.15})  # Xil has no override: not listed
+
+
 class DiskCellsTests(unittest.TestCase):
     def test_disk_off_the_map_is_empty(self) -> None:
         # Wide hazard wiggle rings reach past the map edge.

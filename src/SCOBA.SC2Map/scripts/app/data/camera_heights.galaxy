@@ -6,15 +6,18 @@ const fixed c_CAM_HEIGHT_REFERENCE = 0.9305;  // ToshSCOBA
 void gf_CamHeightLoad () {
     gf_CamHeightType("Armory", 9.0453);
     gf_CamHeightType("AutoTurret", 2.2319);
+    gf_CamHeightType("AutomatedExtractor", 5.6112);
+    gf_CamHeightType("AutomatedRefinery", 4.9421);
     gf_CamHeightType("Banshee", 2.7318);
     gf_CamHeightType("Barracks", 2.2760);
     gf_CamHeightType("BarracksTechLab", 1.6601);
     gf_CamHeightType("Battlecruiser", 13.5914);
     gf_CamHeightType("Brakk", 10.4394);
     gf_CamHeightType("Bunker", 1.4762);
-    gf_CamHeightType("CommandCenter", 11.1465);
+    gf_CamHeightType("CommandCenter", 14.1710);
     gf_CamHeightType("DukesRevenge", 8.4946);
     gf_CamHeightType("EngineeringBay", 3.7786);
+    gf_CamHeightType("Extractor", 5.6112);
     gf_CamHeightType("Factory", 2.0199);
     gf_CamHeightType("FactoryTechLab", 1.6601);
     gf_CamHeightType("Firebat", 1.2320);
@@ -48,15 +51,16 @@ void gf_CamHeightLoad () {
     gf_CamHeightType("MitosaurusB", 5.9132);
     gf_CamHeightType("MitosaurusC", 4.1392);
     gf_CamHeightType("Mothership", 184.7427);
-    gf_CamHeightType("OrbitalCommand", 2.6539);
+    gf_CamHeightType("OrbitalCommand", 14.1710);
     gf_CamHeightType("Overlord", 25.6794);
     gf_CamHeightType("Overseer", 1.3573);
     gf_CamHeightType("PerditionTurret", 2.3911);
-    gf_CamHeightType("PlanetaryFortress", 2.6539);
+    gf_CamHeightType("PlanetaryFortress", 14.1710);
     gf_CamHeightType("Predator", 0.9430);
     gf_CamHeightType("PsiDecimator", 20.3259);
     gf_CamHeightType("Queen", 4.3757);
     gf_CamHeightType("RaynorCommando", 1.2023);
+    gf_CamHeightType("Refinery", 4.9421);
     gf_CamHeightType("Roach", 2.1770);
     gf_CamHeightType("RoachCorpser", 1.9956);
     gf_CamHeightType("SCOBAHeroPod", 98.3331);
@@ -66,7 +70,7 @@ void gf_CamHeightLoad () {
     gf_CamHeightType("SCOBAVikingHeroAssault", 4.1436);
     gf_CamHeightType("SCOBAVistaOverlord", 25.6794);
     gf_CamHeightType("SCOBAWraith", 4.0647);
-    gf_CamHeightType("SCV", 1.0172);
+    gf_CamHeightType("SCV", 2.0345);
     gf_CamHeightType("SensorTower", 27.5842);
     gf_CamHeightType("SpineCrawler", 2.5238);
     gf_CamHeightType("SporeCannon", 9.2382);
@@ -76,8 +80,8 @@ void gf_CamHeightLoad () {
     gf_CamHeightType("Thor", 7.3950);
     gf_CamHeightType("Tosh", 1.2407);
     gf_CamHeightType("ToshSCOBA", 0.9305);
-    gf_CamHeightType("Ultralisk", 5.1374);
-    gf_CamHeightType("VespeneGeyser", 1.2747);
+    gf_CamHeightType("Ultralisk", 4.8761);
+    gf_CamHeightType("VespeneGeyser", 2.5493);
     gf_CamHeightType("VikingAssault", 4.1436);
     gf_CamHeightType("VikingFighter", 2.9807);
     gf_CamHeightType("WarpPrismPhasing", 6.5842);

@@ -1,0 +1,173 @@
+// Hero drop harness, touchdown start state (operator 2026-11-20): every
+// touchdown starts in TPS, camera arm 1.0, pitch 0. Split from
+// herodrop.galaxy (file length). Engine camera pitch and distance, the
+// desired arm the collision tick drives, and the TPS mode.
+
+// Engine camera pitch and distance, and the script's desired arm (x100).
+void gf_HdCamSnap (string lp_section, string lp_tag) {
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamPitch100", FixedToInt(CameraGetPitch(1) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamDist100", FixedToInt(CameraGetDistance(1) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamDesired100", FixedToInt(gv_cameraDistanceDesired[1] * 100.0));
+    // The pod fall sound (operator 2026-11-20): plays per drop, id resolves.
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "PodSounds", gv_dropSounds[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "PodSoundValid", gv_dropSoundValid);
+    BankSave(gv_dbgBank);
+}
+
+// Every scenario starts off the touchdown state: pitch 30, the arm by unit
+// height, so a landing that sets nothing shows.
+void gf_HdCamReset () {
+    gv_cameraDistanceDesired[1] = gf_CameraArm(gv_tPSUNIT[1]);
+    CameraSetValue(1, c_cameraValueDistance, gv_cameraDistanceDesired[1], 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValuePitch, 30.0, 0.0, 0.0, 0.0);
+    Wait(0.25, c_timeGame);
+}
+
+// A hero that dies in Point & Click lands in TPS, arm 1.0, pitch 0.
+void gf_HdLand () {
+    string lv_s = "drop_land";
+    int lv_i;
+
+    gf_HdReset(lv_s, true);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "preTps", gf_TpsActive(1));
+    gf_HdTps(false);
+    // Raw, for the precondition (full suite 20261120-205318: TPS stayed on).
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "tpsOffOrderOk", gv_hdTpsOffOk);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "tpsOffDisabled", UnitCheckAbilCmdState(gv_tPSUNIT[1], AbilityCommand("SCOBATPSToggle", 1), c_cmdStateDisabled));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "tpsOffHidden", UnitCheckAbilCmdState(gv_tPSUNIT[1], AbilityCommand("SCOBATPSToggle", 1), c_cmdStateHidden));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "tpsOrders", UnitOrderCount(gv_tPSUNIT[1]));
+    gf_HdSnap(lv_s, "t0");
+    gf_HdCamSnap(lv_s, "t0");
+    UnitKill(gv_heroTosh);
+    Wait(0.5, c_timeGame);
+    gf_HdSnap(lv_s, "tdead");
+    gf_HdGo(1);
+    for (lv_i = 0; lv_i < 64 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(gv_dropPod[1]));
+    for (lv_i = 0; lv_i < 128 && UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "landed", !UnitIsValid(gv_dropPod[1]));
+    gf_HdSnap(lv_s, "tland");
+    gf_HdCamSnap(lv_s, "tland");
+    // Pitch blend 0.5 s, the arm by the collision tick: read well after both.
+    Wait(1.5, c_timeGame);
+    gf_HdSnap(lv_s, "tafter");
+    gf_HdCamSnap(lv_s, "tafter");
+    // The toggle is in step with the mode: the off command shows, and a
+    // TPS-off order (the HUD button's order) leaves TPS.
+    BankValueSetFromInt(gv_dbgBank, lv_s, "tpsOnOrders", gv_dropTpsOrders[1]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "afterOffHidden", UnitCheckAbilCmdState(gv_tPSUNIT[1], AbilityCommand("SCOBATPSToggle", 1), c_cmdStateHidden));
+    gf_HdTps(false);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "afterOffTps", gf_TpsActive(1));
+    gf_HdTps(true);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "afterOnTps", gf_TpsActive(1));
+    BankSave(gv_dbgBank);
+}
+
+// Drop pod spots (operator 2026-11-20: pods landed on buildings). Engine
+// reads, not the map's own check: per pick, the 16 cells of its 4x4 square
+// pathable, ground units within 2.5, the gap to the wave's other pods. A
+// Supply Depot at a free spot: picks keep its square clear (negative).
+const int c_HD_SPOT_PICKS = 12;
+
+int gf_HdSpotCellsBlocked (point lp_at) {
+    int lv_i;
+    int lv_j;
+    int lv_n = 0;
+
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        for (lv_j = 0; lv_j < 4; lv_j += 1) {
+            if (!PointPathingPassable(PointWithOffset(lp_at, IntToFixed(lv_i) - 1.5, IntToFixed(lv_j) - 1.5))) {
+                lv_n += 1;
+            }
+        }
+    }
+    return lv_n;
+}
+
+int gf_HdSpotUnits (point lp_at) {
+    return UnitGroupCount(UnitGroup(null, c_playerAny, RegionCircle(lp_at, 2.5), UnitFilter(0, 0, (1 << c_targetFilterMissile) | (1 << c_targetFilterAir), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 0), c_unitCountAll);
+}
+
+// Chebyshev distance: two squares overlap below half the sum of sides.
+fixed gf_HdCheb (point lp_a, point lp_b) {
+    return MaxF(AbsF(PointGetX(lp_a) - PointGetX(lp_b)), AbsF(PointGetY(lp_a) - PointGetY(lp_b)));
+}
+
+void gf_HdSpot () {
+    string lv_s = "drop_spot";
+    int lv_lane;
+    int lv_n;
+    int lv_blockedCells = 0;
+    int lv_units = 0;
+    int lv_close = 0;
+    int lv_onDepot = 0;
+    fixed lv_minGap = 9999.0;
+    fixed lv_minDepot = 9999.0;
+    point lv_a;
+    point lv_b;
+    point lv_c;
+    point lv_depotAt;
+    unit lv_depot;
+    string lv_raw = "";
+
+    gf_HdReset(lv_s, true);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "none0", gv_podSpotNone);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "picks0", gv_podSpotPicks);
+    // The S2 Zerus tree (operator 2026-11-20): the actor exists at map init.
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "treeSet", gv_introTree != null);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "tree2Set", gv_introTree2 != null && gv_introTree2 != gv_introTree);
+    for (lv_lane = 1; lv_lane <= 6; lv_lane += 1) {
+        for (lv_n = 0; lv_n < c_HD_SPOT_PICKS / 3; lv_n += 1) {
+            lv_a = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_lane], null, null);
+            lv_b = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_lane], lv_a, null);
+            lv_c = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_lane], lv_a, lv_b);
+            lv_blockedCells += gf_HdSpotCellsBlocked(lv_a) + gf_HdSpotCellsBlocked(lv_b) + gf_HdSpotCellsBlocked(lv_c);
+            lv_units += gf_HdSpotUnits(lv_a) + gf_HdSpotUnits(lv_b) + gf_HdSpotUnits(lv_c);
+            lv_minGap = MinF(lv_minGap, MinF(DistanceBetweenPoints(lv_a, lv_b), MinF(DistanceBetweenPoints(lv_a, lv_c), DistanceBetweenPoints(lv_b, lv_c))));
+            if (lv_n == 0) {
+                lv_raw = lv_raw + IntToString(lv_lane) + ":" + IntToString(FixedToInt(PointGetX(lv_a))) + "," + IntToString(FixedToInt(PointGetY(lv_a))) + " ";
+            }
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "blockedCells", lv_blockedCells);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "units", lv_units);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "minGap100", FixedToInt(lv_minGap * 100.0));
+    BankValueSetFromString(gv_dbgBank, lv_s, "raw", lv_raw);
+    // Negative: a Supply Depot (2x2) on a free spot of lane 1.
+    lv_depotAt = gf_DropPodPoint(gv_sPAWNLOCATIONS[1], null, null);
+    UnitCreate(1, "SupplyDepot", c_unitCreateIgnorePlacement, 1, lv_depotAt, 270.0);
+    lv_depot = UnitLastCreated();
+    Wait(0.25, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "depotValid", UnitIsValid(lv_depot));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "depotCellsBlocked", gf_HdSpotCellsBlocked(lv_depotAt));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "depotSpotFree", gf_DropPodSpotFree(lv_depotAt));
+    for (lv_n = 0; lv_n < c_HD_SPOT_PICKS * 2; lv_n += 1) {
+        lv_a = gf_DropPodPoint(gv_sPAWNLOCATIONS[1], null, null);
+        lv_minDepot = MinF(lv_minDepot, gf_HdCheb(lv_a, lv_depotAt));
+        if (gf_HdCheb(lv_a, lv_depotAt) < 3.0) {
+            lv_onDepot += 1;
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "onDepot", lv_onDepot);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "minDepot100", FixedToInt(lv_minDepot * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "picks", gv_podSpotPicks);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "ring", gv_podSpotRing);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "none", gv_podSpotNone);
+    UnitRemove(lv_depot);
+    BankSave(gv_dbgBank);
+}
+
+// Groups "land" and "spot" (called from herodrop.galaxy).
+void gf_HdLandGroups () {
+    if (gf_DbgGroup("land")) {
+        gf_HdLand();
+    }
+    if (gf_DbgGroup("spot")) {
+        gf_HdSpot();
+    }
+    gf_HdSceneryGroups();  // herodrop_scenery.galaxy
+}

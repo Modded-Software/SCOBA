@@ -394,6 +394,13 @@ not repeated here.
   they existed.
 - Measured values: KerriganSCOBA 1.7813 (offset 1.72, arm 2.87; was 0.9 and
   2.5), SCV 1.0172 (offset 0.98, arm 1.64; was 0.9 and 2.5).
+- 2026-11-20: the SCV is the classic model at actor scale 2; its height
+  is 2.0345 (not run in the game). The classic Command Center is 14.1710,
+  its Orbital Command and Planetary Fortress forms the same (their actors
+  have its scale), the classic Ultralisk 4.8761 (SPEC-HD-TEXTURES 13).
+  6x6 gas (R-BASE-35): VespeneGeyser 1.2747 to 2.5493; new entries
+  Refinery and AutomatedRefinery 4.9421, Extractor and AutomatedExtractor
+  5.6112.
 - Map init now turns camera height smoothing off for every hero, as the hero
   switch already did. Before, Kerrigan kept it on at init.
 

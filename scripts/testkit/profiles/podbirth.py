@@ -17,6 +17,7 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
+from .herodrop_zoom import ARM_MAX_MS, ZOOM_LENGTH
 from .herodrop_zoom import CAM_DISTANCE as CAM_ARM
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
@@ -146,7 +147,9 @@ def check_drop(checks) -> None:
     misses = checks.value(s, "", "misses") or 0
     _report(checks, f"{s} map read Birth every drop loop", reads >= 20 and misses == 0, f"reads={reads} misses={misses}")
     birth = [r for r in rows if _is_birth(r[1])]
-    ok, detail = _covers([r[0] for r in birth], LOOP_MS, pod_birth.LAND_MS - MAX_GAP_MS)
+    # The trace starts with the fall camera, after the arm wait and the zoom
+    # (operator 2026-11-20: the pod births before the camera changes).
+    ok, detail = _covers([r[0] for r in birth], int(ARM_MAX_MS + ZOOM_LENGTH * 1000 + 2 * LOOP_MS), pod_birth.LAND_MS - MAX_GAP_MS)
     _report(checks, f"{s} engine reports Birth over the whole fall", ok and len(birth) == len(rows), f"{detail} birthRows={len(birth)} of {len(rows)}")
     # The map's clip time and the harness's own read agree (same engine).
     gap = [(r[0], (r[1] - r[2]) - r[3]) for r in birth if r[3] >= 0 and abs((r[1] - r[2]) - r[3]) > SYNC_TOL_MS]
@@ -202,9 +205,12 @@ def check_drop(checks) -> None:
         _report(checks, f"{s} even camera speed on leg {lo}-{hi}", ok, f"min={min(steps or [0])} max={max(steps or [0])}")
     # Eye behind the pod on its line: arm = 20 + ray from root to ground.
     ang, pitch_d, _, _ = pod_birth.travel()
-    want0 = CAM_ARM + pod_birth.world(0, 0)[2] / math.sin(math.radians(pitch_d))
+    # The fall camera starts after the zoom (operator 2026-11-20): the arm
+    # at the first traced clip time.
+    t0 = rows[0][1] - rows[0][2]
+    want0 = CAM_ARM + max(pod_birth.world(t0, 0)[2], 0.0) / math.sin(math.radians(pitch_d))
     d0 = yp_rows[0][2] if yp_rows else 0
-    _report(checks, f"{s} arm reaches the pod start", abs(d0 - want0) <= 6.0, f"dist={d0} want~{want0:.1f}")
+    _report(checks, f"{s} arm reaches the pod at the first fall loop", abs(d0 - want0) <= 6.0, f"t0={t0} dist={d0} want~{want0:.1f}")
     # Fixed drop yaw (c_DROP_YAW): pod facing = drop yaw - travel offset,
     # whatever the camera yaw was (engine facing and engine yaw).
     angle, pitch, _, _ = pod_birth.travel()

@@ -17,4 +17,30 @@
     <CSound id="SCOBAPsiHum" parent="PsiDecimator_Amb_Lp">
         <Mode value="2D"/>
     </CSound>
+    <!-- Hero pod fall (operator 2026-11-20: the drop had no sound). The stock
+         TerranDropPod actor (liberty.sc2campaign, not loaded) creates the
+         TerranDropPodImpact sound on creation: Ghost_DropPodImpact0..2.
+         Ghost_DropPodImpact (liberty.sc2mod) plays the same files. 2D: the
+         drop camera starts 60 cells off. Played per seat (systems/hero_drop). -->
+    <CSound id="SCOBAHeroPodFall" parent="Ghost_DropPodImpact">
+        <Mode value="2D"/>
+    </CSound>
+    <!-- Hero jump touchdown sound (REQ-JUMP R-JUMP-8, operator 2026-11-20:
+         "a more appropriate small dirt hit or impact"): the stock light
+         physics impact on dirt. Before: QueenFootstep, stone footsteps. -->
+    <CSound id="ScobaJumpLand" parent="Spell">
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light00.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light01.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light02.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light03.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light04.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light05.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light06.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light07.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light08.wav" FacialGroup=""/>
+        <AssetArray File="Assets\Sounds\PhysicsImpactSound_Dirt_Light09.wav" FacialGroup=""/>
+        <Category value="Combat"/>
+        <Pitch value="-1.000000,1.000000"/>
+        <Volume value="-3.000000,0.000000"/>
+    </CSound>
 </Catalog>

@@ -137,17 +137,41 @@ point gf_HeroDropSide (point lp_at, fixed lp_yaw) {
     return PointWithOffsetPolar(lp_at, c_DROP_CAM_SIDE, lp_yaw - 90.0);
 }
 
-void gf_HeroDropAim (int lp_player, fixed lp_time) {
+// The aim at the current root, no camera write.
+void gf_HeroDropAimCalc (int lp_player) {
     fixed lv_z = gv_dropRootZ[lp_player];
     fixed lv_p = c_POD_BIRTH_PITCH;
     point lv_t = PointWithOffsetPolar(gv_dropRootAt[lp_player], lv_z * Cos(lv_p) / Sin(lv_p), gv_dropTravel[lp_player]);
 
-    lv_t = gf_HeroDropSide(lv_t, gv_dropTravel[lp_player]);
-
-    gv_dropAimAt[lp_player] = lv_t;
+    gv_dropAimAt[lp_player] = gf_HeroDropSide(lv_t, gv_dropTravel[lp_player]);
     gv_dropAimDist[lp_player] = c_DROP_POD_ARM + lv_z / Sin(lv_p);
-    CameraPan(lp_player, lv_t, lp_time, 0.0, 0.0, false);
+}
+
+void gf_HeroDropAim (int lp_player, fixed lp_time) {
+    gf_HeroDropAimCalc(lp_player);
+    CameraPan(lp_player, gv_dropAimAt[lp_player], lp_time, 0.0, 0.0, false);
     CameraSetValue(lp_player, c_cameraValueDistance, gv_dropAimDist[lp_player], lp_time, 0.0, 0.0);
+}
+
+// The drop DOF: near and far, focus on the pod (c_DROP_POD_ARM in front of
+// the eye), the intro's falloffs (operator 2026-11-17). From the zoom's
+// first frame on (operator 2026-11-20: the view had no DOF at the start).
+void gf_HeroDropDof (int lp_player) {
+    CameraSetValue(lp_player, c_cameraValueDepthOfField, 1.0, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFocalDepth, c_DROP_POD_ARM, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFalloffStartNear, c_INTRO_DOF_NEAR_START, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFalloffEndNear, c_INTRO_DOF_NEAR_END, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFalloffStart, c_INTRO_DOF_FAR_START, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFalloffEnd, c_INTRO_DOF_FAR_END, 0.0, 0.0, 0.0);
+}
+
+// Birth clip time on the anchored clock; the script clock from the create
+// when Birth was never reported.
+fixed gf_HeroDropClipNow (int lp_player) {
+    if (gv_dropClipBase[lp_player] >= 0.0) {
+        return TimerGetElapsed(gv_sCOBA_Clock) - gv_dropClipBase[lp_player];
+    }
+    return TimerGetElapsed(gv_sCOBA_Clock) - gv_dropStartAt[lp_player];
 }
 
 // The crash zoom at time lp_t into it, blended over lp_time (0 at the cut).
@@ -155,14 +179,12 @@ void gf_HeroDropAim (int lp_player, fixed lp_time) {
 void gf_HeroDropZoomApply (int lp_player, fixed lp_t, fixed lp_time) {
     fixed lv_w = MinF(MaxF(lp_t / c_DROP_ZOOM_MOVE, 0.0), 1.0);
     fixed lv_e = 1.0 - (1.0 - lv_w) * (1.0 - lv_w) * (1.0 - lv_w);
-    fixed lv_dist1 = c_DROP_POD_ARM + c_POD_BIRTH_START_Z / Sin(c_POD_BIRTH_PITCH);
-    // The look ray through the pod's Birth start meets the ground at the
-    // landing spot, moved by the side arm: the fall's first frame.
-    point lv_target = gf_HeroDropSide(gv_dropGoAt[lp_player], c_DROP_YAW);
 
+    // The end: the fall camera at the clip time the zoom ends on
+    // (gf_HeroDropZoomBegin), so the fall goes on from it.
     gv_dropZoomFov[lp_player] = c_DROP_ZOOM_FOV0 + (c_DROP_ZOOM_FOV1 - c_DROP_ZOOM_FOV0) * lv_e;
-    gv_dropZoomDist[lp_player] = c_DROP_ZOOM_DIST + (lv_dist1 - c_DROP_ZOOM_DIST) * lv_e;
-    CameraPan(lp_player, lv_target, lp_time, 0.0, 0.0, false);
+    gv_dropZoomDist[lp_player] = c_DROP_ZOOM_DIST + (gv_dropZoomDist1[lp_player] - c_DROP_ZOOM_DIST) * lv_e;
+    CameraPan(lp_player, gv_dropZoomAt1[lp_player], lp_time, 0.0, 0.0, false);
     CameraSetValue(lp_player, c_cameraValueYaw, c_DROP_YAW, lp_time, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValuePitch, c_DROP_ZOOM_PITCH + (c_POD_BIRTH_PITCH - c_DROP_ZOOM_PITCH) * lv_e, lp_time, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValueDistance, gv_dropZoomDist[lp_player], lp_time, 0.0, 0.0);
@@ -172,51 +194,44 @@ void gf_HeroDropZoomApply (int lp_player, fixed lp_t, fixed lp_time) {
 }
 
 // The waiting hero's drop starts (R-DROP-10): the drop point in the
-// seat's lane spawn region, off lp_avoidA and lp_avoidB; the scene on;
-// the crash zoom. Callers: the reinforcement (systems/spawns) and the
-// intro deploy. Nothing when no hero waits.
+// seat's lane spawn region, off lp_avoidA and lp_avoidB; the scene on; the
+// pod created and its Birth started. The camera is not touched here: the
+// zoom starts once the engine reports Birth (gf_HeroDropArmStep; operator
+// 2026-11-20). Callers: the reinforcement (systems/spawns) and the intro
+// deploy. Nothing when no hero waits.
 void gf_HeroDropGo (int lp_player, point lp_avoidA, point lp_avoidB) {
+    unit lv_pod;
+
     if (gv_dropPhase[lp_player] != c_DROP_PHASE_WAIT) {
         return;
     }
     gv_dropGoAt[lp_player] = gf_DropPodPoint(gv_sPAWNLOCATIONS[gf_RosterLaneOf(lp_player)], lp_avoidA, lp_avoidB);
     gf_SceneEnter(lp_player, c_SCENE_DROP);
-    gf_CameraFollowStop(lp_player);
-    gf_HeroDropPhase(lp_player, c_DROP_PHASE_ZOOM);
-    gv_dropZooms[lp_player] += 1;
-    gv_dropZoomStart[lp_player] = TimerGetElapsed(gv_sCOBA_Clock);
-    gf_SceneDofDefault(lp_player);
-    gf_HeroDropZoomApply(lp_player, 0.0, 0.0);
-}
-
-// The pod of the zooming hero: a stock pod drop at the drop point, the
-// camera on its Birth root (R-DROP-3, R-DROP-4). The end of the zoom.
-void gf_HeroDropFall (int lp_player) {
-    unit lv_pod;
-    point lv_at = gv_dropGoAt[lp_player];
-
-    if (gv_dropPhase[lp_player] != c_DROP_PHASE_ZOOM || UnitIsValid(gv_dropPod[lp_player])) {
-        return;
-    }
     // As libVCMI_gf_CreateDropPod (voidcampaignmissionlib): create, then
     // Birth on the default slot, non-looping, default time.
     // The pod's travel direction (facing + c_POD_BIRTH_TRAVEL) is the
     // camera yaw, so it falls along the view; the yaw is fixed.
     gv_dropTravel[lp_player] = c_DROP_YAW;
-    UnitCreate(1, c_DROP_POD_UNIT, c_unitCreateIgnorePlacement, lp_player, lv_at, gv_dropTravel[lp_player] - c_POD_BIRTH_TRAVEL);
+    UnitCreate(1, c_DROP_POD_UNIT, c_unitCreateIgnorePlacement, lp_player, gv_dropGoAt[lp_player], gv_dropTravel[lp_player] - c_POD_BIRTH_TRAVEL);
     lv_pod = UnitLastCreated();
     if (!UnitIsValid(lv_pod)) {
         // No pod: the hero waits for the next reinforcement, out of the scene.
-        gf_HeroDropPhase(lp_player, c_DROP_PHASE_WAIT);
         gf_SceneLeave(lp_player, c_SCENE_DROP);
         return;
     }
-    gf_HeroDropPhase(lp_player, c_DROP_PHASE_FALL);
+    // The escort wave (R-DROP-14): pods facing as this pod.
+    gf_DropEscort(lp_player, gv_dropGoAt[lp_player], UnitGetFacing(lv_pod));
+    gf_HeroDropPhase(lp_player, c_DROP_PHASE_ARM);
     libNtve_gf_PlayAnimation(libNtve_gf_MainActorofUnit(lv_pod), c_animNameDefault, c_DROP_CLIP, c_animFlagNonLooping, c_animTimeDefault);
+    // The pod fall sound with the Birth start, this seat only.
+    gv_dropSoundValid = CatalogEntryIsValid(c_gameCatalogSound, c_DROP_SOUND);
+    SoundPlay(SoundLink(c_DROP_SOUND, c_soundIndexAny), PlayerGroupSingle(lp_player), 100.0, 0.0);
+    gv_dropSounds[lp_player] += 1;
     gv_dropPods[lp_player] += 1;
     gv_dropClipReads[lp_player] = 0;
     gv_dropClipMisses[lp_player] = 0;
     gv_dropClipAt[lp_player] = -1.0;
+    gv_dropArmMs[lp_player] = -1.0;
     gv_dropPod[lp_player] = lv_pod;
     gv_dropAt[lp_player] = UnitGetPosition(lv_pod);
     gv_dropFacing[lp_player] = UnitGetFacing(lv_pod);
@@ -224,10 +239,58 @@ void gf_HeroDropFall (int lp_player) {
     gv_dropClipBase[lp_player] = -1.0;
     gv_dropLeg[lp_player] = 0;
     gv_dropLegDirty[lp_player] = true;
+}
+
+// The crash zoom starts on the birthing pod: drop DOF on, the end on the
+// fall camera at the clip time the zoom ends. The intro shot stops here.
+void gf_HeroDropZoomBegin (int lp_player) {
+    gf_IntroCameraRelease(lp_player);
+    gf_CameraFollowStop(lp_player);
+    gf_HeroDropPhase(lp_player, c_DROP_PHASE_ZOOM);
+    gv_dropZooms[lp_player] += 1;
+    gv_dropZoomStart[lp_player] = TimerGetElapsed(gv_sCOBA_Clock);
+    gv_dropZoomClip0[lp_player] = gf_HeroDropClipNow(lp_player);
+    gf_HeroDropRoot(lp_player, gv_dropZoomClip0[lp_player] + c_DROP_ZOOM_LENGTH);
+    gf_HeroDropAimCalc(lp_player);
+    gv_dropZoomAt1[lp_player] = gv_dropAimAt[lp_player];
+    gv_dropZoomDist1[lp_player] = gv_dropAimDist[lp_player];
+    gf_HeroDropDof(lp_player);
+    gf_HeroDropZoomApply(lp_player, 0.0, 0.0);
+}
+
+// The pod exists: wait for the engine to report Birth, then the zoom.
+void gf_HeroDropArmStep (int lp_player) {
+    fixed lv_t = gf_HeroDropClipRead(lp_player);
+    fixed lv_age = TimerGetElapsed(gv_sCOBA_Clock) - gv_dropStartAt[lp_player];
+
+    if (lv_t >= 0.0) {
+        gv_dropClipBase[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) - lv_t;
+        gv_dropArmMs[lp_player] = lv_age * 1000.0;
+        gf_HeroDropZoomBegin(lp_player);
+        return;
+    }
+    if (lv_age >= c_DROP_ARM_MAX) {
+        gv_dropArmLate[lp_player] += 1;
+        gf_HeroDropZoomBegin(lp_player);
+    }
+}
+
+// The end of the zoom: the camera on the pod's Birth root at the current
+// clip time (R-DROP-3, R-DROP-4). The pod already falls.
+void gf_HeroDropFall (int lp_player) {
+    fixed lv_t;
+
+    if (gv_dropPhase[lp_player] != c_DROP_PHASE_ZOOM || !UnitIsValid(gv_dropPod[lp_player])) {
+        return;
+    }
+    gf_HeroDropPhase(lp_player, c_DROP_PHASE_FALL);
+    lv_t = MinF(MaxF(gf_HeroDropClipNow(lp_player), 0.0), c_DROP_FALL);
+    gv_dropLeg[lp_player] = 0;
+    gv_dropLegDirty[lp_player] = true;
     // The camera targets the root, not the unit: no unit follow. Each loop
     // pans to the root's next point (gf_HeroDropStep).
     // The camera's aim is the engine point on the Birth root.
-    gf_HeroDropRoot(lp_player, 0.0);
+    gf_HeroDropRoot(lp_player, lv_t);
     gf_CameraFollowStop(lp_player);
     gv_cameraDistanceDesired[lp_player] = c_DROP_CAM_DISTANCE;
     // Behind the pod on its line, on the side arm: same yaw, the descent
@@ -235,18 +298,12 @@ void gf_HeroDropFall (int lp_player) {
     CameraSetValue(lp_player, c_cameraValueYaw, gv_dropTravel[lp_player], 0.0, 0.0, 0.0);
     CameraSetValue(lp_player, c_cameraValuePitch, c_POD_BIRTH_PITCH, 0.0, 0.0, 0.0);
     gf_HeroDropAim(lp_player, 0.0);
-    // FOV: narrow at the start, up to c_DROP_FOV_END at touchdown, one move
-    // over the fall. No engine getter for the player FOV: operator check.
-    CameraSetValue(lp_player, c_cameraValueFieldOfView, c_DROP_FOV_START, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFieldOfView, c_DROP_FOV_END, c_DROP_FALL, 0.0, 0.0);
-    // Near and far DOF, focus on the pod (c_DROP_POD_ARM in front of
-    // the eye), the intro's falloffs (operator 2026-11-17).
-    CameraSetValue(lp_player, c_cameraValueDepthOfField, 1.0, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFocalDepth, c_DROP_POD_ARM, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFalloffStartNear, c_INTRO_DOF_NEAR_START, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFalloffEndNear, c_INTRO_DOF_NEAR_END, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFalloffStart, c_INTRO_DOF_FAR_START, 0.0, 0.0, 0.0);
-    CameraSetValue(lp_player, c_cameraValueFalloffEnd, c_INTRO_DOF_FAR_END, 0.0, 0.0, 0.0);
+    // FOV: c_DROP_FOV_START at the Birth start, c_DROP_FOV_END at
+    // touchdown, one move; joined at this clip time. No engine getter for
+    // the player FOV: operator check.
+    CameraSetValue(lp_player, c_cameraValueFieldOfView, c_DROP_FOV_START + (c_DROP_FOV_END - c_DROP_FOV_START) * lv_t / c_DROP_FALL, 0.0, 0.0, 0.0);
+    CameraSetValue(lp_player, c_cameraValueFieldOfView, c_DROP_FOV_END, MaxF(c_DROP_FALL - lv_t, c_DROP_TICK), 0.0, 0.0);
+    gf_HeroDropDof(lp_player);
     gv_cAMERAFOV[lp_player] = c_SCOBA_REST_FOV;
     gf_HeroDropCamera(lp_player, 0.0, 0.0);
 }
@@ -285,12 +342,14 @@ void gf_HeroDropLand (int lp_player) {
     // The bind follows the hero; nothing else may stay in the follow.
     gf_CameraFollowStop(lp_player);
     gf_HeroBindPlayer(lp_player, lv_hero);
-    // The bind starts in Point & Click (gf_PncEnsure); the TPS mode the
-    // hero had comes back after it.
-    if (gv_dropTps[lp_player]) {
-        UnitBehaviorAdd(lv_hero, c_SCOBA_TPS_BEHAVIOR, lv_hero, 1);
-        gf_ControlModeApply(lp_player);
-    }
+    // The bind starts in Point & Click (gf_PncEnsure) with the arm by unit
+    // height. Every touchdown then starts in TPS at the minimum arm
+    // (operator 2026-11-20). TPS goes on through its toggle command, as
+    // the HUD button does (gf_HeroDropTpsOn). Adding the behavior directly
+    // left the toggle off: its off command was hidden and a TPS-off order
+    // did nothing (herodrop/20261120-210634; operator 2026-11-20: buggy).
+    gv_dropTpsArm[lp_player] = true;
+    gf_HeroDropTpsOn(lp_player, lv_hero);
     // The pod opens: its death clip opens the doors.
     UnitKill(lv_pod);
     // A toggle order in the loop of the revive did not take
@@ -311,6 +370,21 @@ void gf_HeroDropZoomStep (int lp_player) {
     gf_HeroDropZoomApply(lp_player, lv_t + c_DROP_TICK, MinF(c_DROP_TICK, c_DROP_ZOOM_LENGTH - lv_t));
 }
 
+// TPS on through the toggle command; once it is on, the touchdown arm
+// (the collision tick moves the camera to it), one time.
+void gf_HeroDropTpsOn (int lp_player, unit lp_hero) {
+    if (!gf_TpsActive(lp_player)) {
+        UnitIssueOrder(lp_hero, Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        gv_dropTpsOrders[lp_player] += 1;
+        return;
+    }
+    if (gv_dropTpsArm[lp_player]) {
+        gv_dropTpsArm[lp_player] = false;
+        gf_ControlModeApply(lp_player);
+        gv_cameraDistanceDesired[lp_player] = c_DROP_LAND_ARM;
+    }
+}
+
 // The toggles the hero had (R-DROP-6), after the revive. gf_ToggleSet
 // does nothing once a toggle matches.
 void gf_HeroDropRestore (int lp_player) {
@@ -323,6 +397,7 @@ void gf_HeroDropRestore (int lp_player) {
     if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
         return;
     }
+    gf_HeroDropTpsOn(lp_player, lv_hero);
     gf_AttackSingleSet(lv_hero, gv_dropSingle[lp_player]);
     gf_ChaseStandSet(lv_hero, gv_dropStand[lp_player]);
 }
@@ -408,7 +483,10 @@ bool gt_HeroDropTick_Func (bool testConds, bool runActions) {
         }
         gf_HeroDropRestore(lv_p);
         gf_HeroDropTrack(lv_p);
-        if (gv_dropPhase[lv_p] == c_DROP_PHASE_ZOOM) {
+        if (gv_dropPhase[lv_p] == c_DROP_PHASE_ARM) {
+            gf_HeroDropArmStep(lv_p);
+        }
+        else if (gv_dropPhase[lv_p] == c_DROP_PHASE_ZOOM) {
             gf_HeroDropZoomStep(lv_p);
         }
         else {

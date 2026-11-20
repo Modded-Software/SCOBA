@@ -18,6 +18,7 @@ from hdtex import (
     models,
     pipeline,
     roles,
+    variants,
 )
 from hdtex.catalog import Catalog, CatalogError
 
@@ -188,6 +189,16 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("smaller", models.judge(self.use(), small).reason)
         with mock.patch.object(models, "MODEL_MAX_SIZE", SIZE):
             self.assertIn("already", models.judge(self.use(), TEXTURES["tree_diffuse.dds"]).reason)
+            # A texture the operator named is upscaled at any size.
+            with mock.patch.object(models, "ALWAYS_UPSCALE", frozenset({"assets\\textures\\a.dds"})):
+                self.assertEqual(models.judge(self.use(), TEXTURES["tree_diffuse.dds"]).role, "diffuse")
+
+    def test_a_named_texture_is_kept_larger_than_the_others(self) -> None:
+        with mock.patch.object(models, "MAX_SIZES", {"assets\\textures\\a.dds": 4096}):
+            self.assertEqual(models.max_size("assets\\textures\\a.dds", 2048), 4096)
+            self.assertEqual(models.max_size("assets\\textures\\b.dds", 2048), 2048)
+        self.assertEqual(variants.VARIANTS["upscale"].model_for("color", "commandcenter_remastered_diff"), "seedvr2")
+        self.assertEqual(variants.VARIANTS["upscale"].model_for("color", "commandcenter_remastered_emis"), "pbrify")
 
     def test_dxt1_with_transparent_pixels_is_left(self) -> None:
         block = bytes([0x00, 0x00, 0xFF, 0xFF]) + (0xFFFFFFFF).to_bytes(4, "little")

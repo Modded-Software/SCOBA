@@ -6,6 +6,7 @@
 // the pathing grid of whole cells around the hall.
 // scripts/testkit/profiles/baseai_hall.py compares it with the generated cells.
 
+const fixed c_BH_MORPH_MAX = 90.0;        // game s, a morph to finish
 const int c_BH_SUB = 18;                 // grid half size in 0.5 sub-cells (36x36: 9 cells each way)
 const fixed c_BH_SYNC_WAIT = 2.0;
 const fixed c_BH_LEG = 6.5;              // a leg centre on each axis: scale 2.88, facing 225 (SPEC-SCALED-FOOTPRINTS 5)
@@ -257,6 +258,38 @@ void gf_BhMine (string lp_k, unit lp_cc, int lp_p) {
     BankSave(gv_dbgBank);
 }
 
+// A Command Center created at lp_a and morphed by lp_abil to lp_type
+// (R-FP-10: every town hall form blocks its legs). Snaps lp_k + "Morph"
+// 5 game s into the morph (an Orbital morph once opened the legs at its
+// start, macro run 20261119-175309), lp_k when the type is lp_type, and
+// lp_k + "Dead".
+void gf_BhMorph (string lp_k, string lp_abil, string lp_type, point lp_a, point lp_b, int lp_p) {
+    string lv_s = "ba_hall";
+    unit lv_cc;
+    fixed lv_t = 0.0;
+
+    PlayerModifyPropertyInt(lp_p, c_playerPropMinerals, c_playerPropOperSetTo, 2000);
+    PlayerModifyPropertyInt(lp_p, c_playerPropVespene, c_playerPropOperSetTo, 2000);
+    UnitCreate(1, "CommandCenter", 0, lp_p, lp_a, 270.0);
+    lv_cc = gf_BhScript(UnitLastCreated());
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, lp_k + "Issued", gf_BaFlagInt(UnitIssueOrder(lv_cc, Order(AbilityCommand(lp_abil, 0)), c_orderQueueReplace)));
+    Wait(5.0, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lv_s, lp_k + "MorphOrder", gf_BhOrder(lv_cc));
+    gf_BhSnap(lp_k + "Morph", lv_cc, lp_a, lp_b, lp_p);
+    while (UnitGetType(lv_cc) != lp_type && lv_t < c_BH_MORPH_MAX) {
+        Wait(0.5, c_timeGame);
+        lv_t += 0.5;
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, lp_k + "Seconds", FixedToInt(lv_t) + 5);
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lv_s, lp_k + "Foot", CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_cc), "Footprint", lp_p));
+    gf_BhSnap(lp_k, lv_cc, lp_a, lp_b, lp_p);
+    UnitKill(lv_cc);
+    Wait(c_BH_SYNC_WAIT, c_timeGame);
+    gf_BhSnap(lp_k + "Dead", lv_cc, lp_a, lp_b, lp_p);
+}
+
 void gf_BhHall () {
     string lv_s = "ba_hall";
     int lv_p = gf_BaseAiLaneOwner(1);
@@ -332,6 +365,12 @@ void gf_BhHall () {
     UnitKill(lv_cc);
     Wait(c_BH_SYNC_WAIT, c_timeGame);
     gf_BhSnap("dead", lv_cc, lv_a, lv_b, lv_p);
+
+    // The morphs keep the legs. No tech buildings in this scenario.
+    TechTreeRequirementsEnable(lv_p, false);
+    gf_BhMorph("oc", "UpgradeToOrbital", "OrbitalCommand", lv_a, lv_b, lv_p);
+    gf_BhMorph("pf", "UpgradeToPlanetaryFortress", "PlanetaryFortress", lv_a, lv_b, lv_p);
+    TechTreeRequirementsEnable(lv_p, true);
 
     // Last, so their AI does not mine into the counts above: the starting
     // halls of the Terran lanes 1-3, by the game's lane start

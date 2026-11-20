@@ -36,7 +36,14 @@ BALANCE_STEP = 1  # c_AIR_CREEP_BALANCE_STEP, units per formation
 WAVE_TOL_MS = 2500  # wider than the 0.25 s poll and the 0.5 s harness start
 PERIOD_MS = 20000
 PHASE_MS = 10000
-START_MS = 10000  # first (Zerg) slot after map start
+# First (Zerg) slot: 1 s into the first S7 of the intro, the shot that
+# looks up at the Overmind (50..57 s; operator 2026-11-20: the Mutalisks
+# are born in that shot).
+S7_START_MS = 50000
+S7_END_MS = 57000
+START_MS = 51000
+EARLY_MS = 5000  # c_AIR_CREEP_EARLY: Mutalisks; Wraiths at twice this
+EARLY_TOL_MS = 1500  # under half the stagger: 5 s and 10 s must differ
 CAP = 32
 SIDES = {
     "zerg": {"type": "SCOBAMutalisk", "owner": 4, "weapon": "SCOBAAirGlaive"},
@@ -97,14 +104,26 @@ def check_timer(checks) -> None:
     print(f"{s} raw: " + " ".join(f"{k}={checks.value(s, '', k)}" for k in keys))
     # zerg2Ms / terran2Ms: first wave seen; zerg4Ms / terran4Ms: second wave.
     # at*Zerg / at*Terran: units made so far (spawn counter), not live units.
-    # Negative: no wave of either side at map start.
-    checks.eq(s, "", "firstWavesZerg", 0)
-    checks.eq(s, "", "firstWavesTerran", 0)
-    checks.eq(s, "", "firstZerg", 0)
-    checks.eq(s, "", "firstTerran", 0)
+    # Early waves (operator 2026-11-20): Mutalisks at 5 s, Wraiths at 10 s,
+    # one each (read at 15 real s; negative: not two). Negative: nothing at
+    # 3 s. The Mutalisks see no air creeps (8..12); the Wraiths see them
+    # and are behind (+1: 8).
+    print(f"{s} raw start: " + " ".join(f"{k}={checks.value(s, '', k)}" for k in ("start3Waves", "start3Alive", "earlyZergMs", "earlyTerranMs", "start5Zerg", "start5Terran", "start5WavesZerg", "start5WavesTerran", "start5BalTerran")))
+    checks.eq(s, "", "start3Waves", 0)
+    checks.eq(s, "", "start3Alive", 0)
+    checks.between(s, "", "earlyZergMs", EARLY_MS - EARLY_TOL_MS, EARLY_MS + EARLY_TOL_MS)
+    checks.between(s, "", "earlyTerranMs", 2 * EARLY_MS - EARLY_TOL_MS, 2 * EARLY_MS + EARLY_TOL_MS)
+    checks.eq(s, "", "start5WavesZerg", 1)
+    checks.eq(s, "", "start5WavesTerran", 1)
+    checks.between(s, "", "start5Zerg", 2 * ZERG_MIN_PER_DIR, 2 * ZERG_MAX_PER_DIR)
+    checks.eq(s, "", "start5Terran", 2 * (TERRAN_PER_DIR + BALANCE_STEP))
+    z0, t0 = checks.value(s, "", "start5Zerg") or 0, checks.value(s, "", "start5Terran") or 0
     # Waves at START (Zerg), START + 10 (Terran), START + 20 (Zerg),
     # START + 30 (Terran) s.
+    checks.eq(s, "", "shiftMs", START_MS - 10000)
     checks.between(s, "", "zerg2Ms", START_MS - WAVE_TOL_MS, START_MS + WAVE_TOL_MS)
+    # Inside the first S7, with room for the 1.4 s Birth clip.
+    checks.between(s, "", "zerg2Ms", S7_START_MS, S7_END_MS - 2000)
     checks.between(s, "", "terran2Ms", START_MS + PHASE_MS - WAVE_TOL_MS, START_MS + PHASE_MS + WAVE_TOL_MS)
     checks.between(s, "", "zerg4Ms", START_MS + PERIOD_MS - WAVE_TOL_MS, START_MS + PERIOD_MS + WAVE_TOL_MS)
     checks.between(s, "", "terran4Ms", START_MS + PHASE_MS + PERIOD_MS - WAVE_TOL_MS, START_MS + PHASE_MS + PERIOD_MS + WAVE_TOL_MS)
@@ -126,20 +145,19 @@ def check_timer(checks) -> None:
             ok = None not in (own, enemy, step) and step == _balance_step(own, enemy)
             _report(checks, f"{s} {side} wave {n} balance follows the counts", ok, f"own={own} enemy={enemy} step={step}")
             bal[(side, n)] = step if isinstance(step, int) else 0
-    # The first Zerg wave sees no air creeps: no change (negative).
-    _report(checks, f"{s} first Zerg wave balance 0", bal[("zerg", 1)] == 0, f"step={bal[('zerg', 1)]}")
 
     def zrange(step: int) -> tuple[int, int]:
         return 2 * (ZERG_MIN_PER_DIR + step), 2 * (ZERG_MAX_PER_DIR + step)
 
-    # Units made between the waves. Negative: nothing before the first slot
-    # and nothing outside a wave.
-    checks.eq(s, "", "at5Zerg", 0)
-    checks.eq(s, "", "at5Terran", 0)
-    checks.between(s, "", "at15Zerg", *zrange(bal[("zerg", 1)]))
-    checks.eq(s, "", "at15Terran", 0)
+    # Units made between the waves. Negative: nothing between the start
+    # waves and the first slot, and nothing outside a wave.
+    checks.eq(s, "", "at5Zerg", z0)
+    checks.eq(s, "", "at5Terran", t0)
+    zr1 = zrange(bal[("zerg", 1)])
+    checks.between(s, "", "at15Zerg", z0 + zr1[0], z0 + zr1[1])
+    checks.eq(s, "", "at15Terran", t0)
     checks.eq(s, "", "at25Zerg", checks.value(s, "", "at15Zerg"))
-    checks.eq(s, "", "at25Terran", 2 * (TERRAN_PER_DIR + bal[("terran", 1)]))
+    checks.eq(s, "", "at25Terran", t0 + 2 * (TERRAN_PER_DIR + bal[("terran", 1)]))
     z25, z35 = checks.value(s, "", "at25Zerg"), checks.value(s, "", "at35Zerg")
     zr2 = zrange(bal[("zerg", 2)])
     _report(checks, f"{s} second Zerg wave size", z25 is not None and z35 is not None and zr2[0] <= z35 - z25 <= zr2[1],
@@ -148,8 +166,8 @@ def check_timer(checks) -> None:
     checks.eq(s, "", "timerDurationMs", PHASE_MS)
     # The tick is real time like the reinforcement timer; the wave counters
     # agree with the engine counts.
-    checks.eq(s, "", "wavesZerg", 2)
-    checks.eq(s, "", "wavesTerran", 2)
+    checks.eq(s, "", "wavesZerg", 3)
+    checks.eq(s, "", "wavesTerran", 3)
 
 
 # --- wave -------------------------------------------------------------------
@@ -230,6 +248,15 @@ def check_wave(checks) -> None:
         checks.eq(s, "", "after", made)
         # Negative: a wave of one side makes none of the other.
         checks.eq(s, "", "otherSide", 0)
+        # Birth (operator 2026-11-20): every Mutalisk starts its Birth clip
+        # and the engine reports a clip in that slot. Negative: no Wraith does.
+        print(f"{s} raw births={checks.value(s, '', 'births')} birthLen100={checks.value(s, '', 'birthLen100')}")
+        if side == "zerg":
+            checks.eq(s, "", "births", made)
+            checks.gt(s, "", "birthLen100", 0)
+        else:
+            checks.eq(s, "", "births", 0)
+            checks.between(s, "", "birthLen100", -999999, 0)
         for tag in tags:
             _check_wave_unit(checks, s, tag, side)
         # Formations: one per X, sized per side; each flies to one spot.

@@ -16,6 +16,9 @@ resolve_root() {
     return 1
 }
 ROOT_DIR="$(resolve_root)" || { printf 'ERROR: cannot locate project root\n' >&2; exit 1; }
+# shellcheck source=env/gpu-env.sh
+source "$ROOT_DIR/env/gpu-env.sh" || exit 1  # the shell names the cause
+sc2_apply_gpu_env
 if [ "${SC2_PLAYTEST_ACTIVE:-}" != "1" ]; then
     exec bash "$ROOT_DIR/scripts/playtest.sh" launch
 fi
@@ -60,6 +63,12 @@ fail() {
     log "ERROR: $*" >&2
     exit 1
 }
+
+if [ -n "${LSFGVK_GPU:-}" ]; then
+    log "gpu: game $DRI_PRIME, frame generation $LSFGVK_GPU"
+else
+    log "gpu: game $DRI_PRIME"
+fi
 
 [ -e "$MAP_SOURCE" ] || fail "map not found: $MAP_SOURCE"
 [ -f "$SC2_EXE" ] || fail "StarCraft II not found: $SC2_EXE"

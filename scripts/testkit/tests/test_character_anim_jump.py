@@ -133,7 +133,7 @@ class JumpClipPlanTest(unittest.TestCase):
         for bare in ("Jump,Start,Leg", "Jump,Leg", "Jump,End,Leg"):
             self.assertNotIn(f'"{bare}"', text)
 
-    def test_thump_is_the_light_dust_and_the_queen_sound(self) -> None:
+    def test_thump_is_the_light_dust_and_the_dirt_impact_sound(self) -> None:
         from footfall.fx import FOOTFALL_UNITS, sound_xml
 
         units = {spec.unit: spec for spec in FOOTFALL_UNITS}
@@ -146,9 +146,17 @@ class JumpClipPlanTest(unittest.TestCase):
         # The light physics impact puff; JumpLandDust was too large (operator).
         self.assertIn(r"PhysicsImpactDustLight\PhysicsImpactDustLight.m3", block.group(1))
         self.assertNotIn("JumpLandDust", block.group(0))
-        # The light Queen footfall; the Goliath one was too big (operator 2026-11-17).
-        self.assertIn(f'<CSound id="{sound}"', sound_xml(units["Queen"]))
-        self.assertNotIn(f'<CSound id="{sound}"', sound_xml(units["Goliath"]))
+        # A light dirt impact (operator 2026-11-20), not a footfall: the Queen's
+        # were stone footsteps, the Goliath's too big (operator 2026-11-17).
+        sounds = (APP.parents[1] / "Base.SC2Data" / "GameData" / "SoundData.xml").read_text(encoding="utf-8")
+        entry = re.search(rf'<CSound id="{sound}"[^>]*>(.*?)</CSound>', sounds, re.S)
+        self.assertIsNotNone(entry, f"{sound} not in the source SoundData")
+        files = re.findall(r'<AssetArray File="([^"]+)"', entry.group(1))
+        self.assertEqual(len(files), 10)
+        for file in files:
+            self.assertIn("PhysicsImpactSound_Dirt_Light", file)
+        for unit in ("Queen", "Goliath"):
+            self.assertNotIn(f'<CSound id="{sound}"', sound_xml(units[unit]))
 
     def test_constants_match_requirement(self) -> None:
         self.assertEqual(galaxy_fixed("c_JUMP_PEAK"), 0.6)

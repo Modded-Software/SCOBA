@@ -45,6 +45,22 @@ GRASS_LAND_NOISE = 0.8  # land grass only where noise exceeds this (operator: le
 RIVER_MIN_PER_100 = 6  # build check: props per 100 water cells
 FLORA_CAP = 8000  # build check: total flora and hazard props (load time, frame rate)
 
+# Pool gardens (operator 2026-11-20: "the pools need vegetation around"). A
+# pool is the water of these types that the water feature step carved
+# (mapgen/waterfeatures, SITE_WATER). Its plants are placed before every
+# other family, in a ring round the water, with their own spacing.
+POOL_WATER = ("Albion",)
+POOL_GARDEN_BAND = 3.5  # cells from the water's edge
+POOL_GARDEN_SLOPE = 0.8  # no plants on the pool walls
+# Family -> spacing between two of its plants in the ring, densest last.
+POOL_GARDEN = {
+    "ZerusSwampPlantsLarge": 3.5,
+    "ZerusPlantClusterSmall": 2.5,
+    "ZerusPlant": 2.0,
+    "ZerusSwampPlants": 1.5,
+    "ZerusTallGrassCluster": 1.5,
+}
+
 # Keep-outs (radius around the object).
 KEEP_HERO = 12.0  # player 1 units and the faction heroes
 HERO_UNITS = ("Kerrigan", "Tosh")

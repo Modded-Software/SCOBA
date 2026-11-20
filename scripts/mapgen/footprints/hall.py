@@ -190,6 +190,8 @@ def hall_footprint_xml(hall: Hall) -> str:
 
 def hall_footprints(data: dict, actor_text: str) -> dict[str, Hall]:
     """Unit -> its rows, at the unit's drawn scale (hall_scale)."""
+    if not config.HALL_FOOTPRINTS_ON:
+        return {}
     return {unit: hall_shape(data, model, hall_scale(data, actor_text, unit, model))
             for unit, model in sorted(config.HALL_UNITS.items())}
 
@@ -197,6 +199,10 @@ def hall_footprints(data: dict, actor_text: str) -> dict[str, Hall]:
 def check_halls(footprints: dict[str, str], units: dict[str, str], data: dict, actor_text: str) -> list[str]:
     """Every hall unit links its measured footprint, with the measured rows."""
     problems = []
+    if config.HALL_FOOTPRINTS_ON:
+        scales = {unit: actor_scale(actor_text, unit) for unit in sorted(config.HALL_UNITS)}
+        if len(set(scales.values())) > 1:
+            return [f"town halls are drawn at different actor scales: {scales}"]
     for unit, hall in hall_footprints(data, actor_text).items():
         want = hall_footprint_id(hall)
         fp = re.search(r'<Footprint value="([^"]+)"/>', units.get(unit, ""))

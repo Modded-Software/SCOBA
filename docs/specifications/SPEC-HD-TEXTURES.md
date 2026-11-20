@@ -256,8 +256,8 @@ the GPU.
 Open, from the requirements: O-HD-1, O-HD-2, O-HD-3, O-HD-4.
 
 The web page is `build/hdtex/compare/index.html`. It opens from disk. It
-shows each plane of each texture of every cached source: 381 entries for
-the caches of 2026-11-20, 27 terrain and 354 model. A page per source is
+shows each plane of each texture of every cached source: 438 entries for
+the caches of 2026-11-20, 27 terrain and 411 model. A page per source is
 written next to it, `compare/<source>/index.html`.
 
 The left side lists the entries with a small picture each, grouped by
@@ -338,8 +338,8 @@ The 215 tests include tests of other tooling in the work tree.
 ## 12. Model Textures (proof of concept)
 
 **State: built, not finished.** Host tests pass. The real cache is built and
-fails `verify` for 35 of 194 textures. The map builds with it and passes
-validation: 210 textures, 152 model files. It was launched once with the
+fails `verify` for 43 of 226 textures. The map builds with it and passes
+validation: 242 textures, 159 model files. It was launched once with the
 first scope (doodads, Command Center, psi destroyer): stamp matched, no
 texture warning in `Graphics.txt`. It was not launched with the later units.
 
@@ -348,7 +348,9 @@ build places most doodads.
 
 Named units, `models.MODEL_UNITS`: `CommandCenter`, `PsiDecimator`,
 `HybridUltraliskShackled`, `VikingAssault`, `VikingFighter`, `Overlord`, `MengskBC`, `SensorTower`,
-`Hellion`, `Goliath`.
+`Hellion`, `Goliath`, `Marine`, `SCV`, `Battlecruiser`, `Hydralisk`,
+`Ultralisk`, `Drone`, `Hatchery`. The last seven show classic models
+(section 13).
 `MengskBC` shows the model file `BattlecruiserLoki.m3`.
 The vista overlord (`SCOBAVistaOverlord`) shows the model `Overlord`.
 
@@ -385,18 +387,26 @@ Roles added: `data` (amounts in every channel, byte-averaged mips) and
 `normal_red` (a normal map with blue 0 and a red channel of its own; what
 red means there is not known, it is kept as an amount).
 
-Census of 2026-11-20, `hd_textures.py census`: 36 `CModel` entries, 152 model
-files, 204 textures: 147 DXT5, 56 DXT1, 1 DXT3. 194 are upscaled, 16 of
-them flip books. 10 are left: the 4 main textures of the Hellion, which are
-2048x1024 already, 4 normal layers of displacement materials, 1 DXT3, 1 of
-4x4 pixels. `radius2` was upscaled for the tar pit before; the death model
+Census of 2026-11-20, `hd_textures.py census`: 43 `CModel` entries, 159 model
+files, 250 textures: 179 DXT5, 69 DXT1, 2 DXT3. 226 are upscaled, 19 of
+them flip books; 2 of them are the 2048 colour and normal textures of the
+classic Command Center, kept at 4096 (R-HD-64, `models.ALWAYS_UPSCALE`,
+`models.MAX_SIZES`; both pass `verify`; 22 MB each). The colour plane of
+`commandcenter_remastered_diff` is made by `seedvr2` from the original
+(`variants.VARIANTS["upscale"].textures`); its mask and the normal map by
+`fast`. The upscaler makes 4x only, so 2048 gives 8192, halved once to
+4096. Whether the game loads a 4096 model texture named by a model file
+is not known; the terrain ones load (H11). 24 are left: 17 that are
+2048 on a side already (the
+Hellion, the classic Marine, Hatchery, Lair, and Hive), 3
+normal layers of displacement materials, 2 cube maps, 1 DXT3, 1 of 4x4 pixels. `radius2` was upscaled for the tar pit before; the death model
 of the battlecruiser names it in a displacement material, so it is left.
 
 Open:
 
-- `verify` fails 35 textures with the limits of section 6. 17 miss the seam
+- `verify` fails 43 textures with the limits of section 6. 26 miss the seam
   limit; a model texture is mostly an atlas that does not tile, so that limit
-  and the upscaler's tiling option may not fit it. 16 miss the coarse RMSE
+  and the upscaler's tiling option may not fit it. 15 miss the coarse RMSE
   limit, most of them glows and particles. 2 miss the encode limit and 2 the
   correlation limit. Two textures miss two limits. The limits were not changed.
 - Not tested by a program: that the game shows a patched model copy, and that
@@ -408,6 +418,111 @@ Open:
   unit whose model is patched. The measured shapes are the same.
 - R-HD-40 did not hold as written: the encode and inject stages changed.
 
+## 13. Classic Skins
+
+**State: built, not verified in the game.** R-HD-60 to R-HD-63.
+
+The game swaps a skin in by model entry: a `CSkin` lists pairs of `CModel`
+ids, From and To. `scripts/hdtex/classic_skins.py` reads those pairs for the
+skins in `SKINS` from the game data and writes them into the map's own
+`ModelData.xml`: each From entry takes the fields of its To entry that
+differ. That is the model file, for a portrait also the picture and the
+light, and here and there a radius or a low-quality model. The From entry
+keeps its id. So the map's own fields stay (`Battlecruiser` `AnimSpeed`,
+`Hive` `ScaleMax`), and hit volumes, camera heights, and HD textures find
+the classic model by the usual chain.
+
+- 62 entries are written. An entry the map sets itself takes the lines
+  into its own element, each marked `<!-- classic skins -->`. The others
+  stand in one marked block. A second run changes nothing.
+- `Ultralisk` drops `RequiredAnims` (`index="0" removed="1"`): the skin's
+  entry has none. Not tested in the game.
+- A light is named only when the game has a `CLight` of that id.
+- `CommandCenterRemastered` is in (R-HD-62). The Orbital Command
+  and the Planetary Fortress show the `CommandCenter` model, so they change
+  with it. The classic model has the 34 animation names of the stock one.
+  The hall footprint is measured on the classic model: bones `Leg1..3`,
+  `LegPlate`, `LegPlate2` (SPEC-SCALED-FOOTPRINTS). The foot marks of the
+  Alt+0 paint (`systems/hall_paint`) are still those of the stock model.
+  Whether the blocked cells sit on the classic legs is an operator check
+  (O-HD-6).
+- The SCV is drawn at 200%: `CActorUnit` `SCV` `Scale` 2 (operator
+  2026-11-20; 150% first). Its unit data (radius, speed) is as before.
+- Not in the game data, left out: `CommandCenterDeathUnderConstruction`.
+  `Flags` of the skin's portrait entries are not copied.
+- An injected map holds `.hd_models`: the `Model` each entry of the map's
+  own catalog named before a copy took its place. A second read of the map
+  (`census`, a cache build) puts it back. Without it the classic units
+  resolved to their stock models there.
+- The tool reads the game install. Its result is in `src/` and committed;
+  the build does not read the install.
+- Hit volumes were measured again. Camera heights: Ultralisk 5.1374 to
+  4.8761, Command Center 11.1465 to 14.1710, Orbital Command and Planetary
+  Fortress 2.6539 to 14.1710 (their actors now have the Command
+  Center's scale), SCV 1.0172 to 2.0345.
+- Not known: whether the game shows a skin's model files to a player who
+  does not own the skin. The files are in the game's base archives.
+
+| Requirement | Evidence |
+| --- | --- |
+| R-HD-60 | [host] `tests/models/test_classic_skins.py`: `SwapTest`, `MapDataTest`. [built] the map build resolves the classic files: `hd_textures.py census` lists their textures. Not seen in the game. |
+| R-HD-61 | [host] `MergeTest`. |
+| R-HD-62 | [host] `MapDataTest.test_the_command_center_shows_its_classic_model`; [built] the built `UnitData.xml` links the measured hall footprint. Not seen in the game. |
+| R-HD-63 | [built] census and `verify` output of 2026-11-20. |
+| R-HD-64 | [host] `test_hdtex_models.py` `test_other_formats_small_and_large_files_are_left`. [built] `verify` output of 2026-11-20. The look is O-HD-6. |
+
+## 14. Back Faces
+
+**State: built, not verified in the game.** R-HD-70 to R-HD-72.
+
+The game draws a triangle from its front only. The stock psi destroyer
+(`PsiDisintegratorDoodad.m3`) is made for a camera above it: pipes are open
+tubes, plates have no underside. The third-person camera gets under and
+beside them and sees through.
+
+`scripts/hdtex/model_backfaces.py` runs in the map build (`expand_map.py`). It
+reads the stock model from the game install and writes a changed copy into
+the map at the game's own path, so no catalog changes. The HD step copies
+it from there (section 12, `models.MAP_MARK`).
+
+- Found: the hull is one region of 12800 triangles in 57 connected pieces.
+  54 pieces are open; they have 1250 open edges (edges with one triangle).
+  The other 8 regions are glass and energy effects and are left.
+- Every triangle of a solid, one-sided region (standard material, blend
+  mode opaque, not two-sided) gets a back: a new region with the same
+  triangles, two corners swapped. All 12800, not only those of the open
+  pieces: the camera can also be inside a closed piece.
+- The back stands on copies of the region's vertices (17722 for the hull;
+  the model grows from 19417 to 37139 vertices). A copy keeps position,
+  bones, texture coordinates and tangent. Its normal is negated, so the
+  back is lit as a surface that faces the other way. Its `sign` is negated
+  too: the third axis of the normal map is sign x (normal cross tangent),
+  and so stays where it was.
+- The back shows the texture of the front, seen mirrored (operator
+  2026-11-20: "texture from front of face mirrored on back instead of
+  solid color"). Its material is a copy of the front's material, named
+  with the suffix ` ScobaBackFace`, with all layers kept and two flags
+  added: no shadows cast (a back lies in the plane of its front and would
+  shade it) and no hit test. The HD step patches its texture names like
+  those of any material.
+- Earlier tries. (1) A colour-only diffuse layer, unshaded: in the game
+  the backs were flat bright red, the colour of the owner (operator's
+  screenshot). Assumed cause: a standard material shows the owner's colour
+  where the diffuse texture is transparent, and a layer without a texture
+  counts as transparent. (2) An opaque 16x16 dark gray texture, unshaded:
+  built, replaced by the operator's request before a report from the game.
+- A front and its back are never drawn for the same eye, so they do not
+  fight over depth.
+- Not known: how the engine lights the backs (inside a pipe they may be
+  dark or oddly lit), and whether the front now receives a shadow from
+  geometry it did not before. Not seen in the game.
+
+| Requirement | Evidence |
+| --- | --- |
+| R-HD-70 | [host] `tests/models/test_model_backfaces.py` `BackFaceTest`, `TurnTest`. [built] the model in the built map was read back: 10 regions, the last with 12800 turned triangles on 17722 copied vertices with negated normals and equal texture coordinates; its material names the hull's (HD) diffuse and normal textures. Not seen in the game (O-HD-7). |
+| R-HD-71 | [host] `test_the_faces_the_model_had_are_untouched`, `test_the_material_of_the_front_keeps_its_flags`, `test_only_the_solid_one_sided_region_gets_backs`. |
+| R-HD-72 | [host] `SurveyTest`. [built] the build log line of `PsiDisintegratorDoodad.m3`. |
+
 ## 11. Commands
 
 | Command | Does |
@@ -418,6 +533,7 @@ Open:
 | `uv run python scripts/hd_textures.py [--variant KEY] verify` | Check a variant's cache against its manifest and the limits. |
 | `uv run python scripts/hd_textures.py [--variant KEY] preview` | Write a variant's comparison sheets. |
 | `uv run python scripts/hd_textures.py compare` | Write the web page with every cached source and variant. It prints the path. Images of an unchanged texture are kept. |
+| `cd scripts && uv run python -m hdtex.classic_skins [--list]` | Write the classic skin swaps into the map's `ModelData.xml`, or list them. |
 | `uv run python scripts/hd_textures.py census` | List the textures of the map's models with format, size, slots, and verdict. |
 | `uv run python scripts/hd_textures.py --source models build --gpu 1` | Model textures: extract, upscale, encode at 2048 at most, patch the models, and verify. |
 | `scripts/playtest.sh build` | Build the map with Upscale 4x. |

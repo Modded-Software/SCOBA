@@ -27,6 +27,7 @@ class Terrain(NamedTuple):
     pathable: np.ndarray  # bool, t3CellFlags
     depth: np.ndarray  # water surface - ground; <= 0 dry
     water_level: float
+    pool: np.ndarray | None = None  # bool: drawn water of a POOL_WATER rectangle (water features)
 
     @property
     def wet(self) -> np.ndarray:
@@ -92,7 +93,9 @@ def water_levels(map_dir: Path) -> dict[str, float]:
     text = path.read_text(encoding="utf-8")
     levels = {}
     for match in re.finditer(r'<CWater id="([^"]+)">(.*?)</CWater>', text, re.S):
-        height = re.search(r'<Height value="([^"]+)"/>', match.group(2))
+        # The editor writes the State height as a child element or, since
+        # 2026-11-20, as an attribute: <State index="0" Height="7.15" .../>.
+        height = re.search(r'<Height value="([^"]+)"/>', match.group(2)) or re.search(r'<State\b[^>]*\bHeight="([^"]+)"', match.group(2))
         if height:
             levels[match.group(1)] = float(height.group(1))
     return levels
@@ -137,10 +140,15 @@ def load(map_dir: Path) -> Terrain:
     pathable = np.frombuffer(flags, dtype=np.uint8, offset=32, count=n * n).reshape(n, n) != 0
     levels = water_levels(map_dir)
     surface = np.full_like(height, -np.inf)
+    pool = np.zeros(height.shape, dtype=bool)
     level = 0.0
     for name, (x0, y0, x1, y1) in water_rects(map_dir):
         level = levels.get(name, 0.0)
         sl = (slice(max(0, int(y0)), min(n, int(np.ceil(y1)))), slice(max(0, int(x0)), min(n, int(np.ceil(x1)))))
         surface[sl] = np.maximum(surface[sl], level)
+        if name in config.POOL_WATER and name in levels:
+            # The water height is in doodad space, GROUND_LIFT over this ground
+            # (mapgen/waterfeatures): the drawn water is where the ground is below it.
+            pool[sl] |= height[sl] < level - config.GROUND_LIFT
     depth = np.where(np.isfinite(surface), surface - height, -np.inf)
-    return Terrain(height, slope, downhill, hi - lo, pathable, depth, level)
+    return Terrain(height, slope, downhill, hi - lo, pathable, depth, level, pool)

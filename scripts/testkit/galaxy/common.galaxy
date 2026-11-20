@@ -352,6 +352,35 @@ string gf_DbgZoomTrace (int lp_player) {
     return lv_trace;
 }
 
+// The drop from gf_HeroDropGo to the end of the zoom, under lp_key
+// (operator 2026-11-20: the pod births before the camera changes). In ARM:
+// per loop the engine camera yaw, pitch, distance (x100), to show the view
+// is untouched. At the zoom start: pod valid, the map's clip time (ms, -1 =
+// no Birth read), the arm time and late count. Then the zoom rows and the
+// script zoom end arm.
+void gf_DbgZoomBank (string lp_section, string lp_key, int lp_player) {
+    string lv_arm = "";
+    int lv_i;
+
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "Phase0", gv_dropPhase[lp_player]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_key + "PodAtGo", UnitIsValid(gv_dropPod[lp_player]));
+    for (lv_i = 0; lv_i < 16 && gv_dropPhase[lp_player] == c_DROP_PHASE_ARM; lv_i += 1) {
+        lv_arm = lv_arm + IntToString(FixedToInt(CameraGetYaw(lp_player) * 100.0)) + "/" + IntToString(FixedToInt(CameraGetPitch(lp_player) * 100.0)) + "/" + IntToString(FixedToInt(CameraGetDistance(lp_player) * 100.0)) + " ";
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_key + "Arm", lv_arm);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "ArmLoops", lv_i);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "PhaseZ", gv_dropPhase[lp_player]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_key + "PodAtZoom", UnitIsValid(gv_dropPod[lp_player]));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "ClipAtZoom", FixedToInt(gv_dropZoomClip0[lp_player] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "ArmMs", FixedToInt(gv_dropArmMs[lp_player]));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "ArmLate", gv_dropArmLate[lp_player]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "Reads0", gv_dropClipReads[lp_player]);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_key, gf_DbgZoomTrace(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_key + "Dist1", FixedToInt(gv_dropZoomDist1[lp_player] * 100.0));
+    BankSave(gv_dbgBank);
+}
+
 // The drop scene and phase (SPEC-HERO-DROP 3a, 3b), for every profile.
 void gf_DbgSceneSnap (string lp_section, string lp_tag, int lp_player) {
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "SceneDrop", gf_SceneHas(lp_player, c_SCENE_DROP));

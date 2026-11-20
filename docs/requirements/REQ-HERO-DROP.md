@@ -63,12 +63,15 @@ Implementation lives in
 | R-DROP-3 | At the next reinforcement one pod MUST appear above a point of the seat's spawn region and fall to the ground, never rising, in about 2.2 s, on the stock pod fall curve. The pod MUST be the hero's own: no reinforcement unit rides in it. |
 | R-DROP-4 | While the pod falls, the camera MUST be locked to the pod: on its point, with the pod height in the camera height offset in the same loop time as the pod, and an arm long enough for the pod model. Revised 2026-11-16: an arm of 8 was too close. |
 | R-DROP-5 | At touchdown the pod MUST hit the ground as a reinforcement pod does (crush impacts, quake) and open. |
-| R-DROP-6 | At touchdown the hero MUST come back alive at the pod: same unit type, full life, its level, its Attack and Chase toggles, and its control mode (TPS or Point & Click). It MAY be a fresh unit (operator 2026-11-18). The camera MUST return to the hero with the hero arm and no pod height. |
+| R-DROP-6 | At touchdown the hero MUST come back alive at the pod: same unit type, full life, its level, and its Attack and Chase toggles. It MAY be a fresh unit (operator 2026-11-18). The camera MUST return to the hero with no pod height. Changed 2026-11-20 by the operator: after every touchdown the hero MUST be in TPS, whatever mode it died in; the camera arm MUST be the minimum distance to the target (1.0, the mouse-wheel minimum); the camera pitch MUST be 0 (level, straight ahead). The target height stays as R-TPS-90. Was: the mode the hero died in, the hero arm, pitch 30. |
 | R-DROP-7 | While the hero waits or the pod falls, the hero switch MUST NOT change the hero. |
 | R-DROP-8 | Every death of a returned hero MUST start the same wait and drop again, with no limit on the count. |
 | R-DROP-9 | One seat's death, wait, fall and return MUST NOT change another seat's hero, camera or input. |
-| R-DROP-10 | Every drop MUST run the one drop sequence (operator 2026-11-19): scene on; crash zoom onto the drop point at the drop yaw, ending on the pod's first frame; the pod fall of R-DROP-3, R-DROP-4; touchdown R-DROP-5, R-DROP-6; scene off. The intro deploy and a revive MUST produce the same scene, zoom, camera values, fall and restore. They MAY differ only in the starter, the drop point's spawn region and the points it avoids, the hero's state before touchdown (hidden or dead), and what the intro owns (its music). |
+| R-DROP-10 | Every drop MUST run the one drop sequence (operator 2026-11-19): scene on; the pod created and playing Birth; once the engine reports Birth, the crash zoom onto the drop point at the drop yaw, ending on the fall camera at the pod's clip time, with the drop FOV and DOF from its first frame (changed 2026-11-20 by the operator: the camera MUST NOT change before the pod is ready and birthing; was: the zoom first, the pod at its end); the pod fall of R-DROP-3, R-DROP-4; touchdown R-DROP-5, R-DROP-6; scene off. The intro deploy and a revive MUST produce the same scene, zoom, camera values, fall and restore. They MAY differ only in the starter, the drop point's spawn region and the points it avoids, the hero's state before touchdown (hidden or dead), and what the intro owns (its music). |
 | R-DROP-11 | The drop sequence MUST exist once in code, outside the intro (operator 2026-11-19: one code path, zero redundancy). The intro and the reinforcement MUST only start it. No camera, scene or pod call of a drop MUST exist outside it. |
+| R-DROP-12 | A pod fall sound MUST play for the seat when the pod is created and starts Birth (operator 2026-11-20: the drop had no sound). |
+| R-DROP-13 | Every pod, hero and lane, MUST land on a free 4x4 cell square in or near the spawn region: all cells ground pathable on one cliff level, no building or doodad footprint, no ground unit within 2.5, at least 4 from the other pods of the wave (operator 2026-11-20: pods landed on buildings). Was: a random point of the region. |
+| R-DROP-14 | Every hero drop, intro deploy and revive, MUST bring one extra land creep wave of the seat's lane, in pods (operator 2026-11-20). The hero pod falls toward the southwest; the escort pods MUST fall in the same direction. A reinforcement while the hero lives MUST NOT bring an escort. A Terran escort wave MUST always have a Goliath, also when the seat already has one (operator 2026-11-20); the reinforcement wave keeps its rule (a Goliath only while the seat has none). |
 
 ## 4. Acceptance
 
@@ -83,5 +86,5 @@ Implementation lives in
 
 | ID | Point |
 | --- | --- |
-| O-DROP-1 | Pod sounds: the stock pod fall sound plays in its Birth clip, which this pod does not use. |
+| O-DROP-1 | Closed 2026-11-20: R-DROP-12. |
 | O-DROP-2 | A respawn countdown on screen: the reinforcement countdown already shows in the player bars. |

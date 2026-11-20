@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Port editor terrain geometry from original/ into src/.
 
-Copies t3HeightMap, t3SyncHeightMap and CellAttribute_Pnp (painted
-pathing) from the edited packed map and sets
+Copies t3HeightMap, t3SyncHeightMap, CellAttribute_Pnp (painted
+pathing), t3Water (water bodies) and WaterData.xml (water types) from the
+edited packed map and sets
 the t3HeightMap vertData attributes (quantizeBias, quantizeScale,
 standardHeight) in src/t3Terrain.xml. Nothing else in t3Terrain.xml changes.
 
-Safety: the src/ height files must equal the base map (original/ at
+Safety: the src/ copied files must equal the base map (original/ at
 --base-rev), so no src/ terrain work is overwritten. The vertData line of
 src/ must equal the base too. Otherwise the script stops with no write.
+t3Water is compared by content: the editor rewrites stale pointer bytes
+(record bytes 12-39) on every save, so only the header, the type name, the
+flags and the rectangle count.
 
 Run: PYTHONPATH=scripts uv run python -m mapgen.port_original_terrain --base-rev REV
 """
@@ -30,6 +34,10 @@ SRC = ROOT / "src" / "SCOBA.SC2Map"
 EDITED = ROOT / "original" / "SCOBA.SC2Map"
 # Height mesh, plus the editor's painted pathing layer.
 HEIGHT_FILES = ("t3HeightMap", "t3SyncHeightMap", "CellAttribute_Pnp")
+# Water bodies and water types (operator, 2026-11-20).
+WATER_FILES = ("t3Water", "Base.SC2Data/GameData/WaterData.xml")
+COPY_FILES = HEIGHT_FILES + WATER_FILES
+WATER_RECORD = 56
 VERT_RE = re.compile(r'<vertData [^>]*name="t3HeightMap"[^>]*/>')
 
 
@@ -40,7 +48,7 @@ class Folder:
         self.path = path
 
     def read_file(self, name: str) -> bytes | None:
-        file = self.path / name
+        file = self.path / name.replace("\\", "/")
         return file.read_bytes() if file.is_file() else None
 
 
@@ -49,10 +57,25 @@ def open_map(path: Path) -> mpyq.MPQArchive | Folder:
 
 
 def read(archive: mpyq.MPQArchive | Folder, name: str) -> bytes:
-    data = archive.read_file(name)
+    data = archive.read_file(name if isinstance(archive, Folder) else name.replace("/", "\\"))
     if data is None:
         raise SystemExit(f"{name} missing from archive")
     return data
+
+
+def water_key(data: bytes) -> tuple:
+    """t3Water without the stale pointer bytes the editor writes."""
+    if data[:4] != b"WATR":
+        raise SystemExit("t3Water: bad magic")
+    count = int.from_bytes(data[8:12], "little")
+    if len(data) != 32 + count * WATER_RECORD:
+        raise SystemExit(f"t3Water: size {len(data)} does not fit {count} records")
+    recs = [data[32 + i * WATER_RECORD: 32 + (i + 1) * WATER_RECORD] for i in range(count)]
+    return (data[:32],) + tuple(r[:12] + r[40:] for r in recs)
+
+
+def same(name: str, a: bytes, b: bytes) -> bool:
+    return water_key(a) == water_key(b) if name == "t3Water" else a == b
 
 
 def vert_line(text: str, where: str) -> str:
@@ -81,8 +104,9 @@ def main() -> int:
         base = mpyq.MPQArchive(str(base_path))
     edited = open_map(args.edited)
 
-    for name in HEIGHT_FILES:
-        if (SRC / name).read_bytes() not in (read(base, name), read(edited, name)):
+    for name in COPY_FILES:
+        have = (SRC / name).read_bytes()
+        if not (same(name, have, read(base, name)) or same(name, have, read(edited, name))):
             raise SystemExit(f"src/{name} differs from base {args.base_rev} and from the edited map, refusing to overwrite")
 
     src_xml = (SRC / "t3Terrain.xml").read_bytes().decode("utf-8")
@@ -92,22 +116,22 @@ def main() -> int:
     if src_vert not in (base_vert, new_vert):
         raise SystemExit(f"src vertData differs from base:\n  src  {src_vert}\n  base {base_vert}")
 
-    changed = [name for name in HEIGHT_FILES if read(edited, name) != read(base, name)]
-    print(f"height files changed: {changed or 'none'}")
+    changed = [name for name in COPY_FILES if not same(name, read(edited, name), read(base, name))]
+    print(f"files changed: {changed or 'none'}")
     print(f"vertData: {src_vert}\n      -> {new_vert}")
     if args.check:
         return 0
 
-    for name in HEIGHT_FILES:
+    for name in COPY_FILES:
         (SRC / name).write_bytes(read(edited, name))
     (SRC / "t3Terrain.xml").write_bytes(src_xml.replace(src_vert, new_vert, 1).encode("utf-8"))
 
-    for name in HEIGHT_FILES:
+    for name in COPY_FILES:
         if (SRC / name).read_bytes() != read(edited, name):
             raise SystemExit(f"src/{name} write check failed")
     if vert_line((SRC / "t3Terrain.xml").read_text(encoding="utf-8"), "result") != new_vert:
         raise SystemExit("vertData write check failed")
-    print("wrote src/ terrain geometry")
+    print("wrote src/ terrain geometry, pathing and water")
     return 0
 
 

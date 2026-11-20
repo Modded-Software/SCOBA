@@ -106,10 +106,25 @@ void gf_HoldType (string lp_type) {
     UnitGroupLoopEnd();
 }
 
+// The S2 Zerus tree (operator 2026-11-20): a model actor at map init, just
+// behind the S2 start eye (data/intro_shots). Variation and scale as an
+// editor ZerusTree doodad at 100 %. A second one next to it, further down
+// the camera path: 75 %, turned (c_INTRO_TREE2_FACING).
+void gf_IntroTreePlace () {
+    gv_introTree = libNtve_gf_CreateModelAtPoint("ZerusTree", Point(c_INTRO_TREE_X, c_INTRO_TREE_Y));
+    ActorSend(gv_introTree, "ModelSwap ZerusTree " + IntToString(c_INTRO_TREE_VARIATION));
+    ActorSend(gv_introTree, libNtve_gf_SetScale(c_INTRO_TREE_SCALE_XY, c_INTRO_TREE_SCALE_XY, c_INTRO_TREE_SCALE_Z, 0.0));
+    gv_introTree2 = libNtve_gf_CreateModelAtPoint("ZerusTree", Point(c_INTRO_TREE2_X, c_INTRO_TREE2_Y));
+    ActorSend(gv_introTree2, "ModelSwap ZerusTree " + IntToString(c_INTRO_TREE_VARIATION));
+    ActorSend(gv_introTree2, libNtve_gf_SetScale(c_INTRO_TREE2_SCALE_XY, c_INTRO_TREE2_SCALE_XY, c_INTRO_TREE2_SCALE_Z, 0.0));
+    libNtve_gf_MakeModelFaceAngle(gv_introTree2, c_INTRO_TREE2_FACING);
+}
+
 bool gt_VisualTuning_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
     }
+    gf_IntroTreePlace();
     gf_TripleDeathTime("Armory");
     gf_TripleDeathTime("AutoTurret");
     gf_TripleDeathTime("Banshee");

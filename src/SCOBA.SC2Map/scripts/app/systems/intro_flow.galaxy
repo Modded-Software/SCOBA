@@ -80,6 +80,7 @@ void gf_IntroStart () {
     }
     gv_introMusicValid = CatalogEntryIsValid(c_gameCatalogSound, c_INTRO_MUSIC);
     gv_introHumValid = CatalogEntryIsValid(c_gameCatalogSound, c_INTRO_PSI_HUM);
+    gv_introBeepValid = CatalogEntryIsValid(c_gameCatalogSound, c_INTRO_COUNT_BEEP);
     gv_introSilenceValid = CatalogEntryIsValid(c_gameCatalogSoundtrack, c_INTRO_SILENCE);
     // Silence as the default soundtrack: no stock track under the theme or
     // after it (the Void campaign's own pattern). The theme starts per seat.
@@ -122,6 +123,9 @@ void gf_IntroCountStep (int lp_player) {
         gv_introCountShown[lp_player] = lv_n;
         gv_introCountTrace[lp_player] = gv_introCountTrace[lp_player] + IntToString(lv_n);
         libNtve_gf_SetDialogItemText(gv_introPromptLabel, StringToText("Deploying in " + IntToString(lv_n) + "..."), PlayerGroupSingle(lp_player));
+        // One beep per number, this seat only (operator 2026-11-20).
+        SoundPlay(SoundLink(c_INTRO_COUNT_BEEP, c_soundIndexAny), PlayerGroupSingle(lp_player), 100.0, 0.0);
+        gv_introCountBeeps[lp_player] += 1;
     }
 }
 
@@ -132,6 +136,7 @@ void gf_IntroCountStep (int lp_player) {
 void gf_IntroDeployGo (int lp_player) {
     gv_introDeploys[lp_player] += 1;
     gv_introState[lp_player] = c_INTRO_DROP;
+    gv_introCamHeld[lp_player] = true;
     gf_IntroPromptHide(lp_player);
     gf_IntroHum(lp_player, false);
     gf_IntroQuiet(lp_player, false);
@@ -160,6 +165,15 @@ bool gf_IntroAnyActive () {
     return false;
 }
 
+// The drop's zoom starts (systems/hero_drop): the intro shot stops writing
+// the camera. Nothing for a seat without the hold (a revive drop).
+void gf_IntroCameraRelease (int lp_player) {
+    if (lp_player < 0 || lp_player >= 16) {
+        return;
+    }
+    gv_introCamHeld[lp_player] = false;
+}
+
 // Touchdown (R-INTRO-12): the intro's own parts end. Called by
 // gf_HeroDropLand before the drop leaves the scene, and on leave. This
 // seat only (R-INTRO-16). The scene restore (UI, dialogs, input) runs when
@@ -173,6 +187,7 @@ void gf_IntroEnd (int lp_player) {
     gf_IntroQuiet(lp_player, false);
     gf_IntroMusicStop(lp_player);
     gv_introDof[lp_player] = false;
+    gv_introCamHeld[lp_player] = false;
     gf_SceneLeave(lp_player, c_SCENE_INTRO);
     gv_introState[lp_player] = c_INTRO_DONE;
     gv_introActive[lp_player] = false;
@@ -196,6 +211,13 @@ void gf_IntroTickSeat (int lp_player) {
     if (!gv_introActive[lp_player]) {
         return;
     }
+    // After the deploy the shot keeps moving, without its sounds, until
+    // the drop's zoom takes the camera (gf_IntroCameraRelease): the pod
+    // births first (operator 2026-11-20: a frozen frame before the pod).
+    if (gv_introState[lp_player] == c_INTRO_DROP && gv_introCamHeld[lp_player]) {
+        gf_IntroLoopStep(lp_player, false);
+        return;
+    }
     // The intro writes the camera in its loop only; the drop owns it after.
     if (gv_introState[lp_player] != c_INTRO_LOOP) {
         return;
@@ -204,7 +226,7 @@ void gf_IntroTickSeat (int lp_player) {
         gv_introCamRead[lp_player] = CameraGetTarget(lp_player);
         gv_introCamGap[lp_player] = DistanceBetweenPoints(gv_introCamRead[lp_player], gv_introSent[lp_player]);
     }
-    gf_IntroLoopStep(lp_player);
+    gf_IntroLoopStep(lp_player, true);
     if (gv_introCountAt[lp_player] >= 0.0) {
         gf_IntroCountStep(lp_player);
     }

@@ -153,5 +153,82 @@ class ScriptTest(unittest.TestCase):
         self.assertIn("gf_BaseSitesLoad();", text)
 
 
+GAME = ROOT / "src" / "SCOBA.SC2Map" / "Base.SC2Data" / "GameData"
+GAS_BUILDINGS = ("Refinery", "AutomatedRefinery", "Extractor", "AutomatedExtractor")
+
+
+def _entry(name: str, tag: str, ident: str) -> str:
+    text = (GAME / name).read_text(encoding="utf-8")
+    found = re.findall(rf'<{tag} id="{ident}">(.*?)</{tag}>', text, re.S)
+    if len(found) != 1:
+        raise AssertionError(f"{name}: {len(found)} {tag} entries of {ident}")
+    return found[0]
+
+
+def _solid(footprint: str, layer: str) -> list[str]:
+    """The rows of one layer of a footprint, cut to their solid ("x") cells."""
+    body = re.search(rf'<Layers index="{layer}"[^>]*>(.*?)</Layers>', _entry("FootprintData.xml", "CFootprint", footprint), re.S).group(1)
+    rows = re.findall(r'<Rows value="([^"]+)"/>', body)
+    return [row.strip(".o") for row in rows if "x" in row]
+
+
+class GasSizeTest(unittest.TestCase):
+    """R-BASE-35: the geyser and the gas buildings are 6x6, twice stock, in every place that says a size."""
+
+    def test_the_site_generator_places_6x6_geysers_on_cell_corners(self) -> None:
+        self.assertEqual(config.GEYSER_SIZE, (6, 6))
+        line = sites.line_at(np.ones((256, 256), dtype=bool), "TerranJungleLeftA", (120, 60), set())
+        for x, y in line.geysers:
+            self.assertEqual((x, y), (round(x), round(y)))
+            self.assertEqual(len(set(sites.cells(x, y, config.GEYSER_SIZE))), 36)
+        # Negative: a field keeps its 2x1 snap (half y).
+        self.assertTrue(all(y != round(y) for _x, y in line.fields))
+
+    def test_a_sibling_site_keeps_its_piles_to_itself(self) -> None:
+        # Two halls 20 apart, as a double site: 6x6 geysers reach across.
+        free = np.ones((256, 256), dtype=bool)
+        taken: set = set()
+        first = sites.line_at(free, "TerranJungleLeftA", (185, 132), taken)
+        second = sites.search(free, "TerranJungleLeftB", (185.0, 112.0), taken, [first])
+        self.assertIsNotNone(second)
+        for mine, other in ((first, second), (second, first)):
+            gap = set(sites.hall_cells(other.hall, sites.HALL_GAP))
+            self.assertFalse(gap & sites.pile_cells(mine), mine.name)
+            for pile in mine.fields + mine.geysers:
+                self.assertLess(math.dist(pile, mine.hall), math.dist(pile, other.hall), (mine.name, pile))
+        # Negative: a hall on top of the first line's piles is refused.
+        x, y = first.geysers[0]
+        self.assertIsNone(sites.line_at(free, "x", (int(x), int(y) + 8), set(), others=[first]))
+
+    def test_every_footprint_blocks_a_6x6_square(self) -> None:
+        for footprint in ("FootprintScobaGeyser6x6", "FootprintScobaGeyser6x6Built", "FootprintScoba6x6CappedGeyser"):
+            for layer in ("Check", "Place"):
+                self.assertEqual(_solid(footprint, layer), ["xxxxxx"] * 6, (footprint, layer))
+
+    def test_the_no_hall_ring_keeps_its_stock_width(self) -> None:
+        # Negative: the ring is not doubled. 3 cells each side of the 6.
+        body = _entry("FootprintData.xml", "CFootprint", "FootprintScobaGeyser6x6")
+        self.assertEqual(body.count('<Rows value="oooxxxxxxooo"/>'), 12)
+        self.assertEqual(body.count('Area="-6,-6,6,6"'), 2)
+
+    def test_the_units_name_the_footprints_and_twice_the_stock_radius(self) -> None:
+        geyser = _entry("UnitData.xml", "CUnit", "VespeneGeyser")
+        self.assertIn('<Footprint value="FootprintScobaGeyser6x6"/>', geyser)
+        self.assertNotIn("PlacementFootprint", geyser)
+        for unit in GAS_BUILDINGS:
+            body = _entry("UnitData.xml", "CUnit", unit)
+            self.assertIn('<Footprint value="FootprintScobaGeyser6x6Built"/>', body, unit)
+            self.assertIn('<PlacementFootprint value="FootprintScoba6x6CappedGeyser"/>', body, unit)
+        for unit in ("VespeneGeyser", *GAS_BUILDINGS):
+            body = _entry("UnitData.xml", "CUnit", unit)
+            for field in ("Radius", "SeparationRadius", "MinimapRadius"):
+                self.assertIn(f'<{field} value="3"/>', body, (unit, field))
+
+    def test_the_models_are_drawn_at_twice_the_size(self) -> None:
+        for actor in ("VespeneGeyser", *GAS_BUILDINGS):
+            self.assertIn('<Scale value="2.000000"/>', _entry("ActorData.xml", "CActorUnit", actor), actor)
+        self.assertIn('<Scale value="2.000000"/>', _entry("ActorData.xml", "CActorSplat", "VespeneGeyserSplat"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -107,11 +107,20 @@ S1_Z = 14.0  # target height: the eye looks up from below it and must clear the 
 # 26..58 from the eye, the BC about 97. Focus 60, near 2.0: full near blur
 # closer than 37.5, fading out by 56; the BC beyond stays sharp.
 S1_FOCUS = 60.0
+# S1 eye to the left of the Brakk facing. Left = Brakk yaw + 90. 0.5
+# (operator 2026-11-18), 1.0 (operator 2026-11-20: 0.5 more, keep
+# targeting the BC): the yaw turns from the new eye onto the BC.
+S1_LEFT = 1.0
+S1_EYE = (
+    BRAKK[0] + S1_LEFT * math.cos(math.radians(BRAKK_YAW + 90)),
+    BRAKK[1] + S1_LEFT * math.sin(math.radians(BRAKK_YAW + 90)),
+)
+S1_YAW = round(math.degrees(math.atan2(BC[1] - S1_EYE[1], BC[0] - S1_EYE[0])), 2)
 
 
 def _ahead(d: float, pitch: float) -> tuple[float, float]:
     h = d * math.cos(math.radians(pitch))
-    return (round(BRAKK[0] + h * math.cos(math.radians(BRAKK_YAW)), 2), round(BRAKK[1] + h * math.sin(math.radians(BRAKK_YAW)), 2))
+    return (round(S1_EYE[0] + h * math.cos(math.radians(S1_YAW)), 2), round(S1_EYE[1] + h * math.sin(math.radians(S1_YAW)), 2))
 
 
 # Pitched far up to show the battlecruiser overhead (operator 2026-11-17).
@@ -127,13 +136,15 @@ S2_GROUND = (4.16, 4.17)
 ABSOLUTE = {"S2 Line": (WATER + 1.2, WATER + 1.2)}
 
 SHOTS: tuple[Shot, ...] = (
-    Shot("S1 Pride", 12, "E", *S1_T0, *S1_T1, S1_Z, S1_Z, BRAKK_YAW, BRAKK_YAW, S1_P0, S1_P1, S1_D0, S1_D1, 50, 40, False, VAR_NONE, 2.0, 0.0, S1_FOCUS),  # more near DOF (operator 2026-11-18)
+    Shot("S1 Pride", 12, "E", *S1_T0, *S1_T1, S1_Z, S1_Z, S1_YAW, S1_YAW, S1_P0, S1_P1, S1_D0, S1_D1, 50, 40, False, VAR_NONE, 2.0, 0.0, S1_FOCUS),  # more near DOF (operator 2026-11-18)
     Shot("S2 Line", 12, "L", 119.6, 113.1, 131.0, 124.5, round(WATER + 1.2 - S2_GROUND[0], 2), round(WATER + 1.2 - S2_GROUND[1], 2), 135, 135, 6, 6, 16, 16, 50, 50, True, VAR_TARGET),
-    Shot("S3 Map", 10, "E", *X, *X, 0, 0, 45, 75, 80, 80, 150, 150, 22, 22, False, VAR_NONE, 1.3),
+    # S3 and S6: 1.5x the arm, FOV narrowed to keep the framing (operator
+    # 2026-11-18: farther, tighter lens). S3 was 150 / 22, S6 66 / 55.
+    Shot("S3 Map", 10, "E", *X, *X, 0, 0, 45, 75, 80, 80, 225, 225, 14.8, 14.8, False, VAR_NONE, 1.3),
     Shot("S4 Brambles", 6, "E", *HYBRID, *HYBRID, S4_TZ, S4_TZ, S4_YAW, S4_YAW, S4_PITCH, S4_PITCH, S4_DIST, S4_DIST, 70, 45, False, VAR_NONE),
     Shot("S5 Shackled", 4, "E", *HYBRID, *HYBRID, 4, 4, 90.8, 90.8, 8, 8, 18, 12, 48, 44, False, VAR_NONE, 0.3, 0.15),
     # S6 orbit at half the rate (operator 2026-11-18): 20 degrees in 6 s, was 40.
-    Shot("S6 Overmind", 6, "A", *HIVE, *HIVE, 3, 3, 215, 235, 18, 18, 66, 66, 55, 55, False, VAR_YAW, 1.5, 0.3),  # near DOF: 4.0 was too much (operator 2026-11-18)
+    Shot("S6 Overmind", 6, "A", *HIVE, *HIVE, 3, 3, 215, 235, 18, 18, 99, 99, 38.3, 38.3, False, VAR_YAW, 1.5, 0.3),  # near DOF: 4.0 was too much (operator 2026-11-18)
     # S7 4 s longer (operator 2026-11-18: +2 s, then +2 s): the pitch up over 7 s, was 3.
     Shot("S7 Worm", 7, "O", *NYDUS, *NYDUS, 6, 12, 225, 225, -20, -35, 9, 9, 80, 80, False, VAR_NONE, 6.0),  # near DOF up (operator 2026-11-18: 2.0, 4.0, then 6.0)
     Shot("S8 Jungle", 7, "L", *JUNGLE_START, *JUNGLE_END, 2, 2, 90, 90, 12, 12, 6, 6, 60, 60, False, VAR_NONE, 2.0, 1.5),
@@ -206,6 +217,68 @@ def _f(v: float) -> str:
     return f"{v:.4f}"
 
 
+# S6 foreground pods (operator 2026-11-20): three empty Zerg drop pods in
+# the near view of the first Overmind orbit. Ahead of the eye at the middle
+# yaw of the orbit, along the view line, and to its left (+) or right (-).
+# Closer (operator 2026-11-20; was 64, 70, 76): the eye is 33.6 above
+# the ground, so ground nearer than about 54 is under the frame.
+# Closer again and apart (operator 2026-11-20; was 54, 58, 62 and -3, 3,
+# 0): the nearest lands at the lower edge of the frame.
+S6_POD_AHEAD = (46.0, 52.0, 60.0)
+S6_POD_SIDE = (-6.0, 6.0, 0.0)
+
+
+def s6_row() -> int:
+    return next(i for i, s in enumerate(SHOTS) if s.name.startswith("S6"))
+
+
+def s7_row() -> int:
+    return next(i for i, s in enumerate(SHOTS) if s.name.startswith("S7"))
+
+
+def s6_pods() -> tuple[tuple[float, float], ...]:
+    s6 = SHOTS[s6_row()]
+    yaw = (s6.yaw0 + s6.yaw1) / 2.0
+    ex, ey, _ = eye(s6.x0, s6.y0, s6.z0, yaw, s6.pitch0, s6.dist0)
+    a, left = math.radians(yaw), math.radians(yaw + 90.0)
+    return tuple(
+        (round(ex + d * math.cos(a) + side * math.cos(left), 2), round(ey + d * math.sin(a) + side * math.sin(left), 2))
+        for d, side in zip(S6_POD_AHEAD, S6_POD_SIDE)
+    )
+
+
+# A permanent Zerus tree just behind the S2 start eye (operator 2026-11-20):
+# its leaves come into close view. The first-pass start (left to right,
+# the southwest, Zerg side of the river); TREE_BACK cells behind the eye
+# on the view line. Variation 4. Scale 100 % as an editor doodad: the map's
+# ZerusTree actor scale (ActorData: random 4..6, mid 5, z x1.4) times 1.0.
+TREE_BACK = 2.0  # operator 2026-11-20: 2 cells (3.0 before; 1.0 was too close at 300 %)
+TREE_VARIATION = 4
+TREE_DOODAD_SCALE = 1.0  # operator 2026-11-20: 100 % (was 200 %, 275 %, 300 %)
+TREE_ACTOR_SCALE = 5.0
+TREE_ACTOR_Z = 1.4
+# A second tree next to it (operator 2026-11-20): TREE2_ALONG cells further
+# down the camera's first-pass path, as far behind the eye as the first,
+# 75 %, turned.
+TREE2_ALONG = 2.0
+TREE2_DOODAD_SCALE = 0.75
+TREE2_FACING = 135.0  # the first tree keeps the actor's own facing, 0
+
+
+def s2_tree() -> tuple[float, float]:
+    s2 = next(s for s in SHOTS if s.name.startswith("S2"))
+    ex, ey, _ = eye(s2.x0, s2.y0, s2.z0, s2.yaw0, s2.pitch0, s2.dist0)
+    back = math.radians(s2.yaw0 + 180.0)
+    return (round(ex + TREE_BACK * math.cos(back), 2), round(ey + TREE_BACK * math.sin(back), 2))
+
+
+def s2_tree2() -> tuple[float, float]:
+    s2 = next(s for s in SHOTS if s.name.startswith("S2"))
+    tx, ty = s2_tree()
+    n = math.hypot(s2.x1 - s2.x0, s2.y1 - s2.y0)
+    return (round(tx + TREE2_ALONG * (s2.x1 - s2.x0) / n, 2), round(ty + TREE2_ALONG * (s2.y1 - s2.y0) / n, 2))
+
+
 def galaxy() -> str:
     rows = list(SHOTS)
     n = len(rows)
@@ -224,6 +297,31 @@ def galaxy() -> str:
         f"const int c_INTRO_VAR_TARGET = {VAR_TARGET};",
         f"const int c_INTRO_VAR_YAW = {VAR_YAW};",
     ]
+    tx, ty = s2_tree()
+    xy = TREE_DOODAD_SCALE * TREE_ACTOR_SCALE
+    t2x, t2y = s2_tree2()
+    xy2 = TREE2_DOODAD_SCALE * TREE_ACTOR_SCALE
+    lines += [
+        "// The S2 Zerus tree (s2_tree).",
+        f"const fixed c_INTRO_TREE_X = {_f(tx)};",
+        f"const fixed c_INTRO_TREE_Y = {_f(ty)};",
+        f"const int c_INTRO_TREE_VARIATION = {TREE_VARIATION};",
+        f"const fixed c_INTRO_TREE_SCALE_XY = {_f(xy)};",
+        f"const fixed c_INTRO_TREE_SCALE_Z = {_f(xy * TREE_ACTOR_Z)};",
+        "// The second S2 tree (s2_tree2).",
+        f"const fixed c_INTRO_TREE2_X = {_f(t2x)};",
+        f"const fixed c_INTRO_TREE2_Y = {_f(t2y)};",
+        f"const fixed c_INTRO_TREE2_SCALE_XY = {_f(xy2)};",
+        f"const fixed c_INTRO_TREE2_SCALE_Z = {_f(xy2 * TREE_ACTOR_Z)};",
+        f"const fixed c_INTRO_TREE2_FACING = {_f(TREE2_FACING)};",
+        "// The S6 foreground pods (s6_pods).",
+        f"const int c_INTRO_S6_ROW = {s6_row()};",
+        "// S7 looks up at the Overmind: the first Mutalisk wave (systems/air_creep).",
+        f"const fixed c_INTRO_S7_START = {_f(sum(s.length for s in SHOTS[:s7_row()]))};",
+        f"const int c_INTRO_S6_PODS = {len(s6_pods())};",
+        f"fixed[{len(s6_pods())}] gv_introS6PodX;",
+        f"fixed[{len(s6_pods())}] gv_introS6PodY;",
+    ]
     fields = ("length", "x0", "y0", "x1", "y1", "z0", "z1", "yaw0", "yaw1", "pitch0", "pitch1", "dist0", "dist1", "fov0", "fov1", "near", "far")
     for name in fields + ("focus",):
         lines.append(f"fixed[{n}] gv_introRow_{name};")
@@ -239,6 +337,9 @@ def galaxy() -> str:
         lines.append(f"    gv_introRow_ease[{i}] = c_INTRO_EASE_{s.ease};")
         lines.append(f"    gv_introRow_variant[{i}] = {s.variant};")
         lines.append(f"    gv_introRow_dof[{i}] = {'true' if s.dof else 'false'};")
+    for i, (px, py) in enumerate(s6_pods()):
+        lines.append(f"    gv_introS6PodX[{i}] = {_f(px)};")
+        lines.append(f"    gv_introS6PodY[{i}] = {_f(py)};")
     lines += ["}", ""]
     return "\n".join(lines)
 

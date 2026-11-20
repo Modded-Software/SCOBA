@@ -10,7 +10,7 @@ trigger gt_BaseAiTest;
 
 const int c_BA_PROBE_N = 2;
 const fixed c_BA_FIELD_R = 7.0;     // hall centre to a mineral field
-const fixed c_BA_GEYSER_R = 7.5;    // hall centre to a geyser
+const fixed c_BA_GEYSER_R = 10.0;   // hall centre to a geyser
 const fixed c_BA_MARINE_R = 10.0;   // hall centre to the A5 Marines, toward the map centre
 const int c_BA_TYPES_MAX = 400;     // raw type lists are cut here
 
@@ -29,6 +29,7 @@ string gf_BaBuildOrder (int lp_player);
 void gf_BaMacro ();                 // scripts/testkit/galaxy/baseai/baseai_macro.galaxy
 void gf_BaFlightGroup ();           // scripts/testkit/galaxy/baseai/baseai_flight.galaxy
 void gf_BhHall ();                  // scripts/testkit/galaxy/baseai/baseai_hall.galaxy
+void gf_BgGas ();                   // scripts/testkit/galaxy/baseai/baseai_gas.galaxy
 
 int gf_Ba100 (fixed lp_v) {
     return FixedToInt(lp_v * 100.0);
@@ -409,6 +410,13 @@ void gf_BaProbe () {
     BankSave(gv_dbgBank);
 }
 
+// No air creeps: the schedule off. Called before the early waves (5 s and
+// 10 s); they do not come with the tick trigger disabled.
+void gf_BaNoAir () {
+    TimerPause(gv_airCreepTimer, true);
+    TriggerEnable(gt_AirCreepTick, false);
+}
+
 bool gt_BaseAiTest_Func (bool testConds, bool runActions) {
     if (!runActions) {
         return true;
@@ -426,8 +434,7 @@ bool gt_BaseAiTest_Func (bool testConds, bool runActions) {
     if (gf_DbgGroup("probe")) {
         // No reinforcement waves and no air creeps: they would fight the bases.
         TimerPause(gv_sPAWNTIMER, true);
-        TimerPause(gv_airCreepTimer, true);
-        TriggerEnable(gt_AirCreepTick, false);
+        gf_BaNoAir();
         gf_BaProbe();
     }
     else if (gf_DbgGroup("macro")) {
@@ -437,16 +444,20 @@ bool gt_BaseAiTest_Func (bool testConds, bool runActions) {
     else if (gf_DbgGroup("flight")) {
         // Only the Wraith: no waves, no air creeps near it.
         TimerPause(gv_sPAWNTIMER, true);
-        TimerPause(gv_airCreepTimer, true);
-        TriggerEnable(gt_AirCreepTick, false);
+        gf_BaNoAir();
         gf_BaFlightGroup();
     }
     else if (gf_DbgGroup("hall")) {
         // One script hall: no waves, no air creeps near it.
         TimerPause(gv_sPAWNTIMER, true);
-        TimerPause(gv_airCreepTimer, true);
-        TriggerEnable(gt_AirCreepTick, false);
+        gf_BaNoAir();
         gf_BhHall();
+    }
+    else if (gf_DbgGroup("gas")) {
+        // The AI bases alone: no waves, no air creeps.
+        TimerPause(gv_sPAWNTIMER, true);
+        gf_BaNoAir();
+        gf_BgGas();
     }
     BankValueSetFromInt(gv_dbgBank, "ba_end", "RealClicks", gv_dbgRealClicks);
     BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);

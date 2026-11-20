@@ -35,9 +35,11 @@ TREE_TYPE = "ZerusTree"
 # variation >= 12 may show its own model or the wrapped one: fill both.
 TREE_VARIATION_COUNT = 12
 SPORE_UNITS = ("SporeCannon", "SporeCrawler")
-# Units with a fixed square blocker, side in cells (operator, 2026-11-19:
+# Units with a fixed square blocker, side in cells (operator, 2026-11-20:
+# 12x12 for the caged ultralisk, "increase the blocking and terrain
+# flattening footprint"; its hit shapes reach 5 to 6.8 from the centre. Before, 2026-11-19:
 # 8x8 for the caged ultralisk).
-SQUARE_UNITS = {"HybridUltraliskShackled": 8}
+SQUARE_UNITS = {"HybridUltraliskShackled": 12}
 # Square units also flatten the terrain under their footprint, with the stock
 # core.sc2mod deformers that buildings use (UseUnitFootprint). Operator,
 # 2026-11-19.
@@ -46,11 +48,20 @@ FLATTEN_EVENTS = (
     ("UnitBirth.{u}.Suppressed", "Create BuildingTerrainFlattenInstant"),
     ("UnitBirth.{u}.EditorPlaced", "Create BuildingTerrainFlattenEditor"),
 )
+# Units that keep their own footprint and flatten the terrain under it the
+# same way (operator 2026-11-20: "the geysers also need a terrain flattening
+# actor to match"). The geyser footprint is FootprintScobaGeyser6x6 (R-BASE-35).
+FLATTEN_UNITS = ("VespeneGeyser",)
 # Halls with a measured leg footprint (R-FP-10): unit -> measured model group.
-# Not here: the Planetary Fortress (model CommandCenter at actor scale 1 slices
-# to a solid 5x5, which would close the drop-off) and the Orbital Command
-# (its model is not extracted). Both keep FootprintSCOBAHall1x1.
-HALL_UNITS = {"CommandCenter": "CommandCenter"}
+# All three show the model entry CommandCenter and are drawn at one scale
+# (operator 2026-11-20; check_halls). Before, the Orbital Command and the
+# Planetary Fortress kept FootprintSCOBAHall1x1 and blocked nothing.
+HALL_UNITS = {"CommandCenter": "CommandCenter", "OrbitalCommand": "CommandCenter", "PlanetaryFortress": "CommandCenter"}
+# The map shows the classic Command Center model (scripts/hdtex/classic_skins.py).
+# The legs are still those measured on the stock model: operator 2026-11-20,
+# "it's got pretty much the same 4 legs, enable pathblocking". Off: the hall
+# keeps FootprintSCOBAHall1x1 and blocks no pathing.
+HALL_FOOTPRINTS_ON = True
 # A hall cell blocks when this many of its four 0.5 sub-cells block.
 HALL_SUBCELLS = 2
 # Unit facing in degrees, as the engine reports it in the map: every

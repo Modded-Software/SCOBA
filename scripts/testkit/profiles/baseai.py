@@ -17,14 +17,15 @@ from project_root import project_root
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .baseai_feel import check_feel_extra
+from .baseai_gas import check_gas
 from .baseai_hall import HALL_PLACE, check_hall, check_legs, hall_rows, show_grid
 from .baseai_melee import check_growth, check_melee
 from .baseai_viking import check_right_hold, check_side_keys, check_viking_form, check_viking_morph
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
-GROUPS = ("probe", "macro", "flight", "hall")
-# "all" runs these; macro (about 5 min, waves on) runs by name only.
+GROUPS = ("probe", "macro", "flight", "hall", "gas")
+# "all" runs these; macro (about 5 min, waves on) and gas (about 4 min) run by name only.
 ALL_GROUPS = ("probe", "hall")
 # Lane owners (core/roster.galaxy, scripts/mapgen/player_slots.py): lane 1..6.
 MACRO_OWNERS = tuple(player_slots.LANES[lane][1] for lane in range(1, 7))
@@ -188,13 +189,11 @@ def check_flight(checks, s: str) -> None:
 
 # --- macro ------------------------------------------------------------------
 TERRAN_OWNERS = MACRO_OWNERS[:3]
-# Not measured, no blocking (SPEC-SCALED-FOOTPRINTS 5): the morphs.
-HALL_FOOT_UNMEASURED = "FootprintSCOBAHall1x1"
 
 
 def check_hall_footprint(checks) -> None:
     """R-BASE-30, R-FP-10: the Command Center blocks its measured cells (legs);
-    the middle stays open. The Orbital Command is not measured."""
+    the middle stays open. So do the Orbital Command and the Planetary Fortress."""
     for s in ("ba_macro", "ba_macro_end"):
         for p in TERRAN_OWNERS:
             k = f"p{p}"
@@ -205,12 +204,9 @@ def check_hall_footprint(checks) -> None:
             checks.eq(s, k, "HallPlace", HALL_PLACE)
             # Units walk under the middle.
             checks.eq(s, k, "HallBlocked10", 0)
-            if checks.value(s, k, "HallType") == "CommandCenter":
-                checks.eq(s, k, "HallFoot", hall_footprint_id(hall_rows()))
-                # Minerals and buildings may block more cells: every measured cell is blocked.
-                check_legs(checks, s, k + "Hall", exact=False)
-            else:
-                checks.eq(s, k, "HallFoot", HALL_FOOT_UNMEASURED)
+            checks.eq(s, k, "HallFoot", hall_footprint_id(hall_rows()))
+            # Minerals and buildings may block more cells: every measured cell is blocked.
+            check_legs(checks, s, k + "Hall", exact=False)
 
 
 SUPPLY_MAX = 200           # c_SUPPLY_MAX, systems/base/base_ai
@@ -382,6 +378,7 @@ CHECKS = {
     "macro": check_macro,
     "flight": check_flight_group,
     "hall": check_hall,
+    "gas": check_gas,
 }
 
 
@@ -426,6 +423,7 @@ def map_spec() -> TestMapSpec:
             ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_feel.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_flight.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_hall.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "baseai" / "baseai_gas.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/baseai/common",
@@ -436,6 +434,7 @@ def map_spec() -> TestMapSpec:
             "scripts/test/baseai/baseai_feel",
             "scripts/test/baseai/baseai_flight",
             "scripts/test/baseai/baseai_hall",
+            "scripts/test/baseai/baseai_gas",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_BaseAiTest_Init();"),
     )

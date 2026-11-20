@@ -101,7 +101,7 @@ def write_catalogs(map_dir: Path, trees: list[Blocker], spores: dict[str, Blocke
     actor_path = data_dir / "ActorData.xml"
     append_catalog(actor_path, "".join(tree_actor_xml(p) for p in tree_polygons))
     actor_text = actor_path.read_text(encoding="utf-8")
-    for unit in squares:
+    for unit in (*squares, *config.FLATTEN_UNITS):
         actor_text = add_flatten_events(actor_text, unit)
     actor_path.write_text(actor_text, encoding="utf-8")
     unit_path = data_dir / "UnitData.xml"
@@ -184,6 +184,11 @@ def check_spores(text: str, data: dict, footprints: dict[str, str], units: dict[
     return problems
 
 
+def flatten_problems(unit: str, actors: dict[str, str] | None) -> list[str]:
+    body = (actors or {}).get(unit, "")
+    return [f"{unit} actor does not flatten terrain ({line})" for line in flatten_events(unit) if line not in body]
+
+
 def check_squares(text: str, footprints: dict[str, str], units: dict[str, str], actors: dict[str, str] | None = None) -> list[str]:
     """Every placed square unit links its square footprint and flattens the terrain."""
     problems = []
@@ -196,10 +201,10 @@ def check_squares(text: str, footprints: dict[str, str], units: dict[str, str], 
             problems.append(f"{unit} has no generated square footprint")
         elif shape_of(footprints[want]) != polygon or footprints[want].count('<Rows value="' + "x" * len(cells) + '"/>') != 2 * len(cells):
             problems.append(f"{unit} square footprint has the wrong shape")
-        body = (actors or {}).get(unit, "")
-        for line in flatten_events(unit):
-            if line not in body:
-                problems.append(f"{unit} actor does not flatten terrain ({line})")
+        problems += flatten_problems(unit, actors)
+    for unit in config.FLATTEN_UNITS:
+        if f'UnitType="{unit}"' in text:
+            problems += flatten_problems(unit, actors)
     return problems
 
 

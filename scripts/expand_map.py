@@ -24,11 +24,13 @@ from mapgen.resources.build import apply as apply_resources
 from flora.build import apply_flora
 from flora.lift import lift_doodads, sink_trees
 from mapgen.footprints.build import apply_scaled_footprints
+from hdtex.model_backfaces import generate as generate_back_faces
 from skybox_flip import generate as generate_skybox_flip
 from footfall.fx import generate as generate_footfall_fx
 from slow_death_assets import generate as generate_slow_deaths
 from mapgen.spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
-from mapgen.water_doodads import apply_water_doodads
+from mapgen.rimfalls.build import apply_rim_falls
+from mapgen.waterfeatures.build import apply_water_features
 from strip_gui_triggers import strip_triggers
 from terrain import sync_height
 from water_splashes import apply as apply_water_splashes
@@ -428,18 +430,24 @@ def main() -> int:
     if os.environ.get("SC2_NO_WATER_SPLASHES") != "1":
         apply_water_splashes(dst)
     apply_attack_cooldown_link(dst)
-    for generate in (generate_character_anim, generate_slow_deaths, generate_skybox_flip, generate_footfall_fx, import_audio):
+    for generate in (generate_character_anim, generate_slow_deaths, generate_skybox_flip, generate_footfall_fx, generate_back_faces, import_audio):
         generate(dst, False)
     if os.environ.get("SC2_NO_PROPS") != "1":
         expand_props(dst)
-    # REQ-WATER-DOODADS: positions are in 256-map units by now.
-    if os.environ.get("SC2_NO_WATER_DOODADS") != "1":
-        apply_water_doodads(dst)
+    # REQ-WATER-FEATURES: positions are in 256-map units by now. Before
+    # resources, footprints and flora: the step carves the ground they read.
+    if os.environ.get("SC2_NO_WATER_FEATURES") != "1":
+        apply_water_features(dst)
     if os.environ.get("SC2_NO_SPORES") != "1":
         scale_spores(dst)
     # R-BASE-31: resource lines first (all trees and units are in place by
     # now), then tree blockers at the fitted tree spots, then flora.
     apply_resources(dst)
+    # REQ-RIM-FALLS: after the water features (their pools are kept clear)
+    # and the resources (geysers are kept clear, operator 2026-11-20), before
+    # footprints and flora: the step cuts the ground they read.
+    if os.environ.get("SC2_NO_RIM_FALLS") != "1":
+        apply_rim_falls(dst)
     apply_scaled_footprints(dst)
     if os.environ.get("SC2_NO_FLORA") != "1":
         apply_flora(dst)

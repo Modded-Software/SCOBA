@@ -22,19 +22,23 @@ from project_root import project_root
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .herodrop import birth_follow, scene_on
-from .herodrop_zoom import PHASES, zoom_follow
+from .herodrop_land import check_start_state
+from .herodrop_zoom import ARM_MAX_MS, PHASE_ARM, PHASE_ZOOM, PHASES, zoom_armed, zoom_follow
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
 GROUPS = ("boot", "shots", "wrap", "gate", "seats", "deploy")
 LOOP_MS = 62.5
 STATE_LOOP, STATE_DROP, STATE_DONE = 1, 2, 3
-PHASE_ZOOM, PHASE_FALL = 2, 3  # drop phases (core/hero_drop.galaxy)
+PHASE_FALL = 3  # drop phase (core/hero_drop.galaxy)
 ANGLE_TOL = 2.0       # degrees, engine against script
 DIST_TOL = 0.03       # share, engine against script
 FIRST_CUT_MS = 1500   # gt_MapInit waits 0.5 s real time before the intro starts
 SEED_TERRAN, SEED_ZERG = 5, 10
-ZOOM_MAX_MS = 400 + 1 * 63  # R-INTRO-10, seen at loop resolution
+# R-INTRO-10: the pod births first (at most c_DROP_ARM_MAX), then the
+# 0.35 s zoom; seen at loop resolution (operator 2026-11-20).
+ZOOM_MAX_MS = ARM_MAX_MS + 400 + 1 * 63
+COUNT_BEEPS = 3  # one beep on 3, 2 and 1 (operator 2026-11-20)
 HOST_DEADLINE_S = 240.0
 
 
@@ -293,8 +297,20 @@ def check_deploy(checks) -> None:
     s = "deploy"
     # R-INTRO-10: SPACE starts the drop sequence; the prompt goes.
     checks.eq(s, "", "seenState", STATE_DROP)
-    checks.eq(s, "tzoom", "Phase", PHASE_ZOOM)
+    # The pod exists and births before the camera changes (2026-11-20).
+    phase = checks.value(s, "tzoom", "Phase")
+    _report(checks, f"{s} tzoom drop in ARM or the zoom", phase in (PHASE_ARM, PHASE_ZOOM), f"phase={phase}")
     checks.eq(s, "t0", "Phase", 0)  # negative: no drop in the loop
+    zoom_armed(checks, s, go_loop=False)
+    # The intro shot keeps the camera until the zoom; released after.
+    checks.eq(s, "tzoom", "CamHeld", phase == PHASE_ARM)
+    checks.false(s, "tfall", "CamHeld")
+    checks.false(s, "t0", "CamHeld")  # negative: not in the loop
+    # One beep per countdown number; none before SPACE (negative).
+    checks.true(s, "t0", "BeepValid")
+    beeps0 = checks.value(s, "t0", "Beeps") or 0
+    checks.eq(s, "tzoom", "Beeps", beeps0 + COUNT_BEEPS)
+    checks.eq(s, "tland", "Beeps", beeps0 + COUNT_BEEPS)
     # Countdown 3, 2, 1 on the prompt line, then the zoom (~3 s after SPACE).
     checks.eq(s, "", "countTrace", "321")
     count_ms = checks.value(s, "", "countMs") or 0
@@ -364,11 +380,11 @@ def check_deploy(checks) -> None:
         checks.eq(s, t, "JumpPresses", checks.value(s, "t0", "JumpPresses"))
         checks.eq(s, t, "Deploys", 1)
     checks.eq(s, "tland", "Life", checks.value(s, "tland", "LifeMax"))
-    # The no-intro defaults: Attack single, Chase stand, Point & Click.
+    # The toggle defaults: Attack single, Chase stand. Touchdown start state
+    # (operator 2026-11-20): TPS, arm 1.0, pitch 0 (was Point & Click, 1.5).
     checks.eq(s, "tafter", "Single", 1)
     checks.eq(s, "tafter", "Stand", 1)
-    checks.false(s, "tafter", "TpsMode")
-    checks.eq(s, "tafter", "CamDesired100", 150)
+    check_start_state(checks, s, "tafter")
     # Both extra presses were seen and ignored.
     checks.gt(s, "tafter", "SpaceIgnored", (checks.value(s, "t0", "SpaceIgnored") or 0) + 1)
 

@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 
 from flora import terrain as terrain_mod
 from hitvolumes import intro_shots as S
+from hitvolumes import pod_birth
 from project_root import project_root
 
 SCRIPTS = project_root() / "src" / "SCOBA.SC2Map" / "scripts" / "app"
@@ -40,11 +41,23 @@ def ease(t: float) -> float:
     return 1 - (1 - w) ** 3
 
 
-def sample(t: float) -> tuple[float, float, float]:
+def end_arm(clip0: float) -> float:
+    """The zoom's end arm (gf_HeroDropZoomBegin): the fall arm at the clip
+    time the zoom ends on. The zoom starts once the pod births, clip0 s into
+    Birth (operator 2026-11-20)."""
+    z = max(pod_birth.world((clip0 + C["c_DROP_ZOOM_LENGTH"]) * 1000.0, 0.0)[2], 0.0)
+    return C["c_DROP_POD_ARM"] + z / math.sin(math.radians(C["c_POD_BIRTH_PITCH"]))
+
+
+# The zoom starts between the Birth start and c_DROP_ARM_MAX into it.
+CLIP0S = (0.0, C["c_DROP_ARM_MAX"])
+
+
+def sample(t: float, clip0: float = 0.0) -> tuple[float, float, float]:
     """Pitch, arm, FOV at t seconds into the zoom (gf_HeroDropZoomApply)."""
     e = ease(t)
     pitch1 = C["c_POD_BIRTH_PITCH"]
-    dist1 = C["c_DROP_POD_ARM"] + C["c_POD_BIRTH_START_Z"] / math.sin(math.radians(pitch1))
+    dist1 = end_arm(clip0)
     pitch = C["c_DROP_ZOOM_PITCH"] + (pitch1 - C["c_DROP_ZOOM_PITCH"]) * e
     dist = C["c_DROP_ZOOM_DIST"] + (dist1 - C["c_DROP_ZOOM_DIST"]) * e
     fov = C["c_DROP_ZOOM_FOV0"] + (C["c_DROP_ZOOM_FOV1"] - C["c_DROP_ZOOM_FOV0"]) * e
@@ -64,11 +77,20 @@ class ZoomTest(unittest.TestCase):
         self.assertLessEqual(C["c_DROP_ZOOM_LENGTH"], 0.4)  # R-INTRO-10
         self.assertLess(C["c_DROP_ZOOM_MOVE"], C["c_DROP_ZOOM_LENGTH"])
 
-    def test_ends_on_the_fall_first_frame(self) -> None:
-        pitch, dist, fov = sample(C["c_DROP_ZOOM_LENGTH"])
-        self.assertAlmostEqual(pitch, C["c_POD_BIRTH_PITCH"], places=6)
-        self.assertAlmostEqual(dist, C["c_DROP_POD_ARM"] + C["c_POD_BIRTH_START_Z"] / math.sin(math.radians(C["c_POD_BIRTH_PITCH"])), places=6)
-        self.assertAlmostEqual(fov, C["c_DROP_ZOOM_FOV1"], places=6)
+    def test_ends_on_the_fall_camera(self) -> None:
+        for clip0 in CLIP0S:
+            pitch, dist, fov = sample(C["c_DROP_ZOOM_LENGTH"], clip0)
+            self.assertAlmostEqual(pitch, C["c_POD_BIRTH_PITCH"], places=6)
+            self.assertAlmostEqual(dist, end_arm(clip0), places=6)
+            self.assertAlmostEqual(fov, C["c_DROP_ZOOM_FOV1"], places=6)
+
+    def test_end_arm_follows_the_pod(self) -> None:
+        # At clip 0 + zoom length the pod is below its Birth start: a shorter
+        # arm than the start arm. Negative: a later zoom start ends shorter.
+        start = C["c_DROP_POD_ARM"] + C["c_POD_BIRTH_START_Z"] / math.sin(math.radians(C["c_POD_BIRTH_PITCH"]))
+        self.assertLess(end_arm(0.0), start)
+        self.assertLess(end_arm(C["c_DROP_ARM_MAX"]), end_arm(0.0))
+        self.assertGreater(end_arm(C["c_DROP_ARM_MAX"]), C["c_DROP_POD_ARM"])
 
     def test_easing_held_after_the_move(self) -> None:
         self.assertAlmostEqual(ease(C["c_DROP_ZOOM_MOVE"]), 1.0)
@@ -117,9 +139,10 @@ class ZoomTerrainTest(unittest.TestCase):
         tz = self.ground(tx, ty) + C["c_SCOBA_CAMERA_HEIGHT_OFFSET"]
         worst = 1e9
         for t in times():
-            pitch, dist, _ = sample(t)
-            ex, ey, ez = S.eye(tx, ty, tz, yaw, pitch * pitch_scale, dist)
-            worst = min(worst, ez - self.surface(ex, ey))
+            for clip0 in CLIP0S:
+                pitch, dist, _ = sample(t, clip0)
+                ex, ey, ez = S.eye(tx, ty, tz, yaw, pitch * pitch_scale, dist)
+                worst = min(worst, ez - self.surface(ex, ey))
         return worst
 
     def points(self, region: tuple[float, float, float]) -> list[tuple[float, float]]:

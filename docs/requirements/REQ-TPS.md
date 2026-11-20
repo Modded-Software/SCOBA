@@ -150,7 +150,7 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 
 | ID | Requirement |
 | --- | --- |
-| R-TPS-90 | Added 2026-11-19 by the operator. The TPS and Point & Click camera target height above the ground and the default camera arm MUST follow the bound unit's height. Tosh MUST keep 0.9 and 1.5. Every other unit MUST scale both by its height divided by Tosh's. The heights MUST come from the model bounds by a build script, at the scale the unit has in game. A unit with no measured height MUST use Tosh's values. The Viking keeps its own arm. A morph (Viking landing and lift) MUST switch to the new form's height. |
+| R-TPS-90 | Added 2026-11-19 by the operator. The TPS and Point & Click camera target height above the ground and the default camera arm MUST follow the bound unit's height. Tosh MUST keep 0.9 and 1.5. Every other unit MUST scale both by its height divided by Tosh's. The heights MUST come from the model bounds by a build script, at the scale the unit has in game. A unit with no measured height MUST use Tosh's values. The Viking keeps its own arm. A morph (Viking landing and lift) MUST switch to the new form's height. Exception 2026-11-20 (operator): after a hero drop touchdown the arm is 1.0 for every unit (REQ-HERO-DROP R-DROP-6); the target height still follows this rule. |
 
 ## 4. Open Points
 

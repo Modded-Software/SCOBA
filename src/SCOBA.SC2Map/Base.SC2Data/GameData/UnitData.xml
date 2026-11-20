@@ -854,4 +854,42 @@
     <CUnit id="MengskWraithAirWeaponRight">
         <Mover value="SCOBAWraithMissile"/>
     </CUnit>
+    <!-- 6x6 gas (R-BASE-35, operator 2026-11-20): the geyser and every
+         Terran and Zerg gas building, at twice the stock 3x3. Radii are
+         twice the stock 1.5. Footprints: FootprintData.xml. Models: Scale 2
+         in ActorData.xml. Sites: scripts/mapgen/resources (GEYSER_SIZE). -->
+    <CUnit id="VespeneGeyser">
+        <Radius value="3"/>
+        <SeparationRadius value="3"/>
+        <MinimapRadius value="3"/>
+        <Footprint value="FootprintScobaGeyser6x6"/>
+    </CUnit>
+    <CUnit id="Refinery">
+        <Radius value="3"/>
+        <SeparationRadius value="3"/>
+        <MinimapRadius value="3"/>
+        <Footprint value="FootprintScobaGeyser6x6Built"/>
+        <PlacementFootprint value="FootprintScoba6x6CappedGeyser"/>
+    </CUnit>
+    <CUnit id="AutomatedRefinery">
+        <Radius value="3"/>
+        <SeparationRadius value="3"/>
+        <MinimapRadius value="3"/>
+        <Footprint value="FootprintScobaGeyser6x6Built"/>
+        <PlacementFootprint value="FootprintScoba6x6CappedGeyser"/>
+    </CUnit>
+    <CUnit id="Extractor">
+        <Radius value="3"/>
+        <SeparationRadius value="3"/>
+        <MinimapRadius value="3"/>
+        <Footprint value="FootprintScobaGeyser6x6Built"/>
+        <PlacementFootprint value="FootprintScoba6x6CappedGeyser"/>
+    </CUnit>
+    <CUnit id="AutomatedExtractor">
+        <Radius value="3"/>
+        <SeparationRadius value="3"/>
+        <MinimapRadius value="3"/>
+        <Footprint value="FootprintScobaGeyser6x6Built"/>
+        <PlacementFootprint value="FootprintScoba6x6CappedGeyser"/>
+    </CUnit>
 </Catalog>

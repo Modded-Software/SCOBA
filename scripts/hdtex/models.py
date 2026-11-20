@@ -26,7 +26,9 @@ from .sources import HD_DIR, HD_PREFIX, SourceError, TextureRef, locate, map_arc
 # overlord (SCOBAVistaOverlord) shows the model of the Overlord.
 # Then the Mengsk battlecruiser the map places (MengskBC) and the sensor tower.
 # Then the Hellion and the Goliath.
-MODEL_UNITS = ("CommandCenter", "PsiDecimator", "HybridUltraliskShackled", "VikingAssault", "VikingFighter", "Overlord", "MengskBC", "SensorTower", "Hellion", "Goliath")
+# Then the units with a classic skin (scripts/hdtex/classic_skins.py). The Command
+# Center is above; Lair and Hive show the model file of the Hatchery.
+MODEL_UNITS = ("CommandCenter", "PsiDecimator", "HybridUltraliskShackled", "VikingAssault", "VikingFighter", "Overlord", "MengskBC", "SensorTower", "Hellion", "Goliath", "Marine", "SCV", "Battlecruiser", "Hydralisk", "Ultralisk", "Drone", "Hatchery")
 
 # Model entries that are upscaled by name, with the unit each belongs to.
 # Operator 2026-11-20: the explosions of the death of the Mengsk battlecruiser.
@@ -41,6 +43,22 @@ HD_MODEL_DIR = "Assets\\Models\\scoba_hd"
 MODEL_PREFIX = HD_PREFIX + "m_"
 # Operator 2026-11-19: 2048 per side is plenty for a model texture.
 MODEL_MAX_SIZE = 2048
+# Upscaled at any size. Operator 2026-11-20, on the classic Command Center:
+# "texture needs upsampling regardless, it is very low quality".
+ALWAYS_UPSCALE = frozenset({
+    "assets\\textures\\commandcenter_remastered_diff.dds",
+    "assets\\textures\\commandcenter_remastered_norm.dds",
+})
+# Kept larger than MODEL_MAX_SIZE. Operator 2026-11-20: "try the generative
+# model on the classic cc tex and inject the 4096 output non-downsampled".
+# The colour of the first is made by seedvr2 (variants.VARIANTS). The 2048
+# source gives 8192 at 4x, which is halved once to 4096.
+MAX_SIZES = {asset: 4096 for asset in sorted(ALWAYS_UPSCALE)}
+
+
+def max_size(asset: str, limit: int) -> int:
+    """The largest side to keep for a texture; `limit` is that of the build."""
+    return max(limit, MAX_SIZES.get(asset, 0))
 MIN_SIDE = 32
 SKIPPED = "skipped.json"
 SOURCE = "models"  # the name of this source in sources.SOURCES
@@ -48,6 +66,8 @@ SOURCE = "models"  # the name of this source in sources.SOURCES
 # The map build makes some models itself and puts them at the game's path
 # (VikingAssault.m3 with footstep events). Such a file is the one to copy.
 MAP_MARK = "map:"
+# File in an injected map: what the Model lines that now name a copy named before.
+PRIOR_MODELS = ".hd_models"
 
 NORMAL_SLOT = "normalLayer"
 SURFACE_MATERIALS = "standardMaterials"
@@ -84,18 +104,28 @@ def _own_models(map_dir: Path) -> dict[str, list[str]]:
     return found
 
 
+def prior_models(map_dir: Path) -> dict[str, str]:
+    """Copy file name in lower case -> the Model the map's own catalog named before injection."""
+    path = map_dir / PRIOR_MODELS
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+
 def _drop_hd_overrides(text: str, map_dir: Path) -> str:
     """The map's own catalog without the lines this tooling wrote into it.
 
-    The stock catalogs name a stock model again once the line is gone. A
-    model the map ships itself is named by the map's catalog alone, and the
-    line took the place of that. Such a line gets the map's own file back:
-    the copy keeps the file name, and one file of the map has it.
+    The stock catalogs name a stock model again once the line is gone. Where
+    the map's catalog named a model itself, the line took the place of that:
+    a file of the map, or another file of the game (scripts/hdtex/classic_skins.py).
+    Injection notes what stood there (PRIOR_MODELS) and the line gets it
+    back. Without a note, a line gets the map's own file back: the copy keeps
+    the file name, and one file of the map has it.
     """
     own = _own_models(map_dir)
+    prior = prior_models(map_dir)
 
     def restore(match: re.Match[str]) -> str:
-        places = own.get(match.group(2).lower(), [])
+        name = match.group(2).lower()
+        places = [prior[name]] if name in prior else own.get(name, [])
         return f"{match.group(1)}{places[0]}{match.group(3)}" if len(places) == 1 else match.group(0)
 
     text = re.sub(r'(<Model value=")' + re.escape(HD_MODEL_DIR) + r'\\([^"\\]+)("\s*/>)', restore, text, flags=re.IGNORECASE)
@@ -250,7 +280,7 @@ def judge(use: Use, data: bytes | None) -> Verdict:
         return Verdict(None, f"format {info.format}")
     if min(info.width, info.height) < MIN_SIDE:
         return Verdict(None, f"smaller than {MIN_SIDE} pixels")
-    if max(info.width, info.height) >= MODEL_MAX_SIZE:
+    if max(info.width, info.height) >= MODEL_MAX_SIZE and use.asset not in ALWAYS_UPSCALE:
         return Verdict(None, f"already {MODEL_MAX_SIZE} pixels or more")
     if use.flipbook and use.grid is not None:
         columns, rows = use.grid

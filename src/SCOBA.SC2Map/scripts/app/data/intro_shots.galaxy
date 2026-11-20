@@ -13,6 +13,25 @@ const int c_INTRO_EASE_Z = 5;
 const int c_INTRO_VAR_NONE = 0;
 const int c_INTRO_VAR_TARGET = 1;
 const int c_INTRO_VAR_YAW = 2;
+// The S2 Zerus tree (s2_tree).
+const fixed c_INTRO_TREE_X = 132.2700;
+const fixed c_INTRO_TREE_Y = 100.4300;
+const int c_INTRO_TREE_VARIATION = 4;
+const fixed c_INTRO_TREE_SCALE_XY = 5.0000;
+const fixed c_INTRO_TREE_SCALE_Z = 7.0000;
+// The second S2 tree (s2_tree2).
+const fixed c_INTRO_TREE2_X = 133.6800;
+const fixed c_INTRO_TREE2_Y = 101.8400;
+const fixed c_INTRO_TREE2_SCALE_XY = 3.7500;
+const fixed c_INTRO_TREE2_SCALE_Z = 5.2500;
+const fixed c_INTRO_TREE2_FACING = 135.0000;
+// The S6 foreground pods (s6_pods).
+const int c_INTRO_S6_ROW = 5;
+// S7 looks up at the Overmind: the first Mutalisk wave (systems/air_creep).
+const fixed c_INTRO_S7_START = 50.0000;
+const int c_INTRO_S6_PODS = 3;
+fixed[3] gv_introS6PodX;
+fixed[3] gv_introS6PodY;
 fixed[9] gv_introRow_length;
 fixed[9] gv_introRow_x0;
 fixed[9] gv_introRow_y0;
@@ -38,14 +57,14 @@ bool[9] gv_introRow_dof;
 void gf_IntroShotsLoad () {
     // S1 Pride
     gv_introRow_length[0] = 12.0000;
-    gv_introRow_x0[0] = 21.5700;
-    gv_introRow_y0[0] = 116.3300;
-    gv_introRow_x1[0] = 23.9900;
-    gv_introRow_y1[0] = 117.4100;
+    gv_introRow_x0[0] = 21.1900;
+    gv_introRow_y0[0] = 117.1700;
+    gv_introRow_x1[0] = 23.6200;
+    gv_introRow_y1[0] = 118.2300;
     gv_introRow_z0[0] = 14.0000;
     gv_introRow_z1[0] = 14.0000;
-    gv_introRow_yaw0[0] = 24.1500;
-    gv_introRow_yaw1[0] = 24.1500;
+    gv_introRow_yaw0[0] = 23.5600;
+    gv_introRow_yaw1[0] = 23.5600;
     gv_introRow_pitch0[0] = -25.0000;
     gv_introRow_pitch1[0] = -45.0000;
     gv_introRow_dist0[0] = 8.0000;
@@ -92,13 +111,13 @@ void gf_IntroShotsLoad () {
     gv_introRow_yaw1[2] = 75.0000;
     gv_introRow_pitch0[2] = 80.0000;
     gv_introRow_pitch1[2] = 80.0000;
-    gv_introRow_dist0[2] = 150.0000;
-    gv_introRow_dist1[2] = 150.0000;
-    gv_introRow_fov0[2] = 22.0000;
-    gv_introRow_fov1[2] = 22.0000;
+    gv_introRow_dist0[2] = 225.0000;
+    gv_introRow_dist1[2] = 225.0000;
+    gv_introRow_fov0[2] = 14.8000;
+    gv_introRow_fov1[2] = 14.8000;
     gv_introRow_near[2] = 1.3000;
     gv_introRow_far[2] = 0.0000;
-    gv_introRow_focus[2] = 150.0000;
+    gv_introRow_focus[2] = 225.0000;
     gv_introRow_ease[2] = c_INTRO_EASE_E;
     gv_introRow_variant[2] = 0;
     gv_introRow_dof[2] = false;
@@ -158,13 +177,13 @@ void gf_IntroShotsLoad () {
     gv_introRow_yaw1[5] = 235.0000;
     gv_introRow_pitch0[5] = 18.0000;
     gv_introRow_pitch1[5] = 18.0000;
-    gv_introRow_dist0[5] = 66.0000;
-    gv_introRow_dist1[5] = 66.0000;
-    gv_introRow_fov0[5] = 55.0000;
-    gv_introRow_fov1[5] = 55.0000;
+    gv_introRow_dist0[5] = 99.0000;
+    gv_introRow_dist1[5] = 99.0000;
+    gv_introRow_fov0[5] = 38.3000;
+    gv_introRow_fov1[5] = 38.3000;
     gv_introRow_near[5] = 1.5000;
     gv_introRow_far[5] = 0.3000;
-    gv_introRow_focus[5] = 66.0000;
+    gv_introRow_focus[5] = 99.0000;
     gv_introRow_ease[5] = c_INTRO_EASE_A;
     gv_introRow_variant[5] = 2;
     gv_introRow_dof[5] = false;
@@ -234,4 +253,10 @@ void gf_IntroShotsLoad () {
     gv_introRow_ease[8] = c_INTRO_EASE_Z;
     gv_introRow_variant[8] = 0;
     gv_introRow_dof[8] = false;
+    gv_introS6PodX[0] = 50.8100;
+    gv_introS6PodY[0] = 47.2900;
+    gv_introS6PodX[1] = 55.0500;
+    gv_introS6PodY[1] = 34.5700;
+    gv_introS6PodX[2] = 45.1500;
+    gv_introS6PodY[2] = 33.1500;
 }

@@ -1,0 +1,202 @@
+// Scenery and escort scenarios (operator 2026-11-20). Raw engine values;
+// the profile decides (profiles/herodrop_scenery.py).
+// - scenery: the storms around the Overmind, the S6 foreground pods; no
+//   orbit Wraiths (REQ-SCENERY).
+// - escort: the lane wave that comes with a hero drop (R-DROP-14).
+
+int gf_HsCount (string lp_type, int lp_player) {
+    return UnitGroupCount(UnitGroup(lp_type, lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0), c_unitCountAlive);
+}
+
+fixed gf_HsWrap (fixed lp_deg) {
+    fixed lv_d = lp_deg;
+
+    while (lv_d > 180.0) {
+        lv_d -= 360.0;
+    }
+    while (lv_d < -180.0) {
+        lv_d += 360.0;
+    }
+    return lv_d;
+}
+
+void gf_HsStorms (string lp_s) {
+    unit lv_home = gf_SceneryHome("SCOBAOvermind");
+    int lv_i;
+    int lv_actors = 0;
+    int lv_inMap = 0;
+    fixed lv_far = 0.0;
+    string lv_raw = "";
+
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "stormHomeValid", lv_home != null);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "stormCount", gv_stormCount);
+    for (lv_i = 0; lv_i < gv_stormCount; lv_i += 1) {
+        if (gv_stormActor[lv_i] != null) {
+            lv_actors += 1;
+        }
+        if (RegionContainsPoint(RegionPlayableMap(), gv_stormAt[lv_i])) {
+            lv_inMap += 1;
+        }
+        // From the Overmind unit, read here; not the script's own home point.
+        lv_far = MaxF(lv_far, DistanceBetweenPoints(gv_stormAt[lv_i], UnitGetPosition(lv_home)));
+        lv_raw = lv_raw + IntToString(FixedToInt(PointGetX(gv_stormAt[lv_i]))) + "," + IntToString(FixedToInt(PointGetY(gv_stormAt[lv_i]))) + " ";
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "stormActors", lv_actors);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "stormInMap", lv_inMap);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "stormFar100", FixedToInt(lv_far * 100.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "stormActorValid", CatalogEntryIsValid(c_gameCatalogActor, c_STORM_ACTOR));
+    BankValueSetFromString(gv_dbgBank, lp_s, "stormRaw", lv_raw);
+}
+
+// Negative (the orbit Wraiths are removed): no neutral Wraith on the map.
+void gf_HsNoOrbits (string lp_s) {
+    BankValueSetFromInt(gv_dbgBank, lp_s, "orbitNeutral", gf_HsCount("SCOBAWraith", 0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "wraithsAll", gf_HsCount("SCOBAWraith", c_playerAny));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "airAlive", gf_AirCreepAlive(c_AIR_CREEP_TERRAN));
+}
+
+// The S6 pods: three Zerg pods on the first call, none on the second.
+void gf_HsS6Pods (string lp_s) {
+    int lv_i;
+    fixed lv_off = 0.0;
+    int lv_n;
+    unitgroup lv_seen = UnitGroupEmpty();
+    string lv_made = "";
+    fixed lv_gap = 9999.0;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s6Before", gv_s6PodsMade);
+    gf_SceneryS6Pods();
+    // Spread in time: the pods made, every 0.5 s; every pod unit seen.
+    for (lv_n = 0; lv_n < 12; lv_n += 1) {
+        Wait(0.25, c_timeGame);
+        UnitGroupAddUnitGroup(lv_seen, UnitGroup("ZergDropPod", c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0));
+        if (ModI(lv_n, 2) == 1) {
+            lv_made = lv_made + IntToString(gv_s6PodsMade);
+        }
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, "s6MadeTrace", lv_made);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s6Made", gv_s6PodsMade);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s6PodUnits", UnitGroupCount(lv_seen, c_unitCountAll));
+    lv_gap = MinF(DistanceBetweenPoints(gv_s6PodAt[0], gv_s6PodAt[1]), MinF(DistanceBetweenPoints(gv_s6PodAt[0], gv_s6PodAt[2]), DistanceBetweenPoints(gv_s6PodAt[1], gv_s6PodAt[2])));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s6Gap100", FixedToInt(lv_gap * 100.0));
+    for (lv_i = 0; lv_i < c_INTRO_S6_PODS; lv_i += 1) {
+        lv_off = MaxF(lv_off, DistanceBetweenPoints(gv_s6PodAt[lv_i], Point(gv_introS6PodX[lv_i], gv_introS6PodY[lv_i])));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s6Off100", FixedToInt(lv_off * 100.0));
+    // Negative: once per game.
+    gf_SceneryS6Pods();
+    for (lv_n = 0; lv_n < 12; lv_n += 1) {
+        Wait(0.25, c_timeGame);
+        UnitGroupAddUnitGroup(lv_seen, UnitGroup("ZergDropPod", c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s6MadeAgain", gv_s6PodsMade);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s6PodUnitsAgain", UnitGroupCount(lv_seen, c_unitCountAll));
+}
+
+void gf_HdScenery () {
+    string lv_s = "scenery";
+
+    gf_HdReset(lv_s, true);
+    gf_HsStorms(lv_s);
+    gf_HsNoOrbits(lv_s);
+    gf_HsS6Pods(lv_s);
+    BankSave(gv_dbgBank);
+}
+
+// The escort wave: none with the hero alive; one per drop, its pods facing
+// as the hero pod, off the hero pod, its units alive after the landing.
+void gf_HdEscort () {
+    string lv_s = "drop_escort";
+    int lv_i;
+    int lv_n;
+    int lv_waves0;
+    int lv_owned = 0;
+    int lv_hidden = 0;
+    int lv_ordered = 0;
+    string lv_types = "";
+    unitgroup lv_pods;
+    unit lv_pod;
+    fixed lv_turn = 0.0;
+    fixed lv_near = 9999.0;
+    int lv_reads = 0;
+    unit lv_own;
+
+    gf_HdReset(lv_s, true);
+    // Negative: the hero lives, no drop, no escort.
+    lv_waves0 = gv_escortWaves[1];
+    gf_HdGo(1);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "aliveWaves", gv_escortWaves[1] - lv_waves0);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "alivePods", gf_HdLanePods());
+    // The seat already has a Goliath: the escort brings one all the same.
+    UnitCreate(1, "Goliath", c_unitCreateIgnorePlacement, 1, gv_dropAt[1], 0.0);
+    lv_own = UnitLastCreated();
+    BankValueSetFromInt(gv_dbgBank, lv_s, "goliathsBefore", TechTreeUnitCount(1, "Goliath", c_techCountQueuedOrBetter));
+    UnitKill(gv_heroTosh);
+    Wait(0.5, c_timeGame);
+    gf_HdGo(1);
+    for (lv_i = 0; lv_i < 64 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "podSeen", UnitIsValid(gv_dropPod[1]));
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "waves", gv_escortWaves[1] - lv_waves0);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "heroFacing100", FixedToInt(UnitGetFacing(gv_dropPod[1]) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "heroTravel100", FixedToInt(gf_HsWrap(UnitGetFacing(gv_dropPod[1]) + c_POD_BIRTH_TRAVEL) * 100.0));
+    // The first escort pod is in the air now; the second follows the first
+    // (the Terran lane wave waits per pod). Both are read as they appear.
+    for (lv_i = 0; lv_i < 160; lv_i += 1) {
+        lv_pods = UnitGroup("TerranDropPod", c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+        for (lv_n = 1; lv_n <= UnitGroupCount(lv_pods, c_unitCountAll); lv_n += 1) {
+            lv_pod = UnitGroupUnit(lv_pods, lv_n);
+            lv_turn = MaxF(lv_turn, AbsF(gf_HsWrap(UnitGetFacing(lv_pod) - gv_dropFacing[1])));
+            lv_near = MinF(lv_near, DistanceBetweenPoints(UnitGetPosition(lv_pod), gv_dropAt[1]));
+            lv_reads += 1;
+        }
+        Wait(c_DROP_TICK, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podReads", lv_reads);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podTurn100", FixedToInt(lv_turn * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podNear100", FixedToInt(lv_near * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podGap100", FixedToInt(DistanceBetweenPoints(gv_escortPodA[1], gv_escortPodB[1]) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "escortFacing100", FixedToInt(gv_escortPodFacing[1] * 100.0));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "landed", !UnitIsValid(gv_dropPod[1]));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "heroAlive", UnitIsAlive(gv_tPSUNIT[1]));
+    // Both pods landed and unloaded (2 x 3.5 s from the go).
+    Wait(3.0, c_timeGame);
+    // The wave's own units (the map's group), read from the engine: alive,
+    // owner, type. Other waves do not count.
+    lv_n = UnitGroupCount(gv_escortUnits[1], c_unitCountAll);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "units", lv_n);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "unitsAlive", UnitGroupCount(gv_escortUnits[1], c_unitCountAlive));
+    for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
+        lv_pod = UnitGroupUnit(gv_escortUnits[1], lv_i);
+        lv_types = lv_types + UnitGetType(lv_pod) + " ";
+        if (UnitGetOwner(lv_pod) == 1) {
+            lv_owned += 1;
+        }
+        if (UnitTestState(lv_pod, c_unitStateHidden)) {
+            lv_hidden += 1;
+        }
+        if (UnitOrderCount(lv_pod) > 0) {
+            lv_ordered += 1;
+        }
+    }
+    BankValueSetFromString(gv_dbgBank, lv_s, "unitTypes", lv_types);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "unitsOwned", lv_owned);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "unitsHidden", lv_hidden);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "unitsOrdered", lv_ordered);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "podsLeft", gf_HdLanePods());
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "ownGoliathInWave", UnitGroupHasUnit(gv_escortUnits[1], lv_own));
+    UnitRemove(lv_own);
+    BankSave(gv_dbgBank);
+}
+
+void gf_HdSceneryGroups () {
+    if (gf_DbgGroup("scenery")) {
+        gf_HdScenery();
+    }
+    if (gf_DbgGroup("escort")) {
+        gf_HdEscort();
+    }
+}

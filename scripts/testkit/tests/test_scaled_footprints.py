@@ -184,6 +184,7 @@ class BlockerTests(unittest.TestCase):
 
 
 class ApplyTests(unittest.TestCase):
+    @mock.patch.object(config, "HALL_FOOTPRINTS_ON", True)
     def test_retypes_and_generates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = make_map(Path(tmp))
@@ -244,7 +245,7 @@ class ApplyTests(unittest.TestCase):
             units.write_text(text, encoding="utf-8")
             self.assertIn("SporeCannon has no generated footprint", check_scaled_footprints(root, DATA))
 
-    def test_caged_ultralisk_gets_8x8_square(self) -> None:
+    def test_caged_ultralisk_gets_12x12_square(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = make_map(Path(tmp))
             objects = root / "Objects"
@@ -258,9 +259,10 @@ class ApplyTests(unittest.TestCase):
             fp = re.search(r'<CUnit id="HybridUltraliskShackled">\s*<Footprint value="(FootprintScoba[0-9a-f]+)"/>', units)
             self.assertIsNotNone(fp, units)
             body = re.search(rf'<CFootprint id="{fp.group(1)}">(.*?)</CFootprint>', (game / "FootprintData.xml").read_text(encoding="utf-8"), re.S).group(1)
-            self.assertIn('<Offsets value="-4,-4;-4,4;4,4;4,-4"/>', body)
-            self.assertEqual(body.count('<Rows value="xxxxxxxx"/>'), 16)  # 8 rows, Check and Place
-            self.assertEqual(body.count('Area="-4,-4,4,4"'), 2)
+            self.assertIn('<Offsets value="-6,-6;-6,6;6,6;6,-6"/>', body)
+            self.assertEqual(body.count('<Rows value="xxxxxxxxxxxx"/>'), 24)  # 12 rows, Check and Place
+            self.assertNotIn('<Rows value="xxxxxxxx"/>', body)  # Negative: not the earlier 8x8
+            self.assertEqual(body.count('Area="-6,-6,6,6"'), 2)
             self.assertEqual(check_scaled_footprints(root, DATA), [])
             actor_path = game / "ActorData.xml"
             actors = actor_path.read_text(encoding="utf-8")
@@ -300,6 +302,33 @@ class ApplyTests(unittest.TestCase):
             self.assertIn('<Macros value="TerrainSquibAnimations"/>', entry)  # kept
             self.assertEqual(entry.count("BuildingTerrainFlatten"), 3)
             self.assertEqual(check_scaled_footprints(root, DATA), [])
+
+    def test_geyser_flattens_under_its_own_footprint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_map(Path(tmp))
+            objects = root / "Objects"
+            objects.write_text(objects.read_text(encoding="utf-8").replace(
+                "</PlacedObjects>",
+                '    <ObjectUnit Id="9" Position="60,60,0" Scale="1,1,1" UnitType="VespeneGeyser"/>\n</PlacedObjects>',
+            ), encoding="utf-8")
+            actor_path = root / "Base.SC2Data" / "GameData" / "ActorData.xml"
+            actor_path.write_text(ACTORS.replace(
+                "</Catalog>",
+                '    <CActorUnit id="VespeneGeyser">\n        <Scale value="2.000000"/>\n    </CActorUnit>\n</Catalog>',
+            ), encoding="utf-8")
+            apply_scaled_footprints(root, DATA)
+            actors = actor_path.read_text(encoding="utf-8")
+            entry = re.search(r'<CActorUnit id="VespeneGeyser">(.*?)</CActorUnit>', actors, re.S).group(1)
+            self.assertIn('<Scale value="2.000000"/>', entry)  # kept
+            self.assertIn('<On Terms="UnitBirth.VespeneGeyser.EditorPlaced" Send="Create BuildingTerrainFlattenEditor"/>', entry)
+            self.assertEqual(entry.count("BuildingTerrainFlatten"), 3)
+            # Negative: the geyser keeps its own footprint; no square one is linked.
+            units = (root / "Base.SC2Data" / "GameData" / "UnitData.xml").read_text(encoding="utf-8")
+            self.assertNotIn('<CUnit id="VespeneGeyser">', units)
+            self.assertEqual(check_scaled_footprints(root, DATA), [])
+            # Negative: the check fails when the events are gone.
+            actor_path.write_text(re.sub(r'\s*<On Terms="UnitBirth\.VespeneGeyser[^>]*/>', "", actors), encoding="utf-8")
+            self.assertIn("VespeneGeyser actor does not flatten terrain", "\n".join(check_scaled_footprints(root, DATA)))
 
     def test_fails_without_trees(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

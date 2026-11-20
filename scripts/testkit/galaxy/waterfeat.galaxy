@@ -1,0 +1,193 @@
+// Water feature test (REQ-WATER-FEATURES, scripts/mapgen/waterfeatures).
+// Per site: the engine ground and pathing on the carved ground, a Marine
+// standing on carved ground, and a Marine ordered into the pool. Also where
+// the pipe unit stands and how it faces.
+// Points come from the generated waterfeat_points.galaxy.
+
+trigger gt_WaterFeat;
+const int c_WF_PATH_MAX = 160;
+int gv_wfN;
+
+void gf_WaterFeatPoints ();
+void gf_WaterFeatOrbits ();
+
+string gf_WfIndex (int lp_i) {
+    if (lp_i < 10) {
+        return "00" + IntToString(lp_i);
+    }
+    if (lp_i < 100) {
+        return "0" + IntToString(lp_i);
+    }
+    return IntToString(lp_i);
+}
+
+// Engine ground and ground pathing of one point.
+void gf_WfSample (string lp_section, int lp_k, fixed lp_x, fixed lp_y) {
+    point lv_p = Point(lp_x, lp_y);
+    string lv_key = "s" + IntToString(lp_k);
+
+    BankValueSetFromFixed(gv_dbgBank, lp_section, lv_key + "Ground", WorldHeight(c_heightMapGround, lv_p));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lv_key + "Pass", PointPathingPassable(lv_p));
+    gv_wfN += 1;
+}
+
+unit gf_WfMarine (point lp_at) {
+    UnitCreate(1, "Marine", c_unitCreateIgnorePlacement, 1, lp_at, 0.0);
+    UnitSetState(UnitLastCreated(), c_unitStateInvulnerable, true);
+    return UnitLastCreated();
+}
+
+// A Marine put on carved ground: its height above the engine ground there.
+void gf_WfStand (string lp_section, fixed lp_x, fixed lp_y) {
+    unit lv_u = gf_WfMarine(Point(lp_x, lp_y));
+
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "alive", UnitIsAlive(lv_u));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, "marineH", UnitGetHeight(lv_u));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, "ground", WorldHeight(c_heightMapGround, UnitGetPosition(lv_u)));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, "x", PointGetX(UnitGetPosition(lv_u)));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, "y", PointGetY(UnitGetPosition(lv_u)));
+    UnitRemove(lv_u);
+    BankSave(gv_dbgBank);
+}
+
+// A Marine on open ground ordered to the middle of the pool: every step.
+void gf_WfWalk (string lp_section, fixed lp_sx, fixed lp_sy, fixed lp_ex, fixed lp_ey) {
+    point lv_start = Point(lp_sx, lp_sy);
+    point lv_end = Point(lp_ex, lp_ey);
+    point lv_at;
+    unit lv_u;
+    int lv_i;
+
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "startPass", PointPathingPassable(lv_start));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "endPass", PointPathingPassable(lv_end));
+    lv_u = gf_WfMarine(lv_start);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "moveIssued", UnitIssueOrder(lv_u, OrderTargetingPoint(AbilityCommand("move", 0), lv_end), c_orderQueueReplace));
+    for (lv_i = 0; lv_i < c_WF_PATH_MAX; lv_i += 1) {
+        lv_at = UnitGetPosition(lv_u);
+        BankValueSetFromString(gv_dbgBank, lp_section, "path" + gf_WfIndex(lv_i), IntToString(FixedToInt(PointGetX(lv_at) * 100.0)) + "," + IntToString(FixedToInt(PointGetY(lv_at) * 100.0)));
+        // The walk is over when the order is done; one second of samples is the least.
+        if (lv_i >= 16 && UnitOrderCount(lv_u) == 0) {
+            lv_i += 1;
+            break;
+        }
+        Wait(0.0625, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "pathCount", lv_i);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endOrders", UnitOrderCount(lv_u));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "alive", UnitIsAlive(lv_u));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, "endGround", WorldHeight(c_heightMapGround, UnitGetPosition(lv_u)));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, "endH", UnitGetHeight(lv_u));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "realClicks", gv_dbgRealClicks);
+    UnitRemove(lv_u);
+    BankSave(gv_dbgBank);
+}
+
+// The pipe unit: the build takes the pipe mouths from its place and facing.
+void gf_WfPipe (string lp_section, string lp_type) {
+    unitgroup lv_g = UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+    unit lv_u = UnitGroupUnit(lv_g, 1);
+
+    BankValueSetFromInt(gv_dbgBank, lp_section, "count", UnitGroupCount(lv_g, c_unitCountAll));
+    if (UnitIsValid(lv_u)) {
+        BankValueSetFromFixed(gv_dbgBank, lp_section, "x", PointGetX(UnitGetPosition(lv_u)));
+        BankValueSetFromFixed(gv_dbgBank, lp_section, "y", PointGetY(UnitGetPosition(lv_u)));
+        BankValueSetFromFixed(gv_dbgBank, lp_section, "facing", UnitGetFacing(lv_u));
+        BankValueSetFromFixed(gv_dbgBank, lp_section, "height", UnitGetHeight(lv_u));
+        BankValueSetFromFixed(gv_dbgBank, lp_section, "ground", WorldHeight(c_heightMapGround, UnitGetPosition(lv_u)));
+    }
+    BankSave(gv_dbgBank);
+}
+
+// --- Orbit views (scenery screenshots, AGENTS.md "Screenshots") ----------
+const int c_WF_SCENE = 64;  // the harness's own scene owner bit
+const fixed c_WF_TICK = 0.0625;
+timer gv_wfClock;
+int gv_wfOrbits;
+
+void gf_WfCamSnap (string lp_section, string lp_tag) {
+    point lv_t = CameraGetTarget(1);
+
+    BankValueSetFromFixed(gv_dbgBank, lp_section, lp_tag + "X", PointGetX(lv_t));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, lp_tag + "Y", PointGetY(lv_t));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, lp_tag + "Yaw", CameraGetYaw(1));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, lp_tag + "Pitch", CameraGetPitch(1));
+    BankValueSetFromFixed(gv_dbgBank, lp_section, lp_tag + "Dist", CameraGetDistance(1));
+}
+
+// The camera circles a point for lp_seconds of real time: the host takes
+// screenshots in real time. Yaw is written each loop with no blend, kept in
+// 0..360, so no blend can turn the long way round.
+void gf_WfOrbit (string lp_section, fixed lp_x, fixed lp_y, fixed lp_yaw, fixed lp_turn, fixed lp_seconds, fixed lp_dist, fixed lp_pitch, fixed lp_height) {
+    fixed lv_t = 0.0;
+    bool lv_half = false;
+
+    CameraPan(1, Point(lp_x, lp_y), 0.0, 0.0, 0.0, false);
+    CameraSetValue(1, c_cameraValueYaw, ModF(lp_yaw + 720.0, 360.0), 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValuePitch, lp_pitch, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueDistance, lp_dist, 0.0, 0.0, 0.0);
+    CameraSetValue(1, c_cameraValueHeightOffset, lp_height, 0.0, 0.0, 0.0);
+    Wait(1.0, c_timeReal);
+    gf_WfCamSnap(lp_section, "start");
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "followsHero", gf_CameraFollowsHero(1));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "scene", gf_SceneActive(1));
+    // The host takes its screenshots from here on (profiles/waterfeat.py).
+    gv_wfOrbits += 1;
+    BankValueSetFromString(gv_dbgBank, "wf_host", "name", lp_section);
+    BankValueSetFromInt(gv_dbgBank, "wf_host", "req", gv_wfOrbits);
+    BankSave(gv_dbgBank);
+    TimerStart(gv_wfClock, 3600.0, false, c_timeReal);
+    while (lv_t < lp_seconds) {
+        CameraSetValue(1, c_cameraValueYaw, ModF(lp_yaw + lp_turn * lv_t / lp_seconds + 720.0, 360.0), 0.0, 0.0, 0.0);
+        if (!lv_half && lv_t >= lp_seconds / 2.0) {
+            lv_half = true;
+            gf_WfCamSnap(lp_section, "mid");
+        }
+        Wait(c_WF_TICK, c_timeGame);
+        lv_t = TimerGetElapsed(gv_wfClock);
+    }
+    gf_WfCamSnap(lp_section, "end");
+    BankValueSetFromFixed(gv_dbgBank, lp_section, "seconds", lv_t);
+    BankSave(gv_dbgBank);
+}
+
+// The scene (systems/scene) holds the input and every camera writer, and
+// hides the UI. The follow of the hero ends.
+void gf_WfOrbitsBegin () {
+    gv_wfClock = TimerCreate();
+    gf_SceneEnter(1, c_WF_SCENE);
+    gf_CameraFollowStop(1);
+    gf_SceneDofDefault(1);
+}
+
+void gf_WfOrbitsEnd () {
+    gf_SceneLeave(1, c_WF_SCENE);
+}
+
+bool gt_WaterFeat_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAWATERFEAT", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_WaterFeatPoints();
+    BankValueSetFromInt(gv_dbgBank, "meta", "count", gv_wfN);
+    BankSave(gv_dbgBank);
+    gf_WfOrbitsBegin();
+    gf_WaterFeatOrbits();
+    gf_WfOrbitsEnd();
+    BankValueSetFromInt(gv_dbgBank, "meta", "realClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_WaterFeat_Init () {
+    gt_WaterFeat = TriggerCreate("gt_WaterFeat_Func");
+    TriggerAddEventMapInit(gt_WaterFeat);
+}

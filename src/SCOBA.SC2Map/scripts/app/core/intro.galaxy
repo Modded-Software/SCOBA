@@ -34,6 +34,9 @@ const int c_INTRO_PROMPT_W = 900;
 const int c_INTRO_PROMPT_H = 48;
 const int c_INTRO_PROMPT_OFFSET = 24;
 const int c_INTRO_COUNT = 3;   // SPACE countdown, seconds
+// One beep on every countdown number, 3, 2 and 1 (operator 2026-11-20):
+// the stock Battle.net match countdown beep (liberty.sc2mod SoundData).
+const string c_INTRO_COUNT_BEEP = "UI_BnetCountdownBeep";
 const fixed c_INTRO_PULSE = 0.8;
 const fixed c_INTRO_PULSE_LOW = 0.0;        // transparency, percent
 const fixed c_INTRO_PULSE_HIGH = 55.0;
@@ -94,4 +97,11 @@ int[16] gv_introDeploys;
 fixed[16] gv_introCountAt;  // countdown start (clock); -1: not counting
 int[16] gv_introCountShown;        // the number on the prompt line
 string[16] gv_introCountTrace;     // numbers shown, in order (tests)
+int[16] gv_introCountBeeps;        // countdown beeps played (tests)
+bool gv_introBeepValid;            // the beep sound id resolves (tests)
+// Deploy until the drop's zoom: the intro shot keeps moving (no frozen
+// frame before the pod births); the drop releases it (gf_IntroCameraRelease).
+bool[16] gv_introCamHeld;
+actor gv_introTree;  // the S2 Zerus tree (systems/visual_tuning)
+actor gv_introTree2; // the second, smaller one next to it
 int[16] gv_introSpaceIgnored;

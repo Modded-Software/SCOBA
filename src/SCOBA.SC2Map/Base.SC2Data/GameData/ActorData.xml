@@ -73,6 +73,13 @@
         <!-- x1.2 (operator 2026-11-19): small units fit under it. -->
         <Scale value="3.600000,3.600000,4.200000"/>
     </CActorUnit>
+    <!-- Same scale as the Command Center (operator 2026-11-20); footprints.config.HALL_UNITS. -->
+    <CActorUnit id="OrbitalCommand">
+        <Scale value="3.600000,3.600000,4.200000"/>
+    </CActorUnit>
+    <CActorUnit id="PlanetaryFortress">
+        <Scale value="3.600000,3.600000,4.200000"/>
+    </CActorUnit>
     <!--                                                                                         -->
     <!-- Engineering Bay ....................................................................... -->
     <!--                                                                                         -->
@@ -572,8 +579,10 @@
     <CActorUnit id="Overseer">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
     </CActorUnit>
+    <!-- SCV drawn at 200% (operator 2026-11-20; 150% first). -->
     <CActorUnit id="SCV">
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
+        <Scale value="2.000000"/>
     </CActorUnit>
     <CActorUnit id="SpineCrawler">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
@@ -730,4 +739,24 @@
         <On Terms="UnitPortrait.*.Configure" Target="::PortraitGameSelf" Send="AnimPlay Visor Morph,Stand PlayForever 0.000000"/>
         <Aliases value="_UnitMedium"/>
     </CActorUnit>
+    <!-- 6x6 gas (R-BASE-35, operator 2026-11-20): twice the stock size, as
+         their footprints (FootprintData.xml) and radii (UnitData.xml). -->
+    <CActorUnit id="VespeneGeyser">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorUnit id="Refinery">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorUnit id="AutomatedRefinery">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorUnit id="Extractor">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorUnit id="AutomatedExtractor">
+        <Scale value="2.000000"/>
+    </CActorUnit>
+    <CActorSplat id="VespeneGeyserSplat">
+        <Scale value="2.000000"/>
+    </CActorSplat>
 </Catalog>

@@ -132,7 +132,9 @@ class AirCreepDataTest(unittest.TestCase):
         self.assertEqual(consts["c_AIR_CREEP_CAP"], "32")
         # Formation slots fit inside an X region (radius 16 on the built map).
         self.assertLessEqual(float(consts["c_AIR_CREEP_X_INNER"]) + float(consts["c_AIR_CREEP_SPACING"]), 16.0)
-        self.assertIn("TimerStart(gv_airCreepTimer, c_AIR_CREEP_PHASE, true, c_timeReal)", text)
+        self.assertEqual(consts["c_AIR_CREEP_FIRST_LEAD"], "1.0")
+        tick = text[text.index("bool gt_AirCreepTick_Func"):]
+        self.assertIn("TimerStart(gv_airCreepTimer, c_AIR_CREEP_PHASE, true, c_timeReal)", tick)
 
     def test_balance_read_before_spawn(self) -> None:
         # R-AIR-16: one step per formation (2 per wave), read once per wave
@@ -155,14 +157,27 @@ class AirCreepDataTest(unittest.TestCase):
         self.assertLessEqual(largest + step, int(consts["c_AIR_CREEP_MAX_PER_DIR"]))
 
     def test_first_slot_zerg_after_one_phase(self) -> None:
-        # Map start only arms the timer: the first slot (10 s) is Zerg, the
-        # next (20 s) Terran. The in-game timer group checks the times.
+        # Map start arms the timer, one shot: the first slot is Zerg, 1 s
+        # into the first S7 of the intro (51 s); the next (61 s) Terran. The
+        # in-game timer group checks the times. Then one early wave of each
+        # side (operator 2026-11-20): Zerg after 5 s, Terran at 10 s; none
+        # at 0 s.
         text = MODULE.read_text(encoding="utf-8")
         start = text[text.index("bool gt_AirCreepStart_Func"):text.index("bool gt_AirCreepTick_Func")]
         self.assertIn("gv_airCreepNextSide = c_AIR_CREEP_ZERG;", start)
-        self.assertIn("TimerStart(gv_airCreepTimer, c_AIR_CREEP_PHASE, true, c_timeReal)", start)
-        # Negative: no wave of either side at map start.
-        self.assertNotIn("gf_AirCreepWave", start)
+        self.assertIn("TimerStart(gv_airCreepTimer, c_INTRO_S7_START + c_AIR_CREEP_FIRST_LEAD, false, c_timeReal)", start)
+        # Negative: map start does not start the 10 s period.
+        self.assertNotIn("c_AIR_CREEP_PHASE", start)
+        self.assertEqual(start.count("gf_AirCreepWave("), 2)
+        self.assertIn("gf_AirCreepWave(c_AIR_CREEP_ZERG);", start)
+        self.assertIn("gf_AirCreepWave(c_AIR_CREEP_TERRAN);", start)
+        self.assertLess(start.index("TimerStart(gv_airCreepTimer"), start.index("gf_AirCreepWave("))
+        consts = dict(re.findall(r"const \w+ (c_AIR_CREEP_\w+) = ([^;]+);", text))
+        self.assertEqual(consts["c_AIR_CREEP_EARLY"], "5.0")
+        # Negative: no wave before the first wait.
+        self.assertLess(start.index("Wait(c_AIR_CREEP_EARLY, c_timeReal);"), start.index("gf_AirCreepWave(c_AIR_CREEP_ZERG);"))
+        self.assertLess(start.index("gf_AirCreepWave(c_AIR_CREEP_ZERG);"), start.index("Wait(2.0 * c_AIR_CREEP_EARLY - TimerGetElapsed(lv_clock), c_timeReal);"))
+        self.assertLess(start.index("Wait(2.0 * c_AIR_CREEP_EARLY"), start.index("gf_AirCreepWave(c_AIR_CREEP_TERRAN);"))
 
 
 class AirCreepProfileTest(unittest.TestCase):

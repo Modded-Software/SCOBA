@@ -44,16 +44,21 @@ MODELS = {
     "ZerusTree": r"assets.doodads.zerustree.zerustree_\d+\.m3$",
     "SporeCannon": r"assets.buildings.zerg.sporecannon.sporecannon\.m3$",
     "SporeCrawler": r"assets.buildings.zerg.sporecrawler.sporecrawler\.m3$",
-    # Model "CommandCenter" (liberty ModelData): the hall legs (R-BASE-30).
-    "CommandCenter": r"assets.buildings.terran.commandcenterex1.commandcenterex1\.m3$",
+    # Model "CommandCenter": the hall legs (R-BASE-30). The map shows the
+    # classic model (scripts/hdtex/classic_skins.py; operator 2026-11-20: "the
+    # legs are a tiny bit off need to recalculate footprint"). Before:
+    # commandcenterex1, bones *_Foot_*.
+    "CommandCenter": r"assets.buildings.terran.commandcenter_remastered.commandcenter_remastered\.m3$",
 }
 # Model group -> bone name part: only triangles whose three vertices are
 # skinned mostly to such a bone are sliced. The CC body slopes down between
 # the feet and crossed the feet height as bars and strips that are not on
 # the ground (operator 2026-11-19: "weird flying strip patterns that have
-# nothing to do with the round geometry of the 4 feet"); its ground
-# geometry is skinned to Foot_01..04 (and the entrance Ramp).
-MODEL_BONES = {"CommandCenter": "_Foot_"}
+# nothing to do with the round geometry of the 4 feet"). The classic model
+# stands on Leg1..3, LegPlate and LegPlate2; Stand does not move them.
+MODEL_BONES = {"CommandCenter": "Leg"}
+# Hall group -> file name of the sliced model, in lower case. The unit must show it.
+HALL_FILES = {"CommandCenter": "commandcenter_remastered.m3"}
 # Model-space slice heights. Feet height (world 0.05-0.35) over the placed
 # scales (2-8 trees, 3 spores) falls in 0.006-0.175.
 SLICE_STEP = 0.0025
@@ -165,8 +170,9 @@ def model_scales(scratch: Path) -> dict[str, list[float]]:
         res = game.resolve(unit)
         if res is None:
             raise SystemExit(f"{unit}: no actor or model in the data stack")
-        m3_path = res.m3.replace("\\", "/").lower().replace("/", ".")
-        if not re.search(MODELS[group], m3_path):
+        # The HD step shows a copy with the same file name (hdtex.models).
+        name = res.m3.replace("\\", "/").lower().rsplit("/", 1)[-1]
+        if name != HALL_FILES[group]:
             raise SystemExit(f"{unit}: data stack model {res.m3} is not the sliced {MODELS[group]}")
         out[group] = [round(s, 4) for s in res.model_scale]
     return out

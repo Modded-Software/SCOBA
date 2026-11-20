@@ -6,7 +6,7 @@ FIELDS = 8
 GEYSERS = 2
 HALL_HALF = 4                    # 8x8 Command Center (R-BASE-30)
 FIELD_SIZE = (2, 1)
-GEYSER_SIZE = (3, 3)
+GEYSER_SIZE = (6, 6)                # R-BASE-35: twice the stock 3x3 (FootprintScobaGeyser6x6)
 
 # Organic shape (R-BASE-32), per line from Random(f"{SEED}:{name}").
 ARC_SPAN = (100.0, 130.0)        # degrees covered by the fields
@@ -15,7 +15,7 @@ FIELD_R = (6.5, 9.0)
 FIELD_JITTER = 6.0               # degrees, +-
 FIELD_BACK = 1.5                 # every other field set back up to this
 GEYSER_GAP = (14.0, 30.0)        # degrees past an arc end
-GEYSER_R = (7.0, 9.0)
+GEYSER_R = (8.5, 10.5)           # the 3x3 range (7, 9) plus the 1.5 the half side grew
 SNAP_TRIES = ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1),
               (2, 0), (-2, 0), (0, 2), (0, -2))
 

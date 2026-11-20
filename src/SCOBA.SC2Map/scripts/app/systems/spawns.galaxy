@@ -1,29 +1,96 @@
 // Module: systems/spawns
 
+// Drop pod spots (operator 2026-11-20: pods landed on buildings): a free
+// 4x4 cell square in or near the spawn region. Free: all 16 cells ground
+// pathable on one cliff level (buildings and doodad footprints block), no
+// living, shown ground unit within c_POD_SPOT_CLEAR, and at least
+// c_POD_SPOT_SPACING from the other pods of the wave.
+const int c_POD_SPOT_TRIES = 24;        // random spots in the region
+const fixed c_POD_SPOT_CLEAR = 2.5;     // unit-free radius around the center
+const fixed c_POD_SPOT_SPACING = 4.0;   // between pod centers
+const fixed c_POD_SPOT_NEAR = 12.0;     // ring search past the region edge
+const int c_POD_SPOT_RING_STEPS = 16;   // angles per ring
+int gv_podSpotPicks;                    // spots picked (tests)
+int gv_podSpotRing;                     // picked by the ring search (tests)
+int gv_podSpotNone;                     // no free spot found: region center (tests)
+
+// The 4x4 square centered on lp_at (a cell corner) is free of terrain,
+// buildings and ground units.
+bool gf_DropPodSpotFree (point lp_at) {
+    int lv_i;
+    int lv_j;
+    point lv_c;
+    fixed lv_level = PointPathingCliffLevel(PointWithOffset(lp_at, -1.5, -1.5));
+    unitgroup lv_near;
+
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        for (lv_j = 0; lv_j < 4; lv_j += 1) {
+            lv_c = PointWithOffset(lp_at, IntToFixed(lv_i) - 1.5, IntToFixed(lv_j) - 1.5);
+            if (!PointPathingPassable(lv_c) || PointPathingCliffLevel(lv_c) != lv_level) {
+                return false;
+            }
+        }
+    }
+    lv_near = UnitGroup(null, c_playerAny, RegionCircle(lp_at, c_POD_SPOT_CLEAR), UnitFilter(0, 0, (1 << c_targetFilterMissile) | (1 << c_targetFilterAir), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 1);
+    return UnitGroupCount(lv_near, c_unitCountAll) == 0;
+}
+
+// Distance to the nearer used pod; 9999 with none.
+fixed gf_DropPodSpotGap (point lp_at, point lp_usedA, point lp_usedB) {
+    fixed lv_d = 9999.0;
+
+    if (lp_usedA != null) {
+        lv_d = MinF(lv_d, DistanceBetweenPoints(lp_at, lp_usedA));
+    }
+    if (lp_usedB != null) {
+        lv_d = MinF(lv_d, DistanceBetweenPoints(lp_at, lp_usedB));
+    }
+    return lv_d;
+}
+
+// A cell corner: the 4x4 square covers whole cells.
+point gf_DropPodSpotSnap (point lp_at) {
+    return Point(IntToFixed(FixedToInt(PointGetX(lp_at) + 0.5)), IntToFixed(FixedToInt(PointGetY(lp_at) + 0.5)));
+}
+
+// In the region: the free spot farthest from the used pods among random
+// tries. None: rings around the region center, outward to the region
+// radius plus c_POD_SPOT_NEAR, the first free spot. None at all: the
+// region center, counted in gv_podSpotNone.
 point gf_DropPodPoint (region lp_region, point lp_usedA, point lp_usedB) {
     int lv_try;
+    int lv_k;
     point lv_pick;
-    point lv_best;
-    fixed lv_bestDistance;
-    fixed lv_distance;
+    point lv_best = null;
+    fixed lv_bestGap = 0.0;
+    fixed lv_gap;
+    point lv_center = RegionGetCenter(lp_region);
+    fixed lv_radius = MaxF(PointGetX(RegionGetBoundsMax(lp_region)) - PointGetX(RegionGetBoundsMin(lp_region)), PointGetY(RegionGetBoundsMax(lp_region)) - PointGetY(RegionGetBoundsMin(lp_region))) / 2.0;
+    fixed lv_r;
 
-    lv_best = RegionRandomPoint(lp_region);
-    lv_bestDistance = 0.0;
-    for (lv_try = 0; lv_try < 16; lv_try += 1) {
-        lv_pick = RegionRandomPoint(lp_region);
-        lv_distance = 9999.0;
-        if (lp_usedA != null) {
-            lv_distance = MinF(lv_distance, DistanceBetweenPoints(lv_pick, lp_usedA));
-        }
-        if (lp_usedB != null) {
-            lv_distance = MinF(lv_distance, DistanceBetweenPoints(lv_pick, lp_usedB));
-        }
-        if (lv_distance > lv_bestDistance) {
-            lv_bestDistance = lv_distance;
+    gv_podSpotPicks += 1;
+    for (lv_try = 0; lv_try < c_POD_SPOT_TRIES; lv_try += 1) {
+        lv_pick = gf_DropPodSpotSnap(RegionRandomPoint(lp_region));
+        lv_gap = gf_DropPodSpotGap(lv_pick, lp_usedA, lp_usedB);
+        if (lv_gap >= c_POD_SPOT_SPACING && lv_gap > lv_bestGap && gf_DropPodSpotFree(lv_pick)) {
+            lv_bestGap = lv_gap;
             lv_best = lv_pick;
         }
     }
-    return lv_best;
+    if (lv_best != null) {
+        return lv_best;
+    }
+    for (lv_r = 0.0; lv_r <= lv_radius + c_POD_SPOT_NEAR; lv_r += 1.0) {
+        for (lv_k = 0; lv_k < c_POD_SPOT_RING_STEPS; lv_k += 1) {
+            lv_pick = gf_DropPodSpotSnap(PointWithOffsetPolar(lv_center, lv_r, IntToFixed(lv_k) * 360.0 / IntToFixed(c_POD_SPOT_RING_STEPS)));
+            if (gf_DropPodSpotGap(lv_pick, lp_usedA, lp_usedB) >= c_POD_SPOT_SPACING && gf_DropPodSpotFree(lv_pick)) {
+                gv_podSpotRing += 1;
+                return lv_pick;
+            }
+        }
+    }
+    gv_podSpotNone += 1;
+    return lv_center;
 }
 
 // Wave units are script units: the base AI of their owner leaves them
@@ -48,16 +115,129 @@ void gf_OrderSpawnGroup (unitgroup lp_group, int lp_side, int lp_lane) {
     gf_GateSendGroup(lp_group, lp_side, lp_lane, gv_xLOCATIONS[lp_lane]);
 }
 
+// One lane wave of a Zerg lane lp_map (4..6) in three pods; one of a Terran
+// lane (1..3) in two. The reinforcement and the hero drop escort both run
+// these. They wait while the pods land. The units made are added to
+// lp_into. lp_goliath: the Terran wave always has its Goliath (the hero
+// drop escort, operator 2026-11-20); else only while the seat has none.
+void gf_ZergLaneWave (int lp_map, point lp_podA, point lp_podB, point lp_podC, unitgroup lp_into) {
+    int lv_playerIndex = gf_RosterSeat(lp_map);
+    int lv_lane = lp_map - 3;
+    unitgroup lv_group;
+
+    lv_group = gf_CreateSpawnGroup(8, "Zergling", lv_playerIndex, lp_podA);
+    UnitGroupAddUnitGroup(lp_into, lv_group);
+    gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lp_podA);
+    libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lp_podA, lv_group, false, lv_playerIndex);
+    Wait(4.0, c_timeGame);
+    gf_OrderSpawnGroup(lv_group, 0, lv_lane);
+
+    lv_group = gf_CreateSpawnGroup(1, "RoachCorpser", lv_playerIndex, lp_podB);
+    UnitGroupAddUnitGroup(lp_into, lv_group);
+    gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lp_podB);
+    libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lp_podB, lv_group, false, lv_playerIndex);
+    Wait(4.0, c_timeGame);
+    gf_OrderSpawnGroup(lv_group, 0, lv_lane);
+
+    lv_group = gf_CreateSpawnGroup(2, "Roach", lv_playerIndex, lp_podC);
+    if ((TechTreeUnitCount(lv_playerIndex, "Queen", c_techCountQueuedOrBetter) == 0)) {
+        UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Queen", lv_playerIndex, lp_podC));
+    }
+    UnitGroupAddUnitGroup(lp_into, lv_group);
+    gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lp_podC);
+    libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lp_podC, lv_group, false, lv_playerIndex);
+    Wait(4.0, c_timeGame);
+    gf_OrderSpawnGroup(lv_group, 0, lv_lane);
+}
+
+void gf_TerranLaneWave (int lp_map, point lp_podA, point lp_podB, unitgroup lp_into, bool lp_goliath) {
+    int lv_playerIndex = gf_RosterSeat(lp_map);
+    int lv_lane = lp_map;
+    unitgroup lv_group;
+
+    lv_group = gf_CreateSpawnGroup(4, "Marine", lv_playerIndex, lp_podA);
+    if (lp_goliath || (TechTreeUnitCount(lv_playerIndex, "Goliath", c_techCountQueuedOrBetter) == 0)) {
+        UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Goliath", lv_playerIndex, lp_podA));
+    }
+    UnitGroupAddUnitGroup(lp_into, lv_group);
+    gf_PodImpactQueue(libVCMI_ge_DropPodRace_Terran, lp_podA);
+    libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lp_podA, lv_group, true, lv_playerIndex);
+    gf_OrderSpawnGroup(lv_group, 1, lv_lane);
+
+    lv_group = gf_CreateSpawnGroup(2, "Marauder", lv_playerIndex, lp_podB);
+    UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Firebat", lv_playerIndex, lp_podB));
+    UnitGroupAddUnitGroup(lp_into, lv_group);
+    gf_PodImpactQueue(libVCMI_ge_DropPodRace_Terran, lp_podB);
+    libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lp_podB, lv_group, true, lv_playerIndex);
+    gf_OrderSpawnGroup(lv_group, 1, lv_lane);
+}
+
+// --- Hero drop escort (REQ-HERO-DROP R-DROP-14) ----------------------------
+// Every hero drop brings one extra lane wave of the seat's lane (operator
+// 2026-11-20). Its pods face as the hero pod, so they fall the same way
+// (southwest). Free spots off the hero pod (gf_DropPodPoint). Its own
+// thread: the lane waves wait.
+trigger gt_DropEscort;
+int gv_escortLane;          // parameters of the next gt_DropEscort run
+point gv_escortHeroAt;
+fixed gv_escortFacing;
+int[8] gv_escortWaves;      // escort waves started per seat (tests)
+fixed[8] gv_escortPodFacing; // the facing given to the seat's last escort pods (tests)
+point[8] gv_escortPodA;     // the seat's last escort pod points (tests)
+point[8] gv_escortPodB;
+unitgroup[8] gv_escortUnits; // the units of the seat's last escort wave (tests)
+
+point gf_EscortPoint (region lp_region, point lp_usedA, point lp_usedB, fixed lp_facing) {
+    point lv_at = gf_DropPodPoint(lp_region, lp_usedA, lp_usedB);
+
+    PointSetFacing(lv_at, lp_facing);
+    return lv_at;
+}
+
+bool gt_DropEscort_Func (bool testConds, bool runActions) {
+    int lv_map = gv_escortLane;
+    point lv_hero = gv_escortHeroAt;
+    fixed lv_facing = gv_escortFacing;
+    int lv_seat;
+    point lv_podA;
+    point lv_podB;
+
+    if (!runActions) {
+        return true;
+    }
+    lv_seat = gf_RosterSeat(lv_map);
+    lv_podA = gf_EscortPoint(gv_sPAWNLOCATIONS[lv_map], lv_hero, null, lv_facing);
+    lv_podB = gf_EscortPoint(gv_sPAWNLOCATIONS[lv_map], lv_hero, lv_podA, lv_facing);
+    gv_escortWaves[lv_seat] += 1;
+    gv_escortPodFacing[lv_seat] = lv_facing;
+    gv_escortPodA[lv_seat] = lv_podA;
+    gv_escortPodB[lv_seat] = lv_podB;
+    gv_escortUnits[lv_seat] = UnitGroupEmpty();
+    if (gf_RosterTerran(lv_map)) {
+        gf_TerranLaneWave(lv_map, lv_podA, lv_podB, gv_escortUnits[lv_seat], true);
+    }
+    else {
+        gf_ZergLaneWave(lv_map, lv_podA, lv_podB, gf_EscortPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, lv_podB, lv_facing), gv_escortUnits[lv_seat]);
+    }
+    return true;
+}
+
+// lp_facing: the hero pod's facing.
+void gf_DropEscort (int lp_player, point lp_heroAt, fixed lp_facing) {
+    gv_escortLane = gf_RosterLaneOf(lp_player);
+    gv_escortHeroAt = lp_heroAt;
+    gv_escortFacing = lp_facing;
+    TriggerExecute(gt_DropEscort, true, false);
+}
+
 bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
     int lv_map;
 
     // Variable Declarations
     int lv_playerIndex;
-    int lv_lane;
     point lv_podA;
     point lv_podB;
     point lv_podC;
-    unitgroup lv_group;
 
     // Variable Initialization
 
@@ -72,31 +252,11 @@ bool gt_ZerusSpawn_Func (bool testConds, bool runActions) {
             continue;
         }
         lv_playerIndex = gf_RosterSeat(lv_map);
-        lv_lane = lv_map - 3;
         lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], null, null);
         lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, null);
         lv_podC = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, lv_podB);
 
-        lv_group = gf_CreateSpawnGroup(8, "Zergling", lv_playerIndex, lv_podA);
-        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_podA);
-        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podA, lv_group, false, lv_playerIndex);
-        Wait(4.0, c_timeGame);
-        gf_OrderSpawnGroup(lv_group, 0, lv_lane);
-
-        lv_group = gf_CreateSpawnGroup(1, "RoachCorpser", lv_playerIndex, lv_podB);
-        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_podB);
-        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podB, lv_group, false, lv_playerIndex);
-        Wait(4.0, c_timeGame);
-        gf_OrderSpawnGroup(lv_group, 0, lv_lane);
-
-        lv_group = gf_CreateSpawnGroup(2, "Roach", lv_playerIndex, lv_podC);
-        if ((TechTreeUnitCount(lv_playerIndex, "Queen", c_techCountQueuedOrBetter) == 0)) {
-            UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Queen", lv_playerIndex, lv_podC));
-        }
-        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_podC);
-        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_podC, lv_group, false, lv_playerIndex);
-        Wait(4.0, c_timeGame);
-        gf_OrderSpawnGroup(lv_group, 0, lv_lane);
+        gf_ZergLaneWave(lv_map, lv_podA, lv_podB, lv_podC, UnitGroupEmpty());
     }
     return true;
 }
@@ -111,10 +271,8 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
 
     // Variable Declarations
     int lv_playerIndex;
-    int lv_lane;
     point lv_podA;
     point lv_podB;
-    unitgroup lv_group;
 
     // Variable Initialization
 
@@ -129,7 +287,6 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
             continue;
         }
         lv_playerIndex = gf_RosterSeat(lv_map);
-        lv_lane = lv_map;
         lv_podA = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], null, null);
         lv_podB = gf_DropPodPoint(gv_sPAWNLOCATIONS[lv_map], lv_podA, null);
         // A waiting hero's drop starts with this wave, off the two lane
@@ -140,25 +297,14 @@ bool gt_TerranSpawn_Func (bool testConds, bool runActions) {
             gf_HeroDropGo(lv_playerIndex, lv_podA, lv_podB);
         }
 
-        lv_group = gf_CreateSpawnGroup(4, "Marine", lv_playerIndex, lv_podA);
-        if ((TechTreeUnitCount(lv_playerIndex, "Goliath", c_techCountQueuedOrBetter) == 0)) {
-            UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Goliath", lv_playerIndex, lv_podA));
-        }
-        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Terran, lv_podA);
-        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podA, lv_group, true, lv_playerIndex);
-        gf_OrderSpawnGroup(lv_group, 1, lv_lane);
-
-        lv_group = gf_CreateSpawnGroup(2, "Marauder", lv_playerIndex, lv_podB);
-        UnitGroupAddUnitGroup(lv_group, gf_CreateSpawnGroup(1, "Firebat", lv_playerIndex, lv_podB));
-        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Terran, lv_podB);
-        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Terran, lv_podB, lv_group, true, lv_playerIndex);
-        gf_OrderSpawnGroup(lv_group, 1, lv_lane);
+        gf_TerranLaneWave(lv_map, lv_podA, lv_podB, UnitGroupEmpty(), false);
     }
     return true;
 }
 
 void gt_TerranSpawn_Init () {
     gt_TerranSpawn = TriggerCreate("gt_TerranSpawn_Func");
+    gt_DropEscort = TriggerCreate("gt_DropEscort_Func");
     TriggerAddEventTimer(gt_TerranSpawn, gv_sPAWNTIMER);
 }
 

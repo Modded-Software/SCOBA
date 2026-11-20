@@ -17,6 +17,7 @@ from project_root import project_root
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .herodrop_zoom import (
+    ARM_MAX_MS,
     ARM_TOL_100,
     CAM_DISTANCE,
     CAM_ON_TARGET_100,
@@ -26,19 +27,27 @@ from .herodrop_zoom import (
     FALL_MS,
     LAND_MS,
     LOOP_MS,
+    PHASE_ARM,
     PHASES,
     ROOT_TOL_100,
     UNIT_GROUND_H100,
     YAW_TOL,
+    ZOOM_LENGTH,
     _report,
     _yaw_off,
+    zoom_armed,
     zoom_follow,
 )
+from .herodrop_land import check_land, check_spot, check_start_state
+from .herodrop_scenery import check_escort, check_scenery
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 
 ROOT = project_root()
 # One group per scenario (herodrop.galaxy). Only "wave" fires the real wave.
-GROUPS = ("main", "alive", "loop", "seat2", "leave", "wave")
+# Escort pods in the air at once: a Terran escort lands one pod at a time;
+# two drops in a row overlap.
+ESCORT_PODS_MAX = 2
+GROUPS = ("main", "land", "alive", "loop", "seat2", "leave", "wave", "spot", "scenery", "escort")
 
 
 def selected_group() -> str:
@@ -107,7 +116,10 @@ def birth_follow(checks, s: str, ground: int) -> list[tuple[int, ...]]:
     win0 = [aim(m, px, py, facing) for m in range(max(ms0 - LOOP_MS, 0), ms0 + LOOP_MS + 1, 5)]
     d0 = min(((ax - cx0) ** 2 + (ay - cy0) ** 2) ** 0.5 for ax, ay, _ in win0)
     print(f"{s} raw first row ms={ms0} cam={cx0},{cy0} aim={[(int(a), int(b)) for a, b, _ in win0[:2]]}")
-    _report(checks, f"{s} first loop camera target on the side arm", ms0 <= LOOP_MS and d0 <= ROOT_TOL_100, f"ms={ms0} off100={int(d0)}")
+    # The fall camera starts after the zoom, the pod already birthing
+    # (operator 2026-11-20): at most the arm wait, the zoom and two loops.
+    first_max = ARM_MAX_MS + ZOOM_LENGTH * 1000 + 2 * LOOP_MS
+    _report(checks, f"{s} first fall loop camera target on the side arm", ms0 <= first_max and d0 <= ROOT_TOL_100, f"ms={ms0} max={int(first_max)} off100={int(d0)}")
     # Negative: not right behind the pod. The target is the side arm away
     # from the aim with no side arm.
     nx, ny, _ = aim(ms0, px, py, facing, 0.0)
@@ -209,13 +221,16 @@ def check_loop(checks) -> None:
         c = f"c{n}"
         print(f"{s} raw {c} reads={checks.value(s, '', c + 'reads')} misses={checks.value(s, '', c + 'misses')} landMs={checks.value(s, '', c + 'landMs')}")
         zoom_follow(checks, s, c + "zoom")
-        checks.eq(s, c + "zoom", "Phase", 2)
-        checks.eq(s, c + "zoom", "Zooms", zooms + n)
+        zoom_armed(checks, s, c + "zoom")
+        checks.eq(s, c + "zoom", "Phase", PHASE_ARM)
+        checks.eq(s, c + "zoom", "Zooms", zooms + n - 1)
+        checks.eq(s, c + "fall", "Zooms", zooms + n)
         scene_on(checks, s, c + "zoom", True)
         scene_on(checks, s, c + "fall", True)
         checks.eq(s, c + "fall", "Phase", 3)
         checks.eq(s, c + "fall", "HeroPods", 1)
-        checks.eq(s, c + "fall", "LanePods", 0)
+        # Lane pods: only escort pods (R-DROP-14), this drop's and the one before.
+        checks.between(s, c + "fall", "LanePods", 0, ESCORT_PODS_MAX)
         checks.eq(s, "", c + "misses", 0)
         checks.gt(s, "", c + "reads", 20)
         checks.between(s, "", c + "landMs", *LAND_MS)
@@ -225,7 +240,7 @@ def check_loop(checks) -> None:
         scene_on(checks, s, f"back{n}", False)
         checks.eq(s, f"back{n}", "SceneEnters", enters + n)
         checks.eq(s, f"back{n}", "Phase", 0)
-        checks.eq(s, f"back{n}", "LanePods", 0)
+        checks.between(s, f"back{n}", "LanePods", 0, ESCORT_PODS_MAX)
     # Consistency: the land time of the five cycles within two loops.
     _report(checks, f"{s} land time consistent", max(land) - min(land) <= 2 * LOOP_MS, f"landMs={land}")
     for n in range(1, LOOPS + 1):
@@ -281,7 +296,7 @@ def check_seat2(checks) -> None:
     checks.true(s, "", "oneSame")
     checks.true(s, "", "oneAlive")
     checks.eq(s, "", "onePods", checks.value(s, "", "onePods0"))
-    checks.eq(s, "", "lanePods2", 0)
+    checks.between(s, "", "lanePods2", 0, ESCORT_PODS_MAX)
     checks.lt(s, "", "oneYawDelta100", 100)
 
 
@@ -345,16 +360,22 @@ def check_drop(checks) -> None:
     checks.false(s, "twait", "Alive")
     checks.true(s, "twait", "HeroActive")
     checks.gt(s, "twait", "Blocked", checks.value(s, "tdead", "Blocked") or 0)
-    # R-DROP-10: the zoom starts with the reinforcement, before the pod.
+    # R-DROP-10: the reinforcement creates the pod; the zoom starts once it
+    # births (operator 2026-11-20). Negative: no zoom in ARM; the camera
+    # stays on the yaw set before the drop (135) until Birth is reported.
     checks.eq(s, "twait", "Phase", 1)
     checks.eq(s, "twait", "Zooms", checks.value(s, "t0", "Zooms") or 0)
-    checks.eq(s, "tzoom", "Phase", 2)
-    checks.eq(s, "tzoom", "Zooms", (checks.value(s, "t0", "Zooms") or 0) + 1)
-    checks.false(s, "tzoom", "PodValid")
-    # Only the pod of interest: one hero pod in the fall, no lane pod ever.
+    checks.eq(s, "tzoom", "Phase", PHASE_ARM)
+    checks.eq(s, "tzoom", "Zooms", checks.value(s, "t0", "Zooms") or 0)
+    checks.true(s, "tzoom", "PodValid")
+    checks.eq(s, "tfall", "Zooms", (checks.value(s, "t0", "Zooms") or 0) + 1)
+    zoom_armed(checks, s, "zoom", 135.0)
+    # One hero pod in the fall. No lane pod before the drop; after it only
+    # the escort's (R-DROP-14, operator 2026-11-20; was: no lane pod ever).
     checks.eq(s, "tfall", "HeroPods", 1)
-    for t in ("t0", "tzoom", "tfall", "tland", "tafter", "tnext"):
-        checks.eq(s, t, "LanePods", 0)
+    checks.eq(s, "t0", "LanePods", 0)
+    for t in ("tzoom", "tfall", "tland", "tafter", "tnext"):
+        checks.between(s, t, "LanePods", 0, ESCORT_PODS_MAX)
     zoom_follow(checks, s)
     checks.eq(s, "", "phases", PHASES)
     # R-DROP-3: one pod of the hero pod type.
@@ -382,6 +403,8 @@ def check_drop(checks) -> None:
     print(f"{s} raw Single tland={checks.value(s, 'tland', 'Single')}")
     checks.eq(s, "tafter", "Single", checks.value(s, "t0", "Single"))
     checks.eq(s, "tland", "Life", checks.value(s, "tland", "LifeMax"))
+    # Touchdown start state (operator 2026-11-20): TPS, arm 1.0, pitch 0.
+    check_start_state(checks, s, "tafter")
     # The revived hero animates at full rate (operator 2026-11-18: frozen
     # after the revive). The death sets AnimSetTimeScaleGlobal 0.125 on the
     # actor (ActorData ToshSCOBAUnit); the baseline must read normal.
@@ -437,10 +460,14 @@ def map_spec() -> TestMapSpec:
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "herodrop.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "herodrop_scenery.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "herodrop_land.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/herodrop/common",
             "scripts/test/herodrop/herodrop",
+            "scripts/test/herodrop/herodrop_scenery",
+            "scripts/test/herodrop/herodrop_land",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_HeroDropTest_Init();"),
     )
@@ -457,7 +484,7 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("meta", "", "done", 1)
     checks.eq("drop_end", "", "RealClicks", 0)
     group = selected_group()
-    for name, fn in (("main", check_drop), ("alive", check_alive), ("loop", check_loop), ("seat2", check_seat2), ("leave", check_leave), ("wave", check_far)):
+    for name, fn in (("main", check_drop), ("land", check_land), ("alive", check_alive), ("loop", check_loop), ("seat2", check_seat2), ("leave", check_leave), ("wave", check_far), ("spot", check_spot), ("scenery", check_scenery), ("escort", check_escort)):
         if group in ("all", name):
             fn(checks)
 

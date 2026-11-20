@@ -5,6 +5,10 @@
 // gv_sPAWNTIMER wave, to prove the wave calls it. One group per scenario.
 
 trigger gt_HeroDropTest;
+void gf_HdCamSnap (string lp_section, string lp_tag);  // herodrop_land.galaxy
+void gf_HdCamReset ();
+void gf_HdLandGroups ();  // herodrop_land.galaxy
+bool gv_hdTpsOffOk;  // raw: the engine took the TPS-off order (drop_land)
 
 // The drop, as the wave and the intro start it (systems/hero_drop).
 void gf_HdGo (int lp_player) {
@@ -29,7 +33,7 @@ void gf_HdTps (bool lp_on) {
         UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
     }
     else {
-        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        gv_hdTpsOffOk = UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
     }
     Wait(0.5, c_timeGame);
 }
@@ -67,6 +71,7 @@ void gf_HdReset (string lp_section, bool lp_auto) {
         UnitSetPosition(gv_sCOBAMedic[1], Point(20.0, 20.0), false);
     }
     gf_HdTps(true);
+    gf_HdCamReset();
 }
 
 // -1 when a point is not set yet (no death, no pod so far).
@@ -140,7 +145,7 @@ void gf_HdPodCycle (string lp_s, string lp_t) {
 
     gf_HdGo(1);
     gf_HdSnap(lp_s, lp_t + "zoom");
-    BankValueSetFromString(gv_dbgBank, lp_s, lp_t + "zoom", gf_DbgZoomTrace(1));
+    gf_DbgZoomBank(lp_s, lp_t + "zoom", 1);
     for (lv_i = 0; lv_i < 32 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
         Wait(c_DROP_TICK, c_timeGame);
     }
@@ -408,7 +413,7 @@ void gf_HdDrop () {
     gf_HdSnap(lv_s, "twait");
     gf_HdGo(1);
     gf_HdSnap(lv_s, "tzoom");
-    BankValueSetFromString(gv_dbgBank, lv_s, "zoom", gf_DbgZoomTrace(1));
+    gf_DbgZoomBank(lv_s, "zoom", 1);
     for (lv_i = 0; lv_i < 32 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
         Wait(c_DROP_TICK, c_timeGame);
     }
@@ -449,6 +454,7 @@ void gf_HdDrop () {
     gf_HdSnap(lv_s, "tland");
     Wait(1.0, c_timeGame);
     gf_HdSnap(lv_s, "tafter");
+    gf_HdCamSnap(lv_s, "tafter");
     // Negative: a second start with the hero alive drops nothing.
     gf_HdGo(1);
     Wait(1.0, c_timeGame);
@@ -471,6 +477,7 @@ bool gt_HeroDropTest_Func (bool testConds, bool runActions) {
     if (gf_DbgGroup("main")) {
         gf_HdDrop();
     }
+    gf_HdLandGroups();
     if (gf_DbgGroup("alive")) {
         gf_HdAlive();
     }

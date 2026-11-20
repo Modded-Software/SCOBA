@@ -1,0 +1,174 @@
+// Test harness: baseai group "gas" (R-BASE-35, SPEC-BASE-AI 6).
+// 6x6 geysers and gas buildings. Two questions, kept apart:
+//   direct: can a worker build a gas building on a placed geyser at all?
+//           Lanes 1 (Terran) and 4 (Zerg): a script worker, one order.
+//   ai:     does the stock AI build one? Lanes 2, 3, 5, 6, left alone.
+// Raw engine values only; scripts/testkit/profiles/baseai_gas.py decides.
+
+const int c_BG_COLLECTOR = 0x10008800;  // buildai.galaxy c_makeCollector: c_onVespeneGas | c_nearCloseDropoff | c_nearFarDropoff
+const fixed c_BG_NEAR = 1.5;          // a gas building stands on its geyser
+const fixed c_BG_TOWN = 20.0;         // geysers this near a start count as its own
+const fixed c_BG_BUILD_WAIT = 12.0;   // game s for the worker to walk and start
+
+point[16] gv_bgAt;                    // the geyser point a direct build used, per player
+
+// Engine pathing and state of the gas building at lp_at, under lp_k (Grid
+// rows: baseai_hall gf_BaHallGrid, 9 cells each way).
+void gf_BgGasGrid (string lp_s, string lp_k, int lp_player, point lp_at) {
+    unit lv_b = UnitGroupClosestToPoint(UnitGroup(gf_BgGasType(lp_player), lp_player, RegionCircle(lp_at, c_BG_NEAR), UnitFilter(0, 0, 0, 0), 0), lp_at);
+
+    gf_BaHallGrid(lp_s, lp_k, lp_at);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Found", gf_BaFlagInt(UnitIsValid(lv_b)));
+    if (UnitIsValid(lv_b)) {
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Building", gf_BaFlagInt(UnitTestState(lv_b, c_unitStateUnderConstruction)));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Radius100", gf_Ba100(UnitGetPropertyFixed(lv_b, c_unitPropRadius, c_unitPropCurrent)));
+    }
+}
+
+string gf_BgGasType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "Refinery";
+    }
+    return "Extractor";
+}
+
+abilcmd gf_BgBuildCmd (int lp_player) {
+    // TerranBuild / ZergBuild Build3 (liberty AbilData): Refinery, Extractor.
+    if (PlayerRace(lp_player) == "Terr") {
+        return AbilityCommand("TerranBuild", 2);
+    }
+    return AbilityCommand("ZergBuild", 2);
+}
+
+// Gas buildings of any state of lp_player in a circle.
+int gf_BgCount (int lp_player, point lp_at, fixed lp_r) {
+    return UnitGroupCount(UnitGroup(gf_BgGasType(lp_player), lp_player, RegionCircle(lp_at, lp_r), UnitFilter(0, 0, 0, 0), 0), c_unitCountAlive);
+}
+
+int gf_BgCountAll (int lp_player) {
+    return UnitGroupCount(UnitGroup(gf_BgGasType(lp_player), lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), c_unitCountAlive);
+}
+
+unit gf_BgGeyser (point lp_at) {
+    return UnitGroupClosestToPoint(UnitGroup("VespeneGeyser", c_playerAny, RegionCircle(lp_at, c_BG_TOWN), UnitFilter(0, 0, 0, 0), 0), lp_at);
+}
+
+// What the AI of lp_player sees and has, under key p<player><tag>.
+void gf_BgAiSnap (string lp_s, string lp_tag, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player) + lp_tag;
+    point lv_h = PlayerStartLocation(lp_player);
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Gas", gf_BgCountAll(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "RawSpots", AIGetRawGasNumSpots(lp_player, c_townOne));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "HarvestSpots", AIGetHarvestableGasNumSpots(lp_player, c_townOne));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Place100", gf_BaXY100(AIGetBuildingPlacement(lp_player, lv_h, gf_BgGasType(lp_player), c_BG_COLLECTOR)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "TownState", AIGetTownState(lp_player, c_townOne));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "TownAt100", gf_BaXY100(AIGetTownLocation(lp_player, c_townOne)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Minerals", PlayerGetPropertyInt(lp_player, c_playerPropMinerals));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "GasCollected", PlayerGetPropertyInt(lp_player, c_playerPropVespeneCollected));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Workers", UnitGroupCount(UnitGroup(gf_BaWorkerType(lp_player), lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0), c_unitCountAlive));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Allowed", gf_BaFlagInt(TechTreeUnitIsAllowed(lp_player, gf_BgGasType(lp_player))));
+}
+
+// Static facts of the base of lp_player, under key p<player>.
+void gf_BgFacts (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player);
+    point lv_h = PlayerStartLocation(lp_player);
+    unit lv_g = gf_BgGeyser(lv_h);
+
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Race", PlayerRace(lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Geysers", UnitGroupCount(UnitGroup("VespeneGeyser", c_playerAny, RegionCircle(lv_h, c_BG_TOWN), UnitFilter(0, 0, 0, 0), 0), c_unitCountAlive));
+    if (UnitIsValid(lv_g)) {
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "GeyserDist100", gf_Ba100(DistanceBetweenPoints(lv_h, UnitGetPosition(lv_g))));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "GeyserRes", UnitGetPropertyInt(lv_g, c_unitPropResources, c_unitPropCurrent));
+    }
+}
+
+// One script worker of lp_player builds on the nearest geyser of its start.
+// Then the same order on bare ground 4 off the worker: the negative.
+void gf_BgDirect (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player);
+    point lv_h = PlayerStartLocation(lp_player);
+    unit lv_g = gf_BgGeyser(lv_h);
+    point lv_at;
+    point lv_from;
+    point lv_bare;
+    unit lv_w;
+    unit lv_b;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "GeyserFound", gf_BaFlagInt(UnitIsValid(lv_g)));
+    if (!UnitIsValid(lv_g)) {
+        return;
+    }
+    lv_at = UnitGetPosition(lv_g);
+    lv_from = PointWithOffsetPolar(lv_at, 6.0, AngleBetweenPoints(lv_at, lv_h));
+    lv_bare = PointWithOffsetPolar(lv_at, 10.0, AngleBetweenPoints(lv_at, lv_h));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "GeyserAt100", gf_BaXY100(lv_at));
+    gv_bgAt[lp_player] = lv_at;
+    gf_BaHallGrid(lp_s, lv_k + "Geyser", lv_at);
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "GasFoot", CatalogFieldValueGet(c_gameCatalogUnit, gf_BgGasType(lp_player), "Footprint", lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "GasPlaceFoot", CatalogFieldValueGet(c_gameCatalogUnit, gf_BgGasType(lp_player), "PlacementFootprint", lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "GeyserFoot", CatalogFieldValueGet(c_gameCatalogUnit, "VespeneGeyser", "Footprint", lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Before", gf_BgCount(lp_player, lv_at, c_BG_NEAR));
+    PlayerModifyPropertyInt(lp_player, c_playerPropMinerals, c_playerPropOperAdd, 1000);
+
+    // Negative first: bare ground takes no gas building.
+    UnitCreate(1, gf_BaWorkerType(lp_player), 0, lp_player, lv_from, 0.0);
+    lv_w = gf_BhScript(UnitLastCreated());
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "BareIssued", gf_BaFlagInt(UnitIssueOrder(lv_w, OrderTargetingPoint(gf_BgBuildCmd(lp_player), lv_bare), c_orderQueueReplace)));
+    Wait(c_BG_BUILD_WAIT, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "BareBuilt", gf_BgCount(lp_player, lv_bare, 4.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "BeforeGeyser", gf_BgCount(lp_player, lv_at, c_BG_NEAR));
+
+    // On the geyser: the order names the geyser's point.
+    if (!UnitIsAlive(lv_w)) {
+        UnitCreate(1, gf_BaWorkerType(lp_player), 0, lp_player, lv_from, 0.0);
+        lv_w = gf_BhScript(UnitLastCreated());
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Issued", gf_BaFlagInt(UnitIssueOrder(lv_w, OrderTargetingPoint(gf_BgBuildCmd(lp_player), lv_at), c_orderQueueReplace)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "OrderAfterIssue", gf_BhOrder(lv_w));
+    Wait(c_BG_BUILD_WAIT, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "OrderAfterWait", gf_BhOrder(lv_w));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Built", gf_BgCount(lp_player, lv_at, c_BG_NEAR));
+    lv_b = UnitGroupClosestToPoint(UnitGroup(gf_BgGasType(lp_player), lp_player, RegionCircle(lv_at, c_BG_NEAR), UnitFilter(0, 0, 0, 0), 0), lv_at);
+    if (UnitIsValid(lv_b)) {
+        gf_BhScript(lv_b);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "BuiltAt100", gf_BaXY100(UnitGetPosition(lv_b)));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "BuiltOff100", gf_Ba100(DistanceBetweenPoints(UnitGetPosition(lv_b), lv_at)));
+    }
+    // The geyser gives way to the building: none is left at the point.
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "GeyserLeft", UnitGroupCount(UnitGroup("VespeneGeyser", c_playerAny, RegionCircle(lv_at, c_BG_NEAR), UnitFilter(0, 0, 0, 0), 0), c_unitCountAlive));
+    // Under construction: the footprint the engine applies now.
+    gf_BgGasGrid(lp_s, lv_k + "Build", lp_player, lv_at);
+}
+
+void gf_BgGas () {
+    string lv_s = "ba_gas";
+    int lv_lane;
+    int lv_t;
+
+    Wait(1.0, c_timeGame);
+    for (lv_lane = 1; lv_lane <= 6; lv_lane += 1) {
+        gf_BgFacts(lv_s, gf_BaseAiLaneOwner(lv_lane));
+        gf_BgAiSnap(lv_s, "t1", gf_BaseAiLaneOwner(lv_lane));
+    }
+    BankSave(gv_dbgBank);
+    gf_BgDirect(lv_s, gf_BaseAiLaneOwner(1));
+    BankSave(gv_dbgBank);
+    gf_BgDirect(lv_s, gf_BaseAiLaneOwner(4));
+    BankSave(gv_dbgBank);
+    // About t50 now. The AI owners: every 60 game s to t230.
+    for (lv_t = 0; lv_t < 4; lv_t += 1) {
+        for (lv_lane = 1; lv_lane <= 6; lv_lane += 1) {
+            gf_BgAiSnap(lv_s, "s" + IntToString(lv_t), gf_BaseAiLaneOwner(lv_lane));
+        }
+        BankSave(gv_dbgBank);
+        if (lv_t < 3) {
+            Wait(60.0, c_timeGame);
+        }
+    }
+    // The direct buildings are long finished: the footprint they apply now.
+    gf_BgGasGrid(lv_s, "p" + IntToString(gf_BaseAiLaneOwner(1)) + "Done", gf_BaseAiLaneOwner(1), gv_bgAt[gf_BaseAiLaneOwner(1)]);
+    gf_BgGasGrid(lv_s, "p" + IntToString(gf_BaseAiLaneOwner(4)) + "Done", gf_BaseAiLaneOwner(4), gv_bgAt[gf_BaseAiLaneOwner(4)]);
+    BankSave(gv_dbgBank);
+}

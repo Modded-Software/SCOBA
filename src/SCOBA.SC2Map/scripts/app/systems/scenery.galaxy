@@ -1,0 +1,112 @@
+// Module: systems/scenery
+// Permanent scenery (operator 2026-11-20, REQ-SCENERY): thunder storms
+// around the Overmind, three empty Zerg drop pods in the first Overmind
+// orbit of the intro (S6). The orbit Wraiths at the Psi Destroyer are
+// removed (operator 2026-11-20).
+
+// --- Home structures -------------------------------------------------------
+
+unit gf_SceneryHome (string lp_type) {
+    return UnitGroupUnit(UnitGroup(lp_type, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0), 1);
+}
+
+// --- Storms (R-SCN-1) ------------------------------------------------------
+// The stock ThunderLightning doodad actor (liberty.sc2mod), created at map
+// init at random points of the disc of radius c_STORM_RADIUS around the
+// Overmind, inside the playable map (the Overmind stands in a map corner).
+
+const int c_STORM_COUNT = 6;
+const fixed c_STORM_RADIUS = 16.0;  // operator 2026-11-20: was 32
+const int c_STORM_TRIES = 96;
+const string c_STORM_ACTOR = "ThunderLightning";
+actor[c_STORM_COUNT] gv_stormActor;
+point[c_STORM_COUNT] gv_stormAt;
+int gv_stormCount;
+point gv_stormHome;
+
+void gf_StormsPlace () {
+    unit lv_home = gf_SceneryHome("SCOBAOvermind");
+    region lv_map = RegionPlayableMap();
+    point lv_at;
+    int lv_try;
+
+    if (lv_home == null) {
+        return;
+    }
+    gv_stormHome = UnitGetPosition(lv_home);
+    for (lv_try = 0; lv_try < c_STORM_TRIES && gv_stormCount < c_STORM_COUNT; lv_try += 1) {
+        // Uniform over the disc.
+        lv_at = PointWithOffsetPolar(gv_stormHome, c_STORM_RADIUS * SquareRoot(RandomFixed(0.0, 1.0)), RandomFixed(0.0, 360.0));
+        if (!RegionContainsPoint(lv_map, lv_at)) {
+            continue;
+        }
+        gv_stormActor[gv_stormCount] = libNtve_gf_CreateActorAtPoint(c_STORM_ACTOR, lv_at);
+        gv_stormAt[gv_stormCount] = lv_at;
+        gv_stormCount += 1;
+    }
+}
+
+// --- S6 foreground pods (R-SCN-2) ------------------------------------------
+// Three empty Zerg drop pods, as the lane pods (pod, impact, creep), at
+// the points of data/intro_shots, each on a free 4x4 spot (gf_DropPodPoint).
+// Once per game: the first cut into S6 on the first pass (systems/intro).
+
+const fixed c_S6_POD_SEARCH = 3.0;  // the spot search starts in this circle
+const fixed c_S6_POD_GAP = 1.0;     // game s between two pods (operator 2026-11-20: spread in time)
+trigger gt_SceneryS6Pods;
+bool gv_s6PodsDone;
+int gv_s6PodsMade;
+point[c_INTRO_S6_PODS] gv_s6PodAt;
+
+bool gt_SceneryS6Pods_Func (bool testConds, bool runActions) {
+    unit lv_home = gf_SceneryHome("SCOBAOvermind");
+    int lv_owner = 0;
+    int lv_i;
+    point lv_a = null;
+    point lv_b = null;
+    point lv_at;
+
+    if (!runActions) {
+        return true;
+    }
+    if (lv_home != null) {
+        lv_owner = UnitGetOwner(lv_home);
+    }
+    for (lv_i = 0; lv_i < c_INTRO_S6_PODS; lv_i += 1) {
+        lv_at = gf_DropPodPoint(RegionCircle(Point(gv_introS6PodX[lv_i], gv_introS6PodY[lv_i]), c_S6_POD_SEARCH), lv_a, lv_b);
+        lv_b = lv_a;
+        lv_a = lv_at;
+        gv_s6PodAt[lv_i] = lv_at;
+        gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, lv_at);
+        libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, lv_at, UnitGroupEmpty(), false, lv_owner);
+        gv_s6PodsMade += 1;
+        if (lv_i + 1 < c_INTRO_S6_PODS) {
+            Wait(c_S6_POD_GAP, c_timeGame);
+        }
+    }
+    return true;
+}
+
+void gf_SceneryS6Pods () {
+    if (gv_s6PodsDone) {
+        return;
+    }
+    gv_s6PodsDone = true;
+    TriggerExecute(gt_SceneryS6Pods, true, false);
+}
+
+trigger gt_SceneryInit;
+
+bool gt_SceneryInit_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_StormsPlace();
+    return true;
+}
+
+void gt_Scenery_Init () {
+    gt_SceneryInit = TriggerCreate("gt_SceneryInit_Func");
+    TriggerAddEventMapInit(gt_SceneryInit);
+    gt_SceneryS6Pods = TriggerCreate("gt_SceneryS6Pods_Func");
+}

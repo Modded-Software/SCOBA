@@ -85,6 +85,25 @@ Implements REQ-AIR-CREEP.
     patrols to its slot around the second. All units of a type have the
     same speed, so the formation holds.
   - A unit is skipped while the player has 32 live air creeps.
+- **Birth** (`gf_AirCreepCreate`, R-AIR-17):
+  - Each Mutalisk plays its `Birth` clip on the default slot once it is
+    shown (it is hidden while its stock weapon is removed). Wraiths do not.
+  - [tested] `aircreep/20261120-204804` `ac_wave_zerg`: `births` 10 of 10
+    made, engine clip length in the slot 1.39 s. Negative, `ac_wave_terran`:
+    `births` 0, length 0. How the clip looks: operator check.
+- **First wave in the first S7** (R-AIR-7, operator 2026-11-20): see
+  Schedule. The 2 s first-wave delay is removed. The run below is the
+  earlier 45 s setting (S6); the 51 s setting is not run yet. At height
+  72 the Mutalisks are 40 degrees off the S6 view axis (half field of
+  view 19) and 25 degrees off the S7 axis (half 40).
+  [tested] `aircreep/20261120-221830` `ac_timer`, `failures: 0`: Zerg waves
+  at 45.19 s and 65.19 s, Terran at 55.19 s and 75.19 s; negative: no wave
+  and no unit before (0 at 5 s after the old first slot). Not tested: that
+  the wave is in the S6 frame in a live intro.
+- **Open** (2026-11-20): `ac_route_zerg patrol turns back to X Top` fails
+  (`aircreep/20261120-214010`, `-214811`): the Mutalisk stands at X Bottom
+  and loses life (120 to 25). The attacker is not identified. Last pass:
+  `aircreep/20261117-170156`.
 - **Balance** (`gf_AirCreepBalance`, R-AIR-16):
   - At the start of each wave, before any unit is made, it counts the live
     air creeps: the spawning side's (`gf_AirCreepAlive`) and the enemy's.
@@ -110,12 +129,22 @@ Implements REQ-AIR-CREEP.
     `gv_airCreepLastSize1`/`2`.
 - **Schedule**:
   - At map init (`gt_AirCreepStart`), the next side is set to Zerg and
-    `gv_airCreepTimer` starts. No wave spawns. The timer is periodic, 10 s,
-    real time.
+    `gv_airCreepTimer` starts, one shot, real time:
+    `c_INTRO_S7_START` (50 s, generated from the shot table) +
+    `c_AIR_CREEP_FIRST_LEAD` (1 s). Nothing spawns at 0 s. The
+    same trigger then runs one early wave of each side (operator
+    2026-11-20): Mutalisks after `c_AIR_CREEP_EARLY` (5 s, real time),
+    Wraiths at twice that (10 s). The balance rule applies: the Mutalisks
+    see no air creeps (8 to 12), the Wraiths see them and are behind (8).
+    An early wave is skipped while `gt_AirCreepTick` is disabled (the
+    schedule switched off). Not run in game yet.
   - Each expiry (`gt_AirCreepTick`) flips the next side, then spawns a wave
-    for the side whose slot it is.
-  - So Mutalisks come first, at 10, 30, 50 s. Wraiths come one slot later,
-    at 20, 40, 60 s.
+    for the side whose slot it is. The first expiry restarts the timer as
+    periodic, 10 s, real time.
+  - So Mutalisks come first, at 51, 71, 91 s. Wraiths come one slot later,
+    at 61, 81, 101 s.
+  - The schedule does not follow the intro: if the intro is skipped or the
+    shot table changes at run time, the first wave is still at 51 s.
   - Units of one wave are made one after the other, about one game tick
     apart (the weapon removal wait).
 - **Lanes**: `gf_GateFromX` (`lanegates.galaxy`) ignores air creeps, so the
@@ -140,7 +169,7 @@ Implements REQ-AIR-CREEP.
 
   | Group | What it checks |
   |---|---|
-  | `timer` | The live schedule over the first 42 s: no wave at map start, wave times from the wave counters (Zerg 10 and 30 s, Terran 20 and 40 s), period and phase, and units made between waves. |
+  | `timer` | The live schedule over the first 83 s: nothing at 3 s, the early waves (Zerg 5 s, Terran 10 s, one each, read at 15 s), wave times from the wave counters (Zerg 51 and 71 s, Terran 61 and 81 s), period and phase, and units made between waves. |
   | `wave` | Formation sizes over 600 draws per side. One wave per side: home, owner, orders, formation size per X, slot targets together and distinct, height 72, one weapon. |
   | `route` | Arrival, patrol, and the turn back. |
   | `fight` | A Mutalisk and a Wraith damage each other. |

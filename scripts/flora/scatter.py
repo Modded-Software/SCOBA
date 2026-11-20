@@ -67,6 +67,12 @@ def scatter(ctx: Context, hazards: np.ndarray, seed: int) -> list[Plant]:
     n = ctx.terrain.height.shape[0]
     field = Field()
     taken: list[Plant] = []
+    # Pool gardens first (flora/pools.py): the families below keep clear of them.
+    from .pools import garden
+
+    for plant in garden(ctx, hazards, seed):
+        field.add(plant)
+        taken.append(plant)
     for kind, family in config.FAMILIES.items():
         rng = random.Random(f"{seed}:{kind}")
         count = 0

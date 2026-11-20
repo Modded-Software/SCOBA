@@ -131,6 +131,7 @@ game.
 | ID | Requirement |
 | --- | --- |
 | R-BASE-33 | Tests MUST count losses. An owner that loses units MUST react: supply made plus supply lost keeps growing, and lost units are replaced. |
+| R-BASE-35 | The vespene geyser and every Terran and Zerg gas building (Refinery, Automated Refinery, Extractor, Automated Extractor) MUST be 6x6 cells, twice the stock 3x3, in every place that says a size: pathing footprint, placement footprint, unit radius, drawn model, and the site generator. Operator 2026-11-20: "double to 6x6, also double that of all refineries so it matches as well as the other system data like requirements etc. so it all matches, do this with both terran refinery and zerg extractor". |
 | R-BASE-34 | The AI MUST play aggressively and fast: owners attack early and repeatedly, and expand while they fight. Only stock AI behaviour and map data drive it (R-BASE-28). |
 
 ## 4. Acceptance

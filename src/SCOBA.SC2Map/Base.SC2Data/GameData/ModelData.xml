@@ -11,6 +11,8 @@
         <ScaleMin value="2.000000,2.000000,2.000000"/>
     </CModel>
     <CModel id="Battlecruiser">
+        <!-- shows Battlecruiser_Remastered --> <!-- classic skins -->
+        <Model value="Assets\Units\Terran\Battlecruiser_Remastered\Battlecruiser_Remastered.m3"/> <!-- classic skins -->
         <AnimSpeed value="0.200000"/>
     </CModel>
     <CModel id="ConfirmationLocalGround">
@@ -96,6 +98,8 @@
         <AnimSpeed value="0.500000"/>
     </CModel>
     <CModel id="Hive">
+        <!-- shows Hatchery_Remastered --> <!-- classic skins -->
+        <Model value="Assets\Buildings\Zerg\Hatchery_Remastered\Hatchery_Remastered.m3"/> <!-- classic skins -->
         <ScaleMax value="3.000000,3.000000,3.000000"/>
         <ScaleMin value="3.000000,3.000000,3.000000"/>
     </CModel>
@@ -214,4 +218,271 @@
     <CModel id="ScobaJumpDust">
         <Model value="Assets\Effects\Other\PhysicsImpactDustLight\PhysicsImpactDustLight.m3"/>
     </CModel>
+    <!-- classic skins: written by scripts/classic_skins.py. Do not edit. -->
+    <CModel id="BattlecruiserDeath">
+        <!-- shows Battlecruiser_Remastered_Death -->
+        <Model value="Assets\Units\Terran\Battlecruiser_Remastered_Death\Battlecruiser_Remastered_Death.m3"/>
+        <SelectionRadius value="0.500000"/>
+        <ShadowRadius value="0.500000"/>
+    </CModel>
+    <CModel id="BattlecruiserDeathA">
+        <!-- shows Battlecruiser_Remastered_Yamato_Death -->
+        <Model value="Assets\Units\Terran\Battlecruiser_Remastered_Yamato_Death\Battlecruiser_Remastered_Yamato_Death.m3"/>
+    </CModel>
+    <CModel id="BattlecruiserDeathRagdoll">
+        <!-- shows Battlecruiser_Remastered_DeathRagdoll -->
+        <Model value="Assets\Units\Terran\Battlecruiser_Remastered_DeathRagdoll\Battlecruiser_Remastered_DeathRagdoll.m3"/>
+    </CModel>
+    <CModel id="BattlecruiserHyperjumpPlacement">
+        <!-- shows Battlecruiser_Remastered_Hyperjump_Placement -->
+        <Model value="Assets\Effects\Terran\Battlecruiser_Remastered_Hyperjump_Placement\Battlecruiser_Remastered_Hyperjump_Placement.m3"/>
+    </CModel>
+    <CModel id="BattlecruiserPortrait">
+        <!-- shows Battlecruiser_Remastered_Portrait -->
+        <Image value="Assets\Textures\Battlecruiser_Remastered_Portrait_Static.dds"/>
+        <Lighting value="Battlecruiser_Remastered_Portrait"/>
+        <Model value="Assets\Portraits\Terran\Battlecruiser_Remastered_Portrait\Battlecruiser_Remastered_Portrait.m3"/>
+    </CModel>
+    <CModel id="BattlecruiserYamatoHyperjumpPlacement">
+        <!-- shows Battlecruiser_Remastered_Yamato_Hyperjump_Placement -->
+        <Model value="Assets\Effects\Terran\Battlecruiser_Remastered_Yamato_Hyperjump_Placement\Battlecruiser_Remastered_Yamato_Hyperjump_Placement.m3"/>
+    </CModel>
+    <CModel id="CommandCenter">
+        <!-- shows CommandCenter_Remastered -->
+        <Model value="Assets\Buildings\Terran\CommandCenter_Remastered\CommandCenter_Remastered.m3"/>
+    </CModel>
+    <CModel id="CommandCenterBuild">
+        <!-- shows CommandCenter_Remastered_Build -->
+        <Model value="Assets\Buildings\Terran\TerranBuilding_Remastered_Build\TerranBuilding_Remastered_Build.m3"/>
+    </CModel>
+    <CModel id="CommandCenterDeath">
+        <!-- shows CommandCenter_Remastered_Death -->
+        <Model value="Assets\Buildings\Terran\CommandCenter_Remastered_Death\CommandCenter_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="CommandCenterFlyDeath">
+        <!-- shows CommandCenter_Remastered_Fly_Death -->
+        <Model value="Assets\Buildings\Terran\CommandCenter_Remastered_Fly_Death\CommandCenter_Remastered_Fly_Death.m3"/>
+    </CModel>
+    <CModel id="CommandCenterMorphDeath">
+        <!-- shows CommandCenter_Remastered_Morph_Death -->
+        <Model value="Assets\Units\Test\InvisibleUnit\InvisibleUnit.m3"/>
+    </CModel>
+    <CModel id="CommandCenterPlacement">
+        <!-- shows CommandCenter_Remastered_Placement -->
+        <LowQualityModel value="CommandCenter_Remastered"/>
+        <Model value="Assets\Buildings\Terran\CommandCenter_Remastered_Placement\CommandCenter_Remastered_Placement.m3"/>
+    </CModel>
+    <CModel id="CommandCenterPortrait">
+        <!-- shows CommandCenter_Remastered_Portrait -->
+        <Image value="Assets\Textures\CommandCenter_Remastered_Portrait_Static.dds"/>
+        <Model value="Assets\Portraits\Terran\CommandCenter_Remastered_Portrait\CommandCenter_Remastered_Portrait.m3"/>
+    </CModel>
+    <CModel id="Drone">
+        <!-- shows Drone_Remastered -->
+        <Model value="Assets\Units\Zerg\Drone_Remastered\Drone_Remastered.m3"/>
+    </CModel>
+    <CModel id="DroneDeath">
+        <!-- shows Drone_Remastered_Death -->
+        <Model value="Assets\Units\Zerg\Drone_Remastered_Death\Drone_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="DroneDeathAcid">
+        <!-- shows Drone_Remastered_Death -->
+        <Model value="Assets\Units\Zerg\Drone_Remastered_Death\Drone_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="DroneDeathFire">
+        <!-- shows Drone_Remastered_Death -->
+        <Model value="Assets\Units\Zerg\Drone_Remastered_Death\Drone_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="DroneDeathRagdoll">
+        <!-- shows Drone_Remastered_DeathRagdoll -->
+        <Model value="Assets\Units\Zerg\Drone_Remastered_DeathRagdoll\Drone_Remastered_DeathRagdoll.m3"/>
+    </CModel>
+    <CModel id="DronePortrait">
+        <!-- shows Drone_Remastered_Portrait -->
+        <Image value="Assets\Textures\Drone_Remastered_Portrait_Static.dds"/>
+        <Lighting value="Drone_Remastered_Portrait"/>
+        <Model value="Assets\Portraits\Zerg\Drone_Remastered_Portrait\Drone_Remastered_Portrait.m3"/>
+    </CModel>
+    <CModel id="Hatchery">
+        <!-- shows Hatchery_Remastered -->
+        <Model value="Assets\Buildings\Zerg\Hatchery_Remastered\Hatchery_Remastered.m3"/>
+    </CModel>
+    <CModel id="HatcheryDeath">
+        <!-- shows Hatchery_Remastered_Death -->
+        <LowQualityModel value="ZergBuilding_Remastered_Large_Death_Low"/>
+        <Model value="Assets\Buildings\Zerg\Hatchery_Remastered_Death\Hatchery_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="HatcheryPlacement">
+        <!-- shows Hatchery_Remastered_Placement -->
+        <LowQualityModel value="Hatchery_Remastered"/>
+        <Model value="Assets\Buildings\Zerg\Hatchery_Remastered_Placement\Hatchery_Remastered_Placement.m3"/>
+    </CModel>
+    <CModel id="HatcheryPortrait">
+        <!-- shows Hatchery_Remastered_Portrait -->
+        <Image value="Assets\Textures\Hatchery_Remastered_Portrait_Static.dds"/>
+        <Model value="Assets\Portraits\Zerg\Hatchery_Remastered_Portrait\Hatchery_Remastered_Portrait.m3"/>
+    </CModel>
+    <CModel id="HiveDeath">
+        <!-- shows Hatchery_Remastered_Hive_Death -->
+        <LowQualityModel value="ZergBuilding_Remastered_Large_Death_Low"/>
+        <Model value="Assets\Buildings\Zerg\Hatchery_Remastered_Hive_Death\Hatchery_Remastered_Hive_Death.m3"/>
+    </CModel>
+    <CModel id="HivePortrait">
+        <!-- shows Hatchery_Remastered_Hive_Portrait -->
+        <Image value="Assets\Textures\Hatchery_Remastered_Hive_Portrait_Static.dds"/>
+        <Model value="Assets\Portraits\Zerg\Hatchery_Remastered_Hive_Portrait\Hatchery_Remastered_Hive_Portrait.m3"/>
+    </CModel>
+    <CModel id="Hydralisk">
+        <!-- shows Hydralisk_Remastered -->
+        <Model value="Assets\Units\Zerg\Hydralisk_Remastered\Hydralisk_Remastered.m3"/>
+    </CModel>
+    <CModel id="HydraliskDeath">
+        <!-- shows Hydralisk_Remastered_Death -->
+        <Model value="Assets\Units\Zerg\Hydralisk_Remastered_Death\Hydralisk_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="HydraliskDeathAcid">
+        <!-- shows Hydralisk_Remastered_DeathAcid -->
+        <Model value="Assets\Units\Zerg\Hydralisk_Remastered_DeathAcid\Hydralisk_Remastered_DeathAcid.m3"/>
+    </CModel>
+    <CModel id="HydraliskDeathFire">
+        <!-- shows Hydralisk_Remastered_DeathFire -->
+        <Model value="Assets\Units\Zerg\Hydralisk_Remastered_DeathFire\Hydralisk_Remastered_DeathFire.m3"/>
+    </CModel>
+    <CModel id="HydraliskDeathRagdoll">
+        <!-- shows Hydralisk_Remastered_DeathRagdoll -->
+        <Model value="Assets\Units\Zerg\Hydralisk_Remastered_DeathRagdoll\Hydralisk_Remastered_DeathRagdoll.m3"/>
+    </CModel>
+    <CModel id="HydraliskPortrait">
+        <!-- shows Hydralisk_Remastered_Portrait -->
+        <Image value="Assets\Textures\Hydralisk_Remastered_Portrait_Static.dds"/>
+        <Lighting value="Hydralisk_Remastered_Portrait"/>
+        <Model value="Assets\Portraits\Zerg\Hydralisk_Remastered_Portrait\Hydralisk_Remastered_Portrait.m3"/>
+    </CModel>
+    <CModel id="HyperjumpImpact">
+        <!-- shows Battlecruiser_Remastered_HyperjumpIn -->
+        <Model value="Assets\Effects\Terran\Battlecruiser_Remastered_HyperjumpIn\Battlecruiser_Remastered_HyperjumpIn.m3"/>
+    </CModel>
+    <CModel id="HyperjumpImpactUpgraded">
+        <!-- shows Battlecruiser_Remastered_Yamato_HyperjumpIn -->
+        <Model value="Assets\Effects\Terran\Battlecruiser_Remastered_Yamato_HyperjumpIn\Battlecruiser_Remastered_Yamato_HyperjumpIn.m3"/>
+    </CModel>
+    <CModel id="HyperjumpLaunch">
+        <!-- shows Battlecruiser_Remastered_HyperjumpOut -->
+        <Model value="Assets\Effects\Terran\Battlecruiser_Remastered_HyperjumpOut\Battlecruiser_Remastered_HyperjumpOut.m3"/>
+    </CModel>
+    <CModel id="HyperjumpLaunchUpgraded">
+        <!-- shows Battlecruiser_Remastered_Yamato_HyperjumpOut -->
+        <Model value="Assets\Effects\Terran\Battlecruiser_Remastered_Yamato_HyperjumpOut\Battlecruiser_Remastered_Yamato_HyperjumpOut.m3"/>
+    </CModel>
+    <CModel id="Lair">
+        <!-- shows Hatchery_Remastered -->
+        <Model value="Assets\Buildings\Zerg\Hatchery_Remastered\Hatchery_Remastered.m3"/>
+    </CModel>
+    <CModel id="LairDeath">
+        <!-- shows Hatchery_Remastered_Lair_Death -->
+        <LowQualityModel value="ZergBuilding_Remastered_Large_Death_Low"/>
+        <Model value="Assets\Buildings\Zerg\Hatchery_Remastered_Lair_Death\Hatchery_Remastered_Lair_Death.m3"/>
+    </CModel>
+    <CModel id="LairPortrait">
+        <!-- shows Hatchery_Remastered_Lair_Portrait -->
+        <Image value="Assets\Textures\Hatchery_Remastered_Lair_Portrait_Static.dds"/>
+        <Model value="Assets\Portraits\Zerg\Hatchery_Remastered_Lair_Portrait\Hatchery_Remastered_Lair_Portrait.m3"/>
+    </CModel>
+    <CModel id="Marine">
+        <!-- shows Marine_Remastered -->
+        <Model value="Assets\Units\Terran\Marine_Remastered\Marine_Remastered.m3"/>
+    </CModel>
+    <CModel id="MarineDeath">
+        <!-- shows Marine_Remastered_Death -->
+        <Model value="Assets\Units\Terran\Marine_Remastered_Death\Marine_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="MarineDeathAcid">
+        <!-- shows Marine_Remastered_DeathAcid -->
+        <Model value="Assets\Units\Terran\Marine_Remastered_DeathAcid\Marine_Remastered_DeathAcid.m3"/>
+    </CModel>
+    <CModel id="MarineDeathBlast">
+        <!-- shows Marine_Remastered_DeathBlast -->
+        <Model value="Assets\Units\Terran\Marine_Remastered_DeathBlast\Marine_Remastered_DeathBlast.m3"/>
+    </CModel>
+    <CModel id="MarineDeathEviscerate">
+        <!-- shows Marine_Remastered_DeathEviscerate -->
+        <Model value="Assets\Units\Terran\Marine_Remastered_DeathEviscerate\Marine_Remastered_DeathEviscerate.m3"/>
+    </CModel>
+    <CModel id="MarineDeathFire">
+        <!-- shows Marine_Remastered_DeathFire -->
+        <Model value="Assets\Units\Terran\Marine_Remastered_DeathFire\Marine_Remastered_DeathFire.m3"/>
+    </CModel>
+    <CModel id="MarineDeathRagdoll">
+        <!-- shows Marine_Remastered_DeathRagdoll -->
+        <Model value="Assets\Units\Terran\Marine_Remastered_DeathRagdoll\Marine_Remastered_DeathRagdoll.m3"/>
+    </CModel>
+    <CModel id="MarinePortrait">
+        <!-- shows Marine_Remastered_Portrait -->
+        <Image value="Assets\Textures\Marine_Remastered_Portrait_Static.dds"/>
+        <Lighting value="Marine_Remastered_Portrait"/>
+        <Model value="Assets\Portraits\Terran\Marine_Remastered_Portrait\Marine_Remastered_Portrait.m3"/>
+    </CModel>
+    <CModel id="OrbitalCommandDeath">
+        <!-- shows OrbitalCommand_Remastered_Death -->
+        <Model value="Assets\Buildings\Terran\OrbitalCommand_Remastered_Death\OrbitalCommand_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="OrbitalCommandFlyDeath">
+        <!-- shows OrbitalCommand_Remastered_Fly_Death -->
+        <Model value="Assets\Buildings\Terran\OrbitalCommand_Remastered_Fly_Death\OrbitalCommand_Remastered_Fly_Death.m3"/>
+    </CModel>
+    <CModel id="OrbitalCommandPlacement">
+        <!-- shows OrbitalCommand_Remastered_Placement -->
+        <LowQualityModel value="CommandCenter_Remastered"/>
+        <Model value="Assets\Buildings\Terran\OrbitalCommand_Remastered_Placement\OrbitalCommand_Remastered_Placement.m3"/>
+    </CModel>
+    <CModel id="PlanetaryFortressDeath">
+        <!-- shows PlanetaryFortress_Remastered_Death -->
+        <Model value="Assets\Buildings\Terran\PlanetaryFortress_Remastered_Death\PlanetaryFortress_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="SCV">
+        <!-- shows SCV_Remastered -->
+        <Model value="Assets\Units\Terran\SCV_Remastered\SCV_Remastered.m3"/>
+    </CModel>
+    <CModel id="SCVDeath">
+        <!-- shows SCV_Remastered_Death -->
+        <Model value="Assets\Units\Terran\SCV_Remastered_Death\SCV_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="SCVDeathRagdoll">
+        <!-- shows SCV_Remastered_DeathRagdoll -->
+        <Model value="Assets\Units\Terran\SCV_Remastered_DeathRagdoll\SCV_Remastered_DeathRagdoll.m3"/>
+    </CModel>
+    <CModel id="SCVPortrait">
+        <!-- shows SCV_Remastered_Portrait -->
+        <Image value="Assets\Textures\SCV_Remastered_Portrait_Static.dds"/>
+        <Lighting value="SCV_Remastered_Portrait"/>
+        <Model value="Assets\Portraits\Terran\SCV_Remastered_Portrait\SCV_Remastered_Portrait.m3"/>
+    </CModel>
+    <CModel id="Ultralisk">
+        <!-- shows Ultralisk_Remastered -->
+        <Model value="Assets\Units\Zerg\Ultralisk_Remastered\Ultralisk_Remastered.m3"/>
+        <RequiredAnims index="0" removed="1"/>
+    </CModel>
+    <CModel id="UltraliskDeath">
+        <!-- shows Ultralisk_Remastered_Death -->
+        <Model value="Assets\Units\Zerg\Ultralisk_Remastered_Death\Ultralisk_Remastered_Death.m3"/>
+    </CModel>
+    <CModel id="UltraliskDeathAcid">
+        <!-- shows Ultralisk_Remastered_DeathAcid -->
+        <Model value="Assets\Units\Zerg\Ultralisk_Remastered_DeathAcid\Ultralisk_Remastered_DeathAcid.m3"/>
+    </CModel>
+    <CModel id="UltraliskDeathFire">
+        <!-- shows Ultralisk_Remastered_DeathFire -->
+        <Model value="Assets\Units\Zerg\Ultralisk_Remastered_DeathFire\Ultralisk_Remastered_DeathFire.m3"/>
+    </CModel>
+    <CModel id="UltraliskDeathRagdoll">
+        <!-- shows Ultralisk_Remastered_DeathRagdoll -->
+        <Model value="Assets\Units\Zerg\Ultralisk_Remastered_DeathRagdoll\Ultralisk_Remastered_DeathRagdoll.m3"/>
+    </CModel>
+    <CModel id="UltraliskPortrait">
+        <!-- shows Ultralisk_Remastered_Portrait -->
+        <Image value="Assets\Textures\Ultralisk_Remastered_Portrait_Static.dds"/>
+        <Lighting value="Ultralisk_Remastered_Portrait"/>
+        <Model value="Assets\Portraits\Zerg\Ultralisk_Remastered_Portrait\Ultralisk_Remastered_Portrait.m3"/>
+    </CModel>
+    <!-- classic skins: end -->
 </Catalog>

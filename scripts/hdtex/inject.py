@@ -127,6 +127,26 @@ def apply_overrides(catalog: Path, element: str, values: dict[tuple[str, str], s
     catalog.write_text(f'<?xml version="1.0" encoding="us-ascii"?>\n{body}\n', encoding="ascii")
 
 
+def note_prior_models(map_dir: Path, values: dict[tuple[str, str], str]) -> None:
+    """Write down the Model each entry of the map's own catalog names, before a copy takes its place.
+
+    A second read of the injected map needs it: the map may name another
+    file than the stock catalogs do (models.prior_models).
+    """
+    catalog = map_dir / "Base.SC2Data" / "GameData" / "ModelData.xml"
+    if not catalog.is_file():
+        return
+    root = ET.parse(catalog).getroot()
+    seen: dict[str, set[str]] = {}
+    for (entry, _field), copy in values.items():
+        node = next((n for n in root.iter("CModel") if n.get("id") == entry), None)
+        model = node.find("Model") if node is not None else None
+        if model is not None and model.get("value"):
+            seen.setdefault(copy.rsplit("\\", 1)[-1].lower(), set()).add(model.get("value", ""))
+    prior = {name: next(iter(found)) for name, found in sorted(seen.items()) if len(found) == 1}
+    (map_dir / models.PRIOR_MODELS).write_text(json.dumps(prior, indent=1) + "\n", encoding="utf-8")
+
+
 def variant_in_map(map_dir: Path) -> str | None:
     """The key of the cached variant whose files the map holds, or None."""
     for key in variants.VARIANTS:
@@ -185,6 +205,8 @@ def apply_hd_textures(map_dir: Path) -> int:
             for override in texture["overrides"]:
                 key = (override["catalog_file"], override["element"])
                 overrides.setdefault(key, {})[override["entry"], override["field"]] = texture["map_path"]
+    if ("ModelData.xml", "CModel") in overrides:
+        note_prior_models(map_dir, overrides["ModelData.xml", "CModel"])
     for (catalog_file, element), values in sorted(overrides.items()):
         apply_overrides(map_dir / "Base.SC2Data" / "GameData" / catalog_file, element, values)
     print(f"hd textures: injected {count} textures, variant {variants.VARIANTS[choice.key].title}, from {cache}")

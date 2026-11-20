@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import struct
 import sys
 import tempfile
 import unittest
@@ -100,10 +101,22 @@ class PortObjectsTest(unittest.TestCase):
 TERRAIN_XML = '<terrain>\n        <vertData quantizeBias="{b}" quantizeScale="1" standardHeight="8" name="t3HeightMap"/>\n        <texture i="7" name="{t}"/>\n</terrain>\n'
 
 
-def write_terrain(folder: Path, height: bytes, bias: str, texture: str = "Zerus5") -> Path:
+def water(rects: list[tuple[float, float, float, float]], junk: int = 0) -> bytes:
+    """A t3Water file; `junk` fills the pointer bytes the editor rewrites."""
+    out = bytearray(b"WATR" + struct.pack("<II", 110, len(rects)) + bytes(20))
+    for r in rects:
+        out += b"BelShir\0" + struct.pack("<I", 100) + bytes([junk]) * 28 + struct.pack("<4f", *r)
+    return bytes(out)
+
+
+def write_terrain(folder: Path, height: bytes, bias: str, texture: str = "Zerus5", rects=((0, 0, 8, 8),), junk: int = 0, xil: bool = False) -> Path:
     folder.mkdir(parents=True)
     for name in terr.HEIGHT_FILES:
         (folder / name).write_bytes(height + name.encode())
+    (folder / "t3Water").write_bytes(water(list(rects), junk))
+    game = folder / "Base.SC2Data" / "GameData"
+    game.mkdir(parents=True)
+    (game / "WaterData.xml").write_text('<Catalog>\n' + ('    <CWater id="Xil"/>\n' if xil else "") + "</Catalog>\n", encoding="utf-8")
     (folder / "t3Terrain.xml").write_text(TERRAIN_XML.format(b=bias, t=texture), encoding="utf-8")
     return folder
 
@@ -112,8 +125,9 @@ class PortTerrainTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp())
         self.base = write_terrain(self.tmp / "base", b"old", "1.0")
-        self.edited = write_terrain(self.tmp / "edited", b"new", "2.0")
-        self.src = write_terrain(self.tmp / "src", b"old", "1.0", texture="CharLavaCracks")
+        self.edited = write_terrain(self.tmp / "edited", b"new", "2.0", rects=((1, 1, 4, 4), (4, 4, 8, 8)), junk=7, xil=True)
+        # src keeps the pointer bytes of an older editor save: same water.
+        self.src = write_terrain(self.tmp / "src", b"old", "1.0", texture="CharLavaCracks", junk=3)
 
     def run_port(self, *extra: str) -> int:
         argv = ["port", "--base", str(self.base), "--edited", str(self.edited), *extra]
@@ -128,6 +142,18 @@ class PortTerrainTest(unittest.TestCase):
         self.assertIn('quantizeBias="2.0"', xml)
         self.assertIn('name="CharLavaCracks"', xml)  # src-only texture change kept
         self.assertIn("CellAttribute_Pnp", terr.HEIGHT_FILES)
+
+    def test_copies_water(self) -> None:
+        self.assertEqual(self.run_port(), 0)
+        self.assertEqual((self.src / "t3Water").read_bytes(), (self.edited / "t3Water").read_bytes())
+        self.assertIn('<CWater id="Xil"/>', (self.src / "Base.SC2Data" / "GameData" / "WaterData.xml").read_text(encoding="utf-8"))
+
+    def test_refuses_when_src_water_rects_differ(self) -> None:
+        # Negative case: a real water change in src/ (not pointer bytes) is not overwritten.
+        (self.src / "t3Water").write_bytes(water([(0, 0, 9, 9)]))
+        with self.assertRaises(SystemExit):
+            self.run_port()
+        self.assertEqual((self.src / "t3HeightMap").read_bytes(), b"oldt3HeightMap")
 
     def test_rerun_is_accepted(self) -> None:
         self.assertEqual(self.run_port(), 0)

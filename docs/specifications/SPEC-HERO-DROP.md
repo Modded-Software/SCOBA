@@ -15,12 +15,15 @@ the map validator backs it; `[operator]` = only a person can judge it.
 | R-DROP-3 | [tested] | `podType` `SCOBAHeroPod`; `fall`: first height 38..40.5 above the ground, never rising, last loop <= 3; `landMs` 2076..2386 |
 | R-DROP-4 | [tested] [operator] | `fall`: applied camera height minus base within 1.6 of the pod height every loop; first loop camera target on the pod; `midCamDist100` 1500..2000; XY lock after that loop and the view: AC-DROP-1, 2 |
 | R-DROP-5 | [operator] | `gf_PodImpactNow` at touchdown; the shake and the open doors: AC-DROP-3 |
-| R-DROP-6 | [tested] [operator] | `tland`, `tafter`: alive, same `Tag`, same `Level`, `HeroToPod100` < 150, `Direct` 1, `TpsMode`, `HeroActive`, `HeroTps`; `tland Life` = `LifeMax`; `tafter Single` = 1 as before death (negative: the default is 0); `tland`, `tafter`: pod part `DropCam100` 0, jump part 0; `tafter CamApplied100` = base + quake part within 2 (the 2.5 s pod quake still shakes 1 s after touchdown); camera follow on the hero: AC-DROP-3 |
+| R-DROP-6 | [tested] [operator] | Start state (2026-11-20): [tested] `herodrop/20261120-213652` `drop_land`, `drop_main tafter`. TPS goes on through the toggle command (`gf_HeroDropTpsOn`, at touchdown and in the restore loops), not by adding the behavior: that left the toggle off and a TPS-off order did nothing (`herodrop/20261120-210634`). `drop_land`: `tpsOnOrders` > 0, off command shown, a TPS-off order leaves TPS, on again. `tland`, `tafter`: alive, same `Tag`, same `Level`, `HeroToPod100` < 150, `Direct` 1, `TpsMode`, `HeroActive`, `HeroTps`; `tland Life` = `LifeMax`; `tafter Single` = 1 as before death (negative: the default is 0); `tland`, `tafter`: pod part `DropCam100` 0, jump part 0; `tafter CamApplied100` = base + quake part within 2 (the 2.5 s pod quake still shakes 1 s after touchdown); camera follow on the hero: AC-DROP-3 |
 | R-DROP-7 | [tested] | `twait`: `Blocked` +1, Tosh still active |
 | R-DROP-8 | [tested] | `herodrop/20261118-203207` `drop_twice`: three deaths by enemy damage (`ByDamage` true), three fresh returns, old unit gone each time, type and current life max (350) kept |
 | R-DROP-9 | [tested] | `herodrop/20261118-203207` `drop_seat2`: seat 2 pod and return owned by 2; seat 1 hero same, alive, not held, yaw delta 0 |
-| R-DROP-10 | [planned] [operator] | `herodrop drop_main` and `intro deploy`: phase trace WAIT → ZOOM → FALL → IDLE; the same zoom rows (script FOV, engine pitch, yaw, distance) and the same scene flags (`SceneDrop`, `Cinematic`, `InputHeld`, `Dialogs` 0) in ZOOM and FALL; after touchdown scene off, dialogs back, input free. The look: AC-DROP-4 |
+| R-DROP-10 | [planned] [operator] | `herodrop drop_main` and `intro deploy`: phase trace WAIT → ARM → ZOOM → FALL → IDLE; pod valid at the go and at the zoom start; Birth read before the zoom (`ArmLate` 0, `ClipAtZoom` 0..500 ms); `drop_main`: engine yaw unchanged in ARM (built 2026-11-20, not run); the same zoom rows (script FOV, engine pitch, yaw, distance) and the same scene flags (`SceneDrop`, `Cinematic`, `InputHeld`, `Dialogs` 0) in ZOOM and FALL; after touchdown scene off, dialogs back, input free. The look: AC-DROP-4 |
 | R-DROP-11 | [planned] [build] | `scripts/hitvolumes/drop_path_check.py` (build): drop camera, scene and pod calls only in `systems/hero_drop.galaxy` and `systems/scene.galaxy`; no `c_INTRO_ROW_ZOOM`, no `gf_HeroDropStart` caller outside the drop; the intro calls only `gf_HeroDropBegin` and `gf_HeroDropGo` |
+| R-DROP-12 | [tested] [operator] | `herodrop/20261120-175525` `drop_land tafter`: `PodSoundValid` (`CatalogEntryIsValid` on `SCOBAHeroPodFall`), `PodSounds` +1 per drop. Design: CSound `SCOBAHeroPodFall` (parent `Ghost_DropPodImpact`, liberty.sc2mod, 2D), played for the seat in `gf_HeroDropGo` with Birth. Audible: operator check |
+| R-DROP-13 | [tested] | `herodrop/20261120-175348` `drop_spot`: 72 picks in lanes 1..6, engine reads: `blockedCells` 0, `units` 0, `minGap100` >= 400; `none` unchanged. Negative: a Supply Depot on a picked spot blocks cells (`depotCellsBlocked` > 0, `depotSpotFree` false); 24 later picks, `onDepot` 0. Design: `gf_DropPodPoint` (`systems/spawns.galaxy`): 24 random snapped spots, the free one farthest from the used pods; none: rings from the region center out to the region radius + 12; none at all: the center, counted (`gv_podSpotNone`) |
+| R-DROP-14 | [tested] | `herodrop/20261120-210434` `drop_escort` (and the full suite `20261120-210634`): one escort wave per drop; hero pod travel 224.99 (southwest); the `TerranDropPod` units face as the hero pod (`podTurn100` 0 over 124 reads); pods 9.4 from the hero pod, 13.5 apart; after the landing the wave's own 8 units (4 Marines, Goliath, 2 Marauders, Firebat) alive, the seat's, shown, with a lane order; no pod left. The older `LanePods` 0 checks of `drop_main`, `drop_loop`, `drop_seat2` now allow the escort pods (at most 2). Negative: a go with the hero alive, no wave, no pod. Design: `gf_HeroDropGo` calls `gf_DropEscort` (`systems/spawns.galaxy`); its own thread runs the lane wave (`gf_TerranLaneWave`, `gf_ZergLaneWave`, shared with the reinforcement) at free spots off the hero pod, the points facing as the hero pod. Always a Goliath (operator 2026-11-20): `gf_TerranLaneWave` takes `lp_goliath`; the escort passes true, the reinforcement false. The `drop_escort` case now gives the seat a Goliath first and wants exactly one more in the wave; this is not run yet. The Zerg wave is unchanged (its Queen only while the seat has none). Not tested: a Zerg seat (the Zerg pod model's travel offset is not measured) |
 
 R-DROP-6 "same `Tag`" changes with the fresh-unit return (3.1): the check
 becomes same type, same level, old unit gone.
@@ -87,34 +90,47 @@ Design: the drop sequence is one module, outside the intro.
   `systems/hero_drop.galaxy`: the sequence. `core/scene.galaxy` and
   `systems/scene.galaxy`: the scene (below). The intro and the
   reinforcement only start the sequence.
-- **Phases** (`gv_dropPhase[p]`): `IDLE` → `WAIT` → `ZOOM` → `FALL` →
-  `IDLE`. `gv_dropPending[p]` is `WAIT`, `ZOOM` or `FALL`.
+- **Phases** (`gv_dropPhase[p]`): `IDLE` 0 → `WAIT` 1 → `ARM` 4 →
+  `ZOOM` 2 → `FALL` 3 → `IDLE` (trace `14230`). `gv_dropPending[p]` is
+  `WAIT`, `ARM`, `ZOOM` or `FALL`. `ARM` added 2026-11-20 (operator: the
+  view changed with no FOV and DOF and sat still before the pod existed;
+  the pod must be birthing before the camera changes).
 - **API.**
   - `gf_HeroDropBegin(p, hero)`: `WAIT`. Callers: the death trigger
     (`gf_HeroDropDied`), the intro deploy.
   - `gf_HeroDropGo(p, avoidA, avoidB)`: from `WAIT` only, else nothing.
     Picks the drop point in the seat's lane spawn region
     (`gf_DropPodPoint(gv_sPAWNLOCATIONS[gf_RosterLaneOf(p)], avoidA,
-    avoidB)`), enters the scene, starts `ZOOM`. Callers: the intro deploy
+    avoidB)`), enters the scene, creates the pod and starts Birth, starts
+    `ARM`. No camera write. Callers: the intro deploy
     (`null, null`), the reinforcement (`gt_TerranSpawn`, the wave's two
     lane pod points, called before the lane pods as before).
   - Everything else is internal to the module.
-- **Scene on** (`gf_SceneEnter(p, c_SCENE_DROP)`), the first step of
-  `ZOOM`: input held, cinematic mode, UI fullscreen, minimap hidden, map
-  dialogs hidden. The camera follow ends.
-- **ZOOM** (moved from the intro's shot table, values unchanged): a cut to
-  the drop point's side-arm target at yaw `c_DROP_YAW`, pitch
+- **Scene on** (`gf_SceneEnter(p, c_SCENE_DROP)`), in `gf_HeroDropGo`:
+  input held, cinematic mode, UI fullscreen, minimap hidden, map dialogs
+  hidden. It writes no camera value.
+- **ARM** (`gf_HeroDropArmStep`, every drop tick): the engine clip read
+  (`gf_HeroDropClipRead`). The first Birth read anchors the clip clock and
+  starts `ZOOM` (`gv_dropArmMs`). No Birth read within `c_DROP_ARM_MAX`
+  0.5 s: `ZOOM` starts on the script clock and `gv_dropArmLate` counts it.
+  The camera is left as it is: the death spot, or the intro shot, which
+  keeps moving without its sounds (`gv_introCamHeld`, cleared by
+  `gf_IntroCameraRelease` at the zoom start).
+- **ZOOM** (`gf_HeroDropZoomBegin`; values unchanged except the end): the
+  follow ends; the end is the fall camera at the clip time the zoom ends
+  on, clip0 + `c_DROP_ZOOM_LENGTH` (`gv_dropZoomAt1`, `gv_dropZoomDist1`,
+  `gf_HeroDropAimCalc`). A cut to that target at yaw `c_DROP_YAW`, pitch
   `c_DROP_ZOOM_PITCH` 55 → `c_POD_BIRTH_PITCH`, arm `c_DROP_ZOOM_DIST` 60
-  → `c_DROP_POD_ARM` + `c_POD_BIRTH_START_Z` / sin(pitch), FOV
-  `c_DROP_ZOOM_FOV0` 60 → `c_DROP_ZOOM_FOV1` 12, height offset the base
-  `c_SCOBA_CAMERA_HEIGHT_OFFSET`, DOF the default values. Crash easing:
+  → `gv_dropZoomDist1`, FOV `c_DROP_ZOOM_FOV0` 60 → `c_DROP_ZOOM_FOV1`
+  12, height offset the base `c_SCOBA_CAMERA_HEIGHT_OFFSET`, the drop DOF
+  (`gf_HeroDropDof`) from the first frame (was the default DOF). Crash easing:
   1 − (1 − w)³, w = t / `c_DROP_ZOOM_MOVE` 0.3, held to
   `c_DROP_ZOOM_LENGTH` 0.35 s. One camera write per tick, over one tick.
   Script state for tests: `gv_dropZoomFov`, `gv_dropZoomDist`.
-- **FALL**: the pod (unchanged, below). Starts in the first tick at or
-  after `c_DROP_ZOOM_LENGTH`. If the pod unit is not created, the phase
-  goes back to `WAIT` and the scene is left: the next reinforcement
-  starts the sequence again.
+- **FALL**: the camera on the pod (below), joined at the current clip
+  time. Starts in the first tick at or after `c_DROP_ZOOM_LENGTH`. If the
+  pod unit is not created in `gf_HeroDropGo`, the phase stays `WAIT` and
+  the scene is left: the next reinforcement starts the sequence again.
 - **Touchdown order** (one order for every drop): impact, hero back (a
   dead hero as a fresh unit, a hidden one revealed), life full, at the
   pod facing `c_DROP_YAW`; phase `IDLE`; `gf_IntroEnd(p)` (it ends only
@@ -128,9 +144,8 @@ Design: the drop sequence is one module, outside the intro.
   the drop point avoids; the hero before touchdown (intro: alive, hidden;
   revive: dead, then a fresh unit); the intro's music; the camera before
   the zoom (the zoom starts with a cut, so it does not carry over).
-- **Timing with the wave**: the reinforcement starts the zoom before the
-  lane pods; the hero pod is created `c_DROP_ZOOM_LENGTH` later than lane
-  pod A.
+- **Timing with the wave**: the reinforcement creates the hero pod before
+  the lane pods, in the same call.
 - **Replaced**: `gf_HeroDropStart(p, at)` as a public call (now internal
   to `ZOOM` → `FALL`); the intro's `ZOOM` and `FALL` states, its
   `gf_IntroFall`, its zoom row; `gf_HeroDropCinematic` (2026-11-19, never
@@ -190,8 +205,9 @@ drop sequence. Owners per seat (`gv_sceneOwners[p]`, bits
   leg's end key over the clip time left (`gv_dropLeg`). Operator-approved
   motion (podbirth/20261117-120310). The camera collision clamp is skipped
   while the pod exists.
-- FOV: `c_DROP_FOV_START` 30 at the start, one move to `c_DROP_FOV_END` 90
-  at touchdown (operator 2026-11-17). No FOV getter: operator check.
+- FOV: `c_DROP_FOV_START` 30 at the Birth start, one move to
+  `c_DROP_FOV_END` 90 at touchdown (operator 2026-11-17); the fall joins
+  this line at its clip time. No FOV getter: operator check.
 - Not verified: side alignment (pod behind the camera) and smoothness are
   operator checks; the podbirth look-ray, target-back and even-speed checks
   fail against this motion (4 failures, podbirth/20261117-123254) and wait
@@ -207,8 +223,13 @@ drop sequence. Owners per seat (`gv_sceneOwners[p]`, bits
   part 0, `gf_PodImpactNow`, a dead hero back as a fresh unit
   (`gf_HeroReturn`, no `UnitRevive`), `gf_HeroReveal`, life 100 %, the hero
   moved to the pod facing the camera yaw, camera pan to the hero, then the
-  touchdown order of 3a (intro end, scene off, bind). The TPS behavior is
-  added back after the bind (the bind starts in Point & Click). The pod is
+  touchdown order of 3a (intro end, scene off, bind). Start state
+  (operator 2026-11-20): pitch blends to `c_DROP_LAND_PITCH` 0 over 0.5 s
+  (no other writer); after the bind (it starts in Point & Click with the
+  arm by unit height) the TPS behavior is always added and the desired arm
+  set to `c_DROP_LAND_ARM` 1.0. The collision tick then moves the engine
+  distance there with its own blends (0.06 s in, 0.28 s out), not 0.5 s.
+  `gv_dropTps` is still recorded, no longer used. The pod is
   killed: its death clip opens it. Over the next 8 loops the toggles are
   set again through their commands (F7; the validator forbids adding
   toggle behaviors).
@@ -243,11 +264,12 @@ drop sequence. Owners per seat (`gv_sceneOwners[p]`, bits
 | `scripts/app/systems/podimpact.galaxy` | `gf_PodImpactNow` |
 | `Base.SC2Data/GameData/UnitData.xml`, `ActorData.xml` | Pod unit and actor, hero `DeathTime` |
 | `scripts/testkit/galaxy/herodrop.galaxy`, `scripts/testkit/profiles/herodrop.py` | Tests |
+| `scripts/testkit/galaxy/herodrop_land.galaxy`, `scripts/testkit/profiles/herodrop_land.py` | Touchdown start state: camera snap, reset, `drop_land` |
 
 ## 5. Tests
 
 `scripts/playtest.sh herodrop [group]`, one group per scenario: `main`
-(`drop_main`), `alive`, `loop`, `seat2`, `leave`, `wave` (`drop_far`).
+(`drop_main`), `land` (`drop_land`), `alive`, `loop`, `seat2`, `leave`, `wave` (`drop_far`).
 The harness pauses `gv_sPAWNTIMER` and starts every drop with
 `gf_HeroDropGo`, the one entry point the wave and the intro use: one hero
 pod, no lane pods (`LanePods` 0, live `TerranDropPod` units, asserted).
@@ -258,6 +280,7 @@ wave starts the drop.
 | --- | --- | --- |
 | `drop_alive` | A reinforcement with the hero alive. | No pod, no landing, no death. |
 | `drop_main` | Tosh in TPS with Single on dies, waits 2.5 s, a reinforcement starts the sequence; phase trace; the zoom per loop (script FOV and arm, engine pitch, yaw, distance); the fall per loop; touchdown; 1 s later; a second reinforcement. Scene in ZOOM and FALL: `SceneDrop`, `Cinematic`, `InputHeld`, `Dialogs` 0. | No scene, pod or zoom before the reinforcement; no switch while dead; hero dead during the fall; no second sequence with the hero alive; drop point not the death point; scene off and dialogs back after touchdown; player 2 not held, no trigger disabled. |
+| `drop_land` | Reset: pitch 30, arm by unit height. Tosh in Point & Click dies, one drop. 1.5 s after touchdown: `TpsMode`, `CamDesired100` 100, engine `CamDist100` 90..105, engine pitch within 2 of 0 (raw values printed). `drop_main` `tafter` asserts the same. | Before: not TPS, `SavedTps` false, desired arm above 1.0, pitch 30. |
 | `drop_far` | Tosh dies at the Zerg spawn, the real wave drops the pod; per loop the engine clip read (raw trace). | No Birth misses; death point more than 30 cells from the pod. |
 | `drop_loop` | Five deaths by damage in a row (operator 2026-11-19: consistency). Each cycle: the zoom rows, scene on in zoom and fall, phase trace, one hero pod, Birth every loop (0 misses), land time in the window, fresh unit of the same type, full life, spent life max carried. The five land times within two loops. | Old unit gone after each return; no lane pod; scene off after each touchdown. |
 | `drop_seat2` | Seat 2 played by the harness: its hero dies, the lane 2 wave drops its pod, it returns as seat 2's hero. | Seat 1: no pending, no hold, same hero, camera yaw unchanged. |
@@ -284,8 +307,8 @@ horizon). `scripts/testkit/tests/test_drop_path.py` checks
   hero after touchdown are operator checks (F6).
 - Kerrigan uses the same path; only Tosh is tested (Kerrigan is a proof of
   concept).
-- The pod has no fall sound (O-DROP-1). Its creation plays the stock
-  `TerranDropPodImpact` sound at the start of the fall.
+- The pod fall sound is the stock pod impact set (R-DROP-12). A whoosh
+  fall loop is not in the loaded mods.
 - The hero pod point and the lane reinforcement pod points are chosen
   independently in the same region; they can land close to each other.
 

@@ -46,6 +46,7 @@ can judge it.
 | R-BASE-29 | [built] | `melee_map.check`; host `test_melee_map.py`; `macro` `DepotsQueued` = 2 for Terran |
 | R-BASE-31 | [built] | `resources.check`: no tree or unit in a keep-out; host `test_resources.py` |
 | R-BASE-32 | [built] | host `test_resources.py`: two plans equal, radii and angle steps vary, hall gap kept |
+| R-BASE-35 | [built] | host `test_resources.py` `GasSizeTest`: footprints, unit fields, actor scales, geyser snap, sibling sites; `resources.check` in the build; 36 geysers on whole coordinates in the built `Objects`. Not run in the game: no gas building has been built on a 6x6 geyser |
 | R-BASE-33 | [built] | `macro`: supply used + supply lost grows within every 2 minutes (`baseai_live.galaxy` death counter); an attacker lost units |
 | R-BASE-34 | [built] | `macro`: attackers ≥ 4 by t480, an owner attacks twice (state 3 left and entered again); `at least 3 owners expanded by t480` |
 | R-BASE-30 | [tested] (`hall` `20261119-203139`, `-172941`, `-135358`; earlier script legs: `20261119-115642`, `-121141`, `macro` `-120004`) | `hall` group: the engine pathing grid (36x36 sub-cells of 0.5) of the starting CC covers the measured feet outline; built, created and landed CCs equal them; open while flying and after death; an SCV mines. `macro`: every Terran CC covers the measured cells at t1; the Orbital Command links `FootprintSCOBAHall1x1` |
@@ -288,9 +289,25 @@ the built map (256 cells).
     away from the map centre, jittered by up to 20. Each field: radius
     6.5 to 9, angle jitter up to 6, every other field set back up to 1.5
     (a loose double row). Geysers: past the arc ends, angle jitter up to
-    15, radius 7 to 9. Fields snap to whole x and half y (2x1), geysers
-    to half cells (3x3); a pile that fails tries the offsets of
-    `SNAP_TRIES`.
+    15, radius 8.5 to 10.5. Fields snap to whole x and half y (2x1),
+    geysers to whole cells (6x6, R-BASE-35: an even side centres on a
+    cell corner); a pile that fails tries the offsets of `SNAP_TRIES`.
+  - **Gas size** (R-BASE-35): the map's `FootprintData.xml` holds the
+    stock geyser footprints scaled x2: `FootprintScobaGeyser6x6` (geyser),
+    `FootprintScobaGeyser6x6Built` and `FootprintScoba6x6CappedGeyser`
+    (pathing and placement of Refinery, AutomatedRefinery, Extractor,
+    AutomatedExtractor). The solid square is 6x6; the ring that keeps
+    town halls off keeps its stock width of 3. `UnitData.xml` names them
+    and sets `Radius`, `SeparationRadius` and `MinimapRadius` to 3 (stock
+    1.5). `ActorData.xml` draws the five units and the geyser's ground
+    splat at `Scale` 2. The Protoss Assimilator is left at 3x3: the
+    operator named Terran and Zerg.
+  - **Sibling sites**: a 6x6 geyser reaches the other hall of a double
+    site. So a pile also keeps `HALL_GAP` off every hall planned before,
+    a new hall keeps it off every earlier pile, and each pile is nearer
+    its own hall than any other (`resources.check` sorts piles by nearest
+    hall). `TerranJungleLeftB` stands at 186,109; without the rule it
+    stood at 183,112 with a geyser beside the hall of `TerranJungleLeftA`.
   - **Search**: the anchor, then rings 2 to 16 by 2, 16 angles from 0;
     the first spot where the 8x8 hall and every pile cell is on good
     ground and off every earlier line. Mains: the start point only.
@@ -477,6 +494,14 @@ Regression, full suites on the same build: `combat`, `tps`, `intro`,
 AC-BASE-1 to AC-BASE-7 of the requirements. Also:
 
 - the look of mineral fields and geysers on the lifted, scaled terrain;
+- **Open, 2026-11-20:** the operator saw that the AI builds no Refinery
+  and no Extractor since the 6x6 change. Cause not known. The `gas`
+  group of the `baseai` profile separates the two suspects (a worker
+  cannot build on a 6x6 geyser; the AI does not see the geyser). Not run.
+- 6x6 gas (R-BASE-35): the geyser and the gas buildings look twice as
+  large and fill their 6x6; a worker builds a Refinery and an Extractor
+  on a geyser and the placement ghost fits; workers harvest gas; the
+  construction, death and placement models have the same size;
 - the resource sounds and worker animations;
 - whether the AI's army movement suits the lanes (O-BASE-2).
 

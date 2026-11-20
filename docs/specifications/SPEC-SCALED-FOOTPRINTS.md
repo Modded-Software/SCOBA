@@ -78,17 +78,51 @@ Fit checks (R-FP-07), against the eroded mesh: covered ≥ `MIN_MESH_COVERED`
   (`flora.terrain._offset`) adds the sink back. Host test:
   `test_tree_sink.py`.
 - `UnitData.xml`: `SporeCannon`, `SporeCrawler` `Footprint`.
-- Square units (`config.SQUARE_UNITS`, `HybridUltraliskShackled` 8): a fixed
-  8x8 `CFootprint` (Shape square, Check and Place rows) linked in `UnitData.xml`.
+- Square units (`config.SQUARE_UNITS`, `HybridUltraliskShackled` 12): a fixed
+  12x12 `CFootprint` (Shape square, Check and Place rows) linked in `UnitData.xml`.
 - `ActorData.xml`: the square unit's `CActorUnit` entry gets
   `config.FLATTEN_EVENTS` appended. The water splash step already writes an
   entry for the ultralisk; without one, a new entry with no parent merges into
   the stock actor. The events: unit birth
   creates core.sc2mod's `BuildingTerrainFlatten` (Normal), `...Instant`
   (Suppressed) or `...Editor` (EditorPlaced). These deformers use the unit
-  footprint, so the flattened area is the 8x8 square.
+  footprint, so the flattened area is the 12x12 square. It was 8x8 until
+  2026-11-20; the unit's hit shapes reach 5 to 6.8 from its centre.
+- Flatten-only units (`config.FLATTEN_UNITS`, `VespeneGeyser`; operator
+  2026-11-20): the same three events on the unit's actor. The unit keeps its
+  own footprint (`FootprintScobaGeyser6x6`, R-BASE-35). Not known: whether
+  the deformer covers the solid 6x6 only or also the 12x12 ring of the
+  footprint.
 - `check_squares` fails the build check when the footprint link, its shape, or
   a flatten event is missing.
+- **2026-11-20: the hall is measured on the classic model**
+  (`CommandCenter_Remastered.m3`, SPEC-HD-TEXTURES 13; operator: "the legs
+  are a tiny bit off need to recalculate footprint"). It has no `Foot_*`
+  bones. The triangles of the bones named `*Leg*` are sliced
+  (`measure.MODEL_BONES`): three round legs `Leg1..3` and two side plates
+  `LegPlate`, `LegPlate2`. `Stand` does not move them. Scale 2.88 and the
+  turn of 45 degrees are as before. Result `FootprintScobaHall653a23aebf`:
+  35 cells, 7 loops. Three loops of 3 by 3 are the legs, at about
+  (-0.5, -5), (-5.5, 0), (4, 4.5). Four smaller loops are what the plates
+  put at feet height after `ERODE`. `measure` checks the unit shows
+  `measure.HALL_FILES` by file name, so the HD copy passes. The text below
+  on feet, bones and footprint ids describes the stock model, measured
+  before. Not seen in the game. The F and A marks of the Alt+0 paint are
+  still the stock foot points; the red marks are the engine's cells.
+  2026-11-20: the Orbital Command and the Planetary Fortress show the
+  same model entry `CommandCenter` (`hitvolumes.resolve` on the map and
+  the stock stack). Before, their actors had scale 1 and the units kept
+  `FootprintSCOBAHall1x1`: an Orbital Command blocked nothing, and the
+  legs opened when the morph started (operator 2026-11-20: "2 of the
+  CCs do not have pathing blocking"). Now all three actors have `Scale`
+  3.6,3.6,4.2 in the map's ActorData and are in `config.HALL_UNITS`, so
+  each links the footprint measured at its own drawn scale; the three
+  ids are equal. `check_halls` fails the build check when the hall
+  scales differ. `hall` group: a CC morphed to each form keeps the
+  footprint during and after the morph.
+  `config.HALL_FOOTPRINTS_ON` switches the hall footprints: off, the build
+  writes none, `check_halls` checks none, and the Command Center keeps
+  `FootprintSCOBAHall1x1` and blocks no pathing.
 - Halls (R-FP-10, `config.HALL_UNITS`): `CommandCenter`, model
   `CommandCenter` (`CommandCenterEx1.m3`, measured as group
   `CommandCenter`). The scale is the drawn scale (`hall_scale`): the x of
@@ -192,7 +226,7 @@ Run `out/test-runs/treepath/20261115-133439` (`SC2_HD_TEXTURES=off`),
 | R-FP-06 | [built] | host tests `test_scaled_footprints.py` |
 | R-FP-07 | [built] | host tests `test_scaled_footprints.py` |
 | R-FP-11 | [tested] | `baseai hall` run `20261119-203139`: on, all 214 engine-blocked 0.5 sub-cells around p9 marked (Miss 0), no open one marked (Extra 0), 640 marks over 3 halls plus 9 per hall (667 tags), F scale 2.88; off, no mark left. The look: operator |
-| R-FP-08 | [built] | host test `test_caged_ultralisk_gets_8x8_square`; in game: `treepath` section `cage_ultralisk`, not run yet |
+| R-FP-08 | [built] | host test `test_caged_ultralisk_gets_12x12_square`; in game: `treepath` section `cage_ultralisk`, not run yet |
 | R-FP-09 | [built] | host test checks the actor events; the flattened look is an operator check |
 | R-FP-10 | [tested] | host tests `test_hall_footprints.py`; `baseai hall` run `20261119-203139` (failures 0, `FootprintScobaHall10cda09540`): the engine pathing sampled on the 0.5 grid (36x36 sub-cells) of a built, a created and a landed CC equals the traced feet outline sub-cell for sub-cell; each starting CC covers it. Whether the feet drawn on screen sit on it: operator. Earlier, Shape on whole cells: run `20261119-180620` at 2.88, run `20261119-135358` at 3.6: the engine grid of a built, a created and a landed CC equals the measured cells, the starting CC of p9 blocks every measured cell, origin open, one SCV mines 20 in 25 s, nothing blocked while flying or after death |
 
@@ -209,7 +243,7 @@ implemented, not verified.
 - Spores (operator will test).
 - Groves still leave intended paths open.
 - Sunk large trees (scale > 4) sit right on the ground, not buried.
-- Caged ultralisk: the terrain under its 8x8 footprint looks flat, and the
+- Caged ultralisk: the terrain under its 12x12 footprint looks flat, and the
   cage model sits on it.
 - Command Center: the blocked cells sit under the visible legs and the ramp
   faces the way the model does (model -y taken as world -y at facing 270).

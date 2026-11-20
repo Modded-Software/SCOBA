@@ -55,11 +55,15 @@ VARIANTS = {
     # On colour pbrify is the sharper one. On dark, low-contrast colour it
     # invents structure the original does not have: hatching on zerus_4, a
     # repainted look on zerus_8. Those two keep fast.
+    #
+    # The colour of the classic Command Center is a trial of seedvr2 on a
+    # model texture (operator 2026-11-20: "try the generative model on the
+    # classic cc tex"). It reads the original, not another variant's result.
     "upscale": Variant(
         "upscale",
         "Upscale 4x",
         {"color": "pbrify", "alpha": "fast", "normal": "fast", "data": "fast"},
-        {"zerus_4.color": "fast", "zerus_8.color": "fast"},
+        {"zerus_4.color": "fast", "zerus_8.color": "fast", "commandcenter_remastered_diff.color": "seedvr2"},
     ),
     # seedvr2 invents detail, so it gets the colour only. The mask and the
     # normal map are data: they stay as in "upscale", and the two variants

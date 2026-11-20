@@ -101,6 +101,17 @@ Results are written to `out/test-runs/<profile>/<run>/summary.txt`.
 
 The testing rules for contributors and agents are in [AGENTS.md](AGENTS.md).
 
+## Desktop Entries
+
+`scripts/install-dock-icon.sh` provisions both the plain `SCOBA` entry and
+`SCOBA FG`. Both put the game on GPU `0000:09:00.0` by default. The FG entry
+also puts lsfg-vk frame generation on GPU `0000:03:00.0`.
+
+Set `SCOBA_GAME_GPU` or `SCOBA_FG_GPU` to change either GPU. The launch
+scripts read them at run time. The installer also reads them, writes them into
+the entries when set, and validates the GPU render nodes and the installed
+lsfg-vk layer. It does not install lsfg-vk.
+
 ## Requirements
 
 - StarCraft II installed under a Proton prefix, launched with GE-Proton. The

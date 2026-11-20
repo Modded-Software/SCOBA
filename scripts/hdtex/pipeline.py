@@ -332,7 +332,7 @@ def encode_stage(refs, originals, upscaled, work: Path, settings: Settings, forc
             _ref_stamp(ref),
             file_sha256(originals[ref.casc_path]),
             {name: file_sha256(path) for name, path in inputs.items()},
-            settings.max_size,
+            models.max_size(ref.asset, settings.max_size),
             settings.wrap,
         )
         if force or not (_fresh(target, stamp) and entry_file.is_file()):
@@ -351,7 +351,7 @@ def encode_stage(refs, originals, upscaled, work: Path, settings: Settings, forc
                 if width % grown:
                     raise ValueError(f"{ref.asset}: an upscaled plane of {width} is not a multiple of {grown}")
                 planes = {name: implode(plane, ref.grid, FLIP_MARGIN * (width // grown)) for name, plane in planes.items()}
-            data, entry = encode_texture(ref, originals[ref.casc_path], planes, settings.max_size, settings.wrap)
+            data, entry = encode_texture(ref, originals[ref.casc_path], planes, models.max_size(ref.asset, settings.max_size), settings.wrap)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
             entry["file"] = f"dds/{target.name}"

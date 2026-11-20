@@ -3,7 +3,7 @@
 Targets come from the built map: the largest tree, the tree whose blocker sits
 farthest from its origin (lean), a thin tree, a tree whose rotation is far from
 a quarter turn, one SporeCannon, one SporeCrawler, and the caged ultralisk
-(HybridUltraliskShackled, 8x8 square blocker).
+(HybridUltraliskShackled, 12x12 square blocker).
 
 Per target, from its generated Shape placed the way the fprot probe found
 (quarter-turn snap, position rounded to 0.5):

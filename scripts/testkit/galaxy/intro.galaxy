@@ -138,6 +138,10 @@ void gf_ItSnap (string lp_s, string lp_t) {
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Hum", gv_introHumOn[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Quiet", gv_introQuiet[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "HumValid", gv_introHumValid);
+    // Countdown beeps (operator 2026-11-20) and the intro camera hold.
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Beeps", gv_introCountBeeps[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "BeepValid", gv_introBeepValid);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "CamHeld", gv_introCamHeld[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "SilenceValid", gv_introSilenceValid);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Dof", gv_introDof[1]);
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "DialogsKept", gf_ItDialogsKept());
@@ -389,7 +393,7 @@ void gf_ItDeploy () {
     }
     gf_ItSnap(lv_s, "tzoom");
     // The drop's own zoom (common.galaxy), the same rows as herodrop.
-    BankValueSetFromString(gv_dbgBank, lv_s, "zoom", gf_DbgZoomTrace(1));
+    gf_DbgZoomBank(lv_s, "zoom", 1);
     for (lv_i = 0; lv_i < 16 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
         Wait(c_DROP_TICK, c_timeGame);
     }

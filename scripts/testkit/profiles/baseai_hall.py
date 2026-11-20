@@ -24,7 +24,9 @@ HALL_PLACE = "FootprintSCOBAHall1x1"
 # The footprint is turned by this unit Facing (footprints.config); every
 # grounded CC must face it, or its drawn feet leave the blocked ones.
 HALL_FACING = round(footprint_config.HALL_FACING[HALL_MODEL])
-SNAPS = ("t0", "built", "builtDead", "made", "lifted", "landed", "dead")
+MORPHS = (("oc", "OrbitalCommand"), ("pf", "PlanetaryFortress"))
+SNAPS = ("t0", "built", "builtDead", "made", "lifted", "landed", "dead",
+         *(k + t for k, _ in MORPHS for t in ("Morph", "", "Dead")))
 # Terran lane owners 1-3 (scripts/mapgen/player_slots.py).
 START_OWNERS = tuple(player_slots.LANES[lane][1] for lane in range(1, 4))
 
@@ -189,4 +191,18 @@ def check_hall(checks) -> None:
     check_open(checks, s, "landedA")
     # Killed: nothing left.
     check_open(checks, s, "deadB")
+    # R-FP-10: the Orbital Command and the Planetary Fortress keep the legs,
+    # from the morph start on; the middle stays open; dead: nothing left.
+    for k, kind in MORPHS:
+        print(f"{s} raw {k}: " + " ".join(f"{n}={checks.value(s, '', k + n)}" for n in ("Issued", "MorphOrder", "Seconds", "Foot")))
+        checks.eq(s, "", k + "Issued", 1)
+        checks.eq(s, k + "Morph", "Type", "CommandCenter")
+        check_legs(checks, s, k + "MorphA")
+        checks.eq(s, k, "Type", kind)
+        checks.eq(s, k, "Facing", HALL_FACING)
+        checks.eq(s, "", k + "Foot", hall_footprint_id(hall_rows()))
+        check_legs(checks, s, k + "A")
+        checks.eq(s, k, "Blocked10", 0)
+        check_open(checks, s, k + "B")
+        check_open(checks, s, k + "DeadA")
     check_paint(checks)

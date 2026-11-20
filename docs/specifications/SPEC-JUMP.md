@@ -18,7 +18,7 @@ judge it.
 | R-JUMP-5 | [tested] | `jump_none`: `peakH100` < 2, no start |
 | R-JUMP-6 | [tested] | `jump_stand`: no order, facing and position unchanged; `jump_aimwalk`, `jump_freewalk`: travel while airborne |
 | R-JUMP-7 | [tested] | `jump_switch`: old unit `endH100` 0..1, phase 0, `camEnd100` 0 |
-| R-JUMP-8 | [tested] [build] [operator] | `thumps` per scenario (1; 0 none; 1 double; 2 rejump; 0 switch), `thumpMs` 687..752, same loop as `firstDownMs`, `thumpH100` 0..10, `thumpActor`; `jumpanim.validate.check_thump`; host test: `ScobaJumpDust` is `PhysicsImpactDustLight`, not `JumpLandDust`; the sound is the Queen footfall, not the Goliath one; look and sound: AC-JUMP-4 |
+| R-JUMP-8 | [tested] [build] [operator] | `thumps` per scenario (1; 0 none; 1 double; 2 rejump; 0 switch), `thumpMs` 687..752, same loop as `firstDownMs`, `thumpH100` 0..10, `thumpActor`; `jumpanim.validate.check_thump`; host test: `ScobaJumpDust` is `PhysicsImpactDustLight`, not `JumpLandDust`; the sound is the light dirt impact, not a footfall (the in-game runs named below are older than this sound); look and sound: AC-JUMP-4 |
 | R-JUMP-10 | [tested] [build] [operator] | `clipLog`: Start, Air, End in order; `jumpanim/validate.py`; host test: no donor in the bake; look: AC-JUMP-1, 2 |
 | R-JUMP-11 | [build] | `jumpanim/validate.py`: no bone under `BoneSpine01` in any jump clip |
 | R-JUMP-12 | [build] | `jumpanim.validate.check_bones`: leg bone length change <= 0.001 over all 51 clips |
@@ -79,7 +79,9 @@ Run results go in section 7.
   height 0, the camera jump part 0, phase LAND, picks the base again, plays
   the landing clip and the thump. It does nothing once the jump is no longer
   airborne.
-- Thump (`gf_JumpThump`, R-JUMP-8): `QueenFootstep` at the hero position;
+- Thump (`gf_JumpThump`, R-JUMP-8): `ScobaJumpLand` at the hero position
+  (map `SoundData.xml`: the ten stock `PhysicsImpactSound_Dirt_Light`
+  files, volume -3 to 0 dB, not heard in the game yet);
   `ScobaJumpDust` (stock `PhysicsImpactDustLight`, F10; source
   `ModelData.xml`) at the same point, Birth one-shot, destroyed after
   `c_JUMP_THUMP_LIFE`. In water (`gf_QuakeInWater`) the dust is skipped. One
@@ -101,7 +103,7 @@ Run results go in section 7.
 | `c_JUMP_BLEND` | 0.08 s |
 | `c_JUMP_WALK_STEP` | 0.03 per loop |
 | `c_JUMP_THUMP_MODEL` | `ScobaJumpDust` |
-| `c_JUMP_THUMP_SOUND` | `QueenFootstep` (was `GoliathFootstep`, too big) |
+| `c_JUMP_THUMP_SOUND` | `ScobaJumpLand` (was `QueenFootstep`, stone footsteps; before that `GoliathFootstep`, too big) |
 | `c_JUMP_THUMP_LIFE` | 2.0 s |
 
 ### 3.2 Camera (R-JUMP-17)

@@ -42,6 +42,7 @@ actions:
   build                  rebuild out/SCOBA256.SC2Map and stop
   host-tests             rebuild, then run the Python unittest suite for the tooling
   launch                 rebuild, then launch the fresh map
+  launch-built           no build: launch out/SCOBA256.SC2Map as it was last built
   launch-check           rebuild, launch, and check runtime logs
   combat [group]         rebuild, build combat test map, run one scenario group
                          (idle, single, auto, cancel, wasd, hold, button, switch,
@@ -75,6 +76,8 @@ actions:
   waterprobe             rebuild, build the water test probe map, run it
   ground                 rebuild, engine ground vs render ground, flyer over a
                          hill
+  waterfeat              rebuild, water features: carved ground, pool pathing,
+                         a walk into each pool, the pipe unit
   dissolveview           rebuild, build the doodad physics view map, launch it
                          for manual viewing (bank SCOBADISSOLVE)
   dropview               rebuild, build the hero pod watch map, launch it: intro
@@ -110,8 +113,9 @@ profile_timeout() {
             ;;
         motion) printf '%s\n' "${SC2_CASE_TIMEOUT:-80}" ;;
         jump) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
-        herodrop) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
+        herodrop) printf '%s\n' "${SC2_CASE_TIMEOUT:-170}" ;;
         roster) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
+        waterfeat) printf '%s\n' "${SC2_CASE_TIMEOUT:-150}" ;;
         podbirth) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
         aimdof) printf '%s\n' "${SC2_CASE_TIMEOUT:-60}" ;;
         ui) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
@@ -138,7 +142,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground) ;;
+        combat|tps|jump|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -165,6 +169,14 @@ fi
 shift
 
 export SC2_PLAYTEST_ACTIVE=1
+# launch-built (operator 2026-11-20): launch the map as it was last built,
+# with no build step. Nothing else skips the build.
+if [ "$ACTION" = launch-built ]; then
+    [ -f "$FRESH_MAP/BuildStamp.txt" ] || fail "no built map: $FRESH_MAP (run: scripts/playtest.sh build)"
+    log "launching the built map, no build: stamp $(cat "$FRESH_MAP/BuildStamp.txt")"
+    export SC2_MAP_SOURCE="$FRESH_MAP"
+    exec bash "$ROOT_DIR/scripts/launch-scoba.sh"
+fi
 fresh_build
 
 case "$ACTION" in
@@ -186,7 +198,7 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground)
+    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat)
         run_profile "$ACTION"
         ;;
     picklog)

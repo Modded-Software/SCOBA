@@ -21,7 +21,7 @@ from typing import NamedTuple
 
 from mapgen.footprints.catalog import append_catalog
 
-from . import border, config, crush, gates, hazard_paint, treevary
+from . import border, config, crush, gates, hazard_paint, pools, treevary
 from . import scene as scene_mod
 from . import terrain as terrain_mod
 from .grid import disk_cells, distance_to
@@ -36,6 +36,7 @@ class Plan(NamedTuple):
     plants: list[Plant]
     detour: list[float]
     notes: list[str]
+    garden: int = 0  # plants of the pool rings (flora/pools.py); they lead `plants`
 
 
 def plan(map_dir: Path, seed: int = config.SEED) -> Plan:
@@ -46,8 +47,9 @@ def plan(map_dir: Path, seed: int = config.SEED) -> Plan:
     hazards, detour, dropped = settle(lanes, hazards, terrain, scene)
     notes += dropped
     ctx = context(terrain, scene, random.Random(seed), [pt for lane in lanes for pt in lane.points])
-    plants = scatter(ctx, hazard_cells(hazards, terrain.height.shape[0]), seed)
-    return Plan(lanes, hazards, plants, detour, notes)
+    blocked = hazard_cells(hazards, terrain.height.shape[0])
+    plants = scatter(ctx, blocked, seed)
+    return Plan(lanes, hazards, plants, detour, notes, len(pools.garden(ctx, blocked, seed)))
 
 
 def balance_problems(hazards: list[Placed], lane_count: int) -> list[str]:
@@ -133,7 +135,7 @@ def add_preload(path: Path, kinds: list[str], variations: dict[str, int]) -> Non
 
 
 def report_lines(p: Plan) -> list[str]:
-    lines = [f"plants {len(p.plants)} hazards {len(p.hazards)} lanes {len(p.lanes)}"]
+    lines = [f"plants {len(p.plants)} hazards {len(p.hazards)} lanes {len(p.lanes)}", f"pool garden {p.garden}"]
     for kind, count in sorted(Counter(pl.kind for pl in p.plants).items()):
         lines.append(f"family {kind} {count}")
     for lane in p.lanes:

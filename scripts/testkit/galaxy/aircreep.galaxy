@@ -52,7 +52,10 @@ void gf_AcWatchSave (string lp_s) {
     gv_acWatch = UnitGroupEmpty();
 }
 
-const fixed c_AC_TIMER_END = 42.0;   // real s: Zerg 10, 30; Terran 20, 40
+const fixed c_AC_TIMER_END = 42.0;   // real s after the shift: Zerg 10, 30; Terran 20, 40
+// The schedule starts in the first S7 of the intro: every time of the
+// timer group is this much later (10 s was the old first slot).
+const fixed c_AC_SHIFT = c_INTRO_S7_START + c_AIR_CREEP_FIRST_LEAD - 10.0;
 const fixed c_AC_POLL = 0.25;        // real s
 const fixed c_AC_NEAR_X = 12.0;      // route start, from the X center
 const fixed c_AC_ROUTE_WAIT = 20.0;  // game s to reach the first X
@@ -238,6 +241,9 @@ void gf_AcTimer () {
     int[2] lv_seen4;
     int lv_side;
     bool lv_s5 = false;
+    bool lv_start5 = false;
+    bool lv_start3 = false;
+    int[2] lv_early;
     bool lv_s15 = false;
     bool lv_s25 = false;
     bool lv_s35 = false;
@@ -249,26 +255,50 @@ void gf_AcTimer () {
     for (lv_side = 0; lv_side < 2; lv_side += 1) {
         lv_seen2[lv_side] = -1;
         lv_seen4[lv_side] = -1;
+        lv_early[lv_side] = -1;
     }
     BankValueSetFromInt(gv_dbgBank, lv_s, "firstMs", gf_AcMs());
     BankValueSetFromInt(gv_dbgBank, lv_s, "firstZerg", gv_airCreepSpawned[0]);
     BankValueSetFromInt(gv_dbgBank, lv_s, "firstTerran", gv_airCreepSpawned[1]);
     BankValueSetFromInt(gv_dbgBank, lv_s, "firstWavesZerg", gv_airCreepWaves[0]);
     BankValueSetFromInt(gv_dbgBank, lv_s, "firstWavesTerran", gv_airCreepWaves[1]);
-    while (TimerGetElapsed(gv_acClock) < c_AC_TIMER_END) {
-        lv_ms = gf_AcMs();
+    BankValueSetFromInt(gv_dbgBank, lv_s, "shiftMs", FixedToInt(c_AC_SHIFT * 1000.0));
+    while (TimerGetElapsed(gv_acClock) < c_AC_TIMER_END + c_AC_SHIFT) {
+        lv_ms = gf_AcMs() - FixedToInt(c_AC_SHIFT * 1000.0);
         for (lv_side = 0; lv_side < 2; lv_side += 1) {
             lv_n[lv_side] = gv_airCreepSpawned[lv_side];
             // The balance globals belong to the wave just started: the next
             // wave is 10 s away.
-            if (lv_seen2[lv_side] < 0 && gv_airCreepWaves[lv_side] >= 1) {
+            if (lv_seen2[lv_side] < 0 && gv_airCreepWaves[lv_side] >= 2) {
                 lv_seen2[lv_side] = lv_ms;
                 gf_AcBalanceSave(lv_s, lv_side, 1);
             }
-            if (lv_seen4[lv_side] < 0 && gv_airCreepWaves[lv_side] >= 2) {
+            if (lv_seen4[lv_side] < 0 && gv_airCreepWaves[lv_side] >= 3) {
                 lv_seen4[lv_side] = lv_ms;
                 gf_AcBalanceSave(lv_s, lv_side, 2);
             }
+        }
+        // The early waves: when each side's first wave is seen (real ms
+        // since map start), and the counts at 3 s and at 15 s.
+        for (lv_side = 0; lv_side < 2; lv_side += 1) {
+            if (lv_early[lv_side] < 0 && gv_airCreepWaves[lv_side] >= 1) {
+                lv_early[lv_side] = gf_AcMs();
+            }
+        }
+        if (!lv_start3 && gf_AcMs() >= 3000) {
+            lv_start3 = true;
+            BankValueSetFromInt(gv_dbgBank, lv_s, "start3Waves", gv_airCreepWaves[0] + gv_airCreepWaves[1]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "start3Alive", gf_AirCreepAlive(0) + gf_AirCreepAlive(1));
+        }
+        if (!lv_start5 && gf_AcMs() >= 15000) {
+            lv_start5 = true;
+            BankValueSetFromInt(gv_dbgBank, lv_s, "earlyZergMs", lv_early[0]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "earlyTerranMs", lv_early[1]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "start5Zerg", lv_n[0]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "start5Terran", lv_n[1]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "start5WavesZerg", gv_airCreepWaves[0]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "start5WavesTerran", gv_airCreepWaves[1]);
+            BankValueSetFromInt(gv_dbgBank, lv_s, "start5BalTerran", gv_airCreepLastBalance);
         }
         if (!lv_s5 && lv_ms >= 5000) {
             lv_s5 = true;
@@ -300,10 +330,11 @@ void gf_AcTimer () {
         }
         Wait(c_AC_POLL, c_timeReal);
     }
-    BankValueSetFromInt(gv_dbgBank, lv_s, "zerg2Ms", lv_seen2[0]);
-    BankValueSetFromInt(gv_dbgBank, lv_s, "zerg4Ms", lv_seen4[0]);
-    BankValueSetFromInt(gv_dbgBank, lv_s, "terran2Ms", lv_seen2[1]);
-    BankValueSetFromInt(gv_dbgBank, lv_s, "terran4Ms", lv_seen4[1]);
+    // Wave times since map start (the shift added back).
+    BankValueSetFromInt(gv_dbgBank, lv_s, "zerg2Ms", lv_seen2[0] + FixedToInt(c_AC_SHIFT * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "zerg4Ms", lv_seen4[0] + FixedToInt(c_AC_SHIFT * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "terran2Ms", lv_seen2[1] + FixedToInt(c_AC_SHIFT * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "terran4Ms", lv_seen4[1] + FixedToInt(c_AC_SHIFT * 1000.0));
     BankValueSetFromInt(gv_dbgBank, lv_s, "endZerg", gf_AirCreepAlive(c_AIR_CREEP_ZERG));
     BankValueSetFromInt(gv_dbgBank, lv_s, "endTerran", gf_AirCreepAlive(c_AIR_CREEP_TERRAN));
     BankValueSetFromInt(gv_dbgBank, lv_s, "wavesZerg", gv_airCreepWaves[0]);
@@ -318,12 +349,20 @@ void gf_AcWaveSide (string lp_s, int lp_side) {
     point lv_home = gf_AirCreepHome(lp_side);
     unitgroup lv_g;
     int lv_before = gf_AirCreepAlive(lp_side);
+    int lv_births0 = gv_airCreepBirths[lp_side];
     int lv_made;
     int lv_n;
     int lv_i;
 
     BankValueSetFromString(gv_dbgBank, lp_s, "home100", gf_AcXY100(lv_home));
     lv_made = gf_AirCreepWave(lp_side);
+    // Birth (operator 2026-11-20): one clip start per Mutalisk; the engine's
+    // length of the clip in the default slot of the last unit made (raw; 0
+    // or less when nothing plays there).
+    BankValueSetFromInt(gv_dbgBank, lp_s, "births", gv_airCreepBirths[lp_side] - lv_births0);
+    AnimLengthQueryByName(libNtve_gf_MainActorofUnit(gv_airCreepLast[lp_side]), c_animNameDefault, false);
+    AnimLengthQueryWait();
+    BankValueSetFromInt(gv_dbgBank, lp_s, "birthLen100", FixedToInt(AnimLengthSync(AnimLengthQueryLastCreated()) * 100.0));
     BankValueSetFromInt(gv_dbgBank, lp_s, "made", lv_made);
     BankValueSetFromInt(gv_dbgBank, lp_s, "armTicks", gv_airCreepArmTicks);
     BankValueSetFromInt(gv_dbgBank, lp_s, "before", lv_before);

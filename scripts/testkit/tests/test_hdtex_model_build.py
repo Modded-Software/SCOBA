@@ -13,6 +13,7 @@ from unittest import mock
 
 from hdtex import (
     dds,
+    inject,
     m3tex,
     models,
     pipeline,
@@ -120,6 +121,19 @@ class ModelSourceTest(ModelCase):
     def test_a_model_of_the_map_is_named_again_by_its_own_file(self) -> None:
         copy = f"{models.HD_MODEL_DIR}\\Own.m3"
         self.assertEqual(self.own_model_catalog(("Assets\\Deaths\\Own.m3", copy)), "Assets\\Deaths\\Own.m3")
+
+    def test_a_game_file_the_map_named_is_named_again_from_the_note(self) -> None:
+        copy = f"{models.HD_MODEL_DIR}\\Own.m3"
+        (self.map_dir / models.PRIOR_MODELS).write_text(json.dumps({"own.m3": "Assets\\Skins\\Own.m3"}))
+        self.assertEqual(self.own_model_catalog((copy,)), "Assets\\Skins\\Own.m3")
+
+    def test_injection_notes_the_model_the_map_named(self) -> None:
+        catalog = self.map_dir / MODEL_CATALOG
+        catalog.parent.mkdir(parents=True, exist_ok=True)
+        catalog.write_text('<Catalog><CModel id="A"><Model value="Assets\\Skins\\Own.m3"/></CModel><CModel id="B"><Radius value="1"/></CModel></Catalog>')
+        copy = f"{models.HD_MODEL_DIR}\\Own.m3"
+        inject.note_prior_models(self.map_dir, {("A", "Model"): copy, ("B", "Model"): f"{models.HD_MODEL_DIR}\\Other.m3", ("C", "Model"): copy})
+        self.assertEqual(models.prior_models(self.map_dir), {"own.m3": "Assets\\Skins\\Own.m3"})
 
     def test_a_copy_without_one_file_of_the_map_is_not_guessed(self) -> None:
         copy = f"{models.HD_MODEL_DIR}\\Own.m3"

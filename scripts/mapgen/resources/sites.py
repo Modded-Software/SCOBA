@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import random
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -87,7 +88,7 @@ def shape(name: str, hall: tuple[int, int]) -> list[tuple[str, float, float]]:
 def _snap(kind: str, x: float, y: float) -> tuple[float, float]:
     if kind == "field":  # 2x1: whole x, half y
         return float(round(x)), math.floor(y) + 0.5
-    return math.floor(x) + 0.5, math.floor(y) + 0.5  # 3x3 geyser
+    return float(round(x)), float(round(y))  # 6x6 geyser: an even side centres on a cell corner
 
 
 def _ok(mask: np.ndarray, cs: list[tuple[int, int]], taken: set) -> bool:
@@ -95,29 +96,54 @@ def _ok(mask: np.ndarray, cs: list[tuple[int, int]], taken: set) -> bool:
     return all(0 <= x < n and 0 <= y < n and (x, y) not in taken and mask[y, x] for x, y in cs)
 
 
-def _pile(mask: np.ndarray, hall: tuple[int, int], kind: str, a: float, r: float, taken: set) -> tuple[float, float] | None:
+def pile_cells(line: Line) -> set[tuple[int, int]]:
+    out: set[tuple[int, int]] = set()
+    for size, piles in ((config.FIELD_SIZE, line.fields), (config.GEYSER_SIZE, line.geysers)):
+        for x, y in piles:
+            out.update(cells(x, y, size))
+    return out
+
+
+def _hall_fits(hall: tuple[int, int], others: Sequence[Line]) -> bool:
+    """A new hall keeps HALL_GAP off the piles of the lines before it, and takes none of them: each stays nearest its own hall."""
+    near = set(hall_cells(hall, HALL_GAP))
+    for line in others:
+        if near & pile_cells(line):
+            return False
+        if any(math.dist(p, hall) <= math.dist(p, line.hall) for p in line.fields + line.geysers):
+            return False
+    return True
+
+
+def _pile(mask: np.ndarray, hall: tuple[int, int], kind: str, a: float, r: float, taken: set, others: Sequence[Line] = ()) -> tuple[float, float] | None:
     size = config.FIELD_SIZE if kind == "field" else config.GEYSER_SIZE
     near = set(hall_cells(hall, HALL_GAP))
+    for line in others:  # the same gap off every other hall (6x6 geysers reach a sibling site, R-BASE-35)
+        near.update(hall_cells(line.hall, HALL_GAP))
     for push in range(13):  # out along the ray until the hall gap holds
         sx, sy = _snap(kind, *polar(hall, r + 0.5 * push, a))
         for dx, dy in config.SNAP_TRIES:
             cs = cells(sx + dx, sy + dy, size)
-            if not near.intersection(cs) and _ok(mask, cs, taken):
+            p = (sx + dx, sy + dy)
+            mine = all(math.dist(p, hall) < math.dist(p, line.hall) for line in others)
+            if mine and not near.intersection(cs) and _ok(mask, cs, taken):
                 taken.update(cs)
                 return sx + dx, sy + dy
     return None
 
 
-def line_at(mask: np.ndarray, name: str, hall: tuple[int, int], taken: set, check_hall: bool = True) -> Line | None:
-    """The line at a hall spot, or None. taken is updated only on success."""
+def line_at(mask: np.ndarray, name: str, hall: tuple[int, int], taken: set, check_hall: bool = True, others: Sequence[Line] = ()) -> Line | None:
+    """The line at a hall spot, or None. taken is updated only on success. others: the lines planned before."""
     mine = set(taken)
     hc = hall_cells(hall)
     if check_hall and not _ok(mask, hc, mine):
         return None
+    if not _hall_fits(hall, others):
+        return None
     mine.update(hc)
     fields, geysers = [], []
     for kind, a, r in shape(name, hall):
-        p = _pile(mask, hall, kind, a, r, mine)
+        p = _pile(mask, hall, kind, a, r, mine, others)
         if p is None:
             return None
         (fields if kind == "field" else geysers).append(p)
@@ -125,14 +151,14 @@ def line_at(mask: np.ndarray, name: str, hall: tuple[int, int], taken: set, chec
     return Line(name, hall, tuple(fields), tuple(geysers))
 
 
-def search(mask: np.ndarray, name: str, anchor: tuple[float, float], taken: set) -> Line | None:
+def search(mask: np.ndarray, name: str, anchor: tuple[float, float], taken: set, others: Sequence[Line] = ()) -> Line | None:
     """First good spot: the anchor, then rings by ring and angle (fixed order, R-BASE-8)."""
     spots = [anchor]
     for r in range(1, config.RINGS + 1):
         for a in range(config.ANGLES):
             spots.append(polar(anchor, config.RING * r, 360.0 * a / config.ANGLES))
     for x, y in spots:
-        line = line_at(mask, name, (int(round(x)), int(round(y))), taken)
+        line = line_at(mask, name, (int(round(x)), int(round(y))), taken, others=others)
         if line is not None:
             return line
     return None
@@ -201,13 +227,13 @@ def plan(map_dir: Path) -> Plan:
     taken: set[tuple[int, int]] = set()
     problems, mains, sites = [], {}, []
     for owner, at in sorted(start_points(regions).items()):
-        line = line_at(g.good, f"main{owner}", at, taken, check_hall=False)
+        line = line_at(g.good, f"main{owner}", at, taken, check_hall=False, others=list(mains.values()))
         if line is None:
             problems.append(f"main of {owner} at {at}: no room for its piles")
         else:
             mains[owner] = line
     for name, anchor in anchors(objects, regions):
-        line = search(g.wet_site if name in config.WET_SITES else g.site, name, anchor, taken)
+        line = search(g.wet_site if name in config.WET_SITES else g.site, name, anchor, taken, list(mains.values()) + sites)
         if line is None:
             problems.append(f"site {name} near ({anchor[0]:.1f},{anchor[1]:.1f}): no spot")
         else:

@@ -122,8 +122,9 @@ void gf_PbDrop () {
     Wait(c_DROP_TICK, c_timeGame);
     BankValueSetFromInt(gv_dbgBank, lv_s, "yawBefore100", FixedToInt(CameraGetYaw(1) * 100.0));
     gf_HeroDropGo(1, null, null);
-    // The pod comes at the end of the zoom (c_DROP_ZOOM_LENGTH).
-    for (lv_i = 0; lv_i < 16 && !UnitIsValid(gv_dropPod[1]); lv_i += 1) {
+    // The pod is created at the go; the camera rides it from the end of
+    // the zoom, which starts once the pod births (operator 2026-11-20).
+    for (lv_i = 0; lv_i < 32 && gv_dropPhase[1] != c_DROP_PHASE_FALL; lv_i += 1) {
         Wait(c_DROP_TICK, c_timeGame);
     }
     BankValueSetFromInt(gv_dbgBank, lv_s, "dropYaw100", FixedToInt(c_DROP_YAW * 100.0));
