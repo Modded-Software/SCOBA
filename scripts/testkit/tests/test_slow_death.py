@@ -282,3 +282,23 @@ class BuiltModelTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HdCopyTest(unittest.TestCase):
+    """The HD texture step points a CModel at a copy of the generated model."""
+
+    def test_a_generated_model_and_its_hd_copy_are_accepted(self) -> None:
+        import validate_slow_deaths as V
+
+        value = str(SLOW_DEATHS[0][1]).replace("/", "\\")
+        name = value.rsplit("\\", 1)[-1]
+        self.assertEqual(V.generated_value(value), value)
+        self.assertEqual(V.generated_value(V.HD_MODEL_DIR + name), value)
+        self.assertEqual(V.stretch_of(V.HD_MODEL_DIR + name), SLOW_DEATHS[0][2])
+
+    def test_another_model_is_not_accepted(self) -> None:
+        import validate_slow_deaths as V
+
+        self.assertIsNone(V.generated_value("Assets\\Units\\Terran\\Stock\\StockDeath.m3"))
+        self.assertIsNone(V.generated_value(V.HD_MODEL_DIR + "StockDeath.m3"))
+        self.assertIsNone(V.generated_value(None))

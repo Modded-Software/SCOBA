@@ -10,7 +10,13 @@ install. Re-run after a change to units, actors, models, or scales:
     cd scripts && uv run python -m hitvolumes.measure
     cd scripts && uv run python -m hitvolumes.galaxy
 
-usage (from scripts/): uv run python -m hitvolumes.measure [--print]
+The build does not publish a map whose actor scales differ from the measured
+ones. After a scale change, measure a staged map instead:
+
+    uv run python scripts/expand_map.py --out <folder>
+    cd scripts && uv run python -m hitvolumes.measure --map <folder>
+
+usage (from scripts/): uv run python -m hitvolumes.measure [--print] [--map FOLDER]
 """
 
 from __future__ import annotations
@@ -95,7 +101,11 @@ def measure(casc: Casc, scratch: Path, stock: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--print", action="store_true", help="print one line per unit type")
+    parser.add_argument("--map", type=Path, help="measure this expanded map, not out/SCOBA256.SC2Map")
     args = parser.parse_args()
+    global MAP
+    if args.map is not None:
+        MAP = args.map.resolve()
     if not (MAP / "Base.SC2Data").is_dir():
         print(f"built map missing: {MAP}; run scripts/playtest.sh build", file=sys.stderr)
         return 1

@@ -29,12 +29,14 @@ from PIL import Image
 
 from project_root import project_root
 
-from . import bc3, dds, lowfreq, metrics, roles, upscaler, variants
+from . import dds, lowfreq, m3tex, metrics, models, roles, upscaler, variants
 from .casc import Casc
-from .sources import SOURCES, TextureRef
+from .flipbook import FLIP_MARGIN, explode, implode
+from .sources import SOURCES, SourceError, TextureRef, stored_name
 
 MANIFEST = "manifest.json"
 MANIFEST_FORMAT = 2
+MODEL_VERSION = 1  # raise it when the model stage changes
 ENCODER_VERSION = 3  # raise it when the encode stage changes, so cached files are redone (3: normal layouts)
 
 
@@ -51,6 +53,7 @@ class TextureEntry(TypedDict, total=False):
     source_size: list[int]
     size: list[int]
     mips: int
+    format: str
     encode_psnr: list[float]
     fidelity_psnr: list[float]
     fidelity_corr: list[float | None]
@@ -58,6 +61,26 @@ class TextureEntry(TypedDict, total=False):
     seam_source: float
     seam: float
     overrides: list[dict[str, str]]
+
+
+class ModelFileEntry(TypedDict):
+    asset: str
+    casc_path: str
+    file: str
+    map_path: str
+    sha256: str
+    source_sha256: str
+    textures: dict[str, str]
+
+
+class ModelEntry(TypedDict):
+    """One CModel in the manifest. `map_base` is None when no file of it is copied."""
+
+    entry: str
+    actors: list[str]
+    base: str
+    map_base: str | None
+    files: list[ModelFileEntry]
 
 
 class Settings(NamedTuple):
@@ -125,7 +148,21 @@ def stem_of(ref: TextureRef) -> str:
 def read_texture(path: Path) -> tuple[dds.Dds, np.ndarray]:
     """A DDS file and its largest level as (H, W, 4) uint8."""
     texture = dds.parse(path.read_bytes())
-    return texture, bc3.decode(texture.level_bytes(0), texture.width, texture.height)
+    return texture, texture.codec.decode(texture.level_bytes(0), texture.width, texture.height)
+
+
+def _is_flip(ref: TextureRef) -> bool:
+    return tuple(ref.grid) != (1, 1)
+
+
+def _ref_stamp(ref: TextureRef) -> dict:
+    """The ref as a stamp part. A texture without a flip book keeps the stamp it had before flip books."""
+    fields = {**ref._asdict(), "overrides": _override_fields(ref)}
+    if _is_flip(ref):
+        fields["flip_margin"] = FLIP_MARGIN
+    else:
+        del fields["grid"]
+    return fields
 
 
 def _save_plane(plane: np.ndarray, path: Path) -> None:
@@ -165,12 +202,15 @@ def split_stage(refs: list[TextureRef], originals: dict[str, Path], work: Path, 
         models = {plane.name: settings.model_for(plane, stem) for plane in role.planes}
         targets = {name: work / "planes" / model / f"{stem}.{name}.png" for name, model in models.items()}
         own = [name for name in models if name not in inputs]
-        stamp = _stamp("split", source_hash, ref.role)
+        flip = _is_flip(ref)
+        if flip and any(name in inputs for name in models):
+            raise roles.RoleError(f"{ref.asset}: a flip book cannot take a plane from another variant")
+        stamp = _stamp("split", source_hash, ref.role, *((list(ref.grid), FLIP_MARGIN) if flip else ()))
         if own and (force or not all(_fresh(targets[name], stamp) for name in own)):
             _texture, rgba = read_texture(originals[ref.casc_path])
             for name, image in role.split(rgba).items():
                 if name in own:
-                    _save_plane(image, targets[name])
+                    _save_plane(explode(image, ref.grid, FLIP_MARGIN) if flip else image, targets[name])
                     _mark(targets[name], stamp)
         for name in models:
             if name not in inputs:
@@ -239,8 +279,16 @@ def encode_texture(
     height, width = levels[0].shape[:2]
     if width % source.width or height % source.height:
         raise ValueError(f"{ref.asset}: {width}x{height} is not a multiple of the source size")
-    blobs = [bc3.encode(level) for level in levels]
-    data = dds.build(width, height, blobs, source.trailer)
+    if source.format == "DXT1":
+        # DXT1 as this tool writes it has no alpha. A source with transparent
+        # pixels would lose them.
+        if int(source_rgba[:, :, 3].min()) < 255:
+            raise roles.RoleError(f"{ref.asset}: DXT1 with transparent pixels is not supported")
+        for level in levels:
+            level[:, :, 3] = 255
+    codec = source.codec
+    blobs = [codec.encode(level) for level in levels]
+    data = dds.build(width, height, blobs, source.trailer, source.format)
     shrunk = metrics.shrink(levels[0], width // source.width)
     coarse = max(1, source.width // lowfreq.LOW_CELL)
     entry: TextureEntry = {
@@ -254,7 +302,8 @@ def encode_texture(
         "mips": len(levels),
         "sha256": hashlib.sha256(data).hexdigest(),
         # Encoding loss: the largest level before and after BC3, per RGBA channel.
-        "encode_psnr": metrics.channel_psnr(levels[0], bc3.decode(blobs[0], width, height)),
+        "format": source.format,
+        "encode_psnr": metrics.channel_psnr(levels[0], codec.decode(blobs[0], width, height)),
         # Faithfulness: the result shrunk back to the source size, against the source.
         "fidelity_psnr": metrics.channel_psnr(shrunk, source_rgba),
         "fidelity_corr": metrics.channel_correlation(shrunk, source_rgba),
@@ -280,7 +329,7 @@ def encode_stage(refs, originals, upscaled, work: Path, settings: Settings, forc
         stamp = _stamp(
             "encode",
             ENCODER_VERSION,
-            {**ref._asdict(), "overrides": _override_fields(ref)},
+            _ref_stamp(ref),
             file_sha256(originals[ref.casc_path]),
             {name: file_sha256(path) for name, path in inputs.items()},
             settings.max_size,
@@ -295,6 +344,13 @@ def encode_stage(refs, originals, upscaled, work: Path, settings: Settings, forc
                 name: plane if plane.shape[1] == width else roles.shrink_color(plane, plane.shape[1] // width)
                 for name, plane in planes.items()
             }
+            if _is_flip(ref):
+                # The planes were upscaled with a rim around every cell.
+                source_width = dds.describe(originals[ref.casc_path].read_bytes()).width
+                grown = source_width + 2 * FLIP_MARGIN * ref.grid[0]
+                if width % grown:
+                    raise ValueError(f"{ref.asset}: an upscaled plane of {width} is not a multiple of {grown}")
+                planes = {name: implode(plane, ref.grid, FLIP_MARGIN * (width // grown)) for name, plane in planes.items()}
             data, entry = encode_texture(ref, originals[ref.casc_path], planes, settings.max_size, settings.wrap)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
@@ -303,6 +359,66 @@ def encode_stage(refs, originals, upscaled, work: Path, settings: Settings, forc
             _mark(target, stamp)
         entries.append(json.loads(entry_file.read_text()))
     return entries
+
+
+def _model_layers(path: Path) -> list[m3tex.Layer]:
+    return m3tex.layers(m3tex.load(path))
+
+
+def model_stage(map_dir: Path, casc: Casc, work: Path, entries: list[TextureEntry], force: bool) -> list[ModelEntry]:
+    """Write a copy of every wanted model file that names the upscaled textures.
+
+    Returns one manifest entry per CModel. A CModel none of whose files
+    names an upscaled texture has no files and gets no override. Otherwise
+    every file of it is copied: its variations share one base path.
+    """
+    paths = {stored_name(entry["asset"]): entry["map_path"] for entry in entries}
+    hashes = {entry["map_path"]: entry["sha256"] for entry in entries}
+    files = models.model_files(map_dir, casc, work)
+    extracted = models.fetch(files, map_dir, casc, work)
+    layers = {path: _model_layers(extracted[path]) for path in sorted(extracted)}
+    used = {path: sorted({stored_name(layer.path) for layer in found} & set(paths)) for path, found in layers.items()}
+    owners: dict[str, str] = {}
+    result: dict[str, ModelEntry] = {}
+    for file in files:
+        entry = result.setdefault(
+            file.entry,
+            {"entry": file.entry, "actors": list(file.actors), "base": file.base, "map_base": None, "files": []},
+        )
+        if not any(used[other.casc_path] for other in files if other.entry == file.entry):
+            continue
+        name = file.asset.replace("/", "\\").rsplit("\\", 1)[-1]
+        if owners.setdefault(name.lower(), file.casc_path) != file.casc_path:
+            raise SourceError(f"two model files share the name {name}")
+        original = extracted[file.casc_path]
+        target = work / "m3" / name
+        wanted = {asset: paths[asset] for asset in used[file.casc_path]}
+        stamp = _stamp("model", MODEL_VERSION, file_sha256(original), wanted)
+        if force or not _fresh(target, stamp):
+            print(f"hdtex: patching {name}", flush=True)
+            m3tex.rewrite(original, target, wanted)
+            # The copy is read again. It must name the new textures, and its layers must be the same otherwise.
+            expected = [
+                layer._replace(path=wanted.get(stored_name(layer.path), layer.path)) for layer in layers[file.casc_path]
+            ]
+            if _model_layers(target) != expected:
+                target.unlink()
+                raise m3tex.ModelError(f"{name}: the written copy does not read back with the new texture paths")
+            _mark(target, stamp)
+        entry["files"].append(
+            {
+                "asset": file.asset,
+                "casc_path": file.casc_path,
+                "file": f"m3/{name}",
+                "map_path": f"{models.HD_MODEL_DIR}\\{name}",
+                "sha256": file_sha256(target),
+                "source_sha256": file_sha256(original),
+                "textures": {asset: hashes[path] for asset, path in wanted.items()},
+            }
+        )
+        base_name = file.base.replace("/", "\\").rsplit("\\", 1)[-1]
+        entry["map_base"] = f"{models.HD_MODEL_DIR}\\{base_name}"
+    return [result[key] for key in sorted(result)]
 
 
 def select(refs: list[TextureRef], only: tuple[str, ...]) -> list[TextureRef]:
@@ -350,24 +466,27 @@ def build(
     upscaled = upscale_stage(planes, work, settings, force, tool)
     entries = encode_stage(refs, originals, upscaled, work, settings, force)
     path = work / MANIFEST
-    models = {f"{stem}.{name}": model for (stem, name), (model, _path) in sorted(planes.items())}
+    plane_models = {f"{stem}.{name}": model for (stem, name), (model, _path) in sorted(planes.items())}
     if only:
         if not path.is_file():
             raise InputError(f"--texture needs an existing {path}; run a full build first")
         old = json.loads(path.read_text())
         entries = merge_entries(old["textures"], entries)
-        models = {**old["settings"]["models"], **models}
+        plane_models = {**old["settings"]["models"], **plane_models}
     manifest = {
         "format": MANIFEST_FORMAT,
         "variant": settings.variant,
         "source": source,
         "upscaler": tool,
         "settings": {
-            "models": models,
+            "models": plane_models,
             "max_size": settings.max_size,
             "wrap": settings.wrap,
         },
         "textures": entries,
     }
+    if source == models.SOURCE:
+        manifest["models"] = model_stage(map_dir, casc, work, entries, force)
+        manifest["skipped"] = json.loads((work / models.SKIPPED).read_text())
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return path

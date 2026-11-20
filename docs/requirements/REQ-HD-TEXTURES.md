@@ -20,8 +20,11 @@ In scope:
   picks one;
 - checks that the results are sound and that the map still loads.
 
-Out of scope for this phase: textures of doodads, units, effects, and the UI.
-The design must leave room for them (R-HD-40).
+Out of scope: textures of effects and the UI, and of units other than the
+two of section 3.6.
+
+Section 3.6 adds model textures as a proof of concept (operator, 2026-11-19).
+It is not finished: the specification, section 12, gives its state.
 
 Implementation lives in
 [SPEC-HD-TEXTURES](../specifications/SPEC-HD-TEXTURES.md).
@@ -60,6 +63,7 @@ Implementation lives in
 | R-HD-12 | An upscaled file MUST tile as well as its original does. |
 | R-HD-13 | The tooling MUST measure R-HD-10 to R-HD-12 and fail when a limit is missed. |
 | R-HD-14 | The tooling MUST write comparison images so a person can judge the result. |
+| R-HD-15 | One web page MUST show every cached texture of every source. It MUST sort them into categories and let a person filter by category, by plane, and by text. |
 
 ### 3.3 Map
 
@@ -88,6 +92,18 @@ Implementation lives in
 | --- | --- |
 | R-HD-40 | Adding another kind of texture, such as doodads, MUST NOT need a change to the extract, upscale, encode, or inject stages. |
 
+### 3.6 Model textures (proof of concept)
+
+| ID | Requirement |
+| --- | --- |
+| R-HD-50 | The tooling MUST find the textures of the models of every doodad the built map places, and of the units Command Center, psi destroyer, shackled ultralisk, Viking in both forms, Overlord, the Mengsk battlecruiser the map places with its death model, sensor tower, Hellion, and Goliath, from the map and the game's data. A model file the map itself ships MUST be read from the map. |
+| R-HD-51 | A model texture MUST be upscaled four times per side and then shrunk so no side is above 2048. Only Upscale 4x is made. |
+| R-HD-52 | A model texture MUST keep its compression format. |
+| R-HD-53 | A texture the tooling cannot upscale soundly MUST be left as it is and listed with the reason. |
+| R-HD-54 | The built map MUST hold a copy of each such model that names the upscaled textures, and the catalog MUST name the copy. |
+| R-HD-56 | A flip book whose cells are known MUST be upscaled so that no cell takes pixels from another cell. A flip book whose cells are not known, or differ between its users, MUST be left as it is. |
+| R-HD-55 | R-HD-13, R-HD-21, and R-HD-24 hold for model textures. |
+
 ## 4. Operator Checks
 
 Only a person can judge these. The tooling does not claim them.
@@ -98,3 +114,4 @@ Only a person can judge these. The tooling does not claim them.
 | O-HD-2 | No seams, grain, or invented patterns show on the ground. |
 | O-HD-3 | Lighting on the ground looks as before: no flat or inverted bumps, no new shine. |
 | O-HD-4 | The game runs as smoothly as before. |
+| O-HD-5 | Doodads, the Command Center, the psi destroyer, the shackled ultralisk, the Viking in both forms, the overlords, the Mengsk battlecruiser and the explosions of its death, the sensor tower, the Hellion, and the Goliath look sharper and keep their look: edges of leaves, team colour, glow, and shine. |

@@ -335,6 +335,11 @@ not repeated here.
 - Data: `scripts/hitvolumes/` measures `scripts/data/hit_volumes.json`
   (70 units) and generates `scripts/app/data/hit_volumes_*.galaxy`
   (63 types). `validate_aim_shot.py` fails on stale data.
+  Unit types come from the map and from every harness file below
+  `scripts/testkit/galaxy/`, subfolders included. After an actor scale
+  change the build does not publish a map, so `hitvolumes.measure --map
+  <folder>` measures a map staged with `expand_map.py --out <folder>`.
+  SensorTower: actor scale 4,4,8 (operator 2026-11-20), height 27.5842.
 - Near types: scanned in a circle of range + `c_HV_NEAR_REACH`. Far types
   (reach above 20): scanned per type on the whole map.
 - A type without a volume is not pickable and is recorded once

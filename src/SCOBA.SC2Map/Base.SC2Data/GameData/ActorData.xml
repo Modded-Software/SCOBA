@@ -291,7 +291,7 @@
     <CActorUnit id="SensorTower">
         <On Terms="UnitBirth" Send="AnimSetTimeScaleGlobal 0.500000"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
-        <Scale value="4.000000,4.000000,6.000000"/>
+        <Scale value="4.000000,4.000000,8.000000"/>
     </CActorUnit>
     <CActorAction id="SiegeBreakerSiegedAttack">
         <ShieldRippleScaleFactor value="2.000000"/>

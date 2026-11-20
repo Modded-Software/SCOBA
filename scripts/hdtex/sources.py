@@ -64,6 +64,8 @@ class TextureRef(NamedTuple):
     casc_path: str
     map_path: str  # where the upscaled file goes in the map
     overrides: tuple[Override, ...]
+    # (columns, rows) of a flip book. Its cells are upscaled apart from each other.
+    grid: tuple[int, int] = (1, 1)
 
 
 def map_archives(map_dir: Path) -> tuple[str, ...]:
@@ -196,6 +198,13 @@ def terrain_refs(map_dir: Path, casc: Casc, work_dir: Path) -> list[TextureRef]:
     return refs
 
 
+def model_refs(map_dir: Path, casc: Casc, work_dir: Path) -> list[TextureRef]:
+    from .models import model_refs as resolve  # models.py builds on this module
+
+    return resolve(map_dir, casc, work_dir)
+
+
 SOURCES: dict[str, Callable[[Path, Casc, Path], list[TextureRef]]] = {
     "terrain": terrain_refs,
+    "models": model_refs,
 }

@@ -3,6 +3,10 @@
 Each texture is copied to its map path. Its catalog overrides make the
 game load the copy in place of the built-in file.
 
+A model texture has no catalog field. The cache holds a copy of each model
+that names the upscaled textures. The copy goes into the map, and a CModel
+override names it.
+
 SC2_HD_TEXTURES picks the variant, or turns the step off. When it is not
 set, the default variant is used and its cache is optional: without it the
 map keeps the built-in textures and the build says so. A variant asked for
@@ -17,7 +21,7 @@ import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from . import variants
+from . import models, variants
 from .pipeline import MANIFEST, MANIFEST_FORMAT, file_sha256, variant_root
 from .sources import terrain_texture_ids
 
@@ -26,8 +30,9 @@ class InjectError(RuntimeError):
     """The cache does not fit the map. Rebuild the cache or turn the step off."""
 
 
-def build_hint(variant: str) -> str:
-    return f"run: uv run python scripts/hd_textures.py --variant {variant} build"
+def build_hint(variant: str, source: str = "") -> str:
+    named = f" --source {source}" if source else ""
+    return f"run: uv run python scripts/hd_textures.py --variant {variant}{named} build"
 
 
 def load_manifests(cache: Path) -> list[tuple[Path, dict]]:
@@ -52,6 +57,39 @@ def missing_terrain_entries(map_dir: Path, manifest: dict) -> list[str]:
         if override["element"] == "CTerrainTex"
     }
     return [entry for entry in terrain_texture_ids(map_dir) if entry not in covered]
+
+
+def missing_model_actors(map_dir: Path, manifest: dict) -> list[str]:
+    """Placed doodads and named units whose model the cache did not look at."""
+    covered = {actor for entry in manifest.get("models", []) for actor in entry["actors"]}
+    entries = {entry["entry"] for entry in manifest.get("models", [])}
+    # The map build makes doodad actors of its own, with new names on every
+    # change. Such an actor names its model in the map's catalog.
+    own: dict[str, str] = {}
+    catalog = map_dir / "Base.SC2Data" / "GameData" / "ActorData.xml"
+    if catalog.is_file():
+        for node in ET.parse(catalog).getroot():
+            model = node.find("Model")
+            if node.get("id") and model is not None and model.get("value"):
+                own[node.get("id", "")] = model.get("value", "")
+    wanted = [*models.doodad_types(map_dir), *models.MODEL_UNITS]
+    return [actor for actor in wanted if actor not in covered and own.get(actor) not in entries]
+
+
+def stale_models(map_dir: Path, manifest: dict) -> list[str]:
+    """Cached model copies made from another file than the map now shows.
+
+    The map build makes some models itself, at the game's path. A copy must
+    come from that file as it is now.
+    """
+    stale = []
+    for entry in manifest.get("models", []):
+        for model in entry["files"]:
+            own = models.map_model(map_dir, model["asset"])
+            from_map = model["casc_path"].startswith(models.MAP_MARK)
+            if own.is_file() != from_map or (from_map and file_sha256(own) != model["source_sha256"]):
+                stale.append(model["asset"])
+    return stale
 
 
 def _map_file(map_dir: Path, map_path: str) -> Path:
@@ -92,7 +130,9 @@ def apply_overrides(catalog: Path, element: str, values: dict[tuple[str, str], s
 def variant_in_map(map_dir: Path) -> str | None:
     """The key of the cached variant whose files the map holds, or None."""
     for key in variants.VARIANTS:
-        textures = [texture for _folder, manifest in load_manifests(variant_root(key)) for texture in manifest["textures"]]
+        manifests = [manifest for _folder, manifest in load_manifests(variant_root(key))]
+        textures = [texture for manifest in manifests for texture in manifest["textures"]]
+        textures += [model for manifest in manifests for entry in manifest.get("models", []) for model in entry["files"]]
         files = [(_map_file(map_dir, texture["map_path"]), texture["sha256"]) for texture in textures]
         if files and all(path.is_file() and file_sha256(path) == sha256 for path, sha256 in files):
             return key
@@ -117,12 +157,28 @@ def apply_hd_textures(map_dir: Path) -> int:
         print(f"hd textures: no cache at {cache}, the map keeps the built-in textures; {hint}")
         return 0
     count = 0
+    model_count = 0
     overrides: dict[tuple[str, str], dict[tuple[str, str], str]] = {}
     for folder, manifest in manifests:
         if manifest["source"] == "terrain":
             missing = missing_terrain_entries(map_dir, manifest)
             if missing:
                 raise InjectError(f"the cache has no upscaled texture for {', '.join(missing)}; {hint}, or set {off}")
+        if manifest["source"] == models.SOURCE:
+            missing = missing_model_actors(map_dir, manifest)
+            if missing:
+                raise InjectError(f"the cache has not seen the models of {', '.join(missing)}; {build_hint(choice.key, models.SOURCE)}, or set {off}")
+            if stale := stale_models(map_dir, manifest):
+                raise InjectError(
+                    f"the map's own model changed since the cache was built: {', '.join(stale)}; "
+                    f"{build_hint(choice.key, models.SOURCE)}, or set {off}"
+                )
+            for entry in manifest["models"]:
+                for model in entry["files"]:
+                    _copy_texture(folder, model, map_dir, hint)
+                    model_count += 1
+                if entry["files"]:
+                    overrides.setdefault(("ModelData.xml", "CModel"), {})[entry["entry"], "Model"] = entry["map_base"]
         for texture in manifest["textures"]:
             _copy_texture(folder, texture, map_dir, hint)
             count += 1
@@ -132,4 +188,6 @@ def apply_hd_textures(map_dir: Path) -> int:
     for (catalog_file, element), values in sorted(overrides.items()):
         apply_overrides(map_dir / "Base.SC2Data" / "GameData" / catalog_file, element, values)
     print(f"hd textures: injected {count} textures, variant {variants.VARIANTS[choice.key].title}, from {cache}")
+    if model_count:
+        print(f"hd textures: injected {model_count} model files that name them")
     return count

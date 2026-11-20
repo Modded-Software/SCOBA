@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import dds
+from .models import HD_MODEL_DIR
 from .sources import HD_DIR, HD_PREFIX, TERRAIN_FIELDS, terrain_texture_ids
 
 MAX_TRAILER = 16
@@ -39,13 +40,51 @@ def check_texture_file(path: Path) -> None:
         fail(f"upscaled texture {path.name}: {len(texture.trailer)} stray bytes after the last mip")
 
 
+def _folder(map_dir: Path, game_path: str) -> Path:
+    return map_dir.joinpath(*game_path.split("\\"))
+
+
+def hd_model_files(map_dir: Path) -> dict[str, Path]:
+    """Lower-case file name to path, for the patched models in the map."""
+    folder = _folder(map_dir, HD_MODEL_DIR)
+    return {path.name.lower(): path for path in folder.glob("*")} if folder.is_dir() else {}
+
+
 def hd_references(map_dir: Path) -> set[str]:
-    """Lower-case file names below HD_DIR that the map's catalogs point at."""
+    """Lower-case file names below HD_DIR that the map's catalogs or its patched models point at."""
     pattern = re.compile(r'value="' + re.escape(HD_DIR) + r'\\([^"\\]+)"', re.I)
     names: set[str] = set()
     for catalog in sorted((map_dir / "Base.SC2Data" / "GameData").glob("*.xml")):
         names.update(name.lower() for name in pattern.findall(catalog.read_text(encoding="utf-8", errors="replace")))
+    # A model keeps its texture paths as plain text.
+    in_model = re.compile(re.escape(HD_DIR.encode("ascii")) + rb"\\([^\\\x00]+\.dds)", re.I)
+    for path in hd_model_files(map_dir).values():
+        names.update(name.decode("ascii").lower() for name in in_model.findall(path.read_bytes()))
     return names
+
+
+def check_model_overrides(map_dir: Path) -> None:
+    """Every CModel that names a patched model has its files, and every patched file is named."""
+    files = hd_model_files(map_dir)
+    catalog = map_dir / "Base.SC2Data" / "GameData" / "ModelData.xml"
+    prefix = HD_MODEL_DIR.lower() + "\\"
+    named: set[str] = set()
+    if catalog.is_file():
+        for node in ET.parse(catalog).getroot().iter("CModel"):
+            model = node.find("Model")
+            value = (model.get("value") or "") if model is not None else ""
+            if not value.lower().startswith(prefix):
+                continue
+            stem, _dot, extension = value.lower()[len(prefix) :].rpartition(".")
+            own = {name for name in files if name == f"{stem}.{extension}" or re.fullmatch(re.escape(stem) + r"_\d\d\." + extension, name)}
+            if not own:
+                fail(f"model {node.get('id')} points at {value}, but the map has no such model file")
+            named.update(own)
+    for name in sorted(set(files) - named):
+        fail(f"{HD_MODEL_DIR}\\{name} is in the map, but no model entry points at it")
+    for path in files.values():
+        if path.read_bytes()[:4] != b"43DM":
+            fail(f"{HD_MODEL_DIR}\\{path.name} is not a model file")
 
 
 def check_terrain_overrides(map_dir: Path) -> None:
@@ -80,3 +119,4 @@ def check_hd_textures(map_dir: Path) -> None:
             fail(f"{HD_DIR}\\{name} must start with {HD_PREFIX}: the game sizes a texture by its file name")
         check_texture_file(files[name])
     check_terrain_overrides(map_dir)
+    check_model_overrides(map_dir)

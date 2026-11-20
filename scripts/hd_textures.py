@@ -5,6 +5,7 @@
     verify    check the cache against its manifest and the quality limits
     preview   write comparison sheets for judging the result by eye
     compare   write a web page that shows every texture next to its cached variants
+    census    count the textures of the map's models: format, size, slots
 
 `--variant` names the set of models: "upscale" (Upscale 4x) or "generative"
 (Generative 4x). Each variant has its own cache. The map build injects the
@@ -18,11 +19,12 @@ import json
 import sys
 from pathlib import Path
 
-from hdtex import check, compare, pipeline, preview
+from hdtex import census, check, compare, models, pipeline, preview
 from hdtex.casc import Casc, CascError
 from hdtex.inject import InjectError, load_manifests
+from hdtex.m3tex import ModelError
 from hdtex.roles import ROLES, RoleError
-from hdtex.sources import SOURCES, SourceError
+from hdtex.sources import SOURCES, SourceError, stored_name
 from hdtex.upscaler import UpscaleError
 from hdtex.variants import DEFAULT, VARIANTS
 from project_root import project_root
@@ -61,10 +63,17 @@ def parse_models(values: list[str]) -> tuple[tuple[str, str], ...]:
     return tuple(pairs)
 
 
+def source_map(args: argparse.Namespace) -> Path:
+    """The map a source reads. Models read the built map: the map build places most doodads."""
+    if args.map_given:
+        return args.map
+    return built_map() if args.source == models.SOURCE else default_map()
+
+
 def cmd_list(args: argparse.Namespace) -> int:
     work = pipeline.variant_root(args.variant) / args.source
     work.mkdir(parents=True, exist_ok=True)
-    for ref in SOURCES[args.source](args.map, Casc(), work):
+    for ref in SOURCES[args.source](source_map(args), Casc(), work):
         entries = ", ".join(f"{o.entry}.{o.field}" for o in ref.overrides)
         print(f"{ref.role:8s} {ref.asset}  <-  {ref.casc_path}  ->  {ref.map_path}  ({entries})")
     return 0
@@ -73,13 +82,13 @@ def cmd_list(args: argparse.Namespace) -> int:
 def cmd_build(args: argparse.Namespace) -> int:
     settings = pipeline.Settings(
         models=parse_models(args.model),
-        max_size=args.max_size,
+        max_size=args.max_size or (models.MODEL_MAX_SIZE if args.source == models.SOURCE else 4096),
         wrap=not args.no_wrap,
         gpu=args.gpu,
         tile=args.tile,
         variant=args.variant,
     )
-    manifest = pipeline.build(args.source, args.map, settings, force=args.force, only=tuple(args.texture))
+    manifest = pipeline.build(args.source, source_map(args), settings, force=args.force, only=tuple(args.texture))
     print(f"hdtex: wrote {manifest}")
     return cmd_verify(args)
 
@@ -127,6 +136,36 @@ def cached(args: argparse.Namespace) -> list[tuple[Path, dict]]:
     return manifests
 
 
+def verify_models(folder: Path, manifest: dict) -> int:
+    """Check the patched model files of a manifest and print what was left alone. Returns the failures."""
+    failures = 0
+    hashes = {stored_name(texture["asset"]): texture["sha256"] for texture in manifest["textures"]}
+    copied = 0
+    for entry in manifest.get("models", []):
+        for model in entry["files"]:
+            copied += 1
+            path = folder / model["file"]
+            problems = []
+            if not path.is_file():
+                problems.append("file is missing")
+            elif pipeline.file_sha256(path) != model["sha256"]:
+                problems.append("file does not match the manifest hash")
+            for asset, sha256 in model["textures"].items():
+                if hashes.get(asset) != sha256:
+                    problems.append(f"names {asset}, which the manifest holds with another hash or not at all")
+            for problem in problems:
+                print(f"  FAIL {Path(model['file']).name}: {problem}")
+            failures += bool(problems)
+    if "models" in manifest:
+        untouched = sorted(entry["entry"] for entry in manifest["models"] if not entry["files"])
+        print(f"  models: {copied} files copied for {len(manifest['models']) - len(untouched)} entries")
+        if untouched:
+            print(f"  models that name no upscaled texture: {', '.join(untouched)}")
+    for asset, skipped in sorted(manifest.get("skipped", {}).items()):
+        print(f"  left alone: {asset}: {skipped['reason']}")
+    return failures
+
+
 def cmd_verify(args: argparse.Namespace) -> int:
     manifests = cached(args)
     if not manifests:
@@ -151,6 +190,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
             for problem in problems:
                 print(f"       {problem}")
             failures += bool(problems)
+        failures += verify_models(folder, manifest)
     print(f"hdtex: verify failures: {failures}")
     return 1 if failures else 0
 
@@ -163,15 +203,32 @@ def cmd_preview(args: argparse.Namespace) -> int:
     return 0 if manifests else 1
 
 
+def built_map() -> Path:
+    return project_root() / "out" / "SCOBA256.SC2Map"
+
+
+def cmd_census(args: argparse.Namespace) -> int:
+    """The textures of the map's models. Reads the built map: the build places most doodads."""
+    args.source = models.SOURCE
+    map_dir = source_map(args)
+    work = pipeline.variant_root(args.variant) / models.SOURCE
+    work.mkdir(parents=True, exist_ok=True)
+    lines = census.report(map_dir, Casc(), work)
+    (work / "census.txt").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    print(f"hdtex: wrote {work / 'census.txt'}")
+    return 0
+
+
 def cmd_compare(args: argparse.Namespace) -> int:
-    """One page for every cached variant. `--variant` plays no part."""
-    print(compare.write_page(args.source))
+    """One page with every cached source and variant. `--source` and `--variant` play no part."""
+    print(compare.write_index())
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--map", type=Path, default=default_map(), help="map source folder (default: src/SCOBA.SC2Map)")
+    parser.add_argument("--map", type=Path, default=default_map(), help="map folder (default: src/SCOBA.SC2Map for terrain, out/SCOBA256.SC2Map for models)")
     parser.add_argument("--source", choices=sorted(SOURCES), default="terrain", help="kind of textures (default: terrain)")
     titles = ", ".join(f"{key}: {variant.title}" for key, variant in VARIANTS.items())
     parser.add_argument("--variant", choices=list(VARIANTS), default=DEFAULT, help=f"set of models ({titles}; default: {DEFAULT})")
@@ -180,7 +237,7 @@ def build_parser() -> argparse.ArgumentParser:
     build = commands.add_parser("build", help="extract, upscale, and encode into the cache")
     build.add_argument("--gpu", type=int, help="GPU index for arc-upscale (default: its own default)")
     build.add_argument("--tile", type=int, help="arc-upscale tile size; lower it if VRAM runs out")
-    build.add_argument("--max-size", type=int, default=4096, help="largest texture side to keep (default: 4096)")
+    build.add_argument("--max-size", type=int, help="largest texture side to keep (default: 4096 for terrain, 2048 for models)")
     build.add_argument("--model", action="append", default=[], metavar="[TEXTURE.]PLANE=MODEL", help="upscaler model for a plane")
     build.add_argument("--no-wrap", action="store_true", help="do not make opposite edges match; for textures that do not tile")
     build.add_argument("--force", action="store_true", help="redo every stage")
@@ -192,14 +249,17 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser("verify", help="check the cache").set_defaults(handler=cmd_verify)
     commands.add_parser("preview", help="write comparison sheets").set_defaults(handler=cmd_preview)
     commands.add_parser("compare", help="write the web page with every cached variant").set_defaults(handler=cmd_compare)
+    commands.add_parser("census", help="count the textures of the map's models (reads the built map)").set_defaults(handler=cmd_census)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
     args = build_parser().parse_args(argv)
+    args.map_given = "--map" in argv
     try:
         return args.handler(args)
-    except (CascError, SourceError, RoleError, UpscaleError, InjectError, compare.CompareError, pipeline.InputError) as error:
+    except (CascError, SourceError, RoleError, UpscaleError, InjectError, ModelError, compare.CompareError, pipeline.InputError) as error:
         print(f"hdtex: error: {error}", file=sys.stderr)
         return 1
 

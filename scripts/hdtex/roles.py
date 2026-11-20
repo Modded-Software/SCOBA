@@ -6,6 +6,8 @@ mip chain again, in the layout the game expects.
 
     diffuse  RGB colour and a specular mask in alpha
     normal   tangent-space normal, stored as X in alpha and Y in green
+    data     amounts in every channel, such as a specular or occlusion map
+    normal_red  a normal map whose red channel carries an amount of its own
 
 A new texture kind, such as a doodad emissive map, is a new entry in ROLES.
 """
@@ -112,6 +114,26 @@ def join_diffuse(planes: Planes, source: Planes | None = None, wrap: bool = True
     return out
 
 
+def split_data(rgba: np.ndarray) -> Planes:
+    return {"data": rgba[:, :, :3].copy(), "alpha": rgba[:, :, 3].copy()}
+
+
+def _plain_data(planes: Planes) -> np.ndarray:
+    """Every channel as it is, as one (H, W, 4) float image. The values are amounts, not light."""
+    data = planes["data"].astype(np.float32) / 255.0
+    alpha = _grey(planes["alpha"]).astype(np.float32) / 255.0
+    if data.shape[:2] != alpha.shape[:2]:
+        raise RoleError(f"data is {data.shape[:2]}, alpha is {alpha.shape[:2]}")
+    return np.concatenate([data, alpha[:, :, None]], axis=2)
+
+
+def join_data(planes: Planes, source: Planes | None = None, wrap: bool = True) -> list[np.ndarray]:
+    top = _plain_data(planes)
+    if source is not None:
+        top = np.clip(lowfreq.match(top, _plain_data(source), wrap), 0.0, 1.0)
+    return [_to_byte(level) for level in _chain(top, lambda level: level)]
+
+
 def _unit(vectors: np.ndarray) -> np.ndarray:
     length = np.linalg.norm(vectors, axis=2, keepdims=True)
     flat = np.array([0.0, 0.0, 1.0], dtype=vectors.dtype)
@@ -143,13 +165,45 @@ def normal_layout(rgba: np.ndarray) -> str:
     )
 
 
-def split_normal(rgba: np.ndarray) -> Planes:
-    """Rebuild Z, so the upscaler sees an ordinary blue-ish normal map."""
-    normal_layout(rgba)
+def _with_z(rgba: np.ndarray) -> np.ndarray:
     x = rgba[:, :, 3].astype(np.float32) / 255.0 * 2.0 - 1.0
     y = rgba[:, :, 1].astype(np.float32) / 255.0 * 2.0 - 1.0
     z = np.sqrt(np.clip(1.0 - x * x - y * y, 0.0, 1.0))
-    return {"normal": _to_byte(np.stack([x, y, z], axis=2) * 0.5 + 0.5)}
+    return _to_byte(np.stack([x, y, z], axis=2) * 0.5 + 0.5)
+
+
+def split_normal(rgba: np.ndarray) -> Planes:
+    """Rebuild Z, so the upscaler sees an ordinary blue-ish normal map."""
+    normal_layout(rgba)
+    return {"normal": _with_z(rgba)}
+
+
+def has_free_red(rgba: np.ndarray) -> bool:
+    """A swizzled normal map whose red channel carries something of its own: blue is 0, red is not a filler.
+
+    Seen on model normal maps, such as commandcenter_normal: red 0..255.
+    What red means there is not known. It is kept as an amount.
+    """
+    return int(rgba[:, :, 2].max()) <= NORMAL_TOLERANCE
+
+
+def split_normal_red(rgba: np.ndarray) -> Planes:
+    if not has_free_red(rgba):
+        raise RoleError(f"not a normal map with a free red channel: blue is {rgba[:, :, 2].min()}..{rgba[:, :, 2].max()}")
+    return {"normal": _with_z(rgba), "data": rgba[:, :, 0].copy()}
+
+
+def join_normal_red(planes: Planes, source: Planes | None = None, wrap: bool = True) -> list[np.ndarray]:
+    """The normal as join_normal makes it, with red from its own plane."""
+    levels = join_normal({"normal": planes["normal"]}, None if source is None else {"normal": source["normal"]}, wrap)
+    red = _grey(planes["data"]).astype(np.float32)[:, :, None] / 255.0
+    if red.shape[:2] != levels[0].shape[:2]:
+        raise RoleError(f"normal is {levels[0].shape[:2]}, red is {red.shape[:2]}")
+    if source is not None:
+        red = np.clip(lowfreq.match(red, source["data"].astype(np.float32)[:, :, None] / 255.0, wrap), 0.0, 1.0)
+    for level, amount in zip(levels, _chain(red, lambda level: level)):
+        level[:, :, 0] = _to_byte(amount[:, :, 0])
+    return levels
 
 
 def match_layout(levels: list[np.ndarray], layout: str) -> list[np.ndarray]:
@@ -184,6 +238,8 @@ def join_normal(planes: Planes, source: Planes | None = None, wrap: bool = True)
 ROLES = {
     "diffuse": Role("diffuse", (Plane("color"), Plane("alpha")), split_diffuse, join_diffuse),
     "normal": Role("normal", (Plane("normal"),), split_normal, join_normal),
+    "data": Role("data", (Plane("data"), Plane("alpha")), split_data, join_data),
+    "normal_red": Role("normal_red", (Plane("normal"), Plane("data")), split_normal_red, join_normal_red),
 }
 
 

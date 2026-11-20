@@ -67,7 +67,7 @@ void gf_CamHeightLoad () {
     gf_CamHeightType("SCOBAVistaOverlord", 25.6794);
     gf_CamHeightType("SCOBAWraith", 4.0647);
     gf_CamHeightType("SCV", 1.0172);
-    gf_CamHeightType("SensorTower", 20.6881);
+    gf_CamHeightType("SensorTower", 27.5842);
     gf_CamHeightType("SpineCrawler", 2.5238);
     gf_CamHeightType("SporeCannon", 9.2382);
     gf_CamHeightType("SporeCrawler", 2.6719);

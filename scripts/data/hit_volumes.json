@@ -813,7 +813,7 @@
     3.6,
     4.2
    ],
-   "m3": "Assets\\Buildings\\Terran\\CommandCenterEx1\\CommandCenterEx1.m3",
+   "m3": "Assets\\Models\\scoba_hd\\CommandCenterEx1.m3",
    "model": "CommandCenter",
    "modelScale": [
     0.8,
@@ -2058,7 +2058,7 @@
     1.0,
     1.0
    ],
-   "m3": "Assets\\Doodads\\HybridUltraliskShackled\\HybridUltraliskShackled.m3",
+   "m3": "Assets\\Models\\scoba_hd\\HybridUltraliskShackled.m3",
    "model": "HybridUltraliskShackled",
    "modelScale": [
     1.8,
@@ -3785,7 +3785,7 @@
     72.0,
     72.0
    ],
-   "m3": "Assets\\Units\\Terran\\BattlecruiserLoki\\BattlecruiserLoki.m3",
+   "m3": "Assets\\Models\\scoba_hd\\BattlecruiserLoki.m3",
    "model": "MengskBC",
    "modelScale": [
     0.8,
@@ -4338,7 +4338,7 @@
     1.0,
     1.0
    ],
-   "m3": "Assets\\Buildings\\Terran\\CommandCenterEx1\\CommandCenterEx1.m3",
+   "m3": "Assets\\Models\\scoba_hd\\CommandCenterEx1.m3",
    "model": "CommandCenter",
    "modelScale": [
     0.8,
@@ -4504,7 +4504,7 @@
     20.0,
     20.0
    ],
-   "m3": "Assets\\Units\\Zerg\\Overlord\\Overlord.m3",
+   "m3": "Assets\\Models\\scoba_hd\\Overlord.m3",
    "model": "Overlord",
    "modelScale": [
     0.8,
@@ -4654,7 +4654,7 @@
     1.0,
     1.0
    ],
-   "m3": "Assets\\Buildings\\Terran\\CommandCenterEx1\\CommandCenterEx1.m3",
+   "m3": "Assets\\Models\\scoba_hd\\CommandCenterEx1.m3",
    "model": "CommandCenter",
    "modelScale": [
     0.8,
@@ -4879,7 +4879,7 @@
     1.0,
     1.0
    ],
-   "m3": "Assets\\Doodads\\PsiDisintegratorDoodad\\PsiDisintegratorDoodad.m3",
+   "m3": "Assets\\Models\\scoba_hd\\PsiDisintegratorDoodad.m3",
    "model": "PsiDecimator",
    "modelScale": [
     3.5,
@@ -5573,7 +5573,7 @@
     3.0,
     3.0
    ],
-   "m3": "Assets\\Units\\Terran\\VikingFighter\\VikingFighter.m3",
+   "m3": "Assets\\Models\\scoba_hd\\VikingFighter.m3",
    "model": "VikingFighter",
    "modelScale": [
     0.85,
@@ -5635,7 +5635,7 @@
     3.0,
     3.0
    ],
-   "m3": "Assets\\Units\\Terran\\VikingAssault\\VikingAssault.m3",
+   "m3": "Assets\\Models\\scoba_hd\\VikingAssault.m3",
    "model": "VikingAssault",
    "modelScale": [
     0.85,
@@ -5703,7 +5703,7 @@
     20.0,
     20.0
    ],
-   "m3": "Assets\\Units\\Zerg\\Overlord\\Overlord.m3",
+   "m3": "Assets\\Models\\scoba_hd\\Overlord.m3",
    "model": "Overlord",
    "modelScale": [
     0.8,
@@ -5859,49 +5859,49 @@
    "actorScale": [
     4.0,
     4.0,
-    6.0
+    8.0
    ],
-   "m3": "Assets\\Buildings\\Terran\\SensorTower\\SensorTower.m3",
+   "m3": "Assets\\Models\\scoba_hd\\SensorTower.m3",
    "model": "SensorTower",
    "modelScale": [
     1.0,
     1.0,
     1.0
    ],
-   "reach": 5.1326,
+   "reach": 6.8161,
    "scale": [
     4.0,
     4.0,
-    6.0
+    8.0
    ],
    "shapes": [
     {
      "a": [
       0.0,
       0.0,
-      3.6447
+      4.8596
      ],
      "b": [
       0.0,
       0.0,
-      16.672
+      22.2294
      ],
      "k": "capsule",
-     "r": 4.0161
+     "r": 5.3548
     },
     {
      "c": [
       0.0797,
       -0.0189,
-      7.6369
+      10.1825
      ],
      "k": "sphere",
-     "r": 5.0507
+     "r": 6.7342
     }
    ],
    "source": "fuzzy",
-   "zmax": 20.6881,
-   "zmin": -0.3714
+   "zmax": 27.5842,
+   "zmin": -0.4952
   },
   "SpineCrawler": {
    "actor": "SpineCrawler",
@@ -6747,7 +6747,7 @@
     3.0,
     3.0
    ],
-   "m3": "Assets\\Units\\Terran\\VikingAssault\\VikingAssault.m3",
+   "m3": "Assets\\Models\\scoba_hd\\VikingAssault.m3",
    "model": "VikingAssault",
    "modelScale": [
     0.85,
@@ -6815,7 +6815,7 @@
     3.0,
     3.0
    ],
-   "m3": "Assets\\Units\\Terran\\VikingFighter\\VikingFighter.m3",
+   "m3": "Assets\\Models\\scoba_hd\\VikingFighter.m3",
    "model": "VikingFighter",
    "modelScale": [
     0.85,

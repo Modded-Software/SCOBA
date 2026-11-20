@@ -58,7 +58,7 @@ VARIANTS = {
     "upscale": Variant(
         "upscale",
         "Upscale 4x",
-        {"color": "pbrify", "alpha": "fast", "normal": "fast"},
+        {"color": "pbrify", "alpha": "fast", "normal": "fast", "data": "fast"},
         {"zerus_4.color": "fast", "zerus_8.color": "fast"},
     ),
     # seedvr2 invents detail, so it gets the colour only. The mask and the
@@ -72,7 +72,7 @@ VARIANTS = {
     "generative": Variant(
         "generative",
         "Generative 4x",
-        {"color": "seedvr2", "alpha": "fast", "normal": "fast"},
+        {"color": "seedvr2", "alpha": "fast", "normal": "fast", "data": "fast"},
         {},
         {"color": Input("upscale", 2)},
     ),

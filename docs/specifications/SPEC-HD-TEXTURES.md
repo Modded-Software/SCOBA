@@ -235,6 +235,8 @@ the GPU.
 | R-HD-11 | [host] [cache] | `LowFrequencyTest`, `DiffuseRoleTest`; limits of section 6. The look itself is O-HD-1. |
 | R-HD-12 | [cache] | Seam limit of section 6. The look itself is O-HD-2. |
 | R-HD-13 | [host] | `CommandLineTest`: each limit fails a file. |
+| R-HD-15 | [host] | `ComparePageTest` and `ModelComparePageTest`: the page of all sources lists every plane of every source, each with a category, its users, and a thumbnail; its image paths exist. The page loaded in headless Chrome on 2026-11-19 with 253 rows and no console error. The filters and the look have no test; no mouse input was tried on the new page. |
+| R-HD-50 to R-HD-55 | section 12 | Host tests in `test_hdtex_models.py`. Not finished. |
 | R-HD-14 | [host] | `ComparePageTest` in `test_hdtex_compare.py`: the page lists every plane; the layers are ordered Upscale 4x, Generative 4x; each layer shows the file of its own variant; every image it names exists at the stated size. `hd_textures.py compare` wrote 24 entries with 72 images for the real caches. The lines of the page have no test in the repository (section 9). `hd_textures.py preview` wrote 16 sheets per variant; the sheets have no test. |
 | R-HD-20 | [host] | `CheckTest`, `InjectTest`, `BuiltMapTest`. |
 | R-HD-21 | [boot] | Launch 3 for Generative 4x, launch 4 for Upscale 4x. Launch 1 failed this with 16 texture warnings and led to 4.3. |
@@ -253,8 +255,23 @@ the GPU.
 
 Open, from the requirements: O-HD-1, O-HD-2, O-HD-3, O-HD-4.
 
-The web page is `build/hdtex/compare/terrain/index.html`. It opens from disk.
-It shows each plane of each texture, 24 entries, with every cached variant.
+The web page is `build/hdtex/compare/index.html`. It opens from disk. It
+shows each plane of each texture of every cached source: 381 entries for
+the caches of 2026-11-20, 27 terrain and 354 model. A page per source is
+written next to it, `compare/<source>/index.html`.
+
+The left side lists the entries with a small picture each, grouped by
+category: `Terrain`, `Doodads`, one per named unit (`models.MODEL_UNITS`),
+and `Shared` for a model texture more than one of those
+use. A unit whose textures are all shared has no category of its own; the
+Viking's main textures are under `Shared`. Above the list: a search field, and chips for category and plane with
+the number of entries each would show. The keys: arrows step through the
+listed entries, `/` search, `F` fit, `1` 1:1, `T` tile, `S` smooth original.
+Below the view, one card per side gives the size and the measured numbers.
+
+An entry has one layer per variant that holds its texture. Model textures
+have Upscale 4x only. A texture one variant lacks shows the variants it has.
+
 From left to right: the decoded original, the decoded Upscale 4x file, the
 decoded Generative 4x file. A line parts each two neighbours:
 
@@ -318,6 +335,79 @@ both made by one version of the tool. Every build below has the build stamp
 
 The 215 tests include tests of other tooling in the work tree.
 
+## 12. Model Textures (proof of concept)
+
+**State: built, not finished.** Host tests pass. The real cache is built and
+fails `verify` for 35 of 194 textures. The map builds with it and passes
+validation: 210 textures, 152 model files. It was launched once with the
+first scope (doodads, Command Center, psi destroyer): stamp matched, no
+texture warning in `Graphics.txt`. It was not launched with the later units.
+
+Source `models` (`hdtex/models.py`). It reads the built map, because the map
+build places most doodads.
+
+Named units, `models.MODEL_UNITS`: `CommandCenter`, `PsiDecimator`,
+`HybridUltraliskShackled`, `VikingAssault`, `VikingFighter`, `Overlord`, `MengskBC`, `SensorTower`,
+`Hellion`, `Goliath`.
+`MengskBC` shows the model file `BattlecruiserLoki.m3`.
+The vista overlord (`SCOBAVistaOverlord`) shows the model `Overlord`.
+
+Named model entries, `models.MODEL_ENTRIES`: `BattlecruiserLokiDeathSlow`,
+the death model of `MengskBC`. No other death model is followed.
+`validate_slow_deaths.py` takes the patched copy of a generated slow death
+model for that model, and checks the copy.
+
+Flip books (R-HD-56). A flip book layer does not hold its cells. The
+particle system that draws its material does (`m3tex.flip_grids`). Each
+cell gets a rim of 16 of its own edge pixels per side before the upscale
+(`flipbook.explode`), and the rim is cut after it (`flipbook.implode`). A
+flip book is left when two particle systems or two models name different
+cells, when a layer without a flip book names the same file, when the cells
+do not divide the picture, or when a cell is below 32 pixels.
+
+A model file the map itself ships is read from the map, not from the game
+(`models.map_model`, `models.fetch`). Today that is `VikingAssault.m3`, which
+`scripts/footfall/fx.py` writes. The cache keeps the hash of that file.
+`inject.stale_models` fails the build when the map's file has changed since.
+
+| Step | Module | Does |
+| --- | --- | --- |
+| Catalogs | `catalog.py` | Field values with parents, class defaults, and `##token##` values. |
+| Models | `models.py` | Placed doodad or named unit, to actor, to `CModel`, to model files with variations. Only the model an actor shows while it stands. |
+| Layers | `m3tex.py` | The texture paths in the materials of a model, with the slot of each. |
+| Verdict | `models.judge` | A role per texture from its slots, or a reason to leave it. |
+| Codec | `bc1.py`, `dds.py` | DXT1 next to DXT5. The result keeps the format. |
+| Copies | `pipeline.model_stage` | A copy of each model file that names the upscaled textures. It is read back and compared. |
+| Inject | `inject.py` | Copies go to `Assets\Models\scoba_hd\`, textures to `Assets\Textures\scoba_hd\scoba_hd_m_<name>`. `ModelData.xml` gets a `Model` override per `CModel`. |
+| Check | `check.py` | Every patched model is named by a `CModel`, every texture by a catalog or a patched model. |
+
+Roles added: `data` (amounts in every channel, byte-averaged mips) and
+`normal_red` (a normal map with blue 0 and a red channel of its own; what
+red means there is not known, it is kept as an amount).
+
+Census of 2026-11-20, `hd_textures.py census`: 36 `CModel` entries, 152 model
+files, 204 textures: 147 DXT5, 56 DXT1, 1 DXT3. 194 are upscaled, 16 of
+them flip books. 10 are left: the 4 main textures of the Hellion, which are
+2048x1024 already, 4 normal layers of displacement materials, 1 DXT3, 1 of
+4x4 pixels. `radius2` was upscaled for the tar pit before; the death model
+of the battlecruiser names it in a displacement material, so it is left.
+
+Open:
+
+- `verify` fails 35 textures with the limits of section 6. 17 miss the seam
+  limit; a model texture is mostly an atlas that does not tile, so that limit
+  and the upscaler's tiling option may not fit it. 16 miss the coarse RMSE
+  limit, most of them glows and particles. 2 miss the encode limit and 2 the
+  correlation limit. Two textures miss two limits. The limits were not changed.
+- Not tested by a program: that the game shows a patched model copy, and that
+  it takes a `Model` override with variations below a new base path. The one
+  launch gave a clean log; the look is O-HD-5.
+- With this cache in place, a map build without `SC2_HD_TEXTURES` injects the
+  model textures too.
+- `scripts/data/hit_volumes.json` names the patched copy as the `m3` of a
+  unit whose model is patched. The measured shapes are the same.
+- R-HD-40 did not hold as written: the encode and inject stages changed.
+
 ## 11. Commands
 
 | Command | Does |
@@ -327,7 +417,9 @@ The 215 tests include tests of other tooling in the work tree.
 | `uv run python scripts/hd_textures.py --variant generative build --gpu 1` | The same for Generative 4x. |
 | `uv run python scripts/hd_textures.py [--variant KEY] verify` | Check a variant's cache against its manifest and the limits. |
 | `uv run python scripts/hd_textures.py [--variant KEY] preview` | Write a variant's comparison sheets. |
-| `uv run python scripts/hd_textures.py compare` | Write the web page with every cached variant. It prints the path. Images of an unchanged texture are kept. |
+| `uv run python scripts/hd_textures.py compare` | Write the web page with every cached source and variant. It prints the path. Images of an unchanged texture are kept. |
+| `uv run python scripts/hd_textures.py census` | List the textures of the map's models with format, size, slots, and verdict. |
+| `uv run python scripts/hd_textures.py --source models build --gpu 1` | Model textures: extract, upscale, encode at 2048 at most, patch the models, and verify. |
 | `scripts/playtest.sh build` | Build the map with Upscale 4x. |
 | `SC2_HD_TEXTURES=generative scripts/playtest.sh build` | Build the map with Generative 4x. |
 | `SC2_HD_TEXTURES=off scripts/playtest.sh build` | Build the map with the built-in textures. |

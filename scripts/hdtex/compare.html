@@ -2,105 +2,176 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Textures: original and upscaled variants</title>
+<title>HD textures: original and upscaled</title>
 <style>
+  :root {
+    --bg: #14161a; --panel: #1c1f25; --raised: #262a32; --line: #333842;
+    --text: #dfe2e7; --dim: #8e95a1; --accent: #5aa9ff; --accent-bg: #1d3a5c;
+  }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { display: flex; flex-direction: column; background: #1b1d21; color: #d8dade; font: 14px/1.4 system-ui, sans-serif; }
-  header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; background: #25282e; border-bottom: 1px solid #3a3e46; }
-  header label { display: flex; gap: 5px; align-items: center; }
-  select, button { font: inherit; color: inherit; background: #33373f; border: 1px solid #4a4f59; border-radius: 4px; padding: 3px 8px; }
-  button { cursor: pointer; }
-  button:hover, select:hover { background: #3d424b; }
-  #info { padding: 6px 12px; background: #202328; border-bottom: 1px solid #3a3e46; color: #aeb2b9; min-height: 31px; }
-  #info b { color: #d8dade; font-weight: 600; }
-  #view { position: relative; flex: 1; overflow: hidden; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; background: #111; }
+  body { display: flex; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, sans-serif; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent-bg); border-color: var(--accent); }
+
+  #side { display: flex; flex-direction: column; width: 320px; min-width: 320px; background: var(--panel); border-right: 1px solid var(--line); }
+  #side h1 { margin: 0; padding: 12px 14px 4px; font-size: 15px; font-weight: 600; }
+  #side h1 small { display: block; color: var(--dim); font-size: 12px; font-weight: 400; }
+  #search { margin: 8px 14px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; outline: none; }
+  #search:focus { border-color: var(--accent); }
+  .filter { padding: 0 14px 8px; }
+  .filter h2 { margin: 4px 0; color: var(--dim); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { padding: 2px 9px; border-radius: 999px; }
+  .chip span { color: var(--dim); margin-left: 4px; }
+  #list { flex: 1; overflow-y: auto; border-top: 1px solid var(--line); }
+  .group { position: sticky; top: 0; z-index: 1; padding: 5px 14px; background: var(--raised); border-bottom: 1px solid var(--line); color: var(--dim); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .row { display: flex; gap: 10px; align-items: center; padding: 5px 14px; cursor: pointer; border-left: 3px solid transparent; }
+  .row:hover { background: var(--raised); }
+  .row.current { background: var(--accent-bg); border-left-color: var(--accent); }
+  .row img { width: 36px; height: 36px; object-fit: contain; background: #000; border-radius: 4px; flex: none; }
+  .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .meta { color: var(--dim); font-size: 11px; }
+  .row .text { min-width: 0; }
+  #empty { padding: 20px 14px; color: var(--dim); }
+
+  #main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  #bar { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #title { margin-right: auto; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #title small { color: var(--dim); font-weight: 400; margin-left: 8px; }
+  #hint { color: var(--dim); }
+  #view { position: relative; flex: 1; overflow: hidden; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+    background: #0c0d0f; background-image: linear-gradient(45deg, #15171b 25%, transparent 25%, transparent 75%, #15171b 75%), linear-gradient(45deg, #15171b 25%, transparent 25%, transparent 75%, #15171b 75%); background-size: 24px 24px; background-position: 0 0, 12px 12px; }
   #view.panning { cursor: grabbing; }
-  .layer { position: absolute; inset: 0; background-color: #111; }
+  .layer { position: absolute; inset: 0; }
   .divider { position: absolute; top: 0; bottom: 0; width: 21px; margin-left: -10px; cursor: ew-resize; }
   .divider::before { content: ""; position: absolute; left: 10px; top: 0; bottom: 0; width: 1px; background: #fff; box-shadow: 0 0 0 1px #000; }
   /* --knob moves the handle up or down, so two lines at one place show two handles. */
   .divider::after { content: "\2194"; position: absolute; left: 0; top: 50%; width: 21px; height: 21px; margin-top: calc(-10px + var(--knob, 0px)); border-radius: 50%; background: #fff; color: #000; text-align: center; line-height: 21px; }
-  .tag { position: absolute; top: 8px; padding: 1px 8px; border-radius: 3px; background: rgba(0, 0, 0, 0.7); color: #fff; white-space: nowrap; pointer-events: none; }
-  #tag-before { left: 8px; }
-  #status { position: absolute; left: 8px; bottom: 8px; padding: 1px 8px; border-radius: 3px; background: rgba(0, 0, 0, 0.7); color: #fff; pointer-events: none; }
+  .tag { position: absolute; top: 10px; padding: 2px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; white-space: nowrap; pointer-events: none; }
+  #tag-before { left: 10px; }
+  #status { position: absolute; left: 10px; bottom: 10px; padding: 2px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; pointer-events: none; }
+  #cards { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--line); }
+  .card { flex: 1; min-width: 220px; padding: 7px 10px; background: var(--raised); border: 1px solid var(--line); border-radius: 8px; }
+  .card h3 { margin: 0 0 3px; font-size: 13px; }
+  .card h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  .card dl { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; margin: 0; }
+  .card dt { color: var(--dim); }
+  .card dd { margin: 0; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
-<header>
-  <label>Texture <select id="pick"></select></label>
-  <button id="previous" title="Left arrow">Previous</button>
-  <button id="next" title="Right arrow">Next</button>
-  <button id="fit" title="F">Fit</button>
-  <button id="actual" title="1">1:1</button>
-  <label><input type="checkbox" id="tile"> Tile</label>
-  <label><input type="checkbox" id="smooth"> Smooth original</label>
-  <span>Wheel zooms. Drag pans. Drag a line to wipe.</span>
-</header>
-<div id="info"></div>
-<div id="view">
-  <div class="layer" id="before"></div>
-  <div class="tag" id="tag-before">Original</div>
-  <div id="status"></div>
+<aside id="side">
+  <h1>HD textures<small id="count"></small></h1>
+  <div class="filter"><h2>Search name, plane, or user &nbsp;( / )</h2>
+  <input id="search" type="search" aria-label="Search name, plane, or user" autocomplete="off"></div>
+  <div class="filter"><h2>Category</h2><div class="chips" id="categories"></div></div>
+  <div class="filter"><h2>Plane</h2><div class="chips" id="planes"></div></div>
+  <div id="list"></div>
+</aside>
+<div id="main">
+  <div id="bar">
+    <div id="title"></div>
+    <button id="previous" title="Up or left arrow">&#8592; Previous</button>
+    <button id="next" title="Down or right arrow">Next &#8594;</button>
+    <button id="fit" title="F">Fit</button>
+    <button id="actual" title="1">1:1</button>
+    <button id="tile" title="T">Tile</button>
+    <button id="smooth" title="S">Smooth original</button>
+    <span id="hint">Wheel zooms. Drag pans. Drag a line to wipe.</span>
+  </div>
+  <div id="view">
+    <div class="layer" id="before"></div>
+    <div class="tag" id="tag-before">Original</div>
+    <div id="status"></div>
+  </div>
+  <div id="cards"></div>
 </div>
 <script>
 "use strict";
 const PAIRS = /*PAIRS*/[];
 
-const view = document.getElementById("view");
-const before = document.getElementById("before");
-const tagBefore = document.getElementById("tag-before");
-const pick = document.getElementById("pick");
-const info = document.getElementById("info");
-const status = document.getElementById("status");
-const tile = document.getElementById("tile");
-const smooth = document.getElementById("smooth");
+const $ = (id) => document.getElementById(id);
+const view = $("view");
+const before = $("before");
+const tagBefore = $("tag-before");
+const status = $("status");
+const list = $("list");
+const search = $("search");
+const tileButton = $("tile");
+const smoothButton = $("smooth");
 
-// One layer, one line, and one tag per variant, in the order of the data.
-// Line i is the left edge of layer i. The original shows left of line 0.
-const COUNT = PAIRS.length ? PAIRS[0].layers.length : 0;
 const TAG_ROOM = 90; // screen pixels a side needs to show its tag
-const layers = [];
-const dividers = [];
-const tags = [];
-for (const [list, className] of [[layers, "layer"], [dividers, "divider"], [tags, "tag"]]) {
-  for (let i = 0; i < COUNT; i += 1) {
-    const element = document.createElement("div");
-    element.className = className;
-    view.insertBefore(element, tagBefore);
-    list.push(element);
-  }
-}
-dividers.forEach((divider, i) => divider.style.setProperty("--knob", `${(i - (COUNT - 1) / 2) * 34}px`));
-tags.forEach((tag, i) => { tag.textContent = PAIRS[0].layers[i].variant; });
+const ALL = "";
 
-// size: screen pixels the whole texture covers. x, y: its top left corner in the view.
+// One layer, one line, and one tag per variant of the shown entry, in the
+// order of the data. Line i is the left edge of layer i. The original shows
+// left of line 0. They are rebuilt when an entry has another number of variants.
+let layers = [];
+let dividers = [];
+let tags = [];
+
+// size: screen pixels the width of the texture covers. x, y: its top left corner in the view.
 // splits: where each line is, as a part of the view width. They never cross.
-const state = { index: 0, size: 0, x: 0, y: 0, splits: dividers.map((_, i) => (i + 1) / (COUNT + 1)) };
+const state = { index: -1, size: 0, x: 0, y: 0, splits: [], tile: false, smooth: false, category: ALL, plane: ALL, text: "" };
+let visible = []; // indexes into PAIRS that pass the filters, in list order
+const rows = new Map(); // index into PAIRS to its list row
 
+function keyOf(item) { return `${item.source}/${item.id}`; }
+function categoryOf(item) { return item.category; }
 function pair() { return PAIRS[state.index]; }
+function element(tag, className, text) {
+  const made = document.createElement(tag);
+  if (className) { made.className = className; }
+  if (text !== undefined) { made.textContent = text; }
+  return made;
+}
 
-// Screen pixels the texture covers when one pixel of its largest layer is one screen pixel.
-function actualSize() { return Math.max(...pair().layers.map((layer) => layer.size[0])) / window.devicePixelRatio; }
+function setLayerCount(count) {
+  if (layers.length === count) { return; }
+  for (const old of [...layers, ...dividers, ...tags]) { old.remove(); }
+  layers = []; dividers = []; tags = [];
+  for (const [made, className] of [[layers, "layer"], [dividers, "divider"], [tags, "tag"]]) {
+    for (let i = 0; i < count; i += 1) {
+      const part = element("div", className);
+      view.insertBefore(part, tagBefore);
+      made.push(part);
+    }
+  }
+  dividers.forEach((divider, i) => divider.style.setProperty("--knob", `${(i - (count - 1) / 2) * 34}px`));
+  state.splits = dividers.map((_, i) => (i + 1) / (count + 1));
+}
+
+function aspect() { const size = pair().before_size; return size[1] / size[0]; }
+
+// Screen pixels the texture is wide when one pixel of its largest side is one screen pixel.
+function actualSize() {
+  const widths = pair().layers.map((layer) => layer.size[0]);
+  return Math.max(pair().before_size[0], ...widths) / window.devicePixelRatio;
+}
 
 function draw() {
+  if (state.index < 0) { return; }
   const current = pair();
-  const height = state.size * current.before_size[1] / current.before_size[0];
-  const sides = [[before, current.before_size[0], !smooth.checked]];
+  const height = state.size * aspect();
+  const sides = [[before, current.before_size[0], !state.smooth]];
   current.layers.forEach((layer, i) => sides.push([layers[i], layer.size[0], true]));
-  for (const [element, natural, pixels] of sides) {
-    element.style.backgroundSize = `${state.size}px ${height}px`;
-    element.style.backgroundPosition = `${state.x}px ${state.y}px`;
-    element.style.backgroundRepeat = tile.checked ? "repeat" : "no-repeat";
+  for (const [side, natural, pixels] of sides) {
+    side.style.backgroundSize = `${state.size}px ${height}px`;
+    side.style.backgroundPosition = `${state.x}px ${state.y}px`;
+    side.style.backgroundRepeat = state.tile ? "repeat" : "no-repeat";
     // Show true pixels when enlarged. When shrunk, let the browser average.
     const enlarged = state.size * window.devicePixelRatio >= natural;
-    element.style.imageRendering = pixels && enlarged ? "pixelated" : "auto";
+    side.style.imageRendering = pixels && enlarged ? "pixelated" : "auto";
   }
   const width = view.getBoundingClientRect().width;
-  tagBefore.style.display = state.splits[0] * width < TAG_ROOM ? "none" : "";
-  for (let i = 0; i < COUNT; i += 1) {
+  const count = layers.length;
+  tagBefore.style.display = count && state.splits[0] * width < TAG_ROOM ? "none" : "";
+  for (let i = 0; i < count; i += 1) {
     const start = state.splits[i];
-    const end = i + 1 < COUNT ? state.splits[i + 1] : 1;
+    const end = i + 1 < count ? state.splits[i + 1] : 1;
     layers[i].style.clipPath = `inset(0 0 0 ${start * 100}%)`;
     dividers[i].style.left = `${start * 100}%`;
     tags[i].style.left = `calc(${start * 100}% + 14px)`;
@@ -113,16 +184,17 @@ function draw() {
 function moveSplit(index, value) {
   const low = index > 0 ? state.splits[index - 1] : 0;
   state.splits[index] = Math.min(1, Math.max(low, value));
-  for (let i = index + 1; i < COUNT; i += 1) {
+  for (let i = index + 1; i < state.splits.length; i += 1) {
     state.splits[i] = Math.max(state.splits[i], state.splits[index]);
   }
 }
 
 function fit() {
+  if (state.index < 0) { return; }
   const box = view.getBoundingClientRect();
-  state.size = Math.min(box.width, box.height);
+  state.size = Math.min(box.width, box.height / aspect()) * 0.96;
   state.x = (box.width - state.size) / 2;
-  state.y = (box.height - state.size) / 2;
+  state.y = (box.height - state.size * aspect()) / 2;
   draw();
 }
 
@@ -135,39 +207,58 @@ function zoomTo(size, originX, originY) {
 }
 
 function actual() {
+  if (state.index < 0) { return; }
   const box = view.getBoundingClientRect();
   zoomTo(actualSize(), box.width / 2, box.height / 2);
 }
 
-function number(value, digits) { return value === null ? "n/a" : value.toFixed(digits); }
+function number(value, digits) { return value === null || value === undefined ? "n/a" : value.toFixed(digits); }
+
+function card(title, small, facts) {
+  const made = element("div", "card");
+  const head = element("h3", "", title);
+  head.append(element("small", "", small));
+  const table = element("dl");
+  for (const [name, value] of facts) {
+    table.append(element("dt", "", name), element("dd", "", value));
+  }
+  made.append(head, table);
+  return made;
+}
 
 function describe() {
   const current = pair();
-  const first = [
-    `<b>${current.texture}</b> ${current.plane}`,
-    `<b>Original</b> ${current.before_size.join("x")}`,
-    `seam ${number(current.seam_source, 2)}`,
-  ];
-  if (current.note) { first.push(current.note); }
-  const lines = [first.join(" &middot; ")];
+  const title = $("title");
+  title.textContent = current.texture;
+  title.append(element("small", "", `${current.plane} · ${current.category} · ${current.format} · ${current.role}`));
+  const cards = $("cards");
+  cards.replaceChildren();
+  const facts = [["seam", number(current.seam_source, 2)]];
+  if (current.users.length) { facts.push(["used by", current.users.join(", ")]); }
+  if (current.note) { facts.push(["shown", current.note]); }
+  cards.append(card("Original", current.before_size.join("x"), facts));
   for (const layer of current.layers) {
-    lines.push([
-      `<b>${layer.variant}</b> ${layer.size.join("x")}`,
-      `model <b>${layer.model}</b>`,
-      `encode ${number(layer.encode_psnr, 1)} dB`,
-      `correlation ${number(layer.correlation, 2)}`,
-      `coarse RMSE ${number(layer.coarse_rmse, 2)}`,
-      `seam ${number(layer.seam, 2)}`,
-    ].join(" &middot; "));
+    cards.append(card(layer.variant, layer.size.join("x"), [
+      ["model", layer.model],
+      ["encode", `${number(layer.encode_psnr, 1)} dB`],
+      ["correlation", number(layer.correlation, 2)],
+      ["coarse RMSE", number(layer.coarse_rmse, 2)],
+      ["seam", number(layer.seam, 2)],
+    ]));
   }
-  info.innerHTML = lines.join("<br>");
 }
 
 function show(index, keepView) {
-  state.index = (index + PAIRS.length) % PAIRS.length;
+  if (index < 0 || index >= PAIRS.length) { return; }
+  const sameShape = state.index >= 0 && aspect() === PAIRS[index].before_size[1] / PAIRS[index].before_size[0];
+  rows.get(state.index)?.classList.remove("current");
+  state.index = index;
   const current = pair();
-  pick.value = current.id;
-  history.replaceState(null, "", `#${current.id}`);
+  const row = rows.get(index);
+  if (row) { row.classList.add("current"); row.scrollIntoView({ block: "nearest" }); }
+  history.replaceState(null, "", `#${encodeURIComponent(keyOf(current))}`);
+  setLayerCount(current.layers.length);
+  tags.forEach((tag, i) => { tag.textContent = current.layers[i].variant; });
   describe();
   before.style.backgroundImage = `url("${current.before}")`;
   status.textContent = "loading";
@@ -179,47 +270,120 @@ function show(index, keepView) {
     loader.onerror = () => { status.textContent = `cannot load ${layer.image}`; };
     loader.src = layer.image;
   });
-  if (!keepView) { fit(); }
+  if (keepView && sameShape) { draw(); } else { fit(); }
+}
+
+// Step through the entries the filters let through.
+function step(by) {
+  if (!visible.length) { return; }
+  const place = visible.indexOf(state.index);
+  const next = place < 0 ? 0 : (place + by + visible.length) % visible.length;
+  show(visible[next], true);
+}
+
+function passes(item, skip) {
+  if (skip !== "category" && state.category !== ALL && categoryOf(item) !== state.category) { return false; }
+  if (skip !== "plane" && state.plane !== ALL && item.plane !== state.plane) { return false; }
+  if (state.text) {
+    const hay = `${item.texture} ${item.plane} ${item.category} ${item.role} ${item.users.join(" ")}`.toLowerCase();
+    return state.text.split(/\s+/).every((word) => hay.includes(word));
+  }
+  return true;
+}
+
+// One chip per value, with the number of entries it would show under the other filters.
+function chips(holder, field, valueOf) {
+  const counts = new Map();
+  let total = 0;
+  for (const item of PAIRS) {
+    counts.set(valueOf(item), counts.get(valueOf(item)) || 0);
+    if (passes(item, field)) { counts.set(valueOf(item), counts.get(valueOf(item)) + 1); total += 1; }
+  }
+  holder.replaceChildren();
+  for (const [value, label, count] of [[ALL, "All", total], ...[...counts].map(([value, count]) => [value, value, count])]) {
+    const chip = element("button", `chip${state[field] === value ? " on" : ""}`, label);
+    chip.append(element("span", "", String(count)));
+    chip.dataset.value = value;
+    chip.addEventListener("click", () => { state[field] = value; refresh(); });
+    holder.append(chip);
+  }
+}
+
+function refresh() {
+  chips($("categories"), "category", categoryOf);
+  chips($("planes"), "plane", (item) => item.plane);
+  visible = [];
+  rows.clear();
+  list.replaceChildren();
+  let group = null;
+  PAIRS.forEach((item, index) => {
+    if (!passes(item)) { return; }
+    visible.push(index);
+    if (group !== categoryOf(item)) {
+      group = categoryOf(item);
+      list.append(element("div", "group", group));
+    }
+    const row = element("div", `row${index === state.index ? " current" : ""}`);
+    const thumb = element("img");
+    thumb.decoding = "async";
+    thumb.alt = "";
+    thumb.src = item.thumb || item.before;
+    const text = element("div", "text");
+    text.append(element("div", "name", item.texture), element("div", "meta", `${item.plane} · ${item.before_size.join("x")} · ${item.format}`));
+    row.append(thumb, text);
+    row.title = item.users.join(", ");
+    row.addEventListener("click", () => show(index, true));
+    rows.set(index, row);
+    list.append(row);
+  });
+  if (!visible.length) { list.append(element("div", "", "No texture passes the filters.")); list.lastChild.id = "empty"; }
+  $("count").textContent = `${visible.length} of ${PAIRS.length} entries`;
+  if (visible.length && !visible.includes(state.index)) { show(visible[0], false); }
+}
+
+function toggle(name, button) {
+  state[name] = !state[name];
+  button.classList.toggle("on", state[name]);
+  draw();
 }
 
 function start() {
-  if (!PAIRS.length) { info.textContent = "The cache holds no textures."; return; }
-  let group = null;
-  for (const item of PAIRS) {
-    if (!group || group.label !== item.texture) {
-      group = document.createElement("optgroup");
-      group.label = item.texture;
-      pick.append(group);
-    }
-    const option = document.createElement("option");
-    option.value = item.id;
-    option.textContent = `${item.texture} ${item.plane}`;
-    group.append(option);
-  }
-  const wanted = PAIRS.findIndex((item) => item.id === decodeURIComponent(location.hash.slice(1)));
-  show(Math.max(0, wanted), false);
+  if (!PAIRS.length) { $("title").textContent = "The cache holds no textures."; return; }
+  // The list is grouped, so entries of one category must be neighbours.
+  const order = [...new Set(PAIRS.map(categoryOf))];
+  PAIRS.sort((a, b) => order.indexOf(categoryOf(a)) - order.indexOf(categoryOf(b)));
+  const wanted = PAIRS.findIndex((item) => keyOf(item) === decodeURIComponent(location.hash.slice(1)));
+  refresh();
+  show(wanted >= 0 ? wanted : visible[0], false);
 }
 
-pick.addEventListener("change", () => show(PAIRS.findIndex((item) => item.id === pick.value), true));
-document.getElementById("previous").addEventListener("click", () => show(state.index - 1, true));
-document.getElementById("next").addEventListener("click", () => show(state.index + 1, true));
-document.getElementById("fit").addEventListener("click", fit);
-document.getElementById("actual").addEventListener("click", actual);
-tile.addEventListener("change", draw);
-smooth.addEventListener("change", draw);
+search.addEventListener("input", () => { state.text = search.value.trim().toLowerCase(); refresh(); });
+$("previous").addEventListener("click", () => step(-1));
+$("next").addEventListener("click", () => step(1));
+$("fit").addEventListener("click", fit);
+$("actual").addEventListener("click", actual);
+tileButton.addEventListener("click", () => toggle("tile", tileButton));
+smoothButton.addEventListener("click", () => toggle("smooth", smoothButton));
 window.addEventListener("resize", draw);
 
 window.addEventListener("keydown", (event) => {
-  if (event.target === pick) { return; }
-  if (event.key === "ArrowLeft") { show(state.index - 1, true); }
-  if (event.key === "ArrowRight") { show(state.index + 1, true); }
+  if (event.target === search) {
+    if (event.key === "Escape") { search.blur(); }
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") { return; }
+  }
+  if (event.ctrlKey || event.metaKey || event.altKey) { return; }
+  if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); step(-1); }
+  if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); step(1); }
   if (event.key === "f") { fit(); }
   if (event.key === "1") { actual(); }
-  if (event.key === "t") { tile.checked = !tile.checked; draw(); }
+  if (event.key === "t") { toggle("tile", tileButton); }
+  if (event.key === "s") { toggle("smooth", smoothButton); }
+  if (event.key === "/") { event.preventDefault(); search.focus(); search.select(); }
 });
 
 view.addEventListener("wheel", (event) => {
   event.preventDefault();
+  if (state.index < 0) { return; }
   const box = view.getBoundingClientRect();
   const size = state.size * (event.deltaY < 0 ? 1.25 : 0.8);
   // From a sixteenth of the view up to 32 screen pixels per texture pixel.

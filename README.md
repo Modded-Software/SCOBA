@@ -81,7 +81,7 @@ first.
 | `scripts/playtest.sh launch-check` | Rebuild, launch the map, and check the game logs. |
 | `uv run python scripts/hd_textures.py build --gpu 1` | Fill the cache of the `Upscale 4x` textures. Needs `../upscale-on-arc` and a GPU. Run once; the map build applies the cache. |
 | `uv run python scripts/hd_textures.py --variant generative build --gpu 1` | Fill the cache of the `Generative 4x` textures. Its input is the `Upscale 4x` colour at 2048, so build `Upscale 4x` first. |
-| `uv run python scripts/hd_textures.py compare` | Write a web page that shows every texture as original, upscaled, and generative: `build/hdtex/compare/terrain/index.html`. |
+| `uv run python scripts/hd_textures.py compare` | Write a web page that shows every texture as original, upscaled, and generative: `build/hdtex/compare/index.html`. |
 
 `SC2_HD_TEXTURES` picks the terrain textures of a build:
 

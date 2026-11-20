@@ -54,6 +54,30 @@ class ComparePageTest(CacheCase):
         self.assertEqual([pair["id"] for pair in pairs], PAIR_IDS)
         self.assertEqual({pair["texture"] for pair in pairs}, {entry["asset"].rsplit("\\", 1)[-1] for entry in self.manifest["textures"]})
 
+    def test_terrain_entries_are_in_the_terrain_category_with_their_users(self) -> None:
+        for pair in self.pairs(self.write()):
+            self.assertEqual((pair["source"], pair["category"]), ("terrain", compare.TERRAIN), pair["id"])
+            self.assertEqual(pair["format"], "DXT5")
+        self.assertEqual(self.pair(self.write(), "zerus_1.color")["users"], ["Zerus1"])
+
+    def test_each_entry_has_a_small_thumbnail_of_the_original(self) -> None:
+        page = self.write()
+        for pair in self.pairs(page):
+            with Image.open(page.parent / pair["thumb"]) as opened:
+                self.assertEqual(max(opened.size), compare.THUMB, pair["id"])
+
+    def test_the_page_of_all_sources_names_images_one_folder_down(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            page = compare.write_index()
+        self.assertEqual(page, self.cache / "compare" / "index.html")
+        pairs = self.pairs(page)
+        self.assertEqual([pair["id"] for pair in pairs], PAIR_IDS)
+        for pair in pairs:
+            for image in (pair["before"], pair["thumb"], *(layer["image"] for layer in pair["layers"])):
+                self.assertTrue(image.startswith("terrain/img/"), image)
+                self.assertTrue((page.parent / image).is_file(), image)
+        self.assertTrue((self.cache / "compare" / "terrain" / "index.html").is_file())
+
     def test_one_cached_variant_gives_one_layer(self) -> None:
         for pair in self.pairs(self.write()):
             self.assertEqual([layer["variant"] for layer in pair["layers"]], ["Upscale 4x"], pair["id"])
@@ -151,15 +175,19 @@ class ComparePageTest(CacheCase):
         ), self.assertRaises(compare.CompareError):
             self.write()
 
-    def test_variants_with_other_textures_are_an_error(self) -> None:
+    def test_a_texture_one_variant_lacks_has_one_layer(self) -> None:
         self.build(GENERATIVE)
         path = self.cache / "generative" / "terrain" / pipeline.MANIFEST
         manifest = json.loads(path.read_text())
-        manifest["textures"] = manifest["textures"][:1]
+        kept = manifest["textures"][0]
+        manifest["textures"] = [kept]
         path.write_text(json.dumps(manifest))
-        with self.assertRaises(compare.CompareError) as raised:
-            self.write()
-        self.assertIn("generative", str(raised.exception))
+        pairs = self.pairs(self.write())
+        self.assertEqual([pair["id"] for pair in pairs], PAIR_IDS)
+        for pair in pairs:
+            both = pair["texture"] == kept["asset"].rsplit("\\", 1)[-1]
+            wanted = ["Upscale 4x", "Generative 4x"] if both else ["Upscale 4x"]
+            self.assertEqual([layer["variant"] for layer in pair["layers"]], wanted, pair["id"])
 
     def test_a_template_without_the_data_mark_is_an_error(self) -> None:
         self.assertEqual(compare.TEMPLATE.read_text(encoding="utf-8").count(compare.DATA_MARK), 1)

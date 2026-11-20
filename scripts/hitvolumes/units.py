@@ -36,6 +36,6 @@ def unit_types(map_dir: Path, harness_dir: Path) -> list[str]:
     data = map_dir / "Base.SC2Data" / "GameData" / "UnitData.xml"
     found = set(CUNIT_RE.findall(data.read_text(encoding="utf-8")))
     found.update(PLACED_RE.findall((map_dir / "Objects").read_text(encoding="utf-8")))
-    scripts = sorted((map_dir / "scripts").rglob("*.galaxy")) + sorted(harness_dir.glob("*.galaxy"))
+    scripts = sorted((map_dir / "scripts").rglob("*.galaxy")) + sorted(harness_dir.rglob("*.galaxy"))
     found.update(script_types(scripts))
     return sorted(found)

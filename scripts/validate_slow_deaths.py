@@ -14,6 +14,9 @@ from slow_death_assets import FAST_CLIPS, SLOW_DEATHS, SLOW_SIMULATIONS, event_n
 from validate_assets import fail
 
 GAMEDATA = Path("Base.SC2Data") / "GameData"
+# The HD texture step copies a model and points the CModel at the copy
+# (scripts/hdtex/models.py, HD_MODEL_DIR). The copy keeps the file name.
+HD_MODEL_DIR = "Assets\\Models\\scoba_hd\\"
 
 # (CModel id, unit actors that must die with it, soundless). A soundless death has
 # no sound anywhere. A death with sound keeps its CModel sound events, with
@@ -33,7 +36,21 @@ GOLIATH_EVENT_TIMES = {
 }
 
 
+def generated_value(model_value: str | None) -> str | None:
+    """The generated slow death model a CModel value stands for: itself, or the one its HD copy was made from."""
+    values = [str(relative).replace("/", "\\") for _, relative, _, _ in SLOW_DEATHS]
+    if model_value in values:
+        return model_value
+    if model_value and model_value.startswith(HD_MODEL_DIR):
+        name = model_value[len(HD_MODEL_DIR) :]
+        matches = [value for value in values if value.rsplit("\\", 1)[-1] == name]
+        if len(matches) == 1:
+            return matches[0]
+    return None
+
+
 def stretch_of(model_value: str) -> int:
+    model_value = generated_value(model_value) or model_value
     for _, relative, stretch, _ in SLOW_DEATHS:
         if str(relative).replace("/", "\\") == model_value:
             return stretch
@@ -83,13 +100,12 @@ def check_event_times(model_id: str, node, stretch: int) -> None:
 def check_slow_death_data(map_dir: Path) -> None:
     models = ET.parse(map_dir / GAMEDATA / "ModelData.xml").getroot()
     actors = ET.parse(map_dir / GAMEDATA / "ActorData.xml").getroot()
-    values = {str(relative).replace("/", "\\") for _, relative, _, _ in SLOW_DEATHS}
     for model_id, actor_ids, soundless in SLOW_DEATH_MODELS:
         node = models.find(f"./CModel[@id='{model_id}']")
         if node is None:
             fail(f"missing CModel {model_id}")
         model = node.find("Model")
-        if model is None or model.get("value") not in values:
+        if model is None or generated_value(model.get("value")) is None:
             fail(f"CModel {model_id} must point at a generated slow death model")
         if node.get("parent") != "UnitDeath":
             fail(f"CModel {model_id} must have parent UnitDeath, not inherit stock events or a low model")
