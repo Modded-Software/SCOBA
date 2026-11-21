@@ -75,6 +75,55 @@ test('grid lines are thin: about one pixel', async ({ page }) => {
   for (const rgb of beside) expect(near(rgb, BG, 12)).toBe(true);
 });
 
+/** Points along every side of the hexagons near the origin, corners left out. */
+function borderPoints() {
+  const points = [];
+  const r = 1 / Math.sqrt(3); // centre to corner, for one unit side to side
+  for (let j = -3; j <= 3; j++) {
+    for (let i = -3; i <= 3; i++) {
+      const cx = i + (j % 2 ? 0.5 : 0);
+      const cy = j * 0.8660254;
+      for (let k = 0; k < 6; k++) {
+        const a = Math.PI / 6 + (k * Math.PI) / 3;
+        const b = a + Math.PI / 3;
+        for (let t = 0.15; t < 0.9; t += 0.1) {
+          points.push([cx + r * ((1 - t) * Math.cos(a) + t * Math.cos(b)), cy + r * ((1 - t) * Math.sin(a) + t * Math.sin(b))]);
+        }
+      }
+    }
+  }
+  return points;
+}
+
+// The views of the dashed-line report: the default, a low grazing look and
+// a far one. A dashed border has stretches with no line pixel at all.
+const SOLID_VIEWS = [
+  { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0] },
+  { yaw: -Math.PI / 2 + 0.4, pitch: 0.22, distance: 9, target: [0, 0, 0] },
+  { yaw: -Math.PI / 2 - 0.3, pitch: 0.6, distance: 30, target: [0, 0, 0] },
+];
+
+test('grid lines are solid: no gaps along the borders, also at a grazing angle', async ({ page }) => {
+  await open(page);
+  const points = borderPoints();
+  for (const view of SOLID_VIEWS) {
+    await page.evaluate((v) => window.sc2viewer.view(v), view);
+    const peaks = (await page.evaluate((p) => window.sc2viewer.groundPeaks(p, 1), points)).filter(Boolean);
+    const lift = peaks.map((p) => p.rgb[1] - BG[1]).sort((a, b) => a - b);
+    const median = lift[Math.floor(lift.length / 2)];
+    // A gap: a border point with no pixel near it lifted to 40% of a typical one.
+    const gaps = lift.filter((g) => g < 0.4 * median).length;
+    console.log('view', JSON.stringify(view), 'samples', lift.length, 'median', median, 'min', lift[0], 'p5', lift[Math.floor(lift.length * 0.05)], 'gaps', gaps);
+    expect(lift.length).toBeGreaterThan(300);
+    expect(median).toBeGreaterThan(15);
+    expect(gaps / lift.length).toBeLessThan(0.01);
+  }
+  // Negative: cell insides are not lit like a line.
+  await page.evaluate((v) => window.sc2viewer.view(v), SOLID_VIEWS[0]);
+  const inside = (await page.evaluate((p) => window.sc2viewer.groundPeaks(p, 0), CENTRES)).filter(Boolean);
+  for (const p of inside) expect(p.rgb[1] - BG[1]).toBeLessThan(15);
+});
+
 /** Green of the border at (x, 0), the vertical hex side x = k + 0.5. */
 const borderGreen = async (page, x) => (await at(page, x, 0)).rgb[1];
 

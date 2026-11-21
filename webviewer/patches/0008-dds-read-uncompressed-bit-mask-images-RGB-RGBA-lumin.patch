@@ -1,0 +1,162 @@
+From c3a4ec0514e8bb209c64c6b2311ff0f55fab1077 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 13:51:54 +0200
+Subject: [PATCH 08/17] dds: read uncompressed bit-mask images (RGB, RGBA,
+ luminance, alpha)
+
+---
+ src/parsers/dds/image.ts           | 98 +++++++++++++++++++++++++++++-
+ src/viewer/handlers/dds/texture.ts |  5 +-
+ 2 files changed, 100 insertions(+), 3 deletions(-)
+
+diff --git a/src/parsers/dds/image.ts b/src/parsers/dds/image.ts
+index 6d8f9cef..bb05f043 100644
+--- a/src/parsers/dds/image.ts
++++ b/src/parsers/dds/image.ts
+@@ -4,7 +4,14 @@ import { bytesOf } from '../../common/bytesof';
+ 
+ export const DDS_MAGIC = 0x20534444;
+ const DDSD_MIPMAPCOUNT = 0x20000;
++const DDPF_ALPHAPIXELS = 0x1;
++const DDPF_ALPHA = 0x2;
+ const DDPF_FOURCC = 0x4;
++const DDPF_RGB = 0x40;
++const DDPF_LUMINANCE = 0x20000;
++
++/** Format of an uncompressed image, decoded to 8-bit RGBA on load. */
++export const FORMAT_RGBA8 = 1;
+ 
+ export const FOURCC_DXT1 = 0x31545844;
+ export const FOURCC_DXT3 = 0x33545844;
+@@ -38,7 +45,9 @@ export class DdsImage {
+     }
+ 
+     if (!(header[20] & DDPF_FOURCC)) {
+-      throw new Error('Not FourCC');
++      this.loadUncompressed(bytes, header);
++
++      return;
+     }
+ 
+     let fourCC = header[21];
+@@ -101,6 +110,91 @@ export class DdsImage {
+     }
+   }
+ 
++  /**
++   * An uncompressed image: pixels of 8 to 32 bits with a bit mask per
++   * channel (DDPF_RGB, DDPF_LUMINANCE, DDPF_ALPHA). Every mipmap is decoded
++   * to 8-bit RGBA here. A channel without a mask reads 0, alpha reads 255.
++   */
++  loadUncompressed(bytes: Uint8Array, header: Int32Array): void {
++    const flags = header[20];
++
++    if (!(flags & (DDPF_RGB | DDPF_LUMINANCE | DDPF_ALPHA))) {
++      throw new Error(`Unsupported pixel format flags: 0x${(flags >>> 0).toString(16)}`);
++    }
++
++    const bitCount = header[22];
++
++    if (bitCount < 8 || bitCount > 32 || bitCount % 8 !== 0) {
++      throw new Error(`Unsupported bit count: ${bitCount}`);
++    }
++
++    const pixelBytes = bitCount / 8;
++    const luminance = (flags & DDPF_LUMINANCE) !== 0;
++    const hasAlpha = (flags & (DDPF_ALPHAPIXELS | DDPF_ALPHA)) !== 0;
++    const masks = [header[23] >>> 0, header[24] >>> 0, header[25] >>> 0, hasAlpha ? header[26] >>> 0 : 0];
++    const channels = masks.map((mask) => {
++      let shift = 0;
++
++      while (mask && !((mask >>> shift) & 1)) {
++        shift += 1;
++      }
++
++      return { mask, shift, max: mask ? mask >>> shift : 0 };
++    });
++
++    let mipmaps = 1;
++
++    if (header[2] & DDSD_MIPMAPCOUNT) {
++      mipmaps = Math.max(1, header[7]);
++    }
++
++    let width = header[4];
++    let height = header[3];
++    let offset = 128;
++
++    this.format = FORMAT_RGBA8;
++    this.width = width;
++    this.height = height;
++
++    for (let i = 0; i < mipmaps; i++) {
++      const count = width * height;
++      const end = offset + count * pixelBytes;
++
++      if (end > bytes.byteLength) {
++        throw new Error(`Mipmap ${i} (${width}x${height}) runs past the end of the file`);
++      }
++
++      const rgba = new Uint8Array(count * 4);
++
++      for (let p = 0, at = offset; p < count; p++, at += pixelBytes) {
++        let pixel = 0;
++
++        for (let b = pixelBytes - 1; b >= 0; b--) {
++          pixel = pixel * 256 + bytes[at + b];
++        }
++
++        for (let c = 0; c < 4; c++) {
++          const { mask, shift, max } = channels[c];
++
++          rgba[p * 4 + c] = mask ? Math.round((((pixel & mask) >>> shift) * 255) / max) : c === 3 ? 255 : 0;
++        }
++
++        if (luminance) {
++          rgba[p * 4 + 1] = rgba[p * 4];
++          rgba[p * 4 + 2] = rgba[p * 4];
++        }
++      }
++
++      this.mipmapWidths[i] = width;
++      this.mipmapHeights[i] = height;
++      this.mipmapDatas[i] = rgba;
++
++      offset = end;
++      width = Math.max(Math.floor(width / 2), 1);
++      height = Math.max(Math.floor(height / 2), 1);
++    }
++  }
++
+   mipmaps(): number {
+     return this.mipmapDatas.length;
+   }
+@@ -111,7 +205,7 @@ export class DdsImage {
+     const data = this.mipmapDatas[level];
+     let mipmap: Uint16Array | Uint8Array;
+ 
+-    if (raw) {
++    if (raw || this.format === FORMAT_RGBA8) {
+       mipmap = data;
+     } else if (this.format === FOURCC_DXT1) {
+       mipmap = decodeDxt1(data, width, height);
+diff --git a/src/viewer/handlers/dds/texture.ts b/src/viewer/handlers/dds/texture.ts
+index 5dd65e74..4fab47d3 100644
+--- a/src/viewer/handlers/dds/texture.ts
++++ b/src/viewer/handlers/dds/texture.ts
+@@ -1,4 +1,4 @@
+-import { DdsImage, FOURCC_DXT1, FOURCC_DXT3, FOURCC_DXT5, FOURCC_ATI2 } from '../../../parsers/dds/image';
++import { DdsImage, FOURCC_DXT1, FOURCC_DXT3, FOURCC_DXT5, FOURCC_ATI2, FORMAT_RGBA8 } from '../../../parsers/dds/image';
+ import { HandlerResourceData } from '../../handlerresource';
+ import Texture from '../../texture';
+ 
+@@ -60,6 +60,9 @@ export default class DdsTexture extends Texture {
+ 
+       if (internalFormat) {
+         gl.compressedTexImage2D(gl.TEXTURE_2D, i, internalFormat, width, height, 0, data);
++      } else if (format === FORMAT_RGBA8) {
++        // Uncompressed images are decoded to 8-bit RGBA by the parser.
++        gl.texImage2D(gl.TEXTURE_2D, i, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+       } else if (format === FOURCC_DXT1) {
+         gl.texImage2D(gl.TEXTURE_2D, i, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+       } else if (format === FOURCC_DXT3) {

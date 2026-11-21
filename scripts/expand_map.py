@@ -25,6 +25,7 @@ from flora.build import apply_flora
 from flora.lift import lift_doodads, sink_trees
 from mapgen.footprints.build import apply_scaled_footprints
 from hdtex.model_backfaces import generate as generate_back_faces
+from hitvolumes.intro_trees import apply_intro_tree_clearing
 from skybox_flip import generate as generate_skybox_flip
 from footfall.fx import generate as generate_footfall_fx
 from slow_death_assets import generate as generate_slow_deaths
@@ -448,6 +449,10 @@ def main() -> int:
     # footprints and flora: the step cuts the ground they read.
     if os.environ.get("SC2_NO_RIM_FALLS") != "1":
         apply_rim_falls(dst)
+    # R-INTRO-17: before footprints and flora. Flora plans from the trees
+    # and its validator re-plans from the built map, so both see the same
+    # trees. The seeded scatter re-rolls (operator 2026-11-21: accepted).
+    apply_intro_tree_clearing(dst)
     apply_scaled_footprints(dst)
     if os.environ.get("SC2_NO_FLORA") != "1":
         apply_flora(dst)

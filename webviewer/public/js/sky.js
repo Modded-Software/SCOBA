@@ -31,18 +31,13 @@
       if (!model) throw new Error('cannot load ' + mine.file);
       if (app.sky !== mine) return; // another sky was chosen meanwhile
       const instance = model.addInstance();
-      // The library culls by the model's bounds, which are zero for M3, so
-      // a point at the camera. The sky surrounds the camera: always draw it.
-      instance.isVisible = () => {
-        instance.depth = 0;
-        return true;
-      };
       if (model.sequences.length) {
         instance.setSequence(0);
         instance.setSequenceLoopMode(2);
       }
       skyScene.addInstance(instance);
       Object.assign(mine, { model, instance });
+      app.reportUndrawn(mine.name, model);
     } catch (error) {
       if (app.sky === mine) {
         app.sky = null;

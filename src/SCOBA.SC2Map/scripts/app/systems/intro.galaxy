@@ -163,6 +163,24 @@ void gf_IntroQuiet (int lp_player, bool lp_on) {
     SoundChannelSetVolume(PlayerGroupSingle(lp_player), c_soundCategoryDoodad, 100.0, c_INTRO_CAGED_FADE);
 }
 
+// No chat in the intro (R-INTRO-18), this seat only: the stock chat display
+// hidden and cleared, the Alert sound channel muted (the AI's voice lines,
+// SoundData AICommunication_*, are all Alert). Cleared again on the way
+// out: a line sent in the intro does not show after it.
+void gf_IntroChatHide (int lp_player, bool lp_on) {
+    if (gv_introChatFrame == c_invalidDialogControlId) {
+        DialogControlHookupStandard(c_triggerControlTypePanel, c_INTRO_CHAT_FRAME);
+        gv_introChatFrame = DialogControlLastCreated();
+    }
+    if (lp_on == gv_introChatHidden[lp_player]) {
+        return;
+    }
+    gv_introChatHidden[lp_player] = lp_on;
+    DialogControlSetVisible(gv_introChatFrame, PlayerGroupSingle(lp_player), !lp_on);
+    SoundChannelMute(PlayerGroupSingle(lp_player), c_soundCategoryAlert, lp_on);
+    UIClearMessages(PlayerGroupSingle(lp_player), c_messageAreaChat);
+}
+
 // Cut to row lp_row at time lp_t into it. lp_sounds false after the
 // deploy: the shot sounds stay off (the camera hold, gv_introCamHeld).
 void gf_IntroCutAt (int lp_player, int lp_row, fixed lp_t, bool lp_sounds) {

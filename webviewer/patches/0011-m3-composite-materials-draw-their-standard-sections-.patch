@@ -1,0 +1,154 @@
+From a1e39c29444067ca7464ed20f19103dce97a878f Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 13:58:38 +0200
+Subject: [PATCH 11/17] m3: composite materials draw their standard sections;
+ undrawn material types are listed
+
+---
+ src/parsers/m3/compositematerial.ts | 38 +++++++++++++++++++++++++++++
+ src/parsers/m3/indexentry.ts        |  9 ++++---
+ src/viewer/handlers/m3/model.ts     | 35 +++++++++++++++++++++++---
+ 3 files changed, 75 insertions(+), 7 deletions(-)
+ create mode 100644 src/parsers/m3/compositematerial.ts
+
+diff --git a/src/parsers/m3/compositematerial.ts b/src/parsers/m3/compositematerial.ts
+new file mode 100644
+index 00000000..88d0adcb
+--- /dev/null
++++ b/src/parsers/m3/compositematerial.ts
+@@ -0,0 +1,38 @@
++import BinaryStream from '../../common/binarystream';
++import IndexEntry from './indexentry';
++import Reference from './reference';
++import { Float32AnimationReference } from './animationreference';
++
++/**
++ * A section of a composite material (CMS_ version 0, 24 bytes): one
++ * material, drawn with an alpha factor.
++ */
++export class CompositeMaterialSection {
++  version = -1;
++  materialReferenceIndex = -1;
++  alphaFactor = new Float32AnimationReference();
++
++  load(stream: BinaryStream, version: number, _index: IndexEntry[]): void {
++    this.version = version;
++    this.materialReferenceIndex = stream.readUint32();
++    this.alphaFactor.load(stream);
++  }
++}
++
++/**
++ * A composite material (CMP_ version 2, 28 bytes): materials drawn one over
++ * the other, in section order.
++ */
++export default class CompositeMaterial {
++  version = -1;
++  name = new Reference();
++  unknown0 = 0;
++  sections = new Reference();
++
++  load(stream: BinaryStream, version: number, index: IndexEntry[]): void {
++    this.version = version;
++    this.name.load(stream, index);
++    this.unknown0 = stream.readUint32();
++    this.sections.load(stream, index);
++  }
++}
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index 672ca63f..0097a7d5 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -19,6 +19,7 @@ import AttachmentPoint from './attachmentpoint';
+ import Camera from './camera';
+ import Sd from './sd';
+ import UnsupportedEntry from './unsupportedentry';
++import CompositeMaterial, { CompositeMaterialSection } from './compositematerial';
+ 
+ 
+ // Mapping from entry tags, to their constructors and known version->size values.
+@@ -59,8 +60,8 @@ const tagMapping = {
+   PATU: [UnsupportedEntry, { 4: 152 }],
+   TRGD: [UnsupportedEntry, { 0: 24 }],
+   DIS_: [UnsupportedEntry, { 4: 68 }],
+-  CMS_: [UnsupportedEntry, { 0: 24 }],
+-  CMP_: [UnsupportedEntry, { 2: 28 }],
++  CMS_: [CompositeMaterialSection, { 0: 24 }],
++  CMP_: [CompositeMaterial, { 2: 28 }],
+   TER_: [UnsupportedEntry, { 0: 24, 1: 28 }],
+   VOL_: [UnsupportedEntry, { 0: 84 }],
+   VON_: [UnsupportedEntry, { 0: 268 }],
+@@ -88,8 +89,8 @@ const tagMapping = {
+   WRP_: [UnsupportedEntry, { 1: 132 }],
+ };
+ 
+-export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[];
+-export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | UnsupportedEntry | string | number | Float32Array;
++export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[];
++export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | UnsupportedEntry | string | number | Float32Array;
+ 
+ /**
+  * An index entry.
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index eeef43e9..27208502 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -26,6 +26,12 @@ import { HandlerResourceData } from '../../handlerresource';
+ import Division from '../../../parsers/m3/division';
+ import Batch from '../../../parsers/m3/batch';
+ import MaterialReference from '../../../parsers/m3/materialreference';
++import CompositeMaterial, { CompositeMaterialSection } from '../../../parsers/m3/compositematerial';
++
++// MATM material types (m3addon): 1 standard, 2 displacement, 3 composite,
++// 4 terrain, 5 volume, 7 creep, 8 volume noise, 9 splat terrain bake.
++const MATERIAL_STANDARD = 1;
++const MATERIAL_COMPOSITE = 3;
+ 
+ /**
+  * An M3 model.
+@@ -57,6 +63,11 @@ export default class M3Model extends Model {
+   vertexCount = 0;
+   /** Distance of the farthest rest-pose vertex from the model origin. */
+   vertexReach = 0;
++  /**
++   * Batches the renderer cannot draw (material types other than standard
++   * and composite), one line each, so the caller can report them.
++   */
++  undrawnBatches: string[] = [];
+ 
+   constructor(bufferOrParser: ArrayBuffer | Parser, resourceData: HandlerResourceData) {
+     super(resourceData);
+@@ -92,12 +103,30 @@ export default class M3Model extends Model {
+     }
+ 
+     // Create concrete batch objects
++    // Composite materials: standard materials drawn one over the other, in
++    // section order. Their alpha factors are not applied.
++    const composites = model.materials[2].list(<CompositeMaterial[]>[]);
++
+     for (const batch of div.batches.list(<Batch[]>[])) {
+-      const regionId = batch.regionIndex;
++      const region = this.regions[batch.regionIndex];
+       const materialMap = materialMaps[batch.materialReferenceIndex];
+ 
+-      if (materialMap.materialType === 1) {
+-        this.batches.push(new M3Batch(this.regions[regionId], this.materials[1][materialMap.materialIndex]));
++      if (materialMap.materialType === MATERIAL_STANDARD) {
++        this.batches.push(new M3Batch(region, this.materials[1][materialMap.materialIndex]));
++      } else if (materialMap.materialType === MATERIAL_COMPOSITE) {
++        const composite = composites[materialMap.materialIndex];
++
++        for (const section of composite.sections.list(<CompositeMaterialSection[]>[])) {
++          const sectionMap = materialMaps[section.materialReferenceIndex];
++
++          if (sectionMap.materialType === MATERIAL_STANDARD) {
++            this.batches.push(new M3Batch(region, this.materials[1][sectionMap.materialIndex]));
++          } else {
++            this.undrawnBatches.push(`region ${batch.regionIndex}: composite ${<string>composite.name.get()} section of material type ${sectionMap.materialType}`);
++          }
++        }
++      } else {
++        this.undrawnBatches.push(`region ${batch.regionIndex}: material type ${materialMap.materialType}`);
+       }
+     }
+ 

@@ -14,6 +14,7 @@ from .herodrop_zoom import _report
 STORM_MIN = 5  # the operator's "at least 5"
 STORM_RADIUS_100 = 1600  # c_STORM_RADIUS (operator 2026-11-20: was 32)
 S6_PODS = 3
+S7_LAND_TOL_MS = 150  # two game ticks and the trigger start
 S6_SEARCH_100 = 1600  # the spot search may leave the 3-cell circle (ring search)
 ESCORT_TURN_100 = 100  # pods face as the hero pod, within 1 degree
 DROP_YAW = 225.0  # c_DROP_YAW: southwest
@@ -43,7 +44,17 @@ def check_scenery(checks) -> None:
     checks.eq(s, "", "s6PodUnits", S6_PODS)
     checks.between(s, "", "s6Off100", 0, S6_SEARCH_100)
     checks.eq(s, "", "s6MadeAgain", S6_PODS)
-    checks.eq(s, "", "s6PodUnitsAgain", S6_PODS)
+    # The three S6 pods and the S7 camera pod; negative: no more.
+    checks.eq(s, "", "s6PodUnitsAgain", S6_PODS + 1)
+    # S7 camera pod (R-SCN-4): one, on the S7 eye, landing at the cut into
+    # S7 (the S6 length after the S6 cut). Negative: none in the first 3 s.
+    print(f"{s} raw s7: " + " ".join(f"{k}={checks.value(s, '', k)}" for k in ("s7MadeEarly", "s7Made", "s7DelayMs", "s7LandMs", "s6LengthMs", "s7Off100", "s7NearUnits")))
+    checks.eq(s, "", "s7MadeEarly", 0)
+    checks.eq(s, "", "s7Made", 1)
+    checks.eq(s, "", "s7Off100", 0)
+    checks.eq(s, "", "s7NearUnits", 1)
+    length = checks.value(s, "", "s6LengthMs") or 0
+    checks.between(s, "", "s7LandMs", length - S7_LAND_TOL_MS, length + S7_LAND_TOL_MS)
     # Negative (R-SCN-3 withdrawn): no neutral Wraith; every Wraith on the
     # map is an air creep of the Terran side.
     checks.eq(s, "", "orbitNeutral", 0)

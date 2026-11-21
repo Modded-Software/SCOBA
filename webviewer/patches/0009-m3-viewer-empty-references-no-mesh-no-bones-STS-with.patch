@@ -1,0 +1,127 @@
+From 40e3d0b38fc324aac5827e5bb88f502a0610084b Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 13:55:20 +0200
+Subject: [PATCH 09/17] m3 viewer: empty references (no mesh, no bones, STS
+ without animations) load as empty lists
+
+---
+ src/parsers/m3/reference.ts     | 19 +++++++++++++++++++
+ src/viewer/handlers/m3/model.ts | 20 +++++++++++---------
+ src/viewer/handlers/m3/sts.ts   |  2 +-
+ 3 files changed, 31 insertions(+), 10 deletions(-)
+
+diff --git a/src/parsers/m3/reference.ts b/src/parsers/m3/reference.ts
+index 9871e5e2..2d251690 100644
+--- a/src/parsers/m3/reference.ts
++++ b/src/parsers/m3/reference.ts
+@@ -28,6 +28,25 @@ export default class Reference {
+     return;
+   }
+ 
++  /**
++   * Get the entries, or `empty` when the reference holds none (a model with
++   * no mesh, an animation validator with no animations).
++   * A reference that counts entries but points at none is an error.
++   */
++  list<T>(empty: T): T {
++    if (this.entries === 0) {
++      return empty;
++    }
++
++    const entries = this.get();
++
++    if (entries === undefined) {
++      throw new Error(`Reference to index entry ${this.id} with ${this.entries} entries has no data`);
++    }
++
++    return <T><unknown>entries;
++  }
++
+   /**
+    * Get the first entry this index entry references.
+    */
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 0a42e8c3..eeef43e9 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -78,20 +78,21 @@ export default class M3Model extends Model {
+ 
+     this.setupGeometry(model, div);
+ 
+-    const materialMaps = <MaterialReference[]>model.materialReferences.get();
++    // A model with no mesh (some skyboxes) has no materials or batches.
++    const materialMaps = model.materialReferences.list(<MaterialReference[]>[]);
+ 
+     this.materialMaps = materialMaps;
+ 
+     // Create concrete material objects for standard materials
+ 
+-    const standardMaterials = <StandardMaterial[]>model.materials[0].get();
++    const standardMaterials = model.materials[0].list(<StandardMaterial[]>[]);
+ 
+     for (let i = 0, l = standardMaterials.length; i < l; i++) {
+       this.materials[1].push(new M3StandardMaterial(this, i, standardMaterials[i]));
+     }
+ 
+     // Create concrete batch objects
+-    for (const batch of <Batch[]>div.batches.get()) {
++    for (const batch of div.batches.list(<Batch[]>[])) {
+       const regionId = batch.regionIndex;
+       const materialMap = materialMaps[batch.materialReferenceIndex];
+ 
+@@ -144,13 +145,13 @@ export default class M3Model extends Model {
+ 
+     // this.batches = batchGroups[0].concat(batchGroups[1]).concat(batchGroups[2]).concat(batchGroups[3]).concat(batchGroups[4]).concat(batchGroups[5]);
+ 
+-    this.initialReference = <Float32Array[]>model.absoluteInverseBoneRestPositions.get();
++    this.initialReference = model.absoluteInverseBoneRestPositions.list(<Float32Array[]>[]);
+ 
+-    for (const bone of <Bone[]>model.bones.get()) {
++    for (const bone of model.bones.list(<Bone[]>[])) {
+       this.bones.push(new M3Bone(bone));
+     }
+ 
+-    this.boneLookup = <Uint16Array>model.boneLookup.get();
++    this.boneLookup = model.boneLookup.list(new Uint16Array(0));
+ 
+     const sequences = model.sequences.get();
+     if (sequences) {
+@@ -242,7 +243,8 @@ export default class M3Model extends Model {
+     // tangent bytes: still inside the vertex, and no layer has a texture to map.
+     const uvSetCount = Math.max(1, Math.min(fileUvSets, 4));
+ 
+-    const regions = <Region[]>div.regions.get();
++    // A model with no mesh has no regions, triangles or vertices.
++    const regions = div.regions.list(<Region[]>[]);
+     let totalElements = 0;
+     const offsets = [];
+ 
+@@ -253,13 +255,13 @@ export default class M3Model extends Model {
+ 
+     const elementArray = new Uint16Array(totalElements);
+ 
+-    const triangles = <Uint16Array>div.triangles.get();
++    const triangles = div.triangles.list(new Uint16Array(0));
+ 
+     for (let i = 0, l = regions.length; i < l; i++) {
+       this.regions.push(new M3Region(this, regions[i], triangles, elementArray, offsets[i]));
+     }
+ 
+-    const vertices = <Uint8Array>parser.vertices.get();
++    const vertices = parser.vertices.list(new Uint8Array(0));
+ 
+     this.elementBuffer = gl.createBuffer();
+     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.elementBuffer);
+diff --git a/src/viewer/handlers/m3/sts.ts b/src/viewer/handlers/m3/sts.ts
+index f69d7abe..48182c0d 100644
+--- a/src/viewer/handlers/m3/sts.ts
++++ b/src/viewer/handlers/m3/sts.ts
+@@ -8,7 +8,7 @@ export default class M3Sts {
+   animIds = new Map<number, number>();
+ 
+   constructor(sts: M3ParserSts) {
+-    const animIds = <Uint32Array>sts.animIds.get();
++    const animIds = sts.animIds.list(new Uint32Array(0));
+ 
+     // Allows direct checks instead of loops
+     for (let i = 0, l = animIds.length; i < l; i++) {

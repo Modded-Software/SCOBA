@@ -1,0 +1,65 @@
+From 64c9e8a9a33a2cbacde5b8c6706111ba39fccbb9 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 13:56:01 +0200
+Subject: [PATCH 10/17] m3 viewer: empty STC, STG and sequence data references
+ load as empty lists
+
+---
+ src/viewer/handlers/m3/sd.ts  | 5 +++--
+ src/viewer/handlers/m3/stc.ts | 7 ++++---
+ src/viewer/handlers/m3/stg.ts | 2 +-
+ 3 files changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/sd.ts b/src/viewer/handlers/m3/sd.ts
+index b232b43a..fbf66101 100644
+--- a/src/viewer/handlers/m3/sd.ts
++++ b/src/viewer/handlers/m3/sd.ts
+@@ -15,8 +15,9 @@ class M3Sd {
+   biggestKey: number;
+ 
+   constructor(sd: M3ParserSd) {
+-    this.keys = <Int32Array>sd.keys.get();
+-    this.values = <vec3[]>sd.values.get(); // Fake typecasting to avoid a TS error.
++    // A track with no keys reads its initial value (getValueUnsafe).
++    this.keys = sd.keys.list(new Int32Array(0));
++    this.values = sd.values.list(<vec3[]>[]); // Fake typecasting to avoid a TS error.
+     this.biggestKey = sd.biggestKey;
+   }
+ }
+diff --git a/src/viewer/handlers/m3/stc.ts b/src/viewer/handlers/m3/stc.ts
+index 5dec4425..d418dedc 100644
+--- a/src/viewer/handlers/m3/stc.ts
++++ b/src/viewer/handlers/m3/stc.ts
+@@ -17,15 +17,16 @@ export default class M3Stc {
+   sd: M3SdContainer[] = [];
+ 
+   constructor(stc: M3ParserStc) {
+-    const animIds = <Uint32Array>stc.animIds.get();
++    // An STC that animates nothing has no ids and no references.
++    const animIds = stc.animIds.list(new Uint32Array(0));
+ 
+     this.name = <string>stc.name.get();
+     this.runsConcurrent = stc.runsConcurrent;
+     this.priority = stc.priority;
+     this.stsIndex = stc.stsIndex;
+ 
+-    const uints = <Uint32Array>stc.animRefs.get();
+-    const animRefs = new Uint16Array(uints.buffer);
++    const uints = stc.animRefs.list(new Uint32Array(0));
++    const animRefs = new Uint16Array(uints.buffer, uints.byteOffset, uints.length * 2);
+ 
+     // Allows direct checks instead of loops
+     for (let i = 0, l = animIds.length; i < l; i++) {
+diff --git a/src/viewer/handlers/m3/stg.ts b/src/viewer/handlers/m3/stg.ts
+index f467b7e1..f0127db9 100644
+--- a/src/viewer/handlers/m3/stg.ts
++++ b/src/viewer/handlers/m3/stg.ts
+@@ -16,7 +16,7 @@ export default class M3Stg {
+ 
+   constructor(stg: M3ParserStg, sts: M3Sts[], stc: M3Stc[]) {
+     this.name = <string>stg.name.get();
+-    this.stcIndices = <Uint32Array>stg.stcIndices.get();
++    this.stcIndices = stg.stcIndices.list(new Uint32Array(0));
+     this.sts = sts;
+     this.stc = stc;
+   }

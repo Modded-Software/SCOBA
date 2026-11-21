@@ -48,6 +48,13 @@
     setStatus(error.message);
   }
 
+  /** Say so when a loaded model has parts the renderer cannot draw. */
+  function reportUndrawn(name, model) {
+    if (!model.undrawnBatches.length) return;
+    console.warn(`sc2viewer: ${name}: not drawn: ${model.undrawnBatches.join('; ')}`);
+    setStatus(`${name}: ${model.undrawnBatches.length} part(s) not drawn (${model.undrawnBatches[0]})`);
+  }
+
   async function getJson(url) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`${response.status} ${url}`);
@@ -107,16 +114,38 @@
     return [v[0] / length, v[1] / length, v[2] / length];
   };
 
-  /** The ground point (z = 0) under a canvas pixel, or null when the pixel shows sky. */
-  function groundAt(px, py) {
+  /** The camera's eye and its forward, right and up axes. */
+  function basis() {
     const from = eye();
     const forward = unit3([camera.target[0] - from[0], camera.target[1] - from[1], camera.target[2] - from[2]]);
     const right = unit3(cross(forward, UP));
     const up = cross(right, forward);
-    const tan = Math.tan(FOV / 2);
-    const nx = ((2 * px) / canvas.clientWidth - 1) * tan * (canvas.clientWidth / canvas.clientHeight);
+    return { from, forward, right, up, tan: Math.tan(FOV / 2), aspect: canvas.clientWidth / canvas.clientHeight };
+  }
+
+  /** The ray through a canvas pixel (from the top left, in CSS pixels): { from, dir }. */
+  function rayAt(px, py) {
+    const { from, forward, right, up, tan, aspect } = basis();
+    const nx = ((2 * px) / canvas.clientWidth - 1) * tan * aspect;
     const ny = (1 - (2 * py) / canvas.clientHeight) * tan;
-    const dir = [0, 1, 2].map((i) => forward[i] + right[i] * nx + up[i] * ny);
+    return { from, dir: [0, 1, 2].map((i) => forward[i] + right[i] * nx + up[i] * ny) };
+  }
+
+  /** The page pixel [clientX, clientY] a world point lands on, or null behind the camera. The inverse of rayAt. */
+  function screenOf(point) {
+    const { from, forward, right, up, tan, aspect } = basis();
+    const d = [0, 1, 2].map((i) => point[i] - from[i]);
+    const depth = d[0] * forward[0] + d[1] * forward[1] + d[2] * forward[2];
+    if (depth <= 0) return null;
+    const nx = (d[0] * right[0] + d[1] * right[1] + d[2] * right[2]) / depth;
+    const ny = (d[0] * up[0] + d[1] * up[1] + d[2] * up[2]) / depth;
+    const box = canvas.getBoundingClientRect();
+    return [box.left + ((nx / (tan * aspect) + 1) * canvas.clientWidth) / 2, box.top + ((1 - ny / tan) * canvas.clientHeight) / 2];
+  }
+
+  /** The ground point (z = 0) under a canvas pixel, or null when the pixel shows sky. */
+  function groundAt(px, py) {
+    const { from, dir } = rayAt(px, py);
     if (dir[2] >= -1e-6) return null;
     const t = -from[2] / dir[2];
     if (t <= 0) return null;
@@ -165,6 +194,8 @@
     scene,
     skyScene,
     ground: SC2Ground.create(viewer),
+    outline: SC2Outline.create(viewer),
+    displacement: SC2Displacement.create(viewer),
     canvas,
     // constants
     BACKGROUND,
@@ -181,6 +212,7 @@
     $,
     setStatus,
     reportFailure,
+    reportUndrawn,
     getJson,
     el,
     iconNode,
@@ -194,6 +226,8 @@
     resize,
     groundAt,
     eventGround,
+    rayAt,
+    screenOf,
     dataScale,
     playRate,
     defaultSequence,

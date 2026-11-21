@@ -63,6 +63,8 @@ void gf_HsS6Pods (string lp_s) {
     unitgroup lv_seen = UnitGroupEmpty();
     string lv_made = "";
     fixed lv_gap = 9999.0;
+    int lv_s7Early;
+    int lv_s7Near = 0;
 
     BankValueSetFromInt(gv_dbgBank, lp_s, "s6Before", gv_s6PodsMade);
     gf_SceneryS6Pods();
@@ -83,14 +85,27 @@ void gf_HsS6Pods (string lp_s) {
         lv_off = MaxF(lv_off, DistanceBetweenPoints(gv_s6PodAt[lv_i], Point(gv_introS6PodX[lv_i], gv_introS6PodY[lv_i])));
     }
     BankValueSetFromInt(gv_dbgBank, lp_s, "s6Off100", FixedToInt(lv_off * 100.0));
+    lv_s7Early = gv_s7PodMade;
     // Negative: once per game.
     gf_SceneryS6Pods();
-    for (lv_n = 0; lv_n < 12; lv_n += 1) {
+    // 4 s: past the S7 pod's landing at 6 s after the first call.
+    for (lv_n = 0; lv_n < 16; lv_n += 1) {
         Wait(0.25, c_timeGame);
         UnitGroupAddUnitGroup(lv_seen, UnitGroup("ZergDropPod", c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0));
+        // The pod unit at the S7 eye, from the engine.
+        lv_s7Near = MaxI(lv_s7Near, UnitGroupCount(UnitGroup("ZergDropPod", c_playerAny, RegionCircle(Point(c_INTRO_S7_EYE_X, c_INTRO_S7_EYE_Y), 2.0), UnitFilter(0, 0, 0, 0), 0), c_unitCountAll));
     }
     BankValueSetFromInt(gv_dbgBank, lp_s, "s6MadeAgain", gv_s6PodsMade);
     BankValueSetFromInt(gv_dbgBank, lp_s, "s6PodUnitsAgain", UnitGroupCount(lv_seen, c_unitCountAll));
+    // The S7 camera pod: one, made the S6 length less the pod fall after
+    // the first call, on the S7 eye. Negative: not yet after 3 s.
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s7MadeEarly", lv_s7Early);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s7Made", gv_s7PodMade);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s7DelayMs", FixedToInt((gv_s7PodMadeAt - gv_s7PodStart) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s7LandMs", FixedToInt((gv_s7PodMadeAt - gv_s7PodStart + c_POD_DELAY_ZERG) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s6LengthMs", FixedToInt(gv_introRow_length[c_INTRO_S6_ROW] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s7Off100", FixedToInt(DistanceBetweenPoints(gv_s7PodAt, Point(c_INTRO_S7_EYE_X, c_INTRO_S7_EYE_Y)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "s7NearUnits", lv_s7Near);
 }
 
 void gf_HdScenery () {

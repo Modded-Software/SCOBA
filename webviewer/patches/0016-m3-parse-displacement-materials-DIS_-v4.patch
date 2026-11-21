@@ -1,0 +1,81 @@
+From 1a56c7000954061628d7ddf5223f538a73bf5c9c Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 14:53:10 +0200
+Subject: [PATCH 16/17] m3: parse displacement materials (DIS_ v4)
+
+---
+ src/parsers/m3/displacementmaterial.ts | 32 ++++++++++++++++++++++++++
+ src/parsers/m3/indexentry.ts           |  7 +++---
+ 2 files changed, 36 insertions(+), 3 deletions(-)
+ create mode 100644 src/parsers/m3/displacementmaterial.ts
+
+diff --git a/src/parsers/m3/displacementmaterial.ts b/src/parsers/m3/displacementmaterial.ts
+new file mode 100644
+index 00000000..cce635a0
+--- /dev/null
++++ b/src/parsers/m3/displacementmaterial.ts
+@@ -0,0 +1,32 @@
++import BinaryStream from '../../common/binarystream';
++import IndexEntry from './indexentry';
++import Reference from './reference';
++import { Float32AnimationReference } from './animationreference';
++
++/**
++ * A displacement material (DIS_ version 4, 68 bytes; m3addon
++ * structures.xml): the surface bends the picture behind it. A normal layer
++ * gives the direction, a strength layer and an animated strength factor how
++ * far.
++ */
++export default class DisplacementMaterial {
++  version = -1;
++  name = new Reference();
++  unknown0 = 0;
++  strengthFactor = new Float32AnimationReference();
++  normalLayer = new Reference();
++  strengthLayer = new Reference();
++  flags = 0;
++  priority = 0;
++
++  load(stream: BinaryStream, version: number, index: IndexEntry[]): void {
++    this.version = version;
++    this.name.load(stream, index);
++    this.unknown0 = stream.readUint32();
++    this.strengthFactor.load(stream);
++    this.normalLayer.load(stream, index);
++    this.strengthLayer.load(stream, index);
++    this.flags = stream.readUint32();
++    this.priority = stream.readInt32();
++  }
++}
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index 0097a7d5..025740c8 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -20,6 +20,7 @@ import Camera from './camera';
+ import Sd from './sd';
+ import UnsupportedEntry from './unsupportedentry';
+ import CompositeMaterial, { CompositeMaterialSection } from './compositematerial';
++import DisplacementMaterial from './displacementmaterial';
+ 
+ 
+ // Mapping from entry tags, to their constructors and known version->size values.
+@@ -59,7 +60,7 @@ const tagMapping = {
+   ATVL: [UnsupportedEntry, { 0: 116 }],
+   PATU: [UnsupportedEntry, { 4: 152 }],
+   TRGD: [UnsupportedEntry, { 0: 24 }],
+-  DIS_: [UnsupportedEntry, { 4: 68 }],
++  DIS_: [DisplacementMaterial, { 4: 68 }],
+   CMS_: [CompositeMaterialSection, { 0: 24 }],
+   CMP_: [CompositeMaterial, { 2: 28 }],
+   TER_: [UnsupportedEntry, { 0: 24, 1: 28 }],
+@@ -89,8 +90,8 @@ const tagMapping = {
+   WRP_: [UnsupportedEntry, { 1: 132 }],
+ };
+ 
+-export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[];
+-export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | UnsupportedEntry | string | number | Float32Array;
++export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[];
++export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | UnsupportedEntry | string | number | Float32Array;
+ 
+ /**
+  * An index entry.

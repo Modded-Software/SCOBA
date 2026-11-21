@@ -1,0 +1,60 @@
+From 68e9beceb0f16c4b99e4827ddaccdc99880bb160 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 14:21:06 +0200
+Subject: [PATCH 14/17] m3: keep each region's stored UV range for inspection
+
+---
+ src/viewer/handlers/m3/model.ts  | 17 +++++++++++++++++
+ src/viewer/handlers/m3/region.ts |  4 ++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 18a78159..268952d1 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -326,6 +326,23 @@ export default class M3Model extends Model {
+ 
+       this.vertexReach = Math.max(this.vertexReach, Math.hypot(x, y, z));
+     }
++
++    // The stored range of the first UV set per region, for inspection.
++    if (fileUvSets) {
++      for (const region of this.regions) {
++        let min = Infinity;
++        let max = -Infinity;
++
++        for (let v = region.firstVertexIndex; v < region.firstVertexIndex + region.verticesCount; v++) {
++          const at = v * this.vertexSize + this.uvOffset;
++
++          min = Math.min(min, view.getInt16(at, true), view.getInt16(at + 2, true));
++          max = Math.max(max, view.getInt16(at, true), view.getInt16(at + 2, true));
++        }
++
++        region.rawUvRange = [min, max];
++      }
++    }
+   }
+ 
+   /**
+diff --git a/src/viewer/handlers/m3/region.ts b/src/viewer/handlers/m3/region.ts
+index 6a762c09..cd613f7a 100644
+--- a/src/viewer/handlers/m3/region.ts
++++ b/src/viewer/handlers/m3/region.ts
+@@ -15,6 +15,9 @@ export default class M3Region {
+   /** Stored texture coordinate to texture space: scale, then offset. */
+   uvScale: number;
+   uvOffset: number;
++  /** Smallest and largest stored coordinate of the first UV set (u and v). */
++  rawUvRange: [number, number] = [0, 0];
++  firstVertexIndex: number;
+ 
+   constructor(model: M3Model, region: M3ParserRegion, triangles: Uint16Array, elementArray: Uint16Array, offset: number) {
+     const firstVertexIndex = region.firstVertexIndex;
+@@ -35,6 +38,7 @@ export default class M3Region {
+     this.offset = offset * 2;
+     this.verticesCount = region.verticesCount;
+     this.elements = triangleIndicesCount;
++    this.firstVertexIndex = firstVertexIndex;
+     this.uvScale = region.uvwMult / 16 / 2048;
+     this.uvOffset = region.uvwOffset;
+   }

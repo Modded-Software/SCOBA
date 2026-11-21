@@ -198,12 +198,12 @@ test('a drag that ends off the canvas places nothing', async ({ page }) => {
 test('a drop above the horizon places nothing and says why', async ({ page }) => {
   const problems = watch(page);
   await open(page);
-  // Tilt the camera level, so the top of the view shows sky:
+  // Tilt the camera level (middle drag), so the top of the view shows sky:
   // 112 px up at 0.004 rad/px lowers the pitch from 0.5 to 0.052.
   await page.mouse.move(700, 400);
-  await page.mouse.down();
+  await page.mouse.down({ button: 'middle' });
   await page.mouse.move(700, 288, { steps: 5 });
-  await page.mouse.up();
+  await page.mouse.up({ button: 'middle' });
   const pitch = (await state(page)).camera.pitch;
   expect(pitch).toBeLessThan(0.1);
   expect(pitch).toBeGreaterThan(0);

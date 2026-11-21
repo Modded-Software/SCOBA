@@ -1,0 +1,112 @@
+From dfa4f65218ab77f9d29cb99366a9279216246012 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 14:20:15 +0200
+Subject: [PATCH 13/17] m3: texture coordinates use the region's uvwMult and
+ uvwOffset (REGN v5)
+
+---
+ src/parsers/m3/region.ts                        | 11 +++++++++--
+ src/viewer/handlers/m3/region.ts                |  6 ++++++
+ src/viewer/handlers/m3/shaders/standard.vert.ts | 16 +++++++++-------
+ 3 files changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/src/parsers/m3/region.ts b/src/parsers/m3/region.ts
+index 365cfedd..92c22dcd 100644
+--- a/src/parsers/m3/region.ts
++++ b/src/parsers/m3/region.ts
+@@ -20,7 +20,13 @@ export default class Region {
+   unknown3 = 0;
+   rootBoneIndex = -1;
+   unknown4 = 0;
+-  unknown5 = new Uint8Array(8);
++  /**
++   * Texture coordinate scale and offset (version 5): a stored coordinate c
++   * maps to c * (uvwMult / 16) / 2048 + uvwOffset (m3addon m3import.py,
++   * toBlenderUVCoordinate). Before version 5 the scale is 16, the offset 0.
++   */
++  uvwMult = 16;
++  uvwOffset = 0;
+ 
+   load(stream: BinaryStream, version: number, _index: IndexEntry[]): void {
+     this.version = version;
+@@ -43,7 +49,8 @@ export default class Region {
+     }
+ 
+     if (version > 4) {
+-      stream.readUint8Array(this.unknown5);
++      this.uvwMult = stream.readFloat32();
++      this.uvwOffset = stream.readFloat32();
+     }
+   }
+ }
+diff --git a/src/viewer/handlers/m3/region.ts b/src/viewer/handlers/m3/region.ts
+index 430d4d49..6a762c09 100644
+--- a/src/viewer/handlers/m3/region.ts
++++ b/src/viewer/handlers/m3/region.ts
+@@ -12,6 +12,9 @@ export default class M3Region {
+   offset: number;
+   verticesCount: number;
+   elements: number;
++  /** Stored texture coordinate to texture space: scale, then offset. */
++  uvScale: number;
++  uvOffset: number;
+ 
+   constructor(model: M3Model, region: M3ParserRegion, triangles: Uint16Array, elementArray: Uint16Array, offset: number) {
+     const firstVertexIndex = region.firstVertexIndex;
+@@ -32,11 +35,14 @@ export default class M3Region {
+     this.offset = offset * 2;
+     this.verticesCount = region.verticesCount;
+     this.elements = triangleIndicesCount;
++    this.uvScale = region.uvwMult / 16 / 2048;
++    this.uvOffset = region.uvwOffset;
+   }
+ 
+   render(shader: Shader): void {
+     const gl = this.gl;
+ 
++    gl.uniform2f(shader.uniforms['u_uvTransform'], this.uvScale, this.uvOffset);
+     gl.uniform1f(shader.uniforms['u_firstBoneLookupIndex'], this.firstBoneLookupIndex);
+     gl.uniform1f(shader.uniforms['u_boneWeightPairsCount'], this.boneWeightPairsCount);
+ 
+diff --git a/src/viewer/handlers/m3/shaders/standard.vert.ts b/src/viewer/handlers/m3/shaders/standard.vert.ts
+index 7b188cab..83e4b8ef 100644
+--- a/src/viewer/handlers/m3/shaders/standard.vert.ts
++++ b/src/viewer/handlers/m3/shaders/standard.vert.ts
+@@ -9,6 +9,8 @@ uniform float u_boneWeightPairsCount;
+ uniform vec3 u_teamColors[14];
+ uniform float u_teamColor;
+ uniform vec4 u_vertexColor;
++// Per region: stored texture coordinate * x + y (REGN uvwMult, uvwOffset).
++uniform vec2 u_uvTransform;
+ 
+ attribute vec3 a_position;
+ attribute vec4 a_normal;
+@@ -94,21 +96,21 @@ void main() {
+ 
+   vec4 uv0, uv1;
+ 
+-  uv0.xy = a_uv0 / 2048.0;
++  uv0.xy = a_uv0 * u_uvTransform.x + u_uvTransform.y;
+ 
+   #ifdef EXPLICITUV1
+-  uv0.zw = a_uv1 / 2048.0;
++  uv0.zw = a_uv1 * u_uvTransform.x + u_uvTransform.y;
+   #endif
+ 
+   #ifdef EXPLICITUV2
+-  uv0.zw = a_uv1 / 2048.0;
+-  uv1.xy = a_uv2 / 2048.0;
++  uv0.zw = a_uv1 * u_uvTransform.x + u_uvTransform.y;
++  uv1.xy = a_uv2 * u_uvTransform.x + u_uvTransform.y;
+   #endif
+ 
+   #ifdef EXPLICITUV3
+-  uv0.zw = a_uv1 / 2048.0;
+-  uv1.xy = a_uv2 / 2048.0;
+-  uv1.zw = a_uv3 / 2048.0;
++  uv0.zw = a_uv1 * u_uvTransform.x + u_uvTransform.y;
++  uv1.xy = a_uv2 * u_uvTransform.x + u_uvTransform.y;
++  uv1.zw = a_uv3 * u_uvTransform.x + u_uvTransform.y;
+   #endif
+ 
+   v_uv[0] = uv0;

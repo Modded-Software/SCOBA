@@ -6,7 +6,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from . import intro_shots, pod_birth
+from . import intro_shots, intro_trees, pod_birth
 
 
 def animation_actor_problems(map_dir: Path, actors) -> list[str]:
@@ -36,6 +36,8 @@ def animation_actor_problems(map_dir: Path, actors) -> list[str]:
 def intro_problems(map_dir: Path) -> list[str]:
     problems: list[str] = []
     problems.extend(intro_shots.check(map_dir))
+    # R-INTRO-17: no map tree in the canopy of the two S2 trees.
+    problems.extend(intro_trees.problems(map_dir))
     # SPEC-HERO-DROP 3: the pod's Birth path, generated from the model.
     problems.extend(pod_birth.check(map_dir))
     text = (map_dir / "scripts" / "app" / "core" / "intro.galaxy").read_text(encoding="utf-8")

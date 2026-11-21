@@ -14,25 +14,38 @@
     return spots;
   }
 
-  /** One frame: background, sky, ground, units. */
+  /** One frame: background, sky (and its displacement), ground, units (and theirs), mouse-over outline. */
   function draw(dt) {
     const gl = viewer.gl;
     viewer.update(dt);
+    app.endOneShots();
+    app.updatePick();
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.scissor(0, 0, canvas.width, canvas.height);
     gl.depthMask(true);
     gl.clearColor(BACKGROUND[0], BACKGROUND[1], BACKGROUND[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Displacement batches drawn this frame, sky and units (for the tests).
+    app.displacedBatches = 0;
     if (app.sky && app.sky.instance) {
       skyScene.render();
+      app.displacedBatches += app.displacement.draw(skyScene, canvas.width, canvas.height);
       // The sky is behind everything: forget its depth.
       gl.depthMask(true);
       gl.clear(gl.DEPTH_BUFFER_BIT);
     }
     ground.draw(scene.camera, camera.target, glowSpots());
     scene.render();
+    app.displacedBatches += app.displacement.draw(scene, canvas.width, canvas.height);
+    // The mouse-over outline, when the hovered unit is drawn this frame.
+    const hovered = app.hoveredItem();
+    if (hovered && scene.instances.includes(hovered.instance)) app.outline.draw(hovered.instance, canvas.width, canvas.height);
   }
   app.draw = draw;
+  /** Draw displacement materials or not (tests compare the two). */
+  app.setDisplacement = (on) => {
+    app.displacement.enabled = Boolean(on);
+  };
 
   // ---- URL state ----
 
@@ -61,13 +74,20 @@
 
   // ---- frame loop and startup ----
 
-  function frame() {
+  // Animations advance by the real time since the last frame, so they play
+  // at the data's speed on any screen refresh rate. A long gap (hidden tab)
+  // counts as at most MAX_STEP.
+  const MAX_STEP = 100; // ms
+  let lastTime = null;
+  function frame(now) {
+    const dt = lastTime === null ? 0 : Math.min(now - lastTime, MAX_STEP);
+    lastTime = now;
     app.resize();
-    draw(1000 / 60);
+    draw(dt);
     requestAnimationFrame(frame);
   }
 
-  const api = ['add', 'addUnit', 'remove', 'clear', 'restart', 'state', 'pixels', 'colorStats', 'mark', 'changedSinceMark', 'idle', 'view', 'groundPixel', 'setGrid', 'setSky'];
+  const api = ['add', 'addUnit', 'remove', 'clear', 'restart', 'state', 'pixels', 'colorStats', 'mark', 'changedSinceMark', 'idle', 'view', 'groundPixel', 'groundPeaks', 'worldToCanvas', 'setGrid', 'setSky', 'screenOf', 'itemScreen', 'pickState', 'setDisplacement'];
   window.sc2viewer = { ready: false, groundUnder: app.groundAt };
   for (const name of api) {
     if (typeof app[name] !== 'function') throw new Error('sc2viewer: module did not define ' + name);
@@ -77,7 +97,7 @@
   app.resize();
   app.applyCamera();
   requestAnimationFrame(frame);
-  Promise.all([app.setupUnits(), loadHash(), ground.ready])
+  Promise.all([app.setupUnits(), loadHash(), ground.ready, app.outline.ready])
     .catch((error) => app.setStatus(error.message))
     .finally(() => {
       window.sc2viewer.ready = true;

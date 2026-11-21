@@ -1,7 +1,8 @@
 // Module: systems/scenery
 // Permanent scenery (operator 2026-11-20, REQ-SCENERY): thunder storms
 // around the Overmind, three empty Zerg drop pods in the first Overmind
-// orbit of the intro (S6). The orbit Wraiths at the Psi Destroyer are
+// orbit of the intro (S6), one more on the S7 camera spot at the cut into
+// S7. The orbit Wraiths at the Psi Destroyer are
 // removed (operator 2026-11-20).
 
 // --- Home structures -------------------------------------------------------
@@ -87,12 +88,45 @@ bool gt_SceneryS6Pods_Func (bool testConds, bool runActions) {
     return true;
 }
 
+// --- S7 camera pod (R-SCN-4) -----------------------------------------------
+// One more empty Zerg pod, on the exact spot of the S7 camera (the shot
+// that looks up at the Overmind). It hits the ground at the cut into S7:
+// started with the S6 cut, it waits the S6 length less the pod's fall
+// (c_POD_DELAY_ZERG), in game time as the intro shots. No spot search: the
+// point is the camera's.
+trigger gt_SceneryS7Pod;
+int gv_s7PodMade;
+point gv_s7PodAt;
+fixed gv_s7PodStart;   // mission time of the S6 cut (tests)
+fixed gv_s7PodMadeAt;  // mission time the pod was made (tests)
+
+bool gt_SceneryS7Pod_Func (bool testConds, bool runActions) {
+    unit lv_home = gf_SceneryHome("SCOBAOvermind");
+    int lv_owner = 0;
+
+    if (!runActions) {
+        return true;
+    }
+    gv_s7PodStart = GameGetMissionTime();
+    Wait(gv_introRow_length[c_INTRO_S6_ROW] - c_POD_DELAY_ZERG, c_timeGame);
+    if (lv_home != null) {
+        lv_owner = UnitGetOwner(lv_home);
+    }
+    gv_s7PodAt = Point(c_INTRO_S7_EYE_X, c_INTRO_S7_EYE_Y);
+    gf_PodImpactQueue(libVCMI_ge_DropPodRace_Zerg, gv_s7PodAt);
+    libVCMI_gf_CreateDropPod(libVCMI_ge_DropPodRace_Zerg, gv_s7PodAt, UnitGroupEmpty(), false, lv_owner);
+    gv_s7PodMadeAt = GameGetMissionTime();
+    gv_s7PodMade += 1;
+    return true;
+}
+
 void gf_SceneryS6Pods () {
     if (gv_s6PodsDone) {
         return;
     }
     gv_s6PodsDone = true;
     TriggerExecute(gt_SceneryS6Pods, true, false);
+    TriggerExecute(gt_SceneryS7Pod, true, false);
 }
 
 trigger gt_SceneryInit;
@@ -109,4 +143,5 @@ void gt_Scenery_Init () {
     gt_SceneryInit = TriggerCreate("gt_SceneryInit_Func");
     TriggerAddEventMapInit(gt_SceneryInit);
     gt_SceneryS6Pods = TriggerCreate("gt_SceneryS6Pods_Func");
+    gt_SceneryS7Pod = TriggerCreate("gt_SceneryS7Pod_Func");
 }

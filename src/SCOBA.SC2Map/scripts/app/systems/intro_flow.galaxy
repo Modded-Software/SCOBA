@@ -55,6 +55,7 @@ void gf_IntroStartSeat (int lp_player) {
     UnitClearSelection(lp_player);
     // The dialogs exist now: hidden and kept for the touchdown.
     gf_SceneDialogsEnforce(lp_player);
+    gf_IntroChatHide(lp_player, true);
     gf_CameraFollowStop(lp_player);
     CameraUseHeightSmoothing(lp_player, false);
     gv_introHumOn[lp_player] = false;
@@ -186,6 +187,7 @@ void gf_IntroEnd (int lp_player) {
     gf_IntroHum(lp_player, false);
     gf_IntroQuiet(lp_player, false);
     gf_IntroMusicStop(lp_player);
+    gf_IntroChatHide(lp_player, false);
     gv_introDof[lp_player] = false;
     gv_introCamHeld[lp_player] = false;
     gf_SceneLeave(lp_player, c_SCENE_INTRO);

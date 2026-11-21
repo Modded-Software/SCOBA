@@ -1,0 +1,83 @@
+From ea993250fed21698a169ea6c3d2788835996e910 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 13:48:20 +0200
+Subject: [PATCH 07/17] m3 viewer: culling bounds from header and sequence
+ boxes and rest-pose vertices
+
+---
+ src/viewer/handlers/m3/model.ts | 48 +++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 323e5073..0a42e8c3 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -55,6 +55,8 @@ export default class M3Model extends Model {
+   /** Size of the vertex data, and how many vertices the regions use. */
+   vertexBytes = 0;
+   vertexCount = 0;
++  /** Distance of the farthest rest-pose vertex from the model origin. */
++  vertexReach = 0;
+ 
+   constructor(bufferOrParser: ArrayBuffer | Parser, resourceData: HandlerResourceData) {
+     super(resourceData);
+@@ -157,6 +159,8 @@ export default class M3Model extends Model {
+       }
+     }
+ 
++    this.setupBounds(model, sequences ? <Sequence[]>sequences : []);
++
+     const stss = model.sts.get();
+     if (stss) {
+       for (const sts of <Sts[]>stss) {
+@@ -278,6 +282,50 @@ export default class M3Model extends Model {
+     this.uvSetCount = uvSetCount;
+     this.uvOffset = 24 + colorBytes;
+     this.tangentOffset = 24 + colorBytes + fileUvSets * 4;
++
++    // The farthest rest-pose vertex from the origin (position: 3 floats at 0).
++    const view = new DataView(vertices.buffer, vertices.byteOffset, vertices.byteLength);
++
++    for (let i = 0, at = 0; i < vertexCount; i++, at += this.vertexSize) {
++      const x = view.getFloat32(at, true);
++      const y = view.getFloat32(at + 4, true);
++      const z = view.getFloat32(at + 8, true);
++
++      this.vertexReach = Math.max(this.vertexReach, Math.hypot(x, y, z));
++    }
++  }
++
++  /**
++   * Culling bounds, as the game has them: the box of the model header and
++   * the box of every sequence, joined. The game culls a unit with the box
++   * of its current animation; one box for all animations is never smaller.
++   *
++   * Some models have vertices outside those boxes (20 of 1474 unit models,
++   * tools/bounds-survey.mjs in the viewer), so the farthest rest-pose
++   * vertex counts too.
++   *
++   * Instance culling adds the bounds centre without the instance rotation,
++   * so the sphere is centred on the model origin. Its radius reaches the
++   * farthest box corner, so it holds the box in any rotation.
++   */
++  setupBounds(model: M3ParserModel, sequences: Sequence[]): void {
++    const boxes = [model.boundings, ...sequences.map((sequence) => sequence.boundingSphere)];
++    let reach = this.vertexReach;
++
++    for (const box of boxes) {
++      for (const x of [box.min[0], box.max[0]]) {
++        for (const y of [box.min[1], box.max[1]]) {
++          for (const z of [box.min[2], box.max[2]]) {
++            reach = Math.max(reach, Math.hypot(x, y, z));
++          }
++        }
++      }
++    }
++
++    this.bounds.x = 0;
++    this.bounds.y = 0;
++    this.bounds.z = 0;
++    this.bounds.r = reach;
+   }
+ 
+   mapMaterial(index: number): M3StandardMaterial {

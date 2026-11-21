@@ -108,8 +108,8 @@ void gf_HoldType (string lp_type) {
 
 // The S2 Zerus tree (operator 2026-11-20): a model actor at map init, just
 // behind the S2 start eye (data/intro_shots). Variation and scale as an
-// editor ZerusTree doodad at 100 %. A second one next to it, further down
-// the camera path: 75 %, turned (c_INTRO_TREE2_FACING).
+// editor ZerusTree doodad at 75 %. A second one further down the camera
+// path: 75 % of the first, turned (c_INTRO_TREE2_FACING).
 void gf_IntroTreePlace () {
     gv_introTree = libNtve_gf_CreateModelAtPoint("ZerusTree", Point(c_INTRO_TREE_X, c_INTRO_TREE_Y));
     ActorSend(gv_introTree, "ModelSwap ZerusTree " + IntToString(c_INTRO_TREE_VARIATION));

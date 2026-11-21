@@ -14,4 +14,8 @@ module.exports = {
       tga: require('../ref/mdx-m3-viewer/src/viewer/handlers/tga/handler').default,
     },
   },
+  // The DDS parser alone, so tests can decode a texture file in the page.
+  parsers: {
+    dds: { Image: require('../ref/mdx-m3-viewer/src/parsers/dds/image').DdsImage },
+  },
 };

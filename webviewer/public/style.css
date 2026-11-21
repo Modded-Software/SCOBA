@@ -69,3 +69,12 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .picker-list li:hover { background: #2a2a32; }
 .picker-list li.selected { border-color: #6a8; background: #26302a; }
 .picker-list .sub { font-size: 11px; }
+
+.anim-menu { position: fixed; z-index: 10; min-width: 140px; max-height: 60vh; display: flex; flex-direction: column; background: rgba(16, 16, 20, 0.95); border: 1px solid #6a8; }
+.anim-menu .title { padding: 3px 8px; color: #cfe; border-bottom: 1px solid #333; white-space: nowrap; }
+.anim-menu ul { overflow-y: auto; min-height: 0; }
+.anim-menu button { width: 100%; text-align: left; border: 0; background: none; padding: 2px 8px; white-space: nowrap; }
+.anim-menu button:hover { background: #26302a; color: #fff; }
+.anim-menu .empty { padding: 3px 8px; color: #777; }
+.anim-menu button.playing { background: #2f4a34; color: #cfe; box-shadow: inset 3px 0 0 #6c8; }
+.anim-menu .loop-choice { display: flex; gap: 4px; align-items: center; padding: 3px 8px; border-bottom: 1px solid #333; color: #aaa; cursor: pointer; }

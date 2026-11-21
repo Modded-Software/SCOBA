@@ -16,10 +16,34 @@
     item.instance.setScale(item.dataScale.map((v) => v * item.scale));
   }
 
+  /** Play the item's own (idle) animation, looping. Ends a one-shot. */
   function applySequence(item) {
+    item.oneShot = null;
     item.instance.setSequence(item.sequence);
     item.instance.setSequenceLoopMode(2);
     item.instance.timeScale = app.playRate(item);
+  }
+
+  /** Play one animation once; then the item goes back to its own (see endOneShots). */
+  function playOnce(item, sequence) {
+    item.oneShot = sequence;
+    item.instance.setSequence(sequence);
+    item.instance.setSequenceLoopMode(1); // never loop
+    item.instance.timeScale = app.playRate({ unit: item.unit, model: item.model, sequence });
+  }
+
+  /** Make an animation the item's own: it loops; the list row and the URL show it. */
+  function loopSequence(item, sequence) {
+    item.sequence = sequence;
+    applySequence(item);
+    const select = sceneList.querySelector(`li[data-id="${item.id}"] select.anim`);
+    if (select) select.value = String(sequence);
+    app.saveHash();
+  }
+
+  /** After each update: items whose one-shot has ended go back to their own animation. */
+  function endOneShots() {
+    for (const item of items) if (item.oneShot !== null && item.instance.sequenceEnded) applySequence(item);
   }
 
   function applyLook(item) {
@@ -58,6 +82,7 @@
         team: options.team ?? 0,
         pick,
         dataScale: app.dataScale(unit, pick),
+        oneShot: null, // the animation played once from the menu, or null
       };
       if (item.sequence < -1 || item.sequence >= model.sequences.length) item.sequence = -1;
       if (!(item.team >= 0 && item.team < TEAMS)) item.team = 0;
@@ -69,6 +94,7 @@
       renderList();
       app.saveHash();
       app.setStatus('');
+      app.reportUndrawn(unit ? unit.name : path, model);
       return item.id;
     } catch (error) {
       app.setStatus(error.message);
@@ -97,6 +123,7 @@
     if (at < 0) return;
     items[at].instance.detach();
     items.splice(at, 1);
+    app.forget(id);
     renderList();
     app.saveHash();
   }
@@ -104,6 +131,7 @@
   function clear() {
     for (const item of items) item.instance.detach();
     items.length = 0;
+    app.forget(null);
     renderList();
     app.saveHash();
   }
@@ -173,5 +201,13 @@
 
   app.$('clear').addEventListener('click', clear);
 
-  Object.assign(app, { add, addUnit, remove, clear, restart });
+  /** Turn an item to `rot` degrees and show it in its list row. */
+  function setRotation(item, rot) {
+    item.rot = rot;
+    applyTransform(item);
+    const input = sceneList.querySelector(`li[data-id="${item.id}"] input.rot`);
+    if (input) input.value = shown(rot);
+  }
+
+  Object.assign(app, { add, addUnit, remove, clear, restart, playOnce, loopSequence, endOneShots, setRotation });
 })();

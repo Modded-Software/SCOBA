@@ -23,6 +23,8 @@
     if (!viewer.webgl.ensureExtension('OES_standard_derivatives')) throw new Error('ground: OES_standard_derivatives is not available');
     let shader = null;
     const spotData = new Float32Array(MAX_SPOTS * 3);
+    const ringData = new Float32Array(8);
+    const ringColors = new Float32Array(6);
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
@@ -33,6 +35,8 @@
       radius: 60,
       line: [0.4, 0.95, 0.58],
       fill: [0.1, 0.32, 0.18],
+      /** [selection, mouse-over]: { x, y, radius, width, color } or null. */
+      rings: [null, null],
       ready: Promise.all([source('/shaders/ground.vert'), source('/shaders/ground.frag')]).then(([vertex, fragment]) => {
         shader = viewer.webgl.createShader(vertex, `#define MAX_SPOTS ${MAX_SPOTS}\n${fragment}`);
       }),
@@ -45,6 +49,13 @@
         if (!ground.enabled || !shader) return;
         shader.use();
         const uniforms = shader.uniforms;
+        for (let i = 0; i < 2; i++) {
+          const r = ground.rings[i];
+          ringData.set(r ? [r.x, r.y, r.radius, r.width] : [0, 0, 0, 0], i * 4);
+          ringColors.set(r ? r.color : [0, 0, 0], i * 3);
+        }
+        gl.uniform4fv(uniforms['u_rings[0]'], ringData);
+        gl.uniform3fv(uniforms['u_ringColor[0]'], ringColors);
         const count = Math.min(spots.length, MAX_SPOTS);
         for (let i = 0; i < count; i++) spotData.set(spots[i], i * 3);
         gl.uniform3fv(uniforms['u_spots[0]'], spotData);

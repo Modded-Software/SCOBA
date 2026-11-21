@@ -1,0 +1,419 @@
+From f72fb8b66f5d1253fbb3c082e05e3efa5da39610 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 14:57:16 +0200
+Subject: [PATCH 17/17] m3: draw displacement materials over a copy of the
+ frame
+
+---
+ .../handlers/m3/displacementmaterial.ts       |  65 +++++++++++
+ src/viewer/handlers/m3/handler.ts             |  11 +-
+ src/viewer/handlers/m3/layer.ts               |  14 ++-
+ src/viewer/handlers/m3/model.ts               |  22 +++-
+ src/viewer/handlers/m3/modelinstance.ts       | 110 ++++++++++++------
+ .../handlers/m3/shaders/displacement.frag.ts  |  42 +++++++
+ 6 files changed, 222 insertions(+), 42 deletions(-)
+ create mode 100644 src/viewer/handlers/m3/displacementmaterial.ts
+ create mode 100644 src/viewer/handlers/m3/shaders/displacement.frag.ts
+
+diff --git a/src/viewer/handlers/m3/displacementmaterial.ts b/src/viewer/handlers/m3/displacementmaterial.ts
+new file mode 100644
+index 00000000..c6dca709
+--- /dev/null
++++ b/src/viewer/handlers/m3/displacementmaterial.ts
+@@ -0,0 +1,65 @@
++import DisplacementMaterial from '../../../parsers/m3/displacementmaterial';
++import { Float32AnimationReference } from '../../../parsers/m3/animationreference';
++import Shader from '../../gl/shader';
++import Texture from '../../texture';
++import M3Model from './model';
++import M3Layer from './layer';
++import type M3ModelInstance from './modelinstance';
++
++/**
++ * Texture override keys: displacement materials come after every standard
++ * material (index * STANDARD_MATERIAL_OFFSET + layer stays unique).
++ */
++export const DISPLACEMENT_INDEX_BASE = 10000;
++
++/**
++ * An M3 displacement material: the surface shows the picture behind it,
++ * shifted along its normal map. The normal layer binds to the shader's
++ * normal uniforms; the strength layer to the alpha mask uniforms.
++ */
++export class M3DisplacementMaterial {
++  model: M3Model;
++  gl: WebGLRenderingContext;
++  index: number;
++  name: string;
++  priority: number;
++  strengthFactor: Float32AnimationReference;
++  normalLayer: M3Layer;
++  strengthLayer: M3Layer;
++
++  constructor(model: M3Model, index: number, material: DisplacementMaterial) {
++    this.model = model;
++    this.gl = model.viewer.gl;
++    this.index = DISPLACEMENT_INDEX_BASE + index;
++    this.name = <string>material.name.get();
++    this.priority = material.priority;
++    this.strengthFactor = material.strengthFactor;
++    this.normalLayer = new M3Layer(this, 0, material.normalLayer, 'normal', 2);
++    this.strengthLayer = new M3Layer(this, 1, material.strengthLayer, 'alphaMask', 2);
++  }
++
++  bind(shader: Shader, textureOverrides: Map<number, Texture>, instance: M3ModelInstance): void {
++    const gl = this.gl;
++    const skeleton = instance.skeleton;
++    const strength = skeleton ? skeleton.getValue(this.strengthFactor, instance) : <number>this.strengthFactor.initValue;
++
++    gl.uniform1f(shader.uniforms['u_strength'], strength);
++    // Two-sided, like the effects that use it; tested against depth, not written.
++    gl.disable(gl.BLEND);
++    gl.disable(gl.CULL_FACE);
++    gl.enable(gl.DEPTH_TEST);
++    gl.depthMask(false);
++
++    this.normalLayer.bind(shader, textureOverrides);
++    this.strengthLayer.bind(shader, textureOverrides);
++  }
++
++  unbind(shader: Shader): void {
++    const gl = this.gl;
++
++    gl.enable(gl.CULL_FACE);
++    gl.depthMask(true);
++    this.normalLayer.unbind(shader);
++    this.strengthLayer.unbind(shader);
++  }
++}
+diff --git a/src/viewer/handlers/m3/handler.ts b/src/viewer/handlers/m3/handler.ts
+index 4da6216d..9677658e 100644
+--- a/src/viewer/handlers/m3/handler.ts
++++ b/src/viewer/handlers/m3/handler.ts
+@@ -5,9 +5,12 @@ import Shader from '../../gl/shader';
+ import Model from './model';
+ import standardVert from './shaders/standard.vert';
+ import standardFrag from './shaders/standard.frag';
++import displacementFrag from './shaders/displacement.frag';
+ 
+ export interface M3HandlerObject {
+   standardShaders: Shader[];
++  /** Displacement materials, per texture coordinate count like the standard ones. */
++  displacementShaders: Shader[];
+ }
+ 
+ export default {
+@@ -39,7 +42,13 @@ export default {
+       standardShaders[i] = shader;
+     }
+ 
+-    const handlerData: M3HandlerObject = { standardShaders };
++    const displacementShaders = <Shader[]>[];
++
++    for (let i = 0; i < 4; i++) {
++      displacementShaders[i] = webgl.createShader(`#define EXPLICITUV${i}\n${standardVert}`, displacementFrag);
++    }
++
++    const handlerData: M3HandlerObject = { standardShaders, displacementShaders };
+ 
+     viewer.sharedCache.set('m3', handlerData);
+   },
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index fb54eac7..53540c0a 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -2,7 +2,7 @@ import Reference from '../../../parsers/m3/reference';
+ import Layer from '../../../parsers/m3/layer';
+ import Texture from '../../texture';
+ import Shader from '../../gl/shader';
+-import { M3StandardMaterial, STANDARD_MATERIAL_OFFSET } from './standardmaterial';
++import { STANDARD_MATERIAL_OFFSET } from './standardmaterial';
+ import M3Model from './model';
+ import M3Texture from './texture';
+ 
+@@ -23,12 +23,20 @@ const layerTypeToTextureUnit = {
+   ao: 14,
+ };
+ 
++/** What a layer needs of its material: standard or displacement. */
++export interface M3LayerOwner {
++  model: M3Model;
++  gl: WebGLRenderingContext;
++  /** Texture overrides are keyed by index * STANDARD_MATERIAL_OFFSET + layer index. */
++  index: number;
++}
++
+ /**
+  * An M3 layer.
+  */
+ export default class M3Layer {
+   model: M3Model;
+-  material: M3StandardMaterial;
++  material: M3LayerOwner;
+   index: number;
+   active = 0;
+   layer: Layer | null = null;
+@@ -46,7 +54,7 @@ export default class M3Layer {
+   clampResult = 0;
+   teamColorMode = 0;
+ 
+-  constructor(material: M3StandardMaterial, index: number, layerReference: Reference, type: string, op: number) {
++  constructor(material: M3LayerOwner, index: number, layerReference: Reference, type: string, op: number) {
+     const model = material.model;
+ 
+     this.model = model;
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 268952d1..9ac20b5e 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -27,11 +27,14 @@ import Division from '../../../parsers/m3/division';
+ import Batch from '../../../parsers/m3/batch';
+ import MaterialReference from '../../../parsers/m3/materialreference';
+ import CompositeMaterial, { CompositeMaterialSection } from '../../../parsers/m3/compositematerial';
++import DisplacementMaterial from '../../../parsers/m3/displacementmaterial';
++import { M3DisplacementMaterial } from './displacementmaterial';
+ 
+ // MATM material types: the order of the material lists in the model header
+ // (m3addon structures.xml, MODL).
+ const MATERIAL_TYPES = ['', 'standard', 'displacement', 'composite', 'terrain', 'volume', 'unknown', 'creep', 'volume noise', 'splat terrain bake', 'reflection', 'lens flare', 'buffer'];
+ const MATERIAL_STANDARD = 1;
++const MATERIAL_DISPLACEMENT = 2;
+ const MATERIAL_COMPOSITE = 3;
+ const typeName = (type: number): string => `material type ${type} (${MATERIAL_TYPES[type] || 'unknown'})`;
+ 
+@@ -66,10 +69,16 @@ export default class M3Model extends Model {
+   /** Distance of the farthest rest-pose vertex from the model origin. */
+   vertexReach = 0;
+   /**
+-   * Batches the renderer cannot draw (material types other than standard
+-   * and composite), one line each, so the caller can report them.
++   * Batches the renderer cannot draw (material types other than standard,
++   * displacement and composite), one line each, so the caller can report them.
+    */
+   undrawnBatches: string[] = [];
++  displacementMaterials: M3DisplacementMaterial[] = [];
++  /**
++   * Batches with a displacement material. They are drawn after everything
++   * else, over a copy of the frame (M3ModelInstance.renderDisplacement).
++   */
++  displacementBatches: { region: M3Region; material: M3DisplacementMaterial }[] = [];
+ 
+   constructor(bufferOrParser: ArrayBuffer | Parser, resourceData: HandlerResourceData) {
+     super(resourceData);
+@@ -108,6 +117,11 @@ export default class M3Model extends Model {
+     // Composite materials: standard materials drawn one over the other, in
+     // section order. Their alpha factors are not applied.
+     const composites = model.materials[2].list(<CompositeMaterial[]>[]);
++    const displacements = model.materials[1].list(<DisplacementMaterial[]>[]);
++
++    for (let i = 0, l = displacements.length; i < l; i++) {
++      this.displacementMaterials.push(new M3DisplacementMaterial(this, i, displacements[i]));
++    }
+ 
+     for (const batch of div.batches.list(<Batch[]>[])) {
+       const region = this.regions[batch.regionIndex];
+@@ -115,6 +129,8 @@ export default class M3Model extends Model {
+ 
+       if (materialMap.materialType === MATERIAL_STANDARD) {
+         this.batches.push(new M3Batch(region, this.materials[1][materialMap.materialIndex]));
++      } else if (materialMap.materialType === MATERIAL_DISPLACEMENT) {
++        this.displacementBatches.push({ region, material: this.displacementMaterials[materialMap.materialIndex] });
+       } else if (materialMap.materialType === MATERIAL_COMPOSITE) {
+         const composite = composites[materialMap.materialIndex];
+ 
+@@ -123,6 +139,8 @@ export default class M3Model extends Model {
+ 
+           if (sectionMap.materialType === MATERIAL_STANDARD) {
+             this.batches.push(new M3Batch(region, this.materials[1][sectionMap.materialIndex]));
++          } else if (sectionMap.materialType === MATERIAL_DISPLACEMENT) {
++            this.displacementBatches.push({ region, material: this.displacementMaterials[sectionMap.materialIndex] });
+           } else {
+             this.undrawnBatches.push(`region ${batch.regionIndex}: composite ${<string>composite.name.get()} section of ${typeName(sectionMap.materialType)}`);
+           }
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index 788e590a..d6419e34 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -3,6 +3,7 @@ import DataTexture from '../../gl/datatexture';
+ import Scene from '../../scene';
+ import ModelInstance from '../../modelinstance';
+ import Texture from '../../texture';
++import Shader from '../../gl/shader';
+ import M3Model from './model';
+ import M3Skeleton from './skeleton';
+ import { STANDARD_MATERIAL_OFFSET } from './standardmaterial';
+@@ -104,53 +105,90 @@ export default class M3ModelInstance extends ModelInstance {
+     boneTexture.bindAndUpdate(floatView, boneTexture.width, 1);
+   }
+ 
+-  override renderOpaque(): void {
++  /** Use a shader of the standard vertex layout: camera, bones, vertex attributes. */
++  private useShader(shader: Shader): void {
+     const model = <M3Model>this.model;
+-    const batches = model.batches;
++    const gl = model.viewer.gl;
++    const vertexSize = model.vertexSize;
++    const uvSetCount = model.uvSetCount;
++    const attribs = shader.attribs;
++    const uniforms = shader.uniforms;
++    const scene = <Scene>this.scene;
++    const camera = scene.camera;
++    const boneTexture = <DataTexture>this.boneTexture;
+ 
+-    if (batches.length) {
+-      const viewer = model.viewer;
+-      const m3Cache = <M3HandlerObject>viewer.sharedCache.get('m3');
+-      const gl = viewer.gl;
+-      const vertexSize = model.vertexSize;
+-      const uvSetCount = model.uvSetCount;
+-      const shader = m3Cache.standardShaders[uvSetCount - 1];
+-      const attribs = shader.attribs;
+-      const uniforms = shader.uniforms;
+-      const scene = <Scene>this.scene;
+-      const camera = scene.camera;
+-      const textureOverrides = this.textureOverrides;
+-      const boneTexture = <DataTexture>this.boneTexture;
++    shader.use();
+ 
+-      shader.use();
++    gl.uniform1f(uniforms['u_teamColor'], this.teamColor);
++    gl.uniform4fv(uniforms['u_vertexColor'], this.vertexColor);
++    gl.uniform1f(uniforms['u_highlight'], this.highlight);
+ 
+-      gl.uniform1f(uniforms['u_teamColor'], this.teamColor);
+-      gl.uniform4fv(uniforms['u_vertexColor'], this.vertexColor);
+-      gl.uniform1f(uniforms['u_highlight'], this.highlight);
++    gl.uniformMatrix4fv(uniforms['u_VP'], false, camera.viewProjectionMatrix);
+ 
+-      gl.uniformMatrix4fv(uniforms['u_VP'], false, camera.viewProjectionMatrix);
++    gl.uniform3fv(uniforms['u_eyePos'], camera.location);
++    gl.uniform3fv(uniforms['u_lightPos'], scene.lightPosition);
+ 
+-      gl.uniform3fv(uniforms['u_eyePos'], camera.location);
+-      gl.uniform3fv(uniforms['u_lightPos'], scene.lightPosition);
++    boneTexture.bind(15);
++    gl.uniform1i(uniforms['u_boneMap'], 15);
++    gl.uniform1f(uniforms['u_vectorSize'], 1 / boneTexture.width);
++    gl.uniform1f(uniforms['u_rowSize'], 1);
+ 
+-      boneTexture.bind(15);
+-      gl.uniform1i(uniforms['u_boneMap'], 15);
+-      gl.uniform1f(uniforms['u_vectorSize'], 1 / boneTexture.width);
+-      gl.uniform1f(uniforms['u_rowSize'], 1);
++    gl.bindBuffer(gl.ARRAY_BUFFER, model.arrayBuffer);
++    gl.vertexAttribPointer(attribs['a_position'], 3, gl.FLOAT, false, vertexSize, 0);
++    gl.vertexAttribPointer(attribs['a_weights'], 4, gl.UNSIGNED_BYTE, false, vertexSize, 12);
++    gl.vertexAttribPointer(attribs['a_bones'], 4, gl.UNSIGNED_BYTE, false, vertexSize, 16);
++    gl.vertexAttribPointer(attribs['a_normal'], 4, gl.UNSIGNED_BYTE, false, vertexSize, 20);
+ 
+-      gl.bindBuffer(gl.ARRAY_BUFFER, model.arrayBuffer);
+-      gl.vertexAttribPointer(attribs['a_position'], 3, gl.FLOAT, false, vertexSize, 0);
+-      gl.vertexAttribPointer(attribs['a_weights'], 4, gl.UNSIGNED_BYTE, false, vertexSize, 12);
+-      gl.vertexAttribPointer(attribs['a_bones'], 4, gl.UNSIGNED_BYTE, false, vertexSize, 16);
+-      gl.vertexAttribPointer(attribs['a_normal'], 4, gl.UNSIGNED_BYTE, false, vertexSize, 20);
++    for (let i = 0; i < uvSetCount; i++) {
++      gl.vertexAttribPointer(attribs[`a_uv${i}`], 2, gl.SHORT, false, vertexSize, model.uvOffset + i * 4);
++    }
+ 
+-      for (let i = 0; i < uvSetCount; i++) {
+-        gl.vertexAttribPointer(attribs[`a_uv${i}`], 2, gl.SHORT, false, vertexSize, model.uvOffset + i * 4);
+-      }
++    gl.vertexAttribPointer(attribs['a_tangent'], 4, gl.UNSIGNED_BYTE, false, vertexSize, model.tangentOffset);
+ 
+-      gl.vertexAttribPointer(attribs['a_tangent'], 4, gl.UNSIGNED_BYTE, false, vertexSize, model.tangentOffset);
++    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.elementBuffer);
++  }
++
++  /**
++   * Draw the displacement batches: each shows `sceneMap` (a copy of the
++   * frame drawn so far, `width` x `height`) shifted along its normal map.
++   * Call after everything else in the frame.
++   */
++  renderDisplacement(sceneMap: WebGLTexture, width: number, height: number): void {
++    const model = <M3Model>this.model;
++    const batches = model.displacementBatches;
++
++    if (!batches.length) {
++      return;
++    }
++
++    const gl = model.viewer.gl;
++    const m3Cache = <M3HandlerObject>model.viewer.sharedCache.get('m3');
++    const shader = m3Cache.displacementShaders[model.uvSetCount - 1];
++
++    this.useShader(shader);
++
++    gl.activeTexture(gl.TEXTURE0);
++    gl.bindTexture(gl.TEXTURE_2D, sceneMap);
++    gl.uniform1i(shader.uniforms['u_sceneMap'], 0);
++    gl.uniform2f(shader.uniforms['u_viewSize'], width, height);
++
++    for (const batch of batches) {
++      batch.material.bind(shader, this.textureOverrides, this);
++      batch.region.render(shader);
++      batch.material.unbind(shader);
++    }
++  }
++
++  override renderOpaque(): void {
++    const model = <M3Model>this.model;
++    const batches = model.batches;
++
++    if (batches.length) {
++      const m3Cache = <M3HandlerObject>model.viewer.sharedCache.get('m3');
++      const shader = m3Cache.standardShaders[model.uvSetCount - 1];
++      const textureOverrides = this.textureOverrides;
+ 
+-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.elementBuffer);
++      this.useShader(shader);
+ 
+       for (const batch of batches) {
+         const material = batch.material;
+diff --git a/src/viewer/handlers/m3/shaders/displacement.frag.ts b/src/viewer/handlers/m3/shaders/displacement.frag.ts
+new file mode 100644
+index 00000000..6f7df046
+--- /dev/null
++++ b/src/viewer/handlers/m3/shaders/displacement.frag.ts
+@@ -0,0 +1,42 @@
++import precision from '../../shaders/precision.glsl';
++import layers from './layers.glsl';
++
++// Displacement: the surface shows the picture behind it (u_sceneMap, a
++// copy of the frame drawn so far), shifted along the normal map. The shift
++// is u_strength pixels at a 1080 pixel high view, times the strength layer,
++// in the direction of the normal's tangent-space x and y.
++const shader = `
++${precision}
++
++${layers}
++
++uniform sampler2D u_sceneMap;
++uniform vec2 u_viewSize;
++uniform float u_strength;
++
++void main() {
++  vec2 bend = vec2(0.0);
++
++  if (u_normalLayerSettings.enabled) {
++    vec4 texel = texture2D(u_normalMap, getUV(u_normalLayerSettings));
++
++    bend = 2.0 * texel.wy - 1.0;
++  }
++
++  float strength = u_strength;
++
++  if (u_alphaMaskLayerSettings.enabled) {
++    vec4 s = computeLayerColor(u_alphaMaskMap, u_alphaMaskLayerSettings);
++
++    // One channel is spread over all four; RGB has no alpha.
++    strength *= u_alphaMaskLayerSettings.channels == CHANNELSELECT_RGB ? s.r : s.a;
++  }
++
++  vec2 shift = bend * strength * (u_viewSize.y / 1080.0) / u_viewSize;
++  vec2 uv = gl_FragCoord.xy / u_viewSize + shift;
++
++  gl_FragColor = vec4(texture2D(u_sceneMap, uv).rgb, 1.0);
++}
++`;
++
++export default shader;

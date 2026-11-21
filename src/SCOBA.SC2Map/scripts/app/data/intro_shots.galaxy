@@ -14,21 +14,24 @@ const int c_INTRO_VAR_NONE = 0;
 const int c_INTRO_VAR_TARGET = 1;
 const int c_INTRO_VAR_YAW = 2;
 // The S2 Zerus tree (s2_tree).
-const fixed c_INTRO_TREE_X = 132.2700;
-const fixed c_INTRO_TREE_Y = 100.4300;
+const fixed c_INTRO_TREE_X = 131.5600;
+const fixed c_INTRO_TREE_Y = 101.1400;
 const int c_INTRO_TREE_VARIATION = 4;
-const fixed c_INTRO_TREE_SCALE_XY = 5.0000;
-const fixed c_INTRO_TREE_SCALE_Z = 7.0000;
+const fixed c_INTRO_TREE_SCALE_XY = 3.7500;
+const fixed c_INTRO_TREE_SCALE_Z = 5.2500;
 // The second S2 tree (s2_tree2).
-const fixed c_INTRO_TREE2_X = 133.6800;
-const fixed c_INTRO_TREE2_Y = 101.8400;
-const fixed c_INTRO_TREE2_SCALE_XY = 3.7500;
-const fixed c_INTRO_TREE2_SCALE_Z = 5.2500;
+const fixed c_INTRO_TREE2_X = 137.2200;
+const fixed c_INTRO_TREE2_Y = 106.8000;
+const fixed c_INTRO_TREE2_SCALE_XY = 2.8125;
+const fixed c_INTRO_TREE2_SCALE_Z = 3.9375;
 const fixed c_INTRO_TREE2_FACING = 135.0000;
 // The S6 foreground pods (s6_pods).
 const int c_INTRO_S6_ROW = 5;
 // S7 looks up at the Overmind: the first Mutalisk wave (systems/air_creep).
 const fixed c_INTRO_S7_START = 50.0000;
+// The S7 eye on the ground plane: one pod lands on it at the cut into S7 (systems/scenery).
+const fixed c_INTRO_S7_EYE_X = 64.9800;
+const fixed c_INTRO_S7_EYE_Y = 64.9800;
 const int c_INTRO_S6_PODS = 3;
 fixed[3] gv_introS6PodX;
 fixed[3] gv_introS6PodY;

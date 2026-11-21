@@ -229,15 +229,16 @@ test('mouse orbits, zooms and pans the camera', async ({ page }) => {
   const cy = box.y + box.height / 2;
   const c0 = (await state(page)).camera;
 
+  // Middle drag orbits (around the ground under the mouse: see camera.spec).
   await page.mouse.move(cx, cy);
-  await page.mouse.down();
+  await page.mouse.down({ button: 'middle' });
   await page.mouse.move(cx + 120, cy + 40, { steps: 5 });
-  await page.mouse.up();
+  await page.mouse.up({ button: 'middle' });
   const c1 = (await state(page)).camera;
   expect(c1.yaw).not.toBeCloseTo(c0.yaw, 3);
   expect(c1.pitch).not.toBeCloseTo(c0.pitch, 3);
-  expect(c1.distance).toBeCloseTo(c0.distance, 5);
-  expect(c1.target).toEqual(c0.target);
+  // A rigid move: the eye keeps its distance to the target.
+  expect(c1.distance).toBeCloseTo(c0.distance, 4);
 
   // Negative: moving without a button held does nothing.
   await page.mouse.move(cx - 80, cy - 80, { steps: 3 });
@@ -245,11 +246,15 @@ test('mouse orbits, zooms and pans the camera', async ({ page }) => {
 
   await page.mouse.move(cx, cy);
   const big = await pixels(page);
+  // The wheel zoom glides: wait until it has arrived.
+  const settled = () => expect.poll(async () => (await state(page)).camera.zoomGoal, { timeout: 3000 }).toBe(null);
   await page.mouse.wheel(0, 400);
+  await settled();
   const c2 = (await state(page)).camera;
   expect(c2.distance).toBeGreaterThan(c1.distance);
   expect((await pixels(page)).covered).toBeLessThan(big.covered);
   await page.mouse.wheel(0, -800);
+  await settled();
   expect((await state(page)).camera.distance).toBeLessThan(c2.distance);
 
   const c3 = (await state(page)).camera;
@@ -262,9 +267,9 @@ test('mouse orbits, zooms and pans the camera', async ({ page }) => {
 
   // Pitch stays inside the poles however far the drag goes.
   await page.mouse.move(cx, cy);
-  await page.mouse.down();
+  await page.mouse.down({ button: 'middle' });
   await page.mouse.move(cx, cy + 3000, { steps: 10 });
-  await page.mouse.up();
+  await page.mouse.up({ button: 'middle' });
   const c5 = (await state(page)).camera;
   expect(Math.abs(c5.pitch)).toBeLessThan(Math.PI / 2);
   expect((await pixels(page)).covered).toBeGreaterThan(0);
@@ -278,11 +283,11 @@ test('drag sensitivity: rotate 0.004 rad per pixel, pan 0.0006 x distance per pi
   const cy = box.y + box.height / 2;
   const c0 = (await state(page)).camera;
 
-  // Left drag 100 px right: yaw turns 0.4 rad (was 1.0). Pitch unchanged.
+  // Middle drag 100 px right: yaw turns 0.4 rad (was 1.0). Pitch unchanged.
   await page.mouse.move(cx, cy);
-  await page.mouse.down();
+  await page.mouse.down({ button: 'middle' });
   await page.mouse.move(cx + 100, cy, { steps: 5 });
-  await page.mouse.up();
+  await page.mouse.up({ button: 'middle' });
   const c1 = (await state(page)).camera;
   expect(c0.yaw - c1.yaw).toBeCloseTo(0.4, 3);
   expect(c1.pitch).toBeCloseTo(c0.pitch, 6);

@@ -340,6 +340,12 @@ def check_deploy(checks) -> None:
         scene_on(checks, s, t, True)
         checks.true(s, t, "SceneIntro")
     checks.false(s, "t0", "SceneDrop")  # negative: not before SPACE
+    # R-INTRO-18: no chat display from the loop to touchdown.
+    frame = checks.value(s, "t0", "ChatFrame") or 0
+    _report(checks, f"{s} chat frame hooked", frame > 0, f"ChatFrame={frame}")
+    for t in ("t0", "tzoom", "tfall"):
+        checks.true(s, t, "ChatHidden")
+        checks.false(s, t, "ChatShown")
     checks.lt(s, "", "podToDrop100", 100)
     # The stock drop; the camera on the Birth root (SPEC-HERO-DROP 3).
     fall = birth_follow(checks, s, checks.value(s, "", "landHeroH100") or 0)
@@ -360,6 +366,9 @@ def check_deploy(checks) -> None:
         checks.false(s, t, "Cinematic")
         checks.false(s, t, "SceneDrop")
         checks.false(s, t, "SceneIntro")
+        # Negative for R-INTRO-18: the chat display is back after the intro.
+        checks.false(s, t, "ChatHidden")
+        checks.true(s, t, "ChatShown")
         checks.eq(s, t, "Phase", 0)
         checks.eq(s, t, "Dialogs", checks.value("boot", "t0", "DialogsKept"))
         checks.false(s, t, "InputHeld")

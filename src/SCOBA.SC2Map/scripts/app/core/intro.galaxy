@@ -105,3 +105,7 @@ bool[16] gv_introCamHeld;
 actor gv_introTree;  // the S2 Zerus tree (systems/visual_tuning)
 actor gv_introTree2; // the second, smaller one next to it
 int[16] gv_introSpaceIgnored;
+// The chat lines and the AI voice lines stay out of the intro (R-INTRO-18).
+const string c_INTRO_CHAT_FRAME = "UIContainer/FullscreenUpperContainer/ChatDisplay";
+int gv_introChatFrame;             // the stock chat display, hooked
+bool[16] gv_introChatHidden;       // frame hidden, Alert channel muted

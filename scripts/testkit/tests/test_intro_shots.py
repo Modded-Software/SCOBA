@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import math
+import re
+import tempfile
 import unittest
+import xml.etree.ElementTree as ET
+from pathlib import Path
 
 from hitvolumes import intro_shots as S
+from hitvolumes import intro_trees as T
 from flora import terrain as terrain_mod
 from project_root import project_root
 
@@ -147,11 +152,12 @@ class TableTest(unittest.TestCase):
         self.assertIn(f"const int c_INTRO_S6_ROW = {S.s6_row()};", text)
         self.assertIn(f"gv_introS6PodX[2] = {pods[2][0]:.4f};", text)
 
-    def test_s2_tree_two_cells_behind_the_start_eye(self) -> None:
+    def test_s2_tree_one_cell_behind_the_start_eye(self) -> None:
+        # Operator 2026-11-21: 1 cell behind the camera (was 2).
         s2 = next(s for s in S.SHOTS if s.name.startswith("S2"))
         ex, ey, _ = S.eye(s2.x0, s2.y0, s2.z0, s2.yaw0, s2.pitch0, s2.dist0)
         tx, ty = S.s2_tree()
-        self.assertAlmostEqual(math.hypot(tx - ex, ty - ey), 2.0, delta=0.02)
+        self.assertAlmostEqual(math.hypot(tx - ex, ty - ey), 1.0, delta=0.02)
         # Behind: farther from the start target than the eye.
         self.assertGreater(math.hypot(tx - s2.x0, ty - s2.y0), math.hypot(ex - s2.x0, ey - s2.y0))
         # Negative case: not behind the odd-pass start eye (the swapped target).
@@ -160,21 +166,44 @@ class TableTest(unittest.TestCase):
         text = S.galaxy()
         self.assertIn(f"const fixed c_INTRO_TREE_X = {tx:.4f};", text)
         self.assertIn("const int c_INTRO_TREE_VARIATION = 4;", text)
-        # 100 % of the editor doodad scale (operator 2026-11-20; was 200 %).
-        self.assertIn("const fixed c_INTRO_TREE_SCALE_XY = 5.0000;", text)
-        self.assertIn("const fixed c_INTRO_TREE_SCALE_Z = 7.0000;", text)
+        # 75 % of the editor doodad scale (operator 2026-11-20; was 100 %).
+        self.assertIn("const fixed c_INTRO_TREE_SCALE_XY = 3.7500;", text)
+        self.assertIn("const fixed c_INTRO_TREE_SCALE_Z = 5.2500;", text)
+
+    def test_s7_pod_lands_on_the_eye_at_the_cut(self) -> None:
+        # Operator 2026-11-20: one pod on the exact S7 camera spot, hitting
+        # the ground at the cut into S7. The spot is the eye at the cut: the
+        # row start. Target, yaw and distance hold; the pitch moves.
+        s6, s7 = S.SHOTS[S.s6_row()], S.SHOTS[S.s7_row()]
+        self.assertEqual(S.s7_row(), S.s6_row() + 1)
+        self.assertEqual((s7.x0, s7.y0, s7.yaw0, s7.dist0), (s7.x1, s7.y1, s7.yaw1, s7.dist1))
+        ex, ey, _ = S.eye(s7.x0, s7.y0, s7.z0, s7.yaw0, s7.pitch0, s7.dist0)
+        self.assertEqual(S.s7_eye(), (round(ex, 2), round(ey, 2)))
+        # Negative: the eye is not the shot's target.
+        self.assertGreater(math.hypot(ex - s7.x0, ey - s7.y0), 5.0)
+        text = S.galaxy()
+        self.assertIn(f"const fixed c_INTRO_S7_EYE_X = {S.s7_eye()[0]:.4f};", text)
+        self.assertIn(f"const fixed c_INTRO_S7_EYE_Y = {S.s7_eye()[1]:.4f};", text)
+        # The pod falls c_POD_DELAY_ZERG; it must start inside S6.
+        pod = project_root() / "src" / "SCOBA.SC2Map" / "scripts" / "app" / "systems" / "podimpact.galaxy"
+        found = re.search(r"const fixed c_POD_DELAY_ZERG = ([0-9.]+);", pod.read_text(encoding="utf-8"))
+        self.assertIsNotNone(found)
+        delay = float(found.group(1))
+        self.assertLess(delay, s6.length)
 
     def test_s2_second_tree_down_the_camera_path(self) -> None:
-        # Operator 2026-11-20: 2 cells further down the camera path, still
-        # behind the camera, 75 %, another rotation.
+        # Operator 2026-11-21: 8 cells further down the camera path (was 2),
+        # still behind the camera, 75 % of the first, another rotation.
         s2 = next(s for s in S.SHOTS if s.name.startswith("S2"))
         tx, ty = S.s2_tree()
         ux, uy = S.s2_tree2()
-        self.assertAlmostEqual(math.hypot(ux - tx, uy - ty), 2.0, delta=0.02)
+        self.assertAlmostEqual(math.hypot(ux - tx, uy - ty), 8.0, delta=0.02)
         # Down the path: along the first-pass target move.
         n = math.hypot(s2.x1 - s2.x0, s2.y1 - s2.y0)
         along = ((ux - tx) * (s2.x1 - s2.x0) + (uy - ty) * (s2.y1 - s2.y0)) / n
-        self.assertAlmostEqual(along, 2.0, delta=0.02)
+        self.assertAlmostEqual(along, 8.0, delta=0.02)
+        # Negative: the path is longer than that, the camera passes the tree.
+        self.assertGreater(n, 8.0)
         # Behind the camera over the whole first pass: behind the view
         # plane of the eye at the start, the middle and the end.
         a = math.radians(s2.yaw0)
@@ -183,13 +212,15 @@ class TableTest(unittest.TestCase):
             tgx, tgy = s2.x0 + (s2.x1 - s2.x0) * u, s2.y0 + (s2.y1 - s2.y0) * u
             fn = math.hypot(tgx - ex, tgy - ey)
             ahead = ((ux - ex) * (tgx - ex) + (uy - ey) * (tgy - ey)) / fn
-            self.assertLess(ahead, -1.9, f"u={u}")
+            self.assertLess(ahead, -0.9, f"u={u}")
         # Negative: not on the first tree, not the same size, not the same facing.
         self.assertNotEqual((ux, uy), (tx, ty))
         text = S.galaxy()
         self.assertIn(f"const fixed c_INTRO_TREE2_X = {ux:.4f};", text)
-        self.assertIn("const fixed c_INTRO_TREE2_SCALE_XY = 3.7500;", text)
-        self.assertIn("const fixed c_INTRO_TREE2_SCALE_Z = 5.2500;", text)
+        # 75 % of the first tree.
+        self.assertIn("const fixed c_INTRO_TREE2_SCALE_XY = 2.8125;", text)
+        self.assertIn("const fixed c_INTRO_TREE2_SCALE_Z = 3.9375;", text)
+        self.assertAlmostEqual(S.TREE2_DOODAD_SCALE / S.TREE_DOODAD_SCALE, 0.75)
         self.assertIn("const fixed c_INTRO_TREE2_FACING = 135.0000;", text)
         self.assertNotEqual(S.TREE2_FACING % 360.0, 0.0)
 
@@ -315,6 +346,69 @@ class TerrainTest(unittest.TestCase):
         self.assertAlmostEqual(s4.yaw0, math.degrees(math.atan2(dy, dx)), delta=0.5)
         self.assertAlmostEqual(s4.pitch0, math.degrees(math.atan2(ez - tz, flat)), delta=0.5)
         self.assertAlmostEqual(s4.dist0, math.hypot(flat, ez - tz), delta=0.5)
+
+
+def _tree(ident: int, x: float, y: float, scale: float, kind: str = "ZerusTree", indent: str = "    ") -> str:
+    head = f'{indent}<ObjectDoodad Id="{ident}" Variation="3" Position="{x:.4f},{y:.4f},5.0" Rotation="1.0" Scale="{scale},{scale},{scale}" Type="{kind}">\n'
+    return head + '        <Flag Index="HeightAbsolute" Value="1"/>\n    </ObjectDoodad>\n'
+
+
+class IntroTreeClearingTest(unittest.TestCase):
+    """R-INTRO-17: a map tree in the canopy of a placed S2 tree is removed."""
+
+    def setUp(self) -> None:
+        self.one, self.two = T.placed()
+        # Scale 4: canopy 2. The limit against tree 1 is its canopy + 2.
+        self.limit = self.one.canopy + 2.0
+        self.text = (
+            "<PlacedObjects>\n"
+            + _tree(1, self.one.x + 0.5, self.one.y, 4)
+            # A clone line without indent, as props_expand writes it.
+            + _tree(2, self.one.x, self.one.y + self.limit - 0.05, 4, "ZerusTreeFp0123456789", "")
+            + f'    <ObjectDoodad Id="3" Position="{self.two.x},{self.two.y},5.0" Scale="2,2,2" Type="ZerusTreeScobaBorder"/>\n'
+            # Negative: just outside the limit, a tree far away, a plant on the spot.
+            + _tree(4, self.one.x - self.limit - 0.05, self.one.y, 4)
+            + _tree(5, 20.0, 20.0, 8)
+            + _tree(6, self.one.x, self.one.y, 4, "ZerusWaterPlant")
+            + '    <ObjectUnit Id="7" Position="1,1,0" UnitType="SCV"/>\n'
+            + "</PlacedObjects>\n"
+        )
+
+    def test_placed_trees_come_from_the_shot_table(self) -> None:
+        self.assertEqual((self.one.x, self.one.y), S.s2_tree())
+        self.assertEqual((self.two.x, self.two.y), S.s2_tree2())
+        self.assertAlmostEqual(self.one.canopy, 0.5 * 3.75)
+        self.assertAlmostEqual(self.two.canopy, 0.5 * 2.8125)
+
+    def test_overlapping_trees_are_removed_and_the_rest_stays(self) -> None:
+        text, hits = T.clear(self.text)
+        self.assertEqual([h.ident for h in hits], ["1", "2", "3"])
+        self.assertEqual([h.placed for h in hits], ["tree 1", "tree 1", "tree 2"])
+        root = ET.fromstring(text)
+        self.assertEqual([el.get("Id") for el in root], ["4", "5", "6", "7"])
+        # Whole elements go: every kept tree still has its flag, no stray lines.
+        self.assertEqual(text.count("<Flag "), 3)
+        self.assertEqual(text.count("</ObjectDoodad>"), 3)
+        self.assertEqual(len(text.splitlines()), 2 + 3 * 3 + 1)
+        # Negative: nothing left to remove on a second pass.
+        self.assertEqual(T.clear(text), (text, []))
+
+    def test_step_and_validator_on_a_map_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            objects = Path(tmp) / "Objects"
+            objects.write_text(self.text, encoding="utf-8")
+            self.assertEqual(len(T.problems(Path(tmp))), 3)
+            self.assertEqual(T.apply_intro_tree_clearing(Path(tmp)), 3)
+            self.assertEqual(T.problems(Path(tmp)), [])
+            # Negative: a clean map is not rewritten.
+            before = objects.stat().st_mtime_ns
+            self.assertEqual(T.apply_intro_tree_clearing(Path(tmp)), 0)
+            self.assertEqual(objects.stat().st_mtime_ns, before)
+
+    def test_unclosed_element_fails(self) -> None:
+        broken = f'<ObjectDoodad Id="9" Position="{self.one.x},{self.one.y},5" Scale="4,4,4" Type="ZerusTree">\n'
+        with self.assertRaises(ValueError):
+            T.clear(broken)
 
 
 if __name__ == "__main__":

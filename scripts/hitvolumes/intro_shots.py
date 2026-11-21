@@ -236,6 +236,12 @@ def s7_row() -> int:
     return next(i for i, s in enumerate(SHOTS) if s.name.startswith("S7"))
 
 
+def s7_eye() -> tuple[float, float]:
+    s7 = SHOTS[s7_row()]
+    ex, ey, _ = eye(s7.x0, s7.y0, s7.z0, s7.yaw0, s7.pitch0, s7.dist0)
+    return (round(ex, 2), round(ey, 2))
+
+
 def s6_pods() -> tuple[tuple[float, float], ...]:
     s6 = SHOTS[s6_row()]
     yaw = (s6.yaw0 + s6.yaw1) / 2.0
@@ -250,18 +256,18 @@ def s6_pods() -> tuple[tuple[float, float], ...]:
 # A permanent Zerus tree just behind the S2 start eye (operator 2026-11-20):
 # its leaves come into close view. The first-pass start (left to right,
 # the southwest, Zerg side of the river); TREE_BACK cells behind the eye
-# on the view line. Variation 4. Scale 100 % as an editor doodad: the map's
-# ZerusTree actor scale (ActorData: random 4..6, mid 5, z x1.4) times 1.0.
-TREE_BACK = 2.0  # operator 2026-11-20: 2 cells (3.0 before; 1.0 was too close at 300 %)
+# on the view line. Variation 4. Scale 75 % as an editor doodad: the map's
+# ZerusTree actor scale (ActorData: random 4..6, mid 5, z x1.4) times 0.75.
+TREE_BACK = 1.0  # operator 2026-11-21: 1 cell (was 2.0, 3.0; 1.0 before was too close at 300 %)
 TREE_VARIATION = 4
-TREE_DOODAD_SCALE = 1.0  # operator 2026-11-20: 100 % (was 200 %, 275 %, 300 %)
+TREE_DOODAD_SCALE = 0.75  # operator 2026-11-20: 75 % (was 100 %, 200 %, 275 %, 300 %)
 TREE_ACTOR_SCALE = 5.0
 TREE_ACTOR_Z = 1.4
-# A second tree next to it (operator 2026-11-20): TREE2_ALONG cells further
-# down the camera's first-pass path, as far behind the eye as the first,
-# 75 %, turned.
-TREE2_ALONG = 2.0
-TREE2_DOODAD_SCALE = 0.75
+# A second tree (operator 2026-11-20): TREE2_ALONG cells further down the
+# camera's first-pass path, as far behind the eye as the first, 75 % of
+# the first, turned.
+TREE2_ALONG = 8.0  # operator 2026-11-21: 8 cells (2.0 was too close to the first)
+TREE2_DOODAD_SCALE = 0.75 * 0.75  # 75 % of the first tree's 75 % (operator 2026-11-20: both, relative)
 TREE2_FACING = 135.0  # the first tree keeps the actor's own facing, 0
 
 
@@ -318,6 +324,9 @@ def galaxy() -> str:
         f"const int c_INTRO_S6_ROW = {s6_row()};",
         "// S7 looks up at the Overmind: the first Mutalisk wave (systems/air_creep).",
         f"const fixed c_INTRO_S7_START = {_f(sum(s.length for s in SHOTS[:s7_row()]))};",
+        "// The S7 eye on the ground plane: one pod lands on it at the cut into S7 (systems/scenery).",
+        f"const fixed c_INTRO_S7_EYE_X = {_f(s7_eye()[0])};",
+        f"const fixed c_INTRO_S7_EYE_Y = {_f(s7_eye()[1])};",
         f"const int c_INTRO_S6_PODS = {len(s6_pods())};",
         f"fixed[{len(s6_pods())}] gv_introS6PodX;",
         f"fixed[{len(s6_pods())}] gv_introS6PodY;",

@@ -32,9 +32,12 @@ const MAP_MODEL_DATA = join(ROOT, 'src', 'SCOBA.SC2Map', 'Base.SC2Data', 'GameDa
 const STATIC = new Map([
   ['/', ['public/index.html', 'text/html; charset=utf-8']],
   // The page modules, loaded in this order by index.html.
-  ...['core', 'controls', 'scene', 'panels', 'drag', 'sky', 'inspect', 'main'].map((name) => [`/js/${name}.js`, [`public/js/${name}.js`, 'text/javascript; charset=utf-8']]),
+  ...['core', 'controls', 'scene', 'panels', 'drag', 'sky', 'pick', 'inspect', 'main'].map((name) => [`/js/${name}.js`, [`public/js/${name}.js`, 'text/javascript; charset=utf-8']]),
   ['/components.js', ['public/components.js', 'text/javascript; charset=utf-8']],
   ['/ground.js', ['public/ground.js', 'text/javascript; charset=utf-8']],
+  ['/outline.js', ['public/outline.js', 'text/javascript; charset=utf-8']],
+  ...['outline.vert', 'outline-blur.frag', 'outline-compose.frag'].map((name) => [`/shaders/${name}`, [`public/shaders/${name}`, 'text/plain; charset=utf-8']]),
+  ['/displacement.js', ['public/displacement.js', 'text/javascript; charset=utf-8']],
   ['/shaders/ground.vert', ['public/shaders/ground.vert', 'text/plain; charset=utf-8']],
   ['/shaders/ground.frag', ['public/shaders/ground.frag', 'text/plain; charset=utf-8']],
   ['/style.css', ['public/style.css', 'text/css; charset=utf-8']],

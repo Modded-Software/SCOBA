@@ -41,3 +41,15 @@ exceptions:
     owner: sc2
     review_date: '2026-11-21'
     removal: Remove when the picker search box no longer shows hint text.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0015-m3-mouse-over-highlight-instance\.highlight-u_highlig\.patch$
+    rationale: The exported renderer patch shows the upstream mdx-m3-viewer bone hierarchy class M3Skeleton as diff context. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-21'
+    removal: Remove when this patch no longer carries the bone hierarchy lines as context.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0017-m3-draw-displacement-materials-over-a-copy-of-the-fr\.patch$
+    rationale: The exported renderer patch reads the animated displacement strength through instance.skeleton, the upstream mdx-m3-viewer bone hierarchy field, and shows M3Skeleton as diff context. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-21'
+    removal: Remove when the displacement strength no longer reads through the bone hierarchy.

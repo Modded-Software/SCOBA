@@ -1,0 +1,42 @@
+From f0e9eea901c7245fc93ab101f74c891eba240fe1 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 13:59:53 +0200
+Subject: [PATCH 12/17] m3: name the material type of undrawn batches
+
+---
+ src/viewer/handlers/m3/model.ts | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 27208502..18a78159 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -28,10 +28,12 @@ import Batch from '../../../parsers/m3/batch';
+ import MaterialReference from '../../../parsers/m3/materialreference';
+ import CompositeMaterial, { CompositeMaterialSection } from '../../../parsers/m3/compositematerial';
+ 
+-// MATM material types (m3addon): 1 standard, 2 displacement, 3 composite,
+-// 4 terrain, 5 volume, 7 creep, 8 volume noise, 9 splat terrain bake.
++// MATM material types: the order of the material lists in the model header
++// (m3addon structures.xml, MODL).
++const MATERIAL_TYPES = ['', 'standard', 'displacement', 'composite', 'terrain', 'volume', 'unknown', 'creep', 'volume noise', 'splat terrain bake', 'reflection', 'lens flare', 'buffer'];
+ const MATERIAL_STANDARD = 1;
+ const MATERIAL_COMPOSITE = 3;
++const typeName = (type: number): string => `material type ${type} (${MATERIAL_TYPES[type] || 'unknown'})`;
+ 
+ /**
+  * An M3 model.
+@@ -122,11 +124,11 @@ export default class M3Model extends Model {
+           if (sectionMap.materialType === MATERIAL_STANDARD) {
+             this.batches.push(new M3Batch(region, this.materials[1][sectionMap.materialIndex]));
+           } else {
+-            this.undrawnBatches.push(`region ${batch.regionIndex}: composite ${<string>composite.name.get()} section of material type ${sectionMap.materialType}`);
++            this.undrawnBatches.push(`region ${batch.regionIndex}: composite ${<string>composite.name.get()} section of ${typeName(sectionMap.materialType)}`);
+           }
+         }
+       } else {
+-        this.undrawnBatches.push(`region ${batch.regionIndex}: material type ${materialMap.materialType}`);
++        this.undrawnBatches.push(`region ${batch.regionIndex}: ${typeName(materialMap.materialType)}`);
+       }
+     }
+ 

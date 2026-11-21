@@ -138,6 +138,11 @@ void gf_ItSnap (string lp_s, string lp_t) {
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Hum", gv_introHumOn[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "Quiet", gv_introQuiet[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "HumValid", gv_introHumValid);
+    // R-INTRO-18: the script flag, the hooked frame, and what the engine
+    // reports for the frame.
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "ChatHidden", gv_introChatHidden[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "ChatFrame", gv_introChatFrame);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "ChatShown", DialogControlIsVisible(gv_introChatFrame, 1));
     // Countdown beeps (operator 2026-11-20) and the intro camera hold.
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Beeps", gv_introCountBeeps[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "BeepValid", gv_introBeepValid);
