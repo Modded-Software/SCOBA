@@ -70,3 +70,226 @@ void gt_OrderButton_Init () {
     gt_OrderButton = TriggerCreate("gt_OrderButton_Func");
     TriggerAddEventDialogControl(gt_OrderButton, c_playerAny, c_invalidDialogControlId, c_triggerControlEventTypeClick);
 }
+
+// --- Slow walk on Shift (REQ-SLOW-WALK) ---
+// Tosh only, not in the intro, not during a jump: a jump runs as a normal
+// walk jump (R-SLOW-5, 8, 18). Without these the slow ends at once.
+bool gf_SlowWalkAllowed (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+
+    if (gv_introActive[lp_player]) {
+        return false;
+    }
+    if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
+        return false;
+    }
+    if (gf_AnimHeroProfile(lv_hero) != c_ANIM_HERO_TOSH) {
+        return false;
+    }
+    return gv_jumpPhase[lp_player] == c_JUMP_NONE;
+}
+bool gf_SlowWalkWanted (int lp_player) {
+    return gv_slowKey[lp_player] && gf_SlowWalkAllowed(lp_player);
+}
+// The speed buff of ramp level lp_level (1..c_SLOW_WALK_LEVELS).
+string gf_SlowWalkLevelBuff (int lp_level) {
+    if (lp_level >= c_SLOW_WALK_LEVELS) {
+        return c_SLOW_WALK_BUFF;
+    }
+    if (lp_level < 10) {
+        return c_SLOW_WALK_BUFF + "Ramp0" + IntToString(lp_level);
+    }
+    return c_SLOW_WALK_BUFF + "Ramp" + IntToString(lp_level);
+}
+// The speed follows gf_SlowWalkWanted over c_SLOW_WALK_RAMP (R-SLOW-21):
+// one level buff at a time. Not allowed (jump, intro, death, other hero):
+// level 0 at once. Called by the key triggers, the hero switch, the intro
+// end, the jump press, and every anim tick (the ramp steps, death,
+// respawn, jump end). The buff leaves the old unit on a switch (R-SLOW-6).
+void gf_SlowWalkApply (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+    bool lv_allowed = gf_SlowWalkAllowed(lp_player);
+    bool lv_on = lv_allowed && gv_slowKey[lp_player];
+    fixed lv_now = GameGetMissionTime();
+    fixed lv_step = MinF(MaxF(lv_now - gv_slowRampAt[lp_player], 0.0), 0.125) / c_SLOW_WALK_RAMP;
+    int lv_level = 0;
+
+    gv_slowRampAt[lp_player] = lv_now;
+    if (!lv_allowed) {
+        gv_slowRamp[lp_player] = 0.0;
+    }
+    else if (lv_on) {
+        gv_slowRamp[lp_player] = MinF(1.0, gv_slowRamp[lp_player] + lv_step);
+    }
+    else {
+        gv_slowRamp[lp_player] = MaxF(0.0, gv_slowRamp[lp_player] - lv_step);
+    }
+    if (lv_allowed) {
+        lv_level = FixedToInt(gv_slowRamp[lp_player] * IntToFixed(c_SLOW_WALK_LEVELS) + 0.5);
+    }
+    if (gv_slowUnit[lp_player] != null && (gv_slowUnit[lp_player] != lv_hero || gv_slowLevel[lp_player] != lv_level)) {
+        if (UnitIsValid(gv_slowUnit[lp_player])) {
+            UnitBehaviorRemove(gv_slowUnit[lp_player], gf_SlowWalkLevelBuff(gv_slowLevel[lp_player]), 1);
+        }
+        gv_slowUnit[lp_player] = null;
+        gv_slowLevel[lp_player] = 0;
+    }
+    if (lv_level > 0 && gv_slowUnit[lp_player] == null) {
+        UnitBehaviorAdd(lv_hero, gf_SlowWalkLevelBuff(lv_level), lv_hero, 1);
+        gv_slowUnit[lp_player] = lv_hero;
+        gv_slowLevel[lp_player] = lv_level;
+    }
+    if (lv_on && !gv_slowOn[lp_player]) {
+        gv_slowStarts[lp_player] += 1;
+    }
+    gv_slowOn[lp_player] = lv_on;
+}
+// The single entry for the key triggers and the test harness (R-SLOW-1).
+void gf_SlowWalkSet (int lp_player, bool lp_on) {
+    if (lp_on) {
+        gv_slowPresses[lp_player] += 1;
+    }
+    gv_slowKey[lp_player] = lp_on;
+    gf_SlowWalkApply(lp_player);
+}
+// Slow clip phase tracking for the jump (R-SLOW-18). gf_AnimFullSet calls
+// it when a slow clip starts (lp_restart) or its rate changes.
+void gf_SlowWalkGaitMark (int lp_player, fixed lp_scale, bool lp_restart) {
+    fixed lv_now = TimerGetElapsed(gv_sCOBA_Clock);
+    fixed lv_phase = 0.0;
+
+    if (!lp_restart) {
+        lv_phase = gv_slowGait[lp_player] + (lv_now - gv_slowGaitAt[lp_player]) * gv_slowGaitScale[lp_player] / c_ANIM_SLOW_CYCLE;
+    }
+    gv_slowGait[lp_player] = lv_phase - IntToFixed(FixedToInt(lv_phase));
+    gv_slowGaitAt[lp_player] = lv_now;
+    gv_slowGaitScale[lp_player] = lp_scale;
+    // The arms follow the legs (R-SLOW-19): a leg restart plays the arms
+    // again from the start, a rate change sets the arm rate.
+    if (gf_SlowWalkUpperOn(gv_animUpperState[lp_player])) {
+        if (lp_restart) {
+            gf_SlowWalkUpperPlay(lp_player, gv_animUpperState[lp_player]);
+        }
+        else {
+            ActorSend(libNtve_gf_MainActorofUnit(gv_tPSUNIT[lp_player]), "AnimSetTimeScale " + c_ANIM_BRACKET_UPPER + " " + FixedToString(lp_scale, 3));
+        }
+    }
+}
+bool gf_SlowWalkState (int lp_state) {
+    return lp_state == c_ANIM_LOWER_WALK_SLOW || lp_state == c_ANIM_LOWER_WALK_SLOW_BACK;
+}
+bool gf_SlowWalkUpperOn (int lp_upper) {
+    return lp_upper == c_ANIM_UPPER_WALK_SLOW || lp_upper == c_ANIM_UPPER_WALK_SLOW_BACK;
+}
+// The upper body of a slow walk when not aiming (R-SLOW-19): forward arms,
+// or reversed arms with the reversed (back) leg clips. None without a slow
+// leg state.
+int gf_SlowWalkUpperState (int lp_player, int lp_lower) {
+    int lv_dir = gv_animAimDir[lp_player];
+
+    if (!gf_SlowWalkState(lp_lower)) {
+        return c_ANIM_UPPER_NONE;
+    }
+    if (lv_dir == c_ANIM_DIR_BACK_LEFT || lv_dir == c_ANIM_DIR_BACK || lv_dir == c_ANIM_DIR_BACK_RIGHT) {
+        return c_ANIM_UPPER_WALK_SLOW_BACK;
+    }
+    return c_ANIM_UPPER_WALK_SLOW;
+}
+// Plays the slow arm clip on the upper bracket at the leg rate and the leg
+// phase (gv_slowGait), so arms and legs keep one stride.
+void gf_SlowWalkUpperPlay (int lp_player, int lp_state) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+    actor lv_actor;
+    int lv_profile;
+    int lv_flags = c_animFlagFullMatch | c_animFlagPlayForever;
+    fixed lv_blend;
+    fixed lv_time;
+    string lv_clip;
+
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    lv_clip = gv_animUpperClip[lv_profile][lp_state];
+    if (lv_clip == "") {
+        if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE) {
+            gf_AnimUpperClear(lp_player);
+        }
+        return;
+    }
+    // An attack or a pose leaves first; one arm clip replaces the other.
+    if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE && !gf_SlowWalkUpperOn(gv_animUpperState[lp_player])) {
+        gf_AnimUpperClear(lp_player);
+    }
+    lv_time = gv_slowGait[lp_player] + (TimerGetElapsed(gv_sCOBA_Clock) - gv_slowGaitAt[lp_player]) * gv_slowGaitScale[lp_player] / c_ANIM_SLOW_CYCLE;
+    lv_time = (lv_time - IntToFixed(FixedToInt(lv_time))) * c_ANIM_SLOW_CYCLE;
+    lv_blend = gv_animUpperBlend[lv_profile][lp_state];
+    lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    gv_animUpperStarts[lp_player] += 1;
+    gv_slowUpperPlays[lp_player] += 1;
+    gv_slowUpperTimeMs[lp_player] = FixedToInt(lv_time * 1000.0);
+    gv_slowUpperBlendMs[lp_player] = FixedToInt(lv_blend * 1000.0);
+    gf_AnimEvent(lp_player, "upper_start", lv_clip, lv_flags);
+    gf_ProbeEvent(lp_player, "upper_start", lv_clip, lv_flags);
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, lv_flags, lv_blend, lv_blend, gv_slowGaitScale[lp_player], c_animTimeVariantAsTimeScale));
+    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_BRACKET_UPPER + " " + FixedToString(lv_time, c_fixedPrecisionAny) + " 0");
+    gv_animUpperState[lp_player] = lp_state;
+    gv_animUpperClipIndex[lp_player] = lp_state;
+    gf_ProbeSetUpperClip(lp_player, lv_clip);
+}
+// Jump press from a slow walk (R-SLOW-18): the legs go straight into the
+// regular walk at the same foot phase, and the jump takes off from it with
+// the jump blend (c_JUMP_BLEND). Called after the jump phase is set, so
+// the buff comes off for the jump; it returns after the landing recovery.
+void gf_SlowWalkJumpPress (int lp_player) {
+    int lv_state = gv_animFullState[lp_player];
+    fixed lv_phase;
+
+    if (gf_SlowWalkState(lv_state)) {
+        gf_SlowWalkGaitMark(lp_player, gv_slowGaitScale[lp_player], false);
+        lv_phase = gv_slowGait[lp_player] + c_ANIM_SLOW_GAIT_OFFSET + 1.0;
+        gv_jumpGait[lp_player] = lv_phase - IntToFixed(FixedToInt(lv_phase));
+        gv_slowJumpGait[lp_player] = gv_jumpGait[lp_player];
+        gv_slowJumps[lp_player] += 1;
+        // The jump reads the regular walk: aim and strafe walk clips, or the
+        // stock walk in free walk and Point & Click.
+        if (gf_StrafeMoveActive(lp_player)) {
+            gv_animFullState[lp_player] = c_ANIM_LOWER_WALK;
+            if (lv_state == c_ANIM_LOWER_WALK_SLOW_BACK) {
+                gv_animFullState[lp_player] = c_ANIM_LOWER_WALK_BACK;
+            }
+        }
+        else {
+            gv_animFullState[lp_player] = c_ANIM_LOWER_NONE;
+        }
+    }
+    gf_SlowWalkApply(lp_player);
+}
+
+bool gt_SlowKeyDown_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    // Input hold of this player (systems/input_hold).
+    if (gf_InputHeld(EventPlayer())) {
+        return true;
+    }
+    gf_SlowWalkSet(EventPlayer(), true);
+    return true;
+}
+void gt_SlowKeyDown_Init () {
+    gt_SlowKeyDown = TriggerCreate("gt_SlowKeyDown_Func");
+    TriggerAddEventKeyPressed(gt_SlowKeyDown, c_playerAny, gv_sLOWWALK, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+// The release is never held back: a key let go in a scene must not stay down.
+bool gt_SlowKeyUp_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gf_SlowWalkSet(EventPlayer(), false);
+    return true;
+}
+void gt_SlowKeyUp_Init () {
+    gt_SlowKeyUp = TriggerCreate("gt_SlowKeyUp_Func");
+    TriggerAddEventKeyPressed(gt_SlowKeyUp, c_playerAny, gv_sLOWWALK, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}

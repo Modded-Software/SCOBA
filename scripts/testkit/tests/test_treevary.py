@@ -1,7 +1,9 @@
 import math
+import re
 import unittest
 
 from flora.treevary import T, conflicts, neighbours, repair, too_similar, vary_objects
+from project_root import project_root
 
 
 def clone_grid(n: int, gap: float) -> list[T]:
@@ -60,3 +62,21 @@ class TreeVaryTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TreeSwayTest(unittest.TestCase):
+    """Operator 2026-11-21: every tree doodad animates at 0.25."""
+
+    def test_doodad_and_intro_trees_share_the_speed(self) -> None:
+        src = project_root() / "src" / "SCOBA.SC2Map"
+        actors = (src / "Base.SC2Data" / "GameData" / "ActorData.xml").read_text(encoding="utf-8")
+        block = re.search(r'<CActorDoodad id="ZerusTree">(.*?)</CActorDoodad>', actors, re.S)
+        self.assertIsNotNone(block)
+        self.assertIn('<On Terms="ActorCreation" Send="AnimSetTimeScaleGlobal 0.250000"/>', block.group(1))
+        # Negative: no other tree doodad actor in the source sets its own speed.
+        others = re.findall(r'<CActorDoodad id="(ZerusTree\w+)"', actors)
+        self.assertEqual(others, [])
+        tuning = (src / "scripts" / "app" / "systems" / "visual_tuning.galaxy").read_text(encoding="utf-8")
+        self.assertIn("const fixed c_TREE_ANIM_SPEED = 0.25;", tuning)
+        for actor in ("gv_introTree", "gv_introTree2"):
+            self.assertIn(f'ActorSend({actor}, "AnimSetTimeScaleGlobal " + FixedToString(c_TREE_ANIM_SPEED, 2));', tuning)

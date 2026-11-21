@@ -85,6 +85,7 @@ trigger gf_SceneTrigger (int lp_i) {
     if (lp_i == 40) { return gt_AnimProbeToggle; }
     if (lp_i == 41) { return gt_HeroSwitchScv; }
     if (lp_i == 42) { return gt_HeroSwitchViking; }
+    if (lp_i == 43) { return gt_SlowKeyDown; }
     return null;
 }
 

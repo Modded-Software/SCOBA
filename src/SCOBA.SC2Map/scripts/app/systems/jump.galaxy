@@ -438,6 +438,7 @@ bool gf_JumpPress (int lp_player) {
     gv_jumpUnit[lp_player] = lv_hero;
     gv_jumpStarts[lp_player] += 1;
     gv_jumpStride[lp_player] = -1;  // a new jump picks its stride from the walk phase
+    gf_SlowWalkJumpPress(lp_player);  // from a slow walk: the regular walk, then the jump (R-SLOW-18)
     gf_JumpPickBase(lp_player);
     gv_jumpStartScale[lp_player] = 1.0;
     gv_jumpLandScale[lp_player] = 1.0;

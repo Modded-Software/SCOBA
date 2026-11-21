@@ -1,0 +1,24 @@
+From 6e6fe43053a8c3cdf707e17c0c98d214d72dedb1 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 15:49:42 +0200
+Subject: [PATCH 22/25] m3: draw order comment: distance key not applied
+
+The comment claimed camera distance is equal within one model. That is not verified; it now only says the key is not applied.
+---
+ src/viewer/handlers/m3/draworder.ts | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/draworder.ts b/src/viewer/handlers/m3/draworder.ts
+index 11ca59c9..35516b11 100644
+--- a/src/viewer/handlers/m3/draworder.ts
++++ b/src/viewer/handlers/m3/draworder.ts
+@@ -11,8 +11,7 @@ import M3Batch from './batch';
+  * Source: WhiteoutFlakes `TransparentOrder` (src/renderer/core/draw_list.h),
+  * after the client's CTransparentObject::HasHigherPriority, with the M3
+  * material priority as its priority plane (model_loader.cpp BuildM3Surfaces).
+- * Its next key, camera distance, is not applied: within one model it is the
+- * same for every batch here.
++ * Its next key, camera distance back to front, is not applied.
+  */
+ export function sortBatches(batches: M3Batch[]): M3Batch[] {
+   batches.forEach((b, i) => {

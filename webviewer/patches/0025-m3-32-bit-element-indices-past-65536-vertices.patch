@@ -1,0 +1,104 @@
+From 4aa974fdad597f68e943aaeaf23e02bdf08591dc Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 21:46:21 +0200
+Subject: [PATCH 25/25] m3: 32-bit element indices past 65536 vertices
+
+Element indices are the region's local index plus its first vertex. In a Uint16Array they wrapped past 65535 and joined far vertices (SpaceStationValerian: 200005 vertices, 6 of 8 regions past 65535). Such a model now uses a Uint32Array and UNSIGNED_INT (OES_element_index_uint). The model keeps the largest index stored, for inspection.
+---
+ src/viewer/handlers/m3/model.ts  | 34 +++++++++++++++++++++++++++++++-
+ src/viewer/handlers/m3/region.ts | 10 +++++++---
+ 2 files changed, 40 insertions(+), 4 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index dd38495a..730a5301 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -58,6 +58,12 @@ export default class M3Model extends Model {
+   regions: M3Region[] = [];
+   initialReference: Float32Array[] = [];
+   elementBuffer: WebGLBuffer | null = null;
++  /** UNSIGNED_SHORT, or UNSIGNED_INT for a model past 65536 vertices. */
++  elementType = 0x1403;
++  /** Bytes per element index: 2 or 4. */
++  elementBytes = 2;
++  /** The largest element index stored (for inspection: vertex count - 1 when nothing wrapped). */
++  elementMax = 0;
+   arrayBuffer: WebGLBuffer | null = null;
+   vertexSize = 0;
+   uvSetCount = 0;
+@@ -274,7 +280,25 @@ export default class M3Model extends Model {
+       totalElements += regions[i].triangleIndicesCount;
+     }
+ 
+-    const elementArray = new Uint16Array(totalElements);
++    // Element indices are the region's local index plus its first vertex. A
++    // model with more than 65536 vertices needs 32-bit indices: 16-bit ones
++    // wrap and join far vertices (SpaceStationValerian: 200005 vertices).
++    let topVertex = 0;
++
++    for (const region of regions) {
++      topVertex = Math.max(topVertex, region.firstVertexIndex + region.verticesCount);
++    }
++
++    const wide = topVertex > 65536;
++
++    if (wide && !this.viewer.webgl.ensureExtension('OES_element_index_uint')) {
++      throw new Error(`m3: ${topVertex} vertices need OES_element_index_uint, which this context lacks`);
++    }
++
++    const elementArray = wide ? new Uint32Array(totalElements) : new Uint16Array(totalElements);
++
++    this.elementType = wide ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
++    this.elementBytes = wide ? 4 : 2;
+ 
+     const triangles = div.triangles.list(new Uint16Array(0));
+ 
+@@ -282,6 +306,14 @@ export default class M3Model extends Model {
+       this.regions.push(new M3Region(this, regions[i], triangles, elementArray, offsets[i]));
+     }
+ 
++    let elementMax = 0;
++
++    for (let i = 0; i < elementArray.length; i++) {
++      elementMax = Math.max(elementMax, elementArray[i]);
++    }
++
++    this.elementMax = elementMax;
++
+     const vertices = parser.vertices.list(new Uint8Array(0));
+ 
+     this.elementBuffer = gl.createBuffer();
+diff --git a/src/viewer/handlers/m3/region.ts b/src/viewer/handlers/m3/region.ts
+index cd613f7a..0cf2cd8e 100644
+--- a/src/viewer/handlers/m3/region.ts
++++ b/src/viewer/handlers/m3/region.ts
+@@ -19,7 +19,10 @@ export default class M3Region {
+   rawUvRange: [number, number] = [0, 0];
+   firstVertexIndex: number;
+ 
+-  constructor(model: M3Model, region: M3ParserRegion, triangles: Uint16Array, elementArray: Uint16Array, offset: number) {
++  /** gl.UNSIGNED_SHORT or gl.UNSIGNED_INT: the model's element index type. */
++  elementType: number;
++
++  constructor(model: M3Model, region: M3ParserRegion, triangles: Uint16Array, elementArray: Uint16Array | Uint32Array, offset: number) {
+     const firstVertexIndex = region.firstVertexIndex;
+     const triangleIndicesCount = region.triangleIndicesCount;
+     const firstTriangleIndex = region.firstTriangleIndex;
+@@ -35,7 +38,8 @@ export default class M3Region {
+     this.gl = model.viewer.gl;
+     this.firstBoneLookupIndex = region.firstBoneLookupIndex;
+     this.boneWeightPairsCount = region.boneWeightPairsCount;
+-    this.offset = offset * 2;
++    this.offset = offset * model.elementBytes;
++    this.elementType = model.elementType;
+     this.verticesCount = region.verticesCount;
+     this.elements = triangleIndicesCount;
+     this.firstVertexIndex = firstVertexIndex;
+@@ -50,6 +54,6 @@ export default class M3Region {
+     gl.uniform1f(shader.uniforms['u_firstBoneLookupIndex'], this.firstBoneLookupIndex);
+     gl.uniform1f(shader.uniforms['u_boneWeightPairsCount'], this.boneWeightPairsCount);
+ 
+-    gl.drawElements(gl.TRIANGLES, this.elements, gl.UNSIGNED_SHORT, this.offset);
++    gl.drawElements(gl.TRIANGLES, this.elements, this.elementType, this.offset);
+   }
+ }

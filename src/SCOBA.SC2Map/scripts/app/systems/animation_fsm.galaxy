@@ -211,6 +211,28 @@ int gf_AnimLowerState (int lp_player) {
     }
     return c_ANIM_LOWER_WALK;
 }
+// Slow walk (R-SLOW-13): a walk state becomes its slow state while the
+// slow buff is on, and back when it is off. Other states pass through.
+int gf_AnimSlowState (int lp_player, int lp_state) {
+    int lv_base = lp_state;
+
+    if (lp_state == c_ANIM_LOWER_WALK_SLOW) {
+        lv_base = c_ANIM_LOWER_WALK;
+    }
+    else if (lp_state == c_ANIM_LOWER_WALK_SLOW_BACK) {
+        lv_base = c_ANIM_LOWER_WALK_BACK;
+    }
+    if (!gv_slowOn[lp_player]) {
+        return lv_base;
+    }
+    if (lv_base == c_ANIM_LOWER_WALK) {
+        return c_ANIM_LOWER_WALK_SLOW;
+    }
+    if (lv_base == c_ANIM_LOWER_WALK_BACK) {
+        return c_ANIM_LOWER_WALK_SLOW_BACK;
+    }
+    return lv_base;
+}
 void gf_AnimTick (int lp_player) {
     unit lv_hero;
     int lv_upper;
@@ -222,9 +244,10 @@ void gf_AnimTick (int lp_player) {
     if (!UnitIsValid(lv_hero)) {
         return;
     }
+    gf_SlowWalkApply(lp_player);
     lv_attacking = gf_AnimAttackActive(lp_player);
     if (gv_aIMACTIVE[lp_player]) {
-        lv_lower = gf_AnimLowerState(lp_player);
+        lv_lower = gf_AnimSlowState(lp_player, gf_AnimLowerState(lp_player));
         gv_animAttackUntil[lp_player] = -1.0;
         gv_animReadyUntil[lp_player] = -1.0;
         gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
@@ -243,12 +266,25 @@ void gf_AnimTick (int lp_player) {
         // Right hold: directional walk clips. Standing keeps the stock clip.
         if (gv_holdStrafe[lp_player]) {
             gf_AnimUpdateAimDir(lp_player);
-            lv_lower = gf_AnimLowerState(lp_player);
-            if (lv_lower != c_ANIM_LOWER_WALK && lv_lower != c_ANIM_LOWER_WALK_BACK) {
+            lv_lower = gf_AnimSlowState(lp_player, gf_AnimLowerState(lp_player));
+            if (lv_lower != c_ANIM_LOWER_WALK && lv_lower != c_ANIM_LOWER_WALK_BACK && !gf_SlowWalkState(lv_lower)) {
                 lv_lower = c_ANIM_LOWER_NONE;
             }
             // Forward plays the stock walk, the clip a middle hold plays.
-            if (gv_animAimDir[lp_player] == c_ANIM_DIR_FORWARD) {
+            // A slow walk has no stock clip: it keeps its slow clip.
+            if (gv_animAimDir[lp_player] == c_ANIM_DIR_FORWARD && !gf_SlowWalkState(lv_lower)) {
+                lv_lower = c_ANIM_LOWER_NONE;
+            }
+        }
+        else if (gv_slowOn[lp_player]) {
+            // Free walk and Point & Click face the move: the forward slow
+            // clip replaces the stock walk (R-SLOW-14).
+            lv_lower = gf_AnimLowerState(lp_player);
+            if (lv_lower == c_ANIM_LOWER_WALK || lv_lower == c_ANIM_LOWER_WALK_BACK || gf_SlowWalkState(lv_lower)) {
+                lv_lower = c_ANIM_LOWER_WALK_SLOW;
+                gv_animAimDir[lp_player] = c_ANIM_DIR_FORWARD;
+            }
+            else {
                 lv_lower = c_ANIM_LOWER_NONE;
             }
         }
@@ -267,13 +303,15 @@ void gf_AnimTick (int lp_player) {
             gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
         }
         else {
-            lv_upper = c_ANIM_UPPER_NONE;
+            // Not aiming, no attack: a slow walk moves the upper body too
+            // (R-SLOW-19); otherwise the stock clip shows.
+            lv_upper = gf_SlowWalkUpperState(lp_player, lv_lower);
             gv_animAttackUntil[lp_player] = -1.0;
             gv_animAttackState[lp_player] = c_ANIM_UPPER_NONE;
             gv_animAttackTarget[lp_player] = null;
         }
         gf_AnimUpperSet(lp_player, lv_upper);
-        if (lv_upper != c_ANIM_UPPER_NONE) {
+        if (lv_upper != c_ANIM_UPPER_NONE && !gf_SlowWalkUpperOn(lv_upper)) {
             gf_AnimTargetPitchTick(lp_player);
         }
     }

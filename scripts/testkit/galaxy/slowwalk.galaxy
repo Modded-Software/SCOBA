@@ -1,0 +1,319 @@
+// Slow walk test profile (REQ-SLOW-WALK). Every value read here is engine
+// state or script state; scripts/testkit/profiles/slowwalk.py decides pass
+// or fail. How the legs look is an operator check (AC-SLOW-1..4).
+
+trigger gt_SlowWalkTest;
+trigger gt_SwForward;
+
+const int c_SW_FREE = 0;    // PNC, no hold, W loop (gf_ForwardBegin)
+const int c_SW_PNC = 1;     // PNC move order to a point
+const int c_SW_STRAFE = 2;  // PNC right hold, A
+const int c_SW_BACK = 3;    // PNC right hold, S
+const int c_SW_AIM = 4;     // aim, W
+const fixed c_SW_WINDOW = 1.0;  // travel window, game seconds
+const fixed c_SW_SETTLE = 0.4;  // after a change, before a window
+const fixed c_SW_RAMP_STEP = 0.25;  // ramp sample spacing (R-SLOW-21)
+const int c_SW_RAMP_SAMPLES = 4;    // 1.0 s: the whole ramp
+
+bool gt_SwForward_Func (bool testConds, bool runActions) {
+    gf_ForwardBegin(1);
+    return true;
+}
+
+// lp_mode: Point & Click without a hold runs with Chase on (not stand):
+// with stand, gt_DisableClickMove stops a move order and the root holds
+// the hero (run 20261121-162021: no travel).
+void gf_SwReset (string lp_section, int lp_mode) {
+    if (gv_aIMACTIVE[1]) {
+        gf_AimEnd(1);
+    }
+    gf_SlowWalkSet(1, false);
+    gf_JumpReset(1);
+    gf_DbgReset(lp_section, false, lp_mode != c_SW_FREE && lp_mode != c_SW_PNC);
+    gf_SlowWalkSet(1, false);
+    // No ramp left over from the last scenario (R-SLOW-21).
+    gv_slowRamp[1] = 0.0;
+    gf_SlowWalkApply(1);
+    gv_slowPresses[1] = 0;
+    gv_slowStarts[1] = 0;
+    gv_slowJumps[1] = 0;
+    gv_slowLowerBlendMs[1] = 0;
+    gv_slowUpperBlendMs[1] = 0;
+    Wait(0.2, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "resetBuff", UnitBehaviorCount(gv_tPSUNIT[1], c_SLOW_WALK_BUFF));
+}
+
+void gf_SwStart (int lp_mode) {
+    unit lv_hero = gv_tPSUNIT[1];
+
+    if (lp_mode == c_SW_FREE) {
+        gv_kEYFORWARD[1] = true;
+        TriggerExecute(gt_SwForward, false, false);
+    }
+    else if (lp_mode == c_SW_PNC) {
+        UnitIssueOrder(lv_hero, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(UnitGetPosition(lv_hero), 25.0, UnitGetFacing(lv_hero))), c_orderQueueReplace);
+    }
+    else if (lp_mode == c_SW_STRAFE) {
+        gf_DbgHold(true, false);
+        Wait(0.3, c_timeGame);
+        gv_lEFT[1] = true;
+    }
+    else if (lp_mode == c_SW_BACK) {
+        gf_DbgHold(true, false);
+        Wait(0.3, c_timeGame);
+        gv_bACKWARD[1] = true;
+    }
+    else {
+        gf_AimBegin(1);
+        Wait(0.4, c_timeGame);
+        gv_fORWARD[1] = true;
+    }
+}
+
+void gf_SwStop () {
+    gv_kEYFORWARD[1] = false;
+    gv_fORWARD[1] = false;
+    gv_bACKWARD[1] = false;
+    gv_lEFT[1] = false;
+    gf_DbgHold(false, false);
+    gf_AimMoveStop(1);
+    if (gv_aIMACTIVE[1]) {
+        gf_AimEnd(1);
+    }
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    gf_SlowWalkSet(1, false);
+    Wait(0.3, c_timeGame);
+}
+
+// One travel window: engine travel per second (x1000), raw steps per 0.25 s,
+// and the lower bracket state the window ends on.
+void gf_SwWindow (string lp_section, string lp_tag) {
+    unit lv_hero = gv_tPSUNIT[1];
+    point lv_start = UnitGetPosition(lv_hero);
+    point lv_last = lv_start;
+    fixed lv_t0 = TimerGetElapsed(gv_sCOBA_Clock);
+    fixed lv_path = 0.0;
+    string lv_steps = "";
+    int lv_i;
+    int lv_profile;
+
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        Wait(c_SW_WINDOW / 4.0, c_timeGame);
+        lv_path = lv_path + DistanceBetweenPoints(lv_last, UnitGetPosition(lv_hero));
+        lv_steps = lv_steps + IntToString(FixedToInt(DistanceBetweenPoints(lv_last, UnitGetPosition(lv_hero)) * 1000.0)) + " ";
+        lv_last = UnitGetPosition(lv_hero);
+    }
+    lv_profile = gf_AnimHeroProfile(lv_hero);
+    gf_DbgSnap(lp_section, lp_tag);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Speed1000", FixedToInt(lv_path * 1000.0 / (TimerGetElapsed(gv_sCOBA_Clock) - lv_t0)));
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Steps", lv_steps);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Buff", UnitBehaviorCount(lv_hero, c_SLOW_WALK_BUFF));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "SlowOn", gv_slowOn[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "SpeedProp1000", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Level", gv_slowLevel[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "SlowKey", gv_slowKey[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "FullDir", gv_animFullDir[1]);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Clip", "");
+    if (gv_animFullState[1] > 0 && gv_animFullDir[1] >= 0) {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "Clip", gv_animAimClip[lv_profile][gv_animFullState[1]][gv_animFullDir[1]]);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "Aim", gv_aIMACTIVE[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Orders", UnitOrderCount(lv_hero));
+    // R-SLOW-19: the upper state, its clip, arm plays; raw arm start time.
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Upper", gv_animUpperState[1]);
+    BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "UpperClip", "");
+    if (gv_animUpperState[1] > 0) {
+        BankValueSetFromString(gv_dbgBank, lp_section, lp_tag + "UpperClip", gv_animUpperClip[lv_profile][gv_animUpperState[1]]);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ArmPlays", gv_slowUpperPlays[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ArmTimeMs", gv_slowUpperTimeMs[1]);
+    // R-SLOW-20: blend of the last lower and upper play or clear, ms.
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "LowerBlendMs", gv_slowLowerBlendMs[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "UpperBlendMs", gv_slowUpperBlendMs[1]);
+    BankSave(gv_dbgBank);
+}
+
+// The speed ramp (R-SLOW-21): every c_SW_RAMP_STEP after the key change,
+// the speed property, the ramp level, the final buff, the lower state.
+void gf_SwRamp (string lp_section, string lp_tag) {
+    unit lv_hero = gv_tPSUNIT[1];
+    int lv_i;
+    string lv_k;
+
+    for (lv_i = 1; lv_i <= c_SW_RAMP_SAMPLES; lv_i += 1) {
+        Wait(c_SW_RAMP_STEP, c_timeGame);
+        lv_k = lp_tag + IntToString(lv_i);
+        BankValueSetFromInt(gv_dbgBank, lp_section, lv_k + "Prop1000", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent) * 1000.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lv_k + "Level", gv_slowLevel[1]);
+        BankValueSetFromInt(gv_dbgBank, lp_section, lv_k + "Buff", UnitBehaviorCount(lv_hero, c_SLOW_WALK_BUFF));
+        BankValueSetFromInt(gv_dbgBank, lp_section, lv_k + "FullState", gv_animFullState[1]);
+    }
+}
+
+// Normal walk, slow walk, released: three windows in one walk (R-SLOW-1..4,
+// 13..17), each after its 1 s speed ramp (R-SLOW-21). The legs are read
+// 0.25 s after the release (out1, R-SLOW-16).
+void gf_SwWalk (string lp_section, int lp_mode) {
+    gf_SwReset(lp_section, lp_mode);
+    gf_SwStart(lp_mode);
+    Wait(c_SW_SETTLE, c_timeGame);
+    gf_SwWindow(lp_section, "ref");
+    gf_SlowWalkSet(1, true);
+    gf_SwRamp(lp_section, "in");
+    Wait(c_SW_SETTLE, c_timeGame);
+    gf_SwWindow(lp_section, "slow");
+    gf_SlowWalkSet(1, false);
+    gf_SwRamp(lp_section, "out");
+    Wait(c_SW_SETTLE, c_timeGame);
+    gf_SwWindow(lp_section, "after");
+    BankValueSetFromInt(gv_dbgBank, lp_section, "presses", gv_slowPresses[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "starts", gv_slowStarts[1]);
+    gf_SwStop();
+    BankSave(gv_dbgBank);
+}
+
+// Negative: Shift does not slow Kerrigan (R-SLOW-5).
+void gf_SwKerrigan () {
+    string lv_s = "slow_kerrigan";
+
+    gf_SwReset(lv_s, c_SW_PNC);
+    gf_HeroSwitchTo(gv_heroKerrigan);
+    Wait(0.5, c_timeGame);
+    gf_SwStart(c_SW_PNC);
+    Wait(c_SW_SETTLE, c_timeGame);
+    gf_SwWindow(lv_s, "ref");
+    gf_SlowWalkSet(1, true);
+    Wait(c_SW_SETTLE, c_timeGame);
+    gf_SwWindow(lv_s, "slow");
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "heroIsKerrigan", gv_tPSUNIT[1] == gv_heroKerrigan);
+    gf_SwStop();
+    gf_HeroSwitchTo(gv_heroTosh);
+    Wait(0.5, c_timeGame);
+    BankSave(gv_dbgBank);
+}
+
+// Hero switch with Shift held (R-SLOW-6): the old unit loses the buff; back on
+// Tosh the slow walk starts again.
+void gf_SwSwitch () {
+    string lv_s = "slow_switch";
+
+    gf_SwReset(lv_s, c_SW_AIM);
+    gf_SlowWalkSet(1, true);
+    Wait(c_SLOW_WALK_RAMP + 0.3, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "toshBuffBefore", UnitBehaviorCount(gv_heroTosh, c_SLOW_WALK_BUFF));
+    gf_HeroSwitchTo(gv_heroKerrigan);
+    Wait(0.3, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "toshBuffAway", UnitBehaviorCount(gv_heroTosh, c_SLOW_WALK_BUFF));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "kerriganBuff", UnitBehaviorCount(gv_heroKerrigan, c_SLOW_WALK_BUFF));
+    // The old unit loses every ramp level at once (R-SLOW-6, 21).
+    BankValueSetFromInt(gv_dbgBank, lv_s, "levelAway", gv_slowLevel[1]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "slowOnAway", gv_slowOn[1]);
+    gf_HeroSwitchTo(gv_heroTosh);
+    Wait(c_SLOW_WALK_RAMP + 0.3, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "toshBuffBack", UnitBehaviorCount(gv_heroTosh, c_SLOW_WALK_BUFF));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "slowOnBack", gv_slowOn[1]);
+    gf_SlowWalkSet(1, false);
+    Wait(0.2, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "toshBuffEnd", UnitBehaviorCount(gv_heroTosh, c_SLOW_WALK_BUFF));
+    gf_DbgSnap(lv_s, "end");
+}
+
+// The intro holds the slow walk off (R-SLOW-8). The flag is set by the
+// harness for 0.3 s only; nothing else of the intro runs.
+void gf_SwIntro () {
+    string lv_s = "slow_intro";
+
+    gf_SwReset(lv_s, c_SW_AIM);
+    gv_introActive[1] = true;
+    gf_SlowWalkSet(1, true);
+    Wait(0.3, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "introBuff", UnitBehaviorCount(gv_tPSUNIT[1], c_SLOW_WALK_BUFF));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "introSlowOn", gv_slowOn[1]);
+    gv_introActive[1] = false;
+    Wait(c_SLOW_WALK_RAMP + 0.3, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "afterBuff", UnitBehaviorCount(gv_tPSUNIT[1], c_SLOW_WALK_BUFF));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "afterSlowOn", gv_slowOn[1]);
+    gf_SlowWalkSet(1, false);
+    gf_DbgSnap(lv_s, "end");
+}
+
+// Jump from a slow walk (R-SLOW-18): the regular walk base, the buff off in
+// the air, back after the landing recovery while Shift is still held.
+void gf_SwJump (string lp_section, int lp_mode) {
+    unit lv_hero;
+
+    gf_SwReset(lp_section, lp_mode);
+    lv_hero = gv_tPSUNIT[1];
+    gf_SwStart(lp_mode);
+    gf_SlowWalkSet(1, true);
+    Wait(c_SW_SETTLE + c_SW_WINDOW, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "preFullState", gv_animFullState[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "preBuff", UnitBehaviorCount(lv_hero, c_SLOW_WALK_BUFF));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "preScale1000", FixedToInt(gv_animFullScale[1] * 1000.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "pressOk", gf_JumpPress(1));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "pressBuff", UnitBehaviorCount(lv_hero, c_SLOW_WALK_BUFF));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "pressLevel", gv_slowLevel[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "pressFullState", gv_animFullState[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "pressBase", gv_jumpBase[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "pressStride", gv_jumpStride[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "pressBursts", gv_jumpBursts[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "slowJumps", gv_slowJumps[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "slowJumpGaitMs", FixedToInt(gv_slowJumpGait[1] * c_JUMP_GAIT_CYCLE * 1000.0));
+    Wait(0.4, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "airBuff", UnitBehaviorCount(lv_hero, c_SLOW_WALK_BUFF));
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "airSlowOn", gv_slowOn[1]);
+    // Landing recovery, then the 1 s ramp back to the slow walk (R-SLOW-21).
+    Wait(1.2 + c_SLOW_WALK_RAMP + 0.2, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endPhase", gv_jumpPhase[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endBuff", UnitBehaviorCount(lv_hero, c_SLOW_WALK_BUFF));
+    BankValueSetFromInt(gv_dbgBank, lp_section, "endFullState", gv_animFullState[1]);
+    BankValueSetFromString(gv_dbgBank, lp_section, "clipLog", gv_jumpClipLog[1]);
+    gf_DbgSnap(lp_section, "end");
+    gf_SwStop();
+    BankSave(gv_dbgBank);
+}
+
+bool gt_SlowWalkTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBASLOWWALK", 1);
+    gv_bINPUTLOG = false;
+    BankValueSetFromString(gv_dbgBank, "meta", "profile", "slowwalk");
+    BankValueSetFromString(gv_dbgBank, "meta", "group", gv_dbgGroup);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    gf_DbgProbeInit();
+    BankValueSetFromInt(gv_dbgBank, "slow_start", "ready", 1);
+    BankSave(gv_dbgBank);
+    if (gf_DbgGroup("walk")) {
+        gf_SwWalk("slow_free", c_SW_FREE);
+        gf_SwWalk("slow_pnc", c_SW_PNC);
+    }
+    if (gf_DbgGroup("mode")) {
+        gf_SwWalk("slow_strafe", c_SW_STRAFE);
+        gf_SwWalk("slow_back", c_SW_BACK);
+        gf_SwWalk("slow_aim", c_SW_AIM);
+    }
+    if (gf_DbgGroup("hero")) {
+        gf_SwKerrigan();
+        gf_SwSwitch();
+        gf_SwIntro();
+    }
+    if (gf_DbgGroup("jump")) {
+        gf_SwJump("slow_jump_aim", c_SW_AIM);
+        // No hold: a move order (the W loop gave no travel, SPEC F11).
+        gf_SwJump("slow_jump_pnc", c_SW_PNC);
+    }
+    gf_DbgReset("slow_end", false, true);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_SlowWalkTest_Init () {
+    gt_SwForward = TriggerCreate("gt_SwForward_Func");
+    gt_SlowWalkTest = TriggerCreate("gt_SlowWalkTest_Func");
+    TriggerAddEventMapInit(gt_SlowWalkTest);
+}

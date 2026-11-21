@@ -190,9 +190,24 @@ class RetimeTest(unittest.TestCase):
         bc = [(stretch, child) for _, target, stretch, child in SLOW_DEATHS if target.name == "BattlecruiserLokiDeathSlow.m3"]
         self.assertEqual(bc, [(100, 12.5)])
 
+    def test_tree_particles_match_the_tree_speed(self) -> None:
+        # R-SCN-5: variations 09 and 10 (the ones with particles), 4 = 1 / 0.25,
+        # at the stock path; negative: no other variation, no keyframe stretch.
+        trees = [(entry, target, sim) for entry, target, sim in SLOW_SIMULATIONS if "zerustree" in entry]
+        self.assertEqual([(str(target).replace("\\", "/"), sim) for _, target, sim in trees], [
+            ("Assets/Doodads/ZerusTree/ZerusTree_09.m3", 4),
+            ("Assets/Doodads/ZerusTree/ZerusTree_10.m3", 4),
+        ])
+        for entry, target, _ in trees:
+            self.assertTrue(entry.endswith(target.name.lower()))
+        model = fake_model()
+        retime_model(model, 1, 4)
+        self.assertEqual(model.sequences[0].animEndInMS, 1000)
+        self.assertEqual(model.particles[0].emissionSpeed1.initValue * 4, fake_model().particles[0].emissionSpeed1.initValue)
+
     def test_tentacle_simulation_matches_anim_speed(self) -> None:
         # 40 = 1 / AnimSpeed 0.025; negative: no keyframe stretch (stretch 1 in generate).
-        self.assertEqual([(target.name, sim) for _, target, sim in SLOW_SIMULATIONS], [("LeviathanTentacleSlow.m3", 40)])
+        self.assertEqual([(target.name, sim) for _, target, sim in SLOW_SIMULATIONS][0], ("LeviathanTentacleSlow.m3", 40))
         model = fake_model()
         retime_model(model, 1, 40)
         self.assertEqual(model.sequences[0].animEndInMS, 1000)

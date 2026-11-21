@@ -1,5 +1,5 @@
-// Side panel: the tabs, the model file search, and the unit browser with its
-// filters and preview card.
+// Gallery panel: the tabs, the model file search, and the unit browser with
+// its filters and preview card. The scene list is the instances panel (scene.js).
 'use strict';
 
 (() => {
@@ -49,8 +49,17 @@
   const unitCount = $('unit-count');
   const raceBar = $('races');
   const kindSelect = $('kind');
+  const familySelect = $('family');
   const preview = $('preview');
-  const filter = { race: '', kind: '' };
+  // family null: any family; '' : units with no family.
+  const filter = { race: '', kind: '', family: null };
+
+  /** The unit search query of the list as shown: q, race, kind and, when set, family. */
+  function unitQuery() {
+    const query = { q: unitBox.value.trim(), race: filter.race, kind: filter.kind };
+    if (filter.family !== null) query.family = filter.family;
+    return query;
+  }
   let selected = null;
 
   function unitRow(unit) {
@@ -58,7 +67,7 @@
       app.iconNode(unit.icon),
       el('div', { className: 'text' }, [
         el('div', { className: 'name', textContent: unit.name }),
-        el('div', { className: 'sub', textContent: `${unit.race} · ${unit.kind} · ${unit.id}` }),
+        el('div', { className: 'sub', textContent: `${unit.race} · ${unit.kind} · ${unit.id}${unit.skybox ? ' · skybox' : ''}` }),
       ]),
     ]);
     row.dataset.id = unit.id;
@@ -75,7 +84,7 @@
     list: unitList,
     pageSize: 60,
     fetchPage: (offset, limit) =>
-      app.getJson('/api/units?' + new URLSearchParams({ q: unitBox.value.trim(), race: filter.race, kind: filter.kind, offset: String(offset), limit: String(limit) })),
+      app.getJson('/api/units?' + new URLSearchParams({ ...unitQuery(), offset: String(offset), limit: String(limit) })),
     renderItem: unitRow,
     onTotal: (total) => {
       unitCount.textContent = `${total} units`;
@@ -107,10 +116,10 @@
     addButton.addEventListener('click', () => app.addUnit(unit.id).catch(app.reportFailure));
     preview.replaceChildren(
       picture ? el('img', { className: 'portrait', src: '/icon/' + picture, alt: unit.name }) : el('span', { className: 'portrait' }),
+      // Name and add on one line; the facts scroll inside the fixed-height card.
       el('div', { className: 'body' }, [
-        el('div', { className: 'name', textContent: unit.name }),
+        el('div', { className: 'top' }, [el('div', { className: 'name', textContent: unit.name }), addButton]),
         el('div', { className: 'facts' }, facts.map((text) => el('div', { textContent: text, title: text }))),
-        addButton,
       ]),
     );
   }
@@ -134,9 +143,20 @@
       filter.kind = kindSelect.value;
       relist();
     });
+    // Family (ObjectFamily): Melee is the ladder and multiplayer data.
+    // Option values carry a prefix so "any" and "no family" ('') differ.
+    familySelect.replaceChildren(
+      el('option', { value: 'any', textContent: 'any family' }),
+      ...facets.families.map((family) => el('option', { value: 'is:' + family, textContent: family ? family.toLowerCase() : '(no family)' })),
+    );
+    familySelect.addEventListener('change', () => {
+      filter.family = familySelect.value === 'any' ? null : familySelect.value.slice(3);
+      relist();
+    });
   }
   unitBox.addEventListener('input', relist);
 
   /** Fill the filters, then the first page of units. */
   app.setupUnits = () => setupFilters().then(listUnits);
+  app.unitQuery = unitQuery;
 })();

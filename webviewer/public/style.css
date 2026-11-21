@@ -1,7 +1,11 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1a1f; color: #ccc; font: 12px/1.4 ui-monospace, monospace; }
 #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
 #view.drop { outline: 2px dashed #6a8; outline-offset: -6px; }
-#panel { position: fixed; top: 8px; left: 8px; width: 320px; max-height: calc(100% - 16px); display: flex; flex-direction: column; gap: 6px; padding: 8px; box-sizing: border-box; background: rgba(16, 16, 20, 0.86); border: 1px solid #333; }
+/* One column on the left: the gallery on top, the instances below it, each
+   exactly half the window height (operator 2026-11-21). */
+#side { position: fixed; top: 0; left: 0; width: 320px; height: 100vh; display: flex; flex-direction: column; }
+#panel, #instances { height: 50vh; flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px; box-sizing: border-box; min-height: 0; overflow: hidden; background: rgba(16, 16, 20, 0.86); border: 1px solid #333; }
+#panel > section { flex: 1 1 0; }
 [hidden] { display: none !important; }
 input, select, button { font: inherit; color: inherit; background: #222; border: 1px solid #444; padding: 2px 4px; box-sizing: border-box; }
 button { cursor: pointer; }
@@ -13,13 +17,15 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 #tabs { display: flex; gap: 4px; }
 #tabs button { flex: 1; }
 #unit-search, #search { width: 100%; }
-#filters { display: flex; gap: 4px; align-items: center; }
-#races { display: flex; gap: 2px; flex: 1; flex-wrap: wrap; }
+/* Kept short: the gallery is half the window and the unit list gets the rest. */
+#races { display: flex; gap: 2px; flex-wrap: wrap; }
 #races button { padding: 1px 5px; }
-#kind { max-width: 104px; }
-#unit-count { color: #777; }
+#kind, #family { max-width: 96px; }
+#unit-tools { display: flex; gap: 4px; align-items: center; }
+#unit-count { color: #777; flex: 1; text-align: right; white-space: nowrap; }
+#add-all { padding: 1px 6px; }
 
-#units { overflow-y: auto; max-height: 30vh; min-height: 0; }
+#units { overflow-y: auto; flex: 1 1 0; min-height: 0; }
 #units li { display: flex; gap: 6px; align-items: center; padding: 2px; cursor: grab; border: 1px solid transparent; }
 #units li:hover { background: #2a2a32; }
 #units li.selected { border-color: #6a8; background: #26302a; }
@@ -30,21 +36,25 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .sub { color: #777; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 #preview:empty { display: none; }
-#preview { display: flex; gap: 8px; padding: 6px; border: 1px solid #333; background: #14141a; }
-#preview .portrait { width: 84px; height: 84px; flex: none; object-fit: contain; background: #0c0c10; }
-#preview .body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-#preview .name { color: #fff; font-weight: bold; }
-#preview .facts { color: #999; }
+#preview { display: flex; flex: none; height: 72px; box-sizing: border-box; gap: 8px; padding: 4px; border: 1px solid #333; background: #14141a; }
+#preview .portrait { width: 62px; height: 62px; flex: none; object-fit: contain; background: #0c0c10; }
+#preview .body { min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+#preview .top { display: flex; gap: 6px; align-items: center; }
+#preview .name { color: #fff; font-weight: bold; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#preview .facts { color: #999; flex: 1; min-height: 0; overflow-y: auto; }
 #preview .facts div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#preview-add { align-self: flex-start; margin-top: auto; }
+#preview-add { flex: none; padding: 0 6px; }
 
-#results { overflow-y: auto; max-height: 30vh; }
+#results { overflow-y: auto; flex: 1 1 0; min-height: 0; }
 #results button { width: 100%; text-align: left; border: 0; background: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; }
 #results button:hover { background: #333; }
 
 #scene-head { display: flex; justify-content: space-between; align-items: center; color: #888; }
-#scene { overflow-y: auto; min-height: 0; }
-#scene li { padding: 4px 0; border-top: 1px solid #333; }
+#scene { overflow-y: auto; flex: 1 1 0; min-height: 0; }
+#scene li { padding: 4px; border: 1px solid transparent; border-top-color: #333; }
+#scene li .head { cursor: pointer; }
+#scene li.selected { border-color: #6a8; background: #26302a; }
+#instance-count { color: #666; }
 #scene .head { display: flex; gap: 6px; align-items: center; }
 #scene .head .icon { width: 22px; height: 22px; }
 #scene .head .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -53,10 +63,12 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 #scene input { width: 44px; appearance: textfield; -moz-appearance: textfield; }
 #scene input::-webkit-inner-spin-button, #scene input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 #scene select.anim { flex: 1; min-width: 0; }
-#status { color: #c96; min-height: 1em; word-break: break-all; }
+#status { color: #c96; word-break: break-all; flex: none; }
+#status:empty { display: none; }
 
 #view-tools { position: fixed; top: 8px; right: 8px; display: flex; gap: 4px; }
 #view-tools button { padding: 3px 10px; background: rgba(16, 16, 20, 0.86); }
+#landmarks { max-width: 280px; background: rgba(16, 16, 20, 0.86); }
 #view-tools button.on { background: #26302a; border-color: #6a8; color: #cfe; }
 
 .dialog { width: min(720px, calc(100% - 32px)); max-height: calc(100% - 64px); padding: 0; color: #ccc; background: #14141a; border: 1px solid #555; }
@@ -69,6 +81,9 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .picker-list li:hover { background: #2a2a32; }
 .picker-list li.selected { border-color: #6a8; background: #26302a; }
 .picker-list .sub { font-size: 11px; }
+.confirm-dialog { width: min(420px, calc(100% - 32px)); }
+.confirm-dialog .question { padding: 4px 0 8px; color: #eee; }
+.confirm-dialog .answers { display: flex; justify-content: flex-end; gap: 6px; }
 
 .anim-menu { position: fixed; z-index: 10; min-width: 140px; max-height: 60vh; display: flex; flex-direction: column; background: rgba(16, 16, 20, 0.95); border: 1px solid #6a8; }
 .anim-menu .title { padding: 3px 8px; color: #cfe; border-bottom: 1px solid #333; white-space: nowrap; }

@@ -51,6 +51,8 @@ actions:
                          (move, cursor, aim, head, target, pick, shot, hold, pose) or the full suite when no group is given
   jump [group]           rebuild, build jump test map, run one scenario group
                          (arc, body, hero) or the full suite when no group is given
+  slowwalk [group]       rebuild, build slow walk test map, run one scenario group
+                         (walk, mode, hero, jump) or the full suite when no group is given
   intro [group]          rebuild, build intro test map, run one scenario group
                          (boot, shots, wrap, gate, deploy; boot always runs) or the full suite
   herodrop [group]       rebuild, build hero drop test map, run one scenario group
@@ -113,6 +115,7 @@ profile_timeout() {
             ;;
         motion) printf '%s\n' "${SC2_CASE_TIMEOUT:-80}" ;;
         jump) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
+        slowwalk) printf '%s\n' "${SC2_CASE_TIMEOUT:-120}" ;;
         herodrop) printf '%s\n' "${SC2_CASE_TIMEOUT:-170}" ;;
         roster) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
         waterfeat) printf '%s\n' "${SC2_CASE_TIMEOUT:-150}" ;;
@@ -142,7 +145,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat) ;;
+        combat|tps|jump|slowwalk|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -194,7 +197,7 @@ case "$ACTION" in
         export SC2_MAP_SOURCE="$FRESH_MAP"
         exec bash "$ROOT_DIR/scripts/launch-and-check.sh"
         ;;
-    combat|tps|jump|intro|aircreep|baseai|herodrop)
+    combat|tps|jump|slowwalk|intro|aircreep|baseai|herodrop)
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;

@@ -143,6 +143,12 @@ void gf_ItSnap (string lp_s, string lp_t) {
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "ChatHidden", gv_introChatHidden[1]);
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "ChatFrame", gv_introChatFrame);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "ChatShown", DialogControlIsVisible(gv_introChatFrame, 1));
+    // R-INTRO-19: the intro's mouse hide, what was last sent to the engine,
+    // and the control rule (TPS free cursor or PNC) for comparison.
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "MouseHidden", gv_introMouseHidden[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "SentRelative", gv_ctrlSentRelative[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "SentCursor", gv_ctrlSentCursor[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "CursorRule", !gf_TpsActive(1) || gv_mOUSEMIDDLE[1]);
     // Countdown beeps (operator 2026-11-20) and the intro camera hold.
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_t + "Beeps", gv_introCountBeeps[1]);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_t + "BeepValid", gv_introBeepValid);

@@ -34,7 +34,7 @@
       gl.depthMask(true);
       gl.clear(gl.DEPTH_BUFFER_BIT);
     }
-    ground.draw(scene.camera, camera.target, glowSpots());
+    ground.draw(scene.camera, camera.target, glowSpots(), camera.distance);
     scene.render();
     app.displacedBatches += app.displacement.draw(scene, canvas.width, canvas.height);
     // The mouse-over outline, when the hovered unit is drawn this frame.
@@ -87,7 +87,7 @@
     requestAnimationFrame(frame);
   }
 
-  const api = ['add', 'addUnit', 'remove', 'clear', 'restart', 'state', 'pixels', 'colorStats', 'mark', 'changedSinceMark', 'idle', 'view', 'groundPixel', 'groundPeaks', 'worldToCanvas', 'setGrid', 'setSky', 'screenOf', 'itemScreen', 'pickState', 'setDisplacement'];
+  const api = ['add', 'addUnit', 'remove', 'clear', 'restart', 'state', 'pixels', 'colorStats', 'mark', 'changedSinceMark', 'idle', 'view', 'groundPixel', 'groundPeaks', 'worldToCanvas', 'setGrid', 'setSky', 'screenOf', 'itemScreen', 'pickState', 'setDisplacement', 'setConstantLayers'];
   window.sc2viewer = { ready: false, groundUnder: app.groundAt };
   for (const name of api) {
     if (typeof app[name] !== 'function') throw new Error('sc2viewer: module did not define ' + name);

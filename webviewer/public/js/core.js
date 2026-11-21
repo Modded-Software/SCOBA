@@ -85,8 +85,20 @@
     ];
   }
 
+  /**
+   * The unit scene's projection. Near and far follow the camera distance,
+   * so a far view keeps the ground and the units in front of the far plane
+   * (and the depth range stays the same ratio, 1 to 20000).
+   */
+  function project() {
+    const near = Math.max(0.1, camera.distance * 0.01);
+    const far = Math.max(2000, camera.distance * 200);
+    scene.camera.perspective(FOV, canvas.width / canvas.height, near, far);
+  }
+
   function applyCamera() {
     const from = eye();
+    project();
     scene.camera.moveToAndFace(from, camera.target, UP);
     // The sky turns with the camera but never comes closer.
     skyScene.camera.moveToAndFace([0, 0, 0], [camera.target[0] - from[0], camera.target[1] - from[1], camera.target[2] - from[2]], UP);
@@ -102,8 +114,8 @@
       s.viewport[2] = width;
       s.viewport[3] = height;
     }
-    // SC2 models are a few units tall, so the near plane is close.
-    scene.camera.perspective(FOV, width / height, 0.1, 2000);
+    // SC2 models are a few units tall, so the near plane is close (project).
+    project();
     // Skyboxes are large models around the origin.
     skyScene.camera.perspective(FOV, width / height, 1, 100000);
   }

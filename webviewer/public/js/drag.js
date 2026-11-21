@@ -19,6 +19,8 @@
     app.pending++;
     try {
       const unit = await app.getJson('/api/unit?id=' + encodeURIComponent(id));
+      // A skybox unit is not placed (a drop sets it as the sky): no preview.
+      if (unit.skybox) return;
       const model = await viewer.load(app.modelUrl(unit.file), app.pathSolver);
       if (ghost !== mine) return; // the drag ended meanwhile
       if (!model) throw new Error('cannot load ' + unit.file);

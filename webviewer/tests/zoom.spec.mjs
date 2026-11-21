@@ -3,6 +3,8 @@ import { test, expect } from '@playwright/test';
 // Wheel zoom: a short glide over a few frames. One notch moves the camera a
 // share of its distance: 15% with the eye 10 or more units up, less as the
 // eye comes down (never under 12% of that), and a quarter of it with ctrl.
+// The zoom starts from the ground point on the view line, so it depends on
+// the eye height only, and the eye stays 0.3 or more over the ground.
 
 async function open(page) {
   const errors = [];
@@ -111,6 +113,58 @@ test('wheel up comes closer by the same share; notches add up', async ({ page })
   await settled(page);
   const first = 20 * (1 + share(20, 1.2));
   expect((await camera(page)).distance).toBeCloseTo(first * (1 + share(first, 1.2)), 3);
+});
+
+/** The eye from a camera state (eye = target + distance * dir). */
+const eyeOf = (c) => [
+  c.target[0] + c.distance * Math.cos(c.pitch) * Math.cos(c.yaw),
+  c.target[1] + c.distance * Math.cos(c.pitch) * Math.sin(c.yaw),
+  c.target[2] + c.distance * Math.sin(c.pitch),
+];
+
+test('zoom is absolute: the same eye gives the same step, wherever pan or look left the target', async ({ page }) => {
+  await open(page);
+  const pitch = 0.6;
+  const height = 12;
+  const results = [];
+  // One eye (height 12 over the ground point (0, 0)), three targets on its
+  // view line: on the ground, 5 above it, 5 below it.
+  for (const tz of [0, 5, -5]) {
+    const distance = (height - tz) / Math.sin(pitch);
+    await page.evaluate(([d, p, t]) => window.sc2viewer.view({ distance: d, pitch: p, yaw: 0, target: t }), [distance, pitch, [-(height - tz) / Math.tan(pitch) + height / Math.tan(pitch), 0, tz]]);
+    const before = eyeOf(await camera(page));
+    await page.mouse.wheel(0, 100);
+    await settled(page);
+    const c = await camera(page);
+    const after = eyeOf(c);
+    results.push({ tz, before, after, target: c.target });
+  }
+  console.log(JSON.stringify(results.map((r) => ({ tz: r.tz, eyeBefore: r.before.map((v) => +v.toFixed(3)), eyeAfter: r.after.map((v) => +v.toFixed(3)), target: r.target.map((v) => +v.toFixed(3)) }))));
+  const expected = height * (1 + share(height / Math.sin(pitch), pitch));
+  for (const r of results) {
+    // Same eye before, same eye after: the step follows the eye height only.
+    expect(r.before[2]).toBeCloseTo(height, 6);
+    expect(r.after[2]).toBeCloseTo(expected, 3);
+    expect(r.after[0]).toBeCloseTo(results[0].after[0], 3);
+    // The target was moved to the ground on the view line.
+    expect(r.target[2]).toBeCloseTo(0, 6);
+  }
+});
+
+test('negative: zooming in never takes the eye under the ground, also with the target below it', async ({ page }) => {
+  await open(page);
+  for (const tz of [0, -5]) {
+    await page.evaluate((t) => window.sc2viewer.view({ distance: 20, pitch: 0.8, yaw: 0, target: [0, 0, t] }), tz);
+    // Near the ground a notch is 1.8%: wheel well past the floor.
+    for (let i = 0; i < 40; i++) await page.mouse.wheel(0, -1000);
+    await settled(page);
+    const eye = eyeOf(await camera(page));
+    console.log('target z', tz, 'eye height after zooming in', eye[2].toFixed(4));
+    // Two floors: eye height 0.3, and distance 0.5 to the ground target.
+    const floor = Math.max(0.3, 0.5 * Math.sin(0.8));
+    expect(eye[2]).toBeGreaterThanOrEqual(0.3 - 1e-6);
+    expect(eye[2]).toBeCloseTo(floor, 3);
+  }
 });
 
 test('negative: setting the view stops a zoom glide', async ({ page }) => {

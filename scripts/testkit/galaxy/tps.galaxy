@@ -105,8 +105,15 @@ void gf_DbgTpsExtra (string lp_section, string lp_tag) {
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadSends", gv_animHeadSends[1]);
     // Head lead (R-TPS-16), raw: the lead in tenths of a degree, the camera
     // yaw and the unit facing the torso follows.
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadLeadYaw10", FixedToInt(gv_animHeadLeadYaw[1] * 10.0));
-    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadLeadPitch10", FixedToInt(gv_animHeadLeadPitch[1] * 10.0));
+    // Head look (operator 2026-11-21): eased yaw, wanted yaw, and the raw
+    // camera yaw and hero facing it comes from.
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadYaw10", FixedToInt(gv_animHeadLookYaw[1] * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadWant10", FixedToInt(gv_animHeadLookWant[1] * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadPitch10", FixedToInt(gv_animHeadLookPitch[1] * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeadPitchWant10", FixedToInt(gv_animHeadLookPitchWant[1] * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamPitch10", FixedToInt(gf_AnimHeadSignedPitch(CameraGetPitch(1)) * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamYaw10", FixedToInt(CameraGetYaw(1) * 10.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "HeroFacing10", FixedToInt(UnitGetFacing(gv_tPSUNIT[1]) * 10.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "CamYaw10", FixedToInt(CameraGetYaw(1) * 10.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "Facing10", FixedToInt(UnitGetFacing(gv_tPSUNIT[1]) * 10.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "PitchStep", gv_animAimPitchStep[1]);

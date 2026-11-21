@@ -380,24 +380,40 @@ def _check_aim(checks) -> None:
     checks.false(section, "tend", "AimActive")
 
 
-HEAD_STEPS = 9
-HEAD_YAW_STEPS = 11
-# Clip number = (yaw step - 1) * HEAD_STEPS + pitch step.
-HEAD_YAW_CENTER = (HEAD_YAW_STEPS - 1) // 2 * HEAD_STEPS
+HEAD_STEPS, HEAD_YAW_STEPS, HEAD_MAX, HEAD_YAW_MAX = 9, 11, 30.0, 25.0
+HEAD_HOLD = 0.75  # c_ANIM_HEAD_HOLD
+
+
+def _head_holds(checks, section: str, tag: str) -> None:
+    """Both eased angles reached the wanted angles (eye to the look point,
+    clamped), and each part of the head step shows its eased angle."""
+    step = checks.value(section, tag, "HeadStep")
+    for axis, want_key, got_key, top, steps in (
+        ("yaw", "HeadWant10", "HeadYaw10", HEAD_YAW_MAX, HEAD_YAW_STEPS),
+        ("pitch", "HeadPitchWant10", "HeadPitch10", HEAD_MAX, HEAD_STEPS),
+    ):
+        want, got = checks.value(section, tag, want_key), checks.value(section, tag, got_key)
+        ok = None not in (step, want, got) and step > 0
+        if ok:
+            width = 2 * top / (steps - 1)
+            index = (step - 1) // HEAD_STEPS if axis == "yaw" else (step - 1) % HEAD_STEPS
+            ok = abs(got - want) <= 10 and abs(got / 10.0 + top - index * width) < HEAD_HOLD * width + 0.01
+        _report(checks, f"{section} {tag} head {axis} holds on the look point", ok, f"step={step} want10={want} got10={got}")
 
 
 def _check_head(checks) -> None:
     """R-TPS-12 to 14, 16. Script state: the look of the head is an operator check."""
     section = "tps_head"
-    level = (HEAD_STEPS + 1) // 2
     # Negative cases: no head clip in PNC, while aiming, or with the cursor free.
     for tag in ("t0000", "taim", "tmid", "tend"):
         checks.eq(section, tag, "HeadStep", 0)
-    # Settled: no yaw lead, the pitch step follows the camera pitch.
-    checks.eq(section, "tlevel", "HeadStep", HEAD_YAW_CENTER + level)
-    checks.eq(section, "tdown", "HeadStep", HEAD_YAW_CENTER + 1)
-    checks.eq(section, "tup", "HeadStep", HEAD_YAW_CENTER + HEAD_STEPS)
-    checks.eq(section, "trel", "HeadStep", HEAD_YAW_CENTER + HEAD_STEPS)
+    # Settled on the look point (operator 2026-11-21): camera pitch 0 level,
+    # 60 down and -45 up are past the 30 degree head range.
+    for tag, pitch in (("tlevel", (HEAD_STEPS + 1) // 2), ("tdown", 1), ("tup", HEAD_STEPS), ("trel", HEAD_STEPS)):
+        step = checks.value(section, tag, "HeadStep")
+        got = None if not step else (step - 1) % HEAD_STEPS + 1
+        _report(checks, f"{section} {tag} head pitch step", got == pitch, f"step={step} pitch={got} want={pitch}")
+        _head_holds(checks, section, tag)
     checks.gt(section, "tup", "HeadSends", checks.value(section, "tlevel", "HeadSends") or 0)
     # R-TPS-12: outside aiming the torso pitch clips do not play.
     for tag in ("tlevel", "tdown", "tup", "trel"):
@@ -406,27 +422,27 @@ def _check_head(checks) -> None:
     checks.true(section, "taim", "AimActive")
     checks.gt(section, "taim", "PitchStep", 0)
 
-    # R-TPS-16: the head leads a fast turn, then settles.
+    # R-TPS-16 (operator 2026-11-21): the head holds on the camera target.
     section = "tps_head_lead"
-    rest = HEAD_YAW_CENTER + level
-    for tag in ("tsettle", "tleftrest", "trightrest"):
-        checks.eq(section, tag, "HeadStep", rest)
-        checks.between(section, tag, "HeadLeadYaw10", -10, 10)
-        checks.between(section, tag, "HeadLeadPitch10", -10, 10)
-    # A 60 degree turn left, two game loops later: the head is turned well left
-    # (yaw step 9 or more of 11). The head tick runs once a loop at most.
-    checks.gt(section, "tleft", "HeadLeadYaw10", 150)
+    keys = ("CamYaw10", "HeroFacing10", "HeadWant10", "HeadYaw10", "CamPitch10", "HeadPitchWant10", "HeadPitch10", "HeadStep", "HeadSends")
+    for tag in ("tsettle", "tleft", "tleftrest", "tright", "trightrest"):
+        _head_holds(checks, section, tag)
+        print(f"{section} {tag} raw: " + " ".join(f"{key}={checks.value(section, tag, key)}" for key in keys))
+    # The camera turned 60 degrees left, then right, of the hero: the head
+    # turns that way, to the end of its range.
+    checks.gt(section, "tleft", "HeadWant10", 100)
     checks.gt(section, "tleft", "HeadStep", 8 * HEAD_STEPS)
-    # Negative case: the turn right leads right, not left (yaw step 3 or less).
-    checks.lt(section, "tright", "HeadLeadYaw10", -150)
+    checks.lt(section, "tright", "HeadWant10", -100)
     checks.lt(section, "tright", "HeadStep", 3 * HEAD_STEPS + 1)
+    # Negative (the twitch): no new head clip while the camera is still.
+    for still, rest in (("tleft", "tleftrest"), ("tright", "trightrest")):
+        checks.eq(section, rest, "HeadSends", checks.value(section, still, "HeadSends"))
+        checks.eq(section, rest, "HeadStep", checks.value(section, still, "HeadStep"))
     # Negative case: aiming, a fast look down leaves the head off; the torso pitches.
     checks.true(section, "taimdown", "AimActive")
-    checks.eq(section, "taimdown", "HeadStep", 0)
-    checks.eq(section, "taimdown", "HeadLeadPitch10", 0)
-    checks.gt(section, "taimdown", "PitchStep", 0)
-    checks.eq(section, "taimrest", "HeadStep", 0)
-    checks.gt(section, "taimrest", "PitchStep", 0)
+    for tag in ("taimdown", "taimrest"):
+        checks.eq(section, tag, "HeadStep", 0)
+        checks.gt(section, tag, "PitchStep", 0)
     # Negative case: leaving TPS clears the head.
     checks.eq(section, "tend", "HeadStep", 0)
 

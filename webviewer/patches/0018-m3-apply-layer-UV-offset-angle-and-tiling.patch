@@ -1,7 +1,7 @@
 From 8544a5c24c6c6b998b392cd03f6c365aec52613b Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 15:30:44 +0200
-Subject: [PATCH 18/20] m3: apply layer UV offset, angle and tiling
+Subject: [PATCH 18/25] m3: apply layer UV offset, angle and tiling
 
 Per layer a 2x3 matrix from the animated uvOffset, uvAngle and uvTiling, uploaded as LayerSettings.uvRow0/uvRow1 and applied in getUV. Rule from WhiteoutFlakes M3ComposeUvTransform (citing the SC2 client): uv' = 0.5 + S * R(angle.z) * (uv - 0.5 - offset). An undriven tiling of 0 reads as 1. The normal map now samples through getUV as well.
 ---

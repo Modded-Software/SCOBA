@@ -29,9 +29,16 @@ void gf_AnimUpperClear (int lp_player) {
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     gf_AnimEvent(lp_player, "upper_stop", "", 0);
     gf_ProbeEvent(lp_player, "upper_stop", "", 0);
-    if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE || gv_animAimUpperOn[lp_player] || gv_animTargetPitchStep[lp_player] > 0) {
+    if (gf_SlowWalkUpperOn(gv_animUpperState[lp_player])) {
+        // Out of the slow walk arms with the slow blend (R-SLOW-20).
+        ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_UPPER + " " + FixedToString(c_ANIM_SLOW_BLEND, 3));
+        gv_slowUpperBlendMs[lp_player] = FixedToInt(c_ANIM_SLOW_BLEND * 1000.0);
+        gv_animUpperClears[lp_player] += 1;
+    }
+    else if (gv_animUpperState[lp_player] != c_ANIM_UPPER_NONE || gv_animAimUpperOn[lp_player] || gv_animTargetPitchStep[lp_player] > 0) {
         ActorSend(lv_actor, "AnimSetPaused " + c_ANIM_BRACKET_UPPER + " 0");
         ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_UPPER);
+        gv_slowUpperBlendMs[lp_player] = 0;
         gv_animUpperClears[lp_player] += 1;
     }
     ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_ATTACK);
@@ -76,7 +83,15 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
     if (lp_state == gv_animUpperState[lp_player]) {
         return;
     }
+    if (gf_SlowWalkUpperOn(lp_state)) {
+        gf_SlowWalkUpperPlay(lp_player, lp_state);
+        return;
+    }
     if (lp_state == c_ANIM_UPPER_ATTACK || lp_state == c_ANIM_UPPER_ATTACK_SPELL) {
+        // The slow walk arms share the attack priority: they leave first.
+        if (gf_SlowWalkUpperOn(gv_animUpperState[lp_player])) {
+            gf_AnimUpperClear(lp_player);
+        }
         gf_AnimUpperAttackStart(lp_player, lp_state);
         return;
     }
@@ -105,6 +120,10 @@ void gf_AnimUpperSet (int lp_player, int lp_state) {
     }
     lv_flags = c_animFlagFullMatch | c_animFlagPlayForever | c_animFlagNonLooping;
     lv_blend = gv_animUpperBlend[lv_profile][lp_state];
+    if (gf_SlowWalkUpperOn(gv_animUpperState[lp_player])) {
+        lv_blend = MaxF(lv_blend, c_ANIM_SLOW_BLEND);  // out of the slow arms (R-SLOW-20)
+    }
+    gv_slowUpperBlendMs[lp_player] = FixedToInt(lv_blend * 1000.0);
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     gv_animUpperStarts[lp_player] += 1;
     gf_AnimEvent(lp_player, "upper_start", lv_clip, lv_flags);
@@ -277,8 +296,14 @@ void gf_AnimFullClear (int lp_player) {
         return;
     }
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
-    if (gv_animFullState[lp_player] != c_ANIM_LOWER_NONE || gv_animFullDir[lp_player] != -1) {
+    if (gf_SlowWalkState(gv_animFullState[lp_player])) {
+        // Out of the slow walk legs with the slow blend (R-SLOW-20).
+        ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_LOWER + " " + FixedToString(c_ANIM_SLOW_BLEND, 3));
+        gv_slowLowerBlendMs[lp_player] = FixedToInt(c_ANIM_SLOW_BLEND * 1000.0);
+    }
+    else if (gv_animFullState[lp_player] != c_ANIM_LOWER_NONE || gv_animFullDir[lp_player] != -1) {
         ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_LOWER);
+        gv_slowLowerBlendMs[lp_player] = 0;
     }
     gv_animFullState[lp_player] = c_ANIM_LOWER_NONE;
     gv_animFullDir[lp_player] = -1;
@@ -288,6 +313,12 @@ void gf_AnimFullClear (int lp_player) {
 fixed gf_AnimWalkScale (unit lp_hero, int lp_state) {
     fixed lv_walk;
 
+    // Slow walk (R-SLOW-15): feet on the ground, times the operator's
+    // c_ANIM_SLOW_RATE. The speed property shows the slow buff (run
+    // 20261121-162021: 1.55 of 3.10, engine travel 1.545).
+    if (gf_SlowWalkState(lp_state)) {
+        return c_ANIM_SLOW_RATE * UnitGetPropertyFixed(lp_hero, c_unitPropMovementSpeed, c_unitPropCurrent) / c_ANIM_SLOW_STRIDE;
+    }
     if (lp_state != c_ANIM_LOWER_WALK && lp_state != c_ANIM_LOWER_WALK_BACK) {
         return 1.0;
     }
@@ -326,6 +357,9 @@ void gf_AnimFullSet (int lp_player, int lp_state) {
         if (AbsF(lv_scale - gv_animFullScale[lp_player]) > 0.01) {
             ActorSend(lv_actor, "AnimSetTimeScale " + c_ANIM_BRACKET_LOWER + " " + FixedToString(lv_scale, 3));
             gv_animFullScale[lp_player] = lv_scale;
+            if (gf_SlowWalkState(lp_state)) {
+                gf_SlowWalkGaitMark(lp_player, lv_scale, false);
+            }
         }
         return;
     }
@@ -335,13 +369,20 @@ void gf_AnimFullSet (int lp_player, int lp_state) {
         return;
     }
     lv_blend = 0.15;
+    if (gf_SlowWalkState(lp_state) || gf_SlowWalkState(gv_animFullState[lp_player])) {
+        lv_blend = c_ANIM_SLOW_BLEND;  // into or out of the slow walk (R-SLOW-20)
+    }
     if (gv_jumpGaitResume[lp_player]) {
         // After a landing the walk continues where the End clip stopped: a
         // short blend, no slide (R-JUMP-22).
         lv_blend = c_JUMP_RESUME_BLEND;
     }
     ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, lv_blend, lv_blend, lv_scale, c_animTimeVariantAsTimeScale));
+    gv_slowLowerBlendMs[lp_player] = FixedToInt(lv_blend * 1000.0);
     gf_JumpGaitOnLowerPlay(lp_player, lp_state);  // walk phase after a jump (R-JUMP-18)
+    if (gf_SlowWalkState(lp_state)) {
+        gf_SlowWalkGaitMark(lp_player, lv_scale, true);  // slow phase for a jump (R-SLOW-18)
+    }
     gv_animFullState[lp_player] = lp_state;
     gv_animFullDir[lp_player] = lv_dir;
     gv_animFullScale[lp_player] = lv_scale;

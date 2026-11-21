@@ -32,7 +32,7 @@ const MAP_MODEL_DATA = join(ROOT, 'src', 'SCOBA.SC2Map', 'Base.SC2Data', 'GameDa
 const STATIC = new Map([
   ['/', ['public/index.html', 'text/html; charset=utf-8']],
   // The page modules, loaded in this order by index.html.
-  ...['core', 'controls', 'scene', 'panels', 'drag', 'sky', 'pick', 'inspect', 'main'].map((name) => [`/js/${name}.js`, [`public/js/${name}.js`, 'text/javascript; charset=utf-8']]),
+  ...['core', 'controls', 'scene', 'panels', 'landmarks', 'addall', 'drag', 'sky', 'pick', 'inspect', 'main'].map((name) => [`/js/${name}.js`, [`public/js/${name}.js`, 'text/javascript; charset=utf-8']]),
   ['/components.js', ['public/components.js', 'text/javascript; charset=utf-8']],
   ['/ground.js', ['public/ground.js', 'text/javascript; charset=utf-8']],
   ['/outline.js', ['public/outline.js', 'text/javascript; charset=utf-8']],
@@ -109,7 +109,7 @@ const units = new Map();
 const icons = new Set();
 let unitList = [];
 let unitsWithoutModelFile = 0;
-let facets = { races: [], kinds: [] };
+let facets = { races: [], kinds: [], families: [] };
 
 /** The servable path of a unit's model: the file itself, or its first variation. */
 function modelFile(m3) {
@@ -142,7 +142,8 @@ async function loadCatalog() {
     for (const unit of unitList) seen.set(unit[field], (seen.get(unit[field]) || 0) + 1);
     return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([value]) => value);
   };
-  facets = { races: count('race'), kinds: count('kind') };
+  // Family: the EditorCategories ObjectFamily (Melee, Campaign, Storymode, ...); '' when the unit has none.
+  facets = { races: count('race'), kinds: count('kind'), families: count('family') };
 }
 
 /** Lower is better: the whole name, then a name that starts with it, then a word that does. */
@@ -164,16 +165,17 @@ function intParam(params, name, standard, low, high) {
 /** One page of an ordered list. */
 const pageOf = (list, offset, limit) => list.slice(offset, offset + limit);
 
-function searchUnits(query, race, kind, offset, limit) {
+/** `family` null: any family; a string (also '', no family): that family only. */
+function searchUnits(query, race, kind, family, offset, limit) {
   const text = query.toLowerCase().trim();
   const words = text.split(/\s+/).filter(Boolean);
-  let hits = unitList.filter((unit) => (!race || unit.race === race) && (!kind || unit.kind === kind) && words.every((word) => unit.text.includes(word)));
+  let hits = unitList.filter((unit) => (!race || unit.race === race) && (!kind || unit.kind === kind) && (family === null || unit.family === family) && words.every((word) => unit.text.includes(word)));
   if (words.length) {
     // The map's own units first among equals, then melee units, then the rest.
     const order = (unit) => unitRank(unit, text) * 4 + (unit.inMap ? 0 : unit.family === 'Melee' ? 1 : 2);
     hits = hits.map((unit) => [order(unit), unit]).sort((a, b) => a[0] - b[0]).map(([, unit]) => unit);
   }
-  const brief = ({ id, name, race, kind, family, icon, inMap }) => ({ id, name, race, kind, family, icon, inMap });
+  const brief = ({ id, name, race, kind, family, icon, inMap, skybox }) => ({ id, name, race, kind, family, icon, inMap, skybox });
   return { total: hits.length, items: pageOf(hits, offset, limit).map(brief) };
 }
 
@@ -230,8 +232,24 @@ async function skyboxModels() {
   return byKey;
 }
 
+/** Skybox model folders: the stock skyboxes and the story mode backdrops. */
+const SKYBOX_DIR = /^assets\\(storymode)?skyboxes\\/;
+
+/**
+ * Mark the units whose model is a skybox (`skybox: true`): its file lies in
+ * a skybox folder, or a CModel with parent "Skybox" names it. Such a unit
+ * is a backdrop (SS_BackgroundSpace*), not something to stand on the map.
+ */
+function markSkyboxUnits(named) {
+  for (const unit of units.values()) {
+    const key = unit.m3.toLowerCase().replaceAll('/', '\\');
+    unit.skybox = SKYBOX_DIR.test(key) || named.has(key);
+  }
+}
+
 async function loadSkyboxes() {
   const named = await skyboxModels();
+  markSkyboxUnits(named);
   const seen = new Set();
   skyboxes = [];
   for (const [key, file] of assets) {
@@ -323,7 +341,7 @@ async function handle(req, res) {
   if (route === '/api/units') {
     const limit = intParam(params, 'limit', 60, 1, 500);
     const offset = intParam(params, 'offset', 0, 0, Number.MAX_SAFE_INTEGER);
-    return json(res, 200, searchUnits(params.get('q') || '', params.get('race') || '', params.get('kind') || '', offset, limit));
+    return json(res, 200, searchUnits(params.get('q') || '', params.get('race') || '', params.get('kind') || '', params.has('family') ? params.get('family') : null, offset, limit));
   }
 
   if (route === '/api/skyboxes') {

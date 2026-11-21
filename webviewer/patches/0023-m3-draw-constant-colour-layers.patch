@@ -1,0 +1,193 @@
+From c87dc6d4a82d23a989f8b808683ce051118cdaca Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 19:51:18 +0200
+Subject: [PATCH 23/25] m3: draw constant colour layers
+
+A layer with flag 0x400 and no texture draws its colour (stored b, g, r, a) times rgbMultiply, rest values, after WhiteoutFlakes M3LayerValue mode 2 and LayerTint. An all-zero colour and a multiply <= 0 read as unset. No channel select or team colour on such a layer.
+---
+ src/viewer/handlers/m3/layer.ts               | 64 ++++++++++++++++---
+ src/viewer/handlers/m3/shaders/layers.glsl.ts | 35 +++++-----
+ 2 files changed, 74 insertions(+), 25 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index a692e5ce..a907d527 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -48,7 +48,7 @@ export default class M3Layer {
+   active = 0;
+   layer: Layer | null = null;
+   gl: WebGLRenderingContext;
+-  uniformMap: { map: string; enabled: string; op: string; channels: string; teamColorMode: string; invert: string; clampResult: string; uvCoordinate: string; uvRow0: string; uvRow1: string; };
++  uniformMap: { map: string; enabled: string; op: string; channels: string; teamColorMode: string; invert: string; clampResult: string; uvCoordinate: string; uvRow0: string; uvRow1: string; useConstantColor: string; constantColor: string; };
+   source = '';
+   texture: M3Texture | null = null;
+   flags = 0;
+@@ -60,6 +60,10 @@ export default class M3Layer {
+   invert = 0;
+   clampResult = 0;
+   teamColorMode = 0;
++  /** 1 for a constant colour layer (flag 0x400, no texture). */
++  constant = 0;
++  /** The constant colour, rgba, multiply applied. */
++  constantColor = new Float32Array([1, 1, 1, 1]);
+   /** Rows of the UV transform last uploaded: row 0 in [0..2], row 1 in [3..5]. */
+   uvTransform = new Float32Array([1, 0, 0, 0, 1, 0]);
+   /** The inputs of the last transform: offset u, v; angle x, y, z; tiling u, v (after the neutral rule). */
+@@ -92,6 +96,8 @@ export default class M3Layer {
+       uvCoordinate: settings + 'uvCoordinate',
+       uvRow0: settings + 'uvRow0',
+       uvRow1: settings + 'uvRow1',
++      useConstantColor: settings + 'useConstantColor',
++      constantColor: settings + 'constantColor',
+     };
+ 
+     // Since Gloss doesn't exist in all versions
+@@ -104,7 +110,9 @@ export default class M3Layer {
+ 
+       const path = layer.imagePath.get();
+ 
+-      if (path) {
++      if (!path && (layer.flags & 0x400)) {
++        this.initConstant(layer, type, op);
++      } else if (path) {
+         const source = (<string>path).toLowerCase();
+ 
+         if (source.length) {
+@@ -160,6 +168,41 @@ export default class M3Layer {
+     }
+   }
+ 
++  /**
++   * A constant colour layer: flag 0x400 and no texture. Its value is the
++   * layer colour, not a sample (WhiteoutFlakes m3_standard.slang
++   * M3LayerValue mode 2, then LayerTint). The colour is stored b, g, r, a.
++   * Rest values, as WhiteoutFlakes' bind-pose tint. Two exporter defaults
++   * read as "unset": an all-zero colour is white, a multiply <= 0 is 1.
++   */
++  initConstant(layer: Layer, type: string, op: number): void {
++    const c = <Uint8Array>layer.color.initValue;
++    const unset = c[0] === 0 && c[1] === 0 && c[2] === 0 && c[3] === 0;
++    let mul = <number>layer.brightMult.initValue;
++
++    if (!(mul > 0)) {
++      mul = 1;
++    }
++
++    const out = this.constantColor;
++
++    if (unset) {
++      out.set([mul, mul, mul, 1]);
++    } else {
++      out.set([c[2] / 255 * mul, c[1] / 255 * mul, c[0] / 255 * mul, c[3] / 255 * mul]);
++    }
++
++    this.constant = 1;
++    this.active = 1;
++    this.flags = layer.flags;
++    this.colorChannels = layer.colorChannelSetting;
++    this.type = type;
++    this.op = op;
++    this.textureUnit = layerTypeToTextureUnit[type];
++    this.invert = layer.flags & 0x10;
++    this.clampResult = layer.flags & 0x20;
++  }
++
+   /** Called by the model once its STCs exist: which UV tracks a sequence drives. */
+   resolveUvTracks(): void {
+     const layer = this.layer;
+@@ -219,13 +262,21 @@ export default class M3Layer {
+       gl.uniform3f(uniforms[uniformMap.uvRow0], t[0], t[1], t[2]);
+       gl.uniform3f(uniforms[uniformMap.uvRow1], t[3], t[4], t[5]);
+ 
+-      const m3Texture = <M3Texture>this.texture;
+-      const texture = textureOverrides.get(this.material.index * STANDARD_MATERIAL_OFFSET + this.index) || m3Texture.texture;
+       const textureUnit = this.textureUnit;
+ 
+       gl.uniform1i(uniforms[uniformMap.map], textureUnit);
++      gl.uniform1f(uniforms[uniformMap.useConstantColor], this.constant);
++
++      if (this.constant) {
++        const c = this.constantColor;
+ 
+-      this.model.viewer.webgl.bindTextureAndWrap(texture, textureUnit, m3Texture.wrapS, m3Texture.wrapT);
++        gl.uniform4f(uniforms[uniformMap.constantColor], c[0], c[1], c[2], c[3]);
++      } else {
++        const m3Texture = <M3Texture>this.texture;
++        const texture = textureOverrides.get(this.material.index * STANDARD_MATERIAL_OFFSET + this.index) || m3Texture.texture;
++
++        this.model.viewer.webgl.bindTextureAndWrap(texture, textureUnit, m3Texture.wrapS, m3Texture.wrapT);
++      }
+ 
+       gl.uniform1f(uniforms[uniformMap.op], this.op);
+       gl.uniform1f(uniforms[uniformMap.channels], this.colorChannels);
+@@ -243,9 +294,6 @@ export default class M3Layer {
+ 
+       gl.uniform1f(uniforms[uniformMap.clampResult], this.clampResult);
+ 
+-      // gl.setParameter(uniform + 'useConstantColor', this.flags && 0x400);
+-      // gl.setParameter(uniform + 'constantColor', this.model.getValue(this.color, sequence, frame));
+-      // gl.setParameter(settings + 'uvSource', this.uvSource);
+ 
+       gl.uniform1f(uniforms[uniformMap.uvCoordinate], this.uvCoordinate);
+     }
+diff --git a/src/viewer/handlers/m3/shaders/layers.glsl.ts b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+index 7eba556e..ae53a39c 100644
+--- a/src/viewer/handlers/m3/shaders/layers.glsl.ts
++++ b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+@@ -18,8 +18,9 @@ struct LayerSettings {
+   // bool multColor;
+   // bool addColor;
+   bool clampResult;
+-  // bool useConstantColor;
+-  // vec4 constantColor;
++  // Flag 0x400 with no texture: the layer value is constantColor, not a sample.
++  bool useConstantColor;
++  vec4 constantColor;
+   // float uvSource;
+   float uvCoordinate;
+   // LAYR offset, angle and tiling as two rows applied to (u, v, 1).
+@@ -197,29 +198,29 @@ vec2 getUV(LayerSettings layerSettings) {
+ }
+ 
+ vec4 sampleLayer(sampler2D layer, LayerSettings layerSettings) {
+-  // if (layerSettings.useConstantColor) {
+-  //   return layerSettings.constantColor;
+-  // }
+-
+   return texture2D(layer, getUV(layerSettings));
+ }
+ 
+ vec4 computeLayerColor(sampler2D layer, LayerSettings layerSettings) {
+-  vec4 color = sampleLayer(layer, layerSettings);
+-
+-  // if (layerSettings.useMask) {
+-  //   result *= mask;
+-  // }
++  vec4 color;
++  vec4 result;
+ 
+-  vec4 result = chooseChannel(layerSettings.channels, color);
++  // A constant layer skips channel select and team colour: WhiteoutFlakes
++  // M3LayerValue sets mode 2 to white before the tint, and the tint is the colour.
++  if (layerSettings.useConstantColor) {
++    color = layerSettings.constantColor;
++    result = color;
++  } else {
++    color = sampleLayer(layer, layerSettings);
++    result = chooseChannel(layerSettings.channels, color);
++  }
+ 
+-  // if (layerSettings.useAlphaFactor) {
+-  //   result.a *= layerSettings.multiplyAddAlpha.z;
+-  // }
++  // No team colour on a constant layer.
++  bool team = !layerSettings.useConstantColor;
+ 
+-  if (layerSettings.teamColorMode == TEAMCOLOR_DIFFUSE) {
++  if (team && layerSettings.teamColorMode == TEAMCOLOR_DIFFUSE) {
+     result = vec4(mix(v_teamColor, result.rgb, color.a), 1.0);
+-  } else if (layerSettings.teamColorMode == TEAMCOLOR_EMISSIVE) {
++  } else if (team && layerSettings.teamColorMode == TEAMCOLOR_EMISSIVE) {
+     result = vec4(mix(v_teamColor, result.rgb, color.a), 1.0);
+   }
+ 

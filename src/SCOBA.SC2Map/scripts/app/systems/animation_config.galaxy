@@ -44,6 +44,11 @@ void gf_AnimConfigInit () {
         gf_AnimConfigAimAll(lv_profile, c_ANIM_LOWER_TURN_RIGHT, "Attack,Stand,Right");
         gf_AnimConfigAimWalk(lv_profile, c_ANIM_LOWER_WALK);
         gf_AnimConfigAimWalk(lv_profile, c_ANIM_LOWER_WALK_BACK);
+        // Slow walk: Tosh only (R-SLOW-5); other heroes keep empty clips.
+        if (lv_profile == c_ANIM_HERO_TOSH) {
+            gf_AnimConfigAimSlow(lv_profile, c_ANIM_LOWER_WALK_SLOW);
+            gf_AnimConfigAimSlow(lv_profile, c_ANIM_LOWER_WALK_SLOW_BACK);
+        }
     }
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
         gf_AnimReset(lv_player);

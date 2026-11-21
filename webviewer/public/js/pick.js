@@ -3,8 +3,11 @@
 //   outline (outline.js, drawn by main.js) and a thin ring shows under it;
 // - left click: selects the unit under the mouse (green ring); a click on
 //   the ground or the sky deselects, a click on another unit selects that;
+//   the instances panel marks the selected unit's row (and a row click
+//   selects its unit);
 // - ctrl + left hold, with a unit selected: the unit turns to face the
 //   ground point under the mouse (controls.js starts it, faceSelected does it);
+// - alt + left hold on a unit: drags the unit over the ground (controls.js);
 // - right click on a unit: a menu of its animations, the playing one
 //   marked. A click plays one once, then the unit goes back to its own
 //   animation; with "loop" checked it becomes the unit's own and loops.
@@ -71,10 +74,15 @@
     return Math.max(0, t0);
   }
 
-  /** The nearest item under a page pixel, or null. */
-  function itemAt(clientX, clientY) {
+  /** The ray through a page pixel. */
+  function rayAtPage(clientX, clientY) {
     const box = canvas.getBoundingClientRect();
-    const ray = app.rayAt(clientX - box.left, clientY - box.top);
+    return app.rayAt(clientX - box.left, clientY - box.top);
+  }
+
+  /** The nearest item under a page pixel and the point where the ray meets it, or null. */
+  function hitAt(clientX, clientY) {
+    const ray = rayAtPage(clientX, clientY);
     let best = null;
     let bestT = Infinity;
     for (const item of items) {
@@ -84,7 +92,22 @@
         bestT = t;
       }
     }
-    return best;
+    if (!best) return null;
+    return { item: best, point: [0, 1, 2].map((i) => ray.from[i] + ray.dir[i] * bestT) };
+  }
+
+  /** The nearest item under a page pixel, or null. */
+  function itemAt(clientX, clientY) {
+    const hit = hitAt(clientX, clientY);
+    return hit ? hit.item : null;
+  }
+
+  /** Where the ray through a page pixel meets the level plane at height z, or null (parallel or behind). */
+  function planeAt(clientX, clientY, z) {
+    const { from, dir } = rayAtPage(clientX, clientY);
+    if (Math.abs(dir[2]) < 1e-9) return null;
+    const t = (z - from[2]) / dir[2];
+    return t > 0 ? [from[0] + dir[0] * t, from[1] + dir[1] * t] : null;
   }
 
   const ring = (item, look) => (item ? { x: item.x, y: item.y, radius: radius(item), ...look } : null);
@@ -122,9 +145,19 @@
     return rot > 180 ? rot - 360 : rot <= -180 ? rot + 360 : rot;
   }
 
+  /**
+   * Select an item by id (null: none). The instances panel marks its row
+   * (scene.js markSelected), so a pick in the view shows in the list.
+   */
+  function select(id) {
+    selected = byId(id) ? id : null;
+    updatePick();
+    app.markSelected(selected);
+  }
+
   /** An item was removed (id), or all were (null). */
   function forget(id) {
-    if (id === null || selected === id) selected = null;
+    if (id === null || selected === id) select(null);
     if (id === null || hovered === id) hovered = null;
     if (id === null || (menu && menu.itemId === id)) closeMenu();
     updatePick();
@@ -215,8 +248,7 @@
       // Ctrl + left with a selection turns the unit; it keeps the selection.
       if (p.ctrl && selected !== null) return;
       const item = itemAt(e.clientX, e.clientY);
-      selected = item ? item.id : null;
-      updatePick();
+      select(item ? item.id : null);
     } else if (p.button === BUTTON.right) {
       const item = itemAt(e.clientX, e.clientY);
       if (item) openMenu(item, e.clientX, e.clientY);
@@ -245,7 +277,12 @@
     faceSelected,
     forget,
     pickState,
+    select,
+    selectedId: () => selected,
     hasSelection: () => selected !== null,
+    itemAt,
+    hitAt,
+    planeAt,
     hoveredItem: () => byId(hovered),
     /** The page pixel of an item's hit cylinder at height share `k` (0 base, 1 top). */
     itemScreen: (id, k = 0.5) => {

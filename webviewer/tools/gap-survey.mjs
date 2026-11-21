@@ -56,6 +56,9 @@ const MATERIAL_FLAGS = [
   [0x20000000, 'M9', 'excluded from mouse-over highlight'],
   [0x4000000, 'M10', 'background object'],
 ];
+// Layers the standard shader reads through computeLayerColor, so a constant
+// colour reaches the image. The normal map is decoded from its sample.
+const CONSTANT_DRAWN = new Set(['diffuse', 'decal', 'specular', 'emissive', 'emissive2', 'alphaMask', 'alphaMask2']);
 // Entries the parser skips (indexentry.ts UnsupportedEntry).
 const SKIPPED_TAGS = {
   PAR_: ['E1', 'particle emitters'], PARC: ['E1', 'particle emitter copies'],
@@ -114,13 +117,21 @@ function survey(file, bytes) {
   }
 
   if (model.vertexFlags & 0x200) gap('V1', 'vertices carry colours (vertexFlags 0x200)', file);
+  // Past 65536 vertices the renderer uses 32-bit indices (ref model.ts); counted.
+  const top = div && div.regions.entries ? Math.max(0, ...div.regions.list([]).map((r) => r.firstVertexIndex + r.verticesCount)) : 0;
+  if (top > 65536) tally('wideIndices', 'models');
 
   for (const m of model.materials[0].list([])) {
     if (m.depthBlendFalloff) gap('M1', 'depth blend falloff (soft particles)', file);
     if (m.cutoutThreshold) gap('M2', 'alpha cutout threshold', file);
-    if (m.priority) gap('M3', 'material priority set (draw order)', file);
+    // Priority orders blended batches (ref draworder.ts); counted, not a gap.
+    if (m.priority) tally('priority', m.blendMode ? 'blended' : 'opaque');
     if (m.blendMode > 5) gap('M4', `blend mode above 5`, file);
     tally('blendMode', m.blendMode);
+    // No diffuse (no image, no constant): the base colour is black (ref
+    // standard.frag, after WhiteoutFlakes m3_standard.slang albedo 0). By blend mode.
+    const d = m.diffuseLayer && m.diffuseLayer.entries ? m.diffuseLayer.first() : null;
+    if (!d || (!d.imagePath.get() && !(d.flags & 0x400))) tally('noDiffuse', `blend ${m.blendMode}`);
     tally('layerBlendType', m.layerBlendType);
     tally('specType', m.specType);
     tally('emisMode', m.emisMode);
@@ -148,7 +159,12 @@ function survey(file, bytes) {
       if (ax || ay) tally('uvAngleXY', name);
       if (l.flags & 0x100 || l.flipBookRows * l.flipBookColumns > 1) gap('A3', 'flipbook', file);
       if (l.flags & 0x200) gap('A4', 'video texture', file);
-      if (constant) gap('A5', 'constant colour layer (colorEnabled)', file);
+      // A constant layer without a texture is drawn (ref layer.ts initConstant)
+      // where the shader reads the layer through computeLayerColor; counted.
+      // With a texture the texture is drawn and the flag has no effect.
+      if (constant && image) tally('constantColour', `${name} with texture`);
+      else if (constant && CONSTANT_DRAWN.has(name)) tally('constantColour', name);
+      else if (constant) gap('A5', `constant colour ${name} layer (not read as a constant)`, file);
       if (isAnimated(l.color)) gap('A6', 'animated layer colour', file);
       if (l.brightMult.initValue !== 1 || isAnimated(l.brightMult)) gap('A7', 'bright multiply not 1 or animated', file);
       if (l.midtoneOffset.initValue || isAnimated(l.midtoneOffset)) gap('A7', 'midtone offset set or animated', file);

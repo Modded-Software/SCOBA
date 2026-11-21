@@ -10,7 +10,9 @@ const int c_ANIM_UPPER_ATTACK = 6;
 const int c_ANIM_UPPER_ATTACK_SPELL = 7;
 const int c_ANIM_UPPER_ATTACK_AIM = 8;
 const int c_ANIM_UPPER_ATTACK_SPELL_AIM = 9;
-const int c_ANIM_UPPER_COUNT = 10;
+const int c_ANIM_UPPER_WALK_SLOW = 10;       // slow walk arms, not aiming (R-SLOW-19)
+const int c_ANIM_UPPER_WALK_SLOW_BACK = 11;  // the same in reverse, back leg clips
+const int c_ANIM_UPPER_COUNT = 12;
 
 const int c_ANIM_LOWER_NONE = 0;
 const int c_ANIM_LOWER_IDLE = 1;
@@ -20,7 +22,10 @@ const int c_ANIM_LOWER_TURN_LEFT = 4;
 const int c_ANIM_LOWER_TURN_RIGHT = 5;
 // Turn in place outside aim (TPS rotate, PNC right-click rotate) reuses the
 // TURN_LEFT/RIGHT stand-turn clips (gf_AnimFreeTurning). Operator 2026-11-16.
-const int c_ANIM_LOWER_COUNT = 6;
+// Slow walk on Alt (R-SLOW-13): the walk states while the slow buff is on.
+const int c_ANIM_LOWER_WALK_SLOW = 6;
+const int c_ANIM_LOWER_WALK_SLOW_BACK = 7;
+const int c_ANIM_LOWER_COUNT = 8;
 const fixed c_ANIM_FREE_TURN_DEADBAND = 1.0;  // degrees of facing change per anim tick
 const int c_ANIM_FREE_TURN_HOLD_TICKS = 3;
 
@@ -84,7 +89,7 @@ const string c_ANIM_BRACKET_AIM_ATTACK = "SCOBAAimAtk";
 // Clip number = (yaw step - 1) * c_ANIM_HEAD_STEPS + pitch step.
 const string c_ANIM_BRACKET_HEAD = "SCOBAHead";
 const int c_ANIM_HEAD_STEPS = 9;
-const fixed c_ANIM_HEAD_MAX = 15.0;
+const fixed c_ANIM_HEAD_MAX = 30.0;  // operator 2026-11-21: up or down (was 15)
 const int c_ANIM_HEAD_YAW_STEPS = 11;
 const fixed c_ANIM_HEAD_YAW_MAX = 25.0;
 const fixed c_ANIM_HEAD_SCALE = 0.4;
@@ -93,10 +98,17 @@ const fixed c_ANIM_HEAD_LEVEL_PITCH = 20.0;
 // the engine interpolate between steps on every rendered frame, so the head
 // moves smoothly instead of jumping once per loop.
 const fixed c_ANIM_HEAD_BLEND = 0.0625;
-// Head lead: a virtual body eases toward the crosshair with this time
-// constant; the head shows the gap, so it swings ahead and settles back.
-const fixed c_ANIM_HEAD_LEAD_TAU = 0.2;
-const fixed c_ANIM_HEAD_LEAD_GAIN = 1.0;
+// Head look (operator 2026-11-21): the head holds on the camera target,
+// eased with this time constant. A step changes only when the angle is
+// c_ANIM_HEAD_HOLD step widths from the shown step's center (0.5 is the
+// boundary): no flip between two steps (the twitch).
+const fixed c_ANIM_HEAD_LOOK_TAU = 0.15;
+// The look point: this far along the screen-centre ray past the camera
+// target (operator 2026-11-21: "test with 8 first"). The eye sits at this
+// fraction of the unit height (not measured on the model).
+const fixed c_ANIM_HEAD_LOOK_DIST = 8.0;
+const fixed c_ANIM_HEAD_EYE_FRAC = 0.85;
+const fixed c_ANIM_HEAD_HOLD = 0.75;
 
 const int c_PROBE_ATTACHMENT_COUNT = 6;
 const int c_PROBE_BUFFER_ROWS = 64;

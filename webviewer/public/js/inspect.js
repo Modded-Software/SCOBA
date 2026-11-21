@@ -14,11 +14,44 @@
     return count;
   }
 
-  /** Layers that name a texture file (the library marks them active). */
+  /** Layers that name a texture file: active and not a constant colour. */
   function texturesWanted(model) {
     let count = 0;
     for (const material of model.materials[1]) {
-      for (const layer of material.layers) if (layer.active) count++;
+      for (const layer of material.layers) if (layer.active && !layer.constant) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Constant colour layers (flag 0x400, no texture): the colour uploaded,
+   * rgba with the multiply applied, and how many draws bound the layer.
+   */
+  function constantLayers(model) {
+    const out = [];
+    for (const material of model.materials[1]) {
+      for (const layer of material.layers) {
+        if (!layer.active || !layer.constant) continue;
+        out.push({ material: material.name, type: layer.type, color: Array.from(layer.constantColor), binds: layer.binds });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Turn one model's constant colour layers on or off, so a test can
+   * measure what they draw. Returns how many layers changed.
+   */
+  function setConstantLayers(itemId, on) {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) throw new Error(`no item ${itemId}`);
+    let count = 0;
+    for (const material of item.model.materials[1]) {
+      for (const layer of material.layers) {
+        if (!layer.constant) continue;
+        layer.active = on ? 1 : 0;
+        count++;
+      }
     }
     return count;
   }
@@ -58,6 +91,9 @@
       vertexStride: item.model.vertexSize,
       vertexCount: item.model.vertexCount,
       vertexBytes: item.model.vertexBytes,
+      // Element indices: bytes each, and the largest stored (vertexCount - 1 unless they wrapped).
+      elementBytes: item.model.elementBytes,
+      elementMax: item.model.elementMax,
       // Culling: the model's bounding sphere radius, and whether the last
       // frame drew the instance (false when it was culled).
       boundsRadius: item.model.bounds.r,
@@ -72,8 +108,22 @@
         range: r.rawUvRange.map((c) => c * r.uvScale + r.uvOffset),
       })),
       uvLayers: uvLayers(item.model),
+      constantLayers: constantLayers(item.model),
+      drawOrder: drawOrder(item),
       drawn: scene.instances.includes(item.instance),
     };
+  }
+
+  /**
+   * The standard batches the last frame drew for this instance, in the order
+   * it drew them: file position, material, blend mode, priority.
+   */
+  function drawOrder(item) {
+    const byFile = new Map(item.model.batches.map((b) => [b.fileOrder, b]));
+    return item.instance.drawnOrder.map((fileOrder) => {
+      const m = byFile.get(fileOrder).material;
+      return { fileOrder, material: m.name, blendMode: m.blendMode, priority: m.priority };
+    });
   }
 
   /**
@@ -215,12 +265,18 @@
     if (!marked || marked.width !== now.width || marked.height !== now.height) return null;
     let changed = 0;
     let largest = 0;
+    // Summed signed change (now minus marked) of r, g, b over the changed pixels.
+    const delta = [0, 0, 0];
     for (let i = 0; i < now.data.length; i += 4) {
-      const step = Math.max(Math.abs(now.data[i] - marked.data[i]), Math.abs(now.data[i + 1] - marked.data[i + 1]), Math.abs(now.data[i + 2] - marked.data[i + 2]));
+      const d = [now.data[i] - marked.data[i], now.data[i + 1] - marked.data[i + 1], now.data[i + 2] - marked.data[i + 2]];
+      const step = Math.max(Math.abs(d[0]), Math.abs(d[1]), Math.abs(d[2]));
       if (step > largest) largest = step;
-      if (step > 40) changed++;
+      if (step > 40) {
+        changed++;
+        for (let c = 0; c < 3; c++) delta[c] += d[c];
+      }
     }
-    return { changed, largest };
+    return { changed, largest, delta };
   }
 
   const bg = BACKGROUND.map((c) => Math.round(c * 255));
@@ -282,10 +338,37 @@
     return { pixels: n, mean, brightness: (mean[0] + mean[1] + mean[2]) / 3, redShare: n ? red / n : 0, green, darkShare: n ? dark / n : 0 };
   }
 
+  /**
+   * Grid lines along one canvas row (from the top): the centres, in pixels
+   * from the left, of the runs of grid-line pixels. A grid-line pixel is
+   * greener than the background: green at least 6 over it and 4 over red
+   * (the faint grid away from units is about 14 and 10). Also the ground
+   * quad's half size as last drawn.
+   */
+  function gridLines(row) {
+    const { width, height, data } = grab();
+    const y = height - 1 - row; // the framebuffer is read bottom row first
+    const centres = [];
+    let start = -1;
+    for (let x = 0; x <= width; x++) {
+      let on = false;
+      if (x < width) {
+        const i = (y * width + x) * 4;
+        on = data[i + 1] - bg[1] >= 6 && data[i + 1] - data[i] >= 4;
+      }
+      if (on && start < 0) start = x;
+      if (!on && start >= 0) {
+        centres.push((start + x - 1) / 2);
+        start = -1;
+      }
+    }
+    return { width, centres, radius: app.ground.drawnRadius };
+  }
+
   /** True when nothing is loading: no model being added, no texture in flight. */
   function idle() {
     return app.pending === 0 && viewer.promiseMap.size === 0;
   }
 
-  Object.assign(app, { state, groundPixel, groundPeaks, worldToCanvas, mark, changedSinceMark, pixels, colorStats, idle });
+  Object.assign(app, { state, setConstantLayers, groundPixel, groundPeaks, worldToCanvas, mark, changedSinceMark, pixels, colorStats, gridLines, idle });
 })();

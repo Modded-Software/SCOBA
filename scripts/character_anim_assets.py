@@ -14,6 +14,7 @@ from pathlib import Path
 from project_root import project_root
 from animation_tokens import validate_animation_name
 from jumpanim.bake import JUMP_HEROES, make_jump_groups
+from walkanim.slow import LEG as SLOW_LEG, SLOW_HEROES, SOURCE as SLOW_SOURCE, make_slow_arms, make_slow_groups
 from character_anim_m3 import add_kickback, axis_quaternion, clone, make_lower_group, make_pitch_group, quat_multiply
 from hitvolumes.shapes import axis, columns, inverse, norm
 
@@ -24,7 +25,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "43\n"  # 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
+MARKER_VERSION = "47\n"  # 47: head pitch about the head's own left-right axis; 46: head pitch +-30 (R-TPS-16); 45: slow walk arm clips (R-SLOW-19); 44: slow walk leg clips from Walk Slow (R-SLOW-10, 11); 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SOURCE_MODELS = {
     "tosh": (
@@ -130,7 +131,7 @@ def bone_chain(model, name: str) -> str:
 # every upper-body clip, so the head owns its bone while aiming and attacking.
 HEAD_TILT_GROUP = "Ready Cover"
 HEAD_TILT_SOURCE = "Stand"
-HEAD_TILT_MAX_DEG = 15.0
+HEAD_TILT_MAX_DEG = 30.0  # operator 2026-11-21 (was 15)
 HEAD_TILT_STEPS = 9
 HEAD_YAW_MAX_DEG = 25.0
 HEAD_YAW_STEPS = 11
@@ -138,24 +139,26 @@ HEAD_TILT_FRAME_MS = 100
 HEAD_TILT_PRIORITY = 14
 
 
-def head_yaw_axis(model, head: str) -> tuple[str, float]:
-    """The head's local axis closest to model up (+Z), and its sign.
-
-    A positive angle about it then turns the head counter-clockwise seen from
-    above, the same way a rising camera yaw turns.
-    """
+def head_axis(model, head: str, row: int) -> tuple[str, float]:
+    """The head's local axis closest to model axis `row` (0 X, 2 Z), and the
+    sign of that alignment. Yaw: model up (+Z), counter-clockwise from above
+    as a rising camera yaw. Pitch: model left-right (X); forward is -Y, so a
+    face-up turn is about -X (operator 2026-11-21: the torso axis tilted the
+    head sideways)."""
     index = next(i for i, bone in enumerate(model.bones) if bone.name == head)
     rest = inverse(columns(model.absoluteInverseBoneRestPositions[index].matrix))
-    ups = [rest[2][c] / max(1e-9, norm(axis(rest, c))) for c in range(3)]
-    best = max(range(3), key=lambda c: abs(ups[c]))
-    return "XYZ"[best], (1.0 if ups[best] > 0.0 else -1.0)
+    dots = [rest[row][c] / max(1e-9, norm(axis(rest, c))) for c in range(3)]
+    best = max(range(3), key=lambda c: abs(dots[c]))
+    return "XYZ"[best], (1.0 if dots[best] > 0.0 else -1.0)
 
 
-def make_head_groups(model, groups, pitch_axis: str, pitch_sign: float, head: str) -> str:
+def make_head_groups(model, groups, head: str) -> str:
     """One head-only clip per pitch x yaw step, from the stand pose."""
     if not any(bone.name == head for bone in model.bones):
         raise KeyError(f"head bone {head} not in the model")
-    yaw_axis, yaw_sign = head_yaw_axis(model, head)
+    yaw_axis, yaw_sign = head_axis(model, head, 2)
+    pitch_axis, side = head_axis(model, head, 0)
+    pitch_sign = -side
     if yaw_axis == pitch_axis:
         raise ValueError(f"head {head}: yaw axis {yaw_axis} equals the pitch axis")
     print(f"head {head}: pitch {pitch_axis} {pitch_sign:+.0f}, yaw {yaw_axis} {yaw_sign:+.0f}")
@@ -304,8 +307,9 @@ def generate_model(
     kick_degrees: float,
     head_bone: str,
     jump: bool = False,
+    slow: bool = False,
 ) -> None:
-    """jump: add the jump leg clips (jumpanim.bake)."""
+    """jump: add the jump leg clips (jumpanim.bake); slow: the slow walk legs (walkanim.slow)."""
     model = m3.loadModel(str(source))
     upper_ids, lower_ids = classify_bones(model, upper_roots, lower_roots)
     attack_ids, _ = classify_bones(model, attack_roots, lower_roots)
@@ -372,6 +376,15 @@ def generate_model(
     for direction_name, _, _ in AIM_DIRECTIONS:
         if lengths["Attack Walk " + direction_name] != lengths["Walk"]:
             raise ValueError(f"Attack Walk {direction_name} length differs from Walk")
+    slow_log = "slow: none"
+    if slow:
+        group = clone(groups[SLOW_SOURCE])
+        group.name = SLOW_LEG
+        model.sequenceTransformationGroups.append(group)
+        groups[SLOW_LEG] = group
+        make_clip(model, group, clips[SLOW_SOURCE], lower_ids, SLOW_LEG, "lower", unit_speed)
+        slow_log = make_slow_groups(model, groups, AIM_DIRECTIONS, turn_anim_id)
+        slow_log += ", " + make_slow_arms(model, groups, make_clip, clips[SLOW_SOURCE], upper_ids, unit_speed)
     attack_source = model.sequenceTransformationCollections[groups["Attack"].stcIndices[0]]
     pitch_source = clone(attack_source)
     pitch_pairs = [
@@ -400,11 +413,11 @@ def generate_model(
             AIM_PITCH_FRAME_MS,
             2,
         )
-    head = make_head_groups(model, groups, pitch_axis, pitch_sign, head_bone)
+    head = make_head_groups(model, groups, head_bone)
     jump_log = "jump: none"
     if jump:
         jump_log = make_jump_groups(model, groups)
-    print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)} head={bone_chain(model, head)} {jump_log}")
+    print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)} head={bone_chain(model, head)} {jump_log} {slow_log}")
     target.parent.mkdir(parents=True, exist_ok=True)
     m3.saveAndInvalidateModel(model, str(target))
 
@@ -472,7 +485,7 @@ def generate(root: Path, force: bool) -> None:
         entries = []
         for key, (entry, target, model_id, model_value, *params) in SOURCE_MODELS.items():
             # params: the generate_model arguments after source and target, in order.
-            generate_model(extract_model(entry, temp_root), root / target, *params, jump=key in JUMP_HEROES)
+            generate_model(extract_model(entry, temp_root), root / target, *params, jump=key in JUMP_HEROES, slow=key in SLOW_HEROES)
             entries.append((model_id, model_value))
         (root / MODEL_DATA).write_text(model_data_text(root, entries))
         marker.write_text(MARKER_VERSION)

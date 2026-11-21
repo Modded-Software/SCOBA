@@ -14,5 +14,5 @@ extensions:
   - ".galaxy"
 max_file_bytes: 262144
 max_source_files_per_module: 56
-max_submodules_per_module: 8
+max_submodules_per_module: 16
 max_module_depth: 8

@@ -1,4 +1,5 @@
-// Scene items: add, remove, clear, and the scene list in the side panel.
+// Scene items: add, remove, clear, and the scene list in the instances
+// panel, where the selected unit's row is marked.
 'use strict';
 
 (() => {
@@ -104,11 +105,20 @@
     }
   }
 
-  /** Add a unit by id, with everything its data says about its look. */
+  /**
+   * Add a unit by id, with everything its data says about its look. A unit
+   * whose model is a skybox (server markSkyboxUnits) becomes the sky
+   * instead; it is not placed, and the result is null.
+   */
   async function addUnit(id, options = {}) {
     app.pending++;
     try {
       const unit = await app.getJson('/api/unit?id=' + encodeURIComponent(id));
+      if (unit.skybox) {
+        await app.setSky({ id: unit.id, name: unit.name, file: unit.file });
+        app.setStatus(`${unit.name} is a skybox: set as the sky`);
+        return null;
+      }
       return await add(unit.file, { ...options, unit });
     } catch (error) {
       app.setStatus(error.message);
@@ -192,11 +202,24 @@
     ]);
     row.dataset.id = String(item.id);
     if (item.unit) row.dataset.unit = item.unit.id;
+    // A click on the row's name selects the unit in the view (pick.js).
+    row.querySelector('.head').addEventListener('click', (e) => {
+      if (e.target !== removeButton) app.select(item.id);
+    });
     return row;
+  }
+
+  /** Mark the selected item's row (null: none) and scroll it into view. */
+  function markSelected(id) {
+    for (const row of sceneList.children) row.classList.toggle('selected', row.dataset.id === String(id));
+    const row = id === null ? null : sceneList.querySelector(`li[data-id="${id}"]`);
+    if (row) row.scrollIntoView({ block: 'nearest' });
   }
 
   function renderList() {
     sceneList.replaceChildren(...items.map(listRow));
+    app.$('instance-count').textContent = items.length ? `(${items.length})` : '';
+    markSelected(app.selectedId());
   }
 
   app.$('clear').addEventListener('click', clear);
@@ -209,5 +232,16 @@
     if (input) input.value = shown(rot);
   }
 
-  Object.assign(app, { add, addUnit, remove, clear, restart, playOnce, loopSequence, endOneShots, setRotation });
+  /** Move an item to ground point (x, y) and show it in its list row. */
+  function setPosition(item, x, y) {
+    item.x = x;
+    item.y = y;
+    applyTransform(item);
+    for (const field of ['x', 'y']) {
+      const input = sceneList.querySelector(`li[data-id="${item.id}"] input.${field}`);
+      if (input) input.value = shown(item[field]);
+    }
+  }
+
+  Object.assign(app, { add, addUnit, remove, clear, restart, playOnce, loopSequence, endOneShots, setRotation, setPosition, markSelected });
 })();

@@ -25,7 +25,9 @@ Standard materials (diffuse, decal, specular, emissive 1 and 2, alpha masks
 composite materials (sections drawn in order), displacement materials
 (drawn over a copy of the frame; animated strength), UV sets 0 to 3 with
 region scale and offset, uncompressed and DXT DDS, mouse-over highlight and
-outline.
+outline. Models past 65536 vertices draw with 32-bit indices
+(`wide-index.spec`; survey `wideIndices`: 10 models, e.g.
+SpaceStationValerian with 200005); 16-bit indices wrapped and broke them.
 
 Layer UV transform (former A1 and A2, G1; `uv-anim.spec`): offset, angle
 and tiling, static or animated, on every bound layer including the normal
@@ -36,6 +38,28 @@ radians. An undriven tiling of 0 reads as 1. Angle x and y are not used
 layers animated, 1690 static. Of the animated layers, 168 belong to
 materials no mesh batch draws (particles, ribbons); they wait for E1 and E2
 (`bash webviewer/scripts/uv-anim-survey.sh`, `mesh=no`).
+
+Batch draw order (former M3, G2; `draw-order.spec`): opaque batches first
+in file order, then blended batches by material priority ascending (higher
+on top), ties in file order. Rule from WhiteoutFlakes `TransparentOrder`,
+after the client's `CTransparentObject::HasHigherPriority`. Survey run
+2026-11-21 (`bash webviewer/scripts/priority-survey.sh`): the order differs
+from file order in 526 models; priority is set on 2163 blended and 257
+opaque materials (opaque order does not change the picture). Not applied:
+the engine's next key, camera distance between blended draws of different
+units.
+
+Constant colour layers (former A5; `constant-color.spec`): a layer with
+flag 0x400 and no texture draws its colour, not a sample. The colour is
+stored b, g, r, a; the value is the rest colour times the rest
+`rgbMultiply` (the parser's `brightMult`), an all-zero colour and a
+multiply <= 0 reading as unset. No channel select or team colour on such a
+layer. Rule from WhiteoutFlakes `M3LayerValue` (mode 2) and `LayerTint`.
+Drawn on the diffuse, decal, specular, emissive 1 and 2 and alpha mask
+layers. Survey run 2026-11-21 (`constantColour`): diffuse 603, emissive
+496, specular 218, alpha mask 128, emissive2 16, alpha mask 2 3, decal 1.
+With a texture the flag has no effect. Not applied: an animated colour
+(A6) plays its rest value.
 
 ## Gaps by count
 
@@ -80,7 +104,6 @@ materials no mesh batch draws (particles, ribbons); they wait for E1 and E2
 | Id | Setting | Models | Uses |
 |---|---|---:|---:|
 | M1 | depth blend falloff (soft edges) | 779 | 2771 |
-| M3 | priority (draw order; the sort is commented out) | 698 | 2420 |
 | M2 | alpha cutout threshold | 534 | 1216 |
 | M8 | decal lighting, double lambert, clamp output | 142 | 241 |
 | M6 | depth prepass | 131 | 164 |
@@ -102,13 +125,13 @@ Values seen: `layerBlendType` 2 in 8658 of 8710 materials (others 0, 1,
 | A7 | bright multiply / midtone offset not default (meaning unconfirmed) | 1149 | 6713 |
 | A8 | noise amplitude set (meaning unconfirmed) | 737 | 13472 |
 | F1 | fresnel | 506 | 1557 |
-| A5 | constant colour layer (no texture) | 493 | 1541 |
 | A3 | flipbook | 464 | 2162 |
 | U2 | UV source: reflective cubic environment | 408 | 1198 |
 | U6 | UV source: particle flipbook | 395 | 1772 |
 | U-normal | normal map on a UV set other than 0 (now read through `getUV` with its own set; implemented, not verified) | 148 | 223 |
 | U3 | UV source: reflective spherical environment | 70 | 114 |
 | U5 | UV source: planar world z | 64 | 129 |
+| A5 | constant colour on an environment mask layer (waits for L2) | 46 | 76 |
 | A6 | animated layer colour | 40 | 104 |
 | U7 | UV source: cubic environment | 33 | 53 |
 | A4 | video texture | 26 | 49 |
@@ -146,13 +169,15 @@ feature used only by particle materials waits for particles.
    (779), flipbook A3 and U6 (464, 395), vertex alpha M5. Largest job.
 2. ~~**UV transform and animation (A2 659, A1 534).**~~ Done 2026-11-21
    (`uv-anim.spec`, see "Already supported").
-3. **Draw order and cutout (M3 698, M2 534).** Priority sort of blended
-   batches; alpha test for foliage and grilles. Small.
+3. **Draw order and cutout (M3 698, M2 534).** Draw order done 2026-11-21
+   (`draw-order.spec`). Left: alpha cutout M2 for foliage and grilles.
+   Small.
 4. **Environment reflection and fresnel (L2 484, U2 408, U3 70, U7 33,
    F1 506).** Metal and glass shine, rim glows. Needs an environment map
    and the fresnel term (the shader holds a commented draft). Medium.
-5. **Constant colour layers (A5, 493).** A layer with a colour, no
-   texture. Small.
+5. ~~**Constant colour layers (A5, 493).**~~ Done 2026-11-21
+   (`constant-color.spec`). Left: 46 models with a constant environment
+   mask, with L2.
 6. **Lights (E3, 566).** Local point lights on models (engine glows that
    light the hull). Medium.
 

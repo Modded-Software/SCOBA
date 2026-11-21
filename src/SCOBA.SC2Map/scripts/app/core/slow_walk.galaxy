@@ -1,0 +1,45 @@
+// Module: core/slow_walk
+// Slow walk on Shift (REQ-SLOW-WALK; Alt until 2026-11-21). Code: systems/input.galaxy.
+
+const string c_SLOW_WALK_BUFF = "SCOBASlowWalk";
+// Speed ramp (R-SLOW-21, operator 2026-11-21): walk to slow walk and back
+// over c_SLOW_WALK_RAMP game seconds. c_SLOW_WALK_LEVELS speed levels:
+// level k is the buff SCOBASlowWalkRampNN (k < 16) or c_SLOW_WALK_BUFF
+// (k = 16), MoveSpeedMultiplier 1 - 0.6 k / 16: linear from 1 to 0.4.
+const fixed c_SLOW_WALK_RAMP = 1.0;
+const int c_SLOW_WALK_LEVELS = 16;
+// Game units/s the slow leg clips cover at clip rate 1: the stock walk
+// calibration (WalkAnimMoveSpeed 3) times the planted-foot speed of
+// `Walk Slow Leg` over `Walk Leg`. The build measures it (walkanim.slow).
+const fixed c_ANIM_SLOW_STRIDE = 1.61;
+// Operator 2026-11-21: the slow walk clips 33 % faster (was 25 %) than the measured
+// stride gives, to match the movement speed on screen.
+const fixed c_ANIM_SLOW_RATE = 1.33;
+// Walk phase minus slow walk phase at the same foot pose. The build
+// measures it; both clips lead with the left foot at half cycle.
+const fixed c_ANIM_SLOW_GAIT_OFFSET = 0.0;
+const fixed c_ANIM_SLOW_CYCLE = 1.0;  // `Walk Slow` length, seconds
+// Blend into and out of the slow walk clips, legs and arms (R-SLOW-20,
+// operator 2026-11-21): 3 x the 0.15 s clip blend.
+const fixed c_ANIM_SLOW_BLEND = 0.45;
+
+trigger gt_SlowKeyDown;
+trigger gt_SlowKeyUp;
+
+bool[16] gv_slowKey;        // Shift held (key flag)
+bool[16] gv_slowOn;         // the slow walk is wanted (key and rules)
+unit[16] gv_slowUnit;       // the unit that carries the level buff
+int[16] gv_slowLevel;       // the level buff on it, 0 none
+fixed[16] gv_slowRamp;      // 0 walk .. 1 slow walk
+fixed[16] gv_slowRampAt;    // game time of the last ramp step
+int[16] gv_slowPresses;
+int[16] gv_slowStarts;      // buff adds
+int[16] gv_slowJumps;       // jumps taken from a slow walk (R-SLOW-18)
+fixed[16] gv_slowGait;      // slow clip phase at gv_slowGaitAt, 0..1
+fixed[16] gv_slowGaitAt;    // game time of the last phase fold
+fixed[16] gv_slowGaitScale; // slow clip rate since gv_slowGaitAt
+fixed[16] gv_slowJumpGait;  // walk phase handed to the jump
+int[16] gv_slowUpperPlays;  // slow arm clip plays (R-SLOW-19), for tests
+int[16] gv_slowUpperTimeMs; // arm clip start time of the last play, ms
+int[16] gv_slowLowerBlendMs; // blend of the last lower play or clear, ms (tests)
+int[16] gv_slowUpperBlendMs; // blend of the last upper play or clear, ms (tests)

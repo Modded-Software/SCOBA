@@ -33,7 +33,10 @@ for (const m of parsed.model.materials[0].get()) {
     if (!ref || !ref.entries) continue;
     const l = ref.first();
     const image = l.imagePath.get();
-    if (!image) continue;
-    console.log(`  ${name}: ${image} flags=${hex(l.flags)} uv=${l.uvSource} ch=${l.colorChannelSetting}`);
+    // Flag 0x400: a constant colour layer (no texture); its colour is the animated `color`.
+    const constant = l.flags & 0x400;
+    if (!image && !constant) continue;
+    const color = constant ? ` color=(${[...l.color.initValue].join(',')}) bgra` : '';
+    console.log(`  ${name}: ${image || '(constant colour)'} flags=${hex(l.flags)} uv=${l.uvSource} ch=${l.colorChannelSetting}${color}`);
   }
 }

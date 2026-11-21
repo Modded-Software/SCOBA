@@ -14,16 +14,17 @@ const int c_INTRO_VAR_NONE = 0;
 const int c_INTRO_VAR_TARGET = 1;
 const int c_INTRO_VAR_YAW = 2;
 // The S2 Zerus tree (s2_tree).
-const fixed c_INTRO_TREE_X = 131.5600;
-const fixed c_INTRO_TREE_Y = 101.1400;
+const fixed c_INTRO_TREE_X = 131.2100;
+const fixed c_INTRO_TREE_Y = 101.4900;
 const int c_INTRO_TREE_VARIATION = 4;
-const fixed c_INTRO_TREE_SCALE_XY = 3.7500;
-const fixed c_INTRO_TREE_SCALE_Z = 5.2500;
+const fixed c_INTRO_TREE_SCALE_XY = 3.1875;
+const fixed c_INTRO_TREE_SCALE_Z = 4.4625;
 // The second S2 tree (s2_tree2).
-const fixed c_INTRO_TREE2_X = 137.2200;
-const fixed c_INTRO_TREE2_Y = 106.8000;
-const fixed c_INTRO_TREE2_SCALE_XY = 2.8125;
-const fixed c_INTRO_TREE2_SCALE_Z = 3.9375;
+const fixed c_INTRO_TREE2_X = 137.4000;
+const fixed c_INTRO_TREE2_Y = 106.6200;
+const int c_INTRO_TREE2_VARIATION = 7;
+const fixed c_INTRO_TREE2_SCALE_XY = 2.3906;
+const fixed c_INTRO_TREE2_SCALE_Z = 3.3469;
 const fixed c_INTRO_TREE2_FACING = 135.0000;
 // The S6 foreground pods (s6_pods).
 const int c_INTRO_S6_ROW = 5;

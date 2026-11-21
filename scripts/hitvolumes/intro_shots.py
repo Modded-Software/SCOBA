@@ -258,17 +258,19 @@ def s6_pods() -> tuple[tuple[float, float], ...]:
 # the southwest, Zerg side of the river); TREE_BACK cells behind the eye
 # on the view line. Variation 4. Scale 75 % as an editor doodad: the map's
 # ZerusTree actor scale (ActorData: random 4..6, mid 5, z x1.4) times 0.75.
-TREE_BACK = 1.0  # operator 2026-11-21: 1 cell (was 2.0, 3.0; 1.0 before was too close at 300 %)
+TREE_BACK = 0.5  # operator 2026-11-21: closer to the camera path (was 1.0, 2.0, 3.0)
 TREE_VARIATION = 4
-TREE_DOODAD_SCALE = 0.75  # operator 2026-11-20: 75 % (was 100 %, 200 %, 275 %, 300 %)
+TREE_DOODAD_SCALE = 0.75 * 0.85  # operator 2026-11-21: 15 % smaller (was 75 %, 100 %, 200 %, 275 %, 300 %)
 TREE_ACTOR_SCALE = 5.0
 TREE_ACTOR_Z = 1.4
 # A second tree (operator 2026-11-20): TREE2_ALONG cells further down the
 # camera's first-pass path, as far behind the eye as the first, 75 % of
 # the first, turned.
 TREE2_ALONG = 8.0  # operator 2026-11-21: 8 cells (2.0 was too close to the first)
-TREE2_DOODAD_SCALE = 0.75 * 0.75  # 75 % of the first tree's 75 % (operator 2026-11-20: both, relative)
+TREE2_DOODAD_SCALE = TREE_DOODAD_SCALE * 0.75  # 75 % of the first tree (operator 2026-11-20: both, relative)
+TREE2_VARIATION = 7  # operator 2026-11-21: not the first's (was TREE_VARIATION, 4)
 TREE2_FACING = 135.0  # the first tree keeps the actor's own facing, 0
+TREE2_BACK = 1.25  # operator 2026-11-21: further from the camera path than the first (was 1.0, TREE_BACK 0.5)
 
 
 def s2_tree() -> tuple[float, float]:
@@ -282,7 +284,12 @@ def s2_tree2() -> tuple[float, float]:
     s2 = next(s for s in SHOTS if s.name.startswith("S2"))
     tx, ty = s2_tree()
     n = math.hypot(s2.x1 - s2.x0, s2.y1 - s2.y0)
-    return (round(tx + TREE2_ALONG * (s2.x1 - s2.x0) / n, 2), round(ty + TREE2_ALONG * (s2.y1 - s2.y0) / n, 2))
+    back = math.radians(s2.yaw0 + 180.0)
+    extra = TREE2_BACK - TREE_BACK
+    return (
+        round(tx + TREE2_ALONG * (s2.x1 - s2.x0) / n + extra * math.cos(back), 2),
+        round(ty + TREE2_ALONG * (s2.y1 - s2.y0) / n + extra * math.sin(back), 2),
+    )
 
 
 def galaxy() -> str:
@@ -317,6 +324,7 @@ def galaxy() -> str:
         "// The second S2 tree (s2_tree2).",
         f"const fixed c_INTRO_TREE2_X = {_f(t2x)};",
         f"const fixed c_INTRO_TREE2_Y = {_f(t2y)};",
+        f"const int c_INTRO_TREE2_VARIATION = {TREE2_VARIATION};",
         f"const fixed c_INTRO_TREE2_SCALE_XY = {_f(xy2)};",
         f"const fixed c_INTRO_TREE2_SCALE_Z = {_f(xy2 * TREE_ACTOR_Z)};",
         f"const fixed c_INTRO_TREE2_FACING = {_f(TREE2_FACING)};",

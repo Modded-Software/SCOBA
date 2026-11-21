@@ -23,6 +23,7 @@ PROFILE_OUTPUTS = {
     "dissolveview": ROOT / "out" / "SCOBA256_dissolveview.SC2Map",
     "dropview": ROOT / "out" / "SCOBA256_dropview.SC2Map",
     "jump": ROOT / "out" / "SCOBA256_jumptest.SC2Map",
+    "slowwalk": ROOT / "out" / "SCOBA256_slowwalk.SC2Map",
     "herodrop": ROOT / "out" / "SCOBA256_herodroptest.SC2Map",
     "intro": ROOT / "out" / "SCOBA256_introtest.SC2Map",
     "podbirth": ROOT / "out" / "SCOBA256_podbirth.SC2Map",
@@ -55,6 +56,7 @@ PROFILE_BANKS = {
     "dissolveview": ("SCOBADISSOLVE",),
     "dropview": ("SCOBADROPVIEW",),
     "jump": ("SCOBAJUMPTEST",),
+    "slowwalk": ("SCOBASLOWWALK",),
     "herodrop": ("SCOBAHERODROP",),
     "intro": ("SCOBAINTRO",),
     "podbirth": ("SCOBAPODBIRTH",),
@@ -115,6 +117,9 @@ def profile_module(name):
     if name == "jump":
         from . import jump
         return jump
+    if name == "slowwalk":
+        from . import slowwalk
+        return slowwalk
     if name == "herodrop":
         from . import herodrop
         return herodrop

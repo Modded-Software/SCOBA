@@ -122,12 +122,12 @@ int[8] gv_animHeadStep;
 int[8] gv_animHeadSends;
 // Head lead state: the virtual body yaw and pitch, the last update time, and
 // the last lead in degrees (for tests).
-bool[8] gv_animHeadLeadSeen;
-fixed[8] gv_animHeadBodyYaw;
-fixed[8] gv_animHeadBodyPitch;
-fixed[8] gv_animHeadLeadAt;
-fixed[8] gv_animHeadLeadYaw;
-fixed[8] gv_animHeadLeadPitch;
+bool[8] gv_animHeadLookSeen;
+fixed[8] gv_animHeadLookAt;     // game time of the last ease step
+fixed[8] gv_animHeadLookWant;   // yaw to the look point minus facing, clamped
+fixed[8] gv_animHeadLookYaw;    // the eased head yaw the step shows
+fixed[8] gv_animHeadLookPitchWant;  // pitch to the look point, up +, clamped
+fixed[8] gv_animHeadLookPitch;  // the eased head pitch the step shows
 fixed[8] gv_animAimPitchRest;
 fixed[8] gv_animAimAttackUntil;
 int[8] gv_animTargetPitchStep;

@@ -6,13 +6,13 @@ void gf_DbgTpsHeadRun () {
     gf_DbgTpsCamera(CameraGetYaw(1), 20.0);
     gf_DbgTpsSnap("tps_head", "t0000");
     gf_DbgTpsSet(true);
-    gf_DbgTpsCamera(CameraGetYaw(1), 20.0);
+    gf_DbgTpsCamera(CameraGetYaw(1), 0.0);
     Wait(1.0, c_timeGame);
     gf_DbgTpsSnap("tps_head", "tlevel");
     gf_DbgTpsCamera(CameraGetYaw(1), 60.0);
     Wait(1.0, c_timeGame);
     gf_DbgTpsSnap("tps_head", "tdown");
-    gf_DbgTpsCamera(CameraGetYaw(1), -25.0);
+    gf_DbgTpsCamera(CameraGetYaw(1), -45.0);  // past the 30 degree head range (was -25)
     Wait(1.0, c_timeGame);
     gf_DbgTpsSnap("tps_head", "tup");
     gf_TpsMouseDown(1, gv_fIRE);
@@ -28,20 +28,21 @@ void gf_DbgTpsHeadRun () {
     gf_DbgTpsSet(false);
     gf_DbgTpsSnap("tps_head", "tend");
 
-    // R-TPS-16: the head leads a fast camera turn and settles back.
+    // R-TPS-16 (operator 2026-11-21): the head holds on the camera target.
+    // The camera turns 60 degrees from the hero facing, then holds still.
     gf_DbgTpsReset("tps_head_lead");
     gf_DbgTpsSet(true);
-    gf_DbgTpsCamera(90.0, 20.0);
+    gf_DbgTpsCamera(UnitGetFacing(gv_tPSUNIT[1]), 20.0);
     Wait(1.0, c_timeGame);
     gf_DbgTpsSnap("tps_head_lead", "tsettle");
-    CameraSetValue(1, c_cameraValueYaw, 150.0, 0.0, -1, 10);
-    // Two game loops (62.5 ms each): the head tick runs at most once a loop.
-    Wait(0.125, c_timeGame);
+    gf_DbgTpsCamera(UnitGetFacing(gv_tPSUNIT[1]) + 60.0, 20.0);
+    Wait(0.6, c_timeGame);
     gf_DbgTpsSnap("tps_head_lead", "tleft");
+    // Negative (the twitch): the camera still, no new head clip.
     Wait(1.0, c_timeGame);
     gf_DbgTpsSnap("tps_head_lead", "tleftrest");
-    CameraSetValue(1, c_cameraValueYaw, 90.0, 0.0, -1, 10);
-    Wait(0.125, c_timeGame);
+    gf_DbgTpsCamera(UnitGetFacing(gv_tPSUNIT[1]) - 60.0, 20.0);
+    Wait(0.6, c_timeGame);
     gf_DbgTpsSnap("tps_head_lead", "tright");
     Wait(1.0, c_timeGame);
     gf_DbgTpsSnap("tps_head_lead", "trightrest");

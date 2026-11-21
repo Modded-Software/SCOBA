@@ -81,11 +81,11 @@ not repeated here.
 | R-TPS-3 | [built] | The five aim-shot abilities are removed. The build validator fails if their ids return. No in-game ability count check. |
 | R-TPS-10, 11 | [tested] | `tps` group `move` |
 | R-TPS-12 | [tested] | `tps_head`: torso pitch step 0 outside aiming |
-| R-TPS-13 | [tested] step follows the camera pitch. Look and direction [operator]. | `tps_head` |
+| R-TPS-13 | [built] Changed 2026-11-21 to the R-TPS-16 look point; not run in game. Look and direction [operator]. | `tps_head` |
 | R-TPS-14 | [built] Head off while aiming; not run on the current build. | `tps_head`, `tps_head_lead` `taimdown` |
 | R-TPS-15 | [built] | TPS uses the right-hold step and clips. No check compares the two walks. |
 | R-TPS-17 | [tested] script state; look [operator] | `tps` group `pose`: `tps_pose_auto`, `tps_pose_walk`, `tps_pose_single`, full suite run `tps/20261116-235526`. 5.9 |
-| R-TPS-16 | [built] Earlier variant (on while aiming, 9 yaw steps) passed `tps/20261116-160329`; current build not run. Look, yaw direction, Kerrigan [operator]. | `tps_head_lead` |
+| R-TPS-16 | [built] Changed 2026-11-21 to hold on the camera target (was a lead); not run in game. Look, yaw direction, Kerrigan [operator]. | `tps_head_lead` |
 | R-TPS-20 | [tested] script flag. The cursor itself [operator] (T5). | `tps` group `cursor` |
 | R-TPS-21, 22 | [tested] | `tps` group `cursor` |
 | R-TPS-23 to 26 | [tested] crosshair kind, Tosh. Colors [operator]. Kerrigan not tested. | `tps` group `shot` |
@@ -137,18 +137,44 @@ not repeated here.
 
 - `scripts/character_anim_assets.py` generates 99 static head-only clips,
   `Ready Cover 01` to `99`, from the `Stand` pose: a grid of 9 pitch steps
-  (-15 to +15 degrees) by 11 yaw steps (-25 to +25, 5 degrees each). Clip
+  (-30 to +30 degrees, 7.5 each; operator 2026-11-21, was +-15) by 11 yaw steps (-25 to +25, 5 degrees each). Clip
   number = (yaw step - 1) * 9 + pitch step. 99 is the two-digit token limit.
   Priority 14. The torso clips are unchanged.
 - The yaw axis is the head bone's local axis closest to model up, taken from
   the rest pose at build time and printed in the build log. Tosh: `Z +1`.
   Kerrigan: `X +1`.
-- Lead: `gf_AnimHeadLeadUpdate` eases a virtual body yaw and pitch toward the
-  camera with time constant `c_ANIM_HEAD_LEAD_TAU` (0.2 s). The head shows
-  the gap, camera minus body: zero when still, ahead during a turn. The head
-  blend is one game loop (0.0625 s), so steps interpolate every frame.
-- Not aiming only: the head adds the lead to the R-TPS-13 tilt. Aiming
-  clears the head bracket.
+- The pitch axis is the head bone's local axis closest to model left-right
+  (X), signed so + turns the face up (model forward is -Y): Tosh `X -1`,
+  Kerrigan `Z +1`. Operator 2026-11-21: the head tilted sideways. Cause: the
+  head took the torso pitch axis (`BoneSpine01` local `Y`); on `BoneHead`
+  local Y is the forward/back axis (rest axes printed by a probe of the
+  stock models: X (1, 0, 0), Y (0, 0.91, 0.40), Z (0, -0.40, 0.91)). Host:
+  `HeadAxisTest`. Direction on screen: operator check.
+- Look (operator 2026-11-21, replaces the lead): `gf_AnimHeadLookUpdate`
+  takes a look point `c_ANIM_HEAD_LOOK_DIST` (8, operator "test with 8
+  first") along the screen-centre ray past the camera target (the
+  `gf_AimPickRay` ray, computed locally). From the eye, at
+  `c_ANIM_HEAD_EYE_FRAC` (0.85, not measured on the model) of the unit
+  height, it wants the yaw (minus hero facing, clamped +-25) and the pitch
+  (up +, clamped +-30) to that point. Both ease with `c_ANIM_HEAD_LOOK_TAU`
+  (0.15 s). The head holds while the camera is still. Tosh at camera pitch
+  20: the point is about 2.6 below the eye, about 19 degrees down (the old 15 clamp held it fully down). The
+  operator reported the lead as twitching and not looking at the target;
+  cause not measured. The pitch replaces the R-TPS-13 0.4 scale.
+- `gf_AnimHeadHoldStep`: a pitch or yaw step changes only when the angle is
+  `c_ANIM_HEAD_HOLD` (0.75) step widths from the shown step's center, so
+  the head does not flip between two steps. The head blend is one game loop
+  (0.0625 s), so steps interpolate every frame.
+- Not aiming only: yaw and pitch from the look. Aiming clears the head
+  bracket.
+- Test `tps_head`: camera pitch 0 level, 60 fully down, -45 fully up (was -25 at the 15 range).
+  Test `tps_head_lead` (name kept): camera 60 degrees left, then right, of
+  the facing; full range that way; negative: no new head clip in 1 s with
+  the camera still. Both: each step part shows its eased angle, and the
+  eased angle reaches the wanted one. Raw camera yaw and pitch, facing,
+  wanted and eased angles recorded.
+  Unconfirmed: that TPS leaves the standing hero's facing when the camera
+  turns.
 - The head tick runs at most once a game loop (62.5 ms); tests wait two loops.
 - The head bone is a per-model setting; the build fails if the model lacks
   it. Tosh: `BoneHead`, the parent of the `Ref_Head` attachment. Kerrigan
@@ -190,6 +216,16 @@ not repeated here.
   start and the mode switch force one send (`gf_ControlForceSend`). The PNC
   orbit starts use the same gate. Ten aim cycles send nothing; each middle
   click sends one of each. Whether this cures the report is [operator].
+- Operator report 2026-11-21, after the intro hid the cursor (R-INTRO-19):
+  in TPS a middle click stops mouse look, the cursor stays hidden. Read from
+  the code, not measured: `gv_introActive` is cleared at touchdown, so the
+  rule asks for the cursor; the one script path that can drop the send is the
+  send-once gate, if the engine cursor state differs from the cached value
+  (the intro sends it inside `CinematicMode`). Change: each free-cursor
+  toggle calls `gf_ControlForceSend` first, so the click always sends
+  `CameraSetMouseRotates`, `CameraForceMouseRelative` and
+  `UISetCursorVisible` once each. Aims still send nothing. Cursor on screen:
+  [operator].
 - The free-cursor state ends aiming and blocks it.
 - The script never calls `CameraLockInput`. An earlier build locked the camera
   input for a middle hold; the operator reported the cursor still not free.
@@ -368,7 +404,10 @@ not repeated here.
   z + the vertical extent of its three half axes.
 - `scripts/hitvolumes/camera_heights.py` writes
   `data/camera_heights.galaxy`: `c_CAM_HEIGHT_REFERENCE` (ToshSCOBA, 0.9305)
-  and one `gf_CamHeightType` call per type. `--check` and validate-map fail
+  and one `gf_CamHeightType` call per type. `CAMERA_HEIGHT` pins a type's
+  height: ToshSCOBA 0.9305 (operator 2026-11-21: Tosh actor scale 0.675,
+  was 0.75, measured 0.8374; every camera unchanged). Host test
+  `test_tosh_camera_kept_after_the_shrink`. `--check` and validate-map fail
   when it is stale. `main` loads it into a data table (`gf_CamHeightLoad`).
 - `systems/camera/camera_height.galaxy`: `gf_CameraUnitHeight` (reference
   for an invalid or unmeasured unit), `gf_CameraHeightScale` = height /

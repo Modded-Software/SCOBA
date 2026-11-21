@@ -346,6 +346,10 @@ def check_deploy(checks) -> None:
     for t in ("t0", "tzoom", "tfall"):
         checks.true(s, t, "ChatHidden")
         checks.false(s, t, "ChatShown")
+        # R-INTRO-19: hidden by relative mouse mode, not by a cursor send.
+        checks.true(s, t, "MouseHidden")
+    rule = [t for t in ("t0", "tzoom", "tfall") if checks.value(s, t, "CursorRule")]
+    print(f"{s} raw cursor rule true at: {rule}")
     checks.lt(s, "", "podToDrop100", 100)
     # The stock drop; the camera on the Birth root (SPEC-HERO-DROP 3).
     fall = birth_follow(checks, s, checks.value(s, "", "landHeroH100") or 0)
@@ -369,6 +373,11 @@ def check_deploy(checks) -> None:
         # Negative for R-INTRO-18: the chat display is back after the intro.
         checks.false(s, t, "ChatHidden")
         checks.true(s, t, "ChatShown")
+        # Negative for R-INTRO-19: after touchdown the mouse hide is off and
+        # the cursor and mouse look follow the control rule.
+        checks.false(s, t, "MouseHidden")
+        checks.eq(s, t, "SentCursor", checks.value(s, t, "CursorRule"))
+        checks.eq(s, t, "SentRelative", not checks.value(s, t, "CursorRule"))
         checks.eq(s, t, "Phase", 0)
         checks.eq(s, t, "Dialogs", checks.value("boot", "t0", "DialogsKept"))
         checks.false(s, t, "InputHeld")

@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
 import m3
 
 MARKER = ".slow_death_assets"
-MARKER_VERSION = "10\n"  # 10: Leviathan Stand 3x faster; 9: Leviathan tentacle simulation 40x slower; 8: Leviathan death like the BC; 7: Goliath death 2x slower; 6: Goliath 3x; 5: BC child stretch 12.5 (children 2x faster)
+MARKER_VERSION = "11\n"  # 11: Zerus tree 09, 10 particles 4x slower; 10: Leviathan Stand 3x faster; 9: Leviathan tentacle simulation 40x slower; 8: Leviathan death like the BC; 7: Goliath death 2x slower; 6: Goliath 3x; 5: BC child stretch 12.5 (children 2x faster)
 
 # (CASC entry, target in the map, time stretch, child stretch). Stretch 100
 # is twice the earlier 50 (the old CModel AnimSpeed 0.02): every death runs
@@ -67,6 +67,17 @@ SLOW_SIMULATIONS = (
         Path("Assets") / "Effects" / "Zerg" / "LeviathanTentacle" / "LeviathanTentacleSlow.m3",
         40,
     ),
+) + tuple(
+    # Zerus tree variations 09 and 10, the only ones with particles: the
+    # rising vapour 4x slower, as the tree actor's 0.25 (REQ-SCENERY R-SCN-5,
+    # operator 2026-11-21). Same path as the stock file: the map copy
+    # replaces the variation, ModelData stays.
+    (
+        rf"mods\liberty.sc2mod\base.sc2assets\assets\doodads\zerustree\zerustree_{index:02d}.m3",
+        Path("Assets") / "Doodads" / "ZerusTree" / f"ZerusTree_{index:02d}.m3",
+        4,
+    )
+    for index in (9, 10)
 )
 
 # (CASC entry, target in the map, sequence names, speed-up). The named clips

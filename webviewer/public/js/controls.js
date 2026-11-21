@@ -1,6 +1,8 @@
 // Mouse controls:
 // - left drag: grab the ground and pull it ("left click scrolls the map");
 //   ctrl + left with a unit selected turns that unit instead (pick.js);
+//   alt + left on a unit drags the unit over the ground instead, the point
+//   of the unit pressed staying under the mouse ("drag unit");
 //   a left or right click without a drag is handled by pick.js;
 // - middle drag: orbit around the ground point under the mouse;
 // - ctrl + middle drag: mouse-look, turning around the camera itself;
@@ -101,8 +103,12 @@
 
   // ---- drags ----
 
-  /** The drag in progress: { mode, x, y, anchor, pivot }, or null. */
+  /** The drag in progress: { mode, x, y, anchor, pivot, item, z, offset }, or null. */
   let drag = null;
+  // Releasing Alt must not open the browser's menu bar (Firefox).
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'Alt') e.preventDefault();
+  });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   // Middle click must not paste or start autoscroll.
   canvas.addEventListener('auxclick', (e) => e.preventDefault());
@@ -110,8 +116,15 @@
     e.preventDefault();
     const ground = app.eventGround(e);
     const at = { x: e.clientX, y: e.clientY };
-    // Ctrl + left with a unit selected turns that unit (pick.js).
-    if (e.button === BUTTON.left && e.ctrlKey && app.hasSelection()) {
+    // Alt + left on a unit: drag the unit. The point of the unit pressed
+    // stays under the mouse: the mouse ray is cut with the level plane
+    // through that point, and the unit keeps its offset from it.
+    const hit = e.button === BUTTON.left && e.altKey ? app.hitAt(e.clientX, e.clientY) : null;
+    if (hit) {
+      const p = hit.point;
+      drag = { mode: 'move', ...at, item: hit.item, z: p[2], offset: [hit.item.x - p[0], hit.item.y - p[1]] };
+    } else if (e.button === BUTTON.left && e.ctrlKey && app.hasSelection()) {
+      // Ctrl + left with a unit selected turns that unit (pick.js).
       drag = { mode: 'face', ...at };
       app.faceSelected(e);
     } else if (e.button === BUTTON.left) drag = { mode: 'grab', ...at, anchor: ground };
@@ -122,6 +135,8 @@
     if (drag) stopZoom();
   });
   window.addEventListener('mouseup', () => {
+    // A moved unit goes into the URL once, on release.
+    if (drag && drag.mode === 'move') app.saveHash();
     drag = null;
   });
   window.addEventListener('mousemove', (e) => {
@@ -132,6 +147,12 @@
     drag.y = e.clientY;
     if (drag.mode === 'face') {
       app.faceSelected(e);
+      return;
+    }
+    if (drag.mode === 'move') {
+      // The ray above the plane's horizon: the unit waits where it is.
+      const now = app.planeAt(e.clientX, e.clientY, drag.z);
+      if (now) app.setPosition(drag.item, now[0] + drag.offset[0], now[1] + drag.offset[1]);
       return;
     }
     if (drag.mode === 'grab') {
@@ -149,7 +170,16 @@
   // One wheel notch (deltaY 100) moves the camera a share of its distance:
   // 15% with the eye high up, less as it comes down to the ground (down to
   // 1.8% at 1.2 units and below). Ctrl makes every step a quarter.
+  // The zoom works from the eye's height above the ground (z = 0): when a
+  // zoom starts, the target is moved to where the view line meets the
+  // ground, the eye staying put, so the distance is the eye height over
+  // sin(pitch) whatever pan, orbit or mouse-look did to the target. The eye
+  // never comes closer than MIN_HEIGHT to the ground.
   const NOTCH_SHARE = 0.15;
+  const MIN_HEIGHT = 0.3;
+  // Below this pitch the view line meets the ground too far away (or not at
+  // all, looking up): the target stays, only the height floor holds.
+  const MIN_SIN = 0.01;
   const HIGH = 10; // eye height from which a notch is the full share
   const LOW_SHARE = 0.12; // the least part of the full share, near the ground
   const CTRL_SHARE = 0.25;
@@ -158,6 +188,29 @@
   const MAX_DISTANCE = 2000;
   // deltaMode: 0 pixels, 1 lines, 2 pages. Lines and pages in pixels.
   const DELTA_UNIT = [1, 33, 400];
+
+  /**
+   * Put the target on the ground along the view line, the eye staying put.
+   * False when the view line does not meet the ground in front of the eye.
+   */
+  function targetToGround() {
+    const s = Math.sin(camera.pitch);
+    const eye = app.eye();
+    if (s < MIN_SIN || eye[2] <= 0) return false;
+    const t = eye[2] / s;
+    const dir = direction(camera.yaw, camera.pitch);
+    camera.target = [eye[0] - dir[0] * t, eye[1] - dir[1] * t, 0];
+    camera.distance = t;
+    return true;
+  }
+
+  /** The nearest the camera may come along its view line: the eye MIN_HEIGHT over the ground. */
+  function nearest() {
+    const s = Math.sin(camera.pitch);
+    // Eye height = target z + distance * s; looking flat or up, distance does not lower it.
+    if (s <= 0) return MIN_DISTANCE;
+    return Math.max(MIN_DISTANCE, (MIN_HEIGHT - camera.target[2]) / s);
+  }
 
   /** The share of the distance one notch moves, for a camera at `distance`. */
   function notchShare(distance, ctrl) {
@@ -200,10 +253,15 @@
       // Also keeps ctrl + wheel from zooming the page.
       e.preventDefault();
       const notches = (e.deltaY * (DELTA_UNIT[e.deltaMode] ?? 1)) / 100;
-      const start = zoomGoal ?? camera.distance;
       const gliding = zoomGoal !== null;
+      // A glide already started from the ground; a new zoom anchors first.
+      if (!gliding) {
+        targetToGround();
+        app.applyCamera();
+      }
+      const start = zoomGoal ?? camera.distance;
       const step = Math.log(1 + notchShare(start, e.ctrlKey)) * notches;
-      zoomGoal = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, start * Math.exp(step)));
+      zoomGoal = Math.min(MAX_DISTANCE, Math.max(nearest(), start * Math.exp(step)));
       if (!gliding) {
         zoomTime = performance.now();
         zoomFrame = requestAnimationFrame(zoomStep);

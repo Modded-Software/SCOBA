@@ -420,7 +420,8 @@
         <DeathArray index="Normal" ModelLink="ToshDeath" SoundLink="Tosh_Death"/>
         <PortraitModel value="ToshPortrait"/>
         <Model value="ToshSCOBA"/>
-        <Scale value="0.750000"/>
+        <!-- Operator 2026-11-21: 10 % smaller (was 0.75). -->
+        <Scale value="0.675000"/>
         <WalkAnimMoveSpeed value="3"/>
         <On Terms="UnitDeath" Send="AnimSetTimeScaleGlobal 0.125000"/>
         <VarianceWindowWalk value="0.000000"/>
@@ -526,6 +527,8 @@
         <Scale value="1.250000"/>
     </CActorUnit>
     <CActorDoodad id="ZerusTree">
+        <!-- Every tree doodad sways at a quarter speed (operator 2026-11-21); the clones inherit it. -->
+        <On Terms="ActorCreation" Send="AnimSetTimeScaleGlobal 0.250000"/>
         <RandomScaleRange value="4.000000,6.000000"/>
         <Scale value="1.000000,1.000000,1.400000"/>
     </CActorDoodad>

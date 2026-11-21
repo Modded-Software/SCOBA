@@ -152,12 +152,12 @@ class TableTest(unittest.TestCase):
         self.assertIn(f"const int c_INTRO_S6_ROW = {S.s6_row()};", text)
         self.assertIn(f"gv_introS6PodX[2] = {pods[2][0]:.4f};", text)
 
-    def test_s2_tree_one_cell_behind_the_start_eye(self) -> None:
-        # Operator 2026-11-21: 1 cell behind the camera (was 2).
+    def test_s2_tree_half_cell_behind_the_start_eye(self) -> None:
+        # Operator 2026-11-21: closer to the camera path, 0.5 cells (was 1, 2).
         s2 = next(s for s in S.SHOTS if s.name.startswith("S2"))
         ex, ey, _ = S.eye(s2.x0, s2.y0, s2.z0, s2.yaw0, s2.pitch0, s2.dist0)
         tx, ty = S.s2_tree()
-        self.assertAlmostEqual(math.hypot(tx - ex, ty - ey), 1.0, delta=0.02)
+        self.assertAlmostEqual(math.hypot(tx - ex, ty - ey), 0.5, delta=0.02)
         # Behind: farther from the start target than the eye.
         self.assertGreater(math.hypot(tx - s2.x0, ty - s2.y0), math.hypot(ex - s2.x0, ey - s2.y0))
         # Negative case: not behind the odd-pass start eye (the swapped target).
@@ -166,9 +166,9 @@ class TableTest(unittest.TestCase):
         text = S.galaxy()
         self.assertIn(f"const fixed c_INTRO_TREE_X = {tx:.4f};", text)
         self.assertIn("const int c_INTRO_TREE_VARIATION = 4;", text)
-        # 75 % of the editor doodad scale (operator 2026-11-20; was 100 %).
-        self.assertIn("const fixed c_INTRO_TREE_SCALE_XY = 3.7500;", text)
-        self.assertIn("const fixed c_INTRO_TREE_SCALE_Z = 5.2500;", text)
+        # 75 % x 0.85 of the editor doodad scale (operator 2026-11-21; was 75 %).
+        self.assertIn("const fixed c_INTRO_TREE_SCALE_XY = 3.1875;", text)
+        self.assertIn("const fixed c_INTRO_TREE_SCALE_Z = 4.4625;", text)
 
     def test_s7_pod_lands_on_the_eye_at_the_cut(self) -> None:
         # Operator 2026-11-20: one pod on the exact S7 camera spot, hitting
@@ -197,7 +197,8 @@ class TableTest(unittest.TestCase):
         s2 = next(s for s in S.SHOTS if s.name.startswith("S2"))
         tx, ty = S.s2_tree()
         ux, uy = S.s2_tree2()
-        self.assertAlmostEqual(math.hypot(ux - tx, uy - ty), 8.0, delta=0.02)
+        # 8 along the path, plus the side step to TREE2_BACK.
+        self.assertAlmostEqual(math.hypot(ux - tx, uy - ty), math.hypot(8.0, S.TREE2_BACK - S.TREE_BACK), delta=0.02)
         # Down the path: along the first-pass target move.
         n = math.hypot(s2.x1 - s2.x0, s2.y1 - s2.y0)
         along = ((ux - tx) * (s2.x1 - s2.x0) + (uy - ty) * (s2.y1 - s2.y0)) / n
@@ -212,16 +213,29 @@ class TableTest(unittest.TestCase):
             tgx, tgy = s2.x0 + (s2.x1 - s2.x0) * u, s2.y0 + (s2.y1 - s2.y0) * u
             fn = math.hypot(tgx - ex, tgy - ey)
             ahead = ((ux - ex) * (tgx - ex) + (uy - ey) * (tgy - ey)) / fn
-            self.assertLess(ahead, -0.9, f"u={u}")
+            self.assertLess(ahead, -0.4, f"u={u}")
+        # Operator 2026-11-21: further from the camera path than the first.
+        ex0, ey0, _ = S.eye(s2.x0, s2.y0, s2.z0, s2.yaw0, s2.pitch0, s2.dist0)
+        dx, dy = (s2.x1 - s2.x0) / n, (s2.y1 - s2.y0) / n
+        side1 = abs((tx - ex0) * dy - (ty - ey0) * dx)
+        side2 = abs((ux - ex0) * dy - (uy - ey0) * dx)
+        self.assertAlmostEqual(side1, S.TREE_BACK, delta=0.02)
+        self.assertAlmostEqual(side2, S.TREE2_BACK, delta=0.02)
+        self.assertGreater(side2, side1 + 0.4)
         # Negative: not on the first tree, not the same size, not the same facing.
         self.assertNotEqual((ux, uy), (tx, ty))
         text = S.galaxy()
         self.assertIn(f"const fixed c_INTRO_TREE2_X = {ux:.4f};", text)
         # 75 % of the first tree.
-        self.assertIn("const fixed c_INTRO_TREE2_SCALE_XY = 2.8125;", text)
-        self.assertIn("const fixed c_INTRO_TREE2_SCALE_Z = 3.9375;", text)
+        self.assertIn("const fixed c_INTRO_TREE2_SCALE_XY = 2.3906;", text)
+        self.assertIn("const fixed c_INTRO_TREE2_SCALE_Z = 3.3469;", text)
         self.assertAlmostEqual(S.TREE2_DOODAD_SCALE / S.TREE_DOODAD_SCALE, 0.75)
         self.assertIn("const fixed c_INTRO_TREE2_FACING = 135.0000;", text)
+        # Operator 2026-11-21: its own variation, not the first tree's.
+        self.assertIn("const int c_INTRO_TREE2_VARIATION = 7;", text)
+        self.assertNotEqual(S.TREE2_VARIATION % 12, S.TREE_VARIATION % 12)
+        tuning = (project_root() / "src" / "SCOBA.SC2Map" / "scripts" / "app" / "systems" / "visual_tuning.galaxy").read_text(encoding="utf-8")
+        self.assertIn('ActorSend(gv_introTree2, "ModelSwap ZerusTree " + IntToString(c_INTRO_TREE2_VARIATION));', tuning)
         self.assertNotEqual(S.TREE2_FACING % 360.0, 0.0)
 
 
@@ -377,8 +391,8 @@ class IntroTreeClearingTest(unittest.TestCase):
     def test_placed_trees_come_from_the_shot_table(self) -> None:
         self.assertEqual((self.one.x, self.one.y), S.s2_tree())
         self.assertEqual((self.two.x, self.two.y), S.s2_tree2())
-        self.assertAlmostEqual(self.one.canopy, 0.5 * 3.75)
-        self.assertAlmostEqual(self.two.canopy, 0.5 * 2.8125)
+        self.assertAlmostEqual(self.one.canopy, 0.5 * 3.1875)
+        self.assertAlmostEqual(self.two.canopy, 0.5 * 2.390625)
 
     def test_overlapping_trees_are_removed_and_the_rest_stays(self) -> None:
         text, hits = T.clear(self.text)

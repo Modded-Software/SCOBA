@@ -61,6 +61,7 @@ trigger gt_IntroPulse;
 
 int[16] gv_introState;
 bool[16] gv_introActive;          // LOOP, DROP
+bool[16] gv_introMouseHidden;     // relative mouse, no rotate (R-INTRO-19)
 int[16] gv_introShot;             // row of the shot on screen
 int[16] gv_introPass;
 fixed[16] gv_introShotStart;      // gv_sCOBA_Clock at the cut

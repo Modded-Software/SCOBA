@@ -60,10 +60,10 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-10 | Backpedal MUST always be on. S MUST walk the hero backward. A and D MUST strafe. The hero MUST NOT turn to face its travel direction. |
 | R-TPS-11 | The hero torso MUST always follow the camera yaw, standing and moving. |
 | R-TPS-12 | While not aiming, the torso MUST NOT follow the camera pitch. |
-| R-TPS-13 | While not aiming, the head MUST tilt slightly up or down toward the camera pitch. |
+| R-TPS-13 | While not aiming, the head MUST tilt up or down toward the camera pitch, to the R-TPS-16 look point (operator 2026-11-21; was "slightly"). |
 | R-TPS-14 | While aiming, the whole torso MUST follow the camera pitch. The head MUST NOT tilt or lead separately. |
 | R-TPS-15 | The TPS walk MUST turn and animate as the Point & Click right-hold walk does (R-PNC-68). |
-| R-TPS-16 | In TPS, while not aiming, the head MUST follow the crosshair faster than the torso: on a fast camera turn or look up or down it MUST turn ahead in that direction, sideways and up or down, and MUST settle back once the camera stops. The torso animation MUST NOT change for this. Operator 2026-11-16. |
+| R-TPS-16 | In TPS, while not aiming, the head MUST look at a point 8 units past the camera target along the view (operator 2026-11-21, "test with 8 first"): it MUST turn sideways and up or down toward it as far as the head range allows (25 degrees sideways, 30 up or down; operator 2026-11-21, was 15) and hold there while the camera is still. It MUST move smoothly and MUST NOT twitch. The torso animation MUST NOT change for this. Operator 2026-11-21 (was 2026-11-16: lead a fast camera turn and settle back; reported as twitching and not looking at the target). |
 | R-TPS-17 | In TPS with Attack `auto`, while not aiming, Tosh MUST hold the shooting pose between shots as R-PNC-80 to 82 define it, standing and walking. Aiming MUST own the upper body instead. With Attack `single` no pose is held: no shot fires outside the aim. Switching to `single` MUST end the pose at once. The pose MUST NOT follow the camera pitch (R-TPS-12). Operator 2026-11-16. |
 
 ### 3.3 Cursor and crosshair
@@ -150,7 +150,7 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 
 | ID | Requirement |
 | --- | --- |
-| R-TPS-90 | Added 2026-11-19 by the operator. The TPS and Point & Click camera target height above the ground and the default camera arm MUST follow the bound unit's height. Tosh MUST keep 0.9 and 1.5. Every other unit MUST scale both by its height divided by Tosh's. The heights MUST come from the model bounds by a build script, at the scale the unit has in game. A unit with no measured height MUST use Tosh's values. The Viking keeps its own arm. A morph (Viking landing and lift) MUST switch to the new form's height. Exception 2026-11-20 (operator): after a hero drop touchdown the arm is 1.0 for every unit (REQ-HERO-DROP R-DROP-6); the target height still follows this rule. |
+| R-TPS-90 | Added 2026-11-19 by the operator. The TPS and Point & Click camera target height above the ground and the default camera arm MUST follow the bound unit's height. Tosh MUST keep 0.9 and 1.5. Every other unit MUST scale both by its height divided by Tosh's. The heights MUST come from the model bounds by a build script, at the scale the unit has in game. A unit with no measured height MUST use Tosh's values. The Viking keeps its own arm. A morph (Viking landing and lift) MUST switch to the new form's height. Exception 2026-11-20 (operator): after a hero drop touchdown the arm is 1.0 for every unit (REQ-HERO-DROP R-DROP-6); the target height still follows this rule. Changed 2026-11-21 (operator): Tosh is 10 % smaller (actor scale 0.675, was 0.75), and every camera MUST stay as before: Tosh's height for this rule is his height at the old scale. |
 
 ## 4. Open Points
 

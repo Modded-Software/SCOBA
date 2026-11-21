@@ -12,7 +12,7 @@ const fixed c_SCENE_LETTERBOX_OUT = 0.5;
 
 // Map dialogs hidden in the scene, and the triggers gated by its hold.
 const int c_SCENE_DIALOGS = 15;
-const int c_SCENE_TRIGGERS = 43;
+const int c_SCENE_TRIGGERS = 44;
 
 // The Dflt camera DOF values, set when the scene ends.
 const fixed c_SCENE_DFLT_FOCUS = 8.0;

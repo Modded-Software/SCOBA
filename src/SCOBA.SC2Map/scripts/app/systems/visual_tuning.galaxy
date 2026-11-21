@@ -1,5 +1,8 @@
 // Module: systems/visual_tuning
 
+// Tree sway speed, as ActorData ZerusTree AnimSetTimeScaleGlobal (operator 2026-11-21).
+const fixed c_TREE_ANIM_SPEED = 0.25;
+
 void gf_ScaleDeathTimePlayer (int lp_player, string lp_unitType, fixed lp_factor) {
     string lv_value;
     fixed lv_death;
@@ -109,14 +112,18 @@ void gf_HoldType (string lp_type) {
 // The S2 Zerus tree (operator 2026-11-20): a model actor at map init, just
 // behind the S2 start eye (data/intro_shots). Variation and scale as an
 // editor ZerusTree doodad at 75 %. A second one further down the camera
-// path: 75 % of the first, turned (c_INTRO_TREE2_FACING).
+// path: 75 % of the first, its own variation, turned (c_INTRO_TREE2_FACING).
+// Both sway at the tree doodad speed (ActorData ZerusTree, operator
+// 2026-11-21): these are model actors, the doodad event does not reach them.
 void gf_IntroTreePlace () {
     gv_introTree = libNtve_gf_CreateModelAtPoint("ZerusTree", Point(c_INTRO_TREE_X, c_INTRO_TREE_Y));
     ActorSend(gv_introTree, "ModelSwap ZerusTree " + IntToString(c_INTRO_TREE_VARIATION));
     ActorSend(gv_introTree, libNtve_gf_SetScale(c_INTRO_TREE_SCALE_XY, c_INTRO_TREE_SCALE_XY, c_INTRO_TREE_SCALE_Z, 0.0));
+    ActorSend(gv_introTree, "AnimSetTimeScaleGlobal " + FixedToString(c_TREE_ANIM_SPEED, 2));
     gv_introTree2 = libNtve_gf_CreateModelAtPoint("ZerusTree", Point(c_INTRO_TREE2_X, c_INTRO_TREE2_Y));
-    ActorSend(gv_introTree2, "ModelSwap ZerusTree " + IntToString(c_INTRO_TREE_VARIATION));
+    ActorSend(gv_introTree2, "ModelSwap ZerusTree " + IntToString(c_INTRO_TREE2_VARIATION));
     ActorSend(gv_introTree2, libNtve_gf_SetScale(c_INTRO_TREE2_SCALE_XY, c_INTRO_TREE2_SCALE_XY, c_INTRO_TREE2_SCALE_Z, 0.0));
+    ActorSend(gv_introTree2, "AnimSetTimeScaleGlobal " + FixedToString(c_TREE_ANIM_SPEED, 2));
     libNtve_gf_MakeModelFaceAngle(gv_introTree2, c_INTRO_TREE2_FACING);
 }
 

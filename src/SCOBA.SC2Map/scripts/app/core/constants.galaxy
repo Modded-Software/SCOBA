@@ -1,6 +1,8 @@
 // Module: core/constants
 
-const int gv_zOOM = c_keyShift;
+// FOV zoom on Z, slow walk on Shift (operator 2026-11-21).
+const int gv_zOOM = c_keyZ;
+const int gv_sLOWWALK = c_keyShift;
 const int gv_mOVERIGHT = c_keyD;
 const int gv_mOVELEFT = c_keyA;
 const int gv_mOVEBACKWARD = c_keyS;

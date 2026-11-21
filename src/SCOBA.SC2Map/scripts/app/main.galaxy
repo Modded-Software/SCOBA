@@ -5,6 +5,7 @@ include "scripts/app/core/constants"
 include "scripts/app/core/animation"
 include "scripts/app/core/globals"
 include "scripts/app/core/jump"
+include "scripts/app/core/slow_walk"
 include "scripts/app/data/pod_birth"
 include "scripts/app/core/hero_drop"
 include "scripts/app/core/input_hold"
@@ -122,6 +123,8 @@ void main () {
     gt_OrderKey_Init();
     gt_OrderButton_Init();
     gt_OrderCancel_Init();
+    gt_SlowKeyDown_Init();
+    gt_SlowKeyUp_Init();
     gt_MedicSpawn_Init();
     gt_VisualTuning_Init();
     gt_TargetRing_Init();

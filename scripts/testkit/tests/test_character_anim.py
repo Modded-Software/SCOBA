@@ -13,7 +13,8 @@ from character_anim_assets import (
     HEAD_YAW_MAX_DEG,
     HEAD_YAW_STEPS,
 )
-from testkit.profiles import tps
+from testkit.profiles import slowwalk, tps
+from walkanim import slow
 
 SCRIPTS = Path(__file__).resolve().parents[2]
 ANIMATION_GALAXY = SCRIPTS.parent / "src" / "SCOBA.SC2Map" / "scripts" / "app" / "core" / "animation.galaxy"
@@ -59,10 +60,55 @@ class HeadTiltTest(unittest.TestCase):
         # Smooth between per-loop steps (0.0625 s), no longer.
         self.assertEqual(galaxy_const("c_ANIM_HEAD_BLEND"), 0.0625)
 
+    def test_head_pitch_range(self) -> None:
+        # Operator 2026-11-21: 30 degrees up or down (was 15), 7.5 per step.
+        self.assertEqual(HEAD_TILT_MAX_DEG, 30.0)
+        self.assertEqual(tps.HEAD_MAX, HEAD_TILT_MAX_DEG)
+        self.assertEqual(2.0 * HEAD_TILT_MAX_DEG / (HEAD_TILT_STEPS - 1), 7.5)
+
     def test_head_yaw_step_is_fine(self) -> None:
         self.assertLessEqual(2.0 * HEAD_YAW_MAX_DEG / (HEAD_YAW_STEPS - 1), 5.0)
         # Clip numbers are two-digit animation tokens.
         self.assertLessEqual(HEAD_YAW_STEPS * HEAD_TILT_STEPS, 99)
+
+
+def _bone_model(name: str, rows: tuple) -> object:
+    """A model with one bone whose rest local axes (model space) are the
+    columns of the matrix with these rows; the file stores its inverse."""
+    from types import SimpleNamespace as N
+
+    inv = [[rows[c][r] for c in range(3)] for r in range(3)]  # transpose
+    col = [N(x=inv[0][c], y=inv[1][c], z=inv[2][c], w=0.0) for c in range(3)]
+    matrix = N(x=col[0], y=col[1], z=col[2], w=N(x=0.0, y=0.0, z=0.0, w=1.0))
+    return N(bones=[N(name=name)], absoluteInverseBoneRestPositions=[N(matrix=matrix)])
+
+
+class HeadAxisTest(unittest.TestCase):
+    """Operator 2026-11-21: the head pitch tilted sideways. Pitch is the head's
+    own left-right axis, signed so + is face up (forward -Y); yaw is up."""
+
+    def test_tosh_head_axes(self) -> None:
+        from character_anim_assets import head_axis
+
+        # BoneHead rest axes (stock tosh.m3): X=(1,0,0) Y=(0,.91,.40) Z=(0,-.40,.91).
+        model = _bone_model("BoneHead", ((1.0, 0.0, 0.0), (0.0, 0.91, -0.40), (0.0, 0.40, 0.91)))
+        self.assertEqual(head_axis(model, "BoneHead", 2), ("Z", 1.0))
+        self.assertEqual(head_axis(model, "BoneHead", 0), ("X", 1.0))
+        # Negative: not Y, the forward/back axis that rolled the head.
+        self.assertNotEqual(head_axis(model, "BoneHead", 0)[0], "Y")
+
+    def test_kerrigan_head_axes(self) -> None:
+        from character_anim_assets import head_axis
+
+        # Bone29 rest axes (stock kerrigan.m3): X=(0,-.35,.94) Y=(0,.94,.35) Z=(-1,0,0).
+        model = _bone_model("Bone29", ((0.0, 0.0, -1.0), (-0.35, 0.94, 0.0), (0.94, 0.35, 0.0)))
+        self.assertEqual(head_axis(model, "Bone29", 2), ("X", 1.0))
+        self.assertEqual(head_axis(model, "Bone29", 0), ("Z", -1.0))
+
+    def test_pitch_sign_is_face_up(self) -> None:
+        source = (SCRIPTS / "character_anim_assets.py").read_text(encoding="utf-8")
+        self.assertIn("    pitch_axis, side = head_axis(model, head, 0)\n    pitch_sign = -side\n", source)
+        self.assertIn("    head = make_head_groups(model, groups, head_bone)\n", source)
 
 
 class AimPitchSourceTest(unittest.TestCase):
@@ -87,6 +133,125 @@ class AimDirectionsTest(unittest.TestCase):
     def test_backpedal_directions(self) -> None:
         reverse = [name for name, _, reversed_motion in AIM_DIRECTIONS if reversed_motion]
         self.assertEqual(reverse, ["Back Left", "Back", "Back Right"])
+
+
+APP = SCRIPTS.parent / "src" / "SCOBA.SC2Map" / "scripts" / "app"
+BEHAVIOR_DATA = SCRIPTS.parent / "src" / "SCOBA.SC2Map" / "Base.SC2Data" / "GameData" / "BehaviorData.xml"
+
+
+def app_text(*parts: str) -> str:
+    return APP.joinpath(*parts).read_text(encoding="utf-8")
+
+
+class SlowWalkTest(unittest.TestCase):
+    """REQ-SLOW-WALK: data, constants, clip table, keys, and the profile agree."""
+
+    def test_buff_is_forty_percent_speed(self) -> None:
+        text = BEHAVIOR_DATA.read_text(encoding="utf-8")
+        block = re.search(r'<CBehaviorBuff id="SCOBASlowWalk">(.*?)</CBehaviorBuff>', text, re.S)
+        self.assertIsNotNone(block)
+        multiplier = re.search(r'MoveSpeedMultiplier="([0-9.]+)"', block.group(1))
+        self.assertEqual(float(multiplier.group(1)), 0.4)
+        self.assertAlmostEqual(sum(slowwalk.SLOW_RATIO) / 2.0, 0.4)
+        self.assertNotIn("<Duration", block.group(1))
+
+    def test_lower_states(self) -> None:
+        self.assertEqual(galaxy_const("c_ANIM_LOWER_WALK_SLOW"), slowwalk.LOWER_SLOW)
+        self.assertEqual(galaxy_const("c_ANIM_LOWER_WALK_SLOW_BACK"), slowwalk.LOWER_SLOW_BACK)
+        self.assertEqual(galaxy_const("c_ANIM_LOWER_COUNT"), 8)
+
+    def test_clip_table_matches_the_bake(self) -> None:
+        clips = sorted(clip.replace(",", " ") for _, clip in slow.CLIP_RE.findall(ANIMATION_AIM_GALAXY.read_text(encoding="utf-8")))
+        self.assertEqual(clips, sorted(slow.PREFIX + name for name, _, _ in AIM_DIRECTIONS))
+
+    def test_arm_states_and_clips(self) -> None:
+        # R-SLOW-19: two upper states, their clips match the bake and the profile.
+        self.assertEqual(galaxy_const("c_ANIM_UPPER_WALK_SLOW"), slowwalk.UPPER_SLOW)
+        self.assertEqual(galaxy_const("c_ANIM_UPPER_WALK_SLOW_BACK"), slowwalk.UPPER_SLOW_BACK)
+        self.assertEqual(galaxy_const("c_ANIM_UPPER_COUNT"), 12)
+        arms = sorted(clip.replace(",", " ") for clip in slow.ARM_RE.findall(ANIMATION_AIM_GALAXY.read_text(encoding="utf-8")))
+        self.assertEqual(arms, sorted((slow.ARM, slow.ARM_BACK)))
+        self.assertEqual(sorted((slowwalk.ARM, slowwalk.ARM_BACK)), sorted(a.replace(" ", ",") for a in arms))
+        fsm = app_text("systems", "animation_fsm.galaxy")
+        self.assertIn("lv_upper = gf_SlowWalkUpperState(lp_player, lv_lower);", fsm)
+
+    def test_slow_rate_factor(self) -> None:
+        # Operator 2026-11-21: slow walk clips 33 % faster than the stride gives (was 25 %).
+        self.assertEqual(slowwalk.slow_const("c_ANIM_SLOW_RATE"), 1.33)
+        bracket = app_text("systems", "animation_bracket.galaxy")
+        self.assertIn("return c_ANIM_SLOW_RATE * UnitGetPropertyFixed(lp_hero, c_unitPropMovementSpeed, c_unitPropCurrent) / c_ANIM_SLOW_STRIDE;", bracket)
+
+    def test_speed_ramp_levels_are_linear(self) -> None:
+        # Operator 2026-11-21 (R-SLOW-21): walk to slow walk over 1 s, 16 levels.
+        self.assertEqual(slowwalk.slow_const("c_SLOW_WALK_RAMP"), 1.0)
+        core = app_text("core", "slow_walk.galaxy")
+        self.assertIn("const int c_SLOW_WALK_LEVELS = 16;", core)
+        text = BEHAVIOR_DATA.read_text(encoding="utf-8")
+        for k in range(1, 16):
+            block = re.search(rf'<CBehaviorBuff id="SCOBASlowWalkRamp{k:02d}">(.*?)</CBehaviorBuff>', text, re.S)
+            self.assertIsNotNone(block, k)
+            value = float(re.search(r'MoveSpeedMultiplier="([0-9.]+)"', block.group(1)).group(1))
+            self.assertAlmostEqual(value, 1.0 - 0.6 * k / 16.0, places=4)
+            self.assertNotIn("<Duration", block.group(1))
+        # Negative: no level 16 ramp buff; level 16 is SCOBASlowWalk itself.
+        self.assertNotIn('id="SCOBASlowWalkRamp16"', text)
+        self.assertEqual(slowwalk.RAMP_IN[-1], 0.4)
+        self.assertEqual(slowwalk.RAMP_OUT[-1], 1.0)
+        source = app_text("systems", "input.galaxy")
+        self.assertIn('return c_SLOW_WALK_BUFF + "Ramp0" + IntToString(lp_level);', source)
+
+    def test_slow_blend_is_three_times(self) -> None:
+        # Operator 2026-11-21: into and out of the slow walk 3 x the 0.15 s blend.
+        self.assertAlmostEqual(slowwalk.slow_const("c_ANIM_SLOW_BLEND"), 3 * 0.15)
+        self.assertEqual(slowwalk.SLOW_BLEND_MS, 450)
+        bracket = app_text("systems", "animation_bracket.galaxy")
+        self.assertEqual(bracket.count("FixedToString(c_ANIM_SLOW_BLEND, 3)"), 2)
+        self.assertIn("lv_blend = c_ANIM_SLOW_BLEND;", bracket)
+        aim = app_text("systems", "animation_aim.galaxy")
+        self.assertEqual(aim.count('"Walk,Slow,Arm", c_ANIM_SLOW_BLEND') + aim.count('"Walk,Slow,Arm,Back", c_ANIM_SLOW_BLEND'), 2)
+
+    def test_slow_clips_are_tosh_only(self) -> None:
+        self.assertEqual(slow.SLOW_HEROES, ("tosh",))
+        config = app_text("systems", "animation_config.galaxy")
+        self.assertRegex(config, r"if \(lv_profile == c_ANIM_HERO_TOSH\) \{\n\s+gf_AnimConfigAimSlow")
+
+    def test_slow_key_triggers(self) -> None:
+        # Shift slows, Z zooms (operator 2026-11-21).
+        consts = app_text("core", "constants.galaxy")
+        self.assertIn("const int gv_sLOWWALK = c_keyShift;", consts)
+        self.assertIn("const int gv_zOOM = c_keyZ;", consts)
+        text = app_text("systems", "input.galaxy")
+        self.assertIn("TriggerAddEventKeyPressed(gt_SlowKeyDown, c_playerAny, gv_sLOWWALK, true,", text)
+        self.assertIn("TriggerAddEventKeyPressed(gt_SlowKeyUp, c_playerAny, gv_sLOWWALK, false,", text)
+
+    def test_alt_digit_keys_unchanged(self) -> None:
+        # R-SLOW-7: hero switch and hall paint still require Alt.
+        switch = app_text("systems", "hero_switch.galaxy")
+        for name, key in (("Tosh", "1"), ("Kerrigan", "2"), ("Scv", "3"), ("Viking", "4")):
+            self.assertIn(f"TriggerAddEventKeyPressed(gt_HeroSwitch{name}, 1, c_key{key}, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateRequire);", switch)
+        paint = app_text("systems", "hall_paint.galaxy")
+        self.assertIn("c_key0, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateRequire);", paint)
+
+    def test_press_is_gated_release_is_not(self) -> None:
+        scene = app_text("systems", "scene.galaxy")
+        self.assertIn("return gt_SlowKeyDown;", scene)
+        self.assertNotIn("return gt_SlowKeyUp;", scene)
+        count = len(re.findall(r"if \(lp_i == \d+\) \{ return gt_", scene))
+        self.assertEqual(f"const int c_SCENE_TRIGGERS = {count};" in app_text("core", "scene.galaxy"), True)
+
+    def test_jump_blend_is_minimal(self) -> None:
+        # R-SLOW-18: slow walk to regular walk to jump with a minimal blend.
+        match = re.search(r"const fixed c_JUMP_BLEND = ([0-9.]+);", app_text("core", "jump.galaxy"))
+        self.assertLessEqual(float(match.group(1)), 0.05)
+        self.assertIn("gf_SlowWalkJumpPress(lp_player);", app_text("systems", "jump.galaxy"))
+
+    def test_phase_gap_wraps(self) -> None:
+        self.assertAlmostEqual(slow.phase_gap(0.99, 0.01), 0.02)
+        self.assertAlmostEqual(slow.phase_gap(0.2, 0.5), 0.3)
+
+    def test_profile_windows(self) -> None:
+        self.assertEqual(slowwalk.SLOW_RATIO, (0.35, 0.45))
+        self.assertEqual(set(slowwalk.CHECKS), {s for group in slowwalk.SECTIONS.values() for s in group})
 
 
 if __name__ == "__main__":

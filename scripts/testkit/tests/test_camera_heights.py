@@ -41,11 +41,12 @@ class HeightsTests(unittest.TestCase):
         }
 
     def test_max_top_per_type(self) -> None:
-        self.assertEqual(C.heights(self.data()), {"Big": 2.0, "ToshSCOBA": 1.0})
+        # Tosh's camera height is pinned (operator 2026-11-21), not measured.
+        self.assertEqual(C.heights(self.data()), {"Big": 2.0, "ToshSCOBA": C.CAMERA_HEIGHT["ToshSCOBA"]})
 
     def test_render_reference_and_calls(self) -> None:
         text = C.render(self.data())
-        self.assertIn("const fixed c_CAM_HEIGHT_REFERENCE = 1.0000;", text)
+        self.assertIn("const fixed c_CAM_HEIGHT_REFERENCE = 0.9305;", text)
         self.assertIn('gf_CamHeightType("Big", 2.0000);', text)
         # Negative: types without shapes or below ground get no entry.
         self.assertNotIn('"Empty"', text)
@@ -92,6 +93,14 @@ class CommittedTests(unittest.TestCase):
         # The landed hero Viking (actor Scale 3) stands far above Tosh.
         self.assertGreater(table["SCOBAVikingHeroAssault"], 3.0 * table["ToshSCOBA"])
         self.assertEqual(C.missing_bodies(C.load_json()), [])
+
+    def test_tosh_camera_kept_after_the_shrink(self) -> None:
+        """Operator 2026-11-21: Tosh shrunk 10 %, his camera height is the old one."""
+        data = C.load_json()
+        measured = max(C.top(s) for s in data["units"]["ToshSCOBA"]["shapes"])
+        self.assertAlmostEqual(data["units"]["ToshSCOBA"]["actorScale"][0], 0.675)
+        self.assertAlmostEqual(measured, 0.9305 * 0.9, places=3)
+        self.assertEqual(C.heights(data)["ToshSCOBA"], 0.9305)
 
 
 if __name__ == "__main__":

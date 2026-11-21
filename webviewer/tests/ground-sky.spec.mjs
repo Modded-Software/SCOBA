@@ -48,12 +48,15 @@ test('the ground is a green hexagonal grid, on by default', async ({ page }) => 
   for (const [x, y] of CENTRES) centres.push((await at(page, x, y)).rgb);
   console.log('borders', JSON.stringify(borders), 'centres', JSON.stringify(centres));
   for (const [r, g, b] of borders) {
-    // A faint green line: green leads and is visible, but well below the
-    // old bright line (measured before: 190).
-    expect(g).toBeGreaterThan(r + 15);
-    expect(g).toBeGreaterThan(b + 10);
-    expect(g).toBeGreaterThan(BG[1] + 20);
-    expect(g).toBeLessThan(110);
+    // Away from units the grid is faint (operator 2026-11-21: "way fainter
+    // overall"): green leads and the line shows, but only just. The line
+    // before that change was over 20 above the background.
+    // Green leads; over the bluish background (26, 26, 31) a faint line keeps
+    // little lead on blue (measured: 41 green, 39 blue).
+    expect(g).toBeGreaterThan(r + 4);
+    expect(g).toBeGreaterThanOrEqual(b + 2);
+    expect(g).toBeGreaterThan(BG[1] + 6);
+    expect(g).toBeLessThan(BG[1] + 22);
   }
   // Negative: the inside of a cell is a faint fill, not a line.
   for (const [r, g, b] of centres) {
@@ -71,7 +74,8 @@ test('grid lines are thin: about one pixel', async ({ page }) => {
   const on = (await at(page, 0.5, 0)).rgb;
   const beside = [(await pixelAt(page, 0.53, 0)).rgb, (await pixelAt(page, 0.47, 0)).rgb];
   console.log('on', JSON.stringify(on), 'beside', JSON.stringify(beside));
-  expect(on[1]).toBeGreaterThan(BG[1] + 20);
+  // The faint grid (away from units) is 6 or more over the background.
+  expect(on[1]).toBeGreaterThan(BG[1] + 6);
   for (const rgb of beside) expect(near(rgb, BG, 12)).toBe(true);
 });
 
@@ -115,13 +119,14 @@ test('grid lines are solid: no gaps along the borders, also at a grazing angle',
     const gaps = lift.filter((g) => g < 0.4 * median).length;
     console.log('view', JSON.stringify(view), 'samples', lift.length, 'median', median, 'min', lift[0], 'p5', lift[Math.floor(lift.length * 0.05)], 'gaps', gaps);
     expect(lift.length).toBeGreaterThan(300);
-    expect(median).toBeGreaterThan(15);
+    // The faint grid: a typical border pixel is 6 or more over the background.
+    expect(median).toBeGreaterThan(6);
     expect(gaps / lift.length).toBeLessThan(0.01);
   }
   // Negative: cell insides are not lit like a line.
   await page.evaluate((v) => window.sc2viewer.view(v), SOLID_VIEWS[0]);
   const inside = (await page.evaluate((p) => window.sc2viewer.groundPeaks(p, 0), CENTRES)).filter(Boolean);
-  for (const p of inside) expect(p.rgb[1] - BG[1]).toBeLessThan(15);
+  for (const p of inside) expect(p.rgb[1] - BG[1]).toBeLessThan(5);
 });
 
 /** Green of the border at (x, 0), the vertical hex side x = k + 0.5. */
@@ -136,6 +141,8 @@ test('the grid glows around a unit and fades out with distance', async ({ page }
   const after = { near: await borderGreen(page, 1.5), mid: await borderGreen(page, 2.5), far: await borderGreen(page, 4.5) };
   console.log('unit glow', JSON.stringify({ before, after }));
   expect(after.near).toBeGreaterThan(before.near + 25);
+  // Near a unit the line stands out: at least four times the lift of the faint grid.
+  expect(after.near - BG[1]).toBeGreaterThan(4 * (after.far - BG[1]));
   // It falls off: brighter near than further out.
   expect(after.near).toBeGreaterThan(after.mid);
   // Negative: far from the unit nothing changes.

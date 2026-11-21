@@ -47,7 +47,9 @@ from jumpanim.bake import (
     measure_rig,
     walk_rate,
 )
+from character_anim_assets import AIM_DIRECTIONS
 from validate_assets import fail
+from walkanim.slow import check_slow
 
 # Feet match between a jump clip and the clip it continues (model units).
 SEAM_TOLERANCE = 0.01
@@ -443,3 +445,6 @@ def check_jump(map_dir: Path, galaxy: str) -> None:
             fail(f"{TOSH_MODEL} {name} animates non-leg bones: {bad}")
     for line in check_gait(model, galaxy):
         print(f"jump: {line}")
+    # REQ-SLOW-WALK: the slow walk clips live in the same model.
+    for line in check_slow(model, galaxy, AIM_DIRECTIONS, forbidden, fail):
+        print(f"slow: {line}")

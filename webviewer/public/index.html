@@ -7,6 +7,7 @@
 </head>
 <body>
   <canvas id="view"></canvas>
+  <div id="side">
   <aside id="panel">
     <nav id="tabs">
       <button id="tab-units" class="on">units</button>
@@ -14,11 +15,12 @@
     </nav>
     <section id="pane-units">
       <input id="unit-search" type="search" placeholder="search units by name or id" autocomplete="off" spellcheck="false">
-      <div id="filters">
-        <div id="races"></div>
+      <div id="races"></div>
+      <div id="unit-tools">
         <select id="kind" title="kind"></select>
+        <select id="family" title="family (Melee: ladder and multiplayer)"></select>
+        <span id="unit-count"></span><button id="add-all" title="add every unit of the list to the scene">add all</button>
       </div>
-      <div id="unit-count"></div>
       <ul id="units"></ul>
       <div id="preview"></div>
     </section>
@@ -26,11 +28,15 @@
       <input id="search" type="search" placeholder="search model files" autocomplete="off" spellcheck="false">
       <ul id="results"></ul>
     </section>
-    <div id="scene-head"><span>scene</span><button id="clear" title="remove all">clear</button></div>
-    <ul id="scene"></ul>
     <div id="status"></div>
   </aside>
+  <aside id="instances">
+    <div id="scene-head"><span>instances <span id="instance-count"></span></span><button id="clear" title="remove all">clear</button></div>
+    <ul id="scene"></ul>
+  </aside>
+  </div>
   <nav id="view-tools">
+    <select id="landmarks" title="landmarks: jump to a saved view"></select>
     <button id="grid-toggle" class="on" title="hex grid ground">grid</button>
     <button id="sky-button" title="choose a skybox">sky</button>
   </nav>
@@ -43,6 +49,8 @@
   <script src="/js/controls.js"></script>
   <script src="/js/scene.js"></script>
   <script src="/js/panels.js"></script>
+  <script src="/js/landmarks.js"></script>
+  <script src="/js/addall.js"></script>
   <script src="/js/drag.js"></script>
   <script src="/js/sky.js"></script>
   <script src="/js/pick.js"></script>
