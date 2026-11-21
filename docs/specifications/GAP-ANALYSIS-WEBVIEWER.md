@@ -27,6 +27,16 @@ composite materials (sections drawn in order), displacement materials
 region scale and offset, uncompressed and DXT DDS, mouse-over highlight and
 outline.
 
+Layer UV transform (former A1 and A2, G1; `uv-anim.spec`): offset, angle
+and tiling, static or animated, on every bound layer including the normal
+map. Rule from WhiteoutFlakes `M3ComposeUvTransform`, which cites the SC2
+client: `uv' = 0.5 + S(tiling) * R(angle.z) * (uv - 0.5 - offset)`, angle in
+radians. An undriven tiling of 0 reads as 1. Angle x and y are not used
+(survey `uvAngleXY`: 33 layers set them). Survey run 2026-11-21: 1663
+layers animated, 1690 static. Of the animated layers, 168 belong to
+materials no mesh batch draws (particles, ribbons); they wait for E1 and E2
+(`bash webviewer/scripts/uv-anim-survey.sh`, `mesh=no`).
+
 ## Gaps by count
 
 ### Material types not drawn (`T*`)
@@ -91,14 +101,12 @@ Values seen: `layerBlendType` 2 in 8658 of 8710 materials (others 0, 1,
 |---|---|---:|---:|
 | A7 | bright multiply / midtone offset not default (meaning unconfirmed) | 1149 | 6713 |
 | A8 | noise amplitude set (meaning unconfirmed) | 737 | 13472 |
-| A2 | static UV offset, angle or tiling | 659 | 2705 |
-| A1 | animated UV offset, angle or tiling (scrolling, rotating) | 534 | 1663 |
 | F1 | fresnel | 506 | 1557 |
 | A5 | constant colour layer (no texture) | 493 | 1541 |
 | A3 | flipbook | 464 | 2162 |
 | U2 | UV source: reflective cubic environment | 408 | 1198 |
 | U6 | UV source: particle flipbook | 395 | 1772 |
-| U-normal | normal map on a UV set other than 0 (always read from set 0) | 148 | 223 |
+| U-normal | normal map on a UV set other than 0 (now read through `getUV` with its own set; implemented, not verified) | 148 | 223 |
 | U3 | UV source: reflective spherical environment | 70 | 114 |
 | U5 | UV source: planar world z | 64 | 129 |
 | A6 | animated layer colour | 40 | 104 |
@@ -136,9 +144,8 @@ feature used only by particle materials waits for particles.
 1. **Particles (E1, 783).** Engines exhaust, weapon glows, ambient
    sparks. With them come the particle material features: soft edges M1
    (779), flipbook A3 and U6 (464, 395), vertex alpha M5. Largest job.
-2. **UV transform and animation (A2 659, A1 534).** Scrolling and rotating
-   textures (energy, screens, water). Small: a per-layer matrix from the
-   animated values.
+2. ~~**UV transform and animation (A2 659, A1 534).**~~ Done 2026-11-21
+   (`uv-anim.spec`, see "Already supported").
 3. **Draw order and cutout (M3 698, M2 534).** Priority sort of blended
    batches; alpha test for foliage and grilles. Small.
 4. **Environment reflection and fresnel (L2 484, U2 408, U3 70, U7 33,
@@ -156,7 +163,8 @@ feature used only by particle materials waits for particles.
 8. **Ambient occlusion (L5, 244).** Small.
 9. **Ribbons (E2, 203).** Trails. Medium, shares work with particles.
 10. **Vertex colours (V1 153, M5 71).** Small.
-11. **Normal map UV set (U-normal, 148).** Small: read the layer's set.
+11. **Normal map UV set (U-normal, 148).** Implemented with G1; needs a
+    test.
 12. **Material flags M8 (142), M6 (131), M7 (80).** Small each.
 13. **Gloss (L1 116), light map (L4 73), height (L3 34).** Small each.
 14. **Composite alpha factors (C1, 105).** Small.

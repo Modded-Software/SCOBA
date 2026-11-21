@@ -1,0 +1,32 @@
+From d3202b501c8fb2c78cfbcbf631bfebd63d01feb2 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 15:33:18 +0200
+Subject: [PATCH 20/20] m3: count layer binds
+
+Layer.binds counts draws that bound the layer, so an inspector can tell a drawn layer's uvTransform from the default of one no batch draws.
+---
+ src/viewer/handlers/m3/layer.ts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index 4ba6b05f..a692e5ce 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -64,6 +64,8 @@ export default class M3Layer {
+   uvTransform = new Float32Array([1, 0, 0, 0, 1, 0]);
+   /** The inputs of the last transform: offset u, v; angle x, y, z; tiling u, v (after the neutral rule). */
+   uvInputs = new Float32Array([0, 0, 0, 0, 0, 1, 1]);
++  /** How many draws bound this layer: zero means uvTransform is not from a draw. */
++  binds = 0;
+   /** Whether a sequence drives the offset, angle or tiling track. */
+   uvDriven = false;
+   uvTilingDriven = false;
+@@ -212,6 +214,8 @@ export default class M3Layer {
+     if (active) {
+       const t = this.updateUvTransform(instance);
+ 
++      this.binds++;
++
+       gl.uniform3f(uniforms[uniformMap.uvRow0], t[0], t[1], t[2]);
+       gl.uniform3f(uniforms[uniformMap.uvRow1], t[3], t[4], t[5]);
+ 

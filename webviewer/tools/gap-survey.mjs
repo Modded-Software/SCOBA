@@ -138,11 +138,14 @@ function survey(file, bytes) {
       const uv = l.uvSource;
       if (!UV_DRAWN.has(uv)) gap(`U${uv}`, `uv source ${uv} (${UV_SOURCES[uv] || 'unknown'})`, file);
       if (name === 'normal' && uv !== 0) gap('U-normal', 'normal map on a uv set other than 0', file);
-      if (isAnimated(l.uvOffset) || isAnimated(l.uvAngle) || isAnimated(l.uvTiling)) gap('A1', 'animated uv offset, angle or tiling', file);
+      // UV transform (A1 animated, A2 static) is supported; counted, not a gap.
       const [ox, oy] = l.uvOffset.initValue;
       const [ax, ay, az] = l.uvAngle.initValue;
       const [tx, ty] = l.uvTiling.initValue;
-      if (ox || oy || ax || ay || az || tx !== 1 || ty !== 1) gap('A2', 'static uv offset, angle or tiling', file);
+      if (isAnimated(l.uvOffset) || isAnimated(l.uvAngle) || isAnimated(l.uvTiling)) tally('uvTransform', 'animated');
+      else if (ox || oy || ax || ay || az || tx !== 1 || ty !== 1) tally('uvTransform', 'static');
+      // Angle x and y cannot act on a 2D coordinate (uvtransform.ts); count where set.
+      if (ax || ay) tally('uvAngleXY', name);
       if (l.flags & 0x100 || l.flipBookRows * l.flipBookColumns > 1) gap('A3', 'flipbook', file);
       if (l.flags & 0x200) gap('A4', 'video texture', file);
       if (constant) gap('A5', 'constant colour layer (colorEnabled)', file);

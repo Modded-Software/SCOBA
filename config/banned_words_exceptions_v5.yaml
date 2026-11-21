@@ -53,3 +53,9 @@ exceptions:
     owner: sc2
     review_date: '2026-11-21'
     removal: Remove when the displacement strength no longer reads through the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0018-m3-apply-layer-UV-offset-angle-and-tiling\.patch$
+    rationale: The exported renderer patch reads the animated layer UV offset, angle and tiling through instance.skeleton, the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-21'
+    removal: Remove when the layer UV transform no longer reads through the bone hierarchy.

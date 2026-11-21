@@ -1,0 +1,318 @@
+From 8544a5c24c6c6b998b392cd03f6c365aec52613b Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 15:30:44 +0200
+Subject: [PATCH 18/20] m3: apply layer UV offset, angle and tiling
+
+Per layer a 2x3 matrix from the animated uvOffset, uvAngle and uvTiling, uploaded as LayerSettings.uvRow0/uvRow1 and applied in getUV. Rule from WhiteoutFlakes M3ComposeUvTransform (citing the SC2 client): uv' = 0.5 + S * R(angle.z) * (uv - 0.5 - offset). An undriven tiling of 0 reads as 1. The normal map now samples through getUV as well.
+---
+ .../handlers/m3/displacementmaterial.ts       |  4 +-
+ src/viewer/handlers/m3/layer.ts               | 68 ++++++++++++++++++-
+ src/viewer/handlers/m3/model.ts               | 12 ++++
+ src/viewer/handlers/m3/modelinstance.ts       |  2 +-
+ src/viewer/handlers/m3/shaders/layers.glsl.ts | 15 +++-
+ .../handlers/m3/shaders/standard.frag.ts      |  2 +-
+ src/viewer/handlers/m3/standardmaterial.ts    |  5 +-
+ src/viewer/handlers/m3/uvtransform.ts         | 39 +++++++++++
+ 8 files changed, 136 insertions(+), 11 deletions(-)
+ create mode 100644 src/viewer/handlers/m3/uvtransform.ts
+
+diff --git a/src/viewer/handlers/m3/displacementmaterial.ts b/src/viewer/handlers/m3/displacementmaterial.ts
+index c6dca709..db872d2f 100644
+--- a/src/viewer/handlers/m3/displacementmaterial.ts
++++ b/src/viewer/handlers/m3/displacementmaterial.ts
+@@ -50,8 +50,8 @@ export class M3DisplacementMaterial {
+     gl.enable(gl.DEPTH_TEST);
+     gl.depthMask(false);
+ 
+-    this.normalLayer.bind(shader, textureOverrides);
+-    this.strengthLayer.bind(shader, textureOverrides);
++    this.normalLayer.bind(shader, textureOverrides, instance);
++    this.strengthLayer.bind(shader, textureOverrides, instance);
+   }
+ 
+   unbind(shader: Shader): void {
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index 53540c0a..4ba6b05f 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -5,6 +5,13 @@ import Shader from '../../gl/shader';
+ import { STANDARD_MATERIAL_OFFSET } from './standardmaterial';
+ import M3Model from './model';
+ import M3Texture from './texture';
++import type M3ModelInstance from './modelinstance';
++import { composeUvTransform, neutralTiling } from './uvtransform';
++
++const uvOffsetHeap = new Float32Array(2);
++const uvAngleHeap = new Float32Array(3);
++const uvTilingHeap = new Float32Array(2);
++const uvTilingUsed = new Float32Array(2);
+ 
+ const layerTypeToTextureUnit = {
+   diffuse: 1,
+@@ -41,7 +48,7 @@ export default class M3Layer {
+   active = 0;
+   layer: Layer | null = null;
+   gl: WebGLRenderingContext;
+-  uniformMap: { map: string; enabled: string; op: string; channels: string; teamColorMode: string; invert: string; clampResult: string; uvCoordinate: string; };
++  uniformMap: { map: string; enabled: string; op: string; channels: string; teamColorMode: string; invert: string; clampResult: string; uvCoordinate: string; uvRow0: string; uvRow1: string; };
+   source = '';
+   texture: M3Texture | null = null;
+   flags = 0;
+@@ -53,6 +60,13 @@ export default class M3Layer {
+   invert = 0;
+   clampResult = 0;
+   teamColorMode = 0;
++  /** Rows of the UV transform last uploaded: row 0 in [0..2], row 1 in [3..5]. */
++  uvTransform = new Float32Array([1, 0, 0, 0, 1, 0]);
++  /** The inputs of the last transform: offset u, v; angle x, y, z; tiling u, v (after the neutral rule). */
++  uvInputs = new Float32Array([0, 0, 0, 0, 0, 1, 1]);
++  /** Whether a sequence drives the offset, angle or tiling track. */
++  uvDriven = false;
++  uvTilingDriven = false;
+ 
+   constructor(material: M3LayerOwner, index: number, layerReference: Reference, type: string, op: number) {
+     const model = material.model;
+@@ -74,6 +88,8 @@ export default class M3Layer {
+       invert: settings + 'invert',
+       clampResult: settings + 'clampResult',
+       uvCoordinate: settings + 'uvCoordinate',
++      uvRow0: settings + 'uvRow0',
++      uvRow1: settings + 'uvRow1',
+     };
+ 
+     // Since Gloss doesn't exist in all versions
+@@ -142,7 +158,50 @@ export default class M3Layer {
+     }
+   }
+ 
+-  bind(shader: Shader, textureOverrides: Map<number, Texture>): void {
++  /** Called by the model once its STCs exist: which UV tracks a sequence drives. */
++  resolveUvTracks(): void {
++    const layer = this.layer;
++
++    if (!layer) {
++      return;
++    }
++
++    const stcs = this.model.stc;
++    const driven = (animId: number): boolean => stcs.some((stc) => stc.animRefs[animId] !== undefined);
++
++    this.uvTilingDriven = driven(layer.uvTiling.animId);
++    this.uvDriven = this.uvTilingDriven || driven(layer.uvOffset.animId) || driven(layer.uvAngle.animId);
++  }
++
++  /** Evaluates offset, angle and tiling for the instance's current frame. */
++  updateUvTransform(instance: M3ModelInstance | undefined): Float32Array {
++    const layer = <Layer>this.layer;
++    const skeleton = instance ? instance.skeleton : null;
++    let offset: ArrayLike<number> = <Float32Array>layer.uvOffset.initValue;
++    let angle: ArrayLike<number> = <Float32Array>layer.uvAngle.initValue;
++    let tiling: ArrayLike<number> = <Float32Array>layer.uvTiling.initValue;
++
++    if (this.uvDriven && skeleton && instance) {
++      offset = skeleton.getValue2(uvOffsetHeap, layer.uvOffset, instance);
++      angle = skeleton.getValue3(uvAngleHeap, layer.uvAngle, instance);
++      tiling = skeleton.getValue2(uvTilingHeap, layer.uvTiling, instance);
++    }
++
++    const used = neutralTiling(uvTilingUsed, tiling, this.uvTilingDriven);
++    const inputs = this.uvInputs;
++
++    inputs[0] = offset[0];
++    inputs[1] = offset[1];
++    inputs[2] = angle[0];
++    inputs[3] = angle[1];
++    inputs[4] = angle[2];
++    inputs[5] = used[0];
++    inputs[6] = used[1];
++
++    return composeUvTransform(this.uvTransform, offset, angle, used);
++  }
++
++  bind(shader: Shader, textureOverrides: Map<number, Texture>, instance?: M3ModelInstance): void {
+     const gl = this.gl;
+     const uniformMap = this.uniformMap;
+     const uniforms = shader.uniforms;
+@@ -151,6 +210,11 @@ export default class M3Layer {
+     gl.uniform1f(uniforms[uniformMap.enabled], active);
+ 
+     if (active) {
++      const t = this.updateUvTransform(instance);
++
++      gl.uniform3f(uniforms[uniformMap.uvRow0], t[0], t[1], t[2]);
++      gl.uniform3f(uniforms[uniformMap.uvRow1], t[3], t[4], t[5]);
++
+       const m3Texture = <M3Texture>this.texture;
+       const texture = textureOverrides.get(this.material.index * STANDARD_MATERIAL_OFFSET + this.index) || m3Texture.texture;
+       const textureUnit = this.textureUnit;
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 9ac20b5e..695a0c22 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -232,6 +232,18 @@ export default class M3Model extends Model {
+       }
+     }
+ 
++    // Which layer UV tracks a sequence drives is known only once the STCs exist.
++    for (const material of this.materials[1]) {
++      for (const layer of material.layers) {
++        layer.resolveUvTracks();
++      }
++    }
++
++    for (const material of this.displacementMaterials) {
++      material.normalLayer.resolveUvTracks();
++      material.strengthLayer.resolveUvTracks();
++    }
++
+     this.addGlobalAnims();
+ 
+     /*
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index d6419e34..2157065b 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -194,7 +194,7 @@ export default class M3ModelInstance extends ModelInstance {
+         const material = batch.material;
+         const region = batch.region;
+ 
+-        material.bind(shader, textureOverrides);
++        material.bind(shader, textureOverrides, this);
+ 
+         region.render(shader);
+ 
+diff --git a/src/viewer/handlers/m3/shaders/layers.glsl.ts b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+index 01c8cae3..7eba556e 100644
+--- a/src/viewer/handlers/m3/shaders/layers.glsl.ts
++++ b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+@@ -22,6 +22,9 @@ struct LayerSettings {
+   // vec4 constantColor;
+   // float uvSource;
+   float uvCoordinate;
++  // LAYR offset, angle and tiling as two rows applied to (u, v, 1).
++  vec3 uvRow0;
++  vec3 uvRow1;
+   // float fresnelMode;
+   // float fresnelTransformMode;
+   // mat4 fresnelTransform;
+@@ -175,7 +178,7 @@ vec4 chooseChannel(float channel, vec4 texel) {
+   return texel;
+ }
+ 
+-vec2 getUV(LayerSettings layerSettings) {
++vec2 getRawUV(LayerSettings layerSettings) {
+   if (layerSettings.uvCoordinate == 1.0) {
+     return v_uv[0].zw;
+   } else if (layerSettings.uvCoordinate == 2.0) {
+@@ -187,6 +190,12 @@ vec2 getUV(LayerSettings layerSettings) {
+   return v_uv[0].xy;
+ }
+ 
++vec2 getUV(LayerSettings layerSettings) {
++  vec3 uv = vec3(getRawUV(layerSettings), 1.0);
++
++  return vec2(dot(layerSettings.uvRow0, uv), dot(layerSettings.uvRow1, uv));
++}
++
+ vec4 sampleLayer(sampler2D layer, LayerSettings layerSettings) {
+   // if (layerSettings.useConstantColor) {
+   //   return layerSettings.constantColor;
+@@ -245,8 +254,8 @@ vec4 computeLayerColor(sampler2D layer, LayerSettings layerSettings) {
+   return result;
+ }
+ 
+-vec3 decodeNormal(sampler2D map) {
+-  vec4 texel = texture2D(map, v_uv[0].xy);
++vec3 decodeNormal(sampler2D map, LayerSettings layerSettings) {
++  vec4 texel = texture2D(map, getUV(layerSettings));
+   vec3 normal;
+ 
+   normal.xy = 2.0 * texel.wy - 1.0;
+diff --git a/src/viewer/handlers/m3/shaders/standard.frag.ts b/src/viewer/handlers/m3/shaders/standard.frag.ts
+index ebff9082..76939841 100644
+--- a/src/viewer/handlers/m3/shaders/standard.frag.ts
++++ b/src/viewer/handlers/m3/shaders/standard.frag.ts
+@@ -15,7 +15,7 @@ void main() {
+   vec3 normal = vec3(0.0, 0.0, 1.0);
+ 
+   if (u_normalLayerSettings.enabled) {
+-    normal = decodeNormal(u_normalMap);
++    normal = decodeNormal(u_normalMap, u_normalLayerSettings);
+   }
+ 
+   float lambertFactor = max(dot(normal, normalize(v_lightDir)), 0.0);
+diff --git a/src/viewer/handlers/m3/standardmaterial.ts b/src/viewer/handlers/m3/standardmaterial.ts
+index a2e34408..41de34a2 100644
+--- a/src/viewer/handlers/m3/standardmaterial.ts
++++ b/src/viewer/handlers/m3/standardmaterial.ts
+@@ -3,6 +3,7 @@ import Shader from '../../gl/shader';
+ import Texture from '../../texture';
+ import M3Model from './model';
+ import M3Layer from './layer';
++import type M3ModelInstance from './modelinstance';
+ 
+ 
+ export const STANDARD_MATERIAL_OFFSET = 100;
+@@ -97,7 +98,7 @@ export class M3StandardMaterial {
+     gl.depthMask(blendMode === 0);
+   }
+ 
+-  bind(shader: Shader, textureOverrides: Map<number, Texture>): void {
++  bind(shader: Shader, textureOverrides: Map<number, Texture>, instance: M3ModelInstance): void {
+     const gl = this.gl;
+ 
+     this.bindCommon();
+@@ -113,7 +114,7 @@ export class M3StandardMaterial {
+     const layers = this.layers;
+ 
+     for (const i of BOUND_LAYERS) {
+-      layers[i].bind(shader, textureOverrides);
++      layers[i].bind(shader, textureOverrides, instance);
+     }
+   }
+ 
+diff --git a/src/viewer/handlers/m3/uvtransform.ts b/src/viewer/handlers/m3/uvtransform.ts
+new file mode 100644
+index 00000000..8e481889
+--- /dev/null
++++ b/src/viewer/handlers/m3/uvtransform.ts
+@@ -0,0 +1,39 @@
++/**
++ * The LAYR UV transform as two rows of a 2x3 matrix, applied to (u, v, 1).
++ *
++ * Source: WhiteoutFlakes `M3ComposeUvTransform` (src/io/m3/m3_model_adapter.cpp),
++ * which cites the SC2 client function sub_102ABBDE0:
++ *   uv' = 0.5 + S(tiling) * R(angle.z) * (uv - 0.5 - offset)
++ * The angle is in radians. Only angle.z acts on a 2D texture coordinate.
++ *
++ * `out` holds row 0 in [0..2] and row 1 in [3..5].
++ */
++export function composeUvTransform(out: Float32Array, offset: ArrayLike<number>, angle: ArrayLike<number>, tiling: ArrayLike<number>): Float32Array {
++  const c = Math.cos(angle[2]);
++  const s = Math.sin(angle[2]);
++  const cx = 0.5 + offset[0];
++  const cy = 0.5 + offset[1];
++  const tx = tiling[0];
++  const ty = tiling[1];
++
++  out[0] = tx * c;
++  out[1] = -tx * s;
++  out[2] = tx * (s * cy - c * cx) + 0.5;
++  out[3] = ty * s;
++  out[4] = ty * c;
++  out[5] = ty * (-s * cx - c * cy) + 0.5;
++
++  return out;
++}
++
++/**
++ * Tiling read from a track nothing drives can be (0, 0), which would squash
++ * the surface onto one texel. An undriven zero means 1. A driven value is
++ * used as it is.
++ */
++export function neutralTiling(out: Float32Array, tiling: ArrayLike<number>, driven: boolean): Float32Array {
++  out[0] = driven || tiling[0] !== 0 ? tiling[0] : 1;
++  out[1] = driven || tiling[1] !== 0 ? tiling[1] : 1;
++
++  return out;
++}

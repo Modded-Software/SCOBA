@@ -71,8 +71,34 @@
         raw: [...r.rawUvRange],
         range: r.rawUvRange.map((c) => c * r.uvScale + r.uvOffset),
       })),
+      uvLayers: uvLayers(item.model),
       drawn: scene.instances.includes(item.instance),
     };
+  }
+
+  /**
+   * Per active standard-material layer: the UV transform the last draw
+   * uploaded (rows of a 2x3 matrix), its inputs, whether a sequence
+   * drives the offset, angle or tiling track, and how many draws bound it.
+   * The layer object is shared by every instance of the model.
+   */
+  function uvLayers(model) {
+    const out = [];
+    for (const material of model.materials[1]) {
+      for (const layer of material.layers) {
+        if (!layer.active) continue;
+        out.push({
+          material: material.name,
+          type: layer.type,
+          driven: layer.uvDriven,
+          tilingDriven: layer.uvTilingDriven,
+          transform: Array.from(layer.uvTransform),
+          inputs: Array.from(layer.uvInputs),
+          binds: layer.binds,
+        });
+      }
+    }
+    return out;
   }
 
   function state() {

@@ -1,7 +1,7 @@
 From 2908ff54f5e1bd54a3d326d188f782a62171c290 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 10:19:34 +0200
-Subject: [PATCH 04/17] m3 viewer: team colour only on RGBA diffuse layers
+Subject: [PATCH 04/20] m3 viewer: team colour only on RGBA diffuse layers
 
 An RGB diffuse (colour channel setting 0), such as tank treads, was
 filled with team colour wherever its texture alpha was low.

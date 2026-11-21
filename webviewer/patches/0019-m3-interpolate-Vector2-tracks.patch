@@ -1,0 +1,40 @@
+From b1b66d53234f32ab4de943ae59f95de001c48f1e Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 15:31:22 +0200
+Subject: [PATCH 19/20] m3: interpolate Vector2 tracks
+
+A two-component value went through the scalar lerp and came out NaN. Vector2 tracks (layer uvOffset, uvTiling) now copy or lerp as vec2.
+---
+ src/viewer/handlers/m3/sd.ts | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/src/viewer/handlers/m3/sd.ts b/src/viewer/handlers/m3/sd.ts
+index fbf66101..bf5c5a0a 100644
+--- a/src/viewer/handlers/m3/sd.ts
++++ b/src/viewer/handlers/m3/sd.ts
+@@ -1,8 +1,9 @@
+-import { vec3, quat } from 'gl-matrix';
++import { vec2, vec3, quat } from 'gl-matrix';
+ import { clamp, lerp } from '../../../common/math';
+ import { AnimationReference } from '../../../parsers/m3/animationreference';
+ import M3ParserSd from '../../../parsers/m3/sd';
+ 
++const vector2Heap = vec2.create();
+ const vectorHeap = vec3.create();
+ const quatHeap = quat.create();
+ 
+@@ -85,6 +86,14 @@ export default class M3SdContainer {
+       } else {
+         return vec3.lerp(vectorHeap, <vec3>va, <vec3>vb, t);
+       }
++    } else if (fakeVa.length === 2) {
++      // Vector2 tracks (layer uvOffset, uvTiling). The scalar path below
++      // turned them into NaN.
++      if (interpolationType === 0) {
++        return <vec3><unknown>vec2.copy(vector2Heap, <vec2><unknown>va);
++      } else {
++        return <vec3><unknown>vec2.lerp(vector2Heap, <vec2><unknown>va, <vec2><unknown>vb, t);
++      }
+     } else {
+       if (interpolationType === 0) {
+         return <number>va;
