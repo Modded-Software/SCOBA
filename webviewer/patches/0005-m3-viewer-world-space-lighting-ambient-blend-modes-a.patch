@@ -1,0 +1,350 @@
+From 1450058beaf84d97067e1c47b78eb3c95629f886 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 10:19:34 +0200
+Subject: [PATCH 5/6] m3 viewer: world-space lighting, ambient, blend modes,
+ alpha masks
+
+- Light, eye and half vectors in world space; the half vector is
+  light + eye. Specular uses +dot.
+- No normal map: tangent-space normal (0, 0, 1).
+- Initialize colour, emissive and the skinning bone matrix.
+- Ambient 0.35; material flag 0x10 draws unshaded.
+- Blend modes 1-5 per M3; blended batches do not write depth.
+- Alpha from alpha mask layers 1 and 2.
+---
+ src/viewer/handlers/m3/modelinstance.ts       |   1 -
+ src/viewer/handlers/m3/shaders/layers.glsl.ts |   5 +-
+ .../handlers/m3/shaders/standard.frag.ts      | 101 ++++++++++--------
+ .../handlers/m3/shaders/standard.vert.ts      |  26 ++---
+ src/viewer/handlers/m3/standardmaterial.ts    |  51 +++++----
+ 5 files changed, 99 insertions(+), 85 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index c868bcd0..c291c75f 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -126,7 +126,6 @@ export default class M3ModelInstance extends ModelInstance {
+       gl.uniform4fv(uniforms['u_vertexColor'], this.vertexColor);
+ 
+       gl.uniformMatrix4fv(uniforms['u_VP'], false, camera.viewProjectionMatrix);
+-      gl.uniformMatrix4fv(uniforms['u_MV'], false, camera.viewMatrix);
+ 
+       gl.uniform3fv(uniforms['u_eyePos'], camera.location);
+       gl.uniform3fv(uniforms['u_lightPos'], scene.lightPosition);
+diff --git a/src/viewer/handlers/m3/shaders/layers.glsl.ts b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+index 444d2153..01c8cae3 100644
+--- a/src/viewer/handlers/m3/shaders/layers.glsl.ts
++++ b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+@@ -33,6 +33,7 @@ uniform float u_specularity;
+ uniform float u_specMult;
+ uniform float u_emisMult;
+ uniform vec4 u_lightAmbient;
++uniform float u_unshaded;
+ 
+ uniform LayerSettings u_diffuseLayerSettings;
+ uniform sampler2D u_diffuseMap;
+@@ -54,6 +55,8 @@ uniform LayerSettings u_alphaLayerSettings;
+ uniform sampler2D u_alphaMap;
+ uniform LayerSettings u_alphaMaskLayerSettings;
+ uniform sampler2D u_alphaMaskMap;
++uniform LayerSettings u_alphaMask2LayerSettings;
++uniform sampler2D u_alphaMask2Map;
+ uniform LayerSettings u_normalLayerSettings;
+ uniform sampler2D u_normalMap;
+ uniform LayerSettings u_heightLayerSettings;
+@@ -261,7 +264,7 @@ vec4 computeSpecular(sampler2D specularMap, LayerSettings layerSettings, float s
+     color = vec4(0);
+   }
+ 
+-  float factor = pow(max(-dot(v_halfVec, normal), 0.0), specularity) * specMult;
++  float factor = pow(max(dot(normalize(v_halfVec), normal), 0.0), specularity) * specMult;
+ 
+   return color * factor;
+ }
+diff --git a/src/viewer/handlers/m3/shaders/standard.frag.ts b/src/viewer/handlers/m3/shaders/standard.frag.ts
+index 9f09fcf3..1d02021c 100644
+--- a/src/viewer/handlers/m3/shaders/standard.frag.ts
++++ b/src/viewer/handlers/m3/shaders/standard.frag.ts
+@@ -7,75 +7,84 @@ ${precision}
+ ${layers}
+ 
+ void main() {
+-  vec3 color;
+-  vec4 final = u_lightAmbient;
+-  vec3 normal;
+-  vec3 lightMapDiffuse;
++  // Lighting runs in tangent space: v_lightDir and v_halfVec are in it, and
++  // a surface with no normal map faces straight out, (0, 0, 1).
++  vec3 normal = vec3(0.0, 0.0, 1.0);
+ 
+   if (u_normalLayerSettings.enabled) {
+     normal = decodeNormal(u_normalMap);
+-  } else {
+-    normal = v_normal;
+   }
+ 
+-  float lambertFactor = max(dot(normal, v_lightDir), 0.0);
++  float lambertFactor = max(dot(normal, normalize(v_lightDir)), 0.0);
+ 
+-  if (lambertFactor > 0.0) {
+-    if (u_diffuseLayerSettings.enabled) {
+-      vec4 diffuseColor = computeLayerColor(u_diffuseMap, u_diffuseLayerSettings);
++  // The diffuse is the base colour; with no diffuse layer the surface is white.
++  vec3 color = vec3(1.0);
+ 
+-      color = combineLayerColor(diffuseColor, color, u_diffuseLayerSettings);
+-    }
++  if (u_diffuseLayerSettings.enabled) {
++    color = computeLayerColor(u_diffuseMap, u_diffuseLayerSettings).rgb;
++  }
+ 
+-    if (u_decalLayerSettings.enabled) {
+-      vec4 decalColor = computeLayerColor(u_decalMap, u_decalLayerSettings);
++  // A decal is painted over the diffuse where its alpha is high.
++  if (u_decalLayerSettings.enabled) {
++    vec4 decalColor = computeLayerColor(u_decalMap, u_decalLayerSettings);
+ 
+-      color = combineLayerColor(decalColor, color, u_decalLayerSettings);
+-    }
++    color = mix(color, decalColor.rgb, decalColor.a);
++  }
+ 
+-    vec4 specularColor = computeSpecular(u_specularMap, u_specularLayerSettings, u_specularity, u_specMult, normal);
++  vec3 final;
+ 
+-    if (u_lightMapLayerSettings.enabled) {
+-      vec4 lightMapColor = computeLayerColor(u_lightMapMap, u_lightMapLayerSettings) * 2.0;
++  if (u_unshaded > 0.5) {
++    final = color;
++  } else {
++    final = color * (u_lightAmbient.rgb + lambertFactor);
+ 
+-      lightMapDiffuse = lightMapColor.rgb;
++    if (lambertFactor > 0.0) {
++      final += computeSpecular(u_specularMap, u_specularLayerSettings, u_specularity, u_specMult, normal).rgb;
+     }
++  }
+ 
+-    // final.rgb = color * lightMapDiffuse + specularColor.rgb;
+-    final.rgb = (color + specularColor.rgb) * lambertFactor;
+-
+-    bool addEmissive = false;
+-    vec3 emissiveColor;
+-    vec4 tempColor;
++  vec3 emissiveColor = vec3(0.0);
++  bool addEmissive = false;
++  vec4 tempColor;
+ 
+-    if (u_emissiveLayerSettings.enabled) {
+-      tempColor = computeLayerColor(u_emissiveMap, u_emissiveLayerSettings);
++  if (u_emissiveLayerSettings.enabled) {
++    tempColor = computeLayerColor(u_emissiveMap, u_emissiveLayerSettings);
+ 
+-      if (u_emissiveLayerSettings.op == LAYEROP_MOD || u_emissiveLayerSettings.op == LAYEROP_MOD2X || u_emissiveLayerSettings.op == LAYEROP_LERP) {
+-        final.rgb = combineLayerColor(tempColor, final.rgb, u_emissiveLayerSettings);
+-      } else {
+-        emissiveColor = combineLayerColor(tempColor, emissiveColor, u_emissiveLayerSettings);
+-        addEmissive = true;
+-      }
++    if (u_emissiveLayerSettings.op == LAYEROP_MOD || u_emissiveLayerSettings.op == LAYEROP_MOD2X || u_emissiveLayerSettings.op == LAYEROP_LERP) {
++      final = combineLayerColor(tempColor, final, u_emissiveLayerSettings);
++    } else {
++      emissiveColor = combineLayerColor(tempColor, emissiveColor, u_emissiveLayerSettings);
++      addEmissive = true;
+     }
++  }
+ 
+-    if (u_emissive2LayerSettings.enabled) {
+-      tempColor = computeLayerColor(u_emissive2Map, u_emissive2LayerSettings);
++  if (u_emissive2LayerSettings.enabled) {
++    tempColor = computeLayerColor(u_emissive2Map, u_emissive2LayerSettings);
+ 
+-      if (!addEmissive && (u_emissive2LayerSettings.op == LAYEROP_MOD || u_emissive2LayerSettings.op == LAYEROP_MOD2X || u_emissive2LayerSettings.op == LAYEROP_LERP)) {
+-        final.rgb = combineLayerColor(tempColor, final.rgb, u_emissive2LayerSettings);
+-      } else {
+-        emissiveColor = combineLayerColor(tempColor, emissiveColor, u_emissive2LayerSettings);
+-        addEmissive = true;
+-      }
++    if (!addEmissive && (u_emissive2LayerSettings.op == LAYEROP_MOD || u_emissive2LayerSettings.op == LAYEROP_MOD2X || u_emissive2LayerSettings.op == LAYEROP_LERP)) {
++      final = combineLayerColor(tempColor, final, u_emissive2LayerSettings);
++    } else {
++      emissiveColor = combineLayerColor(tempColor, emissiveColor, u_emissive2LayerSettings);
++      addEmissive = true;
+     }
++  }
+ 
+-    if (addEmissive) {
+-      final.rgb += emissiveColor * u_emisMult;
+-    }
++  if (addEmissive) {
++    final += emissiveColor * u_emisMult;
++  }
++
++  // Alpha comes from the alpha masks; blended materials use it.
++  float alpha = 1.0;
++
++  if (u_alphaMaskLayerSettings.enabled) {
++    alpha *= computeLayerColor(u_alphaMaskMap, u_alphaMaskLayerSettings).a;
++  }
++
++  if (u_alphaMask2LayerSettings.enabled) {
++    alpha *= computeLayerColor(u_alphaMask2Map, u_alphaMask2LayerSettings).a;
+   }
+ 
+-  gl_FragColor = final * v_vertexColor;
++  gl_FragColor = vec4(final, alpha) * v_vertexColor;
+ }
+ `;
+ 
+diff --git a/src/viewer/handlers/m3/shaders/standard.vert.ts b/src/viewer/handlers/m3/shaders/standard.vert.ts
+index 0c0145e4..7b188cab 100644
+--- a/src/viewer/handlers/m3/shaders/standard.vert.ts
++++ b/src/viewer/handlers/m3/shaders/standard.vert.ts
+@@ -2,7 +2,6 @@ import boneTexture from '../../shaders/bonetexture.glsl';
+ 
+ const shader = `
+ uniform mat4 u_VP;
+-uniform mat4 u_MV;
+ uniform vec3 u_eyePos;
+ uniform vec3 u_lightPos;
+ uniform float u_firstBoneLookupIndex;
+@@ -49,7 +48,8 @@ vec4 decodeVector(vec4 v) {
+ 
+ void transform(inout vec3 position, inout vec3 normal, inout vec3 tangent, inout vec3 binormal, vec4 bones, vec4 weights) {
+   if (u_boneWeightPairsCount > 0.0) {
+-    mat4 bone;
++    // Starts at zero: the weighted sum below adds to it.
++    mat4 bone = mat4(0.0);
+ 
+     if (u_boneWeightPairsCount == 1.0) {
+       bone = fetchMatrix(bones[0], 0.0);
+@@ -77,21 +77,17 @@ void main() {
+ 
+   transform(position, normal, tangent, binormal, a_bones + u_firstBoneLookupIndex, a_weights / 255.0);
+ 
+-  vec3 position_mv = vec3(u_MV * vec4(position, 1));
++  // Lighting in world space: the skinned position and normal are in world
++  // space, and so are u_lightPos and u_eyePos.
++  vec3 t = normalize(tangent);
++  vec3 b = normalize(binormal);
++  vec3 n = normalize(normal);
+ 
+-  mat3 mv = mat3(u_MV);
+-  vec3 t = normalize(mv * tangent);
+-  vec3 b = normalize(mv * binormal);
+-  vec3 n = normalize(mv * normal);
++  vec3 lightDir = normalize(u_lightPos - position);
++  vec3 eyeVec = normalize(u_eyePos - position);
++  vec3 halfVec = normalize(lightDir + eyeVec);
+ 
+-  vec3 lightDir = normalize(u_lightPos - position_mv);
+-
+-  v_lightDir = normalize(TBN(lightDir, t, b, n));
+-
+-  vec3 eyeVec = normalize(u_eyePos - position_mv);
+-  vec3 halfVec = normalize(eyeVec - u_lightPos);
+-
+-  // v_eyeVec = TBN(eyeVec, t, b, n);
++  v_lightDir = TBN(lightDir, t, b, n);
+   v_halfVec = TBN(halfVec, t, b, n);
+ 
+   v_normal = n;
+diff --git a/src/viewer/handlers/m3/standardmaterial.ts b/src/viewer/handlers/m3/standardmaterial.ts
+index 505cb2ed..a2e34408 100644
+--- a/src/viewer/handlers/m3/standardmaterial.ts
++++ b/src/viewer/handlers/m3/standardmaterial.ts
+@@ -7,6 +7,9 @@ import M3Layer from './layer';
+ 
+ export const STANDARD_MATERIAL_OFFSET = 100;
+ 
++/** The layers the shader reads: diffuse, decal, specular, emissive, emissive 2, alpha mask, alpha mask 2, normal, light map. */
++const BOUND_LAYERS = [0, 1, 2, 4, 5, 8, 9, 10, 12];
++
+ /**
+  * An M3 standard material.
+  */
+@@ -63,13 +66,21 @@ export class M3StandardMaterial {
+ 
+   bindCommon(): void {
+     const gl = this.gl;
++    const blendMode = this.blendMode;
+ 
+-    if (this.blendMode === 1) {
++    // M3 blend modes: 0 opaque, 1 alpha blend, 2 add, 3 alpha add, 4 mod, 5 mod 2x.
++    if (blendMode === 1) {
++      gl.enable(gl.BLEND);
++      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
++    } else if (blendMode === 2 || blendMode === 3) {
+       gl.enable(gl.BLEND);
+-      gl.blendFunc(gl.ONE, gl.ONE);
+-    } else if (this.blendMode === 2) {
++      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
++    } else if (blendMode === 4) {
+       gl.enable(gl.BLEND);
+-      gl.blendFunc(gl.ONE, gl.ONE);
++      gl.blendFunc(gl.DST_COLOR, gl.ZERO);
++    } else if (blendMode === 5) {
++      gl.enable(gl.BLEND);
++      gl.blendFunc(gl.DST_COLOR, gl.SRC_COLOR);
+     } else {
+       gl.disable(gl.BLEND);
+     }
+@@ -80,10 +91,10 @@ export class M3StandardMaterial {
+       gl.enable(gl.CULL_FACE);
+     }
+ 
+-    // Flags somewhere?
+-    // Per layer?
++    // Blended surfaces test depth but do not write it, so they do not hide
++    // what is drawn behind them later.
+     gl.enable(gl.DEPTH_TEST);
+-    gl.depthMask(true);
++    gl.depthMask(blendMode === 0);
+   }
+ 
+   bind(shader: Shader, textureOverrides: Map<number, Texture>): void {
+@@ -94,17 +105,16 @@ export class M3StandardMaterial {
+     gl.uniform1f(shader.uniforms['u_specularity'], this.specularity);
+     gl.uniform1f(shader.uniforms['u_specMult'], this.specMult);
+     gl.uniform1f(shader.uniforms['u_emisMult'], this.emisMult);
+-    gl.uniform4f(shader.uniforms['u_lightAmbient'], 0.02, 0.02, 0.02, 0);
++    // Enough ambient light that faces turned away from the light keep their colour.
++    gl.uniform4f(shader.uniforms['u_lightAmbient'], 0.35, 0.35, 0.35, 0);
++    // Material flag 0x10: unshaded, drawn at its texture colour.
++    gl.uniform1f(shader.uniforms['u_unshaded'], this.flags & 0x10 ? 1 : 0);
+ 
+     const layers = this.layers;
+ 
+-    layers[0].bind(shader, textureOverrides);
+-    layers[1].bind(shader, textureOverrides);
+-    layers[2].bind(shader, textureOverrides);
+-    layers[4].bind(shader, textureOverrides);
+-    layers[5].bind(shader, textureOverrides);
+-    layers[10].bind(shader, textureOverrides);
+-    layers[12].bind(shader, textureOverrides);
++    for (const i of BOUND_LAYERS) {
++      layers[i].bind(shader, textureOverrides);
++    }
+   }
+ 
+   unbind(shader: Shader): void {
+@@ -112,15 +122,12 @@ export class M3StandardMaterial {
+ 
+     gl.disable(gl.BLEND);
+     gl.enable(gl.CULL_FACE);
++    gl.depthMask(true);
+ 
+     const layers = this.layers;
+ 
+-    layers[0].unbind(shader);
+-    layers[1].unbind(shader);
+-    layers[2].unbind(shader);
+-    layers[4].unbind(shader);
+-    layers[5].unbind(shader);
+-    layers[10].unbind(shader);
+-    layers[12].unbind(shader);
++    for (const i of BOUND_LAYERS) {
++      layers[i].unbind(shader);
++    }
+   }
+ }

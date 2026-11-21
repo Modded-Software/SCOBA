@@ -121,3 +121,39 @@ controls: ## Rebuild and run the controls profile
 
 pitch: ## Rebuild and run the 10-second pitch profile
 	$(SCRIPT_BASH) $(PLAYTEST) pitch
+
+# =============================================================================
+# SC2 model web viewer (webviewer/). Machine paths go in webviewer/local.env.
+# =============================================================================
+WEBVIEWER_DIR := $(REPO_ROOT)/webviewer
+WEBVIEWER := WEBVIEWER_DIR="$(WEBVIEWER_DIR)" $(SCRIPT_BASH) $(WEBVIEWER_DIR)/scripts
+
+.PHONY: viewer-install viewer-build viewer-catalog viewer-survey viewer-serve viewer-start viewer-stop viewer-restart viewer-status viewer-test
+viewer-install: ## Model viewer: install node deps and the test browser, build the renderer
+	$(WEBVIEWER)/setup.sh
+
+viewer-build: ## Model viewer: bundle the renderer with the M3 parser patches
+	$(WEBVIEWER)/build.sh
+
+viewer-catalog: ## Model viewer: rebuild the unit catalog and icons from the game data
+	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/catalog.sh
+
+viewer-survey: ## Model viewer: report which unit models the parser can read
+	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/m3-survey.sh
+
+viewer-serve: ## Model viewer: run the server in the foreground
+	$(WEBVIEWER)/start.sh
+
+viewer-start: ## Model viewer: start the server in the background
+	$(WEBVIEWER)/up.sh
+
+viewer-stop: ## Model viewer: stop the background server
+	$(WEBVIEWER)/down.sh
+
+viewer-restart: viewer-stop viewer-start ## Model viewer: restart the background server
+
+viewer-status: ## Model viewer: show whether the background server runs
+	$(WEBVIEWER)/status.sh
+
+viewer-test: ## Model viewer: run the Playwright integration tests
+	$(WEBVIEWER)/test.sh

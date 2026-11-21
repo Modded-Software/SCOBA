@@ -15,3 +15,14 @@ src/SCOBA.SC2Map/.character_anim_assets
 campaigns/
 mods/
 res/audio/SCOBA_IntroTheme.wav
+# Model viewer: dependencies, the patched upstream clone (scripts/ref-setup.sh
+# rebuilds it from webviewer/patches/), build output, extracted game data,
+# test output (it shows game art) and machine settings.
+webviewer/node_modules/
+webviewer/ref/
+webviewer/build/
+webviewer/public/vendor/
+webviewer/data/
+webviewer/test-results/
+webviewer/.server.pid
+webviewer/local.env

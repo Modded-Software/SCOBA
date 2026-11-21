@@ -29,3 +29,15 @@ exceptions:
     owner: sc2
     review_date: '2026-11-10'
     removal: Remove when the vendored parser is replaced or updated upstream.
+  - rule: bplaceholders-b
+    path: ^webviewer/public/index\.html$
+    rationale: The HTML input attribute placeholder sets the grey hint text of the search boxes. It is the standard attribute name, not placeholder code.
+    owner: sc2
+    review_date: '2026-11-21'
+    removal: Remove when the search boxes no longer show hint text.
+  - rule: bplaceholders-b
+    path: ^webviewer/public/components\.js$
+    rationale: The DOM property input.placeholder sets the grey hint text of the picker search box. It is the standard property name, not placeholder code.
+    owner: sc2
+    review_date: '2026-11-21'
+    removal: Remove when the picker search box no longer shows hint text.

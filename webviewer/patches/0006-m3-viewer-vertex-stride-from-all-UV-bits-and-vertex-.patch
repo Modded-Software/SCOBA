@@ -1,0 +1,104 @@
+From 19efc240224b7b5e28e1f5707610be4c77fd7b56 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 10:44:24 +0200
+Subject: [PATCH 6/6] m3 viewer: vertex stride from all UV bits and vertex
+ colours
+
+UV sets are one per set bit of 0x20000, 0x40000, 0x80000, 0x100000 and
+0x40000000; they add up. Vertex colours (0x200) add 4 bytes before the
+UVs. The old rule (else-if, no colours) read 340 of 1474 unit model
+files of the game with the wrong stride, which smears the geometry into
+spikes. The new rule matches all 1474.
+---
+ src/viewer/handlers/m3/model.ts         | 41 ++++++++++++++++++++-----
+ src/viewer/handlers/m3/modelinstance.ts |  4 +--
+ 2 files changed, 35 insertions(+), 10 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 3bfafbdc..323e5073 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -49,6 +49,12 @@ export default class M3Model extends Model {
+   arrayBuffer: WebGLBuffer | null = null;
+   vertexSize = 0;
+   uvSetCount = 0;
++  /** Byte offsets in a vertex: the first UV set, and the tangent. */
++  uvOffset = 24;
++  tangentOffset = 28;
++  /** Size of the vertex data, and how many vertices the regions use. */
++  vertexBytes = 0;
++  vertexCount = 0;
+ 
+   constructor(bufferOrParser: ArrayBuffer | Parser, resourceData: HandlerResourceData) {
+     super(resourceData);
+@@ -212,17 +218,26 @@ export default class M3Model extends Model {
+ 
+   setupGeometry(parser: M3ParserModel, div: M3ParserDivision): void {
+     const gl = this.viewer.gl;
+-    let uvSetCount = 1;
+     const vertexFlags = parser.vertexFlags;
+ 
+-    if (vertexFlags & 0x40000) {
+-      uvSetCount = 2;
+-    } else if (vertexFlags & 0x80000) {
+-      uvSetCount = 3;
+-    } else if (vertexFlags & 0x100000) {
+-      uvSetCount = 4;
++    // Vertex layout (m3addon VertexFormat*): position 12, weights 4, bones 4,
++    // normal 4, [colour 4 when 0x200], one UV set of 4 bytes per set bit of
++    // 0x20000, 0x40000, 0x80000, 0x100000 and 0x40000000, tangent 4.
++    // The bits add up; they are not alternatives. Checked against every unit
++    // model of the game (tools/vertex-survey.mjs in the viewer).
++    let fileUvSets = 0;
++
++    for (const bit of [0x20000, 0x40000, 0x80000, 0x100000, 0x40000000]) {
++      if (vertexFlags & bit) {
++        fileUvSets += 1;
++      }
+     }
+ 
++    const colorBytes = vertexFlags & 0x200 ? 4 : 0;
++    // The shaders read 1 to 4 UV sets. With none in the file, set 0 reads the
++    // tangent bytes: still inside the vertex, and no layer has a texture to map.
++    const uvSetCount = Math.max(1, Math.min(fileUvSets, 4));
++
+     const regions = <Region[]>div.regions.get();
+     let totalElements = 0;
+     const offsets = [];
+@@ -251,8 +266,18 @@ export default class M3Model extends Model {
+     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+ 
+     this.arrayBuffer = arrayBuffer;
+-    this.vertexSize = (7 + uvSetCount) * 4;
++    let vertexCount = 0;
++
++    for (const region of regions) {
++      vertexCount = Math.max(vertexCount, region.firstVertexIndex + region.verticesCount);
++    }
++
++    this.vertexBytes = vertices.byteLength;
++    this.vertexCount = vertexCount;
++    this.vertexSize = 28 + colorBytes + fileUvSets * 4;
+     this.uvSetCount = uvSetCount;
++    this.uvOffset = 24 + colorBytes;
++    this.tangentOffset = 24 + colorBytes + fileUvSets * 4;
+   }
+ 
+   mapMaterial(index: number): M3StandardMaterial {
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index c291c75f..3889de73 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -142,10 +142,10 @@ export default class M3ModelInstance extends ModelInstance {
+       gl.vertexAttribPointer(attribs['a_normal'], 4, gl.UNSIGNED_BYTE, false, vertexSize, 20);
+ 
+       for (let i = 0; i < uvSetCount; i++) {
+-        gl.vertexAttribPointer(attribs[`a_uv${i}`], 2, gl.SHORT, false, vertexSize, 24 + i * 4);
++        gl.vertexAttribPointer(attribs[`a_uv${i}`], 2, gl.SHORT, false, vertexSize, model.uvOffset + i * 4);
+       }
+ 
+-      gl.vertexAttribPointer(attribs['a_tangent'], 4, gl.UNSIGNED_BYTE, false, vertexSize, 24 + uvSetCount * 4);
++      gl.vertexAttribPointer(attribs['a_tangent'], 4, gl.UNSIGNED_BYTE, false, vertexSize, model.tangentOffset);
+ 
+       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.elementBuffer);
+ 

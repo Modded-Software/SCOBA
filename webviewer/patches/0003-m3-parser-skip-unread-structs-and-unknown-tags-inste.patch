@@ -1,0 +1,40 @@
+From e21656fa929542cd04e8dc41bce072ca05cf77f8 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 09:53:35 +0200
+Subject: [PATCH 3/6] m3 parser: skip unread structs and unknown tags instead
+ of rejecting the model
+
+---
+ src/parsers/m3/indexentry.ts | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index e1bfe10f..672ca63f 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -122,6 +122,13 @@ export default class IndexEntry {
+       const constructor = mapping[0];
+       const entrySize = mapping[1][version];
+ 
++      // Structs that are never read (particles, physics, ...) need no known size.
++      if (constructor === UnsupportedEntry) {
++        this.entries = [];
++        stream.seek(readerOffset);
++        return;
++      }
++
+       if (!entrySize) {
+         // Yey found a new version!
+         throw new Error(': Unsupported object version - tag ' + tag + ' and version ' + version);
+@@ -185,9 +192,9 @@ export default class IndexEntry {
+         this.entries[i] = stream.readFloat32Array(16);
+       }
+     } else {
++      // A tag the parser does not know holds data the renderer does not use.
++      // Entries are found by offset, so skipping it is safe.
+       this.entries = [];
+-
+-      throw new Error(': Unsupported object tag - tag ' + tag + ' and version ' + version);
+     }
+ 
+     stream.seek(readerOffset);

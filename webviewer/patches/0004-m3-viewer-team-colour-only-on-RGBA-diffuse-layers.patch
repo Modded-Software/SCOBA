@@ -1,0 +1,28 @@
+From 2908ff54f5e1bd54a3d326d188f782a62171c290 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 10:19:34 +0200
+Subject: [PATCH 4/6] m3 viewer: team colour only on RGBA diffuse layers
+
+An RGB diffuse (colour channel setting 0), such as tank treads, was
+filled with team colour wherever its texture alpha was low.
+---
+ src/viewer/handlers/m3/layer.ts | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index a42775ee..fb54eac7 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -112,8 +112,10 @@ export default class M3Layer {
+           this.invert = flags & 0x10;
+           this.clampResult = flags & 0x20;
+ 
+-          // I am not sure if the emissive team color mode is even used, since so far combineColors takes care of it.
+-          if (type === 'diffuse') {
++          // Team colour fills the diffuse where its alpha is low, but only when
++          // the layer reads alpha (channel setting 1, RGBA). An RGB diffuse,
++          // such as tank treads, has no team colour.
++          if (type === 'diffuse' && this.colorChannels === 1) {
+             this.teamColorMode = 1;
+           }
+ 

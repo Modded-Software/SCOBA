@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SC2 unit viewer</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <aside id="panel">
+    <nav id="tabs">
+      <button id="tab-units" class="on">units</button>
+      <button id="tab-models">models</button>
+    </nav>
+    <section id="pane-units">
+      <input id="unit-search" type="search" placeholder="search units by name or id" autocomplete="off" spellcheck="false">
+      <div id="filters">
+        <div id="races"></div>
+        <select id="kind" title="kind"></select>
+      </div>
+      <div id="unit-count"></div>
+      <ul id="units"></ul>
+      <div id="preview"></div>
+    </section>
+    <section id="pane-models" hidden>
+      <input id="search" type="search" placeholder="search model files" autocomplete="off" spellcheck="false">
+      <ul id="results"></ul>
+    </section>
+    <div id="scene-head"><span>scene</span><button id="clear" title="remove all">clear</button></div>
+    <ul id="scene"></ul>
+    <div id="status"></div>
+  </aside>
+  <nav id="view-tools">
+    <button id="grid-toggle" class="on" title="hex grid ground">grid</button>
+    <button id="sky-button" title="choose a skybox">sky</button>
+  </nav>
+  <script src="/vendor/renderer.js"></script>
+  <script src="/components.js"></script>
+  <script src="/ground.js"></script>
+  <script src="/js/core.js"></script>
+  <script src="/js/controls.js"></script>
+  <script src="/js/scene.js"></script>
+  <script src="/js/panels.js"></script>
+  <script src="/js/drag.js"></script>
+  <script src="/js/sky.js"></script>
+  <script src="/js/inspect.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

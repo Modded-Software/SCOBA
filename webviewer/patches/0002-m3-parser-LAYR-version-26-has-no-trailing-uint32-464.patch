@@ -1,0 +1,27 @@
+From 9ff1641e6d37363503f5083355262884290309be Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 09:53:27 +0200
+Subject: [PATCH 2/6] m3 parser: LAYR version 26 has no trailing uint32 (464
+ bytes)
+
+---
+ src/parsers/m3/layer.ts | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/parsers/m3/layer.ts b/src/parsers/m3/layer.ts
+index f3fdeeec..4495d0c7 100644
+--- a/src/parsers/m3/layer.ts
++++ b/src/parsers/m3/layer.ts
+@@ -106,7 +106,11 @@ export default class Layer {
+       this.fresnelInvertedMaskZ = stream.readFloat32();
+       this.fresnelRotationYaw = stream.readFloat32();
+       this.fresnelRotationPitch = stream.readFloat32();
+-      this.unknown7 = stream.readUint32();
++
++      // The last field exists in version 25 only: version 26 is 4 bytes shorter.
++      if (version < 26) {
++        this.unknown7 = stream.readUint32();
++      }
+     }
+   }
+ }

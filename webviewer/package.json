@@ -1,0 +1,19 @@
+{
+  "name": "sc2-webviewer",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build-renderer.mjs",
+    "start": "node server.mjs",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "mdx-m3-viewer": "5.12.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "esbuild": "^0.25.0",
+    "events": "^3.3.0"
+  }
+}

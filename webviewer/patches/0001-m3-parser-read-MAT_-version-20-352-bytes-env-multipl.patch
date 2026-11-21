@@ -1,0 +1,53 @@
+From b18e072d413433010bf248b4d623f90f132384bc Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sat, 21 Nov 2026 09:53:20 +0200
+Subject: [PATCH 1/6] m3 parser: read MAT_ version 20 (352 bytes, env
+ multipliers)
+
+---
+ src/parsers/m3/indexentry.ts       |  2 +-
+ src/parsers/m3/standardmaterial.ts | 11 +++++++++++
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index 04b598a9..e1bfe10f 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -35,7 +35,7 @@ const tagMapping = {
+   REGN: [Region, { 3: 36, 4: 40, 5: 48 }],
+   BAT_: [Batch, { 1: 14 }],
+   MATM: [MaterialReference, { 0: 8 }],
+-  MAT_: [StandardMaterial, { 15: 268, 16: 280, 17: 280, 18: 280, 19: 340 }],
++  MAT_: [StandardMaterial, { 15: 268, 16: 280, 17: 280, 18: 280, 19: 340, 20: 352 }],
+   LAYR: [Layer, { 22: 356, 24: 436, 25: 468, 26: 464 }],
+   EVNT: [Event, { 0: 96, 1: 104, 2: 108 }],
+   BNDS: [BoundingSphere, { 0: 28 }],
+diff --git a/src/parsers/m3/standardmaterial.ts b/src/parsers/m3/standardmaterial.ts
+index 93869485..be13c437 100644
+--- a/src/parsers/m3/standardmaterial.ts
++++ b/src/parsers/m3/standardmaterial.ts
+@@ -22,6 +22,9 @@ export default class StandardMaterial {
+   unknown3 = 0;
+   specMult = 0;
+   emisMult = 0;
++  envConstMult = 1;
++  envDiffMult = 0;
++  envSpecMult = 0;
+   diffuseLayer = new Reference();
+   decalLayer = new Reference();
+   specularLayer = new Reference();
+@@ -65,6 +68,14 @@ export default class StandardMaterial {
+     this.unknown3 = stream.readUint8(); // ?
+     this.specMult = stream.readFloat32();
+     this.emisMult = stream.readFloat32();
++
++    // Version 20: envConstMult, envDiffMult, envSpecMult.
++    if (version > 19) {
++      this.envConstMult = stream.readFloat32();
++      this.envDiffMult = stream.readFloat32();
++      this.envSpecMult = stream.readFloat32();
++    }
++
+     this.diffuseLayer.load(stream, index);
+     this.decalLayer.load(stream, index);
+     this.specularLayer.load(stream, index);
