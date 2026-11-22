@@ -13,7 +13,7 @@ ranked.
 - **Models** = model files using the feature. **Uses** = materials, layers
   or entries using it.
 - Scope: unit models only. Skyboxes and doodads without a unit are not
-  counted.
+  counted. Doodads have their own sample: see "Doodads".
 - A feature counts as used when the file sets it (layer with an image or a
   constant colour; field not at its default; or animated through a
   sequence). Whether the game shows it on screen is not measured.
@@ -157,6 +157,46 @@ the shift is the strength in pixels at a 1080 pixel high view, and the
 direction is the normal map's tangent-space x and y, not turned to the
 screen. Displacement is drawn after everything else.
 
+## Doodads
+
+Doodads (`CActorDoodad`) are in the viewer since 2026-11-22: catalog
+`webviewer/tools/build_doodads.py`, tests `doodads-api.spec`,
+`doodads-ui.spec`. The counts above do not include them.
+
+- Catalog: 2588 doodads built; 2552 served; 36 have no model file in the
+  storage.
+- Sample: `DOODAD_SURVEY_STRIDE=7 bash webviewer/scripts/test.sh
+  doodads-survey` (`doodads-survey.spec`), run 2026-11-22: every 7th
+  doodad, 365 of 2552. All 365 loaded; none was rejected.
+- A sample, not a count: multiply by 7 for a rough total.
+
+| Gap | Doodads of 365 | Share |
+|---|---:|---:|
+| No batch the renderer draws: nothing shows | 46 | 13% |
+| Some parts not drawn (material type) | 30 | 8% |
+
+The two rows overlap in 3 doodads: they have vertices, but every part is
+a terrain material.
+
+Nothing shows: 43 of the 46 have no vertices at all. By their names these
+are particle-only effects (fire, fog, sparks, rain), decals and splats,
+lights, and roads. They wait for E1 (particles), E4 (projections), E3
+(lights) and T4 (terrain). The kind of each was read from the name, not
+measured.
+
+Parts not drawn, by material type: terrain T4 in 17 doodads, lens flare
+T11 in 8, creep T7 in 5 (one of the T4 doodads also has a splat bake T9
+part). Terrain is far more common here than on units: 17 of 365 sampled
+doodads against 16 of 1530 unit models.
+
+Doodad data not applied (no test, not counted):
+
+- child models attached on creation (`Create` sends), `ModelSwap`;
+- texture selection sends;
+- footprints (the footprint id is listed, nothing is drawn);
+- `TexSets`: used as a list filter only;
+- the list has no thumbnails or icons.
+
 ## Priorities
 
 Rank by models affected, then by how visible the gap is, then by cost. A
@@ -203,7 +243,8 @@ feature used only by particle materials waits for particles.
 17. Planar, screen-space and spherical UV sources (U5 64, U15 15, rest
     26).
 18. Lens flare (T11 28), volume (T5 26), reflection (T10 10), terrain
-    (T4 16), creep (T7 4), splat bake (T9 3).
+    (T4 16), creep (T7 4), splat bake (T9 3). Unit counts; terrain is
+    far more common on doodads (see "Doodads").
 19. Animated layer colour (A6 40), video textures (A4 26), render target
     channels (A9 22), blend modes 6 and 7 (M4 9), background object
     (M10 15).

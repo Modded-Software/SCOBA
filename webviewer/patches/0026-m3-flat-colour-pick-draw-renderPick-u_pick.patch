@@ -1,0 +1,78 @@
+From 5b64f42ac2ff28a2fbcdd1dfbb319a5c83b984e9 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 13:09:11 +0200
+Subject: [PATCH 26/27] m3: flat-colour pick draw (renderPick, u_pick)
+
+Draws the opaque batches of an instance in one flat colour, unblended and writing depth, so the page can tell by pixel which instance is under the mouse. A model with no opaque batch draws all its batches.
+---
+ src/viewer/handlers/m3/modelinstance.ts       | 36 +++++++++++++++++++
+ .../handlers/m3/shaders/standard.frag.ts      |  7 ++++
+ 2 files changed, 43 insertions(+)
+
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index fdb97c74..1e0ffd32 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -211,6 +211,42 @@ export default class M3ModelInstance extends ModelInstance {
+     }
+   }
+ 
++  /**
++   * Draw the instance in one flat colour, for picking by pixel: the opaque
++   * batches, unblended, writing depth. A model with no opaque batch draws
++   * all its batches, so it can still be picked.
++   */
++  renderPick(r: number, g: number, b: number): void {
++    const model = <M3Model>this.model;
++    const opaque = model.batches.filter((batch) => batch.material.blendMode === 0);
++    const batches = opaque.length ? opaque : model.batches;
++
++    if (!batches.length) {
++      return;
++    }
++
++    const gl = model.viewer.gl;
++    const m3Cache = <M3HandlerObject>model.viewer.sharedCache.get('m3');
++    const shader = m3Cache.standardShaders[model.uvSetCount - 1];
++
++    this.useShader(shader);
++
++    gl.uniform4f(shader.uniforms['u_pick'], r, g, b, 1);
++
++    for (const batch of batches) {
++      batch.material.bind(shader, this.textureOverrides, this);
++
++      gl.disable(gl.BLEND);
++      gl.depthMask(true);
++
++      batch.region.render(shader);
++
++      batch.material.unbind(shader);
++    }
++
++    gl.uniform4f(shader.uniforms['u_pick'], 0, 0, 0, 0);
++  }
++
+   override updateAnimations(dt: number): void {
+     const sequenceId = this.sequence;
+ 
+diff --git a/src/viewer/handlers/m3/shaders/standard.frag.ts b/src/viewer/handlers/m3/shaders/standard.frag.ts
+index 95193d98..2345fa6f 100644
+--- a/src/viewer/handlers/m3/shaders/standard.frag.ts
++++ b/src/viewer/handlers/m3/shaders/standard.frag.ts
+@@ -8,8 +8,15 @@ ${layers}
+ 
+ // Mouse-over highlight, 0 to 1: the lit colour is brightened.
+ uniform float u_highlight;
++// Picking: with alpha above 0 every pixel is drawn in this flat colour.
++uniform vec4 u_pick;
+ 
+ void main() {
++  if (u_pick.a > 0.0) {
++    gl_FragColor = u_pick;
++    return;
++  }
++
+   // Lighting runs in tangent space: v_lightDir and v_halfVec are in it, and
+   // a surface with no normal map faces straight out, (0, 0, 1).
+   vec3 normal = vec3(0.0, 0.0, 1.0);

@@ -3,6 +3,7 @@
 //   ctrl + left with a unit selected turns that unit instead (pick.js);
 //   alt + left on a unit drags the unit over the ground instead, the point
 //   of the unit pressed staying under the mouse ("drag unit");
+//   alt + left off any unit draws the select rectangle instead (select.js);
 //   a left or right click without a drag is handled by pick.js;
 // - middle drag: orbit around the ground point under the mouse;
 // - ctrl + middle drag: mouse-look, turning around the camera itself;
@@ -123,6 +124,10 @@
     if (hit) {
       const p = hit.point;
       drag = { mode: 'move', ...at, item: hit.item, z: p[2], offset: [hit.item.x - p[0], hit.item.y - p[1]] };
+    } else if (e.button === BUTTON.left && e.altKey) {
+      // Alt + left on the ground or the sky: the select rectangle (select.js).
+      drag = { mode: 'rect', ...at };
+      app.startSelectRect(e);
     } else if (e.button === BUTTON.left && e.ctrlKey && app.hasSelection()) {
       // Ctrl + left with a unit selected turns that unit (pick.js).
       drag = { mode: 'face', ...at };
@@ -134,9 +139,10 @@
     else if (e.button === BUTTON.right) drag = { mode: 'pan', ...at };
     if (drag) stopZoom();
   });
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', (e) => {
     // A moved unit goes into the URL once, on release.
     if (drag && drag.mode === 'move') app.saveHash();
+    if (drag && drag.mode === 'rect') app.endSelectRect(e);
     drag = null;
   });
   window.addEventListener('mousemove', (e) => {
@@ -147,6 +153,10 @@
     drag.y = e.clientY;
     if (drag.mode === 'face') {
       app.faceSelected(e);
+      return;
+    }
+    if (drag.mode === 'rect') {
+      app.moveSelectRect(e);
       return;
     }
     if (drag.mode === 'move') {

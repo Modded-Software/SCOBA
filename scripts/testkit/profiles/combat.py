@@ -15,13 +15,14 @@ from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .bank_checks import _delta, _no_damage, _report, _shots, _still
 from .camheight import check_camheight
+from .combat_kerrigan import check_breath, check_psi_probe, check_psi_watch, check_weapons
 from .pose import check_combat_pose
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 from .tps_shot import shot_clocks
 
 ROOT = project_root()
 
-GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "pose", "kerrigan", "camheight")
+GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "pose", "kerrigan", "psiprobe", "psiwatch", "camheight")
 
 
 def selected_group() -> str:
@@ -41,11 +42,13 @@ def map_spec() -> TestMapSpec:
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "combat_cam.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat_kerrigan.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "combat.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/combat/common",
             "scripts/test/combat/combat_cam",
+            "scripts/test/combat/combat_kerrigan",
             "scripts/test/combat/combat",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_DbgTest_Init();"),
@@ -84,7 +87,7 @@ def _button_after_shot(checks, section: str) -> None:
     checks.gt(section, "tshot", "EarlyBtnMs", 0)
 
 
-KERRIGAN_SINGLE = ("talons_single", "psiblast_single")
+KERRIGAN_SINGLE = ("psi_close_single", "psiblast_single")
 
 
 def _single_shots(checks, section: str, damage: bool = True) -> None:
@@ -365,11 +368,16 @@ def _check_switch(checks) -> None:
 
 
 def _check_kerrigan(checks) -> None:
-    checks.false("talons_single", "t0000", "HeroIsTosh")
-    # Kerrigan weapons: one full shot per command.
-    _single_shots(checks, "talons_single", damage=False)
+    checks.false("psi_close_single", "t0000", "HeroIsTosh")
+    # One full shot per command; Psi Blast also up close (operator
+    # 2026-11-22: not the talons), with damage.
+    _single_shots(checks, "psi_close_single")
+    check_weapons(checks, "psi_close_single", 3)
     _single_shots(checks, "psiblast_single")
-    _button_after_shot(checks, "talons_auto")
+    check_weapons(checks, "psiblast_single", 3)
+    _button_after_shot(checks, "psi_close_auto")
+    check_weapons(checks, "psi_close_auto", 1)
+    check_breath(checks)
 
 
 GROUP_CHECKS = {
@@ -383,6 +391,8 @@ GROUP_CHECKS = {
     "switch": _check_switch,
     "pose": check_combat_pose,
     "kerrigan": _check_kerrigan,
+    "psiprobe": check_psi_probe,
+    "psiwatch": check_psi_watch,
     "camheight": check_camheight,
 }
 

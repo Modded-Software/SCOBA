@@ -33,7 +33,7 @@ const onCanvas = (page, ids) => page.evaluate((list) => {
   return { inside, of: list.length, camera: { target: c.target.map((t) => +t.toFixed(2)), distance: +c.distance.toFixed(2) } };
 }, ids);
 
-test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overlap', async ({ page }) => {
+test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overlap @slow', async ({ page }) => {
   test.setTimeout(300_000);
   await page.goto('/');
   await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);

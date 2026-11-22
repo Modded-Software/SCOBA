@@ -1,5 +1,6 @@
 // "add all": adds one instance of every unit the unit list shows (search,
 // race, kind and family filters), after a dialog asks to confirm the count.
+// The doodads tab has its own button: every doodad its list shows (SOURCES).
 // Skybox units (a backdrop model, server markSkyboxUnits) are left out, and
 // the dialog names them.
 // The new units are laid out on the ground by size, smallest first, in
@@ -23,42 +24,48 @@
 
   // ---- confirm dialog ----
 
-  const dialog = new SC2Components.Dialog({ id: 'add-all-dialog', title: 'add all' });
-  dialog.node.classList.add('confirm-dialog');
   const question = el('div', { className: 'question' });
-  const yes = el('button', { id: 'add-all-yes', textContent: 'add' });
-  const no = el('button', { id: 'add-all-no', textContent: 'cancel' });
-  dialog.body.append(question, el('div', { className: 'answers' }, [no, yes]));
-  let answer = null; // resolves the open question: true (add) or false
-  const settle = (value) => {
-    const done = answer;
-    answer = null;
-    dialog.close();
-    if (done) done(value);
-  };
-  yes.addEventListener('click', () => settle(true));
-  no.addEventListener('click', () => settle(false));
-  // Escape, the x and the backdrop close the dialog: that is a "no".
-  dialog.node.addEventListener('close', () => settle(false));
+  const confirm = new SC2Components.ConfirmDialog({ id: 'add-all-dialog', title: 'add all', yesText: 'add', content: [question] });
 
   function ask(text) {
     question.textContent = text;
-    return new Promise((resolve) => {
-      answer = resolve;
-      dialog.open();
-      yes.focus();
-    });
+    const asking = confirm.ask();
+    confirm.yes.focus();
+    return asking;
   }
 
   // ---- the run ----
 
-  /** Every unit the list shows, all pages. */
-  async function listedUnits() {
-    const query = app.unitQuery();
+  /**
+   * A doodad list's landmark name, read like a phrase: terrain set, type,
+   * "Doodads", then the search, e.g. 'Char Environment Doodads "rock"'.
+   */
+  function doodadFilterName(query) {
+    const words = [];
+    if (query.tileset) words.push(query.tileset);
+    if (query.type) words.push(query.type);
+    words.push('Doodads');
+    if (!query.tileset && !query.type && !query.q) words.unshift('All');
+    if (query.q) words.push(`"${query.q}"`);
+    return words.join(' ');
+  }
+
+  /**
+   * What "add all" works on, per gallery tab: the list's query and API,
+   * how one record is added, the landmark name, and which records are left
+   * out (with the word for them).
+   */
+  const SOURCES = {
+    unit: { query: () => app.unitQuery(), url: '/api/units', add: (id) => app.addUnit(id), noun: 'unit', name: (query) => app.filterName(query), left: (unit) => unit.skybox, leftNoun: 'skybox unit' },
+    doodad: { query: () => app.doodadQuery(), url: '/api/doodads', add: (id) => app.addDoodad(id), noun: 'doodad', name: doodadFilterName, left: () => false, leftNoun: '' },
+  };
+
+  /** Every record the list shows, all pages. */
+  async function listedRecords(source, query) {
     const units = [];
     let total = Infinity;
     while (units.length < total) {
-      const page = await app.getJson('/api/units?' + new URLSearchParams({ ...query, offset: String(units.length), limit: String(PAGE) }));
+      const page = await app.getJson(app.api(source.url, { ...query, offset: String(units.length), limit: String(PAGE) }));
       total = page.total;
       if (!page.items.length) break;
       units.push(...page.items);
@@ -161,20 +168,24 @@
     return layout;
   }
 
-  async function addAll() {
+  /** `kind`: 'unit' (the units tab) or 'doodad' (the doodads tab). */
+  async function addAll(kind = 'unit') {
     if (run.running) return;
-    // The filters as the list showed them: the landmark's name.
-    const name = app.filterName(app.unitQuery());
-    const listed = await listedUnits();
+    const source = SOURCES[kind];
+    if (!source) throw new Error(`add all: unknown kind ${kind}`);
+    // The filters as the list showed them: the query, and the landmark's name.
+    const query = source.query();
+    const name = source.name(query);
+    const listed = await listedRecords(source, query);
     // Skybox units are backdrops, not units to stand on the map: left out, and said so.
-    const skipped = listed.filter((unit) => unit.skybox);
-    const ids = listed.filter((unit) => !unit.skybox).map((unit) => unit.id);
-    const skippedText = skipped.length ? ` ${skipped.length} skybox unit${skipped.length === 1 ? ' is' : 's are'} left out: ${skipped.map((unit) => unit.id).join(', ')}.` : '';
+    const skipped = listed.filter(source.left);
+    const ids = listed.filter((record) => !source.left(record)).map((record) => record.id);
+    const skippedText = skipped.length ? ` ${skipped.length} ${source.leftNoun}${skipped.length === 1 ? ' is' : 's are'} left out: ${skipped.map((unit) => unit.id).join(', ')}.` : '';
     if (!ids.length) {
-      app.setStatus(listed.length ? `add all: only skybox units in the list.${skippedText}` : 'add all: the list is empty');
+      app.setStatus(listed.length ? `add all: only ${source.leftNoun}s in the list.${skippedText}` : 'add all: the list is empty');
       return;
     }
-    const sure = await ask(`Are you sure you want to add ${ids.length} unit${ids.length === 1 ? '' : 's'} to the map?${skippedText}`);
+    const sure = await ask(`Are you sure you want to add ${ids.length} ${source.noun}${ids.length === 1 ? '' : 's'} to the map?${skippedText}`);
     if (!sure) return;
     Object.assign(run, { asked: ids.length, added: 0, failed: [], running: true, layout: [], landmark: null, skipped: skipped.map((unit) => unit.id) });
     // The units already on the map: the new block goes next to them.
@@ -185,7 +196,7 @@
       while (next < ids.length) {
         const id = ids[next++];
         try {
-          made.push(await app.addUnit(id));
+          made.push(await source.add(id));
           run.added++;
         } catch (error) {
           run.failed.push(`${id}: ${error.message}`);
@@ -214,11 +225,12 @@
     }
   }
 
-  button.addEventListener('click', () => addAll().catch(app.reportFailure));
+  button.addEventListener('click', () => addAll('unit').catch(app.reportFailure));
+  app.$('doodad-add-all').addEventListener('click', () => addAll('doodad').catch(app.reportFailure));
 
   Object.assign(app, {
     addAll,
     arrangeBySize: arrange,
-    addAllState: () => ({ ...run, failed: [...run.failed], skipped: [...run.skipped], layout: run.layout.map((l) => ({ ...l })), dialogOpen: dialog.isOpen, question: question.textContent }),
+    addAllState: () => ({ ...run, failed: [...run.failed], skipped: [...run.skipped], layout: run.layout.map((l) => ({ ...l })), dialogOpen: confirm.dialog.isOpen, question: question.textContent }),
   });
 })();

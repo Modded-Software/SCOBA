@@ -44,7 +44,7 @@ passed in that run unless another run is named.
 | F6 | A weapon fires only at a target inside its `Arc`. With `Arc 360` it fires at any facing. | [tested] `move_fire_auto`, `combat/20261114-144027` |
 | F7 | `DefaultAcquireLevel=Offensive` acquires an enemy and walks into range. | [tested] `auto_move_near` |
 | F8 | A unit with `SuppressMoving` still acquires and attacks in range. | [tested] `auto_stand_in` |
-| F9 | The effect-used event fires once per shot for all three hero weapons. | [tested] `single_shot`, `talons_single`, `psiblast_single` |
+| F9 | The effect-used event fires once per shot for all three hero weapons. | [tested] `single_shot`, `talons_single`, `psiblast_single` (before 2026-11-22; Kerrigan carries no talons now, SPEC-TPS 5.5a) |
 | F10 | Unit cooldowns and ability cooldowns are separate stores, even under one link name. | [probe] `pncprobe/20261114-145027` |
 | F11 | A weapon `Cost` cooldown with `TimeUse` starts a unit cooldown on each shot. Without `TimeUse` it reads 0. | [probe] `pncprobe/20261114-140102` |
 | F12 | A unit cooldown shared by weapon and button does not draw the cooldown clock. The button's own ability cooldown is the store the clock was last seen on. | [operator] 2026-11-14 |
@@ -76,7 +76,7 @@ passed in that run unless another run is named.
 | R-PNC-42, 45 | [tested] | `single_shot`, `weapon_button`. |
 | R-PNC-43 | [tested] | `auto_to_single`. |
 | R-PNC-44 | [tested] | `switch_single_stand`, `switch_auto_move`, hero state and button state. |
-| R-PNC-46 | [tested] | Read one game loop after the shot effect (`gf_DbgClockRead`; the 0.25 s Tosh period is over by the old 0.5 s read): `EarlyCdMs`, `EarlyBtnMs` above 0, at most the weapon cooldown for Tosh; Kerrigan above 0 only (her 1.5 s button clock is not her first weapon's). Every shot path: `single_shot`, `weapon_button`, `auto_click`, `auto_stand_in`, `talons_single`, `psiblast_single`, `talons_auto`. The clock overlay is [operator]. |
+| R-PNC-46 | [tested] | Read one game loop after the shot effect (`gf_DbgClockRead`; the 0.25 s Tosh period is over by the old 0.5 s read): `EarlyCdMs`, `EarlyBtnMs` above 0, at most the weapon cooldown for Tosh; Kerrigan above 0 only (her 1.5 s button clock is not her first weapon's). Every shot path: `single_shot`, `weapon_button`, `auto_click`, `auto_stand_in`, `talons_single`, `psiblast_single`, `talons_auto`. Since 2026-11-22 the Kerrigan sections are `psi_close_single`, `psiblast_single`, `psi_close_auto` (SPEC-TPS 5.5a); not run. The clock overlay is [operator]. |
 | R-PNC-47 | [tested] | `startup`, hero state and button state. |
 | R-PNC-48 | [tested] | `toggle buttons match hero state` over every snapshot; `auto_to_single`; both switch scenarios. |
 | R-PNC-50, 53 | [tested] | `wasd_stand`, `auto_stand_out`. |
@@ -126,6 +126,10 @@ Each hero attack is two weapons. [tested] by `auto_to_single`,
 | --- | --- | --- |
 | `Tosh`, `RazorTalons`, `QueenOfBladesPsiBlast` | Order-bound. Serves Attack `single`. | Stock options (F5). |
 | `ToshAuto`, `RazorTalonsAuto`, `QueenOfBladesPsiBlastAuto` | Fires on its own, while moving, at any facing. Serves Attack `auto`. | Child of the stock weapon. `AllowedMovement=Moving`, both `OnlyFire` options `0`, `Arc 360` (F4, F6). |
+
+Since 2026-11-22 no hero carries `RazorTalons` or `RazorTalonsAuto`: Kerrigan
+attacks with Psi Blast only (REQ-TPS R-TPS-63, SPEC-TPS 5.5a). The two
+weapons stay in the data.
 
 - `SCOBAAttackSingle` lists the three auto weapons in `WeaponDisableArray`.
 - Attack `single` has no shot while WASD-moving. A WASD `move` order replaces

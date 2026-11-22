@@ -118,6 +118,9 @@ fixed[8] gv_animAimPitchTime;
 int[8] gv_animAimPitchStep;
 int[8] gv_animAimPitchTicks;
 int[8] gv_animAimPitchSends;
+fixed[c_ANIM_HERO_COUNT] gv_animBreathPeriod;  // 0: the aim pose is still
+int[8] gv_animBreathSyncs;
+fixed[8] gv_animBreathPhase;  // the clip time of the last sync
 int[8] gv_animHeadStep;
 int[8] gv_animHeadSends;
 // Head lead state: the virtual body yaw and pitch, the last update time, and

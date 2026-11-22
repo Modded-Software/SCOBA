@@ -46,7 +46,8 @@ can judge it.
 | R-BASE-29 | [built] | `melee_map.check`; host `test_melee_map.py`; `macro` `DepotsQueued` = 2 for Terran |
 | R-BASE-31 | [built] | `resources.check`: no tree or unit in a keep-out; host `test_resources.py` |
 | R-BASE-32 | [built] | host `test_resources.py`: two plans equal, radii and angle steps vary, hall gap kept |
-| R-BASE-35 | [built] | host `test_resources.py` `GasSizeTest`: footprints, unit fields, actor scales, geyser snap, sibling sites; `resources.check` in the build; 36 geysers on whole coordinates in the built `Objects`. Not run in the game: no gas building has been built on a 6x6 geyser |
+| R-BASE-35 | [built] | host `test_resources.py` `GasSizeTest`: footprints, unit fields, actor scales, geyser snap, sibling sites; `resources.check` in the build; 36 geysers on whole coordinates in the built `Objects`. In the game, `baseai gas` run `20261122-122231` (failures 0): the footprint, direct-build and blocker checks pass (geyser and gas building block the whole 6x6, a script worker builds a Refinery and an Extractor on a geyser, bare ground takes none). Not met: the engine radius reads 4.25, not 3. The drawn model is an operator check (section 8) |
+| R-BASE-36 | [tested] (`gas` `20261122-122231`, `-125459`, `-130824`); awaits operator approval | `gas` group, AI lanes 11 to 14: a finished gas building on both placed geysers, 3 crew workers on each, gas taken from each geyser, `GasCollected` > 0 at 180 game s and higher at 240. Negative: no map gas order before the AI starts; none for the owners 9 and 10, whose AI is not started; no worker left script controlled without gas work. Hand-back case: a killed gas building frees its slot and its crew, and the map orders a new build |
 | R-BASE-33 | [built] | `macro`: supply used + supply lost grows within every 2 minutes (`baseai_live.galaxy` death counter); an attacker lost units |
 | R-BASE-34 | [built] | `macro`: attackers ≥ 4 by t480, an owner attacks twice (state 3 left and entered again); `at least 3 owners expanded by t480` |
 | R-BASE-30 | [tested] (`hall` `20261119-203139`, `-172941`, `-135358`; earlier script legs: `20261119-115642`, `-121141`, `macro` `-120004`) | `hall` group: the engine pathing grid (36x36 sub-cells of 0.5) of the starting CC covers the measured feet outline; built, created and landed CCs equal them; open while flying and after death; an SCV mines. `macro`: every Terran CC covers the measured cells at t1; the Orbital Command links `FootprintSCOBAHall1x1` |
@@ -297,7 +298,19 @@ the built map (256 cells).
     `FootprintScobaGeyser6x6Built` and `FootprintScoba6x6CappedGeyser`
     (pathing and placement of Refinery, AutomatedRefinery, Extractor,
     AutomatedExtractor). The solid square is 6x6; the ring that keeps
-    town halls off keeps its stock width of 3. `UnitData.xml` names them
+    town halls off keeps its stock width of 3. The pathing `Shape` of all
+    three is that same 6x6 square, not the stock rounded shape x2: the
+    rounded geyser blocked only a 4x4, and a unit standing in the strip
+    left inside the checked square stopped the build (`baseai gas` run
+    `20261122-090349`). With the square the geyser, the building under
+    construction and the finished building each block 144 of 144
+    sub-cells, a unit made 2.6 from the geyser point is put outside the
+    square (3.35) and the build starts (run `20261122-092635`). The
+    engine reports radius 4.25 for them, half the diagonal: the larger
+    of the Shape's radius and the unit `Radius` field (a probe geyser
+    with a small Shape reads 3.00, run `20261122-110629`; with the
+    square and unit `Radius` 4.75 it reads 4.75, run `-104133`).
+    `UnitData.xml` names them
     and sets `Radius`, `SeparationRadius` and `MinimapRadius` to 3 (stock
     1.5). `ActorData.xml` draws the five units and the geyser's ground
     splat at `Scale` 2. The Protoss Assimilator is left at 3x3: the
@@ -417,6 +430,53 @@ the built map (256 cells).
   Marine's z, `WorldHeight` and `CliffLevel` are equal everywhere (run
   `20261118-145950`). The hills are visual only; Galaxy cannot read them.
 
+### 4.9 Gas orders (R-BASE-36)
+
+`systems/base/base_gas.galaxy`. Why: section 8, causes 1 and 2. The stock
+AI gives no gas order here, so the map gives the two it lacks. Nothing
+else is ordered.
+
+- **Start.** `gf_BaseAiStart` calls `gf_BaseGasStart(player)`. One trigger,
+  `gt_BaseGas`, looks every `c_BASE_GAS_TICK` (2 s) at every owner whose AI
+  has started. Other owners get nothing.
+- **Build** (`gf_BaseGasBuild`). One build at a time per owner. The first
+  comes `c_BASE_GAS_FIRST` (30 s) after the AI start, the next
+  `c_BASE_GAS_NEXT` (60 s) after an order. Conditions: the owner can pay;
+  a geyser with gas and no gas building stands within `c_BASE_GAS_R` (15)
+  of one of its finished halls; no other owner's builder is on its way to
+  it. The nearest such geyser is taken. The order names the geyser unit:
+  the only form the engine takes on a geyser. A builder that has no build
+  order after `c_BASE_GAS_GIVE_UP` (60 s) is dropped.
+- **Crew** (`gf_BaseGasStaff`). Each finished gas building with gas left
+  keeps `c_BASE_GAS_CREW` (3) workers on a gather order. A member that
+  died or has another order leaves the crew and another is sent.
+- **Which worker** (`gf_BaseGasPickWorker`). The owner's nearest worker
+  that gathers now, is not script controlled, not hired, and has no gas
+  work yet.
+- **Script control.** The engine marks a worker script controlled when a
+  script orders it (run `20261122-121438`: all 24 crew workers read
+  `AIIsScriptControlled`). That is why the AI leaves it at its work.
+  `gf_BaseAiUnitIsAi` counts a worker on gas work (`gf_BaseGasHas`) as an
+  AI unit, so the lane gates give it no lane order.
+- **Hand-back** (`gf_BaseGasRelease`). `AISetUnitScriptControlled(unit,
+  false)` when gas work ends: the builder after its build or its give-up,
+  a crew member that left, the whole crew when the gas building is empty
+  or gone.
+- **Reach.** 15 from a hall covers both geysers of a site (10.00 to 14.14
+  in the built map). In a double site a geyser of the sibling site can be
+  in reach too: player 13 got three Extractors in run `20261122-122231`.
+- **Tested cases** (run `20261122-130824`): a killed gas building (its
+  crew goes back to the AI and gathers again, a new build follows); a crew
+  member given a move order (the engine marks it script controlled at
+  once, `ScriptAtOrder` 1; the map hands it back, refills the crew, and
+  the AI sends the worker to gather within 1 game s); an empty gas
+  building (slot freed, crew handed back, no new crew or builder in 20
+  game s). Seen raw, not asserted: the handed-back Drones of the empty
+  Extractor still have a `DroneHarvest` order; the AI did not move them
+  in that time.
+- **Not tested:** a real person's order (no real input in a run); the
+  gas orders in a full game with waves on (`macro`).
+
 ## 5. Files
 
 | File | Role |
@@ -431,9 +491,12 @@ the built map (256 cells).
 | `src/SCOBA.SC2Map/scripts/app/data/base_sites.galaxy` | Site table (empty in `src/`) |
 | `src/SCOBA.SC2Map/scripts/app/core/base_ai.galaxy` | Constants, state |
 | `src/SCOBA.SC2Map/scripts/app/systems/base/base_ai.galaxy` | Exclusion, bases, AI start |
+| `src/SCOBA.SC2Map/scripts/app/systems/base/base_gas.galaxy` | Gas orders for the base owners (4.9) |
+| `scripts/testkit/galaxy/baseai/baseai_gas.galaxy` (core), `baseai_gas_build`, `baseai_gas_probe`, `baseai_gas_help`, `baseai_gas_map`, `baseai_gas_main` (`.galaxy`); `scripts/testkit/profiles/baseai_gas.py` | `gas` group: 6x6 checks (R-BASE-35), gas orders (R-BASE-36), probe modes of section 8 |
 | `src/SCOBA.SC2Map/scripts/app/main.galaxy`, `header.galaxy`, `app/init.galaxy` | Includes, declarations, init order |
 | `spawns.galaxy`, `air_creep.galaxy`, `hero_switch.galaxy`, `hero_drop.galaxy`, `medic.galaxy`, `companion.galaxy`, `aim.galaxy`, `intro.galaxy` | Exclusion calls |
-| `scripts/testkit/galaxy/baseai/baseai.galaxy`, `baseai_macro.galaxy`, `baseai_flight.galaxy`, `scripts/testkit/profiles/baseai.py`, `baseai_viking.py` | In-game tests |
+| `scripts/testkit/galaxy/baseai/baseai.galaxy`, `baseai_macro.galaxy`, `baseai_flight.galaxy`, `scripts/testkit/profiles/baseai.py` (wiring), `baseai_probe.py`, `baseai_macro.py`, `baseai_flight.py`, `baseai_viking.py`, `baseai_common.py` | In-game tests |
+| `scripts/testkit/profiles/baseai_env.py`, `baseai_patch.py`, `baseai_scan.py` | Run switches; A/B data patches of the probe map (depot, gas scan) |
 | `scripts/testkit/profiles/registry.py`, `scripts/testkit/map_builder.py`, `scripts/playtest.sh` | Profile, switch, entry point |
 | `scripts/testkit/tests/test_base_sites.py`, `test_base_ai.py` | Host tests |
 | `README.md` | Feature and command list |
@@ -450,6 +513,7 @@ is one bank section. Windows are in game time.
 | `start` | Per lane player at 1 game second: 1 town hall of the right type within 2 of its main site point; 12 workers; 1 Overlord for Zerg, 0 for Terran; minerals 50; vespene 0; difficulty 10. | No town hall of the other race for the player. |
 | `macro` | All six lane owners, waves on, 8 game minutes, the operator in the Alt+4 Wraith. Per owner: minerals collected; workers, supply made, makers, fighters at t480; supply used plus supply lost (R-BASE-33: a harness death counter adds `c_unitPropSuppliesUsed` of every dying owner unit) grows within every 2 minutes; an owner whose fighters fell makes new fighters within 2 minutes (`FightersMade` counter). Terran halls: a CC links the measured footprint (R-FP-10) and its engine grid blocks every measured cell; an Orbital Command links `FootprintSCOBAHall1x1`; `PlacementFootprint` `FootprintSCOBAHall1x1`. Wraith flight as in `flight`. | Not supply-capped for 2 minutes. Hall: a Barracks refused at the four leg centres (±6, ±6); origin open; none of 4 directions blocked at 1.0 (R-BASE-30). Raw: the grid. |
 | `hall` | The first Terran lane owner, no waves, a script-controlled hall at a clear point A and a landing point B at least 20 away (19x19 pathable each). The engine pathing grid (36x36 sub-cells of 0.5) at A and B against the feet outline the build generates. Before: both open, a Barracks fits at each leg centre. Built by an SCV: grid A equals the cells, legs refuse a Barracks, origin open. Killed under construction: open. Created: equals; one SCV mines from a field 11 south in 25 s. Lift-off (4 s): both open. Land at B (polled up to 60 game s, then 2 s): B equals, A open. Killed: open. Last: lanes 1-3 started by the game path (`gf_BaseAiCreateLane`); each starting CC covers every cell and stands within half a cell per axis of its start point (the cell-centre snap). | Nothing blocked while flying, at the old point, or after death. Origin and 1.0 open on the ground. |
+| `gas` | Runs by name only (about 5 min). Lanes 1 and 4 (owners 9, 10): no AI; a script worker builds on a placed geyser; geyser, building under construction and finished building block the 6x6 (R-BASE-35). AI lanes (owners 11 to 14), 240 game s: a finished gas building on both placed geysers, 3 crew workers each, all counted as AI units, gas taken from each geyser, `GasCollected` > 0 at t180 and higher at t240 (R-BASE-36). Last, one case per owner: owner 11's gas building on its first geyser is killed (slot free after two looks, crew not script controlled and gathering again, a new build within 30 game s); a crew member of owner 12 gets a move order (it leaves the crew, is not script controlled, still an AI unit, the crew is full again, the AI gives it a gather or build order within 30 game s); owner 13's gas building is set to 0 gas (slot free, crew handed back, still free 20 game s later, no builder sent to its geyser). Raw: `CrewScript` (the engine's script-control mark). Probe modes by environment (`SC2_BA_GAS_SCAN`, `HELP`, `RING`, `TOWN`, `EXTRA`) turn the map's gas orders off. | Bare ground takes no gas building. No map gas order at t1. No map gas order for owners 9 and 10. No worker script controlled without gas work (`Stuck` 0), at the end and after the kill. |
 | `flight` | Alt+4 Viking (regular unit, PNC), no lanes, no waves. W held and LMB+RMB held: ground speed within 10 % of the unit's speed property, which equals its data speed. Space 1 s climbs 4, Ctrl 1 s descends 4 (within 1), camera = base + flight. Land and lift by the hero morph pair: landed type `SCOBAVikingHeroAssault` on the ground; lifted type `SCOBAVikingHero` at speed 12. Raw: the height methods of F17, each form's ability list. | Speed not Tosh's. Height holds after each release. No jump on the flyer. No TPS, no Stand. No stock morph in either hero form; lift is not a stock `VikingFighter`. A / D: no flag, no move, no turn; the release keeps a move order. Control: Tosh on A moves along camera yaw + 90 (within 20). |
 | `macro` raw (A11 to A13) | Per owner at t0 and every minute: `StartLoc100`, `GroundStartLocs`, `TotalStartLocs`, `NumEnemies`, `NumTeams`, `EnemyBuildings`, `OpeningType`, `AttackState`, wave sizes (main, attack), `NearbyOpen`, town state per slot. Asserts: start location equals the hall point; ground start locs > 0; enemies > 0; at least 3 owners hold a hall at a site by t480; at least 4 owners in attack state by t480 and one owner enters it twice (R-BASE-34). | No `AIExpand` call by script (counter stays 0). |
 | `expand` | For one Terran and one Zerg lane player: a town hall inside an expansion site radius within the time limit. The time is recorded. | No town hall of a lane player outside every site radius. |
@@ -494,10 +558,68 @@ Regression, full suites on the same build: `combat`, `tps`, `intro`,
 AC-BASE-1 to AC-BASE-7 of the requirements. Also:
 
 - the look of mineral fields and geysers on the lifted, scaled terrain;
-- **Open, 2026-11-20:** the operator saw that the AI builds no Refinery
-  and no Extractor since the 6x6 change. Cause not known. The `gas`
-  group of the `baseai` profile separates the two suspects (a worker
-  cannot build on a 6x6 geyser; the AI does not see the geyser). Not run.
+- **2026-11-20:** the operator saw that the AI builds no Refinery and no
+  Extractor since the 6x6 change. Two causes found (below). Fixed by map
+  gas orders (R-BASE-36, 4.9); the fix awaits operator approval. Measured
+  with the `gas` group of the `baseai` profile, 2026-11-22:
+  - A script worker builds both on a 6x6 geyser, by the order that
+    names the geyser unit (run `20261122-092635`).
+  - The AI of all four AI lanes queues the gas building and gives no gas
+    build order in 240 game s (every run).
+  - The AI counts a geyser up to about 10 from its town point, which is
+    not the hall (run `20261122-083512`). Placed geysers lie 8.5 to 12.3
+    from it; two of four lanes count one.
+  - With the rounded built shape (engine radius 3.37) the AI built on a
+    stock 3x3 `RichVespeneGeyser` made 7 to 8 from its town, and on no
+    6x6 geyser (run `20261122-084908`). With the square shape (radius
+    4.25) it builds on neither (run `20261122-092635`). Both shapes
+    changed between these runs, so they do not name the cause.
+  - **Cause 1, reach** (run `20261122-102102`, no probe geysers): the AI
+    counts as raw gas spots 0, 1, 0, 1 of the two placed geysers of
+    players 11 to 14. The counted ones lie 9.19 and 8.51 from the town
+    point, the others 10.12 to 12.34 (one 20.50: the town point of
+    player 14 is 10.5 off its hall). The hall is 8x8 and the geyser 6x6,
+    so mapgen cannot place a geyser nearer than 8.5 to the site centre.
+  - **Cause 2, the geyser Shape.** Probe geysers of the scan
+    (`SC2_BA_GAS_SCAN`, 6x6 layers, own Shape) 7.6 to 8.5 from the town
+    point, the only geyser in reach of players 11 and 13:
+
+    | Probe Shape | Blocks of 144 | AI built | Run |
+    |---|---|---|---|
+    | stock built octagon, radius 1.68 | 32 | yes, and harvests | `20261122-095219` (p11), `20261122-110629` (p13) |
+    | square, corners cut 1.5 | 126 | no | `20261122-101245` |
+    | square, corners cut 1.0 | 136 | no | `20261122-101245` |
+    | full square | 144 | no | `20261122-095831` |
+    | full square, geyser `Radius` 4.75 | 144 | no | `20261122-104133` |
+    | full square, gas building `Radius` 4.75 | 144 | no | `20261122-104755` |
+    | octagon 1.68 plus 32 stock `PathingBlocker1x1` (`SC2_BA_GAS_RING=1`) | 144 | no | `20261122-110629` |
+
+    The block counts are per Shape: 32 was measured in run
+    `20261122-110629`, 144 in `-104133`, 126 and 136 in `-101245`.
+    The unit `Radius` fields do not matter. Only the Shape blocks
+    pathing: stock footprints have no layer flag for it, and the stock
+    geyser Shape is a 2x2 square in its 3x3 cells. A script worker
+    ordered onto the geyser ringed with blockers builds nothing either
+    (same run): the engine refuses it.
+  - Runs with real clicks are no evidence: `20261122-100606`,
+    `-103338` (no Shape, octagon 3.0), `-105736` (octagons 3.0, 2.5).
+  - **Script help** (`SC2_BA_GAS_HELP=1`, run `20261122-102102`): script
+    workers built on all 8 placed geysers of the AI lanes. The AI then
+    collected gas on players 11, 12 and 14 (275, 865, 425 at 240 game s)
+    and none on player 13, whose geysers are both out of reach.
+  - **AI workers ordered** (`SC2_BA_GAS_HELP=2`, run `20261122-120457`):
+    the AI's own workers, ordered by script, built and gathered: 975,
+    980, 835 gas for players 11, 12, 13 at 240 game s. The AI left an
+    ordered worker at its work.
+  - **No data fix.** No map data found that blocks the whole 6x6 and lets
+    the stock AI build. The two choices were: the script gives the gas
+    orders (an exception to R-BASE-34), or the geyser gets a small Shape
+    (breaks R-BASE-35).
+  - **Taken: the script gives the gas orders** (R-BASE-36, 4.9). The
+    agent chose it without an operator answer, because R-BASE-35 is
+    binding. Run `20261122-122231`, failures 0: every AI lane has a gas
+    building on both placed geysers and collects gas (705, 700, 645, 625
+    at 240 game s). **Operator: approve or reject.**
 - 6x6 gas (R-BASE-35): the geyser and the gas buildings look twice as
   large and fill their 6x6; a worker builds a Refinery and an Extractor
   on a geyser and the placement ghost fits; workers harvest gas; the
@@ -535,3 +657,10 @@ AC-BASE-1 to AC-BASE-7 of the requirements. Also:
 | `baseai/20261119-172941` (`hall`) | failures 0. See F34. |
 | `baseai/20261119-175309` (`macro`) | failures 2: p11 `Refused` 3/4 (Orbital morph under way, F35); attack repeats (known). |
 | `baseai/20261119-180620` (`hall`, drawn scale 2.88), `-200703` (per-foot slices, paint), `-203139` (Shape on the 0.5 grid, SPEC-SCALED-FOOTPRINTS 5) | failures 0. See F35. |
+| `baseai/20261122-121438` (`gas`, map gas orders, first run) | failures 8, all `G{n}CrewScript` 3, want 0: the engine marks a script-ordered worker script controlled (4.9). All other checks pass. |
+| `baseai/20261122-122231`, `-125459` (`gas`, map gas orders with hand-back) | failures 0, both; `RealClicks` 0. Owners 11 to 14: 2 gas buildings on the placed geysers (13: a third on a sibling geyser), 3 crew each, `GasCollected` 705, 700, 645, 625 and 705, 690, 595, 620 at 240 game s. Hand-back case passes. |
+| `baseai/20261122-130824` (`gas`, kill, away and empty cases) | failures 0, 174 PASS, `RealClicks` 0. Away case: `ScriptAtOrder` 1, then handed back and gathering after 0 s of waiting. Empty case: crew raw `DroneHarvest` x3. |
+| `baseai/20261122-123025` (all) | failures 114, all `hall` with no value. Not a map fault: the harness dispatch is an `if / else if` chain, so group `all` runs only `probe` in the game, and the Python side still checks `hall`. Open. The `probe` checks of this run pass. |
+| `baseai/20261122-123555` (`probe`) | failures 2: `t60Out`, `t120Out` `Moved100` 379, want < 50. The excluded Marine has no order and no wave. Raw: owner 11 had two Barracks at t60 and a Barracks order at 212.5,156.5; the Marine stood at 211.0,155.4. Likely pushed by the placement; not measured (the nearest-structure read-out was added after this run). |
+| `baseai/20261122-124813` (`probe`, nearest-structure read-out) | failures 1: `p11t180 Army` 2, want > 2. Raw: a second Command Center by t120. Same as `20261118-204818`. Marine moved 0, no structure within 8. |
+| `baseai/20261122-124022` (`hall`) | failures 12: `Refused` 3 of 4 on six hall states, `landed` not found. The same 12 as `20261120-113630`, before the gas orders existed. Open, not part of the gas work. |

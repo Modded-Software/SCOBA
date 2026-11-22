@@ -460,17 +460,31 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
         gf_DbgAttackRate();
     }
     if (gf_DbgGroup("kerrigan")) {
-        // Kerrigan weapons: one full shot per command.
-        gf_DbgReset("talons_single", false, true);
+        // Kerrigan: one full shot per command, Psi Blast at any distance
+        // (1.2 was talons reach until 2026-11-22), then the aim breathing.
+        gf_DbgReset("psi_close_single", false, true);
         gf_DbgUseKerrigan();
-        gf_DbgSingleShots("talons_single", 1.2);
-        gf_DbgReset("talons_auto", true, true);
+        gf_DbgKerriganWeapons("psi_close_single", "w0");
+        gf_DbgSingleShots("psi_close_single", 1.2);
+        gf_DbgKerriganWeapons("psi_close_single", "w1");
+        gf_DbgReset("psi_close_auto", true, true);
         gf_DbgUseKerrigan();
-        gf_DbgAutoRun("talons_auto", 1.2, 4.0);
-        gf_DbgSnapAfterShot("talons_auto", "tshot");
+        gf_DbgKerriganWeapons("psi_close_auto", "w0");
+        gf_DbgAutoRun("psi_close_auto", 1.2, 4.0);
+        gf_DbgSnapAfterShot("psi_close_auto", "tshot");
+        gf_DbgKerriganWeapons("psi_close_auto", "w1");
         gf_DbgReset("psiblast_single", false, true);
         gf_DbgUseKerrigan();
+        gf_DbgKerriganWeapons("psiblast_single", "w0");
         gf_DbgSingleShots("psiblast_single", 3.0);
+        gf_DbgKerriganWeapons("psiblast_single", "w1");
+        gf_DbgBreathGroup();
+    }
+    if (gf_DbgGroup("psiprobe")) {
+        gf_DbgPsiProbeGroup();
+    }
+    if (gf_DbgGroup("psiwatch")) {
+        gf_DbgPsiWatchGroup();
     }
     if (gf_DbgGroup("camheight")) {
         gf_DbgCamHeightGroup();
@@ -487,5 +501,6 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
 void gt_DbgTest_Init () {
     gt_DbgForward = TriggerCreate("gt_DbgForward_Func");
     gt_DbgTest = TriggerCreate("gt_DbgTest_Func");
+    gf_DbgKerriganInit();
     TriggerAddEventMapInit(gt_DbgTest);
 }

@@ -1,0 +1,161 @@
+// Test harness: baseai group "gas", the sequence (gf_BgGas, called from
+// baseai.galaxy). Starts the AI lanes, picks the mode (a probe mode turns
+// the map's gas orders off), runs the snapshots on their own thread, then
+// the direct builds, the read-outs and the R-BASE-36 cases. Included last
+// of the gas modules: it calls them all. Core: baseai_gas.galaxy.
+
+const fixed c_BG_SNAP_EVERY = 60.0;   // game s between the AI snapshots s0..s3
+const int c_BG_SNAPS = 4;
+bool gv_bgMapGas;                     // no probe mode: the map's own gas orders run
+trigger gt_BgSnaps;
+bool gv_bgSnapsDone;
+
+// The AI snapshots s0..s3, every c_BG_SNAP_EVERY game s from the lane
+// start, on their own thread: the direct builds do not delay them.
+bool gt_BgSnaps_Func (bool testConds, bool runActions) {
+    int lv_t;
+    int lv_lane;
+
+    if (!runActions) {
+        return true;
+    }
+    for (lv_t = 0; lv_t < c_BG_SNAPS; lv_t += 1) {
+        Wait(c_BG_SNAP_EVERY, c_timeGame);
+        for (lv_lane = 1; lv_lane <= 6; lv_lane += 1) {
+            gf_BgAiSnap("ba_gas", "s" + IntToString(lv_t), gf_BaseAiLaneOwner(lv_lane));
+        }
+        BankSave(gv_dbgBank);
+    }
+    gv_bgSnapsDone = true;
+    return true;
+}
+
+void gf_BgGas () {
+    string lv_s = "ba_gas";
+    int lv_lane;
+    int lv_p;
+    unit lv_g;
+
+    // The AI lanes 2, 3, 5, 6 start as in the game. Lanes 1 and 4 get no
+    // base and no AI: the direct builds are theirs alone.
+    gf_BgStart(lv_s, 2);
+    gf_BgStart(lv_s, 3);
+    gf_BgStart(lv_s, 5);
+    gf_BgStart(lv_s, 6);
+    // A probe mode keeps the map's own gas orders (R-BASE-36,
+    // systems/base/base_gas) out of its way. Default: they run, and the
+    // lanes are as in the game.
+    gv_bgMapGas = !(gv_bgTown || gv_bgHelp || gv_bgExtraOn || gf_BgScan());
+    if (!gv_bgMapGas) {
+        TriggerEnable(gt_BaseGas, false);
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "mapGas", gf_BaFlagInt(gv_bgMapGas));
+    gt_BgSnaps = TriggerCreate("gt_BgSnaps_Func");
+    TriggerExecute(gt_BgSnaps, false, false);
+    gt_BgWatch = TriggerCreate("gt_BgWatch_Func");
+    TriggerAddEventTimePeriodic(gt_BgWatch, 0.0625, c_timeGame);
+    gt_BgIssued = TriggerCreate("gt_BgIssued_Func");
+    TriggerAddEventUnitOrder(gt_BgIssued, null, gf_BgCmd("Refinery"));
+    TriggerAddEventUnitOrder(gt_BgIssued, null, gf_BgCmd("Extractor"));
+    Wait(1.0, c_timeGame);
+    // Probe modes. The stock baseline (SC2_BA_GAS_EXTRA=1): probe geysers
+    // for lanes 2 (Terran) and 5 (Zerg). In a radius scan map: one scan
+    // probe on every AI lane. Default: no probe.
+    BankValueSetFromInt(gv_dbgBank, lv_s, "scan", gf_BaFlagInt(gf_BgScan()));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "help", gf_BaFlagInt(gv_bgHelp));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "town", gf_BaFlagInt(gv_bgTown));
+    if (gv_bgTown) {
+        // The town probe: no probe geysers, the lanes as in the game.
+        gf_BgTown(lv_s, gf_BaseAiLaneOwner(2));
+        gf_BgTown(lv_s, gf_BaseAiLaneOwner(3));
+        gf_BgTown(lv_s, gf_BaseAiLaneOwner(5));
+        gf_BgTown(lv_s, gf_BaseAiLaneOwner(6));
+    }
+    else if (gv_bgHelp) {
+        // The help probe: no probe geysers, the lanes as in the game.
+        gf_BgHelp(lv_s, gf_BaseAiLaneOwner(2));
+        gf_BgHelp(lv_s, gf_BaseAiLaneOwner(3));
+        gf_BgHelp(lv_s, gf_BaseAiLaneOwner(5));
+        gf_BgHelp(lv_s, gf_BaseAiLaneOwner(6));
+        gt_BgStaff = TriggerCreate("gt_BgStaff_Func");
+        TriggerAddEventTimePeriodic(gt_BgStaff, 2.0, c_timeGame);
+    }
+    else if (gf_BgScan()) {
+        gf_BgScanProbe(lv_s, 2);
+        gf_BgScanProbe(lv_s, 3);
+        gf_BgScanProbe(lv_s, 5);
+        gf_BgScanProbe(lv_s, 6);
+    }
+    else if (gv_bgExtraOn) {
+        gf_BgExtra(lv_s, gf_BaseAiLaneOwner(2));
+        gf_BgExtra(lv_s, gf_BaseAiLaneOwner(5));
+    }
+    Wait(1.0, c_timeGame);
+    for (lv_lane = 1; lv_lane <= 6; lv_lane += 1) {
+        gf_BgFacts(lv_s, gf_BaseAiLaneOwner(lv_lane));
+        gf_BgAiSnap(lv_s, "t1", gf_BaseAiLaneOwner(lv_lane));
+        Wait(0.0625, c_timeGame);
+    }
+    BankSave(gv_dbgBank);
+    // Accept maps of lane 2, before its AI builds on anything: the 6x6
+    // Refinery and the stock 3x3 Assimilator, each around a placed 6x6
+    // geyser and around the stock 3x3 probe geyser.
+    lv_p = gf_BaseAiLaneOwner(2);
+    lv_g = gf_BgGeyser(PlayerStartLocation(lv_p), 0);
+    if (UnitIsValid(lv_g)) {
+        gf_BgAcceptMap(lv_s, "accept", lv_p, "Refinery", UnitGetPosition(lv_g));
+        Wait(0.0625, c_timeGame);
+        gf_BgAcceptMap(lv_s, "accA6", lv_p, "Assimilator", UnitGetPosition(lv_g));
+        Wait(0.0625, c_timeGame);
+    }
+    gf_BgAcceptMap(lv_s, "accR3", lv_p, "Refinery", gv_bgExtraAt[lv_p][0]);
+    Wait(0.0625, c_timeGame);
+    gf_BgAcceptMap(lv_s, "accA3", lv_p, "Assimilator", gv_bgExtraAt[lv_p][0]);
+    BankSave(gv_dbgBank);
+    gf_BgDirect(lv_s, gf_BaseAiLaneOwner(1));
+    BankSave(gv_dbgBank);
+    gf_BgBlock(lv_s, gf_BaseAiLaneOwner(1));
+    BankSave(gv_dbgBank);
+    gf_BgDirect(lv_s, gf_BaseAiLaneOwner(4));
+    BankSave(gv_dbgBank);
+    while (!gv_bgSnapsDone) {
+        Wait(1.0, c_timeGame);
+    }
+    TriggerEnable(gt_BgWatch, false);
+    if (gv_bgHelp) {
+        TriggerEnable(gt_BgStaff, false);
+    }
+    for (lv_lane = 1; lv_lane <= 6; lv_lane += 1) {
+        BankValueSetFromInt(gv_dbgBank, lv_s, "p" + IntToString(gf_BaseAiLaneOwner(lv_lane)) + "GasOrderTicks", gv_bgOrderTicks[gf_BaseAiLaneOwner(lv_lane)]);
+        BankValueSetFromInt(gv_dbgBank, lv_s, "p" + IntToString(gf_BaseAiLaneOwner(lv_lane)) + "GasOrderSeen", gv_bgOrderSeen[gf_BaseAiLaneOwner(lv_lane)]);
+        BankValueSetFromInt(gv_dbgBank, lv_s, "p" + IntToString(gf_BaseAiLaneOwner(lv_lane)) + "GasIssued", gv_bgIssued[gf_BaseAiLaneOwner(lv_lane)]);
+    }
+    gf_BgExtraBuilt(lv_s, gf_BaseAiLaneOwner(2));
+    gf_BgExtraBuilt(lv_s, gf_BaseAiLaneOwner(3));
+    gf_BgExtraBuilt(lv_s, gf_BaseAiLaneOwner(5));
+    gf_BgExtraBuilt(lv_s, gf_BaseAiLaneOwner(6));
+    gf_BgHelpEnd(lv_s, gf_BaseAiLaneOwner(2));
+    gf_BgHelpEnd(lv_s, gf_BaseAiLaneOwner(3));
+    gf_BgHelpEnd(lv_s, gf_BaseAiLaneOwner(5));
+    gf_BgHelpEnd(lv_s, gf_BaseAiLaneOwner(6));
+    for (lv_lane = 1; lv_lane <= 6; lv_lane += 1) {
+        gf_BgMapGas(lv_s, gf_BaseAiLaneOwner(lv_lane));
+    }
+    BankSave(gv_dbgBank);
+    if (gv_bgMapGas) {
+        // Each case on its own owner: lanes 2, 3, 5.
+        gf_BgRelease(lv_s, gf_BaseAiLaneOwner(2));
+        BankSave(gv_dbgBank);
+        gf_BgAway(lv_s, gf_BaseAiLaneOwner(3));
+        BankSave(gv_dbgBank);
+        gf_BgEmpty(lv_s, gf_BaseAiLaneOwner(5));
+        BankSave(gv_dbgBank);
+    }
+    // The direct buildings are long finished: the footprint they apply now.
+    gf_BgGasGrid(lv_s, "p" + IntToString(gf_BaseAiLaneOwner(1)) + "Done", gf_BgGasType(gf_BaseAiLaneOwner(1)), gf_BaseAiLaneOwner(1), gv_bgAt[gf_BaseAiLaneOwner(1)]);
+    gf_BgGasGrid(lv_s, "p" + IntToString(gf_BaseAiLaneOwner(4)) + "Done", gf_BgGasType(gf_BaseAiLaneOwner(4)), gf_BaseAiLaneOwner(4), gv_bgAt[gf_BaseAiLaneOwner(4)]);
+    BankSave(gv_dbgBank);
+    // Last: the reach probe changes the towns of lane 2's AI.
+    gf_BgReach(lv_s, gf_BaseAiLaneOwner(2));
+    BankSave(gv_dbgBank);
+}

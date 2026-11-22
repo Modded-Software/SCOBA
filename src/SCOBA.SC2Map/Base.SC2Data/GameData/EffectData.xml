@@ -77,10 +77,14 @@
         <InitialEffect value="SCOBAAttackCooldown15"/>
         <WhichLocation Value="TargetUnitOrPoint"/>
     </CEffectCreatePersistent>
-    <CEffectLaunchMissile id="PsiBlastLaunchMissile">
-        <LaunchEffect value="SCOBAAttackCooldown10"/>
-        <ImpactLocation Value="TargetUnitOrPoint"/>
-    </CEffectLaunchMissile>
+    <!-- Psi Blast shot (operator 2026-11-22): the stock missile beside the
+         button clock, as SCOBAToshShot. PsiBlastLaunchMissile is stock: as
+         its LaunchEffect the clock, an effect on the caster, sat in the
+         missile's effect tree, and the missile was drawn at the shooter. -->
+    <CEffectSet id="SCOBAPsiBlastShot">
+        <EffectArray value="PsiBlastLaunchMissile"/>
+        <EffectArray value="SCOBAAttackCooldown10"/>
+    </CEffectSet>
     <!-- Glaive bounces (REQ-AIR-CREEP): air targets with User1 only, like
          SCOBAAirGlaive. These two effects belong to the stock glaive chain.
          SCOBAMutalisk is the only glaive unit on this map. -->

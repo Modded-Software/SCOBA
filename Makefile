@@ -39,15 +39,16 @@ help: ## Show this help
 # =============================================================================
 # Setup
 # =============================================================================
-.PHONY: preflight init install install-ci install-deps install-hooks sync
+DEPS := $(SCRIPT_BASH) $(REPO_ROOT)/scripts/setup/deps.sh
+
+.PHONY: preflight init install install-ci install-deps install-hdtex install-hooks sync
 preflight: ## Verify environment
 	test -d "$(CI_DIR)" || { echo "ERROR: CI directory not found at $(CI_DIR)" >&2; exit 1; }
 	test -f "$(CI_DIR)/scripts/reinstall-hooks" || { echo "ERROR: reinstall-hooks missing" >&2; exit 1; }
 	echo "Preflight OK"
 
-init: ## Install system-level dependencies
-	echo "TODO: implement per-project system dependencies."
-	:
+init: ## Report system dependencies (tools, StarCraft II, GE-Proton, lsfg-vk); installs nothing
+	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) check
 
 install: install-deps ## Full install: deps (hooks install separately, root-only: sudo make install-hooks)
 	:
@@ -55,9 +56,14 @@ install: install-deps ## Full install: deps (hooks install separately, root-only
 install-ci: install-deps ## CI install: deps only, no hooks
 	:
 
-install-deps: ## Install project dependencies
-	echo "TODO: implement per-project dependency install."
-	:
+install-deps: ## Install project dependencies: uv env, stormex (built from source), model viewer, then check
+	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) venv
+	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) stormex
+	$(MAKE) -C "$(REPO_ROOT)" viewer-install
+	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) check
+
+install-hdtex: ## Clone ../upscale-on-arc (if absent) and install it, for the HD texture cache build
+	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) upscale
 
 install-hooks: ## Install native git hooks (root-only: root-owned, immutable)
 	$(SCRIPT_BASH) $(CI_DIR)/scripts/reinstall-hooks
@@ -128,15 +134,18 @@ pitch: ## Rebuild and run the 10-second pitch profile
 WEBVIEWER_DIR := $(REPO_ROOT)/webviewer
 WEBVIEWER := WEBVIEWER_DIR="$(WEBVIEWER_DIR)" $(SCRIPT_BASH) $(WEBVIEWER_DIR)/scripts
 
-.PHONY: viewer-install viewer-build viewer-catalog viewer-survey viewer-serve viewer-start viewer-stop viewer-restart viewer-status viewer-test
+.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-serve viewer-start viewer-stop viewer-restart viewer-status viewer-test viewer-test-all
 viewer-install: ## Model viewer: install node deps and the test browser, build the renderer
 	$(WEBVIEWER)/setup.sh
 
 viewer-build: ## Model viewer: bundle the renderer with the M3 parser patches
 	$(WEBVIEWER)/build.sh
 
-viewer-catalog: ## Model viewer: rebuild the unit catalog and icons from the game data
-	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/catalog.sh
+viewer-catalog: ## Model viewer: extract the stock data again and rebuild every dataset's unit and doodad catalogs and icons
+	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/catalog.sh --extract
+
+viewer-dataset: ## Model viewer: make a new dataset from the full stock data (NAME=id, WITH_MAP=1 to copy the SCOBA map layer in)
+	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/dataset-new.sh "$(NAME)" $(if $(WITH_MAP),--with-map,)
 
 viewer-survey: ## Model viewer: report which unit models the parser can read
 	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/m3-survey.sh
@@ -155,5 +164,8 @@ viewer-restart: viewer-stop viewer-start ## Model viewer: restart the background
 viewer-status: ## Model viewer: show whether the background server runs
 	$(WEBVIEWER)/status.sh
 
-viewer-test: ## Model viewer: run the Playwright integration tests
+viewer-test: ## Model viewer: run the Playwright integration tests (not the @slow surveys)
 	$(WEBVIEWER)/test.sh
+
+viewer-test-all: ## Model viewer: run every Playwright test, the @slow surveys too
+	WEBVIEWER_TEST_ALL=1 $(WEBVIEWER)/test.sh

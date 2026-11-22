@@ -1,0 +1,78 @@
+/* The theme: colour and shape tokens, the base look of controls, and the
+   look of the reusable components (components.js). The HD texture viewer
+   (scripts/hdtex/compare.html) opens from disk, so it carries its own copy
+   of the :root block; tests/texture-window.spec.mjs holds the two equal. */
+:root {
+  --bg: #0d0e11; --panel: #15171c; --raised: #1f2229; --line: #2a2e37;
+  --text: #e4e6eb; --dim: #8b919d; --accent: #7aa2ff; --accent-bg: #1c2740;
+  --radius: 6px;
+  --glass: rgba(17, 18, 22, 0.86);
+  --warn: #e0a070; --danger: #ff7a7a;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 12px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+ul { list-style: none; margin: 0; padding: 0; }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+
+/* ---- controls ---- */
+button, input, select { font: inherit; color: inherit; height: 26px; padding: 0 8px; background: var(--raised); border: 1px solid transparent; border-radius: var(--radius); outline: none; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+input[type='checkbox'] { height: auto; padding: 0; accent-color: var(--accent); }
+input::placeholder { color: var(--dim); }
+input:focus, select:focus, button:focus-visible { border-color: var(--accent); }
+button { cursor: pointer; color: var(--dim); background: transparent; white-space: nowrap; }
+button:hover { color: var(--text); background: var(--raised); }
+button:disabled { opacity: 0.4; cursor: default; }
+button.on { color: var(--accent); background: var(--accent-bg); }
+button.primary { color: var(--bg); background: var(--accent); font-weight: 600; }
+button.primary:hover { color: var(--bg); background: var(--text); }
+select { cursor: pointer; color: var(--dim); padding: 0 4px; }
+select:hover { color: var(--text); }
+
+/* ---- rows of a list: hover and selected ---- */
+.rows > li { border-radius: var(--radius); }
+.rows > li:hover { background: var(--raised); }
+.rows > li.selected { background: var(--accent-bg); box-shadow: inset 2px 0 0 var(--accent); }
+.sub { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- Dialog, Picker, ConfirmDialog ---- */
+.dialog { width: min(720px, calc(100% - 32px)); max-height: calc(100% - 64px); padding: 0; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: calc(var(--radius) * 2); box-shadow: var(--shadow); }
+.dialog::backdrop { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); }
+.dialog[open] { display: flex; flex-direction: column; }
+.dialog-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 8px 8px 14px; font-weight: 600; }
+.dialog-body { display: flex; flex-direction: column; gap: 8px; padding: 4px 14px 14px; min-height: 0; }
+.dialog-close, .window-close { width: 26px; padding: 0; font-size: 16px; line-height: 1; }
+.picker-list { overflow-y: auto; max-height: 60vh; min-height: 0; }
+.picker-list li { padding: 5px 8px; cursor: pointer; }
+.confirm-dialog { width: min(420px, calc(100% - 32px)); }
+.confirm-dialog .question { padding: 2px 0 6px; }
+.confirm-dialog .answers { display: flex; justify-content: flex-end; gap: 6px; }
+.confirm-dialog .answers button { padding: 0 14px; }
+
+/* ---- Toast: bottom centre, sliding up from below the edge ---- */
+.toast { position: fixed; z-index: 11; bottom: 16px; left: 50%; display: flex; gap: 6px; align-items: center; max-width: 70vw; padding: 8px 8px 8px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: calc(var(--radius) * 2); box-shadow: var(--shadow); transform: translate(-50%, calc(100% + 32px)); visibility: hidden; transition: transform 0.25s ease-out, visibility 0s linear 0.25s; }
+.toast.up { transform: translate(-50%, 0); visibility: visible; transition: transform 0.25s ease-out, visibility 0s; }
+/* At the top: down from above the top edge. */
+.toast.top { top: 12px; bottom: auto; transform: translate(-50%, calc(-100% - 32px)); }
+.toast.top.up { transform: translate(-50%, 0); }
+.toast.failure .text { color: var(--warn); }
+.toast .text { margin-right: 8px; }
+.toast button { padding: 0 12px; }
+
+/* ---- Dropdown ---- */
+.dropdown { position: relative; }
+.dropdown-list { position: absolute; z-index: 8; top: calc(100% + 4px); right: 0; min-width: 100%; max-height: 60vh; overflow-y: auto; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: calc(var(--radius) * 1.5); box-shadow: var(--shadow); }
+.dropdown-list li { display: flex; align-items: center; border-radius: var(--radius); }
+.dropdown-list li.selected { background: var(--accent-bg); }
+.dropdown-list li.selected button { color: var(--accent); }
+
+/* ---- FloatingWindow ---- */
+.window { position: fixed; z-index: 7; display: flex; flex-direction: column; min-width: 320px; min-height: 200px; overflow: hidden; resize: both; background: var(--panel); border: 1px solid var(--line); border-radius: calc(var(--radius) * 2); box-shadow: var(--shadow); }
+.window-head { display: flex; align-items: center; justify-content: space-between; flex: none; height: 34px; padding: 0 4px 0 14px; cursor: move; user-select: none; -webkit-user-select: none; touch-action: none; }
+.window-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.window-body { flex: 1; min-height: 0; display: flex; border-top: 1px solid var(--line); }
+.window-body > iframe { flex: 1; width: 100%; height: 100%; border: 0; background: var(--bg); }
+.window.dragging iframe { pointer-events: none; }

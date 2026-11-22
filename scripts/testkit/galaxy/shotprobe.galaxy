@@ -224,7 +224,7 @@ void gf_ProbeAll () {
     gf_ProbeTpsShot("tps_ff_enemy_tosh", 2, false, 4.0, 0.0, 4, false);
     gf_ProbeTpsShot("tps_ff_own_kerr", 2, true, 3.0, 0.0, 1, false);
     gf_ProbeTpsShot("tps_ff_enemy_kerr", 2, true, 3.0, 0.0, 4, false);
-    gf_ProbeTpsShot("tps_ff_own_talons", 2, true, 0.8, 0.0, 1, false);
+    gf_ProbeTpsShot("tps_ff_own_close", 2, true, 0.8, 0.0, 1, false);
     gf_ProbeTpsShot("tps_rng_kerr_05", 2, true, 5.0, 0.0, 4, false);
     gf_ProbeTpsShot("tps_rng_tosh_11", 2, false, 11.0, 0.0, 4, false);
     gf_ProbeWalkShot("walk_none", 0);

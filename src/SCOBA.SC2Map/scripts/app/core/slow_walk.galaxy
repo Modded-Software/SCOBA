@@ -5,7 +5,7 @@ const string c_SLOW_WALK_BUFF = "SCOBASlowWalk";
 // Speed ramp (R-SLOW-21, operator 2026-11-21): walk to slow walk and back
 // over c_SLOW_WALK_RAMP game seconds. c_SLOW_WALK_LEVELS speed levels:
 // level k is the buff SCOBASlowWalkRampNN (k < 16) or c_SLOW_WALK_BUFF
-// (k = 16), MoveSpeedMultiplier 1 - 0.6 k / 16: linear from 1 to 0.4.
+// (k = 16), MoveSpeedMultiplier 1 - 0.7 k / 16: linear from 1 to 0.3.
 const fixed c_SLOW_WALK_RAMP = 1.0;
 const int c_SLOW_WALK_LEVELS = 16;
 // Game units/s the slow leg clips cover at clip rate 1: the stock walk

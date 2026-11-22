@@ -15,6 +15,16 @@ const int c_BASE_AI_PLAYERS = 16;
 const fixed c_BASE_AI_FIELD_R = 7.0;     // hall centre to a mineral field
 const fixed c_BASE_AI_GEYSER_R = 10.0;   // hall centre to a geyser
 
+// Gas (R-BASE-36, systems/base/base_gas).
+const fixed c_BASE_GAS_TICK = 2.0;       // game s between two looks
+const fixed c_BASE_GAS_R = 15.0;         // hall to its geysers: 10.0 to 14.14 in the built map
+const fixed c_BASE_GAS_FIRST = 30.0;     // game s from an owner's AI start to its first gas build
+const fixed c_BASE_GAS_NEXT = 60.0;      // game s between two gas builds of one owner
+const fixed c_BASE_GAS_GIVE_UP = 60.0;   // a builder that has not built by then is dropped
+const fixed c_BASE_GAS_NEAR = 1.0;       // a gas building stands on its geyser's point
+const int c_BASE_GAS_CREW = 3;           // workers that gather from one gas building
+const int c_BASE_GAS_MAX = 48;           // gas buildings with a crew at one time (36 geysers)
+
 // Unit custom value index set to 1 on a hired unit (systems/hire).
 const int c_HIRE_MARK = 0;
 

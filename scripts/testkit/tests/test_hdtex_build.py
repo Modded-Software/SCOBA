@@ -147,7 +147,8 @@ class UpscalerToolTest(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
-        for name in ("arc-upscale", "upscale.py", "uv.lock"):
+        for name in ("arc-upscale", "upscale.py", "uv.lock", "arc_upscale/cli.py"):
+            (self.root / name).parent.mkdir(exist_ok=True)
             (self.root / name).write_text(name)
         patch = mock.patch.dict(os.environ, {"ARC_UPSCALE": str(self.root / "arc-upscale")})
         patch.start()
@@ -160,10 +161,22 @@ class UpscalerToolTest(unittest.TestCase):
         second = upscaler.version()
         self.assertNotEqual(second, first)
         (self.root / "uv.lock").write_text("changed")
-        self.assertNotIn(upscaler.version(), (first, second))
+        third = upscaler.version()
+        self.assertNotIn(third, (first, second))
+        (self.root / "arc_upscale" / "cli.py").write_text("changed")
+        fourth = upscaler.version()
+        self.assertNotIn(fourth, (first, second, third))
+        (self.root / "arc_upscale" / "gpus.py").write_text("new module")
+        self.assertNotIn(upscaler.version(), (first, second, third, fourth))
 
     def test_an_incomplete_checkout_is_an_error(self) -> None:
         (self.root / "uv.lock").unlink()
+        with self.assertRaises(upscaler.UpscaleError):
+            upscaler.version()
+
+    def test_a_checkout_without_the_package_is_an_error(self) -> None:
+        (self.root / "arc_upscale" / "cli.py").unlink()
+        (self.root / "arc_upscale").rmdir()
         with self.assertRaises(upscaler.UpscaleError):
             upscaler.version()
 

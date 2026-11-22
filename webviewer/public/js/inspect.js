@@ -60,7 +60,12 @@
     return {
       id: item.id,
       path: item.path,
-      unit: item.unit ? item.unit.id : null,
+      // Where its data and textures come from.
+      dataset: item.dataset,
+      // A unit or a doodad, never both; a bare model file is neither.
+      unit: item.unit && !item.unit.doodad ? item.unit.id : null,
+      doodad: item.unit && item.unit.doodad ? item.unit.id : null,
+      variation: item.variation,
       name: item.unit ? item.unit.name : null,
       // Loaded means the model has geometry to draw.
       loaded: item.model.batches.length > 0,
@@ -87,6 +92,14 @@
       engineTeam: item.instance.teamColor,
       tint: Array.from(item.instance.vertexColor),
       texturesLoaded: texturesLoaded(item.model),
+      // HD textures (hd.js): the choice, the layers that have both sets, and
+      // the texture overrides the renderer's instance holds.
+      hd: item.hd,
+      hdLayers: item.hdLayers,
+      hdApplied: item.instance.textureOverrides.size,
+      // The longest side of any texture the model has, and whether that makes its grid glow blue.
+      largestTexture: item.largestTexture,
+      blueGlow: app.isHd(item),
       // Geometry layout as the renderer reads it.
       vertexStride: item.model.vertexSize,
       vertexCount: item.model.vertexCount,
@@ -199,15 +212,22 @@
     return { width, height, data };
   }
 
-  /** The drawn colour where a world point lands on the canvas. */
-  function groundPixel(x, y, z = 0) {
+  /** The drawn colours where world points [x, y, z?] land on the canvas, from one frame. */
+  function groundPixels(points) {
     const frameData = grab();
     const screen = new Float32Array(2);
-    scene.camera.worldToScreen(screen, new Float32Array([x, y, z]), scene.viewport);
-    const px = Math.min(frameData.width - 1, Math.max(0, screen[0]));
-    const py = Math.min(frameData.height - 1, Math.max(0, screen[1]));
-    const i = (py * frameData.width + px) * 4;
-    return { px, py, rgb: [frameData.data[i], frameData.data[i + 1], frameData.data[i + 2]] };
+    return points.map(([x, y, z = 0]) => {
+      scene.camera.worldToScreen(screen, new Float32Array([x, y, z]), scene.viewport);
+      const px = Math.min(frameData.width - 1, Math.max(0, screen[0]));
+      const py = Math.min(frameData.height - 1, Math.max(0, screen[1]));
+      const i = (py * frameData.width + px) * 4;
+      return { px, py, rgb: [frameData.data[i], frameData.data[i + 1], frameData.data[i + 2]] };
+    });
+  }
+
+  /** The drawn colour where a world point lands on the canvas. */
+  function groundPixel(x, y, z = 0) {
+    return groundPixels([[x, y, z]])[0];
   }
 
   /**
@@ -370,5 +390,28 @@
     return app.pending === 0 && viewer.promiseMap.size === 0;
   }
 
-  Object.assign(app, { state, setConstantLayers, groundPixel, groundPeaks, worldToCanvas, mark, changedSinceMark, pixels, colorStats, gridLines, idle });
+  /**
+   * For each page pixel [clientX, clientY]: is something drawn there (not
+   * the background colour)? From one frame. Read with the grid and the sky
+   * off and the mouse away, it is the units' silhouette.
+   */
+  function drawnAt(points) {
+    const { width, height, data } = grab();
+    const box = canvas.getBoundingClientRect();
+    const k = width / canvas.clientWidth;
+    return points.map(([cx, cy]) => {
+      const x = Math.floor((cx - box.left) * k);
+      const y = height - 1 - Math.floor((cy - box.top) * k);
+      if (x < 0 || y < 0 || x >= width || y >= height) return null;
+      const i = (y * width + x) * 4;
+      return !isBackground(data[i], data[i + 1], data[i + 2]);
+    });
+  }
+
+  /** Draw only the solid (unblended) parts of every unit, or all parts again (tests compare the two). */
+  function setSolidOnly(on) {
+    for (const item of app.items) item.instance.solidOnly = Boolean(on);
+  }
+
+  Object.assign(app, { state, setConstantLayers, drawnAt, setSolidOnly, groundPixel, groundPixels, groundPeaks, worldToCanvas, mark, changedSinceMark, pixels, colorStats, gridLines, idle });
 })();

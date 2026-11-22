@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Landmarks (public/js/landmarks.js): named camera views in the view tools
-// select. "origin (0, 0, 0)" is always there. Each "add all" run frames its
+// drop-down. "origin (0, 0, 0)" is always there. Each "add all" run frames its
 // new block and keeps that view as a landmark named after the list filters.
 
 async function open(page) {
@@ -18,7 +18,13 @@ async function open(page) {
 const landmarks = (page) => page.evaluate(() => window.SC2App.landmarks());
 const camera = async (page) => (await page.evaluate(() => window.sc2viewer.state())).camera;
 const run = (page) => page.evaluate(() => window.SC2App.addAllState());
-const options = (page) => page.locator('#landmarks option').allTextContents();
+// The drop-down list's rows (landmarks-store.spec.mjs covers the pin and trash buttons).
+const options = (page) => page.locator('#landmarks-list li .go').allTextContents();
+/** Open the list and click the row of landmark `id`. */
+async function choose(page, id) {
+  await page.click('#landmarks-button');
+  await page.click(`#landmarks-list li[data-id="${id}"] .go`);
+}
 
 async function filterFew(page) {
   await page.selectOption('#family', 'is:Melee');
@@ -68,7 +74,8 @@ test('add all frames the new block, adds a landmark named after the filters, and
   expect(await options(page)).toEqual(['origin (0, 0, 0)', 'Melee Units "zergling"']);
   const block = marks[1];
   expect(r.landmark).toBe(block.id);
-  expect(await page.locator('#landmarks').inputValue()).toBe(String(block.id));
+  expect((await page.evaluate(() => window.SC2App.landmarkState())).selected).toBe(block.id);
+  await expect(page.locator('#landmarks-button')).toHaveText('Melee Units "zergling"');
   // The camera is the landmark's view, and every new unit stands in the uncovered part of the canvas.
   expectView(await camera(page), block);
   const inside = await page.evaluate((ids) => {
@@ -81,9 +88,9 @@ test('add all frames the new block, adds a landmark named after the filters, and
   expect(inside.every(Boolean)).toBe(true);
 
   // The select: origin, then back to the block.
-  await page.selectOption('#landmarks', String(marks[0].id));
+  await choose(page, marks[0].id);
   expectView(await camera(page), marks[0]);
-  await page.selectOption('#landmarks', String(block.id));
+  await choose(page, block.id);
   expectView(await camera(page), block);
   expect(errors).toEqual([]);
 });

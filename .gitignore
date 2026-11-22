@@ -9,6 +9,7 @@ dist/
 out/
 *.log
 tools/stormex
+tools/stormex.pins
 .DS_Store
 src/SCOBA.SC2Map/Assets/
 src/SCOBA.SC2Map/.character_anim_assets

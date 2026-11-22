@@ -25,7 +25,8 @@ async function place(page, id) {
 
 const state = (page) => page.evaluate(() => window.sc2viewer.state());
 const itemOf = async (page, id) => (await state(page)).items.find((i) => i.id === id);
-const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemScreen(i, 0.5), id);
+// A pixel on the unit's picture: the mouse hit goes by pixel.
+const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
 const onWorld = (page, p) => page.evaluate((q) => window.sc2viewer.screenOf(q), p);
 
 async function altDrag(page, from, to) {
@@ -77,16 +78,20 @@ test('alt + left drag on a unit moves it; the point pressed stays under the mous
   expect(errors).toEqual([]);
 });
 
-test('negative: alt + left drag on empty ground scrolls the camera and moves no unit', async ({ page }) => {
+// Operator 2026-11-22: alt + left off any unit draws the select rectangle
+// (multi-select.spec.mjs); before, it scrolled the camera.
+test('negative: alt + left drag on empty ground moves no unit and keeps the camera', async ({ page }) => {
   const errors = await open(page);
   const marine = await place(page, 'Marine');
   const before = await state(page);
   const from = await onWorld(page, [3, 2, 0]);
-  await altDrag(page, from, [from[0] - 80, from[1]]);
+  // A short drag that stays clear of the unit.
+  await altDrag(page, from, [from[0] + 60, from[1]]);
   const after = await state(page);
   const item = after.items.find((i) => i.id === marine);
   expect([item.x, item.y]).toEqual([0, 0]);
-  expect(after.camera.target).not.toEqual(before.camera.target);
+  expect(after.camera.target).toEqual(before.camera.target);
+  expect(after.pick.selection).toEqual([]);
   expect(errors).toEqual([]);
 });
 

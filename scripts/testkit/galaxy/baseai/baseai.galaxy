@@ -29,7 +29,7 @@ string gf_BaBuildOrder (int lp_player);
 void gf_BaMacro ();                 // scripts/testkit/galaxy/baseai/baseai_macro.galaxy
 void gf_BaFlightGroup ();           // scripts/testkit/galaxy/baseai/baseai_flight.galaxy
 void gf_BhHall ();                  // scripts/testkit/galaxy/baseai/baseai_hall.galaxy
-void gf_BgGas ();                   // scripts/testkit/galaxy/baseai/baseai_gas.galaxy
+void gf_BgGas ();                   // scripts/testkit/galaxy/baseai/baseai_gas_main.galaxy
 
 int gf_Ba100 (fixed lp_v) {
     return FixedToInt(lp_v * 100.0);
@@ -303,6 +303,8 @@ string gf_BaAllWorkerOrders (int lp_player) {
 
 // A5: one unit's AI state and how far it moved from lp_at.
 void gf_BaUnitAi (string lp_s, string lp_key, unit lp_u, point lp_at) {
+    unit lv_near;
+
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "Valid", UnitIsValid(lp_u));
     if (!UnitIsValid(lp_u)) {
         return;
@@ -312,6 +314,15 @@ void gf_BaUnitAi (string lp_s, string lp_key, unit lp_u, point lp_at) {
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + "Moved100", gf_Ba100(DistanceBetweenPoints(UnitGetPosition(lp_u), lp_at)));
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_key + "UsingSupply", UnitTestState(lp_u, c_unitStateUsingSupply));
     gf_BaOrder(lp_s, lp_key, lp_u);
+    // Raw: where it stood, where it is, and the owner's nearest structure
+    // to where it stood (a structure placed on a unit pushes it aside).
+    lv_near = UnitGroupClosestToPoint(UnitGroup(null, UnitGetOwner(lp_u), RegionCircle(lp_at, 8.0), UnitFilter((1 << c_targetFilterStructure), 0, 0, (1 << (c_targetFilterDead - 32))), 0), lp_at);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "From100", gf_BaXY100(lp_at));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "At100", gf_BaXY100(UnitGetPosition(lp_u)));
+    if (UnitIsValid(lv_near)) {
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "Near", UnitGetType(lv_near));
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_key + "NearAt100", gf_BaXY100(UnitGetPosition(lv_near)));
+    }
 }
 
 // Every unit the probe players own before their base exists: script

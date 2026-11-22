@@ -188,7 +188,7 @@ START = JumpClip("Jump Start", 267, False)
 AIR = JumpClip("Jump", 533, True)
 END = JumpClip("Jump End", 250, False)
 JUMP_PHASES = (START, AIR, END)
-# Heroes with jump clips (keys of character_anim_assets.SOURCE_MODELS).
+# Heroes with jump clips (keys of heroanim.rig.HEROES).
 JUMP_HEROES = frozenset({"tosh"})
 
 # Walk directions, as character_anim_assets.AIM_DIRECTIONS.

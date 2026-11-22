@@ -67,10 +67,25 @@
     </CFootprint>
     <!-- 6x6 vespene geyser and gas buildings (R-BASE-35, operator
          2026-11-20: "double to 6x6, also double that of all refineries").
-         The stock footprints scaled x2: FootprintGeyserRounded (void.sc2mod
-         rows and shape), FootprintGeyserRoundedBuilt (liberty shape) and
+         The layers are the stock ones scaled x2: FootprintGeyserRounded
+         (void.sc2mod rows), FootprintGeyserRoundedBuilt and
          Footprint3x3CappedGeyser. The solid square is 6x6. The ring of "o"
-         cells (no town hall this near) keeps its stock width of 3. -->
+         cells (no town hall this near) keeps its stock width of 3.
+         Shape: all three block the whole 6x6 square for pathing, the same
+         square the gas building checks. The stock rounded shapes x2
+         blocked only a 4x4 and left a walkable strip inside the checked
+         square; a unit standing there stopped the build (baseai gas run
+         20261122-090349).
+         Shape Radius 4.2426 is half the diagonal, as stock writes it for
+         a square. The engine reports 4.25 as the radius of the geyser and
+         of the gas building: the larger of the Shape's radius and the
+         unit Radius field (3). A probe geyser with a small Shape read
+         3.00 (run 20261122-110629), one with this square and unit Radius
+         4.75 read 4.75 (run 20261122-104133).
+         Open: the stock AI builds on no geyser whose Shape blocks most of
+         the 6x6 (126 of 144 sub-cells or more; runs 20261122-095831,
+         -101245). It built on a probe geyser with the stock built octagon
+         (32 of 144; runs 20261122-095219, -110629). SPEC-BASE-AI 8. -->
     <CFootprint id="FootprintScobaGeyser6x6">
         <Layers index="Check" Area="-6,-6,6,6">
             <Sets index="0">
@@ -114,9 +129,9 @@
             <Rows value="..oooooooo.."/>
         </Layers>
         <Shape>
-            <Radius value="2.9155"/>
-            <Offsets value="-1,-2;1,-2;-1,2;1,2;-2,-1;-2,1;2,-1;2,1;-2.5,1.5;-1.5,2.5;-2.5,-1.5;1.5,2.5;-1.5,-2.5;2.5,1.5;1.5,-2.5;2.5,-1.5"/>
-            <Borders value="0,12,2;1,0,2;2,3,2;3,11,2;4,5,2;5,8,2;6,15,2;7,6,2;8,9,2;9,2,2;10,4,2;11,13,2;12,10,2;13,7,2;14,1,2;15,14,2"/>
+            <Radius value="4.2426"/>
+            <Offsets value="-3,-3;-3,3;3,3;3,-3"/>
+            <Borders value="3,0,2;0,1,2;1,2,2;2,3,2"/>
         </Shape>
     </CFootprint>
     <CFootprint id="FootprintScobaGeyser6x6Built">
@@ -162,9 +177,9 @@
             <Rows value="..oooooooo.."/>
         </Layers>
         <Shape>
-            <Radius value="3.3541"/>
-            <Offsets value="-1.5,-3;1.5,-3;-1.5,3;1.5,3;-3,-1.5;-3,1.5;3,-1.5;3,1.5"/>
-            <Borders value="0,4,2;1,0,2;2,3,2;3,7,2;4,5,2;5,2,2;6,1,2;7,6,2"/>
+            <Radius value="4.2426"/>
+            <Offsets value="-3,-3;-3,3;3,3;3,-3"/>
+            <Borders value="3,0,2;0,1,2;1,2,2;2,3,2"/>
         </Shape>
     </CFootprint>
     <CFootprint id="FootprintScoba6x6CappedGeyser">

@@ -61,9 +61,11 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-11 | The hero torso MUST always follow the camera yaw, standing and moving. |
 | R-TPS-12 | While not aiming, the torso MUST NOT follow the camera pitch. |
 | R-TPS-13 | While not aiming, the head MUST tilt up or down toward the camera pitch, to the R-TPS-16 look point (operator 2026-11-21; was "slightly"). |
-| R-TPS-14 | While aiming, the whole torso MUST follow the camera pitch. The head MUST NOT tilt or lead separately. |
+| R-TPS-14 | While aiming, the whole torso MUST follow the camera pitch. The head MUST NOT tilt or lead separately. The torso MUST nod up and down, on every hero; it MUST NOT lean sideways (operator 2026-11-22: Kerrigan's torso turned on the wrong axis). |
 | R-TPS-15 | The TPS walk MUST turn and animate as the Point & Click right-hold walk does (R-PNC-68). |
 | R-TPS-16 | In TPS, while not aiming, the head MUST look at a point 8 units past the camera target along the view (operator 2026-11-21, "test with 8 first"): it MUST turn sideways and up or down toward it as far as the head range allows (25 degrees sideways, 30 up or down; operator 2026-11-21, was 15) and hold there while the camera is still. It MUST move smoothly and MUST NOT twitch. The torso animation MUST NOT change for this. Operator 2026-11-21 (was 2026-11-16: lead a fast camera turn and settle back; reported as twitching and not looking at the target). |
+| R-TPS-18 | Added 2026-11-22 by the operator. Each hero's walk direction clips (strafe, backpedal, diagonals) MUST turn that hero's whole legs: thighs, shins and feet together. Feet MUST NOT stay on the forward walk path while the pelvis turns. The bake MUST be generic: one rig record per hero, no per-hero code. |
+| R-TPS-19 | Added 2026-11-22 by the operator. Kerrigan's aim pose MUST breathe: a slow, small, looping motion in place of a still pose. Operator choice: her Psi Blast cast pose, 4 source frames to each side, 4 s per breath. The breath MUST NOT restart when the camera pitch changes. Tosh's aim pose stays still. |
 | R-TPS-17 | In TPS with Attack `auto`, while not aiming, Tosh MUST hold the shooting pose between shots as R-PNC-80 to 82 define it, standing and walking. Aiming MUST own the upper body instead. With Attack `single` no pose is held: no shot fires outside the aim. Switching to `single` MUST end the pose at once. The pose MUST NOT follow the camera pitch (R-TPS-12). Operator 2026-11-16. |
 
 ### 3.3 Cursor and crosshair
@@ -119,6 +121,9 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-60 | An aim shot MUST NOT move the hero. |
 | R-TPS-61 | An aim shot MUST NOT stop or slow a walking hero. |
 | R-TPS-62 | A proxy shot whose proxy is above the ground MUST show no hit effect: no impact model and no impact sound. A proxy shot that lands on the ground keeps its hit effect. |
+| R-TPS-63 | Added 2026-11-22 by the operator. Kerrigan's attack MUST be Psi Blast, in both modes and at every distance. She MUST NOT attack with Razor Talons. |
+| R-TPS-64 | Added 2026-11-22 by the operator. A Psi Blast that reaches its target unit MUST deal its damage to that unit, at every distance within range. |
+| R-TPS-65 | Added 2026-11-22 by the operator. Kerrigan MUST NOT have the Poison Nova ability. |
 
 ### 3.7 Shot floaters
 

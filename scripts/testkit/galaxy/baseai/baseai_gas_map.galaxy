@@ -1,0 +1,267 @@
+// Test harness: baseai group "gas", the map's gas orders (R-BASE-36,
+// systems/base/base_gas). The read-out at the end, and one case per owner:
+// a killed gas building (release), a crew member ordered away (away), an
+// empty gas building (empty). Run only when no probe mode is on
+// (baseai_gas_main.galaxy). Core: baseai_gas.galaxy.
+
+// Workers of lp_player that are script controlled and do no gas work for
+// the map: workers the map failed to give back to the AI. (The harness
+// makes no script worker for an AI lane owner unless a probe mode is on.)
+int gf_BgStuck (int lp_player) {
+    unitgroup lv_g = UnitGroup(gf_BaWorkerType(lp_player), lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0);
+    int lv_n = 0;
+    int lv_i;
+
+    for (lv_i = 1; lv_i <= UnitGroupCount(lv_g, c_unitCountAll); lv_i += 1) {
+        if (AIIsScriptControlled(UnitGroupUnit(lv_g, lv_i)) && !gf_BaseGasHas(UnitGroupUnit(lv_g, lv_i))) {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}
+
+// The owner's gas building on placed geyser lp_n. null: none.
+unit gf_BgMapBuilding (int lp_player, int lp_n) {
+    point lv_at = gv_bgGeyserAt[lp_player][lp_n];
+
+    if (lv_at == null) {
+        return null;
+    }
+    return UnitGroupClosestToPoint(UnitGroup(gf_BgGasType(lp_player), lp_player, RegionCircle(lv_at, c_BG_NEAR), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0), lv_at);
+}
+
+// Alive members of lp_g with a gather or build order: the AI uses them.
+int gf_BgBusy (unitgroup lp_g) {
+    string lv_a;
+    order lv_o;
+    unit lv_u;
+    int lv_n = 0;
+    int lv_i;
+
+    for (lv_i = 1; lv_i <= UnitGroupCount(lp_g, c_unitCountAll); lv_i += 1) {
+        lv_u = UnitGroupUnit(lp_g, lv_i);
+        if (!UnitIsAlive(lv_u)) {
+            continue;
+        }
+        lv_o = UnitOrder(lv_u, 0);
+        if (lv_o == null) {
+            continue;
+        }
+        lv_a = AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o));
+        if (lv_a == gf_BgHarvest(UnitGetOwner(lv_u)) || lv_a == "TerranBuild" || lv_a == "ZergBuild") {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}
+
+int gf_BgScriptCount (unitgroup lp_g) {
+    int lv_n = 0;
+    int lv_i;
+
+    for (lv_i = 1; lv_i <= UnitGroupCount(lp_g, c_unitCountAll); lv_i += 1) {
+        if (UnitIsAlive(UnitGroupUnit(lp_g, lv_i)) && AIIsScriptControlled(UnitGroupUnit(lp_g, lv_i))) {
+            lv_n += 1;
+        }
+    }
+    return lv_n;
+}
+
+// Raw: the first order ability of every alive member.
+string gf_BgOrders (unitgroup lp_g) {
+    string lv_out = "";
+    order lv_o;
+    unit lv_u;
+    int lv_i;
+
+    for (lv_i = 1; lv_i <= UnitGroupCount(lp_g, c_unitCountAll); lv_i += 1) {
+        lv_u = UnitGroupUnit(lp_g, lv_i);
+        if (!UnitIsAlive(lv_u)) {
+            continue;
+        }
+        lv_o = UnitOrder(lv_u, 0);
+        if (lv_o == null) {
+            lv_out = lv_out + "none ";
+        }
+        else {
+            lv_out = lv_out + AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o)) + " ";
+        }
+    }
+    return lv_out;
+}
+
+// The map's gas orders (R-BASE-36) at the end, for lp_player: the orders it
+// was given, and per placed geyser the owner's gas building on it, the gas
+// left in it and its crew (the map's own table): alive, how many the
+// engine has marked script controlled (raw) and how many count as AI
+// units (gf_BaseAiUnitIsAi).
+void gf_BgMapGas (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player);
+    string lv_g;
+    unitgroup lv_crew;
+    unit lv_b;
+    int lv_n;
+    int lv_s;
+    int lv_i;
+    int lv_script;
+    int lv_ai;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "MapBuilds", gv_baseGasBuilds[lp_player]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "MapGathers", gv_baseGasGathers[lp_player]);
+    for (lv_n = 0; lv_n < 2; lv_n += 1) {
+        if (gv_bgGeyserAt[lp_player][lv_n] == null) {
+            continue;
+        }
+        lv_g = lv_k + "G" + IntToString(lv_n);
+        lv_b = UnitGroupClosestToPoint(UnitGroup(gf_BgGasType(lp_player), lp_player, RegionCircle(gv_bgGeyserAt[lp_player][lv_n], c_BG_NEAR), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0), gv_bgGeyserAt[lp_player][lv_n]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_g + "Gas", gf_BaFlagInt(UnitIsValid(lv_b)));
+        if (!UnitIsValid(lv_b)) {
+            continue;
+        }
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_g + "GasBuilding", gf_BaFlagInt(UnitTestState(lv_b, c_unitStateUnderConstruction)));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_g + "GasRes", UnitGetPropertyInt(lv_b, c_unitPropResources, c_unitPropCurrent));
+        for (lv_s = 0; lv_s < c_BASE_GAS_MAX; lv_s += 1) {
+            if (gv_baseGasUnit[lv_s] != lv_b) {
+                continue;
+            }
+            lv_crew = gv_baseGasCrew[lv_s];
+            lv_script = 0;
+            lv_ai = 0;
+            for (lv_i = 1; lv_i <= UnitGroupCount(lv_crew, c_unitCountAll); lv_i += 1) {
+                if (AIIsScriptControlled(UnitGroupUnit(lv_crew, lv_i))) {
+                    lv_script += 1;
+                }
+                if (gf_BaseAiUnitIsAi(UnitGroupUnit(lv_crew, lv_i))) {
+                    lv_ai += 1;
+                }
+            }
+            BankValueSetFromInt(gv_dbgBank, lp_s, lv_g + "Crew", UnitGroupCount(lv_crew, c_unitCountAlive));
+            BankValueSetFromInt(gv_dbgBank, lp_s, lv_g + "CrewScript", lv_script);
+            BankValueSetFromInt(gv_dbgBank, lp_s, lv_g + "CrewAi", lv_ai);
+        }
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Stuck", gf_BgStuck(lp_player));
+}
+
+// The hand-back case (R-BASE-36): the gas building on the first placed
+// geyser of lp_player is killed. Its crew must go back to the AI and the
+// map must order a new build. Raw under p<player>rel.
+void gf_BgRelease (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player) + "rel";
+    point lv_at = gv_bgGeyserAt[lp_player][0];
+    unitgroup lv_crew = UnitGroupEmpty();
+    unit lv_b;
+    int lv_s;
+    int lv_builds;
+    int lv_wait;
+
+    if (lv_at == null) {
+        return;
+    }
+    lv_b = UnitGroupClosestToPoint(UnitGroup(gf_BgGasType(lp_player), lp_player, RegionCircle(lv_at, c_BG_NEAR), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0), lv_at);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Found", gf_BaFlagInt(UnitIsValid(lv_b)));
+    if (!UnitIsValid(lv_b)) {
+        return;
+    }
+    lv_s = gf_BaseGasSlotOf(lv_b);
+    if (lv_s >= 0) {
+        UnitGroupAddUnitGroup(lv_crew, gv_baseGasCrew[lv_s]);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "CrewBefore", UnitGroupCount(lv_crew, c_unitCountAlive));
+    lv_builds = gv_baseGasBuilds[lp_player];
+    UnitKill(lv_b);
+    Wait(c_BASE_GAS_TICK * 2.0 + 1.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Crew", UnitGroupCount(lv_crew, c_unitCountAlive));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Slot", gf_BaFlagInt(gf_BaseGasSlotOf(lv_b) >= 0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Stuck", gf_BgStuck(lp_player));
+    lv_wait = 0;
+    while (gv_baseGasBuilds[lp_player] == lv_builds && lv_wait < 30) {
+        Wait(1.0, c_timeGame);
+        lv_wait += 1;
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Rebuilds", gv_baseGasBuilds[lp_player] - lv_builds);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Wait", lv_wait);
+    // What the handed-back crew does next (the AI's orders).
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Busy", gf_BgBusy(lv_crew));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "CrewScript", gf_BgScriptCount(lv_crew));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Orders", gf_BgOrders(lv_crew));
+}
+
+// The away case (R-BASE-36): one crew member of the gas building on the
+// first placed geyser of lp_player gets a move order (as a person's order
+// would). It must leave the crew, go back to the AI, and the crew must be
+// full again. Then the AI must use the worker. Raw under p<player>away.
+void gf_BgAway (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player) + "away";
+    unit lv_b = gf_BgMapBuilding(lp_player, 0);
+    unitgroup lv_one = UnitGroupEmpty();
+    unit lv_w;
+    int lv_s;
+    int lv_wait;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Found", gf_BaFlagInt(UnitIsValid(lv_b)));
+    if (!UnitIsValid(lv_b)) {
+        return;
+    }
+    lv_s = gf_BaseGasSlotOf(lv_b);
+    if (lv_s < 0 || UnitGroupCount(gv_baseGasCrew[lv_s], c_unitCountAlive) == 0) {
+        BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "CrewBefore", 0);
+        return;
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "CrewBefore", UnitGroupCount(gv_baseGasCrew[lv_s], c_unitCountAlive));
+    lv_w = UnitGroupUnit(gv_baseGasCrew[lv_s], 1);
+    UnitGroupAdd(lv_one, lv_w);
+    UnitIssueOrder(lv_w, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(UnitGetPosition(lv_w), 3.0, 0.0)), c_orderQueueReplace);
+    Wait(0.0625, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "ScriptAtOrder", gf_BaFlagInt(AIIsScriptControlled(lv_w)));
+    Wait(c_BASE_GAS_TICK * 2.0 + 1.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "InCrew", gf_BaFlagInt(gf_BaseGasInCrew(lv_w)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Script", gf_BaFlagInt(AIIsScriptControlled(lv_w)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "IsAi", gf_BaFlagInt(gf_BaseAiUnitIsAi(lv_w)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Crew", UnitGroupCount(gv_baseGasCrew[lv_s], c_unitCountAlive));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Stuck", gf_BgStuck(lp_player));
+    lv_wait = 0;
+    while (gf_BgBusy(lv_one) == 0 && lv_wait < 30) {
+        Wait(1.0, c_timeGame);
+        lv_wait += 1;
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Busy", gf_BgBusy(lv_one));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "BusyWait", lv_wait);
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Orders", gf_BgOrders(lv_one));
+}
+
+// The empty case (R-BASE-36): the gas building on the first placed geyser
+// of lp_player is set to 0 gas. Its slot must be freed, its crew handed
+// back, and no new crew or build sent to it. Raw under p<player>empty.
+void gf_BgEmpty (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player) + "empty";
+    unit lv_b = gf_BgMapBuilding(lp_player, 0);
+    unitgroup lv_crew = UnitGroupEmpty();
+    int lv_s;
+    int lv_gathers;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Found", gf_BaFlagInt(UnitIsValid(lv_b)));
+    if (!UnitIsValid(lv_b)) {
+        return;
+    }
+    lv_s = gf_BaseGasSlotOf(lv_b);
+    if (lv_s >= 0) {
+        UnitGroupAddUnitGroup(lv_crew, gv_baseGasCrew[lv_s]);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "CrewBefore", UnitGroupCount(lv_crew, c_unitCountAlive));
+    lv_gathers = gv_baseGasGathers[lp_player];
+    UnitSetPropertyInt(lv_b, c_unitPropResources, 0);
+    Wait(c_BASE_GAS_TICK * 2.0 + 1.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Res", UnitGetPropertyInt(lv_b, c_unitPropResources, c_unitPropCurrent));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Slot", gf_BaFlagInt(gf_BaseGasSlotOf(lv_b) >= 0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "CrewScript", gf_BgScriptCount(lv_crew));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Stuck", gf_BgStuck(lp_player));
+    // Ten looks later: still no crew for it and no builder sent to its geyser.
+    Wait(c_BASE_GAS_TICK * 10.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "SlotLate", gf_BaFlagInt(gf_BaseGasSlotOf(lv_b) >= 0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "NewGathers", gv_baseGasGathers[lp_player] - lv_gathers);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Alive", gf_BaFlagInt(UnitIsAlive(lv_b)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "Targeted", gf_BaFlagInt(gv_baseGasTarget[lp_player] != null && DistanceBetweenPoints(UnitGetPosition(gv_baseGasTarget[lp_player]), gv_bgGeyserAt[lp_player][0]) < c_BG_NEAR));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "StuckLate", gf_BgStuck(lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Orders", gf_BgOrders(lv_crew));
+}

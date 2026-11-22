@@ -13,6 +13,8 @@
   const SPOT_CAP = 256;
   /** Fragment uniform vectors the ground shader uses besides the spots, with room to spare. */
   const OTHER_UNIFORMS = 32;
+  /** Rings the shader holds: the selected one, the mouse-over, and the other selected ones. */
+  const MAX_RINGS = 96;
 
   async function source(url) {
     const response = await fetch(url);
@@ -28,10 +30,10 @@
     const gl = viewer.gl;
     if (!viewer.webgl.ensureExtension('OES_standard_derivatives')) throw new Error('ground: OES_standard_derivatives is not available');
     let shader = null;
-    // One vec3 uniform per spot: as many as the fragment stage can hold.
-    const MAX_SPOTS = Math.max(1, Math.min(SPOT_CAP, gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS) - OTHER_UNIFORMS));
-    const spotData = new Float32Array(MAX_SPOTS * 3);
-    const ringData = new Float32Array(8);
+    // One vec4 uniform per spot: as many as the fragment stage can hold.
+    const MAX_SPOTS = Math.max(1, Math.min(SPOT_CAP, gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS) - OTHER_UNIFORMS - MAX_RINGS));
+    const spotData = new Float32Array(MAX_SPOTS * 4);
+    const ringData = new Float32Array(MAX_RINGS * 4);
     const ringColors = new Float32Array(6);
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -52,15 +54,25 @@
       spotsDrawn: 0,
       line: [0.4, 0.95, 0.58],
       fill: [0.1, 0.32, 0.18],
-      /** [selection, mouse-over]: { x, y, radius, width, color } or null. */
+      /** The same two for the glow of a model that has HD textures: blue. */
+      lineHd: [0.4, 0.66, 1.0],
+      fillHd: [0.1, 0.2, 0.38],
+      /**
+       * [selected last, mouse-over, other selected ones...]: { x, y, radius,
+       * width, color } or null. Ring 1 has its own colour; all others take
+       * the selection colour. Past maxRings, the ones nearest `center`.
+       */
       rings: [null, null],
+      maxRings: MAX_RINGS,
+      ringsDrawn: 0,
+      ringColor: [0.2, 1.0, 0.25],
       ready: Promise.all([source('/shaders/ground.vert'), source('/shaders/ground.frag')]).then(([vertex, fragment]) => {
-        shader = viewer.webgl.createShader(vertex, `#define MAX_SPOTS ${MAX_SPOTS}\n${fragment}`);
+        shader = viewer.webgl.createShader(vertex, `#define MAX_SPOTS ${MAX_SPOTS}\n#define MAX_RINGS ${MAX_RINGS}\n${fragment}`);
       }),
 
       /**
        * Draw under everything else: no depth test, no depth write.
-       * spots: [[x, y, radius], ...], where the grid glows; past MAX_SPOTS, the nearest to `center`.
+       * spots: [[x, y, radius, hd], ...], where the grid glows (hd 1: in blue); past MAX_SPOTS, the nearest to `center`.
        * distance: the camera's distance to `center`; the quad grows with it,
        * so the grid fills the same share of the view at any zoom.
        */
@@ -68,11 +80,21 @@
         if (!ground.enabled || !shader) return;
         shader.use();
         const uniforms = shader.uniforms;
-        for (let i = 0; i < 2; i++) {
-          const r = ground.rings[i];
-          ringData.set(r ? [r.x, r.y, r.radius, r.width] : [0, 0, 0, 0], i * 4);
-          ringColors.set(r ? r.color : [0, 0, 0], i * 3);
+        // More rings than the shader holds: the first two, then the ones nearest the view centre.
+        let rings = ground.rings;
+        if (rings.length > MAX_RINGS) {
+          const d = (r) => (r.x - center[0]) ** 2 + (r.y - center[1]) ** 2;
+          rings = [rings[0], rings[1], ...rings.slice(2).sort((a, b) => d(a) - d(b))].slice(0, MAX_RINGS);
         }
+        ground.ringsDrawn = 0;
+        for (let i = 0; i < rings.length; i++) {
+          const r = rings[i];
+          ringData.set(r ? [r.x, r.y, r.radius, r.width] : [0, 0, 0, 0], i * 4);
+          if (r) ground.ringsDrawn++;
+        }
+        ringColors.set(ground.ringColor, 0);
+        ringColors.set(rings[1] ? rings[1].color : [0, 0, 0], 3);
+        gl.uniform1f(uniforms.u_ringCount, rings.length);
         gl.uniform4fv(uniforms['u_rings[0]'], ringData);
         gl.uniform3fv(uniforms['u_ringColor[0]'], ringColors);
         // More spots than the shader holds: the ones nearest the view centre.
@@ -82,9 +104,11 @@
           use = [...spots].sort((a, b) => d(a) - d(b));
         }
         const count = Math.min(use.length, MAX_SPOTS);
-        for (let i = 0; i < count; i++) spotData.set(use[i], i * 3);
+        for (let i = 0; i < count; i++) spotData.set(use[i], i * 4);
         ground.spotsDrawn = count;
-        gl.uniform3fv(uniforms['u_spots[0]'], spotData);
+        gl.uniform4fv(uniforms['u_spots[0]'], spotData);
+        gl.uniform3fv(uniforms.u_lineHd, ground.lineHd);
+        gl.uniform3fv(uniforms.u_fillHd, ground.fillHd);
         gl.uniform1f(uniforms.u_spotCount, count);
         gl.uniformMatrix4fv(uniforms.u_VP, false, camera.viewProjectionMatrix);
         gl.uniform2f(uniforms.u_center, Math.round(center[0]), Math.round(center[1]));

@@ -27,7 +27,7 @@ const DIRECTIONS = [
   [0, -1.4],
 ];
 
-test('every skybox loads; one with a mesh draws all of it with all its textures', async ({ page, request }) => {
+test('every skybox loads; one with a mesh draws all of it with all its textures @slow', async ({ page, request }) => {
   test.setTimeout(180_000);
   const { items } = await (await request.get('/api/skyboxes')).json();
   expect(items.length).toBeGreaterThanOrEqual(60);

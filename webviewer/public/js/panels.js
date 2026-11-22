@@ -8,14 +8,14 @@
 
   // ---- tabs ----
 
+  const TABS = ['units', 'doodads', 'models'];
   function showTab(name) {
-    for (const tab of ['units', 'models']) {
+    for (const tab of TABS) {
       $('tab-' + tab).classList.toggle('on', tab === name);
       $('pane-' + tab).hidden = tab !== name;
     }
   }
-  $('tab-units').addEventListener('click', () => showTab('units'));
-  $('tab-models').addEventListener('click', () => showTab('models'));
+  for (const tab of TABS) $('tab-' + tab).addEventListener('click', () => showTab(tab));
 
   // ---- model files tab ----
 
@@ -40,7 +40,7 @@
       }),
     );
   }
-  searchBox.addEventListener('input', () => search().catch((error) => app.setStatus(error.message)));
+  searchBox.addEventListener('input', () => search().catch((error) => app.reportFailure(error)));
 
   // ---- units tab ----
 
@@ -63,8 +63,9 @@
   let selected = null;
 
   function unitRow(unit) {
-    const row = el('li', { draggable: true, title: 'click to preview, drag into the view to place' }, [
+    const row = el('li', { draggable: true, title: 'click to preview, double-click for its textures, drag into the view to place' }, [
       app.iconNode(unit.icon),
+      // (The list is the current dataset's, and so is the icon.)
       el('div', { className: 'text' }, [
         el('div', { className: 'name', textContent: unit.name }),
         el('div', { className: 'sub', textContent: `${unit.race} · ${unit.kind} · ${unit.id}${unit.skybox ? ' · skybox' : ''}` }),
@@ -72,34 +73,34 @@
     ]);
     row.dataset.id = unit.id;
     row.classList.toggle('selected', unit.id === selected);
-    row.addEventListener('click', () => select(unit.id).catch((error) => app.setStatus(error.message)));
-    row.addEventListener('dblclick', () => app.addUnit(unit.id).catch(app.reportFailure));
+    row.addEventListener('click', () => select(unit.id).catch((error) => app.reportFailure(error)));
+    row.addEventListener('dblclick', () => app.openTexturesFor('unit', unit.id).catch(app.reportFailure));
     row.addEventListener('dragstart', (e) => app.startDrag(e, unit));
     row.addEventListener('dragend', () => app.endGhost());
     return row;
   }
 
   // The list loads a page at a time as it scrolls.
-  const unitPages = new SC2Components.LazyList({
+  const unitPages = new SC2Components.PagedList({
     list: unitList,
     pageSize: 60,
     fetchPage: (offset, limit) =>
-      app.getJson('/api/units?' + new URLSearchParams({ ...unitQuery(), offset: String(offset), limit: String(limit) })),
+      app.getJson(app.api('/api/units', { ...unitQuery(), offset: String(offset), limit: String(limit) })),
     renderItem: unitRow,
     onTotal: (total) => {
       unitCount.textContent = `${total} units`;
     },
-    onError: (error) => app.setStatus(error.message),
+    onError: (error) => app.reportFailure(error),
   });
   const listUnits = () => unitPages.reset();
-  const relist = () => listUnits().catch((error) => app.setStatus(error.message));
+  const relist = () => listUnits().catch((error) => app.reportFailure(error));
 
   const range = (low, high) => (Math.abs(high - low) < 1e-6 ? shown(low) : `${shown(low)} to ${shown(high)}`);
 
   async function select(id) {
     selected = id;
     for (const row of unitList.children) row.classList.toggle('selected', row.dataset.id === id);
-    const unit = await app.getJson('/api/unit?id=' + encodeURIComponent(id));
+    const unit = await app.record('unit', id);
     if (selected !== id) return; // another unit was selected meanwhile
     const low = app.dataScale(unit, 0)[0];
     const high = app.dataScale(unit, 1)[0];
@@ -115,7 +116,7 @@
     const addButton = el('button', { id: 'preview-add', textContent: 'add to scene' });
     addButton.addEventListener('click', () => app.addUnit(unit.id).catch(app.reportFailure));
     preview.replaceChildren(
-      picture ? el('img', { className: 'portrait', src: '/icon/' + picture, alt: unit.name }) : el('span', { className: 'portrait' }),
+      picture ? el('img', { className: 'portrait', src: app.iconUrl(picture, unit.dataset), alt: unit.name }) : el('span', { className: 'portrait' }),
       // Name and add on one line; the facts scroll inside the fixed-height card.
       el('div', { className: 'body' }, [
         el('div', { className: 'top' }, [el('div', { className: 'name', textContent: unit.name }), addButton]),
@@ -124,8 +125,10 @@
     );
   }
 
-  async function setupFilters() {
-    const facets = await app.getJson('/api/facets');
+  /** Fill the filters with what the current dataset has; every filter starts at "any". */
+  async function fillFilters() {
+    const facets = await app.getJson(app.api('/api/facets'));
+    Object.assign(filter, { race: '', kind: '', family: null });
     const raceButton = (value, label) => {
       const button = el('button', { textContent: label });
       button.dataset.race = value;
@@ -139,24 +142,29 @@
     };
     raceBar.replaceChildren(raceButton('', 'all'), ...facets.races.map((race) => raceButton(race, race.toLowerCase())));
     kindSelect.replaceChildren(el('option', { value: '', textContent: 'any kind' }), ...facets.kinds.map((kind) => el('option', { value: kind, textContent: kind.toLowerCase() })));
-    kindSelect.addEventListener('change', () => {
-      filter.kind = kindSelect.value;
-      relist();
-    });
     // Family (ObjectFamily): Melee is the ladder and multiplayer data.
     // Option values carry a prefix so "any" and "no family" ('') differ.
     familySelect.replaceChildren(
       el('option', { value: 'any', textContent: 'any family' }),
       ...facets.families.map((family) => el('option', { value: 'is:' + family, textContent: family ? family.toLowerCase() : '(no family)' })),
     );
-    familySelect.addEventListener('change', () => {
-      filter.family = familySelect.value === 'any' ? null : familySelect.value.slice(3);
-      relist();
-    });
   }
+  kindSelect.addEventListener('change', () => {
+    filter.kind = kindSelect.value;
+    relist();
+  });
+  familySelect.addEventListener('change', () => {
+    filter.family = familySelect.value === 'any' ? null : familySelect.value.slice(3);
+    relist();
+  });
   unitBox.addEventListener('input', relist);
 
-  /** Fill the filters, then the first page of units. */
-  app.setupUnits = () => setupFilters().then(listUnits);
+  /** Fill the filters, then the first page of units. Again when the current dataset changes. */
+  app.setupUnits = () => fillFilters().then(listUnits);
+  app.onDatasetChange(() => {
+    selected = null;
+    preview.replaceChildren();
+    app.setupUnits().catch((error) => app.reportFailure(error));
+  });
   app.unitQuery = unitQuery;
 })();

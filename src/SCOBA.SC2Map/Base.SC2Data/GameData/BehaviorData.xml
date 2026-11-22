@@ -614,106 +614,106 @@
         <Modification MoveSpeedMultiplier="1.4" AccelerationMultiplier="10" DecelerationMultiplier="10"/>
     </CBehaviorBuff>
     <!-- Slow walk speed ramp (R-SLOW-21, operator 2026-11-21): levels 1..15
-         of 16, MoveSpeedMultiplier 1 - 0.6 k / 16. gf_SlowWalkApply puts
+         of 16, MoveSpeedMultiplier 1 - 0.7 k / 16. gf_SlowWalkApply puts
          one level at a time on the hero; level 16 is SCOBASlowWalk. -->
     <CBehaviorBuff id="SCOBASlowWalkRamp01">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.9625"/>
+        <Modification MoveSpeedMultiplier="0.95625"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp02">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.9250"/>
+        <Modification MoveSpeedMultiplier="0.91250"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp03">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.8875"/>
+        <Modification MoveSpeedMultiplier="0.86875"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp04">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.8500"/>
+        <Modification MoveSpeedMultiplier="0.82500"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp05">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.8125"/>
+        <Modification MoveSpeedMultiplier="0.78125"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp06">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.7750"/>
+        <Modification MoveSpeedMultiplier="0.73750"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp07">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.7375"/>
+        <Modification MoveSpeedMultiplier="0.69375"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp08">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.7000"/>
+        <Modification MoveSpeedMultiplier="0.65000"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp09">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.6625"/>
+        <Modification MoveSpeedMultiplier="0.60625"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp10">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.6250"/>
+        <Modification MoveSpeedMultiplier="0.56250"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp11">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.5875"/>
+        <Modification MoveSpeedMultiplier="0.51875"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp12">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.5500"/>
+        <Modification MoveSpeedMultiplier="0.47500"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp13">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.5125"/>
+        <Modification MoveSpeedMultiplier="0.43125"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp14">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.4750"/>
+        <Modification MoveSpeedMultiplier="0.38750"/>
     </CBehaviorBuff>
     <CBehaviorBuff id="SCOBASlowWalkRamp15">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.4375"/>
+        <Modification MoveSpeedMultiplier="0.34375"/>
     </CBehaviorBuff>
-    <!-- Slow walk on Shift (R-SLOW-2): 40 % speed while Shift is held
-         (operator 2026-11-21; was 50 %). Added and removed by
+    <!-- Slow walk on Shift (R-SLOW-2): 30 % speed while Shift is held
+         (operator 2026-11-22; was 40 %, before that 50 %). Added and removed by
          gf_SlowWalkApply; no duration. -->
     <CBehaviorBuff id="SCOBASlowWalk">
         <InfoFlags index="Hidden" value="1"/>
         <BehaviorCategories index="Permanent" value="1"/>
         <EditorCategories value="AbilityorEffectType:Units"/>
-        <Modification MoveSpeedMultiplier="0.4"/>
+        <Modification MoveSpeedMultiplier="0.3"/>
     </CBehaviorBuff>
     <!-- TPS friendly fire: on the hero. Its damage to own and allied units is
          zero. Same form as stock ImmuneToFriendlySplash and InfightLowDamage. -->

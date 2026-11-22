@@ -15,6 +15,7 @@ import numpy as np
 from project_root import project_root
 from mapgen.resources import config, fit, sites
 from mapgen.resources.build import PILE
+from testkit.profiles import baseai_scan
 
 ROOT = project_root()
 APP = ROOT / "src" / "SCOBA.SC2Map" / "scripts" / "app"
@@ -205,6 +206,16 @@ class GasSizeTest(unittest.TestCase):
             for layer in ("Check", "Place"):
                 self.assertEqual(_solid(footprint, layer), ["xxxxxx"] * 6, (footprint, layer))
 
+    def test_every_shape_blocks_the_whole_6x6_square(self) -> None:
+        # The pathing Shape is the square the gas building checks: no walkable strip inside it.
+        for footprint in ("FootprintScobaGeyser6x6", "FootprintScobaGeyser6x6Built", "FootprintScoba6x6CappedGeyser"):
+            body = _entry("FootprintData.xml", "CFootprint", footprint)
+            self.assertIn('<Offsets value="-3,-3;-3,3;3,3;3,-3"/>', body, footprint)
+            self.assertIn('<Borders value="3,0,2;0,1,2;1,2,2;2,3,2"/>', body, footprint)
+            # Negative: none of the stock rounded shapes x2 (they block a 4x4 only).
+            self.assertNotIn("2.5,1.5", body, footprint)
+            self.assertNotIn("-1.5,-3;1.5,-3", body, footprint)
+
     def test_the_no_hall_ring_keeps_its_stock_width(self) -> None:
         # Negative: the ring is not doubled. 3 cells each side of the 6.
         body = _entry("FootprintData.xml", "CFootprint", "FootprintScobaGeyser6x6")
@@ -228,6 +239,99 @@ class GasSizeTest(unittest.TestCase):
         for actor in ("VespeneGeyser", *GAS_BUILDINGS):
             self.assertIn('<Scale value="2.000000"/>', _entry("ActorData.xml", "CActorUnit", actor), actor)
         self.assertIn('<Scale value="2.000000"/>', _entry("ActorData.xml", "CActorSplat", "VespeneGeyserSplat"))
+
+
+class GasScanTest(unittest.TestCase):
+    """The radius scan patch of the baseai probe map (SC2_BA_GAS_SCAN), on the map's own data."""
+
+    def test_an_octagon_has_the_asked_radius(self) -> None:
+        shape = baseai_scan.octagon_shape(2.5)
+        self.assertIn('<Radius value="2.5000"/>', shape)
+        points = [tuple(float(v) for v in pair.split(","))
+                  for pair in re.search(r'<Offsets value="([^"]+)"/>', shape).group(1).split(";")]
+        self.assertEqual(len(points), 8)
+        for x, y in points:
+            self.assertAlmostEqual(math.hypot(x, y), 2.5, places=3)
+
+    def test_a_cut_square_keeps_every_sub_cell_centre_and_loses_radius(self) -> None:
+        shape = baseai_scan.cut_square_shape(0.45)
+        points = [tuple(float(v) for v in pair.split(","))
+                  for pair in re.search(r'<Offsets value="([^"]+)"/>', shape).group(1).split(";")]
+        self.assertEqual(len(points), 8)
+        self.assertIn(f'<Radius value="{math.hypot(3, 2.55):.4f}"/>', shape)
+        self.assertLess(max(math.hypot(x, y) for x, y in points), 4.0)
+        self.assertEqual(max(max(abs(x), abs(y)) for x, y in points), 3.0)
+        # The cut line is |x| + |y| = 6 - cut: the corner sub-cell centre (2.75, 2.75) is inside.
+        self.assertLess(2.75 + 2.75, 6 - 0.45)
+        # Negative: no cut, no shape; a wrong spec is refused.
+        for bad in ("sq0", "sq3", "sqx", "round"):
+            with self.assertRaises(SystemExit):
+                baseai_scan.scan_shape(bad)
+        self.assertIsNone(baseai_scan.scan_shape("map"))
+
+    def test_the_scan_adds_four_footprints_and_keeps_the_map_ones(self) -> None:
+        text = (GAME / "FootprintData.xml").read_text(encoding="utf-8")
+        out = baseai_scan.scan_footprints(text, ("3.3541", "map", "2.2", "sq0.45"))
+        for name in ("BgBuiltFootT", "BgBuiltFootZ", "BgGeyserFootA", "BgGeyserFootB"):
+            self.assertEqual(out.count(f'<CFootprint id="{name}">'), 1, name)
+        body = re.search(r'<CFootprint id="BgBuiltFootT">.*?</CFootprint>', out, re.S).group(0)
+        self.assertIn('<Radius value="3.3541"/>', body)
+        self.assertEqual(body.count('<Rows value="oooxxxxxxooo"/>'), 12)
+        # "map": the Shape stays the map's square.
+        kept = re.search(r'<CFootprint id="BgBuiltFootZ">.*?</CFootprint>', out, re.S).group(0)
+        self.assertIn('<Offsets value="-3,-3;-3,3;3,3;3,-3"/>', kept)
+        # Negative: the map's own footprints are untouched.
+        for name in ("FootprintScobaGeyser6x6", "FootprintScobaGeyser6x6Built"):
+            self.assertIn(re.search(rf'<CFootprint id="{name}">.*?</CFootprint>', text, re.S).group(0), out)
+
+    def test_none_removes_the_shape_and_keeps_the_layers(self) -> None:
+        text = (GAME / "FootprintData.xml").read_text(encoding="utf-8")
+        out = baseai_scan.scan_footprints(text, ("3.3541", "3.3541", "none", "map"))
+        bare = re.search(r'<CFootprint id="BgGeyserFootA">.*?</CFootprint>', out, re.S).group(0)
+        self.assertNotIn("<Shape>", bare)
+        self.assertNotIn("<Offsets", bare)
+        self.assertEqual(bare.count('<Rows value="oooxxxxxxooo"/>'), 12)
+        self.assertEqual(bare.count("<Layers "), 2)
+        # Negative: the other probe geyser keeps its Shape.
+        kept = re.search(r'<CFootprint id="BgGeyserFootB">.*?</CFootprint>', out, re.S).group(0)
+        self.assertEqual(kept.count("<Shape>"), 1)
+
+    def test_a_unit_radius_suffix_sets_the_radius_field_of_that_unit_only(self) -> None:
+        self.assertEqual(baseai_scan.split_spec("map@4.5"), ("map", 4.5))
+        self.assertEqual(baseai_scan.split_spec("sq1.5"), ("sq1.5", None))
+        for bad in ("map@", "map@x", "map@0", "map@-1"):
+            with self.assertRaises(SystemExit):
+                baseai_scan.split_spec(bad)
+        text = (GAME / "UnitData.xml").read_text(encoding="utf-8")
+        out = baseai_scan.scan_units(text, ("3.3541", "map@4.5", "map@4.75", "sq1.5"))
+        self.assertIn('<CUnit id="BgGeyserA" parent="VespeneGeyser">\n        <Radius value="4.75"/>', out)
+        extractor = re.search(r'<CUnit id="Extractor">.*?</CUnit>', out, re.S).group(0)
+        self.assertIn('<Radius value="4.5"/>', extractor)
+        self.assertIn('<SeparationRadius value="3"/>', extractor)
+        # Negative: no suffix, the map's Radius stays.
+        self.assertIn('<CUnit id="BgGeyserB" parent="VespeneGeyser">\n        <Footprint', out)
+        refinery = re.search(r'<CUnit id="Refinery">.*?</CUnit>', out, re.S).group(0)
+        self.assertIn('<Radius value="3"/>', refinery)
+        # The shape of a suffixed spec is that of its shape part.
+        feet = baseai_scan.scan_footprints((GAME / "FootprintData.xml").read_text(encoding="utf-8"),
+                                      ("3.3541", "map@4.5", "map@4.75", "sq1.5"))
+        probe = re.search(r'<CFootprint id="BgGeyserFootA">.*?</CFootprint>', feet, re.S).group(0)
+        self.assertIn('<Offsets value="-3,-3;-3,3;3,3;3,-3"/>', probe)
+
+    def test_the_scan_units_build_on_the_probe_geysers(self) -> None:
+        text = (GAME / "UnitData.xml").read_text(encoding="utf-8")
+        out = baseai_scan.scan_units(text)
+        for unit, foot in (("Refinery", "BgBuiltFootT"), ("Extractor", "BgBuiltFootZ")):
+            body = re.search(rf'<CUnit id="{unit}">.*?</CUnit>', out, re.S).group(0)
+            self.assertIn(f'<Footprint value="{foot}"/>', body)
+            self.assertIn('<BuiltOn index="3" value="BgGeyserA"/>', body)
+            self.assertIn('<BuiltOn index="4" value="BgGeyserB"/>', body)
+        self.assertIn('<CUnit id="BgGeyserA" parent="VespeneGeyser">', out)
+        self.assertIn('<CUnit id="BgGeyserB" parent="VespeneGeyser">', out)
+        # Negative: the automated gas buildings and the geyser keep the map's entries.
+        for unit in ("VespeneGeyser", "AutomatedRefinery", "AutomatedExtractor"):
+            entry = re.search(rf'<CUnit id="{unit}">.*?</CUnit>', text, re.S).group(0)
+            self.assertIn(entry, out, unit)
 
 
 if __name__ == "__main__":

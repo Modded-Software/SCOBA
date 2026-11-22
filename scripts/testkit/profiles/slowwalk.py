@@ -27,11 +27,11 @@ SECTIONS = {
     "jump": ("slow_jump_aim", "slow_jump_pnc"),
 }
 # R-SLOW-2, 3, 5: travel ratios against the normal walk window.
-SLOW_RATIO = (0.35, 0.45)  # operator 2026-11-21: 40 % (was 50 %)
+SLOW_RATIO = (0.25, 0.35)  # operator 2026-11-22: 30 % (was 40 %)
 SAME_RATIO = (0.95, 1.05)
 # R-SLOW-21: speed ratio 0.25, 0.5, 0.75, 1.0 s after the key change.
-RAMP_IN = (0.85, 0.7, 0.55, 0.4)
-RAMP_OUT = (0.55, 0.7, 0.85, 1.0)
+RAMP_IN = (0.825, 0.65, 0.475, 0.3)
+RAMP_OUT = (0.475, 0.65, 0.825, 1.0)
 RAMP_TOLERANCE = 0.08
 # R-SLOW-20: c_ANIM_SLOW_BLEND, 3 x the 0.15 s clip blend (operator 2026-11-21).
 SLOW_BLEND_MS = 450
@@ -133,7 +133,7 @@ def _walk(checks, section: str, slow_state: int, clip: str | None, arm: str | No
     if clip is not None:
         checks.eq(section, "slow", "Clip", clip)
     _arms(checks, section, arm)
-    _ratio(checks, section, "slow", SLOW_RATIO, "slow walk is 40 % speed")
+    _ratio(checks, section, "slow", SLOW_RATIO, "slow walk is 30 % speed")
     _rate(checks, section)
     checks.eq(section, "", "presses", 1)
     checks.eq(section, "", "starts", 1)

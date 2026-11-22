@@ -354,7 +354,6 @@
             <LayoutButtons index="5" Face="GuardianShield" Type="AbilCmd" AbilCmd="GuardianShield,Execute" Row="2" Column="1"/>
             <LayoutButtons index="6" Face="Blink" Type="AbilCmd" AbilCmd="ZeratulBlink,Execute" Row="2" Column="3"/>
             <LayoutButtons Face="VoodooShield" Type="AbilCmd" AbilCmd="VoodooShield,Execute" Row="2" Column="0"/>
-            <LayoutButtons Face="PoisonNova" Type="AbilCmd" AbilCmd="PoisonNova,Execute" Row="2" Column="0"/>
             <LayoutButtons Face="BuildingStasis" Type="AbilCmd" AbilCmd="BuildingStasis,Execute" Row="2" Column="3"/>
             <LayoutButtons Face="PsiStorm" Type="AbilCmd" AbilCmd="KarassPsiStorm,Execute" Row="2" Column="3"/>
             <LayoutButtons Face="BlindingCloud" Type="AbilCmd" AbilCmd="BlindingCloud,Execute" Row="2" Column="1"/>
@@ -388,7 +387,8 @@
         <AbilArray Link="ZeratulBlink"/>
         <AbilArray Link="RogueGhostCloak"/>
         <AbilArray Link="BansheeCloak"/>
-        <AbilArray Link="PoisonNova"/>
+        <!-- No PoisonNova on Kerrigan (operator 2026-11-22): its autocast
+             burst around her whenever an enemy came within 2. -->
         <AbilArray Link="Siphon"/>
         <AbilArray Link="Irradiate"/>
         <AbilArray Link="KarassPsiStorm"/>
@@ -764,11 +764,13 @@
         <WeaponArray Link="ToshAuto"/>
         <BehaviorArray Link="SCOBAFriendlyFireBlock"/>
     </CUnit>
+    <!-- Psi Blast is her only attack (operator 2026-11-22: not the
+         talons). Stock slot 0 is QueenOfBladesPsiBlast and stays; stock
+         slot 1, RazorTalons, becomes the Psi Blast auto twin. -->
     <CUnit id="KerriganSCOBA" parent="Kerrigan">
         <DeathTime value="-1"/>
         <DefaultAcquireLevel value="Offensive"/>
-        <WeaponArray Link="QueenOfBladesPsiBlastAuto"/>
-        <WeaponArray Link="RazorTalonsAuto"/>
+        <WeaponArray index="1" Link="QueenOfBladesPsiBlastAuto"/>
         <BehaviorArray Link="SCOBAFriendlyFireBlock"/>
     </CUnit>
     <!-- Air creeps (REQ-AIR-CREEP). Flying height 72. Speed and acceleration:

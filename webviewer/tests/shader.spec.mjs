@@ -12,7 +12,10 @@ async function open(page) {
 }
 
 async function statsOf(page, unit) {
-  await page.evaluate((id) => window.sc2viewer.addUnit(id, { team: 1, x: 0, y: 0, pick: 0.5 }), unit);
+  // No animation (sequence -1): between the mark and the read only the team
+  // colour changes the picture. An animated unit moved in that time too, and
+  // a slow run counted the motion as team colour (Zealot 0.40, 0.61; full68, full71).
+  await page.evaluate((id) => window.sc2viewer.addUnit(id, { team: 1, x: 0, y: 0, pick: 0.5, sequence: -1 }), unit);
   await page.waitForFunction(() => window.sc2viewer.idle());
   const stats = await page.evaluate(() => window.sc2viewer.colorStats());
   // For diagnosis only; no check reads it.

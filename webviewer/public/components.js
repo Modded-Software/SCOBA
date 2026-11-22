@@ -1,5 +1,7 @@
-// Reusable page components: a list that loads as it scrolls, and a modal
-// dialog. Plain DOM, no framework. Exposed as window.SC2Components.
+// Reusable page components: a list that loads as it scrolls, a modal dialog,
+// a picker and a confirm dialog built on it, a toast, a drop-down, and a
+// floating window. Plain DOM, no framework. Exposed as window.SC2Components.
+// Their look is in theme.css.
 'use strict';
 
 (() => {
@@ -15,7 +17,7 @@
    *   onTotal     (total) => void, after the first page of each reset
    *   onError     (error) => void
    */
-  class LazyList {
+  class PagedList {
     constructor({ list, fetchPage, renderItem, pageSize = 60, onTotal = () => {}, onError = () => {} }) {
       Object.assign(this, { list, fetchPage, renderItem, pageSize, onTotal, onError });
       this.total = 0;
@@ -87,7 +89,7 @@
       heading.textContent = title;
       const close = document.createElement('button');
       close.className = 'dialog-close';
-      close.textContent = 'x';
+      close.textContent = '×';
       close.title = 'close';
       close.addEventListener('click', () => this.close());
       head.append(heading, close);
@@ -140,9 +142,9 @@
       this.count = document.createElement('div');
       this.count.className = 'sub';
       const list = document.createElement('ul');
-      list.className = 'picker-list';
+      list.className = 'picker-list rows';
       this.dialog.body.append(this.search, this.count, list);
-      this.list = new LazyList({
+      this.list = new PagedList({
         list,
         fetchPage: (offset, limit) => fetchPage(this.search.value.trim(), offset, limit),
         renderItem: (item) => this.row(item),
@@ -192,5 +194,181 @@
     }
   }
 
-  window.SC2Components = { LazyList, Dialog, Picker };
+  function make(tag, props = {}, children = []) {
+    const node = Object.assign(document.createElement(tag), props);
+    node.append(...children);
+    return node;
+  }
+
+  /**
+   * A small dialog with a question and two answer buttons. `ask()` opens it
+   * and resolves true (yes) or false (no, Escape, the x, the backdrop).
+   *
+   * options:
+   *   id        of the dialog, "<name>-dialog"; the buttons are "<name>-yes" and "<name>-no"
+   *   title     of the dialog
+   *   yesText   label of the yes button
+   *   content   nodes above the buttons
+   */
+  class ConfirmDialog {
+    constructor({ id, title, yesText, noText = 'cancel', content = [] }) {
+      const name = id.replace(/-dialog$/, '');
+      this.dialog = new Dialog({ id, title });
+      this.dialog.node.classList.add('confirm-dialog');
+      this.yes = make('button', { id: `${name}-yes`, className: 'primary', textContent: yesText });
+      this.no = make('button', { id: `${name}-no`, textContent: noText });
+      this.dialog.body.append(...content, make('div', { className: 'answers' }, [this.no, this.yes]));
+      this.answer = null;
+      this.yes.addEventListener('click', () => this.settle(true));
+      this.no.addEventListener('click', () => this.settle(false));
+      this.dialog.node.addEventListener('close', () => this.settle(false));
+    }
+
+    settle(value) {
+      const done = this.answer;
+      this.answer = null;
+      this.dialog.close();
+      if (done) done(value);
+    }
+
+    ask() {
+      return new Promise((resolve) => {
+        this.answer = resolve;
+        this.dialog.open();
+      });
+    }
+  }
+
+  /**
+   * A note that slides up from below the bottom edge: a text and buttons.
+   * `show(text, centre)` puts it up, centred on the page x `centre`.
+   */
+  class Toast {
+    /** `place`: 'bottom' (default) slides up from the bottom edge, 'top' down from the top edge. */
+    constructor({ id, place = 'bottom', role = 'alertdialog' }) {
+      if (place !== 'bottom' && place !== 'top') throw new Error(`Toast: place "${place}" is not bottom or top`);
+      this.text = make('span', { className: 'text' });
+      this.node = make('div', { id, className: `toast ${place}`, role }, [this.text]);
+      document.body.append(this.node);
+    }
+
+    addButton(id, label) {
+      const button = make('button', { id, textContent: label });
+      this.node.append(button);
+      return button;
+    }
+
+    show(text, centre) {
+      this.text.textContent = text;
+      this.node.style.left = `${centre}px`;
+      this.node.classList.add('up');
+    }
+
+    hide() {
+      this.node.classList.remove('up');
+    }
+
+    get isUp() {
+      return this.node.classList.contains('up');
+    }
+  }
+
+  /**
+   * A button that opens a list below it. Escape and a press outside `root`
+   * close it.
+   */
+  class Dropdown {
+    constructor({ root, button, list }) {
+      Object.assign(this, { root, button, list });
+      root.classList.add('dropdown');
+      list.classList.add('dropdown-list');
+      button.addEventListener('click', () => {
+        list.hidden = !list.hidden;
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') this.close();
+      });
+      window.addEventListener('mousedown', (e) => {
+        if (!root.contains(e.target)) this.close();
+      });
+    }
+
+    close() {
+      this.list.hidden = true;
+    }
+  }
+
+  /**
+   * A window that floats over the page: a title bar to move it by, a close
+   * button, and a body. Hidden until open(). It is not modal. Escape closes
+   * it. Its bottom right corner resizes it.
+   */
+  class FloatingWindow {
+    static KEEP = 80; // pixels of the title bar that stay on the page
+
+    constructor({ id, title }) {
+      this.title = make('span', { className: 'window-title', textContent: title });
+      const close = make('button', { className: 'window-close', textContent: '×', title: 'close (Esc)' });
+      this.head = make('div', { className: 'window-head' }, [this.title, close]);
+      this.body = make('div', { className: 'window-body' });
+      this.node = make('div', { id, className: 'window', hidden: true }, [this.head, this.body]);
+      document.body.append(this.node);
+      close.addEventListener('click', () => this.close());
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') this.close();
+      });
+      window.addEventListener('resize', () => {
+        if (this.isOpen) this.moveTo(this.node.offsetLeft, this.node.offsetTop);
+      });
+      let grab = null; // where in the window the pointer holds it
+      this.head.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || e.target === close) return;
+        e.preventDefault();
+        grab = { x: e.clientX - this.node.offsetLeft, y: e.clientY - this.node.offsetTop };
+        this.head.setPointerCapture(e.pointerId);
+        // A frame in the body would take the pointer when it passes over it.
+        this.node.classList.add('dragging');
+      });
+      this.head.addEventListener('pointermove', (e) => {
+        if (grab) this.moveTo(e.clientX - grab.x, e.clientY - grab.y);
+      });
+      for (const name of ['pointerup', 'pointercancel']) {
+        this.head.addEventListener(name, () => {
+          grab = null;
+          this.node.classList.remove('dragging');
+        });
+      }
+    }
+
+    /** Move the top left corner to (left, top), as far as the title bar stays reachable. */
+    moveTo(left, top) {
+      const keep = FloatingWindow.KEEP;
+      const x = Math.min(Math.max(left, keep - this.node.offsetWidth), innerWidth - keep);
+      const y = Math.min(Math.max(top, 0), innerHeight - this.head.offsetHeight);
+      this.node.style.left = `${x}px`;
+      this.node.style.top = `${y}px`;
+    }
+
+    /** Show the window. `place` ({ left, top, width, height }) is used the first time only: later it opens where it was left. */
+    open(place) {
+      if (this.isOpen) return;
+      this.node.hidden = false;
+      if (!this.placed) {
+        this.node.style.width = `${place.width}px`;
+        this.node.style.height = `${place.height}px`;
+        this.moveTo(place.left, place.top);
+        this.placed = true;
+      }
+    }
+
+    close() {
+      this.node.hidden = true;
+    }
+
+    get isOpen() {
+      return !this.node.hidden;
+    }
+  }
+
+  window.SC2Components = { PagedList, Dialog, Picker, ConfirmDialog, Toast, Dropdown, FloatingWindow };
 })();

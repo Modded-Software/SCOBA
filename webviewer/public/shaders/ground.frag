@@ -19,12 +19,18 @@ uniform float u_cell;
 uniform float u_minPx;
 uniform vec3 u_line;
 uniform vec3 u_fill;
-// Glow spots: x, y, radius. Units and the mouse.
-uniform vec3 u_spots[MAX_SPOTS];
+// Glow spots: x, y, radius, hd. Units and the mouse. hd is 1 for a model
+// that has HD textures: its glow takes u_lineHd and u_fillHd (blue).
+uniform vec3 u_lineHd;
+uniform vec3 u_fillHd;
+uniform vec4 u_spots[MAX_SPOTS];
 uniform float u_spotCount;
 // Unit rings: x, y, radius, width (world units). 0 width: no ring.
-// Ring 0 is the selection, ring 1 the mouse-over.
-uniform vec4 u_rings[2];
+// Ring 0 is the unit selected last, ring 1 the mouse-over, the rest the
+// other selected units. u_ringColor: 0 the selection, 1 the mouse-over.
+// MAX_RINGS is defined by ground.js before this source.
+uniform vec4 u_rings[MAX_RINGS];
+uniform float u_ringCount;
 uniform vec3 u_ringColor[2];
 varying vec2 v_world;
 
@@ -40,13 +46,15 @@ float ring(vec4 r) {
 const float MIN_GLOW_PX = 60.0;
 
 // 1 at a spot, dropping smoothly to 0 at its radius; the strongest spot wins.
-float glow(float perPx) {
-  float g = 0.0;
+// x: of the standard spots; y: of the HD ones.
+vec2 glow(float perPx) {
+  vec2 g = vec2(0.0);
   for (int i = 0; i < MAX_SPOTS; i++) {
     if (float(i) >= u_spotCount) break;
-    vec3 s = u_spots[i];
+    vec4 s = u_spots[i];
     float k = 1.0 - smoothstep(0.0, max(s.z, MIN_GLOW_PX * perPx), distance(v_world, s.xy));
-    g = max(g, k);
+    if (s.w > 0.5) g.y = max(g.y, k);
+    else g.x = max(g.x, k);
   }
   return g;
 }
@@ -114,16 +122,24 @@ void main() {
 
   // Fade out towards the rim of the quad.
   float fade = 1.0 - smoothstep(0.45, 1.0, length(v_world - u_center) / u_radius);
-  float lit = glow(perPx);
+  vec2 spots = glow(perPx);
+  float lit = max(spots.x, spots.y);
+  // How blue: all of it where only HD spots reach, shared where both do.
+  float hd = spots.y / max(spots.x + spots.y, 0.0001);
 
   // Faint away from units (operator 2026-11-21); full strength near them.
-  vec3 color = mix(u_fill, u_line, line);
+  vec3 color = mix(mix(u_fill, u_fillHd, hd), mix(u_line, u_lineHd, hd), line);
   float alpha = mix(0.015 + 0.085 * lit, 0.07 + 0.75 * lit, line) * fade;
   // Rings draw over the grid, unfaded: the mouse-over first, the selection on top.
-  for (int i = 1; i >= 0; i--) {
-    float k = ring(u_rings[i]);
-    color = mix(color, u_ringColor[i], k);
-    alpha = mix(alpha, 1.0, k);
+  float hover = ring(u_rings[1]);
+  color = mix(color, u_ringColor[1], hover);
+  alpha = mix(alpha, 1.0, hover);
+  float chosen = ring(u_rings[0]);
+  for (int i = 2; i < MAX_RINGS; i++) {
+    if (float(i) >= u_ringCount) break;
+    chosen = max(chosen, ring(u_rings[i]));
   }
+  color = mix(color, u_ringColor[0], chosen);
+  alpha = mix(alpha, 1.0, chosen);
   gl_FragColor = vec4(color, alpha);
 }

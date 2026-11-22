@@ -20,9 +20,13 @@
          behavior UnitDirectControl adds 2 to every weapon range, so stock
          Tosh 5 + 2 = 7 becomes 12 + 2 = 14 and stock Psi Blast 4 + 2 = 6
          becomes 10 + 2 = 12. The Auto child weapons inherit the range.
-         Razor Talons is melee and unchanged. -->
+         Razor Talons is melee and unchanged; no hero carries it since
+         2026-11-22. Psi Blast is Kerrigan's only attack, so it has no
+         minimum range (stock 2: up close the talons struck instead). -->
     <CWeaponLegacy id="QueenOfBladesPsiBlast">
+        <Effect value="SCOBAPsiBlastShot"/>
         <Range value="10"/>
+        <MinimumRange value="0"/>
         <Period value="1"/>
         <Cost>
             <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1"/>

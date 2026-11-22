@@ -5,19 +5,20 @@ and the data that changes how the unit looks (scale, animation speed, walk
 speed, flying height, tint, opacity). Icons and portraits are converted to
 PNG.
 
-The stack is the stock data (hitvolumes.resolve.STACK), then the map's own
-data from src/SCOBA.SC2Map. Stock catalogs must be extracted first; see
-webviewer/scripts/catalog.sh.
+The stack is the stock data (hitvolumes.resolve.STACK) of a dataset, then
+the dataset's map layer when it has one: a folder shaped like an SC2Map
+(Base.SC2Data/GameData, enUS.SC2Data/LocalizedData, Assets). "--map none"
+builds from the stock data alone. Datasets: webviewer/server-datasets.mjs.
+Stock catalogs must be extracted first; see webviewer/scripts/catalog.sh.
 
-Run it through webviewer/scripts/catalog.sh. That script sets REPO_ROOT and
-puts scripts/ and scripts/hdtex/ on PYTHONPATH.
+Run it through webviewer/scripts/catalog.sh. That script puts scripts/ and
+scripts/hdtex/ on PYTHONPATH.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -26,10 +27,6 @@ from casc import Casc
 from hitvolumes.resolve import STACK, Catalog, expand, vec3
 from PIL import Image
 
-if "REPO_ROOT" not in os.environ:
-    raise SystemExit("build_catalog: REPO_ROOT is not set; run webviewer/scripts/catalog.sh")
-ROOT = Path(os.environ["REPO_ROOT"])
-MAP = ROOT / "src" / "SCOBA.SC2Map"
 RACES = {"Terr": "Terran", "Prot": "Protoss", "Zerg": "Zerg", "Neut": "Neutral"}
 VERSION = 1
 CHUNK = 80  # paths per stormex call
@@ -37,6 +34,31 @@ CHUNK = 80  # paths per stormex call
 
 def stock(stock_dir: Path, tail: str) -> list[Path]:
     return [stock_dir / Path(*s.split("/")) / Path(*tail.split("/")) for s in STACK]
+
+
+def map_arg(text: str) -> Path | None:
+    """The --map argument: a folder, or "none" for a dataset with no map layer."""
+    if text == "none":
+        return None
+    path = Path(text)
+    if not path.is_dir():
+        raise argparse.ArgumentTypeError(f"map layer is not a folder: {text}")
+    return path
+
+
+def layer(map_dir: Path | None, *parts: str) -> list[Path]:
+    """The map layer's file, as the last entry of a stack; nothing without a map layer."""
+    return [map_dir.joinpath(*parts)] if map_dir else []
+
+
+def layer_ids(map_dir: Path | None, name: str, tag: str) -> set[str]:
+    """Ids the map layer's own catalog file defines."""
+    if not map_dir:
+        return set()
+    path = map_dir / "Base.SC2Data" / "GameData" / name
+    if not path.is_file():
+        return set()
+    return {el.get("id") for el in ET.parse(path).getroot() if el.tag == tag and el.get("id")}
 
 
 def read_strings(paths: list[Path]) -> dict[str, str]:
@@ -118,9 +140,9 @@ def asset_key(path: str) -> str:
 
 
 class Textures:
-    """Find a texture by its in-model path: the map first, then the game storage."""
+    """Find a texture by its in-model path: the map layer first, then the game storage."""
 
-    def __init__(self, casc: Casc) -> None:
+    def __init__(self, casc: Casc, map_dir: Path | None) -> None:
         self.casc = casc
         self.stored: dict[str, str] = {}
         for line in casc._run(["-I", r"\.(dds|tga|png)$", "-l"]).splitlines():
@@ -132,18 +154,29 @@ class Textures:
             held = self.stored.get(key)
             if held is None or self.rank(path) < self.rank(held):
                 self.stored[key] = path
-        self.local = {p.relative_to(MAP).as_posix().replace("/", "\\").lower(): p for p in MAP.rglob("*") if p.suffix.lower() in (".dds", ".tga", ".png")}
+        found = map_dir.rglob("*") if map_dir else []
+        self.local = {p.relative_to(map_dir).as_posix().replace("/", "\\").lower(): p for p in found if p.suffix.lower() in (".dds", ".tga", ".png")}
 
     @staticmethod
     def rank(path: str) -> int:
         return 0 if "\\base.sc2assets\\" in path else 1
 
     def fetch(self, keys: set[str], work: Path) -> dict[str, Path]:
+        """Where each texture is on disk. A file from the game storage is
+        extracted into `work` once and found there afterwards (the storage
+        only changes with a game patch: catalog.sh --extract empties `work`)."""
         found = {k: self.local[k] for k in keys if k in self.local}
         wanted = sorted({self.stored[k] for k in keys if k not in found and k in self.stored})
         files: dict[str, Path] = {}
-        for i in range(0, len(wanted), CHUNK):
-            files.update(self.casc.extract(wanted[i : i + CHUNK], work))
+        missing = []
+        for path in wanted:
+            held = work / Path(*path.split("\\"))
+            if held.is_file():
+                files[path] = held
+            else:
+                missing.append(path)
+        for i in range(0, len(missing), CHUNK):
+            files.update(self.casc.extract(missing[i : i + CHUNK], work))
         for k in keys:
             if k not in found and k in self.stored:
                 found[k] = files[self.stored[k]]
@@ -155,6 +188,9 @@ def png_name(key: str) -> str:
 
 
 def convert(source: Path, target: Path) -> None:
+    """Write `source` as a PNG of at most 256 px. A PNG at least as new as its source is kept."""
+    if target.is_file() and target.stat().st_mtime >= source.stat().st_mtime:
+        return
     with Image.open(source) as image:
         image = image.convert("RGBA")
         if max(image.size) > 256:
@@ -162,13 +198,15 @@ def convert(source: Path, target: Path) -> None:
         image.save(target)
 
 
-def build(stock_dir: Path, out: Path) -> dict:
-    data = MAP / "Base.SC2Data" / "GameData"
-    units = Catalog(stock(stock_dir, "base.sc2data/gamedata/unitdata.xml") + [data / "UnitData.xml"], ("CUnit",))
-    actors = Catalog(stock(stock_dir, "base.sc2data/gamedata/actordata.xml") + [data / "ActorData.xml"], ("CActorUnit",))
-    models = Catalog(stock(stock_dir, "base.sc2data/gamedata/modeldata.xml") + [data / "ModelData.xml"], ("CModel",))
-    names = read_strings(stock(stock_dir, "enus.sc2data/localizeddata/gamestrings.txt") + [MAP / "enUS.SC2Data" / "LocalizedData" / "GameStrings.txt"])
-    map_units = {el.get("id") for el in ET.parse(data / "UnitData.xml").getroot() if el.tag == "CUnit" and el.get("id")}
+def build(stock_dir: Path, map_dir: Path | None, out: Path) -> dict:
+    data = ("Base.SC2Data", "GameData")
+    units = Catalog(stock(stock_dir, "base.sc2data/gamedata/unitdata.xml") + layer(map_dir, *data, "UnitData.xml"), ("CUnit",))
+    actors = Catalog(stock(stock_dir, "base.sc2data/gamedata/actordata.xml") + layer(map_dir, *data, "ActorData.xml"), ("CActorUnit",))
+    models = Catalog(stock(stock_dir, "base.sc2data/gamedata/modeldata.xml") + layer(map_dir, *data, "ModelData.xml"), ("CModel",))
+    names = read_strings(stock(stock_dir, "enus.sc2data/localizeddata/gamestrings.txt") + layer(map_dir, "enUS.SC2Data", "LocalizedData", "GameStrings.txt"))
+    if not units.entries:
+        raise SystemExit(f"build_catalog: no unit data under {stock_dir}")
+    map_units = layer_ids(map_dir, "UnitData.xml", "CUnit")
 
     # Unit -> actor: the actor named like the unit, else the first that names it.
     by_unit: dict[str, str] = {}
@@ -251,7 +289,7 @@ def build(stock_dir: Path, out: Path) -> dict:
     icon_dir = out / "icons"
     icon_dir.mkdir(parents=True, exist_ok=True)
     wanted = {asset_key(r[f]) for r in records for f in ("iconSource", "portraitSource") if r[f]}
-    textures = Textures(Casc())
+    textures = Textures(Casc(), map_dir)
     files = textures.fetch(wanted, out / "raw")
     made: dict[str, str | None] = {}
     failed: dict[str, str] = {}
@@ -287,10 +325,11 @@ def build(stock_dir: Path, out: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stock", type=Path, required=True, help="folder with the extracted stock catalogs")
+    parser.add_argument("--map", type=map_arg, required=True, help='the map layer: a folder shaped like an SC2Map, or "none"')
     parser.add_argument("--out", type=Path, required=True, help="folder for units.json and icons/")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
-    result = build(args.stock, args.out)
+    result = build(args.stock, args.map, args.out)
     target = args.out / "units.json"
     target.write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     print(f"{target} {json.dumps(result['stats'])}")

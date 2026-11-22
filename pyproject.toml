@@ -8,6 +8,7 @@ dependencies = [
     "mpyq>=0.2.5",
     "numpy>=2.5.4",
     "pillow>=13.0.0",
+    "pydantic>=2.14.4",
 ]
 
 [dependency-groups]

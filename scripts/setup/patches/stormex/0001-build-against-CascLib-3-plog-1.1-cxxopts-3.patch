@@ -1,0 +1,86 @@
+diff --git a/include/common.hpp b/include/common.hpp
+index 3a46cbd..3d4b8e3 100644
+--- a/include/common.hpp
++++ b/include/common.hpp
+@@ -3,6 +3,8 @@
+ 
+ #include <iostream>
+ #include "plog/Log.h"
++#include "plog/Init.h"
++#include "plog/Formatters/TxtFormatter.h"
+ #include "mplog/ColorConsoleAppenderStderr.h"
+ // #include "plog/Formatters/FuncMessageFormatter.h"
+ 
+diff --git a/src/cascfuse.cc b/src/cascfuse.cc
+index 41b6152..b9e9a9c 100644
+--- a/src/cascfuse.cc
++++ b/src/cascfuse.cc
+@@ -322,12 +322,12 @@ static int cascfs_read(const char *path, char *buf, size_t size, FUSE_OFF_T offs
+             DWORD readLen;
+             auto fHandle = cfFileTree.GetNodeHandle(fNode);
+             if (fHandle == NULL) {
+-                LOG_ERROR << "Failed to open " << fNode->Filepath() << " E" << GetLastError();
++                LOG_ERROR << "Failed to open " << fNode->Filepath() << " E" << GetCascError();
+                 return 0;
+             }
+             CascSetFilePointer(fHandle, offset, NULL, FILE_BEGIN);
+             if (!CascReadFile(cfFileTree.GetNodeHandle(fNode), buf, size, &readLen)) {
+-                LOG_ERROR << "Failed to read " << fNode->Filepath() << " E" << GetLastError();
++                LOG_ERROR << "Failed to read " << fNode->Filepath() << " E" << GetCascError();
+                 return 0;
+             }
+             return readLen;
+@@ -351,8 +351,8 @@ void cascfs_populate(HANDLE hStorage)
+     HANDLE handle = CascFindFirstFile(hStorage, "*", &findData, NULL);
+ 
+     if (handle == INVALID_HANDLE_VALUE) {
+-        PLOG_FATAL << "CascFindFirstFile E(" << GetLastError() << ")";
+-        exit(GetLastError());
++        PLOG_FATAL << "CascFindFirstFile E(" << GetCascError() << ")";
++        exit(GetCascError());
+     }
+ 
+     do {
+diff --git a/src/storage.cc b/src/storage.cc
+index af081ed..8344b87 100644
+--- a/src/storage.cc
++++ b/src/storage.cc
+@@ -14,7 +14,7 @@ int StorageExplorer::openStorage(std::string src)
+     }
+ 
+     if (!CascOpenStorage(src.c_str(), 0, &m_hStorage)) {
+-        return GetLastError();
++        return GetCascError();
+     }
+ 
+     return 0;
+@@ -31,7 +31,7 @@ bool StorageExplorer::enumerateFiles(std::vector<STORAGE_SEARCH_RESULT*>& search
+     HANDLE handle = CascFindFirstFile(m_hStorage, "*", &findData, NULL);
+ 
+     if (handle == INVALID_HANDLE_VALUE) {
+-        PLOG_FATAL << "CascFindFirstFile E(" << GetLastError() << ")";
++        PLOG_FATAL << "CascFindFirstFile E(" << GetCascError() << ")";
+         return false;
+     }
+ 
+diff --git a/src/stormex.cc b/src/stormex.cc
+index ed119e1..f275026 100644
+--- a/src/stormex.cc
++++ b/src/stormex.cc
+@@ -6,6 +6,7 @@
+ #include <stdio.h>
+ #include <fstream>
+ #include <algorithm>
++#include <iomanip>
+ 
+ #include "cxxopts.hpp"
+ #include "common.hpp"
+@@ -175,7 +176,7 @@ void parseArguments(int argc, char* argv[])
+         }
+ 
+         appCtx.scanExtraArgs(result);
+-    } catch (const cxxopts::OptionException& e) {
++    } catch (const cxxopts::exceptions::exception& e) {
+         std::cerr << "error parsing options: " << e.what() << std::endl;
+         exit(1);
+     }

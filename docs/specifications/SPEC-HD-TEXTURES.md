@@ -94,7 +94,10 @@ Each output has a `.stamp` file: a hash of its inputs and settings. A stage is
 skipped while the stamp matches.
 
 The stamp of an upscaled plane holds the version of the tool: a hash of its
-`upscale.py` and `uv.lock`. A change of the tool redoes every plane. This is
+`upscale.py`, `uv.lock`, and every module of its `arc_upscale/` package. Since
+2026-11-22 (`upscale-on-arc` commit `b35fa07`) `upscale.py` is only the entry
+point and the code is the package. A change of the tool redoes every plane, so
+that commit redoes the planes made before it. This is
 needed: after the tool's update of 2026-11-15 the model `fast` gave other
 pixels for the same input, up to 6 of 255 levels apart. With one version of
 the tool, three runs of `fast` gave the same file.
@@ -265,9 +268,29 @@ category: `Terrain`, `Doodads`, one per named unit (`models.MODEL_UNITS`),
 and `Shared` for a model texture more than one of those
 use. A unit whose textures are all shared has no category of its own; the
 Viking's main textures are under `Shared`. Above the list: a search field, and chips for category and plane with
-the number of entries each would show. The keys: arrows step through the
+the number of entries each would show. A chip that would show none is left
+out, but the chosen one. The keys: arrows step through the
 listed entries, `/` search, `F` fit, `1` 1:1, `T` tile, `S` smooth original.
 Below the view, one card per side gives the size and the measured numbers.
+
+The address can filter the page. `?user=<id>` lists only the textures that
+catalog entry uses (a unit, a doodad, a terrain); a chip `used by <id>`
+drops the filter. With no texture for the user the list says so and the view
+is empty. `&embed=1` is the narrow layout for a window.
+
+The model viewer (`webviewer/`) serves the page at `/textures/` and shows it
+in a movable window: a double-click on a unit or doodad, in the gallery, in
+the instances list, or in the view, opens it with `?user=<id>&embed=1`. The
+viewer then reads every texture the unit's model file names, from the
+instance's dataset, and hands the decoded pictures to the page
+(`hdtex.addOriginals`). A texture the page has no entry for is listed under
+`Original only`, one entry per plane (`color`, and `alpha` when it is not
+one value all over), with no upscaled side. Only DDS files are decoded; the
+list names the others as not shown. Both
+pages have the same theme: the page carries a copy of the `:root` block of
+`webviewer/public/theme.css`. Tests: `webviewer/tests/texture-window.spec.mjs`,
+with the page template and four made-up entries
+(`webviewer/tools/hdtex-fixture.mjs`).
 
 An entry has one layer per variant that holds its texture. Model textures
 have Upscale 4x only. A texture one variant lacks shows the variants it has.
@@ -544,4 +567,11 @@ Upscaling one 1024x1024 plane on one Arc A770 took about 72 s with `seedvr2`,
 27 s with `pbrify`, and 7 s with `fast`.
 
 `build --max-size 2048` keeps the files at 2048 per side. `arc-upscale` is
-found next to this project, or at `ARC_UPSCALE`.
+found next to this project, or at `ARC_UPSCALE`. `make install-hdtex` clones
+`upscale-on-arc` there if it is absent, checks that it holds the pinned commit,
+and runs its `make install` (`scripts/setup/deps.sh upscale`).
+
+`tools/stormex`, used by the extract stage, is built from source by
+`make install-deps` (`scripts/setup/deps.sh stormex`). It is built against
+CascLib `3.0`. That tag holds the StarCraft II Nova Covert Ops keys. The
+earlier build left the six encrypted Nova `unitdata.xml` files empty.

@@ -27,7 +27,8 @@ async function place(page, units) {
 
 const state = (page) => page.evaluate(() => window.sc2viewer.state());
 const itemOf = async (page, id) => (await state(page)).items.find((i) => i.id === id);
-const onItem = (page, id, k = 0.5) => page.evaluate(([i, h]) => window.sc2viewer.itemScreen(i, h), [id, k]);
+// A pixel on the unit's picture: the mouse hit goes by pixel (pick-pixel.spec.mjs).
+const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
 const onWorld = (page, p) => page.evaluate((q) => window.sc2viewer.screenOf(q), p);
 const pick = async (page) => (await state(page)).pick;
 // Facings are checked to half a degree: the mouse lands on whole pixels.
@@ -273,8 +274,10 @@ test('menu "loop" checked: the picked animation keeps looping and becomes the un
   const hash = JSON.parse(decodeURIComponent(await page.evaluate(() => location.hash.slice(1))));
   expect(hash[0].q).toBe(sequences.indexOf(choice));
   // The choice is kept for the next menu.
+  // (The unit plays another animation now: a pixel on its picture as it is.)
   await page.keyboard.press('Escape');
-  await page.mouse.click(at[0], at[1], { button: 'right' });
+  const now = await onItem(page, marine);
+  await page.mouse.click(now[0], now[1], { button: 'right' });
   expect((await pick(page)).menu.loop).toBe(true);
   expect(errors).toEqual([]);
 });

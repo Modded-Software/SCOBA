@@ -59,3 +59,15 @@ exceptions:
     owner: sc2
     review_date: '2026-11-21'
     removal: Remove when the layer UV transform no longer reads through the bone hierarchy.
+  - rule: bplaceholders-b
+    path: ^webviewer/public/theme\.css$
+    rationale: The CSS pseudo-element input::placeholder colours the grey hint text of the search boxes. It is the standard selector name, not placeholder code.
+    owner: sc2
+    review_date: '2026-11-22'
+    removal: Remove when no search box shows hint text.
+  - rule: bplaceholders-b
+    path: ^scripts/hdtex/compare\.html$
+    rationale: The HTML input attribute placeholder and the CSS pseudo-element ::placeholder set and colour the grey hint text of the texture search box. They are the standard names, not placeholder code.
+    owner: sc2
+    review_date: '2026-11-22'
+    removal: Remove when the texture search box no longer shows hint text.

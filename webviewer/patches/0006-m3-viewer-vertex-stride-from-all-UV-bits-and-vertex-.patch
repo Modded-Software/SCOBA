@@ -1,7 +1,7 @@
 From 19efc240224b7b5e28e1f5707610be4c77fd7b56 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 10:44:24 +0200
-Subject: [PATCH 06/25] m3 viewer: vertex stride from all UV bits and vertex
+Subject: [PATCH 06/27] m3 viewer: vertex stride from all UV bits and vertex
  colours
 
 UV sets are one per set bit of 0x20000, 0x40000, 0x80000, 0x100000 and

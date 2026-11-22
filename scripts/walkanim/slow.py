@@ -33,10 +33,10 @@ CONST_RE = re.compile(r"const fixed (c_ANIM_SLOW_\w+) = (-?[0-9.]+);")
 CLIP_RE = re.compile(r'gf_AnimConfigAimDir\(lp_profile, lp_state, (c_ANIM_DIR_\w+), "(Attack,Walk,Slow,[A-Za-z,]+)"\)')
 
 
-def make_slow_groups(model, groups, directions, turn_anim_id) -> str:
+def make_slow_groups(model, groups, directions, turn_anim_id, leg_turn=None) -> str:
     """Directional slow leg clips from `Walk Slow Leg` (R-SLOW-11, 12)."""
     for direction, yaw, reverse in directions:
-        make_lower_group(model, groups, PREFIX + direction, LEG, yaw, reverse, turn_anim_id)
+        make_lower_group(model, groups, PREFIX + direction, LEG, yaw, reverse, turn_anim_id, leg_turn)
     lengths = {sequence.name: sequence.animEndInMS - sequence.animStartInMS for sequence in model.sequences}
     for name in [LEG] + [PREFIX + direction for direction, _, _ in directions]:
         if lengths[name] != lengths[SOURCE]:

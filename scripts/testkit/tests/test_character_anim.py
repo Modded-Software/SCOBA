@@ -4,7 +4,7 @@ import re
 import unittest
 from pathlib import Path
 
-from character_anim_assets import AIM_DIRECTIONS, AIM_PITCH_SOURCE
+from character_anim_assets import AIM_DIRECTIONS
 from character_anim_assets import (
     HEAD_TILT_GROUP,
     HEAD_TILT_MAX_DEG,
@@ -13,6 +13,7 @@ from character_anim_assets import (
     HEAD_YAW_MAX_DEG,
     HEAD_YAW_STEPS,
 )
+from heroanim.rig import HEROES, pitch_axis, shared_pitch_axis, yaw_axis
 from testkit.profiles import slowwalk, tps
 from walkanim import slow
 
@@ -88,32 +89,58 @@ class HeadAxisTest(unittest.TestCase):
     own left-right axis, signed so + is face up (forward -Y); yaw is up."""
 
     def test_tosh_head_axes(self) -> None:
-        from character_anim_assets import head_axis
-
         # BoneHead rest axes (stock tosh.m3): X=(1,0,0) Y=(0,.91,.40) Z=(0,-.40,.91).
         model = _bone_model("BoneHead", ((1.0, 0.0, 0.0), (0.0, 0.91, -0.40), (0.0, 0.40, 0.91)))
-        self.assertEqual(head_axis(model, "BoneHead", 2), ("Z", 1.0))
-        self.assertEqual(head_axis(model, "BoneHead", 0), ("X", 1.0))
+        self.assertEqual(yaw_axis(model, "BoneHead"), ("Z", 1.0))
+        self.assertEqual(pitch_axis(model, "BoneHead"), ("X", -1.0))
         # Negative: not Y, the forward/back axis that rolled the head.
-        self.assertNotEqual(head_axis(model, "BoneHead", 0)[0], "Y")
+        self.assertNotEqual(pitch_axis(model, "BoneHead")[0], "Y")
 
     def test_kerrigan_head_axes(self) -> None:
-        from character_anim_assets import head_axis
-
         # Bone29 rest axes (stock kerrigan.m3): X=(0,-.35,.94) Y=(0,.94,.35) Z=(-1,0,0).
         model = _bone_model("Bone29", ((0.0, 0.0, -1.0), (-0.35, 0.94, 0.0), (0.94, 0.35, 0.0)))
-        self.assertEqual(head_axis(model, "Bone29", 2), ("X", 1.0))
-        self.assertEqual(head_axis(model, "Bone29", 0), ("Z", -1.0))
+        self.assertEqual(yaw_axis(model, "Bone29"), ("X", 1.0))
+        self.assertEqual(pitch_axis(model, "Bone29"), ("Z", 1.0))
 
-    def test_pitch_sign_is_face_up(self) -> None:
+    def test_bake_reads_the_axes_from_the_rig(self) -> None:
         source = (SCRIPTS / "character_anim_assets.py").read_text(encoding="utf-8")
-        self.assertIn("    pitch_axis, side = head_axis(model, head, 0)\n    pitch_sign = -side\n", source)
-        self.assertIn("    head = make_head_groups(model, groups, head_bone)\n", source)
+        self.assertIn("    nod_axis, pitch_sign = pitch_axis(model, head)\n", source)
+        self.assertIn("    nod_axis, nod_sign = shared_pitch_axis(model, rig.pitch_bones)\n", source)
+        self.assertIn("    head = make_head_groups(model, groups, rig.head_bone)\n", source)
+
+
+class TorsoAxisTest(unittest.TestCase):
+    """Operator 2026-11-22: Kerrigan's torso aim pitch turned on the wrong
+    axis. The torso nods about its own left-right axis, read from the rig."""
+
+    def test_tosh_torso_axis(self) -> None:
+        # BoneSpine01 rest axes (stock tosh.m3): X=(0,0,1) Y=(-1,0,0) Z=(0,-1,0).
+        model = _bone_model("BoneSpine01", ((0.0, -1.0, 0.0), (0.0, 0.0, -1.0), (1.0, 0.0, 0.0)))
+        self.assertEqual(shared_pitch_axis(model, HEROES["tosh"].pitch_bones), ("Y", 1.0))
+
+    def test_kerrigan_torso_axis(self) -> None:
+        # Bone07 rest axes (stock kerrigan.m3): X=(0,-.13,.99) Y=(0,.99,.13) Z=(-1,0,0).
+        model = _bone_model("Bone07", ((0.0, 0.0, -1.0), (-0.13, 0.99, 0.0), (0.99, 0.13, 0.0)))
+        axis = shared_pitch_axis(model, HEROES["kerrigan"].pitch_bones)
+        self.assertEqual(axis, ("Z", 1.0))
+        # Negative: not Y, the axis copied from Tosh that rolled her sideways.
+        self.assertNotEqual(axis[0], "Y")
+
+    def test_bones_with_different_axes_are_refused(self) -> None:
+        from types import SimpleNamespace as N
+
+        one = _bone_model("A", ((0.0, -1.0, 0.0), (0.0, 0.0, -1.0), (1.0, 0.0, 0.0)))
+        two = _bone_model("B", ((0.0, 0.0, -1.0), (-0.13, 0.99, 0.0), (0.99, 0.13, 0.0)))
+        model = N(bones=one.bones + two.bones, absoluteInverseBoneRestPositions=one.absoluteInverseBoneRestPositions + two.absoluteInverseBoneRestPositions)
+        with self.assertRaises(ValueError):
+            shared_pitch_axis(model, ("A", "B"))
 
 
 class AimPitchSourceTest(unittest.TestCase):
     def test_pitch_source_is_upper_only(self) -> None:
-        self.assertEqual(AIM_PITCH_SOURCE, "Attack Arm Alternate")
+        self.assertEqual(HEROES["tosh"].aim_pose_clip, "Attack Arm Alternate")
+        # Operator 2026-11-22: her aim pose is the Psi Blast cast, not talons.
+        self.assertEqual(HEROES["kerrigan"].aim_pose_clip, "Spell Arm Alternate")
 
 
 class AimDirectionsTest(unittest.TestCase):
@@ -146,13 +173,14 @@ def app_text(*parts: str) -> str:
 class SlowWalkTest(unittest.TestCase):
     """REQ-SLOW-WALK: data, constants, clip table, keys, and the profile agree."""
 
-    def test_buff_is_forty_percent_speed(self) -> None:
+    def test_buff_is_thirty_percent_speed(self) -> None:
+        # Operator 2026-11-22: 30 % (was 40 %).
         text = BEHAVIOR_DATA.read_text(encoding="utf-8")
         block = re.search(r'<CBehaviorBuff id="SCOBASlowWalk">(.*?)</CBehaviorBuff>', text, re.S)
         self.assertIsNotNone(block)
         multiplier = re.search(r'MoveSpeedMultiplier="([0-9.]+)"', block.group(1))
-        self.assertEqual(float(multiplier.group(1)), 0.4)
-        self.assertAlmostEqual(sum(slowwalk.SLOW_RATIO) / 2.0, 0.4)
+        self.assertEqual(float(multiplier.group(1)), 0.3)
+        self.assertAlmostEqual(sum(slowwalk.SLOW_RATIO) / 2.0, 0.3)
         self.assertNotIn("<Duration", block.group(1))
 
     def test_lower_states(self) -> None:
@@ -191,11 +219,11 @@ class SlowWalkTest(unittest.TestCase):
             block = re.search(rf'<CBehaviorBuff id="SCOBASlowWalkRamp{k:02d}">(.*?)</CBehaviorBuff>', text, re.S)
             self.assertIsNotNone(block, k)
             value = float(re.search(r'MoveSpeedMultiplier="([0-9.]+)"', block.group(1)).group(1))
-            self.assertAlmostEqual(value, 1.0 - 0.6 * k / 16.0, places=4)
+            self.assertAlmostEqual(value, 1.0 - 0.7 * k / 16.0, places=5)
             self.assertNotIn("<Duration", block.group(1))
         # Negative: no level 16 ramp buff; level 16 is SCOBASlowWalk itself.
         self.assertNotIn('id="SCOBASlowWalkRamp16"', text)
-        self.assertEqual(slowwalk.RAMP_IN[-1], 0.4)
+        self.assertEqual(slowwalk.RAMP_IN[-1], 0.3)
         self.assertEqual(slowwalk.RAMP_OUT[-1], 1.0)
         source = app_text("systems", "input.galaxy")
         self.assertIn('return c_SLOW_WALK_BUFF + "Ramp0" + IntToString(lp_level);', source)
@@ -250,7 +278,7 @@ class SlowWalkTest(unittest.TestCase):
         self.assertAlmostEqual(slow.phase_gap(0.2, 0.5), 0.3)
 
     def test_profile_windows(self) -> None:
-        self.assertEqual(slowwalk.SLOW_RATIO, (0.35, 0.45))
+        self.assertEqual(slowwalk.SLOW_RATIO, (0.25, 0.35))
         self.assertEqual(set(slowwalk.CHECKS), {s for group in slowwalk.SECTIONS.values() for s in group})
 
 

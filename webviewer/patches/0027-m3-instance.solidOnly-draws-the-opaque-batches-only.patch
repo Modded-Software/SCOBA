@@ -1,0 +1,34 @@
+From 4fc8b342c263ff181a64f4d718b13e561c50a2d2 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 13:13:41 +0200
+Subject: [PATCH 27/27] m3: instance.solidOnly draws the opaque batches only
+
+For tests: the picture of the solid parts alone, to compare with what renderPick draws.
+---
+ src/viewer/handlers/m3/modelinstance.ts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index 1e0ffd32..648b5eef 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -21,6 +21,8 @@ export default class M3ModelInstance extends ModelInstance {
+   vertexColor = new Float32Array([1, 1, 1, 1]);
+   /** Mouse-over highlight, 0 (none) to 1. */
+   highlight = 0;
++  /** Draw the opaque batches only (to compare the picture with what renderPick draws). */
++  solidOnly = false;
+   sequence = -1;
+   frame = 0;
+   sequenceLoopMode = 0;
+@@ -200,6 +202,10 @@ export default class M3ModelInstance extends ModelInstance {
+         const material = batch.material;
+         const region = batch.region;
+ 
++        if (this.solidOnly && material.blendMode !== 0) {
++          continue;
++        }
++
+         drawnOrder.push(batch.fileOrder);
+ 
+         material.bind(shader, textureOverrides, this);

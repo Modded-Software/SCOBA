@@ -1,0 +1,381 @@
+// Combat harness: Kerrigan (operator 2026-11-22). Psi Blast is her only
+// attack, and her aim pose breathes (R-TPS-19). Included after
+// combat_cam.galaxy and before combat.galaxy, which calls these.
+
+// The ability she must not have (R-TPS-65).
+const string c_DBG_PSI_NOVA = "PoisonNova";
+int gv_dbgTalonsFx;
+int gv_dbgPsiFx;
+trigger gt_DbgKerriganFx;
+
+// Counts every Razor Talons and every Psi Blast effect of any player.
+bool gt_DbgKerriganFx_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (EventPlayerEffectUsed() == c_SCOBA_EFFECT_TALONS) {
+        gv_dbgTalonsFx += 1;
+    }
+    else {
+        gv_dbgPsiFx += 1;
+    }
+    return true;
+}
+
+// Psi Blast probe (operator 2026-11-22: a burst at Kerrigan, no projectile).
+// Found: the burst was Poison Nova, and the missile's impact got no unit.
+const string c_DBG_PSI_MISSILE = "KerriganWeapon";
+const string c_DBG_PSI_DAMAGE = "PsiBlastDamage";
+const string c_DBG_PSI_LOCATION = "ImpactLocation.Value";
+const int c_DBG_PSI_LOOPS = 48;
+int gv_dbgPsiDmg;       // PsiBlastDamage effect events
+unit gv_dbgPsiDmgUnit;  // the target of the last one
+fixed gv_dbgPsiDmgAt;
+point gv_dbgPsiDmgPoint;  // where the last one landed
+int gv_dbgPsiMade;      // missile units the unit-created event reported
+string gv_dbgPsiDmgInfo;   // the last damage effect: target and caster as the event has them
+unit gv_dbgPsiWatch;       // the probe target; every damage it takes is logged
+string gv_dbgPsiHits;      // "amount:effect:source type" per damage event on it
+trigger gt_DbgPsiDamage;
+trigger gt_DbgPsiMade;
+trigger gt_DbgPsiHit;
+
+bool gt_DbgPsiDamage_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gv_dbgPsiDmg += 1;
+    gv_dbgPsiDmgUnit = EventPlayerEffectUsedUnit(c_effectUnitTarget);
+    gv_dbgPsiDmgAt = TimerGetElapsed(gv_sCOBA_Clock);
+    gv_dbgPsiDmgPoint = EventPlayerEffectUsedPoint(c_effectLocationTargetPoint);
+    gv_dbgPsiDmgInfo = "target " + IntToString(BoolToInt(UnitIsValid(gv_dbgPsiDmgUnit))) + ":" + UnitGetType(gv_dbgPsiDmgUnit)
+        + " caster " + UnitGetType(EventPlayerEffectUsedUnit(c_effectUnitCaster));
+    return true;
+}
+
+bool gt_DbgPsiMade_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    if (UnitGetType(EventUnitCreatedUnit()) == c_DBG_PSI_MISSILE) {
+        gv_dbgPsiMade += 1;
+    }
+    return true;
+}
+
+// Every damage the probe target takes, whatever dealt it.
+bool gt_DbgPsiHit_Func (bool testConds, bool runActions) {
+    if (!runActions || EventUnit() != gv_dbgPsiWatch) {
+        return true;
+    }
+    gv_dbgPsiHits = gv_dbgPsiHits + FixedToString(EventUnitDamageAmount(), 1) + ":" + EventUnitDamageEffect() + ":" + UnitGetType(EventUnitDamageSourceUnit()) + " ";
+    return true;
+}
+
+void gf_DbgKerriganInit () {
+    gt_DbgPsiHit = TriggerCreate("gt_DbgPsiHit_Func");
+    TriggerAddEventUnitDamaged(gt_DbgPsiHit, null, c_unitDamageTypeAny, c_unitDamageEither, null);
+    gt_DbgPsiDamage = TriggerCreate("gt_DbgPsiDamage_Func");
+    TriggerAddEventPlayerEffectUsed(gt_DbgPsiDamage, c_playerAny, c_DBG_PSI_DAMAGE);
+    gt_DbgPsiMade = TriggerCreate("gt_DbgPsiMade_Func");
+    TriggerAddEventUnitCreated(gt_DbgPsiMade, null, null, null);
+    gt_DbgKerriganFx = TriggerCreate("gt_DbgKerriganFx_Func");
+    TriggerAddEventPlayerEffectUsed(gt_DbgKerriganFx, c_playerAny, c_SCOBA_EFFECT_TALONS);
+    TriggerAddEventPlayerEffectUsed(gt_DbgKerriganFx, c_playerAny, c_SCOBA_EFFECT_PSIBLAST);
+}
+
+// The bound unit's weapons as the engine has them, and the effect counters.
+void gf_DbgKerriganWeapons (string lp_s, string lp_tag) {
+    unit lv_u = gv_tPSUNIT[1];
+
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "Type", UnitGetType(lv_u));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Weapons", UnitWeaponCount(lv_u));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "Weapon1", UnitWeaponGet(lv_u, 1));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "Weapon2", UnitWeaponGet(lv_u, 2));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "Weapon3", UnitWeaponGet(lv_u, 3));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "AimWeapon", UnitWeaponGet(lv_u, gf_AimWeaponIndex(1)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "MinRange1000", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, c_SCOBA_WEAPON_PSIBLAST, "MinimumRange", 1)) * 1000.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "Nova", UnitAbilityExists(lv_u, c_DBG_PSI_NOVA));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "TalonsFx", gv_dbgTalonsFx);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "PsiFx", gv_dbgPsiFx);
+    BankSave(gv_dbgBank);
+}
+
+// Breath state: the script's syncs and phase, the game clock's place in the
+// breath, and the engine's length and remaining time of the pitch clip (raw:
+// that AnimSetTime moves a clip just played is an engine assumption).
+void gf_DbgBreathSnap (string lp_s, string lp_tag) {
+    generichandle lv_q;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Syncs", gv_animBreathSyncs[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Sends", gv_animAimPitchSends[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Step", gv_animAimPitchStep[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "PhaseMs", FixedToInt(gv_animBreathPhase[1] * 1000.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, lp_tag + "AimUpper", gv_animAimUpperOn[1]);
+    AnimLengthQueryByName(libNtve_gf_MainActorofUnit(gv_tPSUNIT[1]), c_ANIM_BRACKET_UPPER, false);
+    AnimLengthQueryWait();
+    lv_q = AnimLengthQueryLastCreated();
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "ClockMs", FixedToInt(ModF(TimerGetElapsed(gv_sCOBA_Clock), c_ANIM_BREATH_KERRIGAN) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "LenMs", FixedToInt(AnimLengthSync(lv_q) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "RemMs", FixedToInt(AnimLengthRemainingSync(lv_q) * 1000.0));
+    BankSave(gv_dbgBank);
+}
+
+// One aim with two camera pitch changes and a still second at the end.
+void gf_DbgBreathRun (string lp_s, bool lp_kerrigan) {
+    gf_DbgReset(lp_s, false, true);
+    if (lp_kerrigan) {
+        gf_DbgUseKerrigan();
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, "type", UnitGetType(gv_tPSUNIT[1]));
+    gv_cameraCollisionOff[1] = true;
+    CameraSetValue(1, c_cameraValuePitch, 30.0, 0.0, -1, 10);
+    Wait(0.3, c_timeGame);
+    gf_DbgBreathSnap(lp_s, "tpre");
+    gf_AimBegin(1);
+    Wait(0.5, c_timeGame);
+    gf_DbgBreathSnap(lp_s, "t0");
+    CameraSetValue(1, c_cameraValuePitch, 60.0, 0.2, -1, 10);
+    Wait(1.3, c_timeGame);
+    gf_DbgBreathSnap(lp_s, "t1");
+    CameraSetValue(1, c_cameraValuePitch, 10.0, 0.2, -1, 10);
+    Wait(1.3, c_timeGame);
+    gf_DbgBreathSnap(lp_s, "t2");
+    // Negative: a still camera plays no new clip and sends no sync.
+    Wait(1.0, c_timeGame);
+    gf_DbgBreathSnap(lp_s, "t3");
+    gf_AimEnd(1);
+    gv_cameraCollisionOff[1] = false;
+    Wait(0.3, c_timeGame);
+}
+
+void gf_DbgBreathGroup () {
+    gf_DbgBreathRun("breath_kerrigan", true);
+    // Negative: Tosh has a still aim pose; no sync is ever sent.
+    gf_DbgBreathRun("breath_tosh", false);
+}
+
+// One Psi Blast at lp_target and its trace: every game loop for 3 s the
+// missile units near the hero (count, distance from the hero, height, alive),
+// then the effect events and the target's life. lp_mode 0: the effect is
+// created as the aim shot does, with no camera and no aim in the way.
+// 1: by attack order (the weapon path). 2: the real aim click
+// (gf_AimShotPress); the target is the one it chose. 3: the damage effect
+// alone at the unit, no missile.
+void gf_DbgPsiShot (string lp_s, unit lp_target, int lp_mode) {
+    unit lv_hero = gv_tPSUNIT[1];
+    unitgroup lv_g;
+    unit lv_m;
+    int lv_i;
+    int lv_d;
+    int lv_seen;
+    int lv_far;
+    int lv_last = -1;
+    int lv_psi = gv_dbgPsiFx;
+    int lv_dmg = gv_dbgPsiDmg;
+    int lv_made = gv_dbgPsiMade;
+    fixed lv_at;
+    fixed lv_life0;
+    string lv_row;
+
+    BankValueSetFromString(gv_dbgBank, lp_s, "heroType", UnitGetType(lv_hero));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "talons0", gv_dbgTalonsFx);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "heroCdMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+    // Raw: the effect data as the engine holds it, and the nova ability.
+    BankValueSetFromString(gv_dbgBank, lp_s, "lmImpactLocation", CatalogFieldValueGet(c_gameCatalogEffect, c_SCOBA_EFFECT_PSIBLAST, c_DBG_PSI_LOCATION, 1));
+    BankValueSetFromString(gv_dbgBank, lp_s, "lmImpactEffect", CatalogFieldValueGet(c_gameCatalogEffect, c_SCOBA_EFFECT_PSIBLAST, "ImpactEffect", 1));
+    BankValueSetFromString(gv_dbgBank, lp_s, "lmAmmoUnit", CatalogFieldValueGet(c_gameCatalogEffect, c_SCOBA_EFFECT_PSIBLAST, "AmmoUnit", 1));
+    BankValueSetFromString(gv_dbgBank, lp_s, "dmgAmount", CatalogFieldValueGet(c_gameCatalogEffect, c_DBG_PSI_DAMAGE, "Amount", 1));
+    BankValueSetFromString(gv_dbgBank, lp_s, "dmgImpactLocation", CatalogFieldValueGet(c_gameCatalogEffect, c_DBG_PSI_DAMAGE, c_DBG_PSI_LOCATION, 1));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "novaExists", UnitAbilityExists(lv_hero, c_DBG_PSI_NOVA));
+    // The missile's look: its actors and models live in liberty.sc2campaign.
+    // Does this map's catalog hold them? (Whether it is drawn: operator.)
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "missileActorValid", CatalogEntryIsValid(c_gameCatalogActor, "QueenOfBladesRangedAttackMissile"));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "attackActorValid", CatalogEntryIsValid(c_gameCatalogActor, "QueenOfBladesRangedAttack"));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "missileModelValid", CatalogEntryIsValid(c_gameCatalogModel, c_DBG_PSI_MISSILE));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "impactModelValid", CatalogEntryIsValid(c_gameCatalogModel, "KerriganWeaponImpact"));
+    BankValueSetFromString(gv_dbgBank, lp_s, "missileModelFile", CatalogFieldValueGet(c_gameCatalogModel, c_DBG_PSI_MISSILE, "Model", 1));
+    gv_dbgPsiDmgUnit = null;
+    gv_dbgPsiDmgPoint = null;
+    gv_dbgPsiDmgInfo = "";
+    gv_dbgPsiHits = "";
+    gv_dbgPsiWatch = lp_target;
+    // Before the shot: the damage effect alone (mode 3) lands at once.
+    lv_life0 = UnitGetPropertyFixed(lp_target, c_unitPropLife, c_unitPropCurrent);
+    lv_at = TimerGetElapsed(gv_sCOBA_Clock);
+    if (lp_mode == 1) {
+        gf_PncAttack(1, lp_target);
+    }
+    else if (lp_mode == 2) {
+        gf_AimShotPress(1);
+        lp_target = gv_tpsShotTarget[1];
+        gv_dbgPsiWatch = lp_target;
+        lv_life0 = UnitGetPropertyFixed(lp_target, c_unitPropLife, c_unitPropCurrent);
+        BankValueSetFromString(gv_dbgBank, lp_s, "aimEffect", gv_tpsShotEffect[1]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, "aimKind", gv_tpsShotKind[1]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, "aimTargetIsProxy", UnitIsValid(lp_target) && lp_target == gv_tpsProxy[1]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, "aimProxyZ100", FixedToInt(gv_tpsProxyHeight[1] * 100.0));
+        BankValueSetFromInt(gv_dbgBank, lp_s, "camPitch", FixedToInt(CameraGetPitch(1)));
+        BankValueSetFromInt(gv_dbgBank, lp_s, "camYaw", FixedToInt(CameraGetYaw(1)));
+        BankValueSetFromInt(gv_dbgBank, lp_s, "heroFacing", FixedToInt(UnitGetFacing(lv_hero)));
+    }
+    else if (lp_mode == 3) {
+        UnitCreateEffectUnit(lv_hero, c_DBG_PSI_DAMAGE, lp_target);
+    }
+    else {
+        UnitCreateEffectUnit(lv_hero, c_SCOBA_EFFECT_PSIBLAST, lp_target);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "targetValid", UnitIsValid(lp_target));
+    BankValueSetFromString(gv_dbgBank, lp_s, "targetType", UnitGetType(lp_target));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "targetOwner", UnitGetOwner(lp_target));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "targetDist100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lp_target)) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "targetZ100", FixedToInt(UnitGetHeight(lp_target) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "life0", FixedToInt(lv_life0));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "targetVisible", VisIsVisibleForPlayer(1, UnitGetPosition(lp_target)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "weaponRange100", FixedToInt(UnitWeaponRange(lv_hero, gf_AimWeaponIndex(1)) * 100.0));
+    for (lv_i = 0; lv_i < c_DBG_PSI_LOOPS; lv_i += 1) {
+        lv_g = UnitGroup(c_DBG_PSI_MISSILE, c_playerAny, RegionCircle(gv_dbgAnchor, 40.0), UnitFilter(0, 0, 0, 0), 0);
+        lv_row = IntToString(UnitGroupCount(lv_g, c_unitCountAll));
+        if (UnitGroupCount(lv_g, c_unitCountAll) > 0) {
+            lv_m = UnitGroupUnit(lv_g, 1);
+            lv_d = FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lv_m)) * 100.0);
+            lv_row = lv_row + " d" + IntToString(lv_d) + " z" + IntToString(FixedToInt(UnitGetHeight(lv_m) * 100.0)) + " a" + IntToString(BoolToInt(UnitIsAlive(lv_m)));
+            lv_seen += 1;
+            lv_far = MaxI(lv_far, lv_d);
+            lv_last = lv_i;
+        }
+        lv_row = lv_row + " fx" + IntToString(gv_dbgPsiFx - lv_psi) + " dmg" + IntToString(gv_dbgPsiDmg - lv_dmg);
+        BankValueSetFromString(gv_dbgBank, lp_s, "loop" + IntToString(lv_i / 10) + IntToString(lv_i % 10), lv_row);
+        Wait(0.0625, c_timeGame);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "launches", gv_dbgPsiFx - lv_psi);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "damages", gv_dbgPsiDmg - lv_dmg);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "damageOnTarget", gv_dbgPsiDmgUnit == lp_target);
+    BankValueSetFromString(gv_dbgBank, lp_s, "damageInfo", gv_dbgPsiDmgInfo);
+    BankValueSetFromString(gv_dbgBank, lp_s, "hits", gv_dbgPsiHits);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "damageDelayMs", FixedToInt((gv_dbgPsiDmgAt - lv_at) * 1000.0));
+    if (gv_dbgPsiDmgPoint != null) {
+        // Where the damage effect landed, from the hero and from the target.
+        BankValueSetFromInt(gv_dbgBank, lp_s, "damageFromHero100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lv_hero), gv_dbgPsiDmgPoint) * 100.0));
+        BankValueSetFromInt(gv_dbgBank, lp_s, "damageFromTarget100", FixedToInt(DistanceBetweenPoints(UnitGetPosition(lp_target), gv_dbgPsiDmgPoint) * 100.0));
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "missilesMade", gv_dbgPsiMade - lv_made);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "missileLoops", lv_seen);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "missileFar100", lv_far);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "missileLastLoop", lv_last);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "life1", FixedToInt(UnitGetPropertyFixed(lp_target, c_unitPropLife, c_unitPropCurrent)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "talons1", gv_dbgTalonsFx);
+    BankSave(gv_dbgBank);
+}
+
+void gf_DbgPsiCase (string lp_s, fixed lp_dx, int lp_mode) {
+    gf_DbgReset(lp_s, false, true);
+    gf_DbgUseKerrigan();
+    gf_DbgPsiShot(lp_s, gf_DbgSpawnOne(lp_s, lp_dx, 500.0), lp_mode);
+}
+
+void gf_DbgPsiProbeGroup () {
+    unit lv_proxy;
+
+    gf_DbgPsiCase("psi_fx_02", 2.0, 0);
+    gf_DbgPsiCase("psi_fx_03", 3.0, 0);
+    gf_DbgPsiCase("psi_fx_035", 3.5, 0);
+    gf_DbgPsiCase("psi_fx_04", 4.0, 0);
+    gf_DbgPsiCase("psi_fx_08", 8.0, 0);
+    gf_DbgPsiCase("psi_order_04", 4.0, 1);
+    gf_DbgPsiCase("psi_order_08", 8.0, 1);
+    // The missed aim shot: the neutral proxy unit, in the air.
+    gf_DbgReset("psi_fx_proxy", false, true);
+    gf_DbgUseKerrigan();
+    libNtve_gf_CreateUnitsAtPoint2(1, c_SCOBA_TPS_PROXY_UNIT, 0, 0, PointWithOffset(gv_dbgAnchor, 6.0, 0.0));
+    lv_proxy = UnitLastCreated();
+    UnitSetHeight(lv_proxy, 2.0, 0.0);
+    Wait(0.1, c_timeGame);
+    gf_DbgPsiShot("psi_fx_proxy", lv_proxy, 0);
+    UnitRemove(lv_proxy);
+    // The real aim click with nothing under the crosshair (the operator's
+    // case): gf_AimShotPress places its own proxy and fires at it.
+    gf_DbgReset("psi_aim", false, true);
+    gf_DbgUseKerrigan();
+    gv_cameraCollisionOff[1] = true;
+    CameraSetValue(1, c_cameraValuePitch, 20.0, 0.0, -1, 10);
+    gf_AimBegin(1);
+    Wait(0.75, c_timeGame);
+    gf_DbgPsiShot("psi_aim", null, 2);
+    gf_AimEnd(1);
+    gv_cameraCollisionOff[1] = false;
+    Wait(0.3, c_timeGame);
+    // The damage effect alone at the unit: does it hurt without the missile?
+    gf_DbgPsiCase("psi_direct_04", 4.0, 3);
+}
+
+// Operator watch (2026-11-22): the drawn Psi Blast runs from the shooter's
+// feet to its head. Three shooters in front of the bound hero, each firing
+// by a plain attack order for c_DBG_WATCH_FIRE s, one after the other:
+// 1 the stock Kerrigan unit, 2 KerriganSCOBA, 3 a stock Hydralisk
+// (control). Each fires across the screen, left to right, at its own
+// stunned Zergling. Where the missile is drawn: operator check. Bank: the
+// target's life before and after (the shots landed).
+const fixed c_DBG_WATCH_FIRE = 5.0;
+
+// lp_effect empty: a plain attack order. Else that effect, once a second.
+void gf_DbgPsiWatchOne (string lp_s, string lp_tag, string lp_type, fixed lp_fwd, string lp_label, string lp_effect) {
+    unit lv_hero = gv_tPSUNIT[1];
+    fixed lv_f = UnitGetFacing(lv_hero);
+    point lv_row = PointWithOffsetPolar(UnitGetPosition(lv_hero), lp_fwd, lv_f);
+    point lv_from = PointWithOffsetPolar(lv_row, 3.0, lv_f + 90.0);
+    point lv_to = PointWithOffsetPolar(lv_row, 3.0, lv_f - 90.0);
+    unit lv_shooter;
+    unit lv_target;
+    int lv_tag;
+    int lv_i;
+
+    libNtve_gf_CreateUnitsAtPoint2(1, "Zergling", 0, 4, lv_to);
+    lv_target = UnitLastCreated();
+    UnitSetState(lv_target, c_unitStateStunned, true);
+    UnitSetPropertyFixed(lv_target, c_unitPropLifeMax, 5000.0);
+    UnitSetPropertyFixed(lv_target, c_unitPropLife, 5000.0);
+    libNtve_gf_CreateUnitsAtPoint2(1, lp_type, 0, 1, lv_from);
+    lv_shooter = UnitLastCreated();
+    UnitSetFacing(lv_shooter, lv_f - 90.0, 0.0);
+    TextTagCreate(StringToText(lp_label), 24, lv_from, 2.5, true, false, PlayerGroupAll());
+    lv_tag = TextTagLastCreated();
+    Wait(1.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Life0", FixedToInt(UnitGetPropertyFixed(lv_target, c_unitPropLife, c_unitPropCurrent)));
+    if (lp_effect == "") {
+        UnitIssueOrder(lv_shooter, OrderTargetingUnit(AbilityCommand("attack", 0), lv_target), c_orderQueueReplace);
+        Wait(c_DBG_WATCH_FIRE, c_timeGame);
+    }
+    else {
+        for (lv_i = 0; lv_i < FixedToInt(c_DBG_WATCH_FIRE); lv_i += 1) {
+            UnitCreateEffectUnit(lv_shooter, lp_effect, lv_target);
+            Wait(1.0, c_timeGame);
+        }
+    }
+    UnitIssueOrder(lv_shooter, Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Life1", FixedToInt(UnitGetPropertyFixed(lv_target, c_unitPropLife, c_unitPropCurrent)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "Type", UnitGetType(lv_shooter));
+    BankSave(gv_dbgBank);
+    TextTagDestroy(lv_tag);
+    UnitRemove(lv_shooter);
+    UnitRemove(lv_target);
+}
+
+void gf_DbgPsiWatchGroup () {
+    fixed lv_dist;
+
+    gf_DbgReset("psi_watch", false, true);
+    gf_DbgClearEnemies();
+    lv_dist = gv_cameraDistanceDesired[1];
+    gv_cameraDistanceDesired[1] = 8.0;
+    Wait(1.0, c_timeGame);
+    gf_DbgPsiWatchOne("psi_watch", "stock", "Kerrigan", 6.0, "1: stock Kerrigan", "");
+    gf_DbgPsiWatchOne("psi_watch", "scoba", "KerriganSCOBA", 6.0, "2: KerriganSCOBA (map hero)", "");
+    gf_DbgPsiWatchOne("psi_watch", "hydra", "Hydralisk", 6.0, "3: stock Hydralisk (control)", "");
+    // Swap: which half carries the fault, the Psi Blast missile or Kerrigan?
+    gf_DbgPsiWatchOne("psi_watch", "hydrapsi", "Hydralisk", 6.0, "4: Hydralisk fires PSI BLAST", c_SCOBA_EFFECT_PSIBLAST);
+    gf_DbgPsiWatchOne("psi_watch", "kerrneedle", "KerriganSCOBA", 6.0, "5: KerriganSCOBA fires NEEDLE SPINES", "NeedleSpinesLaunchMissile");
+    gv_cameraDistanceDesired[1] = lv_dist;
+    Wait(0.5, c_timeGame);
+}

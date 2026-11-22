@@ -9,6 +9,7 @@ from pathlib import Path
 
 from project_root import project_root
 import character_anim_assets as assets
+from heroanim.rig import HEROES
 
 ROOT = project_root()
 sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
@@ -21,12 +22,9 @@ def main() -> int:
     parser.add_argument("--map", type=Path, default=ROOT / "out" / "SCOBA256.SC2Map")
     parser.add_argument("--tree", action="store_true")
     args = parser.parse_args()
-    for name, data in assets.SOURCE_MODELS.items():
-        target = data[1]
-        upper_roots = data[4]
-        lower_roots = data[5]
-        model = m3.loadModel(str(args.map / target))
-        upper, lower = assets.classify_bones(model, upper_roots, lower_roots)
+    for name, rig in HEROES.items():
+        model = m3.loadModel(str(args.map / rig.target))
+        upper, lower = assets.classify_bones(model, rig.upper_roots, rig.lower_roots)
         print(f"model: {name}")
         if args.tree:
             for index, bone in enumerate(model.bones):

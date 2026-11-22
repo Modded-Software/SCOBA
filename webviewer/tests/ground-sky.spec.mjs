@@ -16,13 +16,12 @@ const pixelAt = (page, x, y) => page.evaluate(([x, y]) => window.sc2viewer.groun
 /**
  * The brightest (by green) of 5 samples across ±0.01 in x, about ±1 pixel
  * at the top-down view: a one-pixel line may fall between sample points.
+ * All 5 come from one frame (each frame is a full read of the canvas).
  */
 async function at(page, x, y) {
+  const samples = await page.evaluate((points) => window.sc2viewer.groundPixels(points), [-0.01, -0.005, 0, 0.005, 0.01].map((dx) => [x + dx, y]));
   let best = null;
-  for (const dx of [-0.01, -0.005, 0, 0.005, 0.01]) {
-    const p = await pixelAt(page, x + dx, y);
-    if (!best || p.rgb[1] > best.rgb[1]) best = p;
-  }
+  for (const p of samples) if (!best || p.rgb[1] > best.rgb[1]) best = p;
   return best;
 }
 const BG = [26, 26, 31];

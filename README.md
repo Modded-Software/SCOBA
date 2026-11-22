@@ -59,11 +59,58 @@ Two control modes have a contract and a state document:
 | `src/SCOBA.SC2Map/scripts/app/` | Galaxy modules. |
 | `scripts/` | Build, validation, launch, and test tooling. |
 | `scripts/testkit/` | In-game test harness and profiles. |
+| `scripts/setup/deps.sh` | Dependency checks and installs behind `make init`, `install-deps`, `install-hdtex`. |
+| `scripts/setup/patches/stormex/` | Patches `deps.sh` applies to the stormex source before it builds. |
+| `.venv/src/stormex/` | The stormex source checkout built by setup. Not in git. |
+| `tools/stormex`, `tools/stormex.pins` | The CASC extractor and the pins it was built from, written by `make install-deps`. Not in git. |
 | `scripts/hdtex/`, `scripts/hd_textures.py` | Texture upscaling: extract, upscale, encode, inject. |
 | `build/hdtex/` | Cache of upscaled textures, one folder per variant. Not in git. |
 | `original/` | The untouched source map. |
 | `out/` | Build output and test runs. Never edited by hand. |
 | `docs/` | Requirements and specifications. |
+
+## Setup
+
+| Command | Does |
+| --- | --- |
+| `make init` | Report every dependency as `OK`, `MISSING` or `OPTIONAL`. Installs nothing. Exit 1 if a required one is missing. |
+| `make install` | `make install-deps`. Git hooks are separate: `sudo make install-hooks`. |
+| `make install-deps` | `uv sync --frozen`, build `tools/stormex`, `make viewer-install`, then `make init`. |
+| `make install-hdtex` | Clone `../upscale-on-arc` if absent, check its pinned commit, run its `make install`. Only the HD texture cache build needs it. |
+
+All steps are in `scripts/setup/deps.sh` and can run again safely.
+
+- **stormex** is built from source: [Talv/stormex](https://github.com/Talv/stormex)
+  at `v2.2.0` (commit `1e93179`). Upstream ships only a Windows binary and has
+  had no commit since 2019. Its tag pins a CascLib commit (`b2bd4c8`) that no
+  public repository has, so the gitlinks are not used. Each dependency is the
+  latest stable tag of its maintained upstream:
+
+  | Dependency | Tag | Commit |
+  | --- | --- | --- |
+  | [CascLib](https://github.com/ladislav-zezula/CascLib) | `3.0` | `4971d36` |
+  | [cxxopts](https://github.com/jarro2783/cxxopts) | `v3.3.1` | `44380e5` |
+  | [plog](https://github.com/SergiusTheBest/plog) | `1.1.11` | `e5c033e` |
+
+  `scripts/setup/patches/stormex/` makes the 2019 source build against them.
+  The source goes to `.venv/src/stormex`. The build uses the system compiler
+  and linker (`STORMEX_PATH`, default `/usr/local/bin:/usr/bin:/bin`). The
+  pins go to `tools/stormex.pins`. The build is skipped while
+  `tools/stormex --version` reports `v2.2.0` and that file matches the current
+  pins. Needs `cmake`, a system C++ compiler, and the FUSE 2 headers (Ubuntu:
+  `libfuse-dev`).
+- **upscale-on-arc** is
+  [Modded-Software/upscale-on-arc](https://github.com/Modded-Software/upscale-on-arc).
+  A checkout must contain commit `b35fa07`.
+- **Model viewer**: `make viewer-install` runs `npm install`, installs the
+  Playwright browser, clones the pinned
+  [mdx-m3-viewer](https://github.com/flowtsohg/mdx-m3-viewer) into
+  `webviewer/ref/` with `webviewer/patches/` applied, and builds the renderer.
+- Not installed by any step: StarCraft II, GE-Proton, lsfg-vk. See
+  [Requirements](#requirements).
+
+`deps.sh` reads `STORMEX`, `STORMEX_SRC`, `STORMEX_PATH`, `UPSCALE_DIR`, `BNET_PREFIX`,
+`SC2_DIR` and `STEAM_ROOT` to override its paths.
 
 ## Build And Test
 
@@ -116,4 +163,10 @@ lsfg-vk layer. It does not install lsfg-vk.
 
 - StarCraft II installed under a Proton prefix, launched with GE-Proton. The
   test runner reads `SC2_GAME_PREFIX`, default `~/Games/battlenet-prefix`.
+  GE-Proton is looked up under the Flatpak Steam's `compatibilitytools.d`.
 - `uv` for the Python tooling.
+- `git`, `node` and `npm`, `cmake`, a C++ compiler, and the FUSE 2 headers.
+- Optional: lsfg-vk, for the `SCOBA FG` entry. An Intel Arc GPU, for the HD
+  texture cache build.
+
+`make init` checks all of these.

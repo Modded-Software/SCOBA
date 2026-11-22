@@ -37,6 +37,13 @@ def version() -> str:
         if not path.is_file():
             raise UpscaleError(f"{path} is missing; the arc-upscale checkout at {root} is not complete")
         digest.update(path.read_bytes())
+    # Since 2026-11-22 upscale.py is only the entry point; the code is the arc_upscale package.
+    package = root / "arc_upscale"
+    if not package.is_dir():
+        raise UpscaleError(f"{package} is missing; the arc-upscale checkout at {root} is not complete")
+    for path in sorted(package.glob("*.py")):
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
     return digest.hexdigest()
 
 

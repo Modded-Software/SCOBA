@@ -280,6 +280,8 @@ void gf_BaAiSnap (string lp_s, string lp_tag, int lp_player) {
     BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "DepotsQueued", TechTreeUnitCount(lp_player, "SupplyDepot", c_techCountQueuedOrBetter) + TechTreeUnitCount(lp_player, "SupplyDepotLowered", c_techCountQueuedOrBetter));
 }
 
+int gf_BgStuck (int lp_player);     // baseai_gas_map.galaxy
+
 void gf_BaMacroSnap (string lp_s, string lp_tag) {
     int lv_lane;
     int lv_p;
@@ -288,6 +290,10 @@ void gf_BaMacroSnap (string lp_s, string lp_tag) {
         lv_p = gf_BaseAiLaneOwner(lv_lane);
         gf_BaPlayerSnap(lp_s, lp_tag, lv_p);
         gf_BaAiSnap(lp_s, lp_tag, lv_p);
+        // The map's gas orders (R-BASE-36), under waves.
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "MapBuilds"), gv_baseGasBuilds[lv_p]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "MapGathers"), gv_baseGasGathers[lv_p]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "GasStuck"), gf_BgStuck(lv_p));
     }
     BankSave(gv_dbgBank);
 }

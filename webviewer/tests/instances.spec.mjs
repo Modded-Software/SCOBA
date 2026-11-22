@@ -28,7 +28,8 @@ async function place(page, units) {
 }
 
 const state = (page) => page.evaluate(() => window.sc2viewer.state());
-const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemScreen(i, 0.5), id);
+// A pixel on the unit's picture: the mouse hit goes by pixel.
+const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
 const onWorld = (page, p) => page.evaluate((q) => window.sc2viewer.screenOf(q), p);
 /** Ids of the rows marked selected in the instances panel. */
 const marked = (page) => page.locator('#scene li.selected').evaluateAll((rows) => rows.map((r) => Number(r.dataset.id)));

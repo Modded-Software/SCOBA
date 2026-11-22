@@ -1,0 +1,216 @@
+// Test harness: baseai group "gas", direct builds (R-BASE-35).
+// Can a worker build a gas building on a placed 6x6 geyser at all? Lanes 1
+// (Terran) and 4 (Zerg): a script worker, no base, no AI. Also: a blocker
+// inside the 6x6, bare ground, and where the AI's placement call accepts a
+// gas building. Core: baseai_gas.galaxy.
+
+const fixed c_BG_BUILD_WAIT = 12.0;   // game s for the worker to walk and start
+const fixed c_BG_BARE_WAIT = 6.0;     // game s per order form on bare ground (4 off the worker)
+const int c_BG_FORMS = 3;             // order forms: 0 point, 1 placement, 2 unit
+const fixed c_BG_BLOCK_IN = 2.6;      // blocker asked inside the checked 6x6 square (half side 3)
+const int c_BG_BLOCK_OWNER = 1;       // seat 1, a hero's player: not the builder's own unit
+const string c_BG_BLOCK_UNIT = "SCV"; // radius 0.375, never attacks
+const int c_BG_MAP_R = 8;             // accept map: whole cells each way from the geyser
+point[16] gv_bgAt;                    // the geyser point a direct build used, per player
+
+// Raw: what the engine says of each order form at lp_at before any is
+// issued, and whether lp_gas fits there by footprint alone (range 0: no
+// search; this test knows nothing of BuiltOn).
+void gf_BgForms (string lp_s, string lp_k, int lp_player, string lp_gas, unit lp_w, unit lp_g, point lp_at) {
+    int lv_form;
+
+    for (lv_form = 0; lv_form < c_BG_FORMS; lv_form += 1) {
+        if (lv_form == 2 && !UnitIsValid(lp_g)) {
+            continue;
+        }
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Valid" + gf_BgFormName(lv_form), gf_BaFlagInt(UnitOrderIsValid(lp_w, gf_BgOrder(lv_form, lp_gas, lp_w, lp_g, lp_at))));
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Fit100", gf_BaXY100(UnitTypePlacementFromPoint(lp_gas, lp_player, lp_at, 0.0)));
+}
+
+// One script worker of lp_player tries lp_gas on geyser lp_g: the order
+// forms in turn until one builds. Raw under lp_k; Via names the form that
+// built, or "none".
+void gf_BgTry (string lp_s, string lp_k, int lp_player, string lp_gas, unit lp_g, point lp_toward) {
+    point lv_at = UnitGetPosition(lp_g);
+    point lv_from = PointWithOffsetPolar(lv_at, UnitGetPropertyFixed(lp_g, c_unitPropRadius, c_unitPropCurrent) + 3.0, AngleBetweenPoints(lv_at, lp_toward));
+    string lv_via = "none";
+    string lv_f;
+    unit lv_w;
+    unit lv_b;
+    int lv_form;
+
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Gas", lp_gas);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "GeyserType", UnitGetType(lp_g));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "GeyserAt100", gf_BaXY100(lv_at));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "GeyserFoot", CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lp_g), "Footprint", lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "GasFoot", CatalogFieldValueGet(c_gameCatalogUnit, lp_gas, "Footprint", lp_player));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "GasPlaceFoot", CatalogFieldValueGet(c_gameCatalogUnit, lp_gas, "PlacementFootprint", lp_player));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Before", gf_BgCount(lp_gas, lp_player, lv_at, c_BG_NEAR));
+    gf_BaHallGrid(lp_s, lp_k + "Geyser", lv_at);
+    lv_w = gf_BgMakeWorker(lp_gas, lp_player, lv_from);
+    gf_BgForms(lp_s, lp_k + "On", lp_player, lp_gas, lv_w, lp_g, lv_at);
+    for (lv_form = 0; lv_form < c_BG_FORMS; lv_form += 1) {
+        lv_f = gf_BgFormName(lv_form);
+        if (!UnitIsAlive(lv_w)) {
+            lv_w = gf_BgMakeWorker(lp_gas, lp_player, lv_from);
+        }
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Issued" + lv_f, gf_BaFlagInt(UnitIssueOrder(lv_w, gf_BgOrder(lv_form, lp_gas, lv_w, lp_g, lv_at), c_orderQueueReplace)));
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Order" + lv_f, gf_BhOrder(lv_w));
+        Wait(c_BG_BUILD_WAIT, c_timeGame);
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Built" + lv_f, gf_BgCount(lp_gas, lp_player, lv_at, c_BG_NEAR));
+        if (UnitIsAlive(lv_w)) {
+            BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Worker" + lv_f + "Off100", gf_Ba100(DistanceBetweenPoints(UnitGetPosition(lv_w), lv_at)));
+        }
+        if (gf_BgCount(lp_gas, lp_player, lv_at, c_BG_NEAR) > 0) {
+            lv_via = lv_f;
+            break;
+        }
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Via", lv_via);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Built", gf_BgCount(lp_gas, lp_player, lv_at, c_BG_NEAR));
+    lv_b = UnitGroupClosestToPoint(UnitGroup(lp_gas, lp_player, RegionCircle(lv_at, c_BG_NEAR), UnitFilter(0, 0, 0, 0), 0), lv_at);
+    if (UnitIsValid(lv_b)) {
+        gf_BhScript(lv_b);
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "BuiltAt100", gf_BaXY100(UnitGetPosition(lv_b)));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "BuiltOff100", gf_Ba100(DistanceBetweenPoints(UnitGetPosition(lv_b), lv_at)));
+    }
+    // Raw: is the geyser unit still at the point under the building?
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "GeyserLeft", UnitGroupCount(UnitGroup(UnitGetType(lp_g), c_playerAny, RegionCircle(lv_at, c_BG_NEAR), UnitFilter(0, 0, 0, 0), 0), c_unitCountAlive));
+    // Under construction: the footprint the engine applies now.
+    gf_BgGasGrid(lp_s, lp_k + "Build", lp_gas, lp_player, lv_at);
+}
+
+// One build of lp_gas on geyser lp_g by a script worker of lp_player while a
+// unit of another player (c_BG_BLOCK_OWNER, a hero's seat) holds position
+// lp_off from the geyser point on the x axis, on the side away from the
+// worker. Raw under lp_k: where the blocker stood before and after, the
+// order and what was built. The blocker and the worker are removed after.
+void gf_BgBlockTry (string lp_s, string lp_k, int lp_player, string lp_gas, unit lp_g, point lp_toward, fixed lp_off) {
+    point lv_at = UnitGetPosition(lp_g);
+    point lv_from = PointWithOffsetPolar(lv_at, UnitGetPropertyFixed(lp_g, c_unitPropRadius, c_unitPropCurrent) + 3.0, AngleBetweenPoints(lv_at, lp_toward));
+    fixed lv_side = 1.0;
+    unit lv_b;
+    unit lv_w;
+
+    if (PointGetX(lp_toward) > PointGetX(lv_at)) {
+        lv_side = -1.0;
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Before", gf_BgCount(lp_gas, lp_player, lv_at, c_BG_NEAR));
+    UnitCreate(1, c_BG_BLOCK_UNIT, 0, c_BG_BLOCK_OWNER, PointWithOffset(lv_at, lv_side * lp_off, 0.0), 0.0);
+    lv_b = UnitLastCreated();
+    UnitIssueOrder(lv_b, Order(AbilityCommand("move", 2)), c_orderQueueReplace);
+    lv_w = gf_BgMakeWorker(lp_gas, lp_player, lv_from);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "BlockerDX100", gf_Ba100(AbsF(PointGetX(UnitGetPosition(lv_b)) - PointGetX(lv_at))));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "BlockerDY100", gf_Ba100(AbsF(PointGetY(UnitGetPosition(lv_b)) - PointGetY(lv_at))));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "BlockerRadius100", gf_Ba100(UnitGetPropertyFixed(lv_b, c_unitPropRadius, c_unitPropCurrent)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Valid", gf_BaFlagInt(UnitOrderIsValid(lv_w, gf_BgOrder(2, lp_gas, lv_w, lp_g, lv_at))));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Issued", gf_BaFlagInt(UnitIssueOrder(lv_w, gf_BgOrder(2, lp_gas, lv_w, lp_g, lv_at), c_orderQueueReplace)));
+    Wait(c_BG_BUILD_WAIT, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Built", gf_BgCount(lp_gas, lp_player, lv_at, c_BG_NEAR));
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "WorkerAlive", gf_BaFlagInt(UnitIsAlive(lv_w)));
+    if (UnitIsAlive(lv_w)) {
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Order", gf_BhOrder(lv_w));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "WorkerOff100", gf_Ba100(DistanceBetweenPoints(UnitGetPosition(lv_w), lv_at)));
+        UnitRemove(lv_w);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "BlockerAlive", gf_BaFlagInt(UnitIsAlive(lv_b)));
+    if (UnitIsAlive(lv_b)) {
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "BlockerDX100After", gf_Ba100(AbsF(PointGetX(UnitGetPosition(lv_b)) - PointGetX(lv_at))));
+        BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "BlockerDY100After", gf_Ba100(AbsF(PointGetY(UnitGetPosition(lv_b)) - PointGetY(lv_at))));
+        UnitRemove(lv_b);
+    }
+}
+
+// Lane lp_player, its other placed geyser: a unit is made c_BG_BLOCK_IN
+// from the geyser point, inside the 6x6 square the gas building checks.
+// Raw: where the engine put it, and whether the build started. (With a
+// geyser that blocked only a 4x4 it stood there and stopped the build,
+// run 20261122-090349.)
+void gf_BgBlock (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player) + "Block";
+    string lv_gas = gf_BgGasType(lp_player);
+    point lv_h = PlayerStartLocation(lp_player);
+    unit lv_g = gf_BgGeyser(lv_h, 1);
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "GeyserFound", gf_BaFlagInt(UnitIsValid(lv_g)));
+    if (!UnitIsValid(lv_g)) {
+        return;
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_k + "Geyser100", gf_BaXY100(UnitGetPosition(lv_g)));
+    gf_BgBlockTry(lp_s, lv_k + "In", lp_player, lv_gas, lv_g, lv_h, c_BG_BLOCK_IN);
+}
+
+// Lane lp_player (no base, no AI): the negative on bare ground 4 off the
+// worker, by the point and the placement order, then its own gas building
+// on the nearest placed geyser of its start.
+void gf_BgDirect (string lp_s, int lp_player) {
+    string lv_k = "p" + IntToString(lp_player);
+    string lv_gas = gf_BgGasType(lp_player);
+    point lv_h = PlayerStartLocation(lp_player);
+    unit lv_g = gf_BgGeyser(lv_h, 0);
+    point lv_at;
+    point lv_bare;
+    unit lv_w;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "GeyserFound", gf_BaFlagInt(UnitIsValid(lv_g)));
+    if (!UnitIsValid(lv_g)) {
+        return;
+    }
+    lv_at = UnitGetPosition(lv_g);
+    lv_bare = PointWithOffsetPolar(lv_at, 10.0, AngleBetweenPoints(lv_at, lv_h));
+    gv_bgAt[lp_player] = lv_at;
+    PlayerModifyPropertyInt(lp_player, c_playerPropMinerals, c_playerPropOperAdd, 1000);
+
+    lv_w = gf_BgMakeWorker(lv_gas, lp_player, PointWithOffsetPolar(lv_at, 6.0, AngleBetweenPoints(lv_at, lv_h)));
+    gf_BgForms(lp_s, lv_k + "Bare", lp_player, lv_gas, lv_w, null, lv_bare);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "BareIssuedPoint", gf_BaFlagInt(UnitIssueOrder(lv_w, gf_BgOrder(0, lv_gas, lv_w, null, lv_bare), c_orderQueueReplace)));
+    Wait(c_BG_BARE_WAIT, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "BareIssuedPlace", gf_BaFlagInt(UnitIssueOrder(lv_w, gf_BgOrder(1, lv_gas, lv_w, null, lv_bare), c_orderQueueReplace)));
+    Wait(c_BG_BARE_WAIT, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lv_k + "BareBuilt", gf_BgCount(lv_gas, lp_player, lv_bare, 4.0));
+    if (UnitIsAlive(lv_w)) {
+        UnitRemove(lv_w);
+    }
+    gf_BgTry(lp_s, lv_k, lp_player, lv_gas, lv_g, lv_h);
+}
+
+// Where the AI's placement call of lp_player accepts the lp_gas building
+// around the geyser point lp_at, raw, under lp_k. One row per y offset, top
+// (+y) first, offsets -c_BG_MAP_R..c_BG_MAP_R whole cells. Per centre
+// asked: "C" the call returns that centre, "g" it returns the geyser's
+// point, "o" another point, "." none.
+void gf_BgAcceptMap (string lp_s, string lp_k, int lp_player, string lp_gas, point lp_at) {
+    point lv_c;
+    point lv_p;
+    string lv_row;
+    int lv_i;
+    int lv_j;
+
+    if (lp_at == null) {
+        return;
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Geyser100", gf_BaXY100(lp_at));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Gas", lp_gas);
+    for (lv_j = c_BG_MAP_R; lv_j >= -c_BG_MAP_R; lv_j -= 1) {
+        lv_row = "";
+        for (lv_i = -c_BG_MAP_R; lv_i <= c_BG_MAP_R; lv_i += 1) {
+            lv_c = PointWithOffset(lp_at, IntToFixed(lv_i), IntToFixed(lv_j));
+            lv_p = AIGetBuildingPlacement(lp_player, lv_c, lp_gas, c_BG_COLLECTOR);
+            if (lv_p == null) {
+                lv_row = lv_row + ".";
+            }
+            else if (DistanceBetweenPoints(lv_p, lp_at) < 0.01) {
+                lv_row = lv_row + "g";
+            }
+            else if (DistanceBetweenPoints(lv_p, lv_c) < 0.01) {
+                lv_row = lv_row + "C";
+            }
+            else {
+                lv_row = lv_row + "o";
+            }
+        }
+        BankValueSetFromString(gv_dbgBank, lp_s, lp_k + "Row" + IntToString(c_BG_MAP_R - lv_j), lv_row);
+    }
+}

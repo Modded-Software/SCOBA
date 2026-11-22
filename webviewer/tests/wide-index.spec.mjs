@@ -21,6 +21,8 @@ async function open(page) {
 async function added(page, id) {
   await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0 }), id);
   await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 60_000 });
+  // `drawn` is the scene's list of instances drawn in the last frame: let two frames run.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   const item = (await page.evaluate(() => window.sc2viewer.state())).items.at(-1);
   console.log(`${id}: vertices ${item.vertexCount}, element bytes ${item.elementBytes}, largest index ${item.elementMax}`);
   return item;

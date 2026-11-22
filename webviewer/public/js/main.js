@@ -7,10 +7,13 @@
 
   const GLOW = 2.5; // how far the glow reaches past a unit's radius, or from the mouse
 
-  /** Grid glow spots: under the mouse and under each unit. */
+  /**
+   * Grid glow spots: under the mouse and under each unit, [x, y, radius,
+   * hd]. hd is 1 for a model with a 2048 texture or larger (hd.js isHd): its glow is blue.
+   */
   function glowSpots() {
-    const spots = app.pointer ? [[app.pointer[0], app.pointer[1], GLOW]] : [];
-    for (const item of items) spots.push([item.x, item.y, (item.unit ? item.unit.radius : 0.5) + GLOW]);
+    const spots = app.pointer ? [[app.pointer[0], app.pointer[1], GLOW, 0]] : [];
+    for (const item of items) spots.push([item.x, item.y, (item.unit ? item.unit.radius : 0.5) + GLOW, app.isHd(item) ? 1 : 0]);
     return spots;
   }
 
@@ -50,7 +53,12 @@
   // ---- URL state ----
 
   app.saveHash = () => {
-    const data = items.map((i) => ({ ...(i.unit ? { u: i.unit.id } : { p: i.path }), x: i.x, y: i.y, r: i.rot, s: i.scale, q: i.sequence, t: i.team, k: i.pick }));
+    // u: a unit id; d: a doodad id with v, its model variation; p: a bare model file.
+    // h: 0 when the HD textures are switched off (hd.js); left out otherwise.
+    // ds: the item's dataset, left out for the default one.
+    const source = (i) => (!i.unit ? { p: i.path } : i.unit.doodad ? { d: i.unit.id, v: i.variation } : { u: i.unit.id });
+    const from = (i) => (i.dataset === app.defaultDataset() ? {} : { ds: i.dataset });
+    const data = items.map((i) => ({ ...source(i), ...from(i), x: i.x, y: i.y, r: i.rot, s: i.scale, q: i.sequence, t: i.team, k: i.pick, ...(i.hd ? {} : { h: 0 }) }));
     history.replaceState(null, '', data.length ? '#' + encodeURIComponent(JSON.stringify(data)) : location.pathname);
   };
 
@@ -60,14 +68,16 @@
     try {
       data = JSON.parse(decodeURIComponent(location.hash.slice(1)));
     } catch (error) {
-      app.setStatus('bad scene in URL: ' + error.message);
+      app.setStatus('bad scene in URL: ' + error.message, { failure: true });
       return;
     }
     if (!Array.isArray(data)) return;
     for (const entry of data) {
-      const options = { x: entry.x, y: entry.y, rot: entry.r, scale: entry.s, sequence: entry.q, team: entry.t, pick: entry.k };
+      // An item with no dataset in the URL is from the default one, whatever the current one is.
+      const options = { x: entry.x, y: entry.y, rot: entry.r, scale: entry.s, sequence: entry.q, team: entry.t, pick: entry.k, hd: entry.h !== 0, dataset: entry.ds ?? app.defaultDataset() };
       // One after another, so the order is kept.
       if (entry.u) await app.addUnit(entry.u, options).catch(app.reportFailure);
+      else if (entry.d) await app.addDoodad(entry.d, { ...options, variation: entry.v }).catch(app.reportFailure);
       else if (entry.p) await app.add(entry.p, options).catch(app.reportFailure);
     }
   }
@@ -87,7 +97,7 @@
     requestAnimationFrame(frame);
   }
 
-  const api = ['add', 'addUnit', 'remove', 'clear', 'restart', 'state', 'pixels', 'colorStats', 'mark', 'changedSinceMark', 'idle', 'view', 'groundPixel', 'groundPeaks', 'worldToCanvas', 'setGrid', 'setSky', 'screenOf', 'itemScreen', 'pickState', 'setDisplacement', 'setConstantLayers'];
+  const api = ['add', 'addUnit', 'addDoodad', 'remove', 'clear', 'restart', 'state', 'pixels', 'colorStats', 'mark', 'changedSinceMark', 'idle', 'view', 'groundPixel', 'groundPixels', 'drawnAt', 'setSolidOnly', 'itemPixel', 'groundPeaks', 'worldToCanvas', 'setGrid', 'setSky', 'screenOf', 'itemScreen', 'pickState', 'setDisplacement', 'setConstantLayers', 'textureWindow', 'hdAssets'];
   window.sc2viewer = { ready: false, groundUnder: app.groundAt };
   for (const name of api) {
     if (typeof app[name] !== 'function') throw new Error('sc2viewer: module did not define ' + name);
@@ -97,8 +107,12 @@
   app.resize();
   app.applyCamera();
   requestAnimationFrame(frame);
-  Promise.all([app.setupUnits(), loadHash(), ground.ready, app.outline.ready])
-    .catch((error) => app.setStatus(error.message))
+  // The datasets first: every list and every item reads one.
+  app
+    .setupDatasets()
+    .then(() => app.setupHd())
+    .then(() => Promise.all([app.setupUnits(), app.setupDoodads(), loadHash(), app.restoreView(), ground.ready, app.outline.ready]))
+    .catch((error) => app.reportFailure(error))
     .finally(() => {
       window.sc2viewer.ready = true;
     });

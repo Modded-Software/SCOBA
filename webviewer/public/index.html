@@ -3,16 +3,21 @@
 <head>
   <meta charset="utf-8">
   <title>SC2 unit viewer</title>
+  <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <canvas id="view"></canvas>
   <div id="side">
   <aside id="panel">
-    <nav id="tabs">
-      <button id="tab-units" class="on">units</button>
-      <button id="tab-models">models</button>
-    </nav>
+    <div id="panel-top">
+      <select id="dataset" title="dataset: where the lists and new instances come from"></select>
+      <nav id="tabs">
+        <button id="tab-units" class="on">units</button>
+        <button id="tab-doodads">doodads</button>
+        <button id="tab-models">models</button>
+      </nav>
+    </div>
     <section id="pane-units">
       <input id="unit-search" type="search" placeholder="search units by name or id" autocomplete="off" spellcheck="false">
       <div id="races"></div>
@@ -21,22 +26,38 @@
         <select id="family" title="family (Melee: ladder and multiplayer)"></select>
         <span id="unit-count"></span><button id="add-all" title="add every unit of the list to the scene">add all</button>
       </div>
-      <ul id="units"></ul>
+      <ul id="units" class="rows"></ul>
       <div id="preview"></div>
+    </section>
+    <section id="pane-doodads" hidden>
+      <input id="doodad-search" type="search" placeholder="search doodads by name or id" autocomplete="off" spellcheck="false">
+      <div id="doodad-tools">
+        <select id="doodad-type" title="doodad type"></select>
+        <select id="doodad-tileset" title="terrain set that lists the doodad"></select>
+        <span id="doodad-count"></span><button id="doodad-add-all" title="add every doodad of the list to the scene">add all</button>
+      </div>
+      <ul id="doodads" class="rows"></ul>
+      <div id="doodad-preview"></div>
     </section>
     <section id="pane-models" hidden>
       <input id="search" type="search" placeholder="search model files" autocomplete="off" spellcheck="false">
       <ul id="results"></ul>
     </section>
-    <div id="status"></div>
   </aside>
   <aside id="instances">
     <div id="scene-head"><span>instances <span id="instance-count"></span></span><button id="clear" title="remove all">clear</button></div>
-    <ul id="scene"></ul>
+    <input id="instance-search" type="search" placeholder="search instances by name, id or file" autocomplete="off" spellcheck="false">
+    <ul id="scene" class="rows"></ul>
   </aside>
+  <button id="panel-tab" class="drawer-tab" title="hide the gallery" aria-controls="panel"></button>
+  <button id="instances-tab" class="drawer-tab" title="hide the instances" aria-controls="instances"></button>
   </div>
   <nav id="view-tools">
-    <select id="landmarks" title="landmarks: jump to a saved view"></select>
+    <div id="landmarks">
+      <button id="landmarks-button" title="landmarks: jump to a saved view"></button>
+      <ul id="landmarks-list" hidden></ul>
+    </div>
+    <button id="landmark-pin" title="pin: save this view as a landmark"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M8 1a5 5 0 0 0-5 5c0 3.5 5 9 5 9s5-5.500 5-9a5 5 0 0 0-5-5zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg></button>
     <button id="grid-toggle" class="on" title="hex grid ground">grid</button>
     <button id="sky-button" title="choose a skybox">sky</button>
   </nav>
@@ -44,17 +65,24 @@
   <script src="/components.js"></script>
   <script src="/ground.js"></script>
   <script src="/outline.js"></script>
+  <script src="/pickbuffer.js"></script>
   <script src="/displacement.js"></script>
   <script src="/js/core.js"></script>
+  <script src="/js/side.js"></script>
+  <script src="/js/datasets.js"></script>
   <script src="/js/controls.js"></script>
   <script src="/js/scene.js"></script>
   <script src="/js/panels.js"></script>
+  <script src="/js/doodads.js"></script>
   <script src="/js/landmarks.js"></script>
   <script src="/js/addall.js"></script>
   <script src="/js/drag.js"></script>
   <script src="/js/sky.js"></script>
   <script src="/js/pick.js"></script>
+  <script src="/js/select.js"></script>
   <script src="/js/inspect.js"></script>
+  <script src="/js/textures.js"></script>
+  <script src="/js/hd.js"></script>
   <script src="/js/main.js"></script>
 </body>
 </html>

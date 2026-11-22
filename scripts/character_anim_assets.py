@@ -15,8 +15,10 @@ from project_root import project_root
 from animation_tokens import validate_animation_name
 from jumpanim.bake import JUMP_HEROES, make_jump_groups
 from walkanim.slow import LEG as SLOW_LEG, SLOW_HEROES, SOURCE as SLOW_SOURCE, make_slow_arms, make_slow_groups
+from walkanim.strafe import leg_turner
 from character_anim_m3 import add_kickback, axis_quaternion, clone, make_lower_group, make_pitch_group, quat_multiply
-from hitvolumes.shapes import axis, columns, inverse, norm
+from heroanim.breath import make_breath_pitch_group
+from heroanim.rig import HEROES, HeroRig, pitch_axis, shared_pitch_axis, yaw_axis
 
 ROOT = project_root()
 M3_VENDOR = ROOT / "scripts" / "vendor" / "m3addon"
@@ -25,54 +27,8 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "47\n"  # 47: head pitch about the head's own left-right axis; 46: head pitch +-30 (R-TPS-16); 45: slow walk arm clips (R-SLOW-19); 44: slow walk leg clips from Walk Slow (R-SLOW-10, 11); 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
+MARKER_VERSION = "48\n"  # 48: rigs in heroanim.rig, torso pitch axis from the rest pose, feet turn with the pelvis, aim pose breathing; 47: head pitch about the head's own left-right axis; 46: head pitch +-30 (R-TPS-16); 45: slow walk arm clips (R-SLOW-19); 44: slow walk leg clips from Walk Slow (R-SLOW-10, 11); 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
-SOURCE_MODELS = {
-    "tosh": (
-        r"mods\liberty.sc2mod\base.sc2assets\assets\units\terran\tosh\tosh.m3",
-        Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3",
-        "ToshSCOBA",
-        "Assets\\Units\\Terran\\Tosh\\ToshSCOBA.m3",
-        ("BoneSpine01",),
-        ("BoneShoulderL", "BoneShoulderR", "BoneHead"),
-        ("BoneWaist", "Root", "Main"),
-        "BoneWaist",
-        3.1015,
-        ("BoneSpine01",),
-        (1.0,),
-        "Y",
-        1.0,
-        ("BoneShoulderR",),
-        "Y",
-        -1.0,
-        12.0,
-        # The head bone: the parent of the Ref_Head attachment on this model.
-        "BoneHead",
-    ),
-    "kerrigan": (
-        r"mods\liberty.sc2mod\base.sc2assets\assets\units\zerg\kerrigan\kerrigan.m3",
-        Path("Assets") / "Units" / "Zerg" / "Kerrigan" / "KerriganSCOBA.m3",
-        "KerriganSCOBA",
-        "Assets\\Units\\Zerg\\Kerrigan\\KerriganSCOBA.m3",
-        ("Bone07",),
-        ("Box04", "Box05", "Bone29"),
-        ("Box01", "Bone34", "Bone34(mirrored)", "Root", "Bone_Link_Object"),
-        "Box01",
-        2.5,
-        ("Bone07",),
-        (1.0,),
-        "Y",
-        1.0,
-        ("Box04",),
-        "Y",
-        -1.0,
-        12.0,
-        # The head bone. This model has no Ref_Head attachment; Bone29 is
-        # taken from the attack roots above. Unproven: operator check.
-        "Bone29",
-    ),
-}
-
 CLIP_JOBS = (
     ("Attack", "Attack Arm Alternate", "upper"),
     ("Spell", "Spell Arm Alternate", "upper"),
@@ -88,7 +44,6 @@ AIM_ATTACK_JOBS = (
 )
 
 AIM_PITCH_GROUP = "Ready Alternate"
-AIM_PITCH_SOURCE = "Attack Arm Alternate"
 AIM_PITCH_SOURCE_MS = 350
 AIM_PITCH_MIN_DEG = -95.0
 AIM_PITCH_MAX_DEG = 50.0
@@ -139,29 +94,16 @@ HEAD_TILT_FRAME_MS = 100
 HEAD_TILT_PRIORITY = 14
 
 
-def head_axis(model, head: str, row: int) -> tuple[str, float]:
-    """The head's local axis closest to model axis `row` (0 X, 2 Z), and the
-    sign of that alignment. Yaw: model up (+Z), counter-clockwise from above
-    as a rising camera yaw. Pitch: model left-right (X); forward is -Y, so a
-    face-up turn is about -X (operator 2026-11-21: the torso axis tilted the
-    head sideways)."""
-    index = next(i for i, bone in enumerate(model.bones) if bone.name == head)
-    rest = inverse(columns(model.absoluteInverseBoneRestPositions[index].matrix))
-    dots = [rest[row][c] / max(1e-9, norm(axis(rest, c))) for c in range(3)]
-    best = max(range(3), key=lambda c: abs(dots[c]))
-    return "XYZ"[best], (1.0 if dots[best] > 0.0 else -1.0)
-
-
 def make_head_groups(model, groups, head: str) -> str:
     """One head-only clip per pitch x yaw step, from the stand pose."""
     if not any(bone.name == head for bone in model.bones):
         raise KeyError(f"head bone {head} not in the model")
-    yaw_axis, yaw_sign = head_axis(model, head, 2)
-    pitch_axis, side = head_axis(model, head, 0)
-    pitch_sign = -side
-    if yaw_axis == pitch_axis:
-        raise ValueError(f"head {head}: yaw axis {yaw_axis} equals the pitch axis")
-    print(f"head {head}: pitch {pitch_axis} {pitch_sign:+.0f}, yaw {yaw_axis} {yaw_sign:+.0f}")
+    # Both axes come from the rest pose (heroanim.rig): the head's own.
+    turn_axis, yaw_sign = yaw_axis(model, head)
+    nod_axis, pitch_sign = pitch_axis(model, head)
+    if turn_axis == nod_axis:
+        raise ValueError(f"head {head}: yaw axis {turn_axis} equals the pitch axis")
+    print(f"head {head}: pitch {nod_axis} {pitch_sign:+.0f}, yaw {turn_axis} {yaw_sign:+.0f}")
     head_id = next(bone.rotation.header.animId for bone in model.bones if bone.name == head)
     stand_source = model.sequenceTransformationCollections[groups[HEAD_TILT_SOURCE].stcIndices[0]]
     pairs = [pair for pair in zip(stand_source.animIds, stand_source.animRefs) if pair[0] == head_id]
@@ -185,7 +127,7 @@ def make_head_groups(model, groups, head: str) -> str:
                 0,
                 (head,),
                 (1.0,),
-                pitch_axis,
+                nod_axis,
                 pitch_sign,
                 0.0,
                 0.0,
@@ -194,7 +136,7 @@ def make_head_groups(model, groups, head: str) -> str:
                 HEAD_TILT_PRIORITY,
             )
             stc = model.sequenceTransformationCollections[groups[name].stcIndices[0]]
-            look = quat_multiply(axis_quaternion(yaw_axis, yaw_sign * yaw), axis_quaternion(pitch_axis, pitch_sign * angle))
+            look = quat_multiply(axis_quaternion(turn_axis, yaw_sign * yaw), axis_quaternion(nod_axis, pitch_sign * angle))
             for anim_id, anim_ref in zip(stc.animIds, stc.animRefs):
                 if anim_id != head_id or (anim_ref >> 16) & 0xFFFF != 3:
                     continue
@@ -289,30 +231,11 @@ def validate_model_names(model) -> None:
 
 
 
-def generate_model(
-    source: Path,
-    target: Path,
-    upper_roots: tuple[str, ...],
-    attack_roots: tuple[str, ...],
-    lower_roots: tuple[str, ...],
-    turn_bone: str,
-    unit_speed: float,
-    pitch_bones: tuple[str, ...],
-    pitch_weights: tuple[float, ...],
-    pitch_axis: str,
-    pitch_sign: float,
-    kick_bones: tuple[str, ...],
-    kick_axis: str,
-    kick_sign: float,
-    kick_degrees: float,
-    head_bone: str,
-    jump: bool = False,
-    slow: bool = False,
-) -> None:
+def generate_model(source: Path, target: Path, rig: HeroRig, jump: bool = False, slow: bool = False) -> None:
     """jump: add the jump leg clips (jumpanim.bake); slow: the slow walk legs (walkanim.slow)."""
     model = m3.loadModel(str(source))
-    upper_ids, lower_ids = classify_bones(model, upper_roots, lower_roots)
-    attack_ids, _ = classify_bones(model, attack_roots, lower_roots)
+    upper_ids, lower_ids = classify_bones(model, rig.upper_roots, rig.lower_roots)
+    attack_ids, _ = classify_bones(model, rig.attack_roots, rig.lower_roots)
     groups = {group.name: group for group in model.sequenceTransformationGroups}
     validate_model_names(model)
     
@@ -331,10 +254,10 @@ def generate_model(
         if source_clip is None:
             raise KeyError(new_name)
         group_ids = attack_ids if bone_group == "upper" else lower_ids
-        make_clip(model, group, source_clip, group_ids, new_name, bone_group, unit_speed)
+        make_clip(model, group, source_clip, group_ids, new_name, bone_group, rig.unit_speed)
     pitch_ids = set()
     for bone in model.bones:
-        if bone.name in pitch_bones:
+        if bone.name in rig.pitch_bones:
             pitch_ids.update(bone_anim_ids(bone))
     aim_attack_ids = attack_ids - pitch_ids
     for source_name, new_name in AIM_ATTACK_JOBS:
@@ -346,31 +269,16 @@ def generate_model(
         group.name = new_name
         model.sequenceTransformationGroups.append(group)
         groups[new_name] = group
-        stc_index = make_clip(model, group, source_clip, aim_attack_ids, new_name, "upper_aim", unit_speed)
-        add_kickback(
-            model,
-            model.sequenceTransformationCollections[stc_index],
-            kick_bones,
-            kick_axis,
-            kick_sign,
-            kick_degrees,
-            350,
-            500,
-        )
-    turn_anim_id = next(bone.rotation.header.animId for bone in model.bones if bone.name == turn_bone)
+        stc_index = make_clip(model, group, source_clip, aim_attack_ids, new_name, "upper_aim", rig.unit_speed)
+        add_kickback(model, model.sequenceTransformationCollections[stc_index], rig.kick_bones, rig.kick_axis, rig.kick_sign, rig.kick_degrees, 350, 500)
+    turn_anim_id = next(bone.rotation.header.animId for bone in model.bones if bone.name == rig.turn_bone)
+    # Feet keyed outside the pelvis turn with it (walkanim.strafe).
+    leg_turn = leg_turner(model, rig.turn_bone, rig.leg_roots)
     make_lower_group(model, groups, "Attack Stand", "Stand Leg", 0.0, False, turn_anim_id)
     make_lower_group(model, groups, "Attack Stand Left", "Stand Left Leg", 0.0, False, turn_anim_id)
     make_lower_group(model, groups, "Attack Stand Right", "Stand Right Leg", 0.0, False, turn_anim_id)
     for direction_name, yaw, reverse in AIM_DIRECTIONS:
-        make_lower_group(
-            model,
-            groups,
-            "Attack Walk " + direction_name,
-            "Walk Leg",
-            yaw,
-            reverse,
-            turn_anim_id,
-        )
+        make_lower_group(model, groups, "Attack Walk " + direction_name, "Walk Leg", yaw, reverse, turn_anim_id, leg_turn)
     # A walk clip shorter than the stock walk cuts the stride and hitches on every loop.
     lengths = {sequence.name: sequence.animEndInMS - sequence.animStartInMS for sequence in model.sequences}
     for direction_name, _, _ in AIM_DIRECTIONS:
@@ -382,10 +290,11 @@ def generate_model(
         group.name = SLOW_LEG
         model.sequenceTransformationGroups.append(group)
         groups[SLOW_LEG] = group
-        make_clip(model, group, clips[SLOW_SOURCE], lower_ids, SLOW_LEG, "lower", unit_speed)
-        slow_log = make_slow_groups(model, groups, AIM_DIRECTIONS, turn_anim_id)
-        slow_log += ", " + make_slow_arms(model, groups, make_clip, clips[SLOW_SOURCE], upper_ids, unit_speed)
-    attack_source = model.sequenceTransformationCollections[groups["Attack"].stcIndices[0]]
+        make_clip(model, group, clips[SLOW_SOURCE], lower_ids, SLOW_LEG, "lower", rig.unit_speed)
+        slow_log = make_slow_groups(model, groups, AIM_DIRECTIONS, turn_anim_id, leg_turn)
+        slow_log += ", " + make_slow_arms(model, groups, make_clip, clips[SLOW_SOURCE], upper_ids, rig.unit_speed)
+    # The aim pose: one frame of the rig's aim source clip, upper body only.
+    attack_source = model.sequenceTransformationCollections[groups[rig.aim_source].stcIndices[0]]
     pitch_source = clone(attack_source)
     pitch_pairs = [
         (anim_id, anim_ref)
@@ -394,26 +303,20 @@ def generate_model(
     ]
     pitch_source.animIds = [pair[0] for pair in pitch_pairs]
     pitch_source.animRefs = [pair[1] for pair in pitch_pairs]
+    # The torso nods about its own left-right axis, read from the rest pose.
+    nod_axis, nod_sign = shared_pitch_axis(model, rig.pitch_bones)
+    breath_log = "breath: none"
     for step in range(AIM_PITCH_STEPS):
         t = step / (AIM_PITCH_STEPS - 1)
         angle = AIM_PITCH_MIN_DEG + (AIM_PITCH_MAX_DEG - AIM_PITCH_MIN_DEG) * t
-        make_pitch_group(
-            model,
-            groups,
-            f"{AIM_PITCH_GROUP} {step + 1:02d}",
-            AIM_PITCH_SOURCE,
-            pitch_source,
-            AIM_PITCH_SOURCE_MS,
-            pitch_bones,
-            pitch_weights,
-            pitch_axis,
-            pitch_sign,
-            angle,
-            angle,
-            AIM_PITCH_FRAME_MS,
-            2,
-        )
-    head = make_head_groups(model, groups, head_bone)
+        name = f"{AIM_PITCH_GROUP} {step + 1:02d}"
+        if rig.breath_frames > 0:
+            moving = make_breath_pitch_group(model, groups, name, rig.aim_pose_clip, pitch_source, AIM_PITCH_SOURCE_MS, rig.pitch_bones, rig.pitch_weights, nod_axis, nod_sign, angle, rig.breath_frames, rig.breath_ms)
+            breath_log = f"breath: +-{rig.breath_frames} frames, {rig.breath_ms} ms, {moving} tracks move"
+        else:
+            make_pitch_group(model, groups, name, rig.aim_pose_clip, pitch_source, AIM_PITCH_SOURCE_MS, rig.pitch_bones, rig.pitch_weights, nod_axis, nod_sign, angle, angle, AIM_PITCH_FRAME_MS, 2)
+    print(f"torso {rig.pitch_bones}: pitch {nod_axis} {nod_sign:+.0f}, legs turn {rig.turn_bone} + {rig.leg_roots}, aim pose {rig.aim_source} at {AIM_PITCH_SOURCE_MS} ms, {breath_log}")
+    head = make_head_groups(model, groups, rig.head_bone)
     jump_log = "jump: none"
     if jump:
         jump_log = make_jump_groups(model, groups)
@@ -458,13 +361,13 @@ def model_data_text(root: Path, entries: list[tuple[str, str]]) -> str:
 
 
 def revert(root: Path) -> None:
-    for data in SOURCE_MODELS.values():
-        (root / data[1]).unlink(missing_ok=True)
+    for rig in HEROES.values():
+        (root / rig.target).unlink(missing_ok=True)
     marker = root / MARKER
     marker.unlink(missing_ok=True)
     path = root / MODEL_DATA
     text = path.read_text()
-    for model_id, _ in ((data[2], data[3]) for data in SOURCE_MODELS.values()):
+    for model_id in (rig.model_id for rig in HEROES.values()):
         start = text.find(f'    <CModel id="{model_id}">')
         if start < 0:
             continue
@@ -483,10 +386,9 @@ def generate(root: Path, force: bool) -> None:
     temp_root = Path(tempfile.mkdtemp(prefix="sco anim ", dir=root.parent))
     try:
         entries = []
-        for key, (entry, target, model_id, model_value, *params) in SOURCE_MODELS.items():
-            # params: the generate_model arguments after source and target, in order.
-            generate_model(extract_model(entry, temp_root), root / target, *params, jump=key in JUMP_HEROES, slow=key in SLOW_HEROES)
-            entries.append((model_id, model_value))
+        for key, rig in HEROES.items():
+            generate_model(extract_model(rig.entry, temp_root), root / rig.target, rig, jump=key in JUMP_HEROES, slow=key in SLOW_HEROES)
+            entries.append((rig.model_id, rig.model_value))
         (root / MODEL_DATA).write_text(model_data_text(root, entries))
         marker.write_text(MARKER_VERSION)
     finally:

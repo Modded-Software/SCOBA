@@ -53,7 +53,7 @@ guard; `tps` and `combat` assert `RealClicks` 0.
 | T34 | Mouse down raises `CameraGetPitch`: positive pitch looks down. | [probe] `pncprobe/20261115-223159` |
 | T36 | `UnitInRangeAndAbleToAttackTarget` needs the hero to face the target: false at distance 1 to 2 while aiming (hero facing 14 to 27 degrees off, shoulder ray) and false at every distance with the hero facing away. Not a range check. | [probe] `pncprobe/20261116-145352`, group `inrange` |
 | T35 | A unit position has no height; `UnitGetHeight` gives it (Overseer 7.0). | [probe] `tps/20261115-213703` |
-| T14 | All three hero weapons exclude `Hidden` and `Invulnerable` targets. `RazorTalons` requires `Ground`. Psi Blast has `MinimumRange` 2. | [stock] weapon data |
+| T14 | All three hero weapons exclude `Hidden` and `Invulnerable` targets. `RazorTalons` requires `Ground`. Stock Psi Blast has `MinimumRange` 2; the map sets 0 (R-TPS-63). | [stock] weapon data |
 | T15 | Stock `InvisibleTargetDummy` is unselectable, uncommandable, 1000 life, and carries `ImmuneToDamage`. | [stock] swarm unit data |
 | T19 | `attack` command 0 on an own unit is valid for both heroes. Without a block the unit takes full damage. | [probe] `pncprobe/20261114-185541`, `tps_ally_*` |
 | T23 | `attack` command 0 on a neutral `InvisibleTargetDummy` is valid for both heroes. One shot, the order ends, the hero does not move, the proxy keeps 1000/1000. `UnitSetHeight` raises it; the height reads back. | [probe] `pncprobe/20261114-201119` |
@@ -65,7 +65,10 @@ guard; `tps` and `combat` assert `RealClicks` 0.
 | T29 | An attack order on a walking hero, with the move issued after the shot: one shot, and the walk path falls behind the walk without a shot. | [probe] `pncprobe/20261114-232735`, `walk_order` |
 | T30 | The auto twin weapon fires while walking, but not at the neutral proxy (0 shots), and it picked a nearer decoy over the chosen target. It cannot be steered. | [probe] `pncprobe/20261114-232735`, `walk_auto_proxy`, `walk_auto_idle`, `walk_auto_decoy` |
 | T31 | `UnitCreateEffectUnit(hero, "SCOBAToshShot", target)` on a walking hero: one shot, the walk path equals the walk without a shot, the target lost 35 life. The button clock started (750 ms); the weapon cooldown link read 0. | [probe] `pncprobe/20261114-232735`, `walk_effect` |
-| T32 | Psi Blast killed an enemy Marine at distance 3.0. At 3.5, 4.0, 4.5, 5.0, and 9.5 the weapon effect event fired and the Marine kept full life, also 3.85 s later. Same at 4.0 and 5.0 with the data `Range` set back to 4. Cause not found. | [probe] `pncprobe/20261114-230104`, `pncprobe/20261114-230331` |
+| T32 | Psi Blast killed an enemy Marine at distance 3.0. At 3.5, 4.0, 4.5, 5.0, and 9.5 the weapon effect event fired and the Marine kept full life, also 3.85 s later. Same at 4.0 and 5.0 with the data `Range` set back to 4. Cause: T37. The kill at 3.0 was not examined again (the talons read range 3.0 then, T28). | [probe] `pncprobe/20261114-230104`, `pncprobe/20261114-230331` |
+| T41 | Watch, `combat psiwatch`: with `SCOBAAttackCooldown10` as `LaunchEffect` of `PsiBlastLaunchMissile`, the missile was drawn from the shooter's feet to its head for the stock `Kerrigan`, `KerriganSCOBA` and a Hydralisk firing Psi Blast; Needle Spines from `KerriganSCOBA` and the Hydralisk drew right. A stock `MissileDefault` did not change it. With the clock beside the missile in an effect set it draws right (operator). | [operator] `combat/20261122-160534`, `combat/20261122-152927`, `combat/20261122-161915` |
+| T37 | With `ImpactLocation` `TargetUnitOrPoint` on `PsiBlastLaunchMissile` (the map's data since `e2ba12d`), the `KerriganWeapon` missile flew to its target at 2.0 to 8.0 and `PsiBlastDamage` fired at the target's place with no target unit: life 500 stayed 500, by effect, by attack order and by the aim click. The same shot with `TargetUnit`, written to the catalog at run time, dealt 25 to the Zergling; the neutral proxy got a 0 damage event and kept its life. `PsiBlastDamage` alone at the unit dealt 25. | [probe] `combat/20261122-113428`, `psi_fx_*`, `psi_order_*`, `psi_unit_04`, `psi_unit_proxy`, `psi_direct_04` |
+| T38 | The map's `Kerrigan` unit carried the stock `PoisonNova` ability (swarm.sc2campaign: autocast on, radius 2, 20 damage, cooldown 10 s, its model on the caster). With an enemy at 2.0 it hit for 20 on its own; with the ability disabled it did not. No nova hit at 3.0 or beyond. | [probe] `combat/20261122-113428`, `psi_nova_02`, `psi_nonova_02`, `psi_fx_03` |
 
 Facts T16 to T22 of the earlier draft (Barrage on a point, `PointSetHeight`
 dropped by orders) were measured in `pncprobe/20261114-185541` and
@@ -82,9 +85,14 @@ not repeated here.
 | R-TPS-10, 11 | [tested] | `tps` group `move` |
 | R-TPS-12 | [tested] | `tps_head`: torso pitch step 0 outside aiming |
 | R-TPS-13 | [built] Changed 2026-11-21 to the R-TPS-16 look point; not run in game. Look and direction [operator]. | `tps_head` |
-| R-TPS-14 | [built] Head off while aiming; not run on the current build. | `tps_head`, `tps_head_lead` `taimdown` |
+| R-TPS-14 | [built] Head off while aiming; not run on the current build. Torso nod axis from the rest pose (2026-11-22): [build] `heroanim.validate.check_nod`; direction on screen [operator]. | `tps_head`, `tps_head_lead` `taimdown`; 5.2a |
 | R-TPS-15 | [built] | TPS uses the right-hold step and clips. No check compares the two walks. |
 | R-TPS-17 | [tested] script state; look [operator] | `tps` group `pose`: `tps_pose_auto`, `tps_pose_walk`, `tps_pose_single`, full suite run `tps/20261116-235526`. 5.9 |
+| R-TPS-18 | [build] every walk direction clip keeps the legs rigid and moves the feet off the forward path (`walkanim.strafe.check`); not run in game. The look [operator]. | 5.2a |
+| R-TPS-19 | [build] every pitch clip is one closed 4 s loop with moving tracks; Tosh's are still. [built] phase sync; `combat` group `kerrigan` (`breath_kerrigan`, `breath_tosh`) not run. The look [operator]. | 5.2a |
+| R-TPS-63 | [build] unit weapon slots, `MinimumRange` 0 (`validate_aim_shot.py`). [failed] `combat/20261122-144438` group `kerrigan`: the engine reports 3 weapons, the third `RazorTalons` (`psi_close_single`, `psi_close_auto`, `psiblast_single`). Open defect. | 5.5a |
+| R-TPS-64 | [build] `PsiBlastLaunchMissile` overrides no `ImpactLocation`, `LaunchLocation` or `LaunchOffset` (`validate_aim_shot.check_kerrigan_psi_blast`). [tested] `combat/20261122-144438` group `psiprobe`: 25 damage on the target by effect at 2 to 8, by attack order (PNC) at 4 and 8, the aim click at the proxy keeps 1000/1000. Where the missile is drawn: [operator]. | 5.5a |
+| R-TPS-65 | [build] no `PoisonNova` ability or button on `Kerrigan` and `KerriganSCOBA`. [tested] `combat/20261122-144438` `psiprobe`: `novaExists` false, no nova hit. | 5.5a |
 | R-TPS-16 | [built] Changed 2026-11-21 to hold on the camera target (was a lead); not run in game. Look, yaw direction, Kerrigan [operator]. | `tps_head_lead` |
 | R-TPS-20 | [tested] script flag. The cursor itself [operator] (T5). | `tps` group `cursor` |
 | R-TPS-21, 22 | [tested] | `tps` group `cursor` |
@@ -187,6 +195,56 @@ not repeated here.
   ranges differ from the generated clips.
 - O-TPS-2 is closed: the head turns sideways as the lead.
 
+### 5.2a Hero rigs: torso axis, strafe legs, aim breathing (R-TPS-14, 18, 19)
+
+- `scripts/heroanim/rig.py` holds one `HeroRig` record per hero model
+  (`HEROES`): bones, leg roots, aim pose clip, breathing. The bake
+  (`character_anim_assets.generate_model`) has no per-hero code. Turn axes
+  are not configured: `pitch_axis` and `yaw_axis` read them from the rest
+  pose (model forward -Y, up +Z, side X).
+- Torso pitch (R-TPS-14): the local axis of the pitch bone closest to model
+  left-right, signed so + turns the front up. Tosh `BoneSpine01`: `Y +1`
+  (unchanged; his model is byte-identical). Kerrigan `Bone07`: `Z +1`.
+  Operator 2026-11-22: her torso pitched on the wrong axis. Cause: her rig
+  had Tosh's axis `Y`; on `Bone07` local Y is the forward/back axis (rest
+  axes X (0, -0.13, 0.99), Y (0, 0.99, 0.13), Z (-1, 0, 0)), so the pitch was
+  a roll. Build check `check_nod`: from the lowest to the highest pitch
+  step the head moves back, and its sideways part is under half of the move
+  (measured: Tosh 0.43, his aim pose stands side-on; Kerrigan 0.08).
+  Kerrigan's kick axis (`Box04`, `Y`, copied from Tosh) is not changed and
+  not checked.
+- Strafe legs (R-TPS-18): a walk direction clip is the walk with the pelvis
+  turned. Kerrigan's feet are keyed on `Dummy01` and `Dummy02`, which hang
+  on `Bone_Link_Object`, not on the pelvis `Box01`: the thighs turned and
+  the feet kept walking forward (shins moved 0.1 to 0.19 model units).
+  `walkanim.strafe.turn_leg_roots` gives each rig `leg_roots` bone the
+  pelvis turn, about the pelvis, at every key. Build check
+  `walkanim.strafe.check`: in all 8 direction clips every distance between
+  two leg bones equals the walk's within 0.01 (measured 0.00022), and a
+  turned clip moves the leg roots at least 0.02 off the forward path
+  (measured 0.174). Tosh has no leg roots: his feet hang on the pelvis.
+- Aim breathing (R-TPS-19): `heroanim.breath.make_breath_pitch_group` bakes
+  each of the 99 pitch steps as a loop of `breath_ms` (Kerrigan 4000). The
+  pose frame of the aim clip (`Spell`, 350 ms) swings `breath_frames` (4)
+  source frames to each side on a sine, 16 keys a breath; the last key is
+  the first. Measured: hands move about 5 % of her height, chest 3 %. The
+  operator asked for 8 frames; on her `Attack` clip that moved a hand 78 %
+  of her height, so the operator chose this. Tosh: 0 frames, a still pose.
+- Phase (`gf_AnimAimBreathSync`, `systems/animation_aim.galaxy`): a new
+  pitch step is a new clip and would start the breath over. After each
+  pitch clip play (aim pitch tick, target pitch) the script sends
+  `AnimSetTime` with the game clock modulo the hero's breath period
+  (`c_ANIM_BREATH_KERRIGAN`, 4.0; build check against the rig). Unconfirmed
+  in the engine: that `AnimSetTime` right after `AnimPlay` moves the new
+  clip. The Point & Click target pitch uses the same clips, so that pose
+  breathes too.
+- Tests: host `test_hero_rig.py`, `test_character_anim.py`
+  (`TorsoAxisTest`). In game: `combat` group `kerrigan`, sections
+  `breath_kerrigan` (one sync per pitch clip play; none with a still
+  camera; the engine clip is 4 s long and stands at the game clock's place
+  in the breath, raw values recorded) and `breath_tosh` (negative: pitch
+  clips play, no sync). Not run.
+
 ### 5.3 Cursor, crosshair, free-cursor state (R-TPS-20 to 36)
 
 | State | Mouse look | Cursor | Crosshair |
@@ -283,6 +341,48 @@ not repeated here.
 - A stop command does not cancel a fired shot: there is no order to cancel
   (`tps_shot_stop`).
 - `gf_TpsShotExpire` drops a pending shot after `c_TPS_SHOT_TIMEOUT` (2 s).
+
+### 5.5a Kerrigan: Psi Blast only (R-TPS-63)
+
+- `KerriganSCOBA` weapon slots: stock slot 0 `QueenOfBladesPsiBlast`
+  stays; stock slot 1 `RazorTalons` is replaced by
+  `QueenOfBladesPsiBlastAuto`. No talons weapon is on the unit. The
+  `RazorTalons` weapons and effects stay in the data, unused.
+- `QueenOfBladesPsiBlast` has `MinimumRange` 0 (stock 2). With 2, nothing
+  could hit a target closer than 2 once the talons are gone.
+- `gf_AimWeaponIndex` returns the first enabled weapon: Psi Blast (`single`)
+  or its auto twin.
+- Build check: `validate_aim_shot.check_kerrigan_weapons`.
+- Tests, `combat` group `kerrigan`: `psi_close_single` and `psi_close_auto`
+  at distance 1.2 (talons reach before), `psiblast_single` at 3.0. Engine
+  state: 2 weapons, both Psi Blast; shots are Psi Blast effects; damage per
+  shot. Negative: the talons effect counter stays 0. Not run.
+- R-TPS-64: Psi Blast is a stock projectile (operator 2026-11-22: no
+  special handling). The map does not override `PsiBlastLaunchMissile`.
+  `QueenOfBladesPsiBlast` fires `SCOBAPsiBlastShot`, a set of the stock
+  missile and the button clock `SCOBAAttackCooldown10`, as Tosh's
+  `SCOBAToshShot`. Before, the clock was the missile's `LaunchEffect`:
+  the missile was drawn from the shooter's feet to its head, with any
+  shooter (T41). The stock impact `TargetUnit` gives `PsiBlastDamage`
+  the target unit; the map override `TargetUnitOrPoint` caused T32 (T37)
+  and is removed. A missed aim shot ends at the neutral proxy: a 0 damage event,
+  which the floater, blood and XP scripts skip (`lv_damage <= 0.0`).
+- R-TPS-65: the map's `Kerrigan` unit has no `PoisonNova` ability and no
+  button for it (T38). Tosh keeps his. Open: with Kerrigan, the Offense
+  talent tree and the abilities dialog still name Poison Nova; the
+  operator has not decided what they show.
+- Build check: `validate_aim_shot.check_kerrigan_psi_blast`.
+- Tests, `combat` group `psiprobe`: one Psi Blast at an enemy at 2.0, 3.0,
+  3.5, 4.0, 8.0 by effect and at 4.0, 8.0 by attack order; at the proxy in
+  the air; by the real aim click. Engine state per game loop: the missile
+  units, their distance and height; then the damage event's unit and
+  place, every damage on the target with its effect, the life. Catalog:
+  the missile's actors and models (`QueenOfBladesRangedAttackMissile`,
+  `QueenOfBladesRangedAttack`, `KerriganWeapon`, `KerriganWeaponImpact`,
+  all from liberty.sc2campaign) are valid entries. Negative:
+  no Poison Nova on her and no nova hit; no talons effect; the proxy keeps
+  its life; the damage effect alone launches no missile. Not run on the
+  changed data.
 
 ### 5.6 Shot floaters (R-TPS-70 to 76, 79)
 
@@ -459,7 +559,9 @@ not repeated here.
 | `systems/combat_cooldown.galaxy` | Weapon effect event: animation, pending shot, single shot. |
 | `systems/targeting.galaxy` | `gf_LeftClickTarget`, `gf_TpsLeftClick`. |
 | `systems/animation_aim.galaxy` | Torso pitch tick, head tilt tick. |
-| `scripts/character_anim_assets.py` | Head clips. |
+| `scripts/character_anim_assets.py` | Head clips, the split-body bake. |
+| `scripts/heroanim/` | Hero rig records and axes (`rig.py`), aim breathing (`breath.py`), build checks (`validate.py`). |
+| `scripts/walkanim/strafe.py` | Leg root turn of the walk direction clips and its check. |
 | `scripts/attack_cooldown_link.py` | Cooldown link on the three hero weapons. |
 | `scripts/validate_aim_shot.py`, `scripts/validate-map.py` | Build checks. |
 
@@ -494,6 +596,8 @@ not repeated here.
 | `pick` | Medic head, Marine thigh and middle, Ultralisk front, Zergling at 18.5, Overseer body, Hive top, Marine before Hive, Thor chest with aim held (reticle, status bar, shot). | Above the Medic, beside the Marine and Zergling, behind the Ultralisk, under the Overseer, north of the Hive. |
 | `pose` | Attack `auto`, not aiming: upper pose state and target pitch in every sample, standing and strafing; shots repeat; no bracket clear. | Aiming: hold off, aim state. Attack `single`: hold off at once, no shot. `single` with an enemy in range and in the arc: no pose. Torso pitch step 0. |
 | `combat camheight` | Tosh, Kerrigan, SCV, flying Viking, Viking after `SCOBAHeroAssaultMode` after a hero switch: height = generator's, applied height = 0.9 x scale, desired arm = 1.5 x scale (within 0.01), engine distance = arm or clamp (within 0.05), pick eye = ground + offset. Invalid unit: 0.9 and 1.5. Host: `test_camera_heights.py`. | Kerrigan is not on 0.9, not on 1.5 or the old 2.5. Landed Viking: no flight part, height above 2. |
+| `combat kerrigan` | 2 weapons, both Psi Blast; one Psi Blast effect per command at 1.2 and 3.0, with damage; a shot on its own in `auto` at 1.2. Breath: one sync per pitch clip play; the engine clip is 4 s and in step with the game clock. | No talons effect. No Poison Nova ability. No sync with a still camera. Tosh: no sync. |
+| `combat psiprobe` | One Psi Blast per case: the missile exists and reaches its target; the damage event names the target unit and lands there; an enemy loses 25; the engine's `ImpactLocation` is `TargetUnit`. `PsiBlastDamage` alone at the unit deals 25. | No Poison Nova ability, no nova hit. No talons effect. The proxy keeps its life. The damage effect alone launches no missile. |
 | `pncprobe point` | Engine and script band centres within 2 degrees, pitch at 3, 5, 8, 12 and yaw at 5, rest and aim. Nothing but hero and target near the lane; Medic parked. | No script pick 4 degrees outside the engine band. |
 
 Floater checks read script counters. They do not prove the text is visible.
@@ -515,8 +619,11 @@ Floater checks read script counters. They do not prove the text is visible.
   `controls/20261117-014522` base 1496, flat 1476, clamp 1128, restore
   1468, 0 failures.
   Not investigated.
-- Kerrigan is a proof of concept. Psi Blast dealt no damage beyond about 3.0
-  (T32); cause not found. The `tps` group `kerrigan` is deleted (operator
+- Kerrigan is a proof of concept. Psi Blast dealt no damage at any distance
+  (T32, T37); fixed 2026-11-22 (R-TPS-64). The missile draws from
+  shooter to target since the clock left its `LaunchEffect` (T41).
+  With Kerrigan, the Offense talent tree and the abilities dialog still
+  name Poison Nova, which she no longer has (R-TPS-65); not decided. The `tps` group `kerrigan` is deleted (operator
   2026-11-16). Kerrigan has no air effect (R-TPS-62).
 
 ## 9. Operator Checks
@@ -532,7 +639,14 @@ Floater checks read script counters. They do not prove the text is visible.
   head bone (`Bone29`).
 - Head lead (R-TPS-16): that it looks good, that the head turns the right
   way sideways (yaw axis from the rest pose), the 0.2 s settle, both heroes.
-- Torso pitch while aiming.
+- Torso pitch while aiming. Kerrigan (2026-11-22): she nods up and down,
+  not sideways, and up is up.
+- Kerrigan strafe, backpedal and diagonals: the legs turn as one, the feet
+  do not twist or slide (R-TPS-18).
+- Kerrigan aim pose: the breathing look, amount and speed; no jump when
+  the camera pitch changes (R-TPS-19).
+- Kerrigan attacks with Psi Blast up close, both modes: missile, sound,
+  cast animation (R-TPS-63).
 - Attack `auto`, not aiming: Tosh holds the shooting pose between shots,
   standing and strafing, with no idle flicker (5.9).
 - Backpedal and strafe animation in TPS.

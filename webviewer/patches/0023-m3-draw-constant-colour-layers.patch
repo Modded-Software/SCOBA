@@ -1,7 +1,7 @@
 From c87dc6d4a82d23a989f8b808683ce051118cdaca Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 19:51:18 +0200
-Subject: [PATCH 23/25] m3: draw constant colour layers
+Subject: [PATCH 23/27] m3: draw constant colour layers
 
 A layer with flag 0x400 and no texture draws its colour (stored b, g, r, a) times rgbMultiply, rest values, after WhiteoutFlakes M3LayerValue mode 2 and LayerTint. An all-zero colour and a multiply <= 0 read as unset. No channel select or team colour on such a layer.
 ---

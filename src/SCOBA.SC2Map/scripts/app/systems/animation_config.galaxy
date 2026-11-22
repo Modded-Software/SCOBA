@@ -18,6 +18,7 @@ void gf_AnimConfigInit () {
     // The engine plays the stock walk at unit speed / WalkAnimMoveSpeed.
     gv_animWalkMoveSpeed[c_ANIM_HERO_TOSH] = StringToFixed(CatalogFieldValueGet(c_gameCatalogActor, "ToshSCOBAUnit", "WalkAnimMoveSpeed", c_playerAny));
     gv_animWalkMoveSpeed[c_ANIM_HERO_KERRIGAN] = StringToFixed(CatalogFieldValueGet(c_gameCatalogActor, "KerriganSCOBAUnit", "WalkAnimMoveSpeed", c_playerAny));
+    gv_animBreathPeriod[c_ANIM_HERO_KERRIGAN] = c_ANIM_BREATH_KERRIGAN;
     for (lv_profile = 0; lv_profile < c_ANIM_HERO_COUNT; lv_profile += 1) {
         lv_walk_speed = 0.0;
         if (lv_profile == c_ANIM_HERO_TOSH) {

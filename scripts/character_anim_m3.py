@@ -247,7 +247,9 @@ def append_stc(model, stc, priority):
     return len(model.sequenceTransformationCollections) - 1
 
 
-def make_lower_group(model, groups, name, lower_name, yaw, reverse, turn_anim_id):
+def make_lower_group(model, groups, name, lower_name, yaw, reverse, turn_anim_id, leg_turn=None):
+    """leg_turn(stc, yaw): turns the leg bones that do not hang on the turn
+    bone (walkanim.strafe.leg_turner); it reads the clip before the turn."""
     validate_animation_name(name)
     lower_group = groups[lower_name]
     lower_source = model.sequenceTransformationCollections[lower_group.stcIndices[0]]
@@ -256,6 +258,8 @@ def make_lower_group(model, groups, name, lower_name, yaw, reverse, turn_anim_id
     lower_stc.name = name + " Lower"
     if reverse:
         reverse_lower(lower_stc)
+    if leg_turn is not None:
+        leg_turn(lower_stc, yaw)
     rotate_lower_root(lower_stc, turn_anim_id, yaw)
     lower_index = append_stc(model, lower_stc, 0)
 

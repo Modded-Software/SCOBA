@@ -1,6 +1,8 @@
 // SC2 model viewer server.
 // Lists .m3 models in the game storage and serves models and textures,
-// extracted on demand with stormex. Also serves the map's own Assets.
+// extracted on demand with stormex. Game data and the assets over the
+// storage come per dataset (server-datasets.mjs): "scoba" (this repo's map
+// over the stock data) when a request names none.
 
 import { execFile } from 'node:child_process';
 import { createReadStream } from 'node:fs';
@@ -10,6 +12,11 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+
+import { builtSignature, DEFAULT_DATASET, folders, listDatasets, signature } from './server-datasets.mjs';
+import { loadDoodads } from './server-doodads.mjs';
+import { hdModelsRoot, serveHd, serveTextures, texturesRoot } from './server-textures.mjs';
+import { loadUnits } from './server-units.mjs';
 
 const run = promisify(execFile);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -21,37 +28,43 @@ const STORMEX = process.env.STORMEX || join(ROOT, 'tools', 'stormex');
 const SC2 = process.env.SC2_PATH || process.env.SC2_INSTALL || join(homedir(), 'Games/battlenet-prefix/pfx/drive_c/Program Files (x86)/StarCraft II');
 // Extracted game files live outside git: WEBVIEWER_DATA, default webviewer/data
 // (gitignored). The scripts set it from webviewer/local.env.
-const DATA = process.env.WEBVIEWER_DATA || join(HERE, 'data');
-const CACHE = process.env.WEBVIEWER_CACHE || join(DATA, 'cache');
-const MAP_ASSETS = process.env.MAP_ASSETS || join(ROOT, 'src', 'SCOBA.SC2Map', 'Assets');
-const CATALOG = process.env.WEBVIEWER_CATALOG || join(DATA, 'catalog');
+const DIRS = folders();
+const CACHE = DIRS.cache;
 const MAP_PREFIX = 'map\\';
-const STOCK = process.env.WEBVIEWER_STOCK || join(DATA, 'stock');
-const MAP_MODEL_DATA = join(ROOT, 'src', 'SCOBA.SC2Map', 'Base.SC2Data', 'GameData', 'ModelData.xml');
+const TEXTURES = texturesRoot(ROOT);
+const HD_MODELS = hdModelsRoot(ROOT);
+/** How long a computed dataset signature is good for (the page polls). */
+const SIGNATURE_AGE = 1000; // ms
 
 const STATIC = new Map([
   ['/', ['public/index.html', 'text/html; charset=utf-8']],
   // The page modules, loaded in this order by index.html.
-  ...['core', 'controls', 'scene', 'panels', 'landmarks', 'addall', 'drag', 'sky', 'pick', 'inspect', 'main'].map((name) => [`/js/${name}.js`, [`public/js/${name}.js`, 'text/javascript; charset=utf-8']]),
+  ...['core', 'side', 'datasets', 'controls', 'scene', 'panels', 'doodads', 'landmarks', 'addall', 'drag', 'sky', 'pick', 'select', 'inspect', 'textures', 'hd', 'main'].map((name) => [`/js/${name}.js`, [`public/js/${name}.js`, 'text/javascript; charset=utf-8']]),
   ['/components.js', ['public/components.js', 'text/javascript; charset=utf-8']],
   ['/ground.js', ['public/ground.js', 'text/javascript; charset=utf-8']],
   ['/outline.js', ['public/outline.js', 'text/javascript; charset=utf-8']],
+  ['/pickbuffer.js', ['public/pickbuffer.js', 'text/javascript; charset=utf-8']],
   ...['outline.vert', 'outline-blur.frag', 'outline-compose.frag'].map((name) => [`/shaders/${name}`, [`public/shaders/${name}`, 'text/plain; charset=utf-8']]),
   ['/displacement.js', ['public/displacement.js', 'text/javascript; charset=utf-8']],
   ['/shaders/ground.vert', ['public/shaders/ground.vert', 'text/plain; charset=utf-8']],
   ['/shaders/ground.frag', ['public/shaders/ground.frag', 'text/plain; charset=utf-8']],
+  ['/theme.css', ['public/theme.css', 'text/css; charset=utf-8']],
   ['/style.css', ['public/style.css', 'text/css; charset=utf-8']],
   // Built by tools/build-renderer.mjs: mdx-m3-viewer with the M3 parser patches.
   ['/vendor/renderer.js', ['public/vendor/renderer.js', 'text/javascript; charset=utf-8']],
   ['/vendor/renderer.js.map', ['public/vendor/renderer.js.map', 'application/json; charset=utf-8']],
 ]);
 
-/** Every servable path: storage path or map path -> where it comes from. */
+/** Every servable path: storage path, or a dataset's map layer path -> where it comes from. */
 const files = new Map();
 /** Sorted .m3 paths, for search. */
 let models = [];
-/** In-model asset path (lower case, backslashes, from "assets\") -> servable path. */
-const assets = new Map();
+/** In-model asset path (lower case, backslashes, from "assets\") -> storage path. The game storage alone. */
+const stored = new Map();
+/** Dataset id -> its loaded state (loadDataset). */
+const datasets = new Map();
+/** Folders under the datasets folder that are not a dataset: { dir, reason }. */
+let datasetProblems = [];
 
 async function walk(dir, out = []) {
   let entries;
@@ -69,114 +82,93 @@ async function walk(dir, out = []) {
   return out;
 }
 
-/** Lower rank wins when several archives hold the same in-model path. */
-function rank(path) {
-  if (path.startsWith(MAP_PREFIX)) return 0;
-  if (path.includes('\\base.sc2assets\\')) return 1;
-  return 2;
-}
+/** Among several archives holding the same in-model path, base.sc2assets wins. */
+const rank = (path) => (path.includes('\\base.sc2assets\\') ? 0 : 1);
 
-function indexAsset(path) {
-  const at = path.indexOf('\\assets\\');
-  if (at < 0) return;
-  const key = path.slice(at + 1);
-  const held = assets.get(key);
-  if (held === undefined || rank(path) < rank(held)) assets.set(key, path);
-}
-
-async function buildIndex() {
+async function indexStorage() {
   const { stdout } = await run(STORMEX, ['-S', SC2, '-I', '\\.(m3|dds|tga)$', '-l'], { maxBuffer: 256 * 1024 * 1024 });
   for (const line of stdout.split('\n')) {
     const path = line.trim();
     if (!path) continue;
     files.set(path, { kind: 'casc' });
-    indexAsset(path);
+    const at = path.indexOf('\\assets\\');
+    if (at < 0) continue;
+    const key = path.slice(at + 1);
+    const held = stored.get(key);
+    if (held === undefined || rank(path) < rank(held)) stored.set(key, path);
   }
-  for (const full of await walk(MAP_ASSETS)) {
-    const rel = full.slice(MAP_ASSETS.length + 1).split(sep).join('\\').toLowerCase();
-    const path = `${MAP_PREFIX}assets\\${rel}`;
-    files.set(path, { kind: 'disk', full });
-    indexAsset(path);
-  }
-  models = [...files.keys()].filter((path) => path.endsWith('.m3')).sort();
 }
 
-// ---- unit catalog ----
+/** The servable path prefix of a dataset's map layer files. */
+const layerPrefix = (id) => (id === DEFAULT_DATASET ? MAP_PREFIX : `ds\\${id}\\`);
 
-/** Unit id -> record. Only units whose model file can be served. */
-const units = new Map();
-/** Icon and portrait file names the catalog uses. Nothing else is served from icons/. */
-const icons = new Set();
-let unitList = [];
-let unitsWithoutModelFile = 0;
-let facets = { races: [], kinds: [], families: [] };
-
-/** The servable path of a unit's model: the file itself, or its first variation. */
-function modelFile(m3) {
-  const key = m3.toLowerCase().replaceAll('/', '\\');
-  return assets.get(key) ?? assets.get(key.replace(/\.m3$/, '_00.m3')) ?? null;
-}
-
-async function loadCatalog() {
-  const full = join(CATALOG, 'units.json');
-  let text;
-  try {
-    text = await readFile(full, 'utf8');
-  } catch (error) {
-    if (error.code === 'ENOENT') throw new Error(`unit catalog missing: ${full}. Run "make viewer-catalog".`);
-    throw error;
-  }
-  for (const record of JSON.parse(text).units) {
-    const file = modelFile(record.m3);
-    if (!file) {
-      unitsWithoutModelFile++;
-      continue;
+/**
+ * Load (or load again) one dataset: index its map layer's Assets over the
+ * storage, then join its catalogs with the files that can be served.
+ */
+async function loadDataset(def) {
+  const prefix = layerPrefix(def.id);
+  for (const path of [...files.keys()]) if (path.startsWith(prefix)) files.delete(path);
+  /** In-model asset path -> servable path, for the map layer's own files. */
+  const overlay = new Map();
+  if (def.mapDir) {
+    const root = join(def.mapDir, 'Assets');
+    for (const full of await walk(root)) {
+      const key = `assets\\${full.slice(root.length + 1).split(sep).join('\\').toLowerCase()}`;
+      files.set(prefix + key, { kind: 'disk', full });
+      overlay.set(key, prefix + key);
     }
-    const unit = { ...record, file, text: `${record.name} ${record.id}`.toLowerCase() };
-    units.set(unit.id, unit);
-    for (const name of [unit.icon, unit.portrait]) if (name) icons.add(name);
   }
-  unitList = [...units.values()].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-  const count = (field) => {
-    const seen = new Map();
-    for (const unit of unitList) seen.set(unit[field], (seen.get(unit[field]) || 0) + 1);
-    return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([value]) => value);
-  };
-  // Family: the EditorCategories ObjectFamily (Melee, Campaign, Storymode, ...); '' when the unit has none.
-  facets = { races: count('race'), kinds: count('kind'), families: count('family') };
+  // The map layer first, then the game storage.
+  const assets = { get: (key) => overlay.get(key) ?? stored.get(key), overlay };
+  const state = { ...def, assets, units: await loadUnits(def.catalogDir, assets), doodads: await loadDoodads(def.catalogDir, assets), loaded: await builtSignature(def), checked: null };
+  datasets.set(def.id, state);
+  return state;
 }
 
-/** Lower is better: the whole name, then a name that starts with it, then a word that does. */
-function unitRank(unit, query) {
-  const name = unit.name.toLowerCase();
-  if (name === query) return 0;
-  if (name.startsWith(query)) return 1;
-  if (name.split(/\s+/).some((word) => word.startsWith(query))) return 2;
-  if (unit.id.toLowerCase().startsWith(query)) return 3;
-  return 4;
+/** After any dataset load: the model list and the skyboxes follow the files. */
+async function refreshShared() {
+  models = [...files.keys()].filter((path) => path.endsWith('.m3')).sort();
+  await loadSkyboxes();
 }
 
-/** A whole-number query value, clamped to [low, high]; a missing or bad value gives `standard`. */
-function intParam(params, name, standard, low, high) {
-  const value = Number.parseInt(params.get(name) ?? '', 10);
-  return Number.isFinite(value) ? Math.min(Math.max(value, low), high) : standard;
+/** The dataset's source fingerprint now; computed at most once per SIGNATURE_AGE. */
+async function currentSignature(state) {
+  const now = Date.now();
+  if (!state.checked || now - state.checked.at > SIGNATURE_AGE) state.checked = { at: now, value: await signature(state) };
+  return state.checked.value;
 }
 
-/** One page of an ordered list. */
-const pageOf = (list, offset, limit) => list.slice(offset, offset + limit);
+/** What the page shows of a dataset. `signature`: what is loaded; `current`: its sources now; `changed`: they differ. */
+async function describe(state) {
+  const current = await currentSignature(state);
+  return { id: state.id, label: state.label, builtin: state.builtin, hasMap: Boolean(state.mapDir), units: state.units.size, doodads: state.doodads.size, signature: state.loaded, current, changed: current !== state.loaded };
+}
 
-/** `family` null: any family; a string (also '', no family): that family only. */
-function searchUnits(query, race, kind, family, offset, limit) {
-  const text = query.toLowerCase().trim();
-  const words = text.split(/\s+/).filter(Boolean);
-  let hits = unitList.filter((unit) => (!race || unit.race === race) && (!kind || unit.kind === kind) && (family === null || unit.family === family) && words.every((word) => unit.text.includes(word)));
-  if (words.length) {
-    // The map's own units first among equals, then melee units, then the rest.
-    const order = (unit) => unitRank(unit, text) * 4 + (unit.inMap ? 0 : unit.family === 'Melee' ? 1 : 2);
-    hits = hits.map((unit) => [order(unit), unit]).sort((a, b) => a[0] - b[0]).map(([, unit]) => unit);
-  }
-  const brief = ({ id, name, race, kind, family, icon, inMap, skybox }) => ({ id, name, race, kind, family, icon, inMap, skybox });
-  return { total: hits.length, items: pageOf(hits, offset, limit).map(brief) };
+/** One reload at a time: a catalog build is heavy. */
+let reloading = Promise.resolve();
+
+/** Rebuild a dataset's catalog when its sources changed since it was built, then load it again. */
+function reloadDataset(id) {
+  const job = reloading.then(async () => {
+    const state = datasets.get(id);
+    const current = await signature(state);
+    if ((await builtSignature(state)) !== current) {
+      await run('bash', [join(HERE, 'scripts', 'catalog.sh'), '--dataset', id], { cwd: HERE, env: { ...process.env, WEBVIEWER_DIR: HERE, REPO_ROOT: ROOT }, maxBuffer: 64 * 1024 * 1024 }).catch((error) => {
+        throw new Error(`catalog build failed for "${id}": ${String(error.stderr || error.message).trim().split('\n').slice(-5).join(' | ')}`);
+      });
+    }
+    const { datasets: defs } = await listDatasets(DIRS);
+    const def = defs.find((d) => d.id === id);
+    if (!def) throw new Error(`dataset "${id}" is gone`);
+    const next = await loadDataset(def);
+    await refreshShared();
+    return describe(next);
+  });
+  // A failed reload must not block the next one. The caller gets the error from `job`;
+  // the chain logs it.
+  reloading = job.catch((error) => console.error(`viewer: reload of dataset "${id}" failed: ${error.message}`));
+  return job;
 }
 
 // ---- skyboxes ----
@@ -201,13 +193,13 @@ async function modelDataFiles() {
   for (const group of ['mods', 'campaigns']) {
     let names = [];
     try {
-      names = (await readdir(join(STOCK, group))).sort();
+      names = (await readdir(join(DIRS.stock, group))).sort();
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
     }
-    for (const name of names) out.push(join(STOCK, group, name, 'base.sc2data', 'gamedata', 'modeldata.xml'));
+    for (const name of names) out.push(join(DIRS.stock, group, name, 'base.sc2data', 'gamedata', 'modeldata.xml'));
   }
-  out.push(MAP_MODEL_DATA);
+  out.push(join(DIRS.map, 'Base.SC2Data', 'GameData', 'ModelData.xml'));
   return out;
 }
 
@@ -236,24 +228,27 @@ async function skyboxModels() {
 const SKYBOX_DIR = /^assets\\(storymode)?skyboxes\\/;
 
 /**
- * Mark the units whose model is a skybox (`skybox: true`): its file lies in
- * a skybox folder, or a CModel with parent "Skybox" names it. Such a unit
- * is a backdrop (SS_BackgroundSpace*), not something to stand on the map.
+ * The skyboxes: those of the stock data and this repo's map (the "scoba"
+ * dataset), the same whatever dataset a unit comes from. Also marks, in
+ * every dataset, the units whose model is a skybox (`skybox: true`): its
+ * file lies in a skybox folder, or a CModel with parent "Skybox" names it.
+ * Such a unit is a backdrop (SS_BackgroundSpace*), not something to stand
+ * on the map.
  */
-function markSkyboxUnits(named) {
-  for (const unit of units.values()) {
-    const key = unit.m3.toLowerCase().replaceAll('/', '\\');
-    unit.skybox = SKYBOX_DIR.test(key) || named.has(key);
-  }
-}
-
 async function loadSkyboxes() {
   const named = await skyboxModels();
-  markSkyboxUnits(named);
+  for (const state of datasets.values()) {
+    for (const unit of state.units.values()) {
+      const key = unit.m3.toLowerCase().replaceAll('/', '\\');
+      unit.skybox = SKYBOX_DIR.test(key) || named.has(key);
+    }
+  }
   const seen = new Set();
   skyboxes = [];
-  for (const [key, file] of assets) {
+  const main = datasets.get(DEFAULT_DATASET).assets;
+  for (const key of new Set([...main.overlay.keys(), ...stored.keys()])) {
     if (!key.startsWith('assets\\skyboxes\\') || !key.endsWith('.m3')) continue;
+    const file = main.get(key);
     // A model with variations is stored as name_00.m3, name_01.m3, ...
     const variation = /_(\d\d)\.m3$/.exec(key);
     const model = named.get(key) ?? (variation ? named.get(key.slice(0, variation.index) + '.m3') : undefined) ?? null;
@@ -265,6 +260,15 @@ async function loadSkyboxes() {
   }
   skyboxes.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
+
+/** A whole-number query value, clamped to [low, high]; a missing or bad value gives `standard`. */
+function intParam(params, name, standard, low, high) {
+  const value = Number.parseInt(params.get(name) ?? '', 10);
+  return Number.isFinite(value) ? Math.min(Math.max(value, low), high) : standard;
+}
+
+/** One page of an ordered list. */
+const pageOf = (list, offset, limit) => list.slice(offset, offset + limit);
 
 function searchSkyboxes(query, offset, limit) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -327,21 +331,58 @@ async function serveStored(res, path) {
 }
 
 async function handle(req, res) {
-  if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' });
   // The raw URL decides the route, so "/../x" and "/%2e%2e/x" never normalise onto a real one.
   const raw = req.url || '/';
   const cut = raw.indexOf('?');
   const route = cut < 0 ? raw : raw.slice(0, cut);
   const params = new URLSearchParams(cut < 0 ? '' : raw.slice(cut + 1));
 
-  if (route === '/api/health') return json(res, 200, { models: models.length, files: files.size, units: units.size, unitsWithoutModelFile, skyboxes: skyboxes.length });
+  if (route === '/api/dataset/reload') {
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' });
+    const id = params.get('id');
+    if (!id) return json(res, 400, { error: 'id is required' });
+    if (!datasets.has(id)) return json(res, 404, { error: 'no such dataset', dataset: id });
+    return json(res, 200, await reloadDataset(id));
+  }
+  if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' });
+  if (await serveTextures(TEXTURES, route, res, { json, sendFile })) return undefined;
+  if (await serveHd(HD_MODELS, route, params, res, { json, sendFile })) return undefined;
 
-  if (route === '/api/facets') return json(res, 200, facets);
+  // The dataset a request reads: "dataset=<id>", or the default one.
+  const wanted = params.get('dataset') || DEFAULT_DATASET;
+  const data = datasets.get(wanted);
+  if (!data) return json(res, 404, { error: 'no such dataset', dataset: wanted });
+
+  if (route === '/api/health') {
+    return json(res, 200, { models: models.length, files: files.size, units: data.units.size, unitsWithoutModelFile: data.units.withoutFile, skyboxes: skyboxes.length, doodads: data.doodads.size, doodadsWithoutModelFile: data.doodads.withoutFile, datasets: datasets.size });
+  }
+
+  if (route === '/api/datasets') {
+    const list = [];
+    for (const state of datasets.values()) list.push(await describe(state));
+    return json(res, 200, { default: DEFAULT_DATASET, datasets: list, problems: datasetProblems });
+  }
+
+  if (route === '/api/facets') return json(res, 200, { ...data.units.facets, doodadTypes: data.doodads.facets.types, tilesets: data.doodads.facets.tilesets });
+
+  if (route === '/api/doodads') {
+    const limit = intParam(params, 'limit', 60, 1, 500);
+    const offset = intParam(params, 'offset', 0, 0, Number.MAX_SAFE_INTEGER);
+    return json(res, 200, data.doodads.search(params.get('q') || '', params.get('type') || '', params.get('tileset') || '', offset, limit));
+  }
+
+  if (route === '/api/doodad' || route === '/api/unit') {
+    const id = params.get('id');
+    if (!id) return json(res, 400, { error: 'id is required' });
+    const record = (route === '/api/unit' ? data.units : data.doodads).get(id);
+    if (!record) return json(res, 404, { error: 'not found', id, dataset: data.id });
+    return json(res, 200, { ...record, dataset: data.id });
+  }
 
   if (route === '/api/units') {
     const limit = intParam(params, 'limit', 60, 1, 500);
     const offset = intParam(params, 'offset', 0, 0, Number.MAX_SAFE_INTEGER);
-    return json(res, 200, searchUnits(params.get('q') || '', params.get('race') || '', params.get('kind') || '', params.has('family') ? params.get('family') : null, offset, limit));
+    return json(res, 200, data.units.search(params.get('q') || '', params.get('race') || '', params.get('kind') || '', params.has('family') ? params.get('family') : null, offset, limit));
   }
 
   if (route === '/api/skyboxes') {
@@ -350,20 +391,11 @@ async function handle(req, res) {
     return json(res, 200, searchSkyboxes(params.get('q') || '', offset, limit));
   }
 
-  if (route === '/api/unit') {
-    const id = params.get('id');
-    if (!id) return json(res, 400, { error: 'id is required' });
-    const unit = units.get(id);
-    if (!unit) return json(res, 404, { error: 'not found', id });
-    const { text, ...record } = unit;
-    return json(res, 200, record);
-  }
-
   if (route.startsWith('/icon/')) {
-    // Only names the catalog lists, so no path can leave the icon folder.
+    // Only names the dataset's catalog lists, so no path can leave the icon folder.
     const name = route.slice('/icon/'.length);
-    if (!icons.has(name)) return json(res, 404, { error: 'not found' });
-    return sendFile(res, join(CATALOG, 'icons', name), 'image/png', 'max-age=3600');
+    if (!data.units.icons.has(name)) return json(res, 404, { error: 'not found' });
+    return sendFile(res, join(data.catalogDir, 'icons', name), 'image/png', 'max-age=3600');
   }
 
   if (route === '/api/models') {
@@ -379,11 +411,12 @@ async function handle(req, res) {
   }
 
   if (route === '/asset') {
+    // An in-model path, as the dataset sees it: its map layer, then the storage.
     const path = params.get('path');
     if (!path) return json(res, 400, { error: 'path is required' });
-    const stored = assets.get(path.toLowerCase().replaceAll('/', '\\'));
-    if (!stored) return json(res, 404, { error: 'not found', path });
-    return serveStored(res, stored);
+    const servable = data.assets.get(path.toLowerCase().replaceAll('/', '\\'));
+    if (!servable) return json(res, 404, { error: 'not found', path, dataset: data.id });
+    return serveStored(res, servable);
   }
 
   const entry = STATIC.get(route);
@@ -392,9 +425,12 @@ async function handle(req, res) {
 }
 
 await mkdir(CACHE, { recursive: true });
-await buildIndex();
-await loadCatalog();
-await loadSkyboxes();
+await indexStorage();
+const found = await listDatasets(DIRS);
+datasetProblems = found.problems;
+for (const problem of datasetProblems) console.warn(`sc2 webviewer: not a dataset: ${problem.dir}: ${problem.reason}`);
+for (const def of found.datasets) await loadDataset(def);
+await refreshShared();
 
 createServer((req, res) => {
   handle(req, res).catch((error) => {
@@ -403,5 +439,6 @@ createServer((req, res) => {
     else res.destroy();
   });
 }).listen(PORT, HOST, () => {
-  console.log(`sc2 webviewer: http://${HOST}:${PORT}/  (${models.length} models, ${units.size} units, ${unitsWithoutModelFile} units without a model file)`);
+  const lines = [...datasets.values()].map((d) => `${d.id}: ${d.units.size} units (${d.units.withoutFile} without a model file), ${d.doodads.size} doodads (${d.doodads.withoutFile} without)`);
+  console.log(`sc2 webviewer: http://${HOST}:${PORT}/  (${models.length} models; ${lines.join('; ')})`);
 });

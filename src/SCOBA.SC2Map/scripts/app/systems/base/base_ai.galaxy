@@ -31,11 +31,15 @@ void gf_BaseAiStart (int lp_player) {
     PlayerSetDifficulty(lp_player, c_BASE_AI_DIFFICULTY);
     AIMeleeStart(lp_player);
     gv_baseAiStarted[lp_player] = true;
+    // The gas orders the stock AI does not give here (R-BASE-36).
+    gf_BaseGasStart(lp_player);
 }
 
 // The AI plays this unit: owner has a base AI and it is no script unit.
+// A worker on gas work is an AI unit too: the engine marks it script
+// controlled only while the gas order holds (systems/base/base_gas).
 bool gf_BaseAiUnitIsAi (unit lp_unit) {
-    return UnitIsValid(lp_unit) && gf_BaseAiIsAiPlayer(UnitGetOwner(lp_unit)) && !AIIsScriptControlled(lp_unit);
+    return UnitIsValid(lp_unit) && gf_BaseAiIsAiPlayer(UnitGetOwner(lp_unit)) && (!AIIsScriptControlled(lp_unit) || gf_BaseGasHas(lp_unit));
 }
 
 point gf_BaseAiCentre () {

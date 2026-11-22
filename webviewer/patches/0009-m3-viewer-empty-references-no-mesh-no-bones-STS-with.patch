@@ -1,7 +1,7 @@
 From 40e3d0b38fc324aac5827e5bb88f502a0610084b Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 13:55:20 +0200
-Subject: [PATCH 09/25] m3 viewer: empty references (no mesh, no bones, STS
+Subject: [PATCH 09/27] m3 viewer: empty references (no mesh, no bones, STS
  without animations) load as empty lists
 
 ---

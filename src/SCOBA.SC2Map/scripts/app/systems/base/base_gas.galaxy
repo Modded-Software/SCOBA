@@ -1,0 +1,384 @@
+// Module: systems/base/base_gas
+// Gas for the base owners (R-BASE-36, SPEC-BASE-AI 4.9).
+// The stock AI takes no gas in this map (SPEC-BASE-AI 8): it counts a
+// geyser only within 10 of its town point, and every 6x6 geyser stands 10
+// or more from its 8x8 hall; and it gives no build order for a geyser
+// whose Shape blocks its whole 6x6 (R-BASE-35).
+// So this module gives the two orders the AI does not give: one worker of
+// the owner builds on a free geyser of its town, and c_BASE_GAS_CREW
+// workers gather from each finished gas building.
+// The engine marks a unit script controlled when a script orders it
+// (baseai gas run 20261122-121438); that is why the AI leaves a gas worker
+// at its work (run 20261122-120457). The workers stay AI units by
+// R-BASE's terms (gf_BaseAiUnitIsAi), and each goes back to the AI when
+// its gas work ends (gf_BaseGasRelease).
+
+trigger gt_BaseGas;
+bool gv_baseGasOn;
+fixed[c_BASE_AI_PLAYERS] gv_baseGasNext;       // game time of the owner's next gas build
+unit[c_BASE_AI_PLAYERS] gv_baseGasBuilder;     // the worker on its way to build
+unit[c_BASE_AI_PLAYERS] gv_baseGasTarget;      // the geyser it builds on
+fixed[c_BASE_AI_PLAYERS] gv_baseGasGiveUp;     // game time the builder is dropped
+unit[c_BASE_GAS_MAX] gv_baseGasUnit;           // gas buildings with a crew
+unitgroup[c_BASE_GAS_MAX] gv_baseGasCrew;
+int[c_BASE_AI_PLAYERS] gv_baseGasBuilds;       // build orders given, per owner (tests read it)
+int[c_BASE_AI_PLAYERS] gv_baseGasGathers;      // gather orders given, per owner (tests read it)
+
+string gf_BaseGasType (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "Refinery";
+    }
+    return "Extractor";
+}
+
+string gf_BaseGasWorker (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "SCV";
+    }
+    return "Drone";
+}
+
+string gf_BaseGasHarvest (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return "SCVHarvest";
+    }
+    return "DroneHarvest";
+}
+
+// Build3 of TerranBuild and of ZergBuild: Refinery, Extractor.
+abilcmd gf_BaseGasBuildCmd (int lp_player) {
+    if (PlayerRace(lp_player) == "Terr") {
+        return AbilityCommand("TerranBuild", 2);
+    }
+    return AbilityCommand("ZergBuild", 2);
+}
+
+unitfilter gf_BaseGasAlive () {
+    return UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32)));
+}
+
+// The owner's town halls, every stage.
+unitgroup gf_BaseGasHalls (int lp_player) {
+    unitgroup lv_g = UnitGroupEmpty();
+
+    if (PlayerRace(lp_player) == "Terr") {
+        UnitGroupAddUnitGroup(lv_g, UnitGroup("CommandCenter", lp_player, RegionEntireMap(), gf_BaseGasAlive(), 0));
+        UnitGroupAddUnitGroup(lv_g, UnitGroup("OrbitalCommand", lp_player, RegionEntireMap(), gf_BaseGasAlive(), 0));
+        UnitGroupAddUnitGroup(lv_g, UnitGroup("PlanetaryFortress", lp_player, RegionEntireMap(), gf_BaseGasAlive(), 0));
+        return lv_g;
+    }
+    UnitGroupAddUnitGroup(lv_g, UnitGroup("Hatchery", lp_player, RegionEntireMap(), gf_BaseGasAlive(), 0));
+    UnitGroupAddUnitGroup(lv_g, UnitGroup("Lair", lp_player, RegionEntireMap(), gf_BaseGasAlive(), 0));
+    UnitGroupAddUnitGroup(lv_g, UnitGroup("Hive", lp_player, RegionEntireMap(), gf_BaseGasAlive(), 0));
+    return lv_g;
+}
+
+int gf_BaseGasCountAt (string lp_type, point lp_at) {
+    return UnitGroupCount(UnitGroup(lp_type, c_playerAny, RegionCircle(lp_at, c_BASE_GAS_NEAR), gf_BaseGasAlive(), 0), c_unitCountAlive);
+}
+
+// A gas building of any player stands on the geyser, or a builder of an
+// owner is on its way to it.
+bool gf_BaseGasTaken (unit lp_geyser) {
+    point lv_at = UnitGetPosition(lp_geyser);
+    int lv_p;
+
+    if (gf_BaseGasCountAt("Refinery", lv_at) + gf_BaseGasCountAt("Extractor", lv_at) + gf_BaseGasCountAt("Assimilator", lv_at) + gf_BaseGasCountAt("AutomatedRefinery", lv_at) + gf_BaseGasCountAt("AutomatedExtractor", lv_at) > 0) {
+        return true;
+    }
+    for (lv_p = 1; lv_p < c_BASE_AI_PLAYERS; lv_p += 1) {
+        if (gv_baseGasTarget[lv_p] == lp_geyser && UnitIsAlive(gv_baseGasBuilder[lv_p])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The free geyser with gas nearest one of the owner's finished halls,
+// within c_BASE_GAS_R of it. null: none.
+unit gf_BaseGasFreeGeyser (int lp_player) {
+    unitgroup lv_halls = gf_BaseGasHalls(lp_player);
+    unitgroup lv_gs;
+    unit lv_best = null;
+    fixed lv_bestD = c_BASE_GAS_R + 1.0;
+    fixed lv_d;
+    unit lv_hall;
+    unit lv_g;
+    int lv_i;
+    int lv_j;
+
+    for (lv_i = 1; lv_i <= UnitGroupCount(lv_halls, c_unitCountAll); lv_i += 1) {
+        lv_hall = UnitGroupUnit(lv_halls, lv_i);
+        if (UnitTestState(lv_hall, c_unitStateUnderConstruction)) {
+            continue;
+        }
+        lv_gs = UnitGroup("VespeneGeyser", c_playerAny, RegionCircle(UnitGetPosition(lv_hall), c_BASE_GAS_R), gf_BaseGasAlive(), 0);
+        for (lv_j = 1; lv_j <= UnitGroupCount(lv_gs, c_unitCountAll); lv_j += 1) {
+            lv_g = UnitGroupUnit(lv_gs, lv_j);
+            lv_d = DistanceBetweenPoints(UnitGetPosition(lv_hall), UnitGetPosition(lv_g));
+            if (lv_d >= lv_bestD || UnitGetPropertyInt(lv_g, c_unitPropResources, c_unitPropCurrent) <= 0 || gf_BaseGasTaken(lv_g)) {
+                continue;
+            }
+            lv_bestD = lv_d;
+            lv_best = lv_g;
+        }
+    }
+    return lv_best;
+}
+
+bool gf_BaseGasInCrew (unit lp_unit) {
+    int lv_s;
+
+    for (lv_s = 0; lv_s < c_BASE_GAS_MAX; lv_s += 1) {
+        if (gv_baseGasCrew[lv_s] != null && UnitGroupHasUnit(gv_baseGasCrew[lv_s], lp_unit)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The unit does gas work for this module now: a builder on its way, or a
+// crew member.
+bool gf_BaseGasHas (unit lp_unit) {
+    int lv_p;
+
+    if (!UnitIsValid(lp_unit)) {
+        return false;
+    }
+    lv_p = UnitGetOwner(lp_unit);
+    if (lv_p > 0 && lv_p < c_BASE_AI_PLAYERS && gv_baseGasBuilder[lv_p] == lp_unit) {
+        return true;
+    }
+    return gf_BaseGasInCrew(lp_unit);
+}
+
+// Gas work over: the unit goes back to the AI.
+void gf_BaseGasRelease (unit lp_unit) {
+    if (UnitIsAlive(lp_unit)) {
+        AISetUnitScriptControlled(lp_unit, false);
+    }
+}
+
+// The crew slot is given back and its workers go back to the AI.
+void gf_BaseGasFree (int lp_slot) {
+    int lv_i;
+
+    if (gv_baseGasCrew[lp_slot] != null) {
+        for (lv_i = 1; lv_i <= UnitGroupCount(gv_baseGasCrew[lp_slot], c_unitCountAll); lv_i += 1) {
+            gf_BaseGasRelease(UnitGroupUnit(gv_baseGasCrew[lp_slot], lv_i));
+        }
+    }
+    gv_baseGasUnit[lp_slot] = null;
+    gv_baseGasCrew[lp_slot] = null;
+}
+
+// The owner's worker nearest lp_at that the AI plays and that gathers now,
+// with no gas work yet. null: none.
+unit gf_BaseGasPickWorker (int lp_player, point lp_at) {
+    unitgroup lv_g = UnitGroup(gf_BaseGasWorker(lp_player), lp_player, RegionEntireMap(), gf_BaseGasAlive(), 0);
+    unit lv_best = null;
+    fixed lv_bestD = 9999.0;
+    fixed lv_d;
+    order lv_o;
+    unit lv_u;
+    int lv_i;
+
+    for (lv_i = 1; lv_i <= UnitGroupCount(lv_g, c_unitCountAll); lv_i += 1) {
+        lv_u = UnitGroupUnit(lv_g, lv_i);
+        if (AIIsScriptControlled(lv_u) || gf_HireIsHired(lv_u) || lv_u == gv_baseGasBuilder[lp_player] || gf_BaseGasInCrew(lv_u)) {
+            continue;
+        }
+        lv_o = UnitOrder(lv_u, 0);
+        if (lv_o == null || AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o)) != gf_BaseGasHarvest(lp_player)) {
+            continue;
+        }
+        lv_d = DistanceBetweenPoints(UnitGetPosition(lv_u), lp_at);
+        if (lv_d < lv_bestD) {
+            lv_bestD = lv_d;
+            lv_best = lv_u;
+        }
+    }
+    return lv_best;
+}
+
+// One gas build at a time per owner: when its time has come, it can pay
+// and a geyser of its town is free.
+void gf_BaseGasBuild (int lp_player) {
+    fixed lv_now = GameGetMissionTime();
+    order lv_o;
+    unit lv_g;
+    unit lv_w;
+
+    if (UnitIsAlive(gv_baseGasBuilder[lp_player])) {
+        lv_o = UnitOrder(gv_baseGasBuilder[lp_player], 0);
+        if (lv_o != null && lv_now < gv_baseGasGiveUp[lp_player]
+            && AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o)) == AbilityCommandGetAbility(gf_BaseGasBuildCmd(lp_player))
+            && AbilityCommandGetCommand(OrderGetAbilityCommand(lv_o)) == 2) {
+            return;
+        }
+    }
+    // Built, or given up: the builder goes back to the AI. (A Drone is the
+    // Extractor now; that goes back to the AI too.)
+    gf_BaseGasRelease(gv_baseGasBuilder[lp_player]);
+    gv_baseGasBuilder[lp_player] = null;
+    gv_baseGasTarget[lp_player] = null;
+    if (lv_now < gv_baseGasNext[lp_player]) {
+        return;
+    }
+    if (PlayerGetPropertyInt(lp_player, c_playerPropMinerals) < UnitTypeGetCost(gf_BaseGasType(lp_player), c_unitCostMinerals)) {
+        return;
+    }
+    lv_g = gf_BaseGasFreeGeyser(lp_player);
+    if (lv_g == null) {
+        return;
+    }
+    lv_w = gf_BaseGasPickWorker(lp_player, UnitGetPosition(lv_g));
+    if (lv_w == null) {
+        return;
+    }
+    // The order that names the geyser: the only form the engine takes on a
+    // geyser.
+    if (!UnitIssueOrder(lv_w, OrderTargetingUnit(gf_BaseGasBuildCmd(lp_player), lv_g), c_orderQueueReplace)) {
+        return;
+    }
+    gv_baseGasBuilder[lp_player] = lv_w;
+    gv_baseGasTarget[lp_player] = lv_g;
+    gv_baseGasGiveUp[lp_player] = lv_now + c_BASE_GAS_GIVE_UP;
+    gv_baseGasNext[lp_player] = lv_now + c_BASE_GAS_NEXT;
+    gv_baseGasBuilds[lp_player] += 1;
+}
+
+// The crew slot of a gas building; a free one is taken. -1: all in use.
+int gf_BaseGasSlot (unit lp_gas) {
+    int lv_free = -1;
+    int lv_s;
+
+    for (lv_s = 0; lv_s < c_BASE_GAS_MAX; lv_s += 1) {
+        if (gv_baseGasUnit[lv_s] == lp_gas) {
+            return lv_s;
+        }
+        if (lv_free < 0 && gv_baseGasUnit[lv_s] == null) {
+            lv_free = lv_s;
+        }
+    }
+    if (lv_free >= 0) {
+        gv_baseGasUnit[lv_free] = lp_gas;
+        gv_baseGasCrew[lv_free] = UnitGroupEmpty();
+    }
+    return lv_free;
+}
+
+// A crew member is at its gas work: it gathers, and what it walks to is
+// the gas building or a unit of its own player (the hall it brings gas to).
+bool gf_BaseGasAtWork (unit lp_worker, unit lp_gas) {
+    order lv_o;
+    unit lv_t;
+
+    if (!UnitIsAlive(lp_worker)) {
+        return false;
+    }
+    lv_o = UnitOrder(lp_worker, 0);
+    if (lv_o == null || AbilityCommandGetAbility(OrderGetAbilityCommand(lv_o)) != gf_BaseGasHarvest(UnitGetOwner(lp_worker))) {
+        return false;
+    }
+    lv_t = OrderGetTargetUnit(lv_o);
+    return lv_t == null || lv_t == lp_gas || UnitGetOwner(lv_t) == UnitGetOwner(lp_worker);
+}
+
+// The slot that holds the gas building. -1: none.
+int gf_BaseGasSlotOf (unit lp_gas) {
+    int lv_s;
+
+    for (lv_s = 0; lv_s < c_BASE_GAS_MAX; lv_s += 1) {
+        if (gv_baseGasUnit[lv_s] == lp_gas) {
+            return lv_s;
+        }
+    }
+    return -1;
+}
+
+// Every finished gas building of the owner with gas left keeps
+// c_BASE_GAS_CREW workers. A member that died or took other work (a
+// person's order) leaves the crew, goes back to the AI, and another
+// worker is sent. An empty gas building gives its crew back.
+void gf_BaseGasStaff (int lp_player) {
+    unitgroup lv_gas = UnitGroup(gf_BaseGasType(lp_player), lp_player, RegionEntireMap(), gf_BaseGasAlive(), 0);
+    unitgroup lv_crew;
+    unit lv_b;
+    unit lv_w;
+    int lv_i;
+    int lv_j;
+    int lv_s;
+
+    for (lv_i = 1; lv_i <= UnitGroupCount(lv_gas, c_unitCountAll); lv_i += 1) {
+        lv_b = UnitGroupUnit(lv_gas, lv_i);
+        if (UnitTestState(lv_b, c_unitStateUnderConstruction)) {
+            continue;
+        }
+        if (UnitGetPropertyInt(lv_b, c_unitPropResources, c_unitPropCurrent) <= 0) {
+            lv_s = gf_BaseGasSlotOf(lv_b);
+            if (lv_s >= 0) {
+                gf_BaseGasFree(lv_s);
+            }
+            continue;
+        }
+        lv_s = gf_BaseGasSlot(lv_b);
+        if (lv_s < 0) {
+            continue;
+        }
+        lv_crew = gv_baseGasCrew[lv_s];
+        for (lv_j = UnitGroupCount(lv_crew, c_unitCountAll); lv_j >= 1; lv_j -= 1) {
+            lv_w = UnitGroupUnit(lv_crew, lv_j);
+            if (!gf_BaseGasAtWork(lv_w, lv_b)) {
+                UnitGroupRemove(lv_crew, lv_w);
+                gf_BaseGasRelease(lv_w);
+            }
+        }
+        while (UnitGroupCount(lv_crew, c_unitCountAll) < c_BASE_GAS_CREW) {
+            lv_w = gf_BaseGasPickWorker(lp_player, UnitGetPosition(lv_b));
+            if (lv_w == null || !UnitIssueOrder(lv_w, OrderTargetingUnit(AbilityCommand(gf_BaseGasHarvest(lp_player), 0), lv_b), c_orderQueueReplace)) {
+                break;
+            }
+            UnitGroupAdd(lv_crew, lv_w);
+            gv_baseGasGathers[lp_player] += 1;
+        }
+    }
+}
+
+// A gas building that is gone gives its slot and its crew back.
+void gf_BaseGasSweep () {
+    int lv_s;
+
+    for (lv_s = 0; lv_s < c_BASE_GAS_MAX; lv_s += 1) {
+        if (gv_baseGasUnit[lv_s] != null && !UnitIsAlive(gv_baseGasUnit[lv_s])) {
+            gf_BaseGasFree(lv_s);
+        }
+    }
+}
+
+bool gt_BaseGas_Func (bool testConds, bool runActions) {
+    int lv_p;
+
+    if (!runActions) {
+        return true;
+    }
+    gf_BaseGasSweep();
+    for (lv_p = 1; lv_p < c_BASE_AI_PLAYERS; lv_p += 1) {
+        if (gv_baseAiStarted[lv_p] && gf_BaseAiIsAiPlayer(lv_p)) {
+            gf_BaseGasStaff(lv_p);
+            gf_BaseGasBuild(lv_p);
+        }
+    }
+    return true;
+}
+
+// An owner's AI has started: its first gas build is c_BASE_GAS_FIRST away.
+void gf_BaseGasStart (int lp_player) {
+    gv_baseGasNext[lp_player] = GameGetMissionTime() + c_BASE_GAS_FIRST;
+    if (gv_baseGasOn) {
+        return;
+    }
+    gv_baseGasOn = true;
+    gt_BaseGas = TriggerCreate("gt_BaseGas_Func");
+    TriggerAddEventTimePeriodic(gt_BaseGas, c_BASE_GAS_TICK, c_timeGame);
+}

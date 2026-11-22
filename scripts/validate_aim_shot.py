@@ -18,6 +18,14 @@ HERO_WEAPONS = ("Tosh", "RazorTalons", "QueenOfBladesPsiBlast")
 FRIENDLY_FIRE_BEHAVIOR = "SCOBAFriendlyFireBlock"
 
 HERO_UNITS = ("ToshSCOBA", "KerriganSCOBA")
+# Operator 2026-11-22: Psi Blast is Kerrigan's only attack. Her stock slot 1
+# (RazorTalons) is replaced; slot 0 is the stock QueenOfBladesPsiBlast.
+KERRIGAN_WEAPON_SLOTS = [("1", "QueenOfBladesPsiBlastAuto")]
+# Operator 2026-11-22: the missile's impact effect gets the target unit
+# (R-TPS-64), and Kerrigan has no Poison Nova (R-TPS-65).
+PSI_BLAST_LAUNCH = "PsiBlastLaunchMissile"
+KERRIGAN_UNITS = ("Kerrigan", "KerriganSCOBA")
+KERRIGAN_REMOVED_ABILITY = "PoisonNova"
 
 # The Tosh shot that ends in the air (R-TPS-62).
 AIR_EFFECT = "SCOBAToshAirU"
@@ -74,6 +82,42 @@ def check_link(cooldown: ET.Element | None, owner: str) -> ET.Element:
     return cooldown
 
 
+def check_kerrigan_weapons(gamedata: Path, weapons: dict) -> None:
+    """Psi Blast only, at any distance: no talons slot, no minimum range."""
+    unit = ET.parse(gamedata / "UnitData.xml").getroot().find("CUnit[@id='KerriganSCOBA']")
+    if unit is None:
+        fail("missing unit: KerriganSCOBA")
+    slots = [(slot.get("index"), slot.get("Link")) for slot in unit.findall("WeaponArray")]
+    if slots != KERRIGAN_WEAPON_SLOTS:
+        fail(f"KerriganSCOBA weapon slots must be {KERRIGAN_WEAPON_SLOTS} (Psi Blast only), got {slots}")
+    minimum = weapons["QueenOfBladesPsiBlast"].find("MinimumRange")
+    if minimum is None or float(minimum.get("value")) != 0.0:
+        fail("QueenOfBladesPsiBlast must have MinimumRange 0: it is Kerrigan's only attack")
+    if weapons["QueenOfBladesPsiBlastAuto"].find("MinimumRange") is not None:
+        fail("QueenOfBladesPsiBlastAuto must inherit the minimum range")
+
+
+def check_kerrigan_psi_blast(gamedata: Path) -> None:
+    """Psi Blast hurts the unit it reaches; no Poison Nova on Kerrigan."""
+    effects = ET.parse(gamedata / "EffectData.xml").getroot()
+    # The missile effect is stock: the map may override none of these.
+    # LaunchEffect: an effect on the caster inside the missile tree drew
+    # the missile at the shooter (operator 2026-11-22).
+    for launch in effects.findall(f"CEffectLaunchMissile[@id='{PSI_BLAST_LAUNCH}']"):
+        for field in ("ImpactLocation", "LaunchLocation", "LaunchOffset", "LaunchEffect"):
+            if launch.find(field) is not None:
+                fail(f"{PSI_BLAST_LAUNCH} must keep the stock {field}")
+    units = ET.parse(gamedata / "UnitData.xml").getroot()
+    for unit_id in KERRIGAN_UNITS:
+        unit = units.find(f"CUnit[@id='{unit_id}']")
+        if unit is None:
+            fail(f"missing unit: {unit_id}")
+        links = [element.get("Link") for element in unit.findall("AbilArray")]
+        commands = [element.get("AbilCmd", "").split(",")[0] for element in unit.iter("LayoutButtons")]
+        if KERRIGAN_REMOVED_ABILITY in links or KERRIGAN_REMOVED_ABILITY in commands:
+            fail(f"{unit_id} must not carry {KERRIGAN_REMOVED_ABILITY}: ability or button found")
+
+
 def check_aim_shot_data(map_dir: Path) -> None:
     gamedata = map_dir / GAMEDATA
     abilities = {
@@ -101,6 +145,8 @@ def check_aim_shot_data(map_dir: Path) -> None:
         if weapon is None:
             fail(f"missing weapon override: {weapon_id}")
         check_link(weapon.find("Cost/Cooldown"), weapon_id)
+    check_kerrigan_weapons(gamedata, weapons)
+    check_kerrigan_psi_blast(gamedata)
 
     for name in ("AbilData.xml", "EffectData.xml", "ActorData.xml", "UnitData.xml"):
         text = read(gamedata / name)

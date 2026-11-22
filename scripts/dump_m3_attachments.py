@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from project_root import project_root
-import character_anim_assets as assets
+from heroanim.rig import HEROES
 
 ROOT = project_root()
 sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
@@ -21,9 +21,8 @@ def main() -> int:
     parser.add_argument("--map", type=Path, default=ROOT / "out" / "SCOBA256.SC2Map")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
-    for name, data in assets.SOURCE_MODELS.items():
-        target = data[1]
-        model = m3.loadModel(str(args.map / target))
+    for name, rig in HEROES.items():
+        model = m3.loadModel(str(args.map / rig.target))
         if args.json:
             rows = [
                 {

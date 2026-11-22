@@ -7,7 +7,7 @@ TPS_SHOT_SECTIONS = (
     "tps_ff_enemy_tosh",
     "tps_ff_own_kerr",
     "tps_ff_enemy_kerr",
-    "tps_ff_own_talons",
+    "tps_ff_own_close",
     "tps_rng_kerr_05",
     "tps_rng_tosh_11",
 )

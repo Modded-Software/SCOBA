@@ -27,16 +27,15 @@ from hitvolumes.drop_path_check import check as check_drop_path
 from validate_aim_shot import TOSH_CLOCK, check_aim_shot_data, check_aim_shot_script
 from validate_assets import check_actor_events, check_control_icons, check_footfall_fx, check_skybox_flip, check_stamp
 from jumpanim.validate import check_jump
+from heroanim.rig import HEROES
+from heroanim.validate import check_heroes
 from validate_slow_deaths import check_slow_deaths
 from hitvolumes.validate_pod_actor import check_pod_actor
 from validate_tps_overlay import check_tps_overlay
 from hitvolumes.validate_intro import animation_actor_problems, intro_problems
 from terrain import sync_height
 
-GENERATED_MODELS = [
-    Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3",
-    Path("Assets") / "Units" / "Zerg" / "Kerrigan" / "KerriganSCOBA.m3",
-]
+GENERATED_MODELS = [rig.target for rig in HEROES.values()]
 
 NATIVE_GROUPS = (
     "Attack",
@@ -60,10 +59,7 @@ GAMEPLAY_ACTORS = (
     ("KerriganSCOBAUnit", "KerriganSCOBA", "KerriganSCOBA"),
 )
 
-AIM_ATTACK_PITCH = {
-    Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3": "BoneSpine01",
-    Path("Assets") / "Units" / "Zerg" / "Kerrigan" / "KerriganSCOBA.m3": "Bone07",
-}
+AIM_ATTACK_PITCH = {rig.target: rig.pitch_bones[0] for rig in HEROES.values()}
 
 ANIM_CONFIG_RE = re.compile(r'gf_AnimConfig(?:Upper|Lower)\([^,]+,[^,]+,\s*"([^"]+)"')
 HERO_CONFIG_RE = re.compile(
@@ -325,9 +321,12 @@ def check_catalogs(map_dir: Path) -> None:
     talons = effects.find("CEffectCreatePersistent[@id='RazorTalonsPersistent']/InitialEffect")
     if talons is None or talons.get("value") != "SCOBAAttackCooldown15":
         fail("RazorTalonsPersistent must start SCOBAAttackCooldown15")
-    psi = effects.find("CEffectLaunchMissile[@id='PsiBlastLaunchMissile']/LaunchEffect")
-    if psi is None or psi.get("value") != "SCOBAAttackCooldown10":
-        fail("PsiBlastLaunchMissile must start SCOBAAttackCooldown10")
+    psi_effect = weapon_tree.getroot().find("CWeaponLegacy[@id='QueenOfBladesPsiBlast']/Effect")
+    if psi_effect is None or psi_effect.get("value") != "SCOBAPsiBlastShot":
+        fail("QueenOfBladesPsiBlast must fire SCOBAPsiBlastShot")
+    psi_set = [e.get("value") for e in effects.findall("CEffectSet[@id='SCOBAPsiBlastShot']/EffectArray")]
+    if psi_set != ["PsiBlastLaunchMissile", "SCOBAAttackCooldown10"]:
+        fail("SCOBAPsiBlastShot must run PsiBlastLaunchMissile and SCOBAAttackCooldown10")
 
 
 def galaxy_text(map_dir: Path) -> str:
@@ -480,6 +479,7 @@ def main() -> int:
     for problem in animation_actor_problems(map_dir, GAMEPLAY_ACTORS):
         fail(problem)
     check_jump(map_dir, galaxy_text(map_dir))
+    check_heroes(map_dir, galaxy_text(map_dir), fail)
     check_slow_deaths(map_dir)
     for problem in check_pod_actor(map_dir):
         fail(problem)

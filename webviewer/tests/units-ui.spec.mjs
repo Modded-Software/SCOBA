@@ -72,7 +72,8 @@ test('the unit panel opens first and lists units with names and icons', async ({
   await expect(page.locator('#units li').first()).toHaveAttribute('data-id', 'Zergling');
   // The icon is a real image that loaded.
   const icon = zergling.locator('img.icon');
-  await expect(icon).toHaveAttribute('src', '/icon/btn-unit-zerg-zergling.png');
+  // Icons are served per dataset (datasets-api.spec.mjs).
+  await expect(icon).toHaveAttribute('src', '/icon/btn-unit-zerg-zergling.png?dataset=scoba');
   await expect.poll(() => icon.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   const filtered = Number.parseInt(await page.locator('#unit-count').textContent(), 10);
   expect(filtered).toBeLessThan(total);
@@ -119,7 +120,7 @@ test('selecting a unit shows a preview with portrait and data, and adds it', asy
   await expect(page.locator('#preview .facts')).toContainText('Terran');
   await expect(page.locator('#preview .facts')).toContainText('scale');
   const portrait = page.locator('#preview img.portrait');
-  await expect(portrait).toHaveAttribute('src', /^\/icon\/.+\.png$/);
+  await expect(portrait).toHaveAttribute('src', /^\/icon\/.+\.png\?dataset=scoba$/);
   await expect.poll(() => portrait.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   // Selecting does not add.
   expect((await state(page)).items).toEqual([]);
@@ -132,7 +133,7 @@ test('selecting a unit shows a preview with portrait and data, and adds it', asy
   expect(s.items[0].texturesLoaded).toBeGreaterThan(0);
   const sceneRow = page.locator('#scene li').first();
   await expect(sceneRow.locator('.name')).toContainText('Marine');
-  await expect(sceneRow.locator('img.icon')).toHaveAttribute('src', '/icon/btn-unit-terran-marine.png');
+  await expect(sceneRow.locator('img.icon')).toHaveAttribute('src', '/icon/btn-unit-terran-marine.png?dataset=scoba');
   expect((await pixels(page)).covered).toBeGreaterThan(500);
   expect(problems).toEqual([]);
 });
@@ -143,7 +144,7 @@ test('a unit with no portrait image previews with its icon', async ({ page }) =>
   expect((await unitData(page, 'Barracks')).portrait).toBeNull();
   await find(page, 'barracks', 'Barracks');
   const portrait = page.locator('#preview img.portrait');
-  await expect(portrait).toHaveAttribute('src', '/icon/btn-building-terran-barracks.png');
+  await expect(portrait).toHaveAttribute('src', '/icon/btn-building-terran-barracks.png?dataset=scoba');
   await expect.poll(() => portrait.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   expect(problems).toEqual([]);
 });
@@ -218,11 +219,17 @@ test('a drop above the horizon places nothing and says why', async ({ page }) =>
   expect(problems).toEqual([]);
 });
 
-test('double-click adds a unit', async ({ page }) => {
+test('the preview\'s "add to scene" adds a unit; a double-click on the row does not', async ({ page }) => {
   const problems = watch(page);
   await open(page);
   await page.fill('#unit-search', 'zergling');
+  // Negative: a double-click opens the texture window (texture-window.spec) and adds nothing.
   await row(page, 'Zergling').dblclick();
+  await expect(page.locator('#texture-window')).toBeVisible();
+  await expect(page.locator('#preview .name')).toHaveText('Zergling');
+  expect((await state(page)).items).toEqual([]);
+  await page.click('#texture-window .window-close');
+  await page.click('#preview-add');
   await expect(page.locator('#scene li')).toHaveCount(1);
   await idle(page);
   const s = await state(page);

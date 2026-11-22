@@ -236,11 +236,28 @@ void gf_AnimAimPitchTick (int lp_player) {
     lv_clip = gf_AnimAimPitchClip(lv_step);
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, c_animFlagPlayForever, 0.06, 0.06, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    gf_AnimAimBreathSync(lp_player, lv_hero);
     gv_animAimPitchStep[lp_player] = lv_step;
     gv_animAimPitchTime[lp_player] = lv_time;
     gv_animAimPitchSends[lp_player] += 1;
     gf_AnimEvent(lp_player, "pitch_step", lv_clip, lv_step);
     gf_ProbeSetUpperClip(lp_player, lv_clip);
+}
+
+// Aim pose breathing (R-TPS-19). A new pitch step is a new clip and would
+// start its breath over. Every pitch clip of a hero is one breath long, so
+// the new clip is set to the game clock's place in the breath: the breath
+// runs on across pitch steps.
+void gf_AnimAimBreathSync (int lp_player, unit lp_hero) {
+    fixed lv_period;
+
+    lv_period = gv_animBreathPeriod[gf_AnimHeroProfile(lp_hero)];
+    if (lv_period <= 0.0) {
+        return;
+    }
+    gv_animBreathPhase[lp_player] = ModF(TimerGetElapsed(gv_sCOBA_Clock), lv_period);
+    ActorSend(libNtve_gf_MainActorofUnit(lp_hero), "AnimSetTime " + c_ANIM_BRACKET_UPPER + " " + FixedToString(gv_animBreathPhase[lp_player], c_fixedPrecisionAny) + " 0");
+    gv_animBreathSyncs[lp_player] += 1;
 }
 
 int gf_AnimTargetPitchKey (fixed lp_pitch) {
@@ -282,6 +299,7 @@ void gf_AnimTargetPitchApply (int lp_player, int lp_step) {
     lv_clip = gf_AnimAimPitchClip(lp_step);
     lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
     ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_UPPER, lv_clip, c_animFlagPlayForever, 0.06, 0.06, c_animTimeDefault, c_animTimeVariantAsAutomatic));
+    gf_AnimAimBreathSync(lp_player, lv_hero);
     gv_animTargetPitchStep[lp_player] = lp_step;
     gv_animTargetPitchTime[lp_player] = ((lp_step - 1) * c_ANIM_AIM_PITCH_TIME) / (c_ANIM_AIM_PITCH_STEPS - 1);
     gf_AnimEvent(lp_player, "target_pitch_step", lv_clip, lp_step);

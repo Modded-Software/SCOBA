@@ -71,7 +71,7 @@ test('a skybox unit added alone becomes the sky and is not placed', async ({ pag
   expect(errors).toEqual([]);
 });
 
-test('add all on Terran Campaign units (the operator\'s 142): the dialog names the skybox units left out; the run places none of them', async ({ page }) => {
+test('add all on Terran Campaign units (the operator\'s 142): the dialog names the skybox units left out; the run places none of them @slow', async ({ page }) => {
   test.setTimeout(300_000);
   const errors = await open(page);
   const listed = await units(page, { family: 'Campaign', race: 'Terran', kind: 'Unit' });
