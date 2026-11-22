@@ -50,15 +50,15 @@ test('a status message shows at the top centre of the view, not in the gallery, 
   const errors = await open(page);
   const [marine] = await place(page, [['Marine', 0, 0]]);
   // The add said "loading Marine"; with the add done, the toast goes down after that
-  // message's minimum second. Negative: nothing in the gallery either way.
+  // message's minimum 0.1 s. Negative: nothing in the gallery either way.
   expect((await page.evaluate(() => window.SC2App.statusLog())).shown).toEqual(['loading Marine']);
   await expect.poll(async () => (await status(page)).up, { timeout: 6000 }).toBe(false);
-  // It went down as a finished message (at least 1 s, as long as the add took),
+  // It went down as a finished message (at least 0.1 s, as long as the add took),
   // not after a message's full 5 s. Timed in the page, so a slow test run does not count.
   const done = await page.evaluate(() => window.SC2App.statusLog());
   console.log('loading message up ms', done.lastUpMs);
   expect(done.shown).toEqual(['loading Marine']);
-  expect(done.lastUpMs).toBeGreaterThanOrEqual(1000);
+  expect(done.lastUpMs).toBeGreaterThanOrEqual(100);
   expect(done.lastUpMs).toBeLessThan(4500);
   await expect(page.locator('#status')).toBeHidden();
   await expect(page.locator('#panel #status, #side #status')).toHaveCount(0);
@@ -86,13 +86,13 @@ test('a status message shows at the top centre of the view, not in the gallery, 
   expect(errors).toEqual([]);
 });
 
-test('a failure shows as a failure; a click takes the message down; it re-centres when a drawer closes', async ({ page }) => {
+test('a failure shows as a failure; it re-centres when a drawer closes; a click opens the message log and takes the toast down', async ({ page }) => {
   const errors = await open(page);
   // The add must fail: its error message is read, and a success is a test failure.
   const failure = await page.evaluate(() => window.sc2viewer.add('nope.m3').then(() => 'added', (error) => `failed: ${error.message}`));
   console.log('add nope.m3:', failure);
   expect(failure).toMatch(/^failed: /);
-  // "loading nope.m3" shows first, its minimum second; then the failure replaces it.
+  // "loading nope.m3" shows first, its minimum 0.1 s; then the failure replaces it.
   await expect.poll(async () => (await status(page)).failure, { timeout: 3000 }).toBe(true);
   expect((await status(page)).up).toBe(true);
   await expect(page.locator('#status')).toContainText('nope.m3');
@@ -102,14 +102,27 @@ test('a failure shows as a failure; a click takes the message down; it re-centre
   await settled(page);
   expect((await visible(page)).left).toBe(0);
   await expectCentred(page);
-  // A click takes it down at once.
+  // A click opens the log and takes the toast down at once.
   await page.locator('#status').click();
   expect((await status(page)).up).toBe(false);
+  const log = page.locator('#status-log-dialog');
+  await expect(log).toBeVisible();
+  // "loading nope.m3", then the failures (the renderer's fetch error and the add's).
+  const rows = await log.locator('li').evaluateAll((list) => list.map((li) => ({ text: li.querySelector('.text').textContent, failure: li.classList.contains('failure') })));
+  console.log('log rows', JSON.stringify(rows));
+  expect(rows[0]).toEqual({ text: 'loading nope.m3', failure: false });
+  expect(rows.length).toBeGreaterThanOrEqual(2);
+  for (const row of rows.slice(1)) {
+    expect(row.failure).toBe(true);
+    expect(row.text).toContain('nope.m3');
+  }
+  await page.keyboard.press('Escape');
+  await expect(log).toBeHidden();
   // The failure was logged by the viewer and the browser's 404 (both expected here); nothing else.
   expect(errors.filter((e) => !e.includes('nope.m3') && !e.includes('status of 404 (Not Found)'))).toEqual([]);
 });
 
-test('messages in a row replace each other with the toast up; each shows at least 1 s', async ({ page }) => {
+test('messages in a row replace each other with the toast up; each shows at least 0.1 s', async ({ page }) => {
   const errors = await open(page);
   // Watch the toast in the page: every text change and every "up" change, with the time.
   await page.evaluate(() => {
@@ -134,18 +147,78 @@ test('messages in a row replace each other with the toast up; each shows at leas
   console.log('trace', JSON.stringify(trace.map((e) => [Math.round(e.t - trace[0].t), e.text, e.up])));
   expect(trace.filter((e) => !e.up && e.text === 'four')).toEqual([]);
   expect(ups.every((e) => e.up)).toBe(true);
-  // Each text stayed at least 1 s (a little less for timer rounding) before the next.
+  // Each text stayed at least 0.1 s (a little less for timer rounding) before the next,
+  // and not the old 1 s: the ones waiting move on at the minimum.
   const firsts = ['one', 'two', 'three', 'four'].map((text) => trace.find((e) => e.text === text).t);
-  for (let i = 1; i < firsts.length; i++) expect(firsts[i] - firsts[i - 1], `${i}`).toBeGreaterThanOrEqual(980);
+  for (let i = 1; i < firsts.length; i++) {
+    expect(firsts[i] - firsts[i - 1], `${i}`).toBeGreaterThanOrEqual(90);
+    expect(firsts[i] - firsts[i - 1], `${i}`).toBeLessThan(900);
+  }
   // The failure kept its look only while it was shown.
   expect((await status(page)).failure).toBe(false);
   // Negative: a lone empty text with the toast down does nothing.
   await page.locator('#status').click();
+  await page.keyboard.press('Escape');
   await page.evaluate(() => window.SC2App.setStatus(''));
   await page.waitForTimeout(300);
   expect((await status(page)).up).toBe(false);
   expect((await page.evaluate(() => window.SC2App.statusLog())).shown).toHaveLength(4);
   expect(errors).toEqual([]);
+});
+
+test('the message log holds every message, in order, with its time and failure mark, and grows while open', async ({ page }) => {
+  const errors = await open(page);
+  const log = page.locator('#status-log-dialog');
+  // Negative: nothing opens it but a click on the toast.
+  await expect(log).toBeHidden();
+  const before = await page.locator('#status-log-dialog li').count();
+  await page.evaluate(() => {
+    window.SC2App.setStatus('alpha');
+    window.SC2App.setStatus('beta', { failure: true });
+    window.SC2App.setStatus('gamma');
+  });
+  await page.locator('#status').click();
+  await expect(log).toBeVisible();
+  const rows = log.locator('li');
+  // Every message, also the ones still waiting when the toast was clicked.
+  await expect(rows).toHaveCount(before + 3);
+  const texts = await rows.locator('.text').allTextContents();
+  expect(texts.slice(-3)).toEqual(['alpha', 'beta', 'gamma']);
+  expect(await rows.evaluateAll((list) => list.slice(-3).map((li) => li.classList.contains('failure')))).toEqual([false, true, false]);
+  // Each row has a clock time.
+  for (const time of (await rows.locator('time').allTextContents()).slice(-3)) expect(time).toMatch(/^\d\d:\d\d:\d\d\.\d$/);
+  // A message while the log is open joins it at the end.
+  await page.evaluate(() => window.SC2App.setStatus('delta'));
+  await expect(rows).toHaveCount(before + 4);
+  await expect(rows.last().locator('.text')).toHaveText('delta');
+  // The close button closes it; the history stays for the next look.
+  await log.locator('.dialog-close').click();
+  await expect(log).toBeHidden();
+  await page.evaluate(() => window.SC2App.setStatus('epsilon'));
+  await page.locator('#status').click();
+  await expect(rows).toHaveCount(before + 5);
+  await page.keyboard.press('Escape');
+  expect(errors).toEqual([]);
+});
+
+test('a page module that does not load is reported as a failure, naming the file', async ({ page }) => {
+  const problems = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') problems.push(m.text());
+  });
+  // The drawer tabs died this way: a server that did not serve side.js.
+  await page.route('**/js/side.js', (route) => route.fulfill({ status: 404, body: 'not found' }));
+  await page.goto('/');
+  await expect.poll(() => page.evaluate(() => window.SC2App.statusLog().shown.some((t) => t.includes('/js/side.js'))), { timeout: 10_000 }).toBe(true);
+  const shown = (await page.evaluate(() => window.SC2App.statusLog())).shown.filter((t) => t.includes('/js/side.js'));
+  console.log('reported', JSON.stringify(shown), JSON.stringify(problems));
+  expect(shown[0]).toMatch(/did not load/);
+  expect(problems.some((p) => p.includes('/js/side.js'))).toBe(true);
+  // Negative: a normal load reports no module.
+  await page.unroute('**/js/side.js');
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  expect((await page.evaluate(() => window.SC2App.statusLog())).shown.filter((t) => t.includes('did not load'))).toEqual([]);
 });
 
 test('the instance search hides the rows that do not match, and only the rows', async ({ page }) => {

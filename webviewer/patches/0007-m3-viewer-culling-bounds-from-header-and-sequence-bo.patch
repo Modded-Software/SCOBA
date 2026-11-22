@@ -1,7 +1,7 @@
 From ea993250fed21698a169ea6c3d2788835996e910 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 13:48:20 +0200
-Subject: [PATCH 07/27] m3 viewer: culling bounds from header and sequence
+Subject: [PATCH 07/28] m3 viewer: culling bounds from header and sequence
  boxes and rest-pose vertices
 
 ---

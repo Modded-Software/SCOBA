@@ -169,6 +169,7 @@ test('dragging a unit onto the canvas places it where it is dropped', async ({ p
     expect(x, detail).toBeLessThan(p.maxX + 10);
     expect(Math.abs(p.maxY - y), detail).toBeLessThan(45);
     await page.locator('#clear').click();
+    await page.locator('#clear-yes').click();
   }
 
   // Two drops make two units at two different places.
@@ -255,6 +256,7 @@ test('a placed unit takes its scale from the unit data', async ({ page }) => {
 
   // The same model file with no unit data draws at scale 1: a different size.
   await page.locator('#clear').click();
+  await page.locator('#clear-yes').click();
   await page.evaluate((path) => window.sc2viewer.add(path), data.file);
   await idle(page);
   const raw = (await state(page)).items[0];
@@ -268,6 +270,7 @@ test('a placed unit takes its scale from the unit data', async ({ page }) => {
 
   // The scale input multiplies the data scale.
   await page.locator('#clear').click();
+  await page.locator('#clear-yes').click();
   await addUnit(page, 'ultralisk', 'Ultralisk');
   const input = page.locator('#scene li').first().locator('input.scale');
   await expect(input).toHaveValue('1');

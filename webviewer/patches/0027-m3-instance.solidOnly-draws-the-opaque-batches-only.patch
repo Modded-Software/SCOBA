@@ -1,7 +1,7 @@
 From 4fc8b342c263ff181a64f4d718b13e561c50a2d2 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sun, 22 Nov 2026 13:13:41 +0200
-Subject: [PATCH 27/27] m3: instance.solidOnly draws the opaque batches only
+Subject: [PATCH 27/28] m3: instance.solidOnly draws the opaque batches only
 
 For tests: the picture of the solid parts alone, to compare with what renderPick draws.
 ---

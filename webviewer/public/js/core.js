@@ -11,13 +11,45 @@
   const statusToast = new SC2Components.Toast({ id: 'status', place: 'top', role: 'status' });
   const STATUS_MS = 5000; // a message stays up this long
   const FAILURE_MS = 9000; // a failure stays up longer
-  const STATUS_MIN_MS = 1000; // every message shows at least this long (operator 2026-11-22)
+  const STATUS_MIN_MS = 100; // every message shows at least this long (operator 2026-11-22: 0.1 s)
   let statusTimer = null; // the next step: show the next message, or take the toast down
   let statusShownAt = 0; // when the shown message went up (performance.now)
   /** Messages waiting for the shown one's STATUS_MIN_MS: { text, failure }. */
   const statusQueue = [];
   /** For the tests: every message put on the toast, in order. */
   const statusLog = [];
+
+  // The message log: every message given to setStatus since the page
+  // loaded, with its clock time, in a dialog a click on the toast opens.
+  const logDialog = new SC2Components.Dialog({ id: 'status-log-dialog', title: 'messages' });
+  const logList = document.createElement('ul');
+  logList.id = 'status-log';
+  logList.className = 'rows';
+  logDialog.body.append(logList);
+  const two = (n) => String(n).padStart(2, '0');
+  const clock = (d) => `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}.${Math.floor(d.getMilliseconds() / 100)}`;
+
+  function logMessage(text, failure) {
+    const time = document.createElement('time');
+    const now = new Date();
+    time.dateTime = now.toISOString();
+    time.textContent = clock(now);
+    const body = document.createElement('span');
+    body.className = 'text';
+    body.textContent = text;
+    const row = document.createElement('li');
+    row.classList.toggle('failure', failure);
+    row.append(time, body);
+    // Keep the newest in sight when the log is open at its end.
+    const atEnd = logList.scrollTop + logList.clientHeight >= logList.scrollHeight - 2;
+    logList.append(row);
+    if (atEnd) logList.scrollTop = logList.scrollHeight;
+  }
+
+  function openLog() {
+    logDialog.open();
+    logList.scrollTop = logList.scrollHeight;
+  }
   /** For the tests: how long the last message was up when the toast went down by itself (ms), or null. */
   let statusLastUpMs = null;
 
@@ -144,7 +176,8 @@
    * then replaces the text with the toast still up. No message is dropped.
    * An empty text says the last message is over: it lasts only its
    * STATUS_MIN_MS (waiting or shown), and the toast goes down after it unless
-   * another message comes. A click on the toast takes it down at once.
+   * another message comes. Every message goes into the message log at once.
+   * A click on the toast opens the log and takes the toast down.
    */
   function setStatus(text, { failure = false } = {}) {
     if (!text) {
@@ -152,10 +185,29 @@
       else if (statusToast.isUp) schedule(STATUS_MIN_MS - (performance.now() - statusShownAt), pumpStatus);
       return;
     }
+    logMessage(text, failure);
     statusQueue.push({ text, failure, brief: false });
     if (!statusToast.isUp || statusQueue.length === 1) pumpStatus();
   }
-  statusToast.node.addEventListener('click', dropStatus);
+  statusToast.node.addEventListener('click', () => {
+    dropStatus();
+    openLog();
+  });
+  statusToast.node.title = 'click: all messages';
+
+  // A page module (js/*.js) that does not load leaves its part of the page
+  // dead without a word: say so. Script load errors do not bubble: capture.
+  window.addEventListener(
+    'error',
+    (e) => {
+      const node = e.target;
+      if (!(node instanceof HTMLScriptElement)) return;
+      const src = new URL(node.src, location.href).pathname;
+      console.error(`sc2viewer: page module did not load: ${src}`);
+      setStatus(`page module did not load: ${src}; restart the viewer server`, { failure: true });
+    },
+    true,
+  );
 
   /**
    * End of the line for a failed user action (add, drop, pick a sky): the

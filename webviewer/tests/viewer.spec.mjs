@@ -345,12 +345,51 @@ test('a model that fails to load is reported and not added', async ({ page }) =>
   await expect(page.locator('#scene li')).toHaveCount(1);
 });
 
+test('clear asks first; cancel, Escape and the backdrop keep everything', async ({ page }) => {
+  const problems = watch(page);
+  await open(page);
+  await addByUi(page, 'terran\\marine\\marine.m3', MARINE);
+  await addByUi(page, 'protoss\\zealot\\zealot.m3', ZEALOT);
+  const hash = await page.evaluate(() => location.hash);
+  const dialog = page.locator('#clear-dialog');
+  await page.locator('#clear').click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('2 instances');
+  // Nothing goes while the question is open.
+  expect((await state(page)).items.length).toBe(2);
+  await page.locator('#clear-no').click();
+  await expect(dialog).toBeHidden();
+  await page.locator('#clear').click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await page.locator('#clear').click();
+  const box = await dialog.boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height + 40);
+  await expect(dialog).toBeHidden();
+  const s = await state(page);
+  expect(s.items.map((i) => i.path)).toEqual([MARINE, ZEALOT]);
+  expect(s.sceneInstances).toBe(2);
+  expect(await page.evaluate(() => location.hash)).toBe(hash);
+  expect(problems).toEqual([]);
+});
+
+test('clear with an empty scene asks nothing and removes nothing', async ({ page }) => {
+  const problems = watch(page);
+  await open(page);
+  await page.locator('#clear').click();
+  await expect(page.locator('#clear-dialog')).toBeHidden();
+  expect((await state(page)).items).toEqual([]);
+  expect(problems).toEqual([]);
+});
+
 test('clear empties the scene and the URL', async ({ page }) => {
   const problems = watch(page);
   await open(page);
   await addByUi(page, 'terran\\marine\\marine.m3', MARINE);
   await addByUi(page, 'protoss\\zealot\\zealot.m3', ZEALOT);
   await page.locator('#clear').click();
+  await page.locator('#clear-yes').click();
+  await expect(page.locator('#clear-dialog')).toBeHidden();
   await expect(page.locator('#scene li')).toHaveCount(0);
   const s = await state(page);
   expect(s.items).toEqual([]);

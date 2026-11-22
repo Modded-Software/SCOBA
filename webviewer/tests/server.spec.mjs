@@ -74,3 +74,20 @@ test('unknown and unsafe paths are refused', async ({ request }) => {
   expect((await request.get('/../server.mjs')).status()).toBe(404);
   expect((await request.get('/%2e%2e/server.mjs')).status()).toBe(404);
 });
+
+test('every page module in public/js is served, read at request time; nothing else under /js/', async ({ request }) => {
+  // Each script index.html names is served: a module added after the
+  // server started is not a 404 (the drawer tabs died that way, 2026-11-22).
+  const page = await (await request.get('/')).text();
+  const scripts = [...page.matchAll(/<script src="(\/js\/[^"]+)"/g)].map((m) => m[1]);
+  expect(scripts.length).toBeGreaterThan(10);
+  for (const src of scripts) {
+    const res = await request.get(src);
+    expect(res.status(), src).toBe(200);
+    expect(res.headers()['content-type'], src).toContain('text/javascript');
+  }
+  // Negative: no such module; not a module name; out of public/js.
+  for (const path of ['/js/nope.js', '/js/Core.js', '/js/core.mjs', '/js/../server.mjs', '/js/%2e%2e/server.mjs', '/js/..%2Fserver.mjs', '/js/sub/core.js', '/js/.js']) {
+    expect((await request.get(path)).status(), path).toBe(404);
+  }
+});

@@ -61,6 +61,16 @@ layers. Survey run 2026-11-21 (`constantColour`): diffuse 603, emissive
 With a texture the flag has no effect. Not applied: an animated colour
 (A6) plays its rest value.
 
+Alpha test, cut-out (former M2; `cutout.spec`, patch 0028): a standard
+material with `alphaTestThreshold` t > 0 draws only where the product of
+its alpha-mask layers is at least min(t / 255, 1); the rest is discarded,
+in the pick draw too, so a cut-away pixel takes no mouse hit. The diffuse
+alpha does not count. Rule from WhiteoutFlakes `m3_surface_table.cpp` and
+`m3_standard.slang` (alpha < threshold is discarded, equal survives).
+Operator report 2026-11-22: the vine and leaf cards of Zerus Large Tree
+drew as dark rectangles (vines 150, leaves 200). Measured: 309 of 1072
+samples of the tree are cut away, none added.
+
 ## Gaps by count
 
 ### Material types not drawn (`T*`)
@@ -104,7 +114,6 @@ With a texture the flag has no effect. Not applied: an animated colour
 | Id | Setting | Models | Uses |
 |---|---|---:|---:|
 | M1 | depth blend falloff (soft edges) | 779 | 2771 |
-| M2 | alpha cutout threshold | 534 | 1216 |
 | M8 | decal lighting, double lambert, clamp output | 142 | 241 |
 | M6 | depth prepass | 131 | 164 |
 | M7 | transparency depth effects | 80 | 236 |
@@ -209,9 +218,9 @@ feature used only by particle materials waits for particles.
    (779), flipbook A3 and U6 (464, 395), vertex alpha M5. Largest job.
 2. ~~**UV transform and animation (A2 659, A1 534).**~~ Done 2026-11-21
    (`uv-anim.spec`, see "Already supported").
-3. **Draw order and cutout (M3 698, M2 534).** Draw order done 2026-11-21
-   (`draw-order.spec`). Left: alpha cutout M2 for foliage and grilles.
-   Small.
+3. ~~**Draw order and cutout (M3 698, M2 534).**~~ Draw order done
+   2026-11-21 (`draw-order.spec`), cutout 2026-11-22 (`cutout.spec`); see
+   "Already supported".
 4. **Environment reflection and fresnel (L2 484, U2 408, U3 70, U7 33,
    F1 506).** Metal and glass shine, rim glows. Needs an environment map
    and the fresnel term (the shader holds a commented draft). Medium.

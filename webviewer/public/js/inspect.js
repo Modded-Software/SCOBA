@@ -56,6 +56,37 @@
     return count;
   }
 
+  /**
+   * Each material of one model: its name and its alpha test (the material's
+   * alphaTestThreshold / 255; 0 is no test), as the renderer draws it.
+   */
+  function alphaTests(itemId) {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) throw new Error(`no item ${itemId}`);
+    return item.model.materials[1].map((material) => ({ material: material.name, alphaTest: material.alphaTest }));
+  }
+
+  /** The alpha test each material was loaded with, kept while a test turns it off. */
+  const ownAlphaTest = new WeakMap();
+
+  /**
+   * Turn one model's alpha tests off, or back to the model's own, so a test
+   * can measure what the cut-out removes. Returns how many materials have a test.
+   */
+  function setAlphaTest(itemId, on) {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) throw new Error(`no item ${itemId}`);
+    let count = 0;
+    for (const material of item.model.materials[1]) {
+      if (typeof material.alphaTest !== 'number') continue;
+      if (!ownAlphaTest.has(material)) ownAlphaTest.set(material, material.alphaTest);
+      const own = ownAlphaTest.get(material);
+      material.alphaTest = on ? own : 0;
+      if (own > 0) count++;
+    }
+    return count;
+  }
+
   function itemState(item) {
     return {
       id: item.id,
@@ -413,5 +444,5 @@
     for (const item of app.items) item.instance.solidOnly = Boolean(on);
   }
 
-  Object.assign(app, { state, setConstantLayers, drawnAt, setSolidOnly, groundPixel, groundPixels, groundPeaks, worldToCanvas, mark, changedSinceMark, pixels, colorStats, gridLines, idle });
+  Object.assign(app, { state, setConstantLayers, alphaTests, setAlphaTest, drawnAt, setSolidOnly, groundPixel, groundPixels, groundPeaks, worldToCanvas, mark, changedSinceMark, pixels, colorStats, gridLines, idle });
 })();

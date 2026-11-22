@@ -60,6 +60,11 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 
 /* The status toast (core.js): top centre of the view. */
 #status { max-width: min(640px, 60vw); word-break: break-word; cursor: pointer; }
+/* Its message log (a click on the toast): oldest first, the newest at the bottom. */
+#status-log { max-height: 60vh; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+#status-log li { display: flex; gap: 10px; padding: 2px 4px; word-break: break-word; cursor: default; }
+#status-log time { flex: none; color: var(--dim); font-variant-numeric: tabular-nums; }
+#status-log li.failure .text { color: var(--warn); }
 
 /* ---- instances ---- */
 #scene-head { display: flex; justify-content: space-between; align-items: center; flex: none; padding-left: 4px; color: var(--dim); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }

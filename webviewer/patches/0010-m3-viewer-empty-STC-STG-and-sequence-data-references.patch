@@ -1,7 +1,7 @@
 From 64c9e8a9a33a2cbacde5b8c6706111ba39fccbb9 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 13:56:01 +0200
-Subject: [PATCH 10/27] m3 viewer: empty STC, STG and sequence data references
+Subject: [PATCH 10/28] m3 viewer: empty STC, STG and sequence data references
  load as empty lists
 
 ---

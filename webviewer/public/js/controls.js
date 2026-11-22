@@ -2,7 +2,8 @@
 // - left drag: grab the ground and pull it ("left click scrolls the map");
 //   ctrl + left with a unit selected turns that unit instead (pick.js);
 //   alt + left on a unit drags the unit over the ground instead, the point
-//   of the unit pressed staying under the mouse ("drag unit");
+//   of the unit pressed staying under the mouse ("drag unit"); on a
+//   selected unit every selected unit moves along by the same step;
 //   alt + left off any unit draws the select rectangle instead (select.js);
 //   a left or right click without a drag is handled by pick.js;
 // - middle drag: orbit around the ground point under the mouse;
@@ -123,7 +124,11 @@
     const hit = e.button === BUTTON.left && e.altKey ? app.hitAt(e.clientX, e.clientY) : null;
     if (hit) {
       const p = hit.point;
-      drag = { mode: 'move', ...at, item: hit.item, z: p[2], offset: [hit.item.x - p[0], hit.item.y - p[1]] };
+      // On a selected unit the others selected come along, each keeping its
+      // offset from the one pressed.
+      const ids = app.selectedIds();
+      const others = ids.includes(hit.item.id) ? app.items.filter((i) => i !== hit.item && ids.includes(i.id)).map((i) => ({ item: i, dx: i.x - hit.item.x, dy: i.y - hit.item.y })) : [];
+      drag = { mode: 'move', ...at, item: hit.item, others, z: p[2], offset: [hit.item.x - p[0], hit.item.y - p[1]] };
     } else if (e.button === BUTTON.left && e.altKey) {
       // Alt + left on the ground or the sky: the select rectangle (select.js).
       drag = { mode: 'rect', ...at };
@@ -162,7 +167,11 @@
     if (drag.mode === 'move') {
       // The ray above the plane's horizon: the unit waits where it is.
       const now = app.planeAt(e.clientX, e.clientY, drag.z);
-      if (now) app.setPosition(drag.item, now[0] + drag.offset[0], now[1] + drag.offset[1]);
+      if (!now) return;
+      const x = now[0] + drag.offset[0];
+      const y = now[1] + drag.offset[1];
+      app.setPosition(drag.item, x, y);
+      for (const o of drag.others) app.setPosition(o.item, x + o.dx, y + o.dy);
       return;
     }
     if (drag.mode === 'grab') {

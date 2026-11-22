@@ -1,0 +1,95 @@
+From ab39d0518413e337a97bc772bdac0b506c484279 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 19:52:53 +0200
+Subject: [PATCH 28/28] m3: alpha test (cut-out) from alphaTestThreshold
+
+A standard material with alphaTestThreshold t > 0 draws only where the product of its alpha-mask layers is at least min(t / 255, 1); the rest is discarded, also in the pick draw. Rule: WhiteoutFlakes m3_surface_table.cpp and m3_standard.slang.
+---
+ .../handlers/m3/shaders/standard.frag.ts      | 31 ++++++++++++-------
+ src/viewer/handlers/m3/standardmaterial.ts    |  8 +++++
+ 2 files changed, 28 insertions(+), 11 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/shaders/standard.frag.ts b/src/viewer/handlers/m3/shaders/standard.frag.ts
+index 2345fa6f..7e55150e 100644
+--- a/src/viewer/handlers/m3/shaders/standard.frag.ts
++++ b/src/viewer/handlers/m3/shaders/standard.frag.ts
+@@ -10,8 +10,28 @@ ${layers}
+ uniform float u_highlight;
+ // Picking: with alpha above 0 every pixel is drawn in this flat colour.
+ uniform vec4 u_pick;
++// Alpha test, 0 to 1 (0: none): where the alpha masks give less, nothing is
++// drawn (WhiteoutFlakes m3_standard.slang: discard when alpha < threshold).
++uniform float u_alphaTest;
+ 
+ void main() {
++  // Alpha comes from the alpha masks, not from the diffuse; blended
++  // materials use it, and the alpha test cuts by it.
++  float alpha = 1.0;
++
++  if (u_alphaMaskLayerSettings.enabled) {
++    alpha *= computeLayerColor(u_alphaMaskMap, u_alphaMaskLayerSettings).a;
++  }
++
++  if (u_alphaMask2LayerSettings.enabled) {
++    alpha *= computeLayerColor(u_alphaMask2Map, u_alphaMask2LayerSettings).a;
++  }
++
++  // Before the pick colour: a cut-away pixel takes no mouse hit either.
++  if (u_alphaTest > 0.0 && alpha < u_alphaTest) {
++    discard;
++  }
++
+   if (u_pick.a > 0.0) {
+     gl_FragColor = u_pick;
+     return;
+@@ -85,17 +105,6 @@ void main() {
+     final += emissiveColor * u_emisMult;
+   }
+ 
+-  // Alpha comes from the alpha masks; blended materials use it.
+-  float alpha = 1.0;
+-
+-  if (u_alphaMaskLayerSettings.enabled) {
+-    alpha *= computeLayerColor(u_alphaMaskMap, u_alphaMaskLayerSettings).a;
+-  }
+-
+-  if (u_alphaMask2LayerSettings.enabled) {
+-    alpha *= computeLayerColor(u_alphaMask2Map, u_alphaMask2LayerSettings).a;
+-  }
+-
+   final += (final * 0.5 + vec3(0.06)) * u_highlight;
+ 
+   gl_FragColor = vec4(final, alpha) * v_vertexColor;
+diff --git a/src/viewer/handlers/m3/standardmaterial.ts b/src/viewer/handlers/m3/standardmaterial.ts
+index 41de34a2..7d7a1811 100644
+--- a/src/viewer/handlers/m3/standardmaterial.ts
++++ b/src/viewer/handlers/m3/standardmaterial.ts
+@@ -29,6 +29,12 @@ export class M3StandardMaterial {
+   emisBlendType: number;
+   emisMode: number;
+   doubleSided: number;
++  /**
++   * Alpha test, 0 to 1: the material draws only where its alpha masks give
++   * at least this much (a cut-out). 0 is no test. From alphaTestThreshold,
++   * 0 to 255 (WhiteoutFlakes m3_surface_table.cpp).
++   */
++  alphaTest: number;
+   layers: M3Layer[];
+ 
+   constructor(model: M3Model, index: number, material: M3ParserStandardMaterial) {
+@@ -46,6 +52,7 @@ export class M3StandardMaterial {
+     this.emisBlendType = material.emisBlendType;
+     this.emisMode = material.emisMode;
+     this.doubleSided = material.flags & 0x8;
++    this.alphaTest = material.cutoutThreshold > 0 ? Math.min(material.cutoutThreshold / 255, 1) : 0;
+ 
+     this.layers = [
+       new M3Layer(this, 0, material.diffuseLayer, 'diffuse', 2),
+@@ -110,6 +117,7 @@ export class M3StandardMaterial {
+     gl.uniform4f(shader.uniforms['u_lightAmbient'], 0.35, 0.35, 0.35, 0);
+     // Material flag 0x10: unshaded, drawn at its texture colour.
+     gl.uniform1f(shader.uniforms['u_unshaded'], this.flags & 0x10 ? 1 : 0);
++    gl.uniform1f(shader.uniforms['u_alphaTest'], this.alphaTest);
+ 
+     const layers = this.layers;
+ 

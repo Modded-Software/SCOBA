@@ -5,6 +5,7 @@
 //   middle or the top of its column (pick.js cylinder) is inside on screen.
 //   A press released without a drag is a click (pick.js), not a rectangle.
 // - Delete removes the selected instances, unless a text field has the keys.
+// Copy, cut and paste of the selection: clipboard.js. Moving it: controls.js.
 'use strict';
 
 (() => {
@@ -61,11 +62,13 @@
     node.hidden = true;
   }
 
+  /** True when `target` is a field being edited: it keeps its own keys. */
+  const editingText = (t) => t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
+
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Delete') return;
-    const t = e.target;
     // A field being edited keeps its Delete key.
-    if (t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+    if (editingText(e.target)) return;
     const ids = app.selectedIds();
     if (!ids.length) return;
     e.preventDefault();
@@ -77,6 +80,7 @@
     startSelectRect: start,
     moveSelectRect: move,
     endSelectRect: end,
+    editingText,
     /** The rectangle while it is dragged, in page pixels, or null. */
     selectRect: () => (rect && dragged() ? box() : null),
   });

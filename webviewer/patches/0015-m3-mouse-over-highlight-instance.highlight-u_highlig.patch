@@ -1,7 +1,7 @@
 From 70e92ffcdb90c428fd3b3c7d8ebae50f38331739 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 14:33:28 +0200
-Subject: [PATCH 15/27] m3: mouse-over highlight (instance.highlight,
+Subject: [PATCH 15/28] m3: mouse-over highlight (instance.highlight,
  u_highlight)
 
 ---

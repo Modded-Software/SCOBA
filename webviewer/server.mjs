@@ -38,8 +38,7 @@ const SIGNATURE_AGE = 1000; // ms
 
 const STATIC = new Map([
   ['/', ['public/index.html', 'text/html; charset=utf-8']],
-  // The page modules, loaded in this order by index.html.
-  ...['core', 'side', 'datasets', 'controls', 'scene', 'panels', 'doodads', 'landmarks', 'addall', 'drag', 'sky', 'pick', 'select', 'inspect', 'textures', 'hd', 'main'].map((name) => [`/js/${name}.js`, [`public/js/${name}.js`, 'text/javascript; charset=utf-8']]),
+  // The page modules (public/js) are not listed: serveModule reads them.
   ['/components.js', ['public/components.js', 'text/javascript; charset=utf-8']],
   ['/ground.js', ['public/ground.js', 'text/javascript; charset=utf-8']],
   ['/outline.js', ['public/outline.js', 'text/javascript; charset=utf-8']],
@@ -324,6 +323,32 @@ function sendFile(res, full, type, cache) {
     .pipe(res);
 }
 
+/** A page module route: "/js/<name>.js", the name lower case letters, digits and dashes. */
+const MODULE_ROUTE = /^\/js\/([a-z][a-z0-9-]*)\.js$/;
+
+/**
+ * Serve a page module from public/js, looked up at request time: a module
+ * added after the server started is served too (a fixed list once left the
+ * drawer tabs without their script on a long-running server). The name
+ * pattern keeps the lookup inside public/js. False when `route` is no
+ * module route or the file is missing.
+ */
+async function serveModule(res, route) {
+  const match = MODULE_ROUTE.exec(route);
+  if (!match) return false;
+  const full = join(HERE, 'public', 'js', `${match[1]}.js`);
+  const found = await stat(full).then(
+    (s) => s.isFile(),
+    (error) => {
+      if (error.code === 'ENOENT') return false;
+      throw error;
+    },
+  );
+  if (!found) return false;
+  sendFile(res, full, 'text/javascript; charset=utf-8', 'no-store');
+  return true;
+}
+
 async function serveStored(res, path) {
   const full = await locate(path);
   if (!full) return json(res, 404, { error: 'not found', path });
@@ -345,6 +370,7 @@ async function handle(req, res) {
     return json(res, 200, await reloadDataset(id));
   }
   if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' });
+  if (await serveModule(res, route)) return undefined;
   if (await serveTextures(TEXTURES, route, res, { json, sendFile })) return undefined;
   if (await serveHd(HD_MODELS, route, params, res, { json, sendFile })) return undefined;
 

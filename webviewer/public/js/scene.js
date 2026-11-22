@@ -411,7 +411,17 @@
     markSelected(new Set(app.selectedIds()), app.selectedId());
   }
 
-  app.$('clear').addEventListener('click', clear);
+  // The clear button asks first (operator 2026-11-22); with no instance it does nothing.
+  const clearQuestion = el('div', { className: 'question' });
+  const clearDialog = new SC2Components.ConfirmDialog({ id: 'clear-dialog', title: 'remove all', yesText: 'remove all', content: [clearQuestion] });
+  app.$('clear').addEventListener('click', async () => {
+    if (!items.length) return;
+    clearQuestion.textContent = `Remove all ${items.length} instance${items.length === 1 ? '' : 's'} from the scene?`;
+    const asking = clearDialog.ask();
+    // A stray Enter must not remove everything.
+    clearDialog.no.focus();
+    if (await asking) clear();
+  });
 
   /** Turn an item to `rot` degrees and show it in its list row. */
   function setRotation(item, rot) {
