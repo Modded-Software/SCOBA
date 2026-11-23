@@ -68,6 +68,7 @@ guard; `tps` and `combat` assert `RealClicks` 0.
 | T32 | Psi Blast killed an enemy Marine at distance 3.0. At 3.5, 4.0, 4.5, 5.0, and 9.5 the weapon effect event fired and the Marine kept full life, also 3.85 s later. Same at 4.0 and 5.0 with the data `Range` set back to 4. Cause: T37. The kill at 3.0 was not examined again (the talons read range 3.0 then, T28). | [probe] `pncprobe/20261114-230104`, `pncprobe/20261114-230331` |
 | T41 | Watch, `combat psiwatch`: with `SCOBAAttackCooldown10` as `LaunchEffect` of `PsiBlastLaunchMissile`, the missile was drawn from the shooter's feet to its head for the stock `Kerrigan`, `KerriganSCOBA` and a Hydralisk firing Psi Blast; Needle Spines from `KerriganSCOBA` and the Hydralisk drew right. A stock `MissileDefault` did not change it. With the clock beside the missile in an effect set it draws right (operator). | [operator] `combat/20261122-160534`, `combat/20261122-152927`, `combat/20261122-161915` |
 | T42 | `CEffectEnumArea` `Arc` 90 from Kerrigan, created at a point ahead, on herself, or by a persistent at her: the same enemies were hit at facings 49 and 139, in a world band about 250 to 295 degrees. The arc did not follow her facing. | [probe] `combat/20261123-100054`, `combat/20261123-100936` |
+| T44 | `CameraGetTarget` of a hero-following camera read (12, 8), far from the hero at (188, 186), on most 0.02 s ticks while the view did not move. The ground clamp then measured the wrong ground and the distance jumped (operator 2026-11-23: bounce, then jumps every 0.5 s). Fix: `gf_CameraSafeDistance` uses the hero's position when the read is over `c_CAM_TARGET_LOST` (40) from the hero, and its height offset is the camera's own (`gf_CameraHeightTotal`, was 1.35 x scale). Group `combat camclamp`: pitch sweeps in TPS and PNC settle on the clamp with no reversal, the eye stays above the ground; negatives: walking and the free arm keep the full arm. | [tested] `combat/20261123-150027`; bounce: `combat/20261123-144957`, `145745` |
 | T43 | The swing clip on a bracket, 0.437 game s per reading, the clip time it advanced (ms) at time scale 1, 1.333, 2, 2.5, 2.667, 3: 311, 436, 625, 811, 875, 936. Linear in the scale, about 0.72 clip s per game s at scale 1; readings step by 62.5 ms. | [probe] `combat/20261123-112703` |
 | T37 | With `ImpactLocation` `TargetUnitOrPoint` on `PsiBlastLaunchMissile` (the map's data since `e2ba12d`), the `KerriganWeapon` missile flew to its target at 2.0 to 8.0 and `PsiBlastDamage` fired at the target's place with no target unit: life 500 stayed 500, by effect, by attack order and by the aim click. The same shot with `TargetUnit`, written to the catalog at run time, dealt 25 to the Zergling; the neutral proxy got a 0 damage event and kept its life. `PsiBlastDamage` alone at the unit dealt 25. | [probe] `combat/20261122-113428`, `psi_fx_*`, `psi_order_*`, `psi_unit_04`, `psi_unit_proxy`, `psi_direct_04` |
 | T38 | The map's `Kerrigan` unit carried the stock `PoisonNova` ability (swarm.sc2campaign: autocast on, radius 2, 20 damage, cooldown 10 s, its model on the caster). With an enemy at 2.0 it hit for 20 on its own; with the ability disabled it did not. No nova hit at 3.0 or beyond. | [probe] `combat/20261122-113428`, `psi_nova_02`, `psi_nonova_02`, `psi_fx_03` |
@@ -405,7 +406,7 @@ not repeated here.
   press while aiming and in PNC: no swing. Each enemy's angle before the
   swing is checked. Engine: the attack bracket holds the 2 s clip; clip
   time over game time 1.72 to 2.3 over 0.5 s (the old swing read 1.0); script rate
-  2.67, hold 0.75 s; no pitch pose. A probe (`combat swingwatch`, run
+  2.67, hold 0.75 s; no pitch pose. A probe (the removed group `combat swingwatch`, run
   `20261123-112703`) read clip time over game time as about 0.72 x the
   scale at 1, 1.33, 2, 2.5, 2.67 and 3 (T43). Not run on this build.
 - R-TPS-64: Psi Blast is a stock projectile (operator 2026-11-22: no
@@ -519,16 +520,44 @@ not repeated here.
   invulnerable state and the target filter only. Damage and collision are
   not tested: the `UnitDamage` probe took life from them and the Zergling
   path probe failed on the Marine control too (operator 2026-11-16: dropped).
-- Data: `scripts/hitvolumes/` measures `scripts/data/hit_volumes.json`
-  (70 units) and generates `scripts/app/data/hit_volumes_*.galaxy`
-  (63 types). `validate_aim_shot.py` fails on stale data.
-  Unit types come from the map and from every harness file below
-  `scripts/testkit/galaxy/`, subfolders included. After an actor scale
-  change the build does not publish a map, so `hitvolumes.measure --map
-  <folder>` measures a map staged with `expand_map.py --out <folder>`.
-  SensorTower: actor scale 4,4,8 (operator 2026-11-20), height 27.5842.
+- TerranDropPod is not pickable either (`HV_UNPICKABLE`): the escort pods
+  fall through the lanes, and the m3 box is the whole fall path (reach
+  147), not the pod. Before every stock type was measured it had no volume.
+- Data: `scripts/hitvolumes/measure.py` writes `scripts/data/hit_volumes.json`
+  and `hitvolumes.galaxy` writes `scripts/app/data/hit_volumes_*.galaxy`.
+  Measuring is a separate step: it reads the game install, the build does
+  not. Unit types (`units.py`): every concrete `CUnit` of the stock stack
+  (`resolve.STACK`, melee and campaign mods; no templates, no missiles),
+  every map `CUnit`, placed unit and unit-create call, and every harness
+  file below `scripts/testkit/galaxy/`. 3097 types: 2551 measured
+  (1413 fuzzy, 24 tight, 1114 bounds), 546 without a volume, each with its
+  reason in the JSON: no model (glue-screen dummies), a morph state drawn
+  in another pose (burrowed units, lowered gates), a model path the stock
+  data names but the storage lacks, or an m3 the reader cannot parse (12
+  files).
+- Actor of a type: same id, else `unitName`, else the actor its
+  `UnitBirth` creates (morph states such as ArchiveSealed). `CActorMissile`
+  counts as a unit actor (Dehaka, KerriganVoid). A model with
+  `VariationCount` uses its `_00` file.
+- Stale data (`hitvolumes/fresh.py`, called by validate-map through
+  `galaxy.check_map`): each record keeps a key of the map's own inputs:
+  actor and model entries on its chains, map actors that claim the type,
+  and the bytes of a map m3. The build fails on a changed key or an
+  unmeasured map type: `run hitvolumes.measure`. XML comments do not count.
+  Stock data is not re-read: a game patch needs a manual measure.
+- Measure time, 32 cores: 26 s (catalogs 9, find 1.3, extract 9 in
+  parallel batches of 100, shapes 6 in a process pool). Serial (`--jobs 1`):
+  111 s, same JSON. Before: 96 types, 24 s.
 - Near types: scanned in a circle of range + `c_HV_NEAR_REACH`. Far types
-  (reach above 20): scanned per type on the whole map.
+  (reach above 20, 281 now): `gv_hvFarUnits`, one group kept by events
+  (`gf_HvFarInit`: the units at start, then every unit that enters the map).
+  It replaces one whole-map `UnitGroup` per far type on each pick. A unit
+  that morphs into a far type is not added (not tested).
+- Script size: the full table is 2548 types and 5205 shapes, one load call
+  each. A test map with about 20 more harness lines failed to load: `Code
+  jump out of bounds (try reducing the size of very large functions or
+  triggers)` (`tps` 13:47 run, no bank). The map is likely at the script
+  size limit (not confirmed).
 - A type without a volume is not pickable and is recorded once
   (`gv_hvMissing`).
 
@@ -767,6 +796,16 @@ Other runs:
 
 Crosshair pick (R-TPS-84):
 
+- `tps/20261123-135303`: group `pick`, 0 failures, every stock type
+  measured. New cases: SCV, Drone, Dehaka body in, beside or above out;
+  Overlord made after start in `gv_hvFarUnits` and picked, a Marine not in
+  it; the table loads 2548 types, 5205 shapes, 281 far types, the same
+  after a second `gf_HvLoad`; BanelingBurrowed has no volume. Raw: a
+  real-time timer read 0 ms around the second load (it does not move
+  within one script run), so the load time is not measured.
+- `tps/20261123-134920`: group `pick`, 2 failures (`tps_pick_scv tbody`,
+  `tps_pick_fargroup tbody`): an escort TerranDropPod, newly measured, on
+  the ray. Fixed by `HV_UNPICKABLE`.
 - `tps/20261115-222609`: group `pick`, 0 failures, hit volumes on the old ray.
 - `tps/20261115-215132`: full `tps`, 1 failure (`tps_kerr_enemy tlate
   EnemyHp`, section 8), old ray.

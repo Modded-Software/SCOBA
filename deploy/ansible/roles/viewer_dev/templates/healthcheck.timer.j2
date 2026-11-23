@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=SC2 model viewer dev server, liveness check every {{ viewer_health_every }}
+
+[Timer]
+OnBootSec={{ viewer_health_every }}
+OnUnitActiveSec={{ viewer_health_every }}
+AccuracySec=30s
+Unit={{ viewer_unit }}-healthcheck.service
+
+[Install]
+WantedBy=timers.target

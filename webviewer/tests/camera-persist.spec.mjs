@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// The camera (target, yaw, pitch, distance) is kept in localStorage, so a
-// reload shows the same view (public/js/core.js).
+// The camera (target, yaw, pitch, distance) is a setting in localStorage,
+// "viewer.camera", so a reload shows the same view (src/page/core/settings.ts,
+// src/page/core/camera.ts).
 
-const KEY = 'sc2viewer.camera';
+const KEY = 'viewer.camera';
 const DEFAULT = { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0.8] };
 
 async function open(page) {
@@ -69,4 +70,16 @@ test('negative: a stored view that is not a camera is refused, reported and repl
     // The bad value is gone: the default view took its place.
     expectView(JSON.parse(await page.evaluate((k) => localStorage.getItem(k), KEY)), DEFAULT);
   }
+});
+
+test('negative: the key used before the settings module is not read', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('sc2viewer.camera', JSON.stringify({ yaw: 0.7, pitch: 0.9, distance: 31, target: [12, -5, 0] }));
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready))).toBe(true);
+  expectView(await camera(page), DEFAULT);
+  expect(await page.evaluate(() => window.SC2App.cameraRestore)).toBe('none');
 });

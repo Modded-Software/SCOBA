@@ -83,11 +83,13 @@ void gf_JtTrace (string lp_section, bool lp_press, int lp_loops, int lp_act, int
         BankValueSetFromFlag(gv_dbgBank, lp_section, "pressMoving", gf_AnimMoving(1));
         BankValueSetFromInt(gv_dbgBank, lp_section, "pressStep100", FixedToInt(gv_jumpStepDist[1] * 100.0));
         // Gait (R-JUMP-18): tracked phase, rate, and the harness's own walk start.
-        BankValueSetFromInt(gv_dbgBank, lp_section, "pressGaitMs", FixedToInt(gv_jumpGait[1] * c_JUMP_GAIT_CYCLE * 1000.0));
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressGaitMs", FixedToInt(gv_jumpGait[1] * gv_jumpGaitCycle[gf_AnimHeroProfile(lv_hero)] * 1000.0));
         BankValueSetFromInt(gv_dbgBank, lp_section, "pressRate100", FixedToInt(gf_JumpGaitRate(1, lv_hero) * 100.0));
         // Raw: the stock walk rate (unit speed / WalkAnimMoveSpeed) and the lower clip scale.
         BankValueSetFromInt(gv_dbgBank, lp_section, "pressStock100", FixedToInt(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent) * 100.0 / gv_animWalkMoveSpeed[gf_AnimHeroProfile(lv_hero)]));
         BankValueSetFromInt(gv_dbgBank, lp_section, "pressFullState", gv_animFullState[1]);
+        // Blend of the lower clip that played before the jump (negative case).
+        BankValueSetFromInt(gv_dbgBank, lp_section, "pressBlendMs", gv_slowLowerBlendMs[1]);
         BankValueSetFromInt(gv_dbgBank, lp_section, "pressScale100", FixedToInt(gv_animFullScale[1] * 100.0));
         BankValueSetFromInt(gv_dbgBank, lp_section, "walkMs", -1);
         if (gv_jtWalkStart >= 0.0) {
@@ -188,6 +190,10 @@ void gf_JtTrace (string lp_section, bool lp_press, int lp_loops, int lp_act, int
     BankValueSetFromInt(gv_dbgBank, lp_section, "camBase100", FixedToInt(gf_CameraHeightBase(1) * 100.0));
     BankValueSetFromString(gv_dbgBank, lp_section, "cam", lv_cam);
     BankValueSetFromString(gv_dbgBank, lp_section, "clipLog", gv_jumpClipLog[1]);
+    // Back to stand or walk (R-JUMP-24): release blend, blend of the next clip.
+    BankValueSetFromInt(gv_dbgBank, lp_section, "releaseBlendMs", gv_jumpReleaseBlendMs[1]);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "afterBlendMs", gv_slowLowerBlendMs[1]);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, "releasedPending", gv_jumpReleased[1]);
     BankValueSetFromString(gv_dbgBank, lp_section, "scaleLog", gv_jumpScaleLog[1]);
     BankValueSetFromString(gv_dbgBank, lp_section, "steps", lv_steps);
     BankValueSetFromInt(gv_dbgBank, lp_section, "bursts", gv_jumpBursts[1]);
@@ -302,7 +308,29 @@ void gf_JtSwitch () {
     gf_JtReset("jump_switch");
     gf_JtTrace("jump_switch", true, 16, c_JT_ACT_SWITCH, 4);
 }
-// Kerrigan jumps with her normal legs (R-JUMP-15).
+// Kerrigan, aim walk forward: walk jump clips with a stride (R-JUMP-23).
+void gf_JtKerriganWalk () {
+    gf_JtReset("jump_kerrigan_walk");
+    gf_HeroSwitchTo(gv_heroKerrigan);
+    Wait(0.5, c_timeGame);
+    gf_JumpReset(1);
+    gf_AimBegin(1);
+    Wait(0.4, c_timeGame);
+    gv_fORWARD[1] = true;
+    gf_JtWalkWait(0.5);
+    gf_JtTrace("jump_kerrigan_walk", true, 24, c_JT_ACT_NONE, 0);
+    gv_fORWARD[1] = false;
+    gf_AimEnd(1);
+}
+// Negative: Kerrigan, no press: no jump clip plays.
+void gf_JtKerriganNone () {
+    gf_JtReset("jump_kerrigan_none");
+    gf_HeroSwitchTo(gv_heroKerrigan);
+    Wait(0.5, c_timeGame);
+    gf_JumpReset(1);
+    gf_JtTrace("jump_kerrigan_none", false, 16, c_JT_ACT_NONE, 0);
+}
+// Kerrigan stand jump: her clips from Burrow 01 (R-JUMP-15, 23).
 void gf_JtKerrigan () {
     gf_JtReset("jump_kerrigan");
     gf_HeroSwitchTo(gv_heroKerrigan);
@@ -340,6 +368,8 @@ bool gt_JumpTest_Func (bool testConds, bool runActions) {
     if (gf_DbgGroup("hero")) {
         gf_JtSwitch();
         gf_JtKerrigan();
+        gf_JtKerriganWalk();
+        gf_JtKerriganNone();
     }
     gf_DbgReset("jump_end", false, true);
     BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);

@@ -486,8 +486,8 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
     if (gf_DbgGroup("talons")) {
         gf_DbgTalonsGroup();
     }
-    if (gf_DbgGroup("swingwatch")) {
-        gf_DbgSwingWatchGroup();
+    if (gf_DbgGroup("camclamp")) {
+        gf_DbgCamClampGroup();
     }
     if (gf_DbgGroup("psiwatch")) {
         gf_DbgPsiWatchGroup();

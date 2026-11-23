@@ -1,0 +1,24 @@
+# present: install, start, check. stopped: stop the server and its health
+# check, keep the units (present starts them again). absent: stop, disable,
+# remove the units.
+viewer_state: present
+viewer_unit: sc2-viewer-dev
+viewer_host: 127.0.0.1
+viewer_port: 4517
+# The checkout: deploy/ansible/ is two levels below the repo root.
+viewer_repo_root: "{{ playbook_dir | dirname | dirname }}"
+viewer_dir: "{{ viewer_repo_root }}/webviewer"
+# Node 24 for the service (the same node the other dev services use here).
+viewer_node_bin: "{{ ansible_facts.env.HOME }}/WORKSPACE-VM/.boot-linux/node-env/bin"
+viewer_node_major: 24
+viewer_path: "{{ viewer_dir }}/node_modules/.bin:{{ viewer_node_bin }}:/usr/local/bin:/usr/bin:/bin"
+viewer_unit_dir: "{{ ansible_facts.env.HOME }}/.config/systemd/user"
+# The output of each command of the last run, one log per step.
+viewer_steps_dir: "{{ ansible_facts.env.HOME }}/.local/state/{{ viewer_unit }}/steps"
+# Restart the server even when no unit file changed (a restart rebuilds).
+viewer_restart: false
+# Seconds to wait for /api/health after a start (the start builds first).
+viewer_start_timeout: 180
+viewer_health_every: 2min
+viewer_memory_high: 3G
+viewer_memory_max: 4G

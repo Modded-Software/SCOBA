@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { sceneOf } from './scene.mjs';
 
-// Many instances selected at once (public/js/pick.js, select.js):
+// Many instances selected at once (src/page/features/pick, select):
 // - alt + left drag from empty ground draws a rectangle; on release the
 //   instances inside it are the selection (with shift: added to it);
 // - shift + click adds an instance to the selection or takes it out;
@@ -213,9 +214,9 @@ test('Delete removes the selected instances and no others', async ({ page }) => 
   expect(s.pick.selected).toBe(null);
   expect(s.rings.filter(Boolean)).toEqual([]);
   await expect(page.locator('#scene li')).toHaveCount(1);
-  // The URL holds what is left.
-  const saved = JSON.parse(decodeURIComponent((await page.evaluate(() => location.hash)).slice(1)));
-  expect(saved.map((i) => i.u)).toEqual(['Zergling']);
+  // The stored scene holds what is left.
+  const saved = (await sceneOf(page)).items;
+  expect(saved.map((i) => i.source.record)).toEqual(['Zergling']);
   expect(errors).toEqual([]);
 });
 

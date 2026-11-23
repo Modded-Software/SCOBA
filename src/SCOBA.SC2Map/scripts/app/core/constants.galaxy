@@ -133,6 +133,7 @@ const fixed c_SCOBA_COLLISION_RESTORE_BLEND = 0.28;
 const int c_CAM_CLAMP_STEPS = 64;  // distance samples, eye inward to the hero
 const fixed c_CAM_GROUND_MARGIN = 0.35;  // eye stays this far above the terrain
 const fixed c_CAM_CLAMP_DEADBAND = 0.03;  // no new camera command below this change
+const fixed c_CAM_TARGET_LOST = 40.0;  // camera target read this far off the hero: use the hero
 const fixed c_ANIM_MOVE_TARGET = 30.0;
 const fixed c_ANIM_MOVE_RETARGET = 2.0;
 const fixed c_ANIM_MOVE_HEADING = 3.0;

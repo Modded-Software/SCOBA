@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { api, facets as facetsOf } from './api.mjs';
 
 // The family filter (EditorCategories ObjectFamily; Melee is the ladder and
 // multiplayer data) and "add all": one instance of every listed unit, after a
-// confirm dialog, laid out by size (public/js/addall.js).
+// confirm dialog, laid out by size (src/page/features/addall).
 
 function watch(page) {
   const problems = [];
@@ -21,13 +22,13 @@ async function open(page) {
   await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
 }
 
-const units = async (page, query) => (await page.request.get('/api/units?' + new URLSearchParams({ limit: '500', ...query }))).json();
+const units = async (page, query) => (await page.request.get(api.records('units', { limit: '500', ...query }))).json();
 const state = (page) => page.evaluate(() => window.sc2viewer.state());
 const run = (page) => page.evaluate(() => window.SC2App.addAllState());
 const count = (page) => page.locator('#unit-count').textContent();
 
 test('api: the family facet lists Melee; family=Melee returns Melee units only', async ({ page }) => {
-  const facets = await (await page.request.get('/api/facets')).json();
+  const facets = await facetsOf(page.request);
   console.log('families', JSON.stringify(facets.families));
   expect(facets.families).toContain('Melee');
   const all = await units(page, {});
@@ -136,7 +137,7 @@ test('add all again: each new block goes next to the units already on the map, n
   const problems = watch(page);
   await open(page);
   const listed = await filterFew(page);
-  const GAP = 0.5; // addall.js
+  const GAP = 0.5; // features/addall/layout.ts
   const runs = [];
   for (let i = 0; i < 3; i++) {
     const r = await addAllRun(page, listed.total);

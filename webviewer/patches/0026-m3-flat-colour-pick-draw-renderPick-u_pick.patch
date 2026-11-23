@@ -1,7 +1,7 @@
 From 5b64f42ac2ff28a2fbcdd1dfbb319a5c83b984e9 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sun, 22 Nov 2026 13:09:11 +0200
-Subject: [PATCH 26/51] m3: flat-colour pick draw (renderPick, u_pick)
+Subject: [PATCH 26/55] m3: flat-colour pick draw (renderPick, u_pick)
 
 Draws the opaque batches of an instance in one flat colour, unblended and writing depth, so the page can tell by pixel which instance is under the mouse. A model with no opaque batch draws all its batches.
 ---

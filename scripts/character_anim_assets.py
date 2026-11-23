@@ -14,6 +14,7 @@ from pathlib import Path
 from project_root import project_root
 from animation_tokens import validate_animation_name
 from jumpanim.bake import JUMP_HEROES, make_jump_groups
+from jumpanim.donor import DONOR_HEROES, DonorJump, make_donor_groups
 from walkanim.slow import LEG as SLOW_LEG, SLOW_HEROES, SOURCE as SLOW_SOURCE, make_slow_arms, make_slow_groups
 from walkanim.strafe import leg_turner
 from character_anim_m3 import add_kickback, axis_quaternion, clone, make_lower_group, make_pitch_group, quat_multiply
@@ -27,7 +28,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "50\n"  # 50: the swing clip moves her back talons; 49: Kerrigan talons swing clip from Attack 01; 48: rigs in heroanim.rig, torso pitch axis from the rest pose, feet turn with the pelvis, aim pose breathing; 47: head pitch about the head's own left-right axis; 46: head pitch +-30 (R-TPS-16); 45: slow walk arm clips (R-SLOW-19); 44: slow walk leg clips from Walk Slow (R-SLOW-10, 11); 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
+MARKER_VERSION = "52\n"  # 52: her End eases out in 125 ms; 51: Kerrigan jump legs from Burrow 01 (jumpanim.donor); 50: the swing clip moves her back talons; 49: Kerrigan talons swing clip from Attack 01; 48: rigs in heroanim.rig, torso pitch axis from the rest pose, feet turn with the pelvis, aim pose breathing; 47: head pitch about the head's own left-right axis; 46: head pitch +-30 (R-TPS-16); 45: slow walk arm clips (R-SLOW-19); 44: slow walk leg clips from Walk Slow (R-SLOW-10, 11); 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 CLIP_JOBS = (
     ("Attack", "Attack Arm Alternate", "upper"),
@@ -234,8 +235,9 @@ def validate_model_names(model) -> None:
 
 
 
-def generate_model(source: Path, target: Path, rig: HeroRig, jump: bool = False, slow: bool = False) -> None:
-    """jump: add the jump leg clips (jumpanim.bake); slow: the slow walk legs (walkanim.slow)."""
+def generate_model(source: Path, target: Path, rig: HeroRig, jump: bool = False, slow: bool = False, donor: DonorJump | None = None) -> None:
+    """jump: add the jump leg clips (jumpanim.bake); donor: add them from a
+    source clip instead (jumpanim.donor); slow: the slow walk legs (walkanim.slow)."""
     model = m3.loadModel(str(source))
     upper_ids, lower_ids = classify_bones(model, rig.upper_roots, rig.lower_roots)
     attack_ids, _ = classify_bones(model, rig.attack_roots, rig.lower_roots)
@@ -333,6 +335,8 @@ def generate_model(source: Path, target: Path, rig: HeroRig, jump: bool = False,
     jump_log = "jump: none"
     if jump:
         jump_log = make_jump_groups(model, groups)
+    elif donor is not None:
+        jump_log = make_donor_groups(model, groups, donor, lower_ids, AIM_DIRECTIONS, turn_anim_id, leg_turn)
     print(f"{target.name}: upper={len(upper_ids)} lower={len(lower_ids)} head={bone_chain(model, head)} {jump_log} {slow_log}")
     target.parent.mkdir(parents=True, exist_ok=True)
     m3.saveAndInvalidateModel(model, str(target))
@@ -400,7 +404,7 @@ def generate(root: Path, force: bool) -> None:
     try:
         entries = []
         for key, rig in HEROES.items():
-            generate_model(extract_model(rig.entry, temp_root), root / rig.target, rig, jump=key in JUMP_HEROES, slow=key in SLOW_HEROES)
+            generate_model(extract_model(rig.entry, temp_root), root / rig.target, rig, jump=key in JUMP_HEROES, slow=key in SLOW_HEROES, donor=DONOR_HEROES.get(key))
             entries.append((rig.model_id, rig.model_value))
         (root / MODEL_DATA).write_text(model_data_text(root, entries))
         marker.write_text(MARKER_VERSION)

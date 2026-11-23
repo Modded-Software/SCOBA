@@ -1,0 +1,161 @@
+From c7af28a066d38604422fc479a48b70810676be08 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 14:41:03 +0200
+Subject: [PATCH 52/55] types: declare what compiler 7.0 no longer takes on
+ trust (no change to the built code)
+
+The library was written for compiler 4.3. Compiler 7.0 tells typed arrays, array buffers and video frames apart, and has no suppressImplicitAnyIndexErrors. These are declarations only: the bundle is byte for byte the same.
+---
+ src/common/binarystream.ts         | 2 +-
+ src/common/canvas.ts               | 3 ++-
+ src/common/fetchdatatype.ts        | 2 +-
+ src/parsers/m3/indexentry.ts       | 4 ++--
+ src/parsers/m3/layer.ts            | 2 +-
+ src/parsers/m3/standardmaterial.ts | 2 +-
+ src/viewer/handlers/m3/layer.ts    | 2 +-
+ src/viewer/imagetexture.ts         | 8 +++++++-
+ src/viewer/viewer.ts               | 4 ++--
+ 9 files changed, 18 insertions(+), 11 deletions(-)
+
+diff --git a/src/common/binarystream.ts b/src/common/binarystream.ts
+index 21ec8271..0fef4feb 100644
+--- a/src/common/binarystream.ts
++++ b/src/common/binarystream.ts
+@@ -10,7 +10,7 @@ const uint8 = new Uint8Array(8);
+  * A binary stream.
+  */
+ export default class BinaryStream {
+-  buffer: ArrayBuffer;
++  buffer: ArrayBuffer | Uint8Array;
+   uint8array: Uint8Array;
+   index = 0;
+   byteLength: number;
+diff --git a/src/common/canvas.ts b/src/common/canvas.ts
+index 929cd2ca..1b51f5aa 100644
+--- a/src/common/canvas.ts
++++ b/src/common/canvas.ts
+@@ -82,7 +82,8 @@ export function imageDataToImage(imageData: ImageData): HTMLImageElement {
+   return image;
+ }
+ 
+-export function imageToImageData(image: TexImageSource): ImageData {
++// A video frame has no width and height of its own, and is not drawn here.
++export function imageToImageData(image: Exclude<TexImageSource, VideoFrame>): ImageData {
+   const width = image.width;
+   const height = image.height;
+ 
+diff --git a/src/common/fetchdatatype.ts b/src/common/fetchdatatype.ts
+index 7710b7fc..fa752f74 100644
+--- a/src/common/fetchdatatype.ts
++++ b/src/common/fetchdatatype.ts
+@@ -61,7 +61,7 @@ export async function fetchDataType(path: string, dataType: FetchDataTypeName):
+ 
+     // Try to get the requested data type.
+     try {
+-      let data: string | ArrayBuffer | Blob | null = null;
++      let data: string | ArrayBuffer | Uint8Array | Blob | null = null;
+ 
+       if (dataType === 'text') {
+         data = await response.text();
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index b86d2c0e..adc03fb5 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -100,8 +100,8 @@ const tagMapping = {
+  */
+ const SKIP_UNKNOWN_VERSION = new Set(['PAR_', 'LITE']);
+ 
+-export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | ParticleCopy[] | Light[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[] | Uint8Array[];
+-export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | ParticleEmitter | ParticleCopy | Light | UnsupportedEntry | string | number | Float32Array;
++export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | ParticleCopy[] | Light[] | BillboardBehavior[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[] | Uint8Array[];
++export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | ParticleEmitter | ParticleCopy | Light | BillboardBehavior | UnsupportedEntry | string | number | Float32Array | Uint8Array;
+ 
+ /**
+  * An index entry.
+diff --git a/src/parsers/m3/layer.ts b/src/parsers/m3/layer.ts
+index 4495d0c7..8c4be9df 100644
+--- a/src/parsers/m3/layer.ts
++++ b/src/parsers/m3/layer.ts
+@@ -44,7 +44,7 @@ export default class Layer {
+   fresnelMin = 0;
+   fresnelMaxOffset = 0;
+   unknown5 = 0;
+-  unknown6 = new Uint8Array(8);
++  unknown6: Uint8Array = new Uint8Array(8);
+   fresnelInvertedMaskX = 0;
+   fresnelInvertedMaskY = 0;
+   fresnelInvertedMaskZ = 0;
+diff --git a/src/parsers/m3/standardmaterial.ts b/src/parsers/m3/standardmaterial.ts
+index be13c437..d78d7efb 100644
+--- a/src/parsers/m3/standardmaterial.ts
++++ b/src/parsers/m3/standardmaterial.ts
+@@ -50,7 +50,7 @@ export default class StandardMaterial {
+   specType = 0;
+   unknown9 = new Float32AnimationReference();
+   unknown10 = new Uint32AnimationReference();
+-  unknown11 = new Uint8Array(12);
++  unknown11: Uint8Array = new Uint8Array(12);
+ 
+   load(stream: BinaryStream, version: number, index: IndexEntry[]): void {
+     this.version = version;
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index 06faee8e..6754c916 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -13,7 +13,7 @@ const uvAngleHeap = new Float32Array(3);
+ const uvTilingHeap = new Float32Array(2);
+ const uvTilingUsed = new Float32Array(2);
+ 
+-const layerTypeToTextureUnit = {
++const layerTypeToTextureUnit: { [type: string]: number } = {
+   diffuse: 1,
+   decal: 2,
+   specular: 3,
+diff --git a/src/viewer/imagetexture.ts b/src/viewer/imagetexture.ts
+index 36c866c5..0b59f396 100644
+--- a/src/viewer/imagetexture.ts
++++ b/src/viewer/imagetexture.ts
+@@ -3,6 +3,12 @@ import { isGif, isJpeg, isPng, isWebP } from '../common/isformat';
+ import Texture from './texture';
+ import { HandlerResourceData } from './handlerresource';
+ 
++/**
++ * The image sources a texture is made from: what isImageSource accepts.
++ * Each has a width and a height.
++ */
++export type ImageSource = ImageData | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
++
+ /**
+  * Checks if the given source is a supported image texture source.
+  */
+@@ -38,7 +44,7 @@ export function detectMime(buffer: Uint8Array): string {
+  * A texture handler for image sources.
+  */
+ export class ImageTexture extends Texture {
+-  constructor(src: TexImageSource, resourceData: HandlerResourceData) {
++  constructor(src: ImageSource, resourceData: HandlerResourceData) {
+     super(resourceData);
+ 
+     const gl = this.viewer.gl;
+diff --git a/src/viewer/viewer.ts b/src/viewer/viewer.ts
+index 8aedd58a..fb1d397b 100644
+--- a/src/viewer/viewer.ts
++++ b/src/viewer/viewer.ts
+@@ -6,7 +6,7 @@ import { Resource } from './resource';
+ import { PathSolver, HandlerResourceData, HandlerResource, SolverParams } from './handlerresource';
+ import GenericResource from './genericresource';
+ import ClientBuffer from './gl/clientbuffer';
+-import { isImageSource, ImageTexture, detectMime } from './imagetexture';
++import { isImageSource, ImageSource, ImageTexture, detectMime } from './imagetexture';
+ import { blobToImage } from '../common/canvas';
+ 
+ export enum DebugRenderMode {
+@@ -291,7 +291,7 @@ export default class ModelViewer extends EventEmitter {
+ 
+           // If the source is an image source, load it directly.
+           if (isImageSource(actualSrc)) {
+-            return new ImageTexture(<TexImageSource>actualSrc, { viewer: this, fetchUrl, pathSolver });
++            return new ImageTexture(<ImageSource>actualSrc, { viewer: this, fetchUrl, pathSolver });
+           }
+ 
+           // If the source is a buffer of an image, convert it to an image, and load it directly.

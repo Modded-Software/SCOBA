@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// The mouse hit goes by pixel (public/pickbuffer.js, public/js/pick.js
+// The mouse hit goes by pixel (src/page/core/render/pickbuffer.ts, src/page/features/pick
 // hitAt): the unit whose solid surface is drawn under the mouse, not a
 // cylinder around the unit. The truth here is the drawn frame itself:
 // sc2viewer.drawnAt says which pixels are not background, with the grid

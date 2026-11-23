@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Ctrl + click on an instance's row name selects it and points the camera
-// at it (scene.js focus): the target goes to the instance's middle, the
+// at it (src/page/features/focus): the target goes to the instance's middle, the
 // distance fits its sphere, yaw and pitch stay. A plain or shift click
 // selects only; the camera stays.
 

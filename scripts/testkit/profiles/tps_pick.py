@@ -7,6 +7,10 @@ against scripts/hitvolumes/ray.py (test_hit_volumes.py, InGameCaseTests).
 
 from __future__ import annotations
 
+import re
+
+from hitvolumes import galaxy
+
 # section -> (tags the pick must return the target for, tags it must not)
 CASES = {
     "tps_pick_medic": (("thead",), ("tabove",)),
@@ -15,6 +19,11 @@ CASES = {
     "tps_pick_flyer": (("tbody",), ("tunder",)),
     "tps_pick_far": (("tbody",), ("tside",)),
     "tps_pick_thor": (("tchest",), ()),
+    # Types the old unit list missed or the classic skins changed.
+    "tps_pick_scv": (("tbody",), ("tside",)),
+    "tps_pick_drone": (("tbody",), ("tabove",)),
+    "tps_pick_dehaka": (("tbody",), ("tside",)),
+    "tps_pick_fargroup": (("tbody",), ()),
     # The Hive is unpickable scenery: no ray picks it.
     "tps_pick_hive": ((), ("ttop", "tnorth", "tover")),
 }
@@ -64,3 +73,35 @@ def check_pick(checks) -> None:
     checks.true("tps_pick_thor", "", "tchestShotThor")
     # The click on the body sets the UI target.
     checks.true("tps_pick_marine", "tclick", "TargetEnemy")
+    check_table(checks)
+
+
+# Raw: the reload time is an unconfirmed probe (a real-time timer may not
+# move within one script run).
+LOAD_RAW = ("Types", "Shapes", "FarTypes", "FarUnits", "ReloadRealMs", "ReloadGameMs")
+
+
+def check_table(checks) -> None:
+    """The full table loads, a far type made after start is in the far
+    group, and a near type is not."""
+    for key in LOAD_RAW:
+        print(f"tps_pick_load raw {key}={checks.value('tps_pick_load', '', key)}")
+    want = hit_volume_sizes()
+    checks.eq("tps_pick_load", "", "Types", want["c_HV_TYPES"])
+    checks.eq("tps_pick_load", "", "Shapes", want["c_HV_SHAPES"])
+    checks.eq("tps_pick_load", "", "FarTypes", want["c_HV_FAR_TYPES"])
+    checks.eq("tps_pick_load", "", "TypesAfter", want["c_HV_TYPES"])
+    checks.eq("tps_pick_load", "", "ShapesAfter", want["c_HV_SHAPES"])
+    checks.eq("tps_pick_load", "", "FarTypesAfter", want["c_HV_FAR_TYPES"])
+    checks.true("tps_pick_load", "", "ScvKnown")
+    checks.true("tps_pick_load", "", "DehakaKnown")
+    checks.false("tps_pick_load", "", "BurrowedKnown")
+    checks.true("tps_pick_fargroup", "", "FarType")
+    checks.true("tps_pick_fargroup", "", "InFarGroup")
+    checks.false("tps_pick_fargroup", "", "MarineInFarGroup")
+
+
+def hit_volume_sizes() -> dict[str, int]:
+    """The table sizes the generator wrote (hit_volumes_size.galaxy)."""
+    text = (galaxy.OUT_DIR / galaxy.SIZE).read_text(encoding="utf-8")
+    return {m.group(1): int(m.group(2)) for m in re.finditer(r"const int (c_HV_\w+) = (\d+);", text)}

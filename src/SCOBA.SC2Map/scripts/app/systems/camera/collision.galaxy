@@ -30,6 +30,12 @@ fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {
     lv_yaw = CameraGetYaw(lp_player);
     lv_horiz = Cos(lv_pitch) * lp_desired;
     lv_target = CameraGetTarget(lp_player);
+    // Operator 2026-11-23: distance jumps every 0.5 s. Every 0.25 s the read
+    // gave (12, 8), not the followed hero (run combat/20261123-145745); the
+    // view did not move. A read that far off the hero takes the hero.
+    if (UnitIsValid(gv_tPSUNIT[lp_player]) && DistanceBetweenPoints(lv_target, UnitGetPosition(gv_tPSUNIT[lp_player])) > c_CAM_TARGET_LOST) {
+        lv_target = UnitGetPosition(gv_tPSUNIT[lp_player]);
+    }
     lv_eye = PointWithOffsetPolar(lv_target, lv_horiz, lv_yaw + 180.0);
     lv_tx = PointGetX(lv_target);
     lv_ty = PointGetY(lv_target);
@@ -37,8 +43,12 @@ fixed gf_CameraSafeDistance (int lp_player, fixed lp_desired) {
     if (lv_tz < WorldHeight(c_heightMapGround, lv_target)) {
         lv_tz = WorldHeight(c_heightMapGround, lv_target);
     }
-    // Tosh's clamp offset scaled by unit height (R-TPS-90).
-    lv_offset = gv_mARINE * gf_CameraHeightScale(gv_tPSUNIT[lp_player]);
+    // The camera's own height offset (R-TPS-90). Operator 2026-11-23: the
+    // camera bounced off the ground. The clamp used 1.35 x scale (gv_mARINE)
+    // against the camera's 0.9 x scale: it let the eye 0.45 too low, the
+    // engine pulled the distance in, the clamp pushed it out (run
+    // combat/20261123-144957: 2.25 to 2.63 every 0.25 s, safe 2.906).
+    lv_offset = gf_CameraHeightTotal(lp_player);
     // Operator 2026-11-16: clamp, never snap. The camera keeps the longest
     // distance (up to the desired one) at which the eye itself stays
     // c_CAM_GROUND_MARGIN above the terrain, so it slides along the ground.

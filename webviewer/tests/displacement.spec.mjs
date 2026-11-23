@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Displacement materials (DIS_): drawn after the scene, over a copy of the
-// frame, shifted along their normal maps (public/displacement.js,
+// frame, shifted along their normal maps (src/formats/m3/displacement.ts,
 // M3ModelInstance.renderDisplacement). Survey: scripts/displacement-survey.sh.
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.35, distance: 7, target: [0, 0, 1.2] };

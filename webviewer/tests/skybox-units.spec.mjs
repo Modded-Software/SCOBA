@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
 
 // Units whose model is a skybox (operator 2026-11-21: Terran Campaign holds
 // SS_BackgroundSpaceTerran00..02 and ...Large). The server marks them
@@ -23,8 +24,8 @@ async function open(page) {
   return errors;
 }
 
-const units = async (page, query) => (await page.request.get('/api/units?' + new URLSearchParams({ limit: '500', ...query }))).json();
-const unit = async (page, id) => (await page.request.get('/api/unit?id=' + encodeURIComponent(id))).json();
+const units = async (page, query) => (await page.request.get(api.records('units', { limit: '500', ...query }))).json();
+const unit = async (page, id) => (await page.request.get(api.record('units', id))).json();
 const run = (page) => page.evaluate(() => window.SC2App.addAllState());
 
 test('api: the skybox units of Terran Campaign are marked; units are not', async ({ request, page }) => {
@@ -40,7 +41,7 @@ test('api: the skybox units of Terran Campaign are marked; units are not', async
   let offset = 0;
   const everyMarked = [];
   for (let total = all.total; offset < total; offset += 500) {
-    const pageOf = await (await request.get('/api/units?' + new URLSearchParams({ limit: '500', offset: String(offset) }))).json();
+    const pageOf = await (await request.get(api.records('units', { limit: '500', offset: String(offset) }))).json();
     everyMarked.push(...pageOf.items.filter((u) => u.skybox).map((u) => u.id));
   }
   console.log(`all units: ${everyMarked.length} skybox: ${everyMarked.join(', ')}`);

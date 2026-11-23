@@ -50,6 +50,7 @@ from jumpanim.bake import (
 from character_anim_assets import AIM_DIRECTIONS
 from validate_assets import fail
 from walkanim.slow import check_slow
+from jumpanim.donor_check import check_donors
 
 # Feet match between a jump clip and the clip it continues (model units).
 SEAM_TOLERANCE = 0.01
@@ -85,6 +86,7 @@ GAIT_CONSTS = {
 
 TOSH_MODEL = Path("Assets") / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3"
 UPPER_ROOT = "BoneSpine01"
+JUMP_PROFILES = ("c_ANIM_HERO_TOSH", "c_ANIM_HERO_KERRIGAN")
 JUMP_CONFIG_RE = re.compile(r'gf_JumpConfigClip\((c_ANIM_HERO_\w+),\s*c_JUMP_\w+,\s*"([^"]+)"\)')
 JUMP_DIR_RE = re.compile(r'gv_jumpDirName\[c_ANIM_DIR_\w+\] = "([^"]+)";')
 
@@ -412,12 +414,15 @@ def check_jump(map_dir: Path, galaxy: str) -> None:
     configured = JUMP_CONFIG_RE.findall(galaxy)
     if not configured:
         fail("no gf_JumpConfigClip calls in the map script")
-    for profile, _ in configured:
-        if profile != "c_ANIM_HERO_TOSH":
-            fail(f"jump clips configured for {profile}, but only Tosh has jump clips")
-    prefixes = sorted(prefix.replace(",", " ") for _, prefix in configured)
-    if prefixes != sorted(phase.name for phase in JUMP_PHASES):
-        fail(f"script jump prefixes {prefixes} differ from the baked phases")
+    by_profile: dict[str, list[str]] = {}
+    for profile, prefix in configured:
+        by_profile.setdefault(profile, []).append(prefix.replace(",", " "))
+    # Tosh: the IK bake; Kerrigan: her own source clip (jumpanim.donor).
+    if sorted(by_profile) != sorted(JUMP_PROFILES):
+        fail(f"jump clips configured for {sorted(by_profile)}, want {sorted(JUMP_PROFILES)}")
+    for profile, prefixes in by_profile.items():
+        if sorted(prefixes) != sorted(phase.name for phase in JUMP_PHASES):
+            fail(f"script jump prefixes of {profile} {sorted(prefixes)} differ from the baked phases")
     walks = sorted(name.replace(",", " ") for name in JUMP_DIR_RE.findall(galaxy))
     if walks != sorted(base.token for base in JUMP_BASES if base.walk):
         fail(f"script walk bases {walks} differ from the baked bases")
@@ -448,3 +453,5 @@ def check_jump(map_dir: Path, galaxy: str) -> None:
     # REQ-SLOW-WALK: the slow walk clips live in the same model.
     for line in check_slow(model, galaxy, AIM_DIRECTIONS, forbidden, fail):
         print(f"slow: {line}")
+    for line in check_donors(map_dir, galaxy, fail):
+        print(f"jump: {line}")

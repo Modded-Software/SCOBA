@@ -201,7 +201,7 @@ class GalaxyTests(unittest.TestCase):
 
     def test_unpickable_types_have_no_volume(self) -> None:
         text = "".join(galaxy.render(galaxy.load_json(), galaxy.crosshair_range()).values())
-        for name in ("Hive", "PsiDecimator"):
+        for name in ("Hive", "PsiDecimator", "TerranDropPod"):
             self.assertNotIn(f'gf_HvType("{name}"', text)
         # Negative: other types keep theirs.
         self.assertIn('gf_HvType("Marine"', text)
@@ -223,6 +223,12 @@ IN_GAME = {
     ("tps_pick_ultra", "tback"): ("Ultralisk", 12.0, 90.0, (1.4, 4.0, 2.1), False),
     ("tps_pick_far", "tbody"): ("Zergling", 18.5, 0.0, (0.0, 0.0, 0.4), True),
     ("tps_pick_far", "tside"): ("Zergling", 18.5, 0.0, (0.7, 0.0, 0.4), False),
+    ("tps_pick_scv", "tbody"): ("SCV", 6.0, 0.0, (0.0, -0.29, 0.9), True),
+    ("tps_pick_scv", "tside"): ("SCV", 6.0, 0.0, (2.4, 0.0, 0.9), False),
+    ("tps_pick_drone", "tbody"): ("Drone", 6.0, 0.0, (0.0, 0.09, 0.36), True),
+    ("tps_pick_drone", "tabove"): ("Drone", 6.0, 0.0, (0.0, 0.0, 1.5), False),
+    ("tps_pick_dehaka", "tbody"): ("Dehaka", 8.0, 0.0, (0.0, 0.0, 1.56), True),
+    ("tps_pick_dehaka", "tside"): ("Dehaka", 8.0, 0.0, (3.4, 0.0, 1.5), False),
 }
 # The ray origin is the camera focus (hero, or hero and shoulder proxy centre)
 # at the camera height offset; it sits within this of the hero, sideways.

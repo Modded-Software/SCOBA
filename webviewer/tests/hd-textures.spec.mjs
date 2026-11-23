@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
+import { reloadScene, sceneOf } from './scene.mjs';
 
-// HD textures in the view (public/js/hd.js, server-textures.mjs serveHd):
+// HD textures in the view (src/page/features/hd, src/games/sc2/server/textures.ts hdRoute):
 // - a model with a texture that has an upscaled file shows the HD set from
 //   the start; its right-click menu has an "hd" checkbox;
 // - Ctrl+H switches the selected instances between the two sets;
@@ -11,13 +13,13 @@ import { test, expect } from '@playwright/test';
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.5, distance: 6, target: [0, 0, 0.5] };
 const SKIN = 'assets\\textures\\zergling_diffuse.dds';
 
-async function open(page, hash = '') {
+async function open(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
-  await page.goto('/' + hash);
+  await page.goto('/');
   await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
@@ -60,18 +62,22 @@ async function menu(page, id) {
 }
 
 test('the server lists the textures with an HD file and serves them; nothing else', async ({ request }) => {
-  expect((await (await request.get('/api/hd-textures')).json()).assets).toEqual([SKIN, 'assets\\textures\\roach_diffuse.dds']);
-  const hd = await request.get('/hd-asset?path=' + encodeURIComponent('Assets/Textures/Zergling_Diffuse.dds'));
+  const hdAsset = (path) => `${api.x('hd-asset')}?${new URLSearchParams({ path })}`;
+  expect((await (await request.get(api.x('hd-textures'))).json()).assets).toEqual([SKIN, 'assets\\textures\\roach_diffuse.dds']);
+  const hd = await request.get(hdAsset('Assets/Textures/Zergling_Diffuse.dds'));
   expect(hd.status()).toBe(200);
-  const standard = await request.get('/asset?path=' + encodeURIComponent(SKIN));
+  const standard = await request.get(api.asset(SKIN));
   expect(standard.status()).toBe(200);
   const [hdBytes, standardBytes] = [await hd.body(), await standard.body()];
   expect(hdBytes.subarray(0, 4).toString('latin1')).toBe('DDS ');
   expect(hdBytes.equals(standardBytes)).toBe(false);
   // Negative: a texture with no HD file, and a request with no path.
-  expect((await request.get('/hd-asset?path=' + encodeURIComponent('assets\\textures\\zergling_normal.dds'))).status()).toBe(404);
-  expect((await request.get('/hd-asset?path=' + encodeURIComponent('..\\manifest.json'))).status()).toBe(404);
-  expect((await request.get('/hd-asset')).status()).toBe(400);
+  expect((await request.get(hdAsset('assets\\textures\\zergling_normal.dds'))).status()).toBe(404);
+  expect((await request.get(hdAsset('..\\manifest.json'))).status()).toBe(404);
+  expect((await request.get(api.x('hd-asset'))).status()).toBe(400);
+  // Negative: nothing below the route names.
+  expect((await request.get(`${api.x('hd-textures')}/x`)).status()).toBe(404);
+  expect((await request.get(`${api.x('hd-asset')}/x?path=x`)).status()).toBe(404);
 });
 
 test('a model with both sets shows HD from the start; the menu\'s "hd" checkbox switches the set in the view', async ({ page }) => {
@@ -282,18 +288,17 @@ test('the grid glows blue around a model with a 2048 texture, stock or upscaled,
   expect(errors).toEqual([]);
 });
 
-test('the standard set of an instance is kept in the URL; a reload shows it again', async ({ page }) => {
+test('the standard set of an instance is kept in the scene; a reload shows it again', async ({ page }) => {
   const errors = await open(page);
   const zergling = await place(page, 'Zergling');
-  // Negative: with HD on, the URL says nothing about it.
-  expect(decodeURIComponent(new URL(page.url()).hash)).not.toContain('"h"');
+  expect((await sceneOf(page)).items[0].options.hd).toBe(true);
   await selectRow(page, zergling);
   await page.keyboard.press('Control+h');
   await expect.poll(async () => (await hdOf(page, zergling)).applied).toBe(0);
-  expect(decodeURIComponent(new URL(page.url()).hash)).toContain('"h":0');
-  await page.reload();
-  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
-  await idle(page);
+  expect((await sceneOf(page)).items[0].options.hd).toBe(false);
+  // Negative: the address holds none of it.
+  expect(new URL(page.url()).hash).toBe('');
+  await reloadScene(page);
   const again = (await state(page)).items[0];
   expect(again.hd).toBe(false);
   expect(again.hdLayers).toBeGreaterThan(0);

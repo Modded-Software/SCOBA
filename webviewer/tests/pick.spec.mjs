@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { sceneOf } from './scene.mjs';
 
 // Units under the mouse: mouse-over highlight, click selection, ctrl + left
-// facing, and the right-click animation menu (public/js/pick.js).
+// facing, and the right-click animation menu (src/page/features/pick).
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0.8] };
 
@@ -269,10 +270,9 @@ test('menu "loop" checked: the picked animation keeps looping and becomes the un
   const later = await itemOf(page, marine);
   expect(later.sequenceName).toBe(choice);
   expect((await pick(page)).menu.playing).toEqual([choice]);
-  // It is the unit's own now: list row and URL.
+  // It is the unit's own now: list row and stored scene.
   expect(await page.locator(`#scene li[data-id="${marine}"] select.anim`).inputValue()).toBe(String(sequences.indexOf(choice)));
-  const hash = JSON.parse(decodeURIComponent(await page.evaluate(() => location.hash.slice(1))));
-  expect(hash[0].q).toBe(sequences.indexOf(choice));
+  expect((await sceneOf(page)).items[0].sequence).toBe(sequences.indexOf(choice));
   // The choice is kept for the next menu.
   // (The unit plays another animation now: a pixel on its picture as it is.)
   await page.keyboard.press('Escape');

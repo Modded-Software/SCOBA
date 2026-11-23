@@ -35,12 +35,6 @@ exceptions:
     owner: sc2
     review_date: '2026-11-21'
     removal: Remove when the search boxes no longer show hint text.
-  - rule: bplaceholders-b
-    path: ^webviewer/public/components\.js$
-    rationale: The DOM property input.placeholder sets the grey hint text of the picker search box. It is the standard property name, not placeholder code.
-    owner: sc2
-    review_date: '2026-11-21'
-    removal: Remove when the picker search box no longer shows hint text.
   - rule: bskeleton-b
     path: ^webviewer/patches/0015-m3-mouse-over-highlight-instance\.highlight-u_highlig\.patch$
     rationale: The exported renderer patch shows the upstream mdx-m3-viewer bone hierarchy class M3Skeleton as diff context. Not skeleton code.
@@ -108,18 +102,6 @@ exceptions:
     review_date: '2026-11-23'
     removal: Remove when ground lights no longer read through the bone hierarchy.
   - rule: bskeleton-b
-    path: ^webviewer/public/js/billboards\.js$
-    rationale: The page helper reads billboard bone matrices from instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
-    owner: sc2
-    review_date: '2026-11-23'
-    removal: Remove when the helper no longer reads the bone hierarchy.
-  - rule: bskeleton-b
-    path: ^webviewer/public/js/particles\.js$
-    rationale: The page helper reads emitter bone matrices from item.instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
-    owner: sc2
-    review_date: '2026-11-23'
-    removal: Remove when the helper no longer reads the bone hierarchy.
-  - rule: bskeleton-b
     path: ^webviewer/tests/billboards\.spec\.mjs$
     rationale: The test reads billboard bone matrices from instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
     owner: sc2
@@ -143,3 +125,33 @@ exceptions:
     owner: sc2
     review_date: '2026-11-23'
     removal: Remove when patch 0051 is re-exported without the word.
+  - rule: bplaceholders-b
+    path: ^webviewer/src/page/ui/components/picker\.ts$
+    rationale: The DOM property input.placeholder sets the grey hint text of the picker search box. It is the standard property name, not placeholder code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when the picker search box no longer shows hint text.
+  - rule: bskeleton-b
+    path: ^webviewer/src/formats/m3/billboards\.ts$
+    rationale: The page helper reads billboard bone matrices from instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when the helper no longer reads the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/src/formats/m3/particles\.ts$
+    rationale: The page helper reads emitter bone matrices from item.instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when the helper no longer reads the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0054-types-M3ModelInstance\.model-is-an-M3Model\.patch$
+    rationale: The exported renderer patch shows the upstream mdx-m3-viewer bone hierarchy field M3ModelInstance.skeleton as diff context. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when this patch no longer carries the bone hierarchy line as context.
+  - rule: bmaybe-b
+    path: ^webviewer/patches/0053-types-the-last-places-compiler-7\.0-refuses-small-cod\.patch$
+    rationale: The exported renderer patch shows the upstream mdx-m3-viewer comment "This is maybe a typed array?" in the M3 parser as diff context. The line is upstream text, unchanged by the patch. Not maybe code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when this patch no longer carries that upstream line as context.

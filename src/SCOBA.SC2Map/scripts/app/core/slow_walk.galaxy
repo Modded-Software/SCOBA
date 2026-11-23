@@ -2,6 +2,9 @@
 // Slow walk on Shift (REQ-SLOW-WALK; Alt until 2026-11-21). Code: systems/input.galaxy.
 
 const string c_SLOW_WALK_BUFF = "SCOBASlowWalk";
+// Kerrigan (operator 2026-11-23): walk 2.6, slow walk 1.3, so her own
+// buff (0.5) and ramp SCOBASlowWalkKerriganRampNN, 1 - 0.5 k / 16.
+const string c_SLOW_WALK_BUFF_KERRIGAN = "SCOBASlowWalkKerrigan";
 // Speed ramp (R-SLOW-21, operator 2026-11-21): walk to slow walk and back
 // over c_SLOW_WALK_RAMP game seconds. c_SLOW_WALK_LEVELS speed levels:
 // level k is the buff SCOBASlowWalkRampNN (k < 16) or c_SLOW_WALK_BUFF

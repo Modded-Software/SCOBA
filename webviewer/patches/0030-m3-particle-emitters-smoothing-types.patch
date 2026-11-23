@@ -1,7 +1,7 @@
 From b96a1490b05c1191f27232e1631a60a51f6a82c9 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sun, 22 Nov 2026 21:27:49 +0200
-Subject: [PATCH 30/51] m3: particle emitters: smoothing types
+Subject: [PATCH 30/55] m3: particle emitters: smoothing types
 
 ---
  src/parsers/m3/particleemitter.ts | 19 +++++++++++++++++++

@@ -15,7 +15,7 @@ WEBVIEWER_DIR="${WEBVIEWER_DIR:-$(git rev-parse --show-toplevel)/webviewer}"
 source "$WEBVIEWER_DIR/scripts/paths.sh" || exit 1
 
 UPSTREAM="https://github.com/flowtsohg/mdx-m3-viewer.git"
-# Upstream master, 2025-08-27. Keep in sync with BASE in tools/build-renderer.mjs.
+# Upstream master, 2025-08-27. Keep in sync with BASE in src/tools/build.ts.
 BASE="2ff0bc00c6363f425016e23d88c0fb2929d3b3cc"
 REF="${REF_DIR:-$WEBVIEWER_DIR/ref/mdx-m3-viewer}"
 PATCHES=("$WEBVIEWER_DIR"/patches/*.patch)

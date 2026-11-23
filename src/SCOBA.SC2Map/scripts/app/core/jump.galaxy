@@ -26,6 +26,9 @@ const fixed c_JUMP_LAND_TIME = 0.25;
 const fixed c_JUMP_BLEND = 0.04;
 // Blend of the aim or strafe walk clip that follows a landing.
 const fixed c_JUMP_RESUME_BLEND = 0.05;
+// Jump legs out to the normal clip choice (operator 2026-11-23: faster;
+// before, AnimClear took the engine default and the next clip 0.15 s).
+const fixed c_JUMP_RELEASE_BLEND = 0.05;
 // Walk jump takeoff: a very short burst of speed (BehaviorData SCOBAJumpBurst).
 const string c_JUMP_BURST = "SCOBAJumpBurst";
 // Its MoveSpeedMultiplier. The engine speed property does not show the buff,
@@ -39,6 +42,8 @@ const fixed c_JUMP_BURST_SPEED = 1.4;
 // LAND of a cycle. Values from scripts/jumpanim/bake.py;
 // jumpanim/validate.py checks them against the built model.
 const fixed c_JUMP_GAIT_CYCLE = 0.667;
+// Kerrigan's walk cycle (her Attack Walk, 0-1000 ms; jumpanim/donor.py).
+const fixed c_JUMP_GAIT_CYCLE_KERRIGAN = 1.0;
 const int c_JUMP_GAIT_STRIDES = 2;
 const fixed c_JUMP_GAIT_FLIGHT = 0.05;
 const fixed c_JUMP_GAIT_FLIGHT_BACK = 0.95;
@@ -67,7 +72,8 @@ fixed[8] gv_jumpCamHeight;  // jump part of the camera height offset (R-JUMP-17)
 int[8] gv_jumpBase;         // lower state of the mixed clip: c_ANIM_LOWER_IDLE or _WALK
 int[8] gv_jumpBaseDir;      // walk direction of the mixed clip
 int[8] gv_jumpLandSpeed100; // fall speed at the last touchdown, x100
-fixed[8] gv_jumpGait;        // tracked walk phase, 0..1 of c_JUMP_GAIT_CYCLE
+fixed[8] gv_jumpGait;        // tracked walk phase, 0..1 of the hero's walk cycle
+fixed[c_ANIM_HERO_COUNT] gv_jumpGaitCycle;  // walk cycle per hero, s
 bool[8] gv_jumpGaitWalking;  // walking on the last jump tick
 bool[8] gv_jumpGaitResume;   // the next aim walk clip starts at gv_jumpGait
 int[8] gv_jumpStride;        // stride of the walk jump clips, -1 if none
@@ -94,6 +100,8 @@ int[8] gv_jumpThumpMs;      // last touchdown, ms after takeoff
 int[8] gv_jumpThumpH100;    // hero height at the last touchdown, x100
 string[c_ANIM_HERO_COUNT][c_JUMP_PHASES] gv_jumpClip;  // clip name prefix per phase
 string[c_ANIM_DIR_COUNT] gv_jumpDirName;  // walk base tokens per direction
+bool[8] gv_jumpReleased;    // the next lower clip follows a jump: short blend
+int[8] gv_jumpReleaseBlendMs;  // blend of the last release, ms (tests)
 string[8] gv_jumpClipLog;  // clips played since the last reset, ";"-separated (tests)
 trigger gt_JumpKey;
 trigger gt_JumpTick;

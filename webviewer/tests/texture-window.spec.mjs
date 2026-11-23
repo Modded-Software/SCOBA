@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
 
-// The texture window (public/js/textures.js): the HD texture viewer in a
+// The texture window (src/page/features/textures): the HD texture viewer in a
 // movable window, hidden until a double-click on a gallery row, an instance
 // row, or an instance in the view. It lists the textures of that unit or
 // doodad: the ones with an HD version, and every other texture of its model
@@ -27,7 +28,7 @@ const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null,
 const win = (page) => page.evaluate(() => window.sc2viewer.textureWindow());
 // A pixel on the unit's picture: the mouse hit goes by pixel.
 const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
-const textureFrame = (page) => page.frames().find((frame) => frame.url().includes('/textures/'));
+const textureFrame = (page) => page.frames().find((frame) => frame.url().includes('/api/sc2/x/textures/'));
 
 /**
  * The texture viewer's own state, once the window's page shows `user` and
@@ -207,7 +208,7 @@ test('a unit with no HD texture shows its original textures, decoded; so does a 
   await expect(page.locator('#texture-window')).toBeHidden();
 
   // A model file added by path is no unit: it goes by its file name.
-  const path = (await (await page.request.get('/api/unit?id=Zergling')).json()).file;
+  const path = (await (await page.request.get(api.record('units', 'Zergling'))).json()).file;
   const id = await page.evaluate((p) => window.sc2viewer.add(p), path);
   await idle(page);
   await page.locator(`#scene li[data-id="${id}"] .head .name`).dblclick();
@@ -217,7 +218,7 @@ test('a unit with no HD texture shows its original textures, decoded; so does a 
 
   // A texture with an HD entry that does not name this user is still the
   // model's: it is listed, with its upscaled side (the page names Marine alone).
-  const marinePath = (await (await page.request.get('/api/unit?id=Marine')).json()).file;
+  const marinePath = (await (await page.request.get(api.record('units', 'Marine'))).json()).file;
   const marine = await page.evaluate((p) => window.sc2viewer.add(p), marinePath);
   await idle(page);
   await page.locator(`#scene li[data-id="${marine}"] .head .name`).dblclick();
@@ -303,7 +304,7 @@ test('the model viewer and the texture viewer share one theme', async ({ page })
   const read = (names) => names.map((name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim());
   const mine = await page.evaluate(read, TOKENS);
   for (const value of mine) expect(value).not.toBe('');
-  await page.goto('/textures/');
+  await page.goto(api.x('textures') + '/');
   await page.waitForFunction(() => Boolean(window.hdtex));
   expect(await page.evaluate(read, TOKENS)).toEqual(mine);
   // Stand-alone, the page shows every entry and is not in its embedded layout.
@@ -314,16 +315,17 @@ test('the model viewer and the texture viewer share one theme', async ({ page })
 });
 
 test('the server serves the texture viewer and its images, and nothing outside its folder', async ({ request }) => {
-  const page = await request.get('/textures/');
+  const page = await request.get(api.x('textures') + '/');
   expect(page.status()).toBe(200);
   expect(page.headers()['content-type']).toContain('text/html');
   expect(await page.text()).toContain('const PAIRS = [{');
-  const image = await request.get('/textures/img/original.png');
+  const image = await request.get(api.x('textures') + '/img/original.png');
   expect(image.status()).toBe(200);
   expect(image.headers()['content-type']).toBe('image/png');
-  expect(await (await request.get('/api/textures')).json()).toMatchObject({ built: true });
+  expect(await (await request.get(api.x('textures'))).json()).toMatchObject({ built: true });
   // Negative: no file, another type, or a path out of the folder.
-  for (const path of ['/textures/img/none.png', '/textures/index.js', '/textures/..%2Fpackage.json', '/textures/%2e%2e/server.mjs', '/textures/..%2F..%2Fwebviewer%2Fpublic%2Findex.html']) {
+  for (const tail of ['/img/none.png', '/index.js', '/..%2Fpackage.json', '/%2e%2e/server.js', '/..%2F..%2Fwebviewer%2Fpublic%2Findex.html', '/../../../package.json']) {
+    const path = api.x('textures') + tail;
     expect((await request.get(path)).status(), path).toBe(404);
   }
 });

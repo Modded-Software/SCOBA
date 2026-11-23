@@ -4,16 +4,20 @@
   "version": "0.2.0",
   "type": "module",
   "scripts": {
-    "build": "node tools/build-renderer.mjs",
-    "start": "node server.mjs",
+    "build": "bash scripts/build.sh",
+    "start": "bash scripts/start.sh",
     "test": "playwright test"
   },
   "dependencies": {
+    "gl-matrix": "3.4.4",
     "mdx-m3-viewer": "5.12.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@types/node": "^24.11.0",
+    "@types/pako": "^2.0.0",
     "esbuild": "^0.25.0",
-    "events": "^3.3.0"
+    "events": "^3.3.0",
+    "typescript": "^7.0.2"
   }
 }

@@ -347,6 +347,7 @@ void gf_AnimFullSet (int lp_player, int lp_state) {
     }
     if (lp_state == c_ANIM_LOWER_NONE) {
         gf_AnimFullClear(lp_player);
+        gv_jumpReleased[lp_player] = false;  // the stock clip took over
         return;
     }
     lv_hero = gv_tPSUNIT[lp_player];
@@ -376,11 +377,11 @@ void gf_AnimFullSet (int lp_player, int lp_state) {
     if (gf_SlowWalkState(lp_state) || gf_SlowWalkState(gv_animFullState[lp_player])) {
         lv_blend = c_ANIM_SLOW_BLEND;  // into or out of the slow walk (R-SLOW-20)
     }
-    if (gv_jumpGaitResume[lp_player]) {
-        // After a landing the walk continues where the End clip stopped: a
-        // short blend, no slide (R-JUMP-22).
+    if (gv_jumpGaitResume[lp_player] || gv_jumpReleased[lp_player]) {
+        // After a landing: a short blend, no slide (R-JUMP-22, 24).
         lv_blend = c_JUMP_RESUME_BLEND;
     }
+    gv_jumpReleased[lp_player] = false;
     ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_LOWER, lv_clip, c_animFlagFullMatch | c_animFlagPlayForever, lv_blend, lv_blend, lv_scale, c_animTimeVariantAsTimeScale));
     gv_slowLowerBlendMs[lp_player] = FixedToInt(lv_blend * 1000.0);
     gf_JumpGaitOnLowerPlay(lp_player, lp_state);  // walk phase after a jump (R-JUMP-18)

@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
 
-// Landmarks the user makes and keeps (public/js/landmarks.js):
+// Landmarks the user makes and keeps (src/page/features/landmarks):
 // - the pin button saves the current view as a landmark, after asking a name;
 // - each landmark of the drop-down list has a trash button, which asks
 //   before it deletes; "origin" has none;
 // - landmarks, the one chosen, the grid toggle and the sky are kept in
-//   localStorage, and the camera comes back exactly (core.js, sky.js).
+//   localStorage, and the camera comes back exactly (core/camera.ts, features/sky).
 
 async function open(page) {
   const errors = [];
@@ -168,7 +169,7 @@ test('landmarks and the chosen one are back after a reload; a deleted one stays 
 test('negative: stored landmarks that are not landmarks are refused and reported', async ({ page }) => {
   await open(page);
   for (const bad of ['not json', JSON.stringify({ list: [{ id: 1, name: 'x', yaw: 0, pitch: 0, distance: -1, target: [0, 0, 0] }], selected: null }), JSON.stringify({ list: 'no', selected: null })]) {
-    await page.evaluate((v) => localStorage.setItem('sc2viewer.landmarks', v), bad);
+    await page.evaluate((v) => localStorage.setItem('viewer.landmarks', v), bad);
     await reload(page);
     const s = await marks(page);
     expect(s.list.map((l) => l.name)).toEqual(['origin (0, 0, 0)']);
@@ -194,7 +195,7 @@ test('the exact camera, the grid toggle and the sky are back after a reload', as
   await drag('left', [], -60, 20);
   await page.mouse.wheel(0, 240);
   await page.waitForFunction(() => window.SC2App.zoomGoal() === null);
-  const sky = (await (await page.request.get('/api/skyboxes?limit=1')).json()).items[0];
+  const sky = (await (await page.request.get(api.backdrops('limit=1'))).json()).items[0];
   await page.evaluate((s) => window.sc2viewer.setSky(s), sky);
   await page.click('#grid-toggle');
   await page.waitForFunction(() => window.sc2viewer.idle());

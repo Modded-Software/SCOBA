@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
 
-// Datasets (server-datasets.mjs): "scoba" (this repo's map over the stock
+// Datasets (src/games/sc2/server/datasets.ts): "scoba" (this repo's map over the stock
 // data, the default), "stock" (the stock data alone) and the test fixture
 // "fx" (scripts/test-fixture.sh: Marine at actor scale 2, with the
 // Zealot's texture as its skin).
@@ -10,7 +11,7 @@ const get = async (request, url) => (await request.get(url)).json();
 const MARINE_SKIN = 'Assets/Textures/marine_diffuse_blood.dds';
 
 test('the datasets are listed, the built-in ones first; none has changed', async ({ request }) => {
-  const body = await get(request, '/api/datasets');
+  const body = await get(request, api.datasets);
   console.log('datasets', JSON.stringify(body));
   expect(body.default).toBe('scoba');
   expect(body.datasets.map((d) => d.id)).toEqual(['scoba', 'stock', 'fx']);
@@ -24,22 +25,24 @@ test('the datasets are listed, the built-in ones first; none has changed', async
     expect(d.doodads).toBeGreaterThan(2000);
     expect(d.signature).toMatch(/^[0-9a-f]{40}$/);
   }
-  expect((await get(request, '/api/health')).datasets).toBe(3);
+  // Negative: health holds no counts.
+  expect((await get(request, api.health)).datasets).toBeUndefined();
 });
 
-test('a request without a dataset reads "scoba"', async ({ request }) => {
-  const plain = await get(request, '/api/unit?id=Marine');
-  const named = await get(request, '/api/unit?id=Marine&dataset=scoba');
-  expect(plain.dataset).toBe('scoba');
-  expect(plain).toEqual(named);
-  expect(await get(request, '/api/units?q=marine&limit=5')).toEqual(await get(request, '/api/units?q=marine&limit=5&dataset=scoba'));
-  expect(await get(request, '/api/facets')).toEqual(await get(request, '/api/facets?dataset=scoba'));
+test('negative: a request without a dataset is refused, not read as "scoba"', async ({ request }) => {
+  for (const url of ['/api/sc2/record/units?id=Marine', '/api/sc2/records/units?q=marine', '/api/sc2/categories', `/api/sc2/asset?kind=texture&ref=${encodeURIComponent(MARINE_SKIN)}`]) {
+    const response = await request.get(url);
+    expect(response.status(), url).toBe(400);
+    expect(await response.json(), url).toEqual({ error: 'dataset is required' });
+  }
+  // Named, it is served.
+  expect((await get(request, api.record('units', 'Marine', 'scoba'))).dataset).toBe('scoba');
 });
 
 test('each dataset gives a unit its own data', async ({ request }) => {
-  const scoba = await get(request, '/api/unit?id=Marine&dataset=scoba');
-  const stock = await get(request, '/api/unit?id=Marine&dataset=stock');
-  const fx = await get(request, '/api/unit?id=Marine&dataset=fx');
+  const scoba = await get(request, api.record('units', 'Marine', 'scoba'));
+  const stock = await get(request, api.record('units', 'Marine', 'stock'));
+  const fx = await get(request, api.record('units', 'Marine', 'fx'));
   console.log('marine actorScale', JSON.stringify({ scoba: scoba.actorScale, stock: stock.actorScale, fx: fx.actorScale }));
   expect(stock).toMatchObject({ dataset: 'stock', inMap: false });
   expect(fx).toMatchObject({ dataset: 'fx', actorScale: [2, 2, 2] });
@@ -55,19 +58,19 @@ test('each dataset gives a unit its own data', async ({ request }) => {
 });
 
 test('negative: what only the map defines is not in the stock dataset', async ({ request }) => {
-  const mine = await get(request, '/api/unit?id=ToshSCOBA&dataset=scoba');
+  const mine = await get(request, api.record('units', 'ToshSCOBA', 'scoba'));
   expect(mine).toMatchObject({ id: 'ToshSCOBA', inMap: true });
   expect(mine.file.startsWith('map\\')).toBe(true);
-  expect((await request.get('/api/unit?id=ToshSCOBA&dataset=stock')).status()).toBe(404);
-  expect((await request.get('/api/unit?id=ToshSCOBA&dataset=fx')).status()).toBe(404);
-  const found = await get(request, '/api/units?q=toshscoba&dataset=stock');
+  expect((await request.get(api.record('units', 'ToshSCOBA', 'stock'))).status()).toBe(404);
+  expect((await request.get(api.record('units', 'ToshSCOBA', 'fx'))).status()).toBe(404);
+  const found = await get(request, api.records('units', 'q=toshscoba', 'stock'));
   expect(found.items.map((i) => i.id)).not.toContain('ToshSCOBA');
   // No stock unit claims to be the map's.
-  const all = await get(request, '/api/units?limit=500&dataset=stock');
+  const all = await get(request, api.records('units', 'limit=500', 'stock'));
   expect(all.items.some((i) => i.inMap)).toBe(false);
   // Doodads too: the map's Zerus tree is 4 to 6 times the size; the stock one is not, and is not the map's.
-  const tree = await get(request, '/api/doodad?id=ZerusTree&dataset=scoba');
-  const stockTree = await get(request, '/api/doodad?id=ZerusTree&dataset=stock');
+  const tree = await get(request, api.record('doodads', 'ZerusTree', 'scoba'));
+  const stockTree = await get(request, api.record('doodads', 'ZerusTree', 'stock'));
   expect(tree).toMatchObject({ dataset: 'scoba', inMap: true, scaleRange: [4, 6] });
   expect(stockTree).toMatchObject({ dataset: 'stock', inMap: false });
   expect(stockTree.scaleRange).not.toEqual([4, 6]);
@@ -75,7 +78,7 @@ test('negative: what only the map defines is not in the stock dataset', async ({
 
 test('an in-model asset path is resolved per dataset: the map layer first, then the storage', async ({ request }) => {
   const bytes = async (dataset) => {
-    const response = await request.get(`/asset?path=${encodeURIComponent(MARINE_SKIN)}&dataset=${dataset}`);
+    const response = await request.get(api.asset(MARINE_SKIN, dataset));
     expect(response.status(), dataset).toBe(200);
     return response.body();
   };
@@ -87,37 +90,39 @@ test('an in-model asset path is resolved per dataset: the map layer first, then 
   // Negative: the map has no file of that name, so "scoba" serves the stock one.
   expect(scoba.equals(stock)).toBe(true);
   // The fixture's file is the Zealot texture.
-  const zealot = await (await request.get(`/asset?path=${encodeURIComponent('Assets/Textures/zealot_diffuse.dds')}&dataset=stock`)).body();
+  const zealot = await (await request.get(api.asset('Assets/Textures/zealot_diffuse.dds', 'stock'))).body();
   expect(fx.equals(zealot)).toBe(true);
   // A path the fixture does not override comes from the storage.
   const other = 'Assets/Textures/zealot_diffuse.dds';
-  expect((await (await request.get(`/asset?path=${encodeURIComponent(other)}&dataset=fx`)).body()).equals(zealot)).toBe(true);
+  expect((await (await request.get(api.asset(other, 'fx'))).body()).equals(zealot)).toBe(true);
 });
 
 test('icons are served per dataset', async ({ request }) => {
-  const marine = await get(request, '/api/unit?id=Marine&dataset=stock');
+  const marine = await get(request, api.record('units', 'Marine', 'stock'));
   expect(marine.icon).toBeTruthy();
   for (const dataset of ['scoba', 'stock', 'fx']) {
-    const response = await request.get(`/icon/${marine.icon}?dataset=${dataset}`);
+    const response = await request.get(api.icon(marine.icon, dataset));
     expect(response.status(), dataset).toBe(200);
     expect((await response.body()).subarray(1, 4).toString('latin1')).toBe('PNG');
   }
   // Negative: a name the catalog does not list is not served, whatever the dataset.
-  expect((await request.get('/icon/../units.json?dataset=fx')).status()).toBe(404);
+  expect((await request.get('/api/sc2/icon/../units.json?dataset=fx')).status()).toBe(404);
 });
 
 test('negative: an unknown dataset is refused on every route', async ({ request }) => {
-  for (const url of ['/api/unit?id=Marine', '/api/units?q=marine', '/api/doodad?id=ZerusTree', '/api/doodads?q=tree', '/api/facets?x=1', `/asset?path=${encodeURIComponent(MARINE_SKIN)}`, '/icon/btn-unit-terran-marine.png?x=1']) {
-    const response = await request.get(`${url}&dataset=nosuch`);
+  const urls = [api.record('units', 'Marine', 'nosuch'), api.records('units', 'q=marine', 'nosuch'), api.record('doodads', 'ZerusTree', 'nosuch'), api.records('doodads', 'q=tree', 'nosuch')];
+  urls.push(api.categories('nosuch'), api.summary('nosuch'), api.file('x.m3', 'nosuch'), api.asset(MARINE_SKIN, 'nosuch'), api.icon('btn-unit-terran-marine.png', 'nosuch'));
+  for (const url of urls) {
+    const response = await request.get(url);
     expect(response.status(), url).toBe(404);
     expect(await response.json(), url).toMatchObject({ error: 'no such dataset', dataset: 'nosuch' });
   }
 });
 
 test('negative: a reload is a POST for a known dataset', async ({ request }) => {
-  expect((await request.get('/api/dataset/reload?id=fx')).status()).toBe(405);
-  expect((await request.post('/api/dataset/reload')).status()).toBe(400);
-  expect((await request.post('/api/dataset/reload?id=nosuch')).status()).toBe(404);
+  expect((await request.get(api.reload('fx'))).status()).toBe(405);
+  expect((await request.post(api.reload('nosuch'))).status()).toBe(404);
   // Other routes still refuse a POST.
-  expect((await request.post('/api/units')).status()).toBe(405);
+  expect((await request.post(api.records('units'))).status()).toBe(405);
+  expect((await request.post(api.datasets)).status()).toBe(405);
 });

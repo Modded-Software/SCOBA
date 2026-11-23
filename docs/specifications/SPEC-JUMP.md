@@ -24,7 +24,9 @@ judge it.
 | R-JUMP-12 | [build] | `jumpanim.validate.check_bones`: leg bone length change <= 0.001 over all 51 clips |
 | R-JUMP-13 | [tested] | `jump_aimwalk`: `midAim`, `midUpper` = aim mid |
 | R-JUMP-14 | [tested] | `jump_aimwalk`: `afterFull` > 0 after recovery |
-| R-JUMP-15 | [tested] | `jump_kerrigan`: full arc, `midOwned` false, empty `clipLog` |
+| R-JUMP-15 | [tested] | `jump_kerrigan`: full arc, phases `1230`, thump, camera |
+| R-JUMP-24 | [tested] [build] [operator] | `jump_stand`, `jump_kerrigan`: `releaseBlendMs` 50; `jump_aimwalk`, `jump_kerrigan_walk`: also `afterBlendMs` 50; no `releasedPending`; negatives: `pressBlendMs` 150 (walk before the jump), `jump_kerrigan_none` `releaseBlendMs` -1; host `test_end_eases_out_in_half_the_clip`. The values are the script's message parameters: the engine blend is not readable. Look: AC-JUMP-2, 8 |
+| R-JUMP-23 | [tested] [build] [operator] | `jump_kerrigan`: `Jump,Start,Stand,Leg`, `Jump,Stand,Leg`, `Jump,End,Stand,Leg`, no stride clip, lower bracket released; `jump_kerrigan_walk`: `Walk,Forward` stride clips, one stride, gait at her 1000 ms cycle; negative `jump_kerrigan_none`: no clip. `jumpanim/donor_check.py`: 51 clips at the phase lengths, no bone under `Bone07`, body height inside the stand and walk range +-0.01 (the source rises 0.85 above it), cut foot within 0.005 of the ground, End seams <= 0.01, `c_JUMP_GAIT_CYCLE_KERRIGAN` = her walk; host `tests/models/test_jump_donor.py`; look: AC-JUMP-8 |
 | R-JUMP-16 | [tested] [build] [operator] | `clipLog` has only clips built on a base (`no bare jump clip`); base Stand in `jump_stand`, `jump_stopjump`, `jump_keystill` (`no stride clip`); base `Walk,Forward` in `jump_aimwalk`, `jump_freewalk`; `jumpanim/validate.py`: stand jump feet <= 0.02 off the stand stance along the ground; walk jump air feet <= 0.02 off the walk stride, stride split >= 0.45, forward width <= 0.75 of the stand width; no bare clip in the model; look: AC-JUMP-6 |
 | R-JUMP-18 | [tested] [build] [operator] | `takeoff stride is the nearest` (mirror of `gf_JumpGaitStride`), `Start, Air, End use the takeoff stride`, `gait phase tracks the walk`, `walk resumes where the landing stops` (aim walk), `walk resume absent` (free walk), `no clip time set in the air`; `jumpanim/validate.py`: flight frames within 0.03 of the pelvis height maxima, seams <= 0.01, gait constants equal the bake's; look: AC-JUMP-2, 6. Not exercised in game: stride 02 (both walk scenarios take off in stride 01). |
 | R-JUMP-19 | [build] [operator] | `jumpanim.validate.check_reference`: seven angles (crouch knee, ankle; air knee, ankle, hip; landing knee, ankle) inside the reference ranges +-5 degrees (F14, F17); the landing read with the feet down (from `FEET_DOWN_MS`); feet flat on the ground; host `LegSolveTest`, `ProfileTest`; look: AC-JUMP-1 |
@@ -38,6 +40,7 @@ Run results go in section 7.
 | ID | Fact | Source |
 | --- | --- | --- |
 | F1 | Tosh has no jump clip. Kerrigan has `Jump End` only. | model dump, `/mnt/ws-fast/inspect/jump_hits.txt` |
+| F18 | Kerrigan `Burrow 01` (0-3667 ms): the body (`Root`, moved by `Bone_Link_Object`) rises 0.56 -> 1.41 by 600 ms with no crouch before it, falls back; the lowest foot is back at its first-frame height (0.037) at 1058 ms; then she sinks to -1.8 by 1500 ms and holds. Her feet hang on `Dummy01`, `Dummy02` beside the body, not on the pelvis. Her stock `Jump End` (1833 ms) also sinks into the ground from 500 ms. | `/tmp/opencode/kmeasure.txt`, `kmeasure2.txt` (`out/SCOBA256.SC2Map` model) |
 | F2 | Spectre shares Tosh's leg bones with the same rest pose. Marine does not. No longer used (F11). | bone dump, `/mnt/ws-fast/inspect/unload.txt` |
 | F3 | Spectre `Unload End`: `Main` z 1.8 -> 0 over 0-333 ms; calves bend 56 -> 130 degrees by 433-466 ms and recover by 1100 ms. No longer used (F11). | `/mnt/ws-fast/inspect/timing.txt` |
 | F11 | The Spectre `Unload End` landing holds the feet 0.12 apart; Tosh stands 0.26 apart (unscaled). Blended onto the stand it held the legs together; forced to the stand width on every base it spread the walk jump sideways. Dropped as a pose source. | `/mnt/ws-fast/inspect/symmetry.sh`; operator reports 2026-11-16 |
@@ -234,6 +237,30 @@ thump is the landing sound. Marker version 43.
 Space (`gv_jUMP`) calls `gf_JumpPress(EventPlayer())` in both control
 modes. The old `DehakaJump` trigger and preload entry are removed.
 
+### 3.6 Kerrigan (`scripts/jumpanim/donor.py`, R-JUMP-23)
+
+Her rig has no thigh, calf and foot chain for the IK bake, so her clips come
+from `Burrow 01` on her lower bones (F18). Same clip names and phases as
+3.4, so the script picks them the same way.
+
+- Cut: the first ms after the apex where the lowest foot is back at its
+  first-frame height (1058 ms).
+- Time: source frame 0 through the crouch (150 ms); 0 to the cut from
+  liftoff to touchdown (150-687 ms, about 2x the clip rate); the cut frame
+  after it.
+- Body rise: every sample moves her top bone (`Bone_Link_Object`) down by
+  the source's `Root` rise above frame 0, so body and feet keep their
+  relative pose and the body stays at stand height.
+- Stand: the source pose at weight 1. Walk: per bone, the walk (phase and
+  stride as 3.4) mixed with the source turned to the walk direction, at
+  `WALK_WEIGHT` 0.5 (location linear, rotation short arc).
+- The source weight eases in over the crouch and out over the first
+  125 ms of End (`END_EASE_MS`, R-JUMP-24), so Start begins and End ends
+  on the base clip.
+- Walk cycle: her walk is 1000 ms (Tosh 667). `gv_jumpGaitCycle[profile]`
+  holds it for the gait tracker and the walk resume.
+- Marker version 52.
+
 ## 4. Files
 
 | File | Content |
@@ -248,11 +275,13 @@ modes. The old `DehakaJump` trigger and preload entry are removed.
 | `scripts/jumpanim/bake.py` | The bake: clip plan, timing, weights, clips. |
 | `scripts/jumpanim/kin.py` | Vectors, clip sampling, forward kinematics. |
 | `scripts/jumpanim/ik.py` | Leg IK, rig, crouch, tuck, point, gather, reference angles. |
+| `scripts/jumpanim/donor.py` | Kerrigan's bake from `Burrow 01` (3.6). |
+| `scripts/jumpanim/donor_check.py` | Map checks of that bake. |
 | `scripts/jumpanim/validate.py` | Map checks: clips, names, bones, stance, gather, stride, air drift, walk rate, seams, reference angles, thump ids, camera smoothing. |
 | `src/.../Base.SC2Data/GameData/CameraData.xml` | Follow target and height offset smoothing 0. |
 | `src/.../Base.SC2Data/GameData/BehaviorData.xml` | `SCOBAJumpBurst`: takeoff speed x1.4 for 0.2 s. `c_JUMP_BURST_SPEED` in `core/jump.galaxy` carries the same value for the Start clip rate. |
 | `scripts/testkit/galaxy/jump.galaxy`, `profiles/jump.py`, `profiles/jump_rates.py` | In-game test. `jump_rates.py`: burst, clip rates, landing (R-JUMP-22). |
-| `scripts/testkit/tests/test_character_anim_jump.py`, `test_character_anim_jump_ik.py` | Host tests. |
+| `scripts/testkit/tests/test_character_anim_jump.py`, `test_character_anim_jump_ik.py`, `models/test_jump_donor.py` | Host tests. |
 
 ## 5. Tests
 
@@ -272,12 +301,15 @@ height), `clipLog`, press inputs.
 | `jump_freewalk` | body | free walk (`gf_ForwardBegin`), `Walk,Forward` clips, stride | no walk resume (stock walk) |
 | `jump_keystill` | body | key held, no travel | Stand, not walk, no stride |
 | `jump_switch` | hero | old unit back at 0 | no thump, camera part 0 |
-| `jump_kerrigan` | hero | flight, camera | no jump clip |
+| `jump_kerrigan` | hero | flight, camera, Stand clips | no stride clip; lower bracket released |
+| `jump_kerrigan_walk` | hero | aim walk, `Walk,Forward` stride clips, gait at 1000 ms | no clip time set in the air |
+| `jump_kerrigan_none` | hero | (none) | no height, no start, no clip |
 
 ## 6. Known limits
 
 - The aim ray origin uses the ground height while airborne (O-JUMP-1).
-- Kerrigan has no jump clips (O-JUMP-2).
+- Kerrigan's source has no crouch before the leap: her Start clip holds the
+  first frame through the takeoff crouch (F18).
 - The takeoff clip begins up to a quarter walk cycle from the tracked phase
   (O-JUMP-4). Stride 02 is built and checked at build time; no in-game
   scenario takes off in it.
@@ -315,3 +347,6 @@ height), `clipLog`, press inputs.
 | `tps/20261116-192438` | `d6bcf1b3bbaa-071d5a3c06a98238` | failures: 26, same checks as the baseline. |
 | `jump/20261117-014046` | `53218f36484e-da48f9bd6e36fa6a` | failures: 4. Speed property shows no burst (F16); Start scale without the burst (code bug). |
 | `jump/20261117-014722` | `53218f36484e-66852ba562d8b843` | failures: 0. Start scale x `c_JUMP_BURST_SPEED`; burst by travel. |
+| `jump/20261123-154541` | `3a640a05615d-ee6bc456aa076030` | `hero` group, failures: 0. Kerrigan stand and walk jump clips from `Burrow 01` (R-JUMP-23). |
+| `jump/20261123-154908` | `3a640a05615d-ee6bc456aa076030` | failures: 10, all `jump_freewalk` plus `jump_stopjump walked10`: Tosh does not move under `gf_ForwardBegin` (`moved10` 0; 19 in every run up to 11-19). Regression since 11-19, not isolated. |
+| `jump/20261123-160359` | `3a640a05615d-05d14ea843567d5f` | failures: 10, the same free walk checks only. R-JUMP-24 blends pass: release 50 ms, next clip 50 ms, walk before the jump 149 ms. |

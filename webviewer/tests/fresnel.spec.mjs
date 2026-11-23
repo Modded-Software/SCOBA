@@ -73,6 +73,14 @@ test('negative: a model with no fresnel layer draws the same frame with the term
   await page.evaluate(() => window.sc2viewer.view({ yaw: -Math.PI / 2, pitch: 0.2, distance: 4, target: [0, 0, 0.8] }));
   const s = await onOff(page);
   expect(s.on.pixels).toBeGreaterThan(500);
-  expect(s.on).toEqual(s.off);
+  console.log('marine', JSON.stringify(s));
+  // The same frame, within render noise: two renders of one still scene can
+  // differ by a level in a few pixels (full87: one pixel, one level).
+  // Operator 2026-11-23: a small tolerance. The real term moves the mean
+  // brightness by over 20 levels (the Diablo test).
+  expect(Math.abs(s.on.pixels - s.off.pixels)).toBeLessThanOrEqual(5);
+  for (let c = 0; c < 3; c++) expect(Math.abs(s.on.mean[c] - s.off.mean[c]), `channel ${c}`).toBeLessThan(0.05);
+  expect(Math.abs(s.on.white - s.off.white)).toBeLessThan(0.001);
+  expect(Math.abs(s.on.redShare - s.off.redShare)).toBeLessThan(0.001);
   expect(errors).toEqual([]);
 });

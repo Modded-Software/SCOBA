@@ -8,7 +8,7 @@ PNG.
 The stack is the stock data (hitvolumes.resolve.STACK) of a dataset, then
 the dataset's map layer when it has one: a folder shaped like an SC2Map
 (Base.SC2Data/GameData, enUS.SC2Data/LocalizedData, Assets). "--map none"
-builds from the stock data alone. Datasets: webviewer/server-datasets.mjs.
+builds from the stock data alone. Datasets: webviewer/src/games/sc2/server/datasets.ts.
 Stock catalogs must be extracted first; see webviewer/scripts/catalog.sh.
 
 Run it through webviewer/scripts/catalog.sh. That script puts scripts/ and

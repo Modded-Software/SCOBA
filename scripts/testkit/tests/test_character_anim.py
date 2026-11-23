@@ -227,7 +227,35 @@ class SlowWalkTest(unittest.TestCase):
         self.assertEqual(slowwalk.RAMP_IN[-1], 0.3)
         self.assertEqual(slowwalk.RAMP_OUT[-1], 1.0)
         source = app_text("systems", "input.galaxy")
-        self.assertIn('return c_SLOW_WALK_BUFF + "Ramp0" + IntToString(lp_level);', source)
+        self.assertIn('return lv_buff + "Ramp0" + IntToString(lp_level);', source)
+
+    def test_kerrigan_speed_and_buff(self) -> None:
+        # Operator 2026-11-23 (R-SLOW-22): walk 2.6, slow walk 1.3: her own
+        # 0.5 buff and ramp 1 - 0.5 k / 16; Tosh's buff stays 0.3.
+        units = (BEHAVIOR_DATA.parent / "UnitData.xml").read_text(encoding="utf-8")
+        unit = re.search(r'<CUnit id="KerriganSCOBA" parent="Kerrigan">(.*?)</CUnit>', units, re.S)
+        self.assertIsNotNone(unit)
+        self.assertEqual(re.findall(r'<Speed value="([0-9.]+)"/>', unit.group(1)), ["2.6"])
+        self.assertEqual(slowwalk.KERRIGAN_PROP1000, (2600, 1300))
+        text = BEHAVIOR_DATA.read_text(encoding="utf-8")
+        block = re.search(r'<CBehaviorBuff id="SCOBASlowWalkKerrigan">(.*?)</CBehaviorBuff>', text, re.S)
+        self.assertIsNotNone(block)
+        self.assertEqual(float(re.search(r'MoveSpeedMultiplier="([0-9.]+)"', block.group(1)).group(1)), 0.5)
+        self.assertAlmostEqual(sum(slowwalk.KERRIGAN_SLOW_RATIO) / 2.0, 0.5)
+        for k in range(1, 16):
+            ramp = re.search(rf'<CBehaviorBuff id="SCOBASlowWalkKerriganRamp{k:02d}">(.*?)</CBehaviorBuff>', text, re.S)
+            self.assertIsNotNone(ramp, k)
+            value = float(re.search(r'MoveSpeedMultiplier="([0-9.]+)"', ramp.group(1)).group(1))
+            self.assertAlmostEqual(value, 1.0 - 0.5 * k / 16.0, places=5)
+            self.assertNotIn("<Duration", ramp.group(1))
+        self.assertNotIn('id="SCOBASlowWalkKerriganRamp16"', text)
+        self.assertEqual(slowwalk.KERRIGAN_RAMP_IN[-1], 0.5)
+        self.assertEqual(slowwalk.KERRIGAN_RAMP_OUT[-1], 1.0)
+        core = app_text("core", "slow_walk.galaxy")
+        self.assertIn('const string c_SLOW_WALK_BUFF_KERRIGAN = "SCOBASlowWalkKerrigan";', core)
+        source = app_text("systems", "input.galaxy")
+        self.assertIn("return c_SLOW_WALK_BUFF_KERRIGAN;", source)
+        self.assertIn("gf_SlowWalkLevelBuff(lv_hero, lv_level)", source)
 
     def test_slow_blend_is_three_times(self) -> None:
         # Operator 2026-11-21: into and out of the slow walk 3 x the 0.15 s blend.

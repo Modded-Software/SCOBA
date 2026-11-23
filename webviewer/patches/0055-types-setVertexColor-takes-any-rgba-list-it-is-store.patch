@@ -1,0 +1,24 @@
+From 7ac1103a8d918a0c34ba2bcf0ef6d20a079a98fe Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 15:46:32 +0200
+Subject: [PATCH 55/55] types: setVertexColor takes any rgba list (it is stored
+ as floats)
+
+---
+ src/viewer/handlers/m3/modelinstance.ts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index c695e0d7..c77db500 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -354,7 +354,8 @@ export default class M3ModelInstance extends ModelInstance {
+     return this;
+   }
+ 
+-  setVertexColor(color: Uint8Array): this {
++  /** The vertex colour, rgba, each 0 to 1 (it is stored in a Float32Array). */
++  setVertexColor(color: ArrayLike<number>): this {
+     this.vertexColor.set(color);
+ 
+     return this;

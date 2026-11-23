@@ -1,0 +1,127 @@
+From 1989c174abba0bc2c1b9b91e34d99e68010fe095 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 14:43:36 +0200
+Subject: [PATCH 53/55] types: the last places compiler 7.0 refuses (small code
+ changes)
+
+billboard: the 3x3 scratch matrix is a Float32Array(9). It was mat3.create(), whose type has no set(); every use fills all nine values first.
+
+skeletalnode: vec3.set(localScale, 1, 1, 1) in place of fill(1), which the vec3 type of gl-matrix 3.4.4 does not have.
+
+viewer: image bytes held in shared memory fail with a clear error before the Blob is made.
+
+indexentry: the tag table has a type. The UnsupportedEntry branch inside the loop was never reached (the constructor returns above it) and is removed.
+---
+ src/parsers/m3/indexentry.ts        | 25 ++++++++++++++++---------
+ src/viewer/handlers/m3/billboard.ts |  5 +++--
+ src/viewer/skeletalnode.ts          |  2 +-
+ src/viewer/viewer.ts                |  9 ++++++++-
+ 4 files changed, 28 insertions(+), 13 deletions(-)
+
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index adc03fb5..899add2e 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -26,9 +26,19 @@ import BillboardBehavior from './billboardbehavior';
+ import ParticleCopy from './particlecopy';
+ import Light from './light';
+ 
++/** The struct classes of the index. Each is made empty, then loaded from its bytes. */
++type StructClass = typeof Md34 | typeof ModelHeader | typeof Sequence | typeof Stc | typeof Stg | typeof Sts | typeof Bone | typeof Division | typeof Region | typeof Batch | typeof MaterialReference | typeof StandardMaterial | typeof Layer | typeof Event | typeof BoundingSphere | typeof AttachmentPoint | typeof Camera | typeof Sd | typeof Light | typeof DisplacementMaterial | typeof CompositeMaterialSection | typeof CompositeMaterial | typeof ParticleEmitter | typeof ParticleCopy | typeof BillboardBehavior;
++
++/** A row of tagMapping: the class (UnsupportedEntry for a struct that is never read) and the byte size by version. */
++type TagRow = [StructClass | typeof UnsupportedEntry, { [version: number]: number }];
++
++/** True for the class of the structs that are never read. */
++function isUnsupported(constructor: StructClass | typeof UnsupportedEntry): constructor is typeof UnsupportedEntry {
++  return constructor === UnsupportedEntry;
++}
+ 
+ // Mapping from entry tags, to their constructors and known version->size values.
+-const tagMapping = {
++const tagMapping: { [tag: string]: TagRow } = {
+   // Objects
+   MD34: [Md34, { 11: 24 }],
+   MODL: [ModelHeader, { 23: 784, 25: 808, 26: 820, 28: 844, 29: 856 }],
+@@ -135,7 +145,7 @@ export default class IndexEntry {
+       const entrySize = mapping[1][version];
+ 
+       // Structs that are never read (particles, physics, ...) need no known size.
+-      if (constructor === UnsupportedEntry) {
++      if (isUnsupported(constructor)) {
+         this.entries = [];
+         stream.seek(readerOffset);
+         return;
+@@ -160,15 +170,12 @@ export default class IndexEntry {
+         // If some bytes aren't read, the error will not carry to the next object.
+         // Since new versions of objects usually add data to the end, this allows the parser to work, even if trying to load newer versions.
+         // Of course, the new version size needs to be added to IndexEntry.tagMapping, when finding one.
+-        if (constructor === UnsupportedEntry) {
+-          this.entries[i] = new UnsupportedEntry(stream.substream(entrySize), version, index);
+-        } else {
+-          const entry = new constructor();
++        // UnsupportedEntry never gets here: it returned above.
++        const entry = new constructor();
+ 
+-          entry.load(stream.substream(entrySize), version, index);
++        entry.load(stream.substream(entrySize), version, index);
+ 
+-          this.entries[i] = entry;
+-        }
++        this.entries[i] = entry;
+       }
+       // This is maybe a typed array?
+     } else if (tag === 'CHAR' || tag === 'SCHR') {
+diff --git a/src/viewer/handlers/m3/billboard.ts b/src/viewer/handlers/m3/billboard.ts
+index f9a67ca9..3121fed6 100644
+--- a/src/viewer/handlers/m3/billboard.ts
++++ b/src/viewer/handlers/m3/billboard.ts
+@@ -1,4 +1,4 @@
+-import { mat3, mat4, quat, vec3 } from 'gl-matrix';
++import { mat4, quat, vec3 } from 'gl-matrix';
+ import BillboardBehavior from '../../../parsers/m3/billboardbehavior';
+ 
+ /**
+@@ -133,7 +133,8 @@ const basisHeap = new Float32Array(9);
+ const q = quat.create();
+ const parentQ = quat.create();
+ const local = mat4.create();
+-const m3Heap = mat3.create();
++// A 3x3 matrix as nine floats. Every use fills all nine first.
++const m3Heap = new Float32Array(9);
+ 
+ /** A rotation from rows: normalised first two, the third rebuilt (M3Node_GetWorldRotationQuat). */
+ function rotationOf(out: quat, m: mat4 | Float32Array): quat {
+diff --git a/src/viewer/skeletalnode.ts b/src/viewer/skeletalnode.ts
+index 8f09470c..155ccb2a 100644
+--- a/src/viewer/skeletalnode.ts
++++ b/src/viewer/skeletalnode.ts
+@@ -64,7 +64,7 @@ export class SkeletalNode {
+ 
+     this.localRotation[3] = 1;
+ 
+-    this.localScale.fill(1);
++    vec3.set(this.localScale, 1, 1, 1);
+ 
+     this.localMatrix[0] = 1;
+     this.localMatrix[5] = 1;
+diff --git a/src/viewer/viewer.ts b/src/viewer/viewer.ts
+index fb1d397b..473db81f 100644
+--- a/src/viewer/viewer.ts
++++ b/src/viewer/viewer.ts
+@@ -299,7 +299,14 @@ export default class ModelViewer extends EventEmitter {
+             const type = detectMime(actualSrc);
+ 
+             if (type.length) {
+-              return new ImageTexture(await blobToImage(new Blob([actualSrc.buffer], { type })), { viewer: this, fetchUrl, pathSolver });
++              const buffer = actualSrc.buffer;
++
++              // A Blob takes no shared memory.
++              if (!(buffer instanceof ArrayBuffer)) {
++                throw new Error('An image held in shared memory cannot be loaded');
++              }
++
++              return new ImageTexture(await blobToImage(new Blob([buffer], { type })), { viewer: this, fetchUrl, pathSolver });
+             }
+           }
+ 

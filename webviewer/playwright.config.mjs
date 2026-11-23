@@ -50,7 +50,8 @@ export default defineConfig({
     { name: 'shared', testMatch: SHARED, dependencies: ALL ? ['main', 'slow'] : ['main'] },
   ],
   webServer: {
-    command: 'node server.mjs',
+    // Built by scripts/test.sh (src/tools/build.ts) before the run.
+    command: 'node build/server.js',
     url: `http://127.0.0.1:${PORT}/api/health`,
     env: { PORT: String(PORT) },
     reuseExistingServer: false,

@@ -53,6 +53,11 @@
   <button id="instances-tab" class="drawer-tab" title="hide the instances" aria-controls="instances"></button>
   </div>
   <nav id="view-tools">
+    <div id="scenes">
+      <button id="scenes-button" title="scenes: open, make, rename, delete, export, import"></button>
+      <ul id="scenes-list" hidden></ul>
+    </div>
+    <input id="scenes-import-file" type="file" accept=".json,application/json" hidden>
     <div id="landmarks">
       <button id="landmarks-button" title="landmarks: jump to a saved view"></button>
       <ul id="landmarks-list" hidden></ul>
@@ -61,31 +66,8 @@
     <button id="grid-toggle" class="on" title="hex grid ground">grid</button>
     <button id="sky-button" title="choose a skybox">sky</button>
   </nav>
-  <script src="/vendor/renderer.js"></script>
-  <script src="/components.js"></script>
-  <script src="/ground.js"></script>
-  <script src="/outline.js"></script>
-  <script src="/pickbuffer.js"></script>
-  <script src="/displacement.js"></script>
-  <script src="/js/core.js"></script>
-  <script src="/js/side.js"></script>
-  <script src="/js/datasets.js"></script>
-  <script src="/js/controls.js"></script>
-  <script src="/js/scene.js"></script>
-  <script src="/js/panels.js"></script>
-  <script src="/js/doodads.js"></script>
-  <script src="/js/landmarks.js"></script>
-  <script src="/js/addall.js"></script>
-  <script src="/js/drag.js"></script>
-  <script src="/js/sky.js"></script>
-  <script src="/js/pick.js"></script>
-  <script src="/js/select.js"></script>
-  <script src="/js/clipboard.js"></script>
-  <script src="/js/inspect.js"></script>
-  <script src="/js/textures.js"></script>
-  <script src="/js/hd.js"></script>
-  <script src="/js/particles.js"></script>
-  <script src="/js/billboards.js"></script>
-  <script src="/js/main.js"></script>
+  <!-- The page is one bundle (src/page/main.ts). When it does not load, nothing of the page runs: these lines say so, naming the file. -->
+  <p id="load-failure" role="alert" hidden></p>
+  <script src="/vendor/renderer.js" onerror="const text = 'page bundle did not load: ' + this.getAttribute('src') + '; restart the viewer server'; console.error('sc2viewer: ' + text); const node = document.getElementById('load-failure'); node.textContent = text; node.hidden = false;"></script>
 </body>
 </html>

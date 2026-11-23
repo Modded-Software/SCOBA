@@ -1,0 +1,24 @@
+From 38bf820ad2ebb01c299102e23f210abd603e3b46 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 15:17:21 +0200
+Subject: [PATCH 54/55] types: M3ModelInstance.model is an M3Model
+
+The constructor takes an M3Model and every method casts this.model to
+one. A declared field says so to callers. It emits no code.
+---
+ src/viewer/handlers/m3/modelinstance.ts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index febbe7fa..c695e0d7 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -19,6 +19,8 @@ const boneHeap = mat4.create();
+  * An M3 model instance.
+  */
+ export default class M3ModelInstance extends ModelInstance {
++  /** The constructor takes an M3Model; the declaration says so to callers. Emits nothing. */
++  declare model: M3Model;
+   skeleton: M3Skeleton | null = null;
+   teamColor = 0;
+   vertexColor = new Float32Array([1, 1, 1, 1]);

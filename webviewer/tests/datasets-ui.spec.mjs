@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { flush, reloadScene, sceneOf, settled } from './scene.mjs';
 
-// Datasets in the page (public/js/datasets.js, scene.js): the dataset the
+// Datasets in the page (src/page/core/datasets.ts, scene.ts): the dataset the
 // gallery lists and new instances come from, and the dataset of each
 // placed instance, which can be swapped to compare data and textures.
 // Datasets here: scoba (default), stock, and the fixture fx (Marine at
 // actor scale 2 with the Zealot's skin; scripts/test-fixture.sh).
 
-async function open(page, hash = '') {
+async function open(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + hash);
+  await page.goto('/');
   await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
   return errors;
 }
@@ -85,11 +86,9 @@ test('choosing a dataset relists the gallery; new instances come from it; the ch
   await page.fill('#doodad-search', 'zerus tree');
   await expect(page.locator('#doodads li[data-id="ZerusTree"] .sub')).not.toContainText('in map');
 
-  await page.reload();
-  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready))).toBe(true);
+  await reloadScene(page);
   await expect(page.locator('#dataset')).toHaveValue('stock');
-  await idle(page);
-  // The instance from the URL keeps its own dataset.
+  // The instance from the stored scene keeps its own dataset.
   item = (await state(page)).items[0];
   expect(item).toMatchObject({ unit: 'Marine', dataset: 'stock' });
   // Negative: back on scoba the map's unit is listed again.
@@ -170,7 +169,7 @@ test('textures come from the instance\'s dataset: the same model, another skin',
   expect(errors).toEqual([]);
 });
 
-test('instances of different datasets stand side by side and are kept in the URL', async ({ page }) => {
+test('instances of different datasets stand side by side and are kept in the scene', async ({ page }) => {
   await open(page);
   await addUnit(page, 'Marine', { x: -3, y: 0, pick: 0.5 });
   await addUnit(page, 'Marine', { x: 0, y: 0, pick: 0.5, dataset: 'stock' });
@@ -184,13 +183,16 @@ test('instances of different datasets stand side by side and are kept in the URL
   // The stock tree does not have the map's 4 to 6 times scale.
   expect(s.items[3].dataScale[0]).toBeLessThan(4);
 
-  const hash = await page.evaluate(() => location.hash);
-  const saved = JSON.parse(decodeURIComponent(hash.slice(1)));
-  // The default dataset is not written; the others are.
-  expect(saved.map((e) => e.ds)).toEqual([undefined, 'stock', 'fx', 'stock']);
+  const saved = await sceneOf(page);
+  // Every item names its dataset, the default one too.
+  expect(saved.items.map((e) => e.dataset)).toEqual(['scoba', 'stock', 'fx', 'stock']);
+  // Negative: the address holds none of it.
+  expect(new URL(page.url()).hash).toBe('');
+  // A fresh page of the same browser opens the same stored scene.
+  await flush(page);
   const fresh = await page.context().newPage();
-  await open(fresh, hash);
-  await idle(fresh);
+  await open(fresh);
+  await settled(fresh);
   s = await state(fresh);
   expect(scales(s).slice(0, 3)).toEqual([['scoba', 1.25], ['stock', 1], ['fx', 2]]);
   expect(s.items[3]).toMatchObject({ doodad: 'ZerusTree', dataset: 'stock', variation: 2 });

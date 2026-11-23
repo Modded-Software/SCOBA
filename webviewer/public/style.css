@@ -5,7 +5,7 @@ html, body { overflow: hidden; }
 
 /* One column on the left: the gallery on top, the instances below it, each
    exactly half the window height (operator 2026-11-21). Each is a drawer:
-   its tab slides it out to the left (side.js). The column itself takes no
+   its tab slides it out to the left (src/page/ui/drawers.ts). The column itself takes no
    mouse, so the view under a closed drawer is reachable. */
 #side { position: fixed; top: 0; left: 0; width: 320px; height: 100vh; display: flex; flex-direction: column; pointer-events: none; }
 #panel, #instances { height: 50vh; flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px; min-height: 0; overflow: hidden; pointer-events: auto; background: var(--glass); backdrop-filter: blur(14px); border-right: 1px solid var(--line); transition: transform 0.2s ease-out; }
@@ -58,7 +58,9 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 
 #results button { width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; direction: rtl; }
 
-/* The status toast (core.js): top centre of the view. */
+/* The page bundle did not load (index.html): the message, top centre. */
+#load-failure { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); margin: 0; padding: 6px 12px; color: var(--warn); background: #000c; }
+/* The status toast (page/ui/status.ts): top centre of the view. */
 #status { max-width: min(640px, 60vw); word-break: break-word; cursor: pointer; }
 /* Its message log (a click on the toast): oldest first, the newest at the bottom. */
 #status-log { max-height: 60vh; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
@@ -92,6 +94,13 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 #landmarks-list .go { flex: 1; text-align: left; }
 #landmarks-list .trash:hover { color: var(--danger); }
 #landmark-pin, #landmarks-list .trash { display: flex; align-items: center; }
+#scenes-button { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+#scenes-button::after { content: ' \25BE'; }
+#scenes-list .go { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+#scenes-list .rename, #scenes-list .trash { display: flex; align-items: center; }
+#scenes-list .trash:hover { color: var(--danger); }
+#scenes-list li.refused .go { color: var(--danger); }
+#scenes-list li.actions { gap: 4px; justify-content: flex-end; }
 #landmark-name { width: 100%; }
 
 #select-rect { position: fixed; z-index: 9; border: 1px solid var(--accent); border-radius: 2px; background: rgba(122, 162, 255, 0.12); pointer-events: none; }

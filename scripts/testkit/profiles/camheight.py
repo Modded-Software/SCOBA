@@ -88,3 +88,62 @@ def check_camheight(checks) -> None:
     want = 1000.0 * BASE_OFFSET * table["SCOBAVikingHeroAssault"] / table["ToshSCOBA"]
     ok = applied is not None and abs(applied - want) <= TOL and applied > 2000
     _report(checks, "cam_viking_land camera at the landed height", ok, f"applied={applied} want={want:.0f}")
+
+
+# Camera ground clamp (operator 2026-11-23): raw traces per game loop.
+CLAMP_CASES = ("clamp_tps_sweep", "clamp_pnc_sweep", "clamp_tps_walk", "clamp_tps_up", "clamp_tps_free")
+CLAMP_LOOPS = 48
+SETTLE_FROM = 36  # the sweep holds its pitch from loop 33; 0.2 s more for the blend
+SETTLE_TOL = 60  # 0.06: the blend and the 0.03 deadband
+
+
+def _series(checks, section: str, key: str) -> list[int]:
+    return [int(v) for v in (checks.value(section, "", key) or "").split()]
+
+
+def reversals(values: list[int], noise: int = 10) -> int:
+    """Direction changes of a series, steps under noise ignored."""
+    turns, last = 0, 0
+    for a, b in zip(values, values[1:]):
+        step = b - a
+        if abs(step) <= noise:
+            continue
+        sign = 1 if step > 0 else -1
+        if last and sign != last:
+            turns += 1
+        last = sign
+    return turns
+
+
+def check_camclamp(checks) -> None:
+    for section in CLAMP_CASES:
+        dist, safe, clear = (_series(checks, section, key) for key in ("dist", "safe", "clear"))
+        print(f"{section} pitch x10: {_series(checks, section, 'pitches')}")
+        print(f"{section} tick log (tick:safe/dist/pitch10/yaw/tx,ty,tz,ground): {checks.value(section, '', 'tickLog')}")
+        raw = " ".join(f"{key}={checks.value(section, '', key)}" for key in ("pitch100", "desired1000", "height1000", "targetZ1000", "groundZ1000", "tps"))
+        print(f"{section} raw: {raw}")
+        print(f"{section} dist: {dist}")
+        print(f"{section} safe: {safe}")
+        print(f"{section} clear: {clear}")
+        print(f"{section} dist reversals={reversals(dist)} safe reversals={reversals(safe)} eye below ground={sum(1 for c in clear if c < 0)}")
+        _report(checks, f"{section} traced", len(dist) == len(safe) == len(clear) == CLAMP_LOOPS, f"n={len(dist)}")
+        if len(dist) != CLAMP_LOOPS:
+            continue
+        # Engine state: the eye never under the ground (the bounce dipped it
+        # to -0.43, run combat/20261123-144957).
+        low = min(clear)
+        _report(checks, f"{section} eye stays above the ground", low >= 0, f"min clear1000={low}")
+        # Once the pitch holds: no bounce, and the distance settles on the clamp.
+        tail = dist[SETTLE_FROM:]
+        turns = reversals(tail)
+        _report(checks, f"{section} distance settles, no bounce", turns == 0, f"reversals={turns} tail={tail}")
+        last = safe[-1]
+        _report(checks, f"{section} distance at the clamp", abs(dist[-1] - min(last, 6000)) <= SETTLE_TOL, f"dist={dist[-1]} safe={last}")
+    # The negative case: clear of the ground, the full arm.
+    checks.eq("clamp_tps_free", "", "desired1000", 6000)
+    free = _series(checks, "clamp_tps_free", "safe")
+    _report(checks, "clamp_tps_free no clamp", bool(free) and min(free) == 6000, f"min safe={min(free) if free else None}")
+    # The sweeps reach the ground: the clamp must act (else the test proves nothing).
+    for section in ("clamp_tps_sweep", "clamp_pnc_sweep"):
+        safe = _series(checks, section, "safe")
+        _report(checks, f"{section} clamp acts", bool(safe) and min(safe) < 6000, f"min safe={min(safe) if safe else None}")

@@ -4,6 +4,6 @@ set -euo pipefail
 WEBVIEWER_DIR="${WEBVIEWER_DIR:-$(git rev-parse --show-toplevel)/webviewer}"
 source "$WEBVIEWER_DIR/scripts/paths.sh" || exit 1
 bash scripts/ref-setup.sh
-node tools/build-renderer.mjs
+bash scripts/tool.sh build
 bash scripts/catalog.sh --if-missing
-exec node server.mjs
+exec node build/server.js

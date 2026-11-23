@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+[Unit]
+Description=SC2 model viewer dev server, liveness check
+After={{ viewer_unit }}.service
+
+[Service]
+Type=oneshot
+WorkingDirectory={{ viewer_dir }}
+Environment="PATH={{ viewer_path }}"
+Environment="VIEWER_UNIT={{ viewer_unit }}"
+Environment="PORT={{ viewer_port }}"
+Environment="HOST={{ viewer_host }}"
+ExecStart=/bin/bash {{ viewer_dir }}/scripts/healthcheck.sh
+StandardOutput=inherit
+StandardError=inherit
+SyslogIdentifier={{ viewer_unit }}-healthcheck

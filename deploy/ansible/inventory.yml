@@ -1,0 +1,5 @@
+# The dev server is this machine, as the user who owns the checkout. No root.
+all:
+  hosts:
+    localhost:
+      ansible_connection: local

@@ -14,7 +14,9 @@ WEBVIEWER_DIR="${WEBVIEWER_DIR:-$(git rev-parse --show-toplevel)/webviewer}"
 source "$WEBVIEWER_DIR/scripts/paths.sh" || exit 1
 export WEBVIEWER_DATASETS="$WEBVIEWER_DATA/test-datasets"
 bash scripts/ref-setup.sh
-node tools/build-renderer.mjs
+# A type error ends the run before any test starts (R-VIEW-13).
+bash scripts/typecheck.sh
+bash scripts/tool.sh build
 bash scripts/catalog.sh --if-missing
 bash scripts/test-fixture.sh
 # The texture viewer the tests open: the real page template with four entries.

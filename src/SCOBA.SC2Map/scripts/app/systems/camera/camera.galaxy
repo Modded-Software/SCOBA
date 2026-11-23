@@ -31,8 +31,14 @@ string[8] gv_cameraHeightType;
 const fixed c_CAMERA_MORPH_BLEND = 0.5;
 trigger gt_CameraMorphTick;
 
+// The camera height offset over the target's ground: the one value the
+// height writer sends and the ground clamp measures from.
+fixed gf_CameraHeightTotal (int lp_player) {
+    return gf_CameraHeightBase(lp_player) + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player] + gv_dropCamHeight[lp_player] + gf_CameraUnitLift(lp_player);
+}
+
 void gf_CameraHeightApply (int lp_player, fixed lp_time) {
-    fixed lv_height = gf_CameraHeightBase(lp_player) + gv_quakeHeight[lp_player] + gv_jumpCamHeight[lp_player] + gv_dropCamHeight[lp_player] + gf_CameraUnitLift(lp_player);
+    fixed lv_height = gf_CameraHeightTotal(lp_player);
 
     gv_cameraHeightType[lp_player] = UnitGetType(gv_tPSUNIT[lp_player]);
     // Velocity 0, deceleration 0: a plain linear blend over lp_time. The old

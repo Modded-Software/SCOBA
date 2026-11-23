@@ -1,11 +1,12 @@
 import { readFile, utimes, writeFile } from 'node:fs/promises';
+import { api } from './api.mjs';
 import { join } from 'node:path';
 
 import { test, expect } from '@playwright/test';
 
 // A dataset whose files changed on disk: the page notices, and a toast
 // slides up at the bottom centre of the view asking to reload the data
-// (public/js/datasets.js). Yes rebuilds the dataset and reloads the page;
+// (src/page/features/dataset-reload). Yes rebuilds the dataset and reloads the page;
 // no hides the toast until the files change again.
 // The test edits the fixture dataset fx (scripts/test-fixture.sh) and puts
 // it back as it was.
@@ -15,10 +16,10 @@ const ACTORS = join(ROOT ?? '', 'fx', 'map', 'Base.SC2Data', 'GameData', 'ActorD
 // The change time test-fixture.sh gives every fixture file.
 const STAMP = new Date('2026-01-01T00:00:00');
 
-async function open(page, hash = '') {
+async function open(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + hash);
+  await page.goto('/');
   await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
   return errors;
 }
@@ -27,7 +28,7 @@ const state = (page) => page.evaluate(() => window.sc2viewer.state());
 const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 30_000 });
 const toast = (page) => page.evaluate(() => window.SC2App.datasetToast());
 const check = (page) => page.evaluate(() => window.SC2App.checkDatasets());
-const fx = async (request) => (await (await request.get('/api/datasets')).json()).datasets.find((d) => d.id === 'fx');
+const fx = async (request) => (await (await request.get(api.datasets)).json()).datasets.find((d) => d.id === 'fx');
 
 /** Set the Marine's actor scale in the fixture's map layer; `when`: the file's new change time. */
 async function setScale(original, value, when) {
@@ -60,7 +61,7 @@ test('a changed dataset raises the toast; no hides it; yes reloads the data and 
     await setScale(original, '3.000000', new Date('2026-02-02T00:00:00'));
     await expect.poll(async () => (await fx(request)).changed).toBe(true);
     // Negative: the other datasets did not change.
-    const others = (await (await request.get('/api/datasets')).json()).datasets.filter((d) => d.id !== 'fx');
+    const others = (await (await request.get(api.datasets)).json()).datasets.filter((d) => d.id !== 'fx');
     expect(others.map((d) => d.changed)).toEqual([false, false]);
 
     // The page finds out by itself (it asks every few seconds).
@@ -111,19 +112,19 @@ test('a changed dataset raises the toast; no hides it; yes reloads the data and 
     expect(s.camera.yaw).toBeCloseTo(0.4, 6);
     expect(s.camera.distance).toBeCloseTo(14, 6);
     expect((await fx(request)).changed).toBe(false);
-    expect((await (await request.get('/api/unit?id=Marine&dataset=fx')).json()).actorScale).toEqual([4, 4, 4]);
+    expect((await (await request.get(api.record('units', 'Marine', 'fx'))).json()).actorScale).toEqual([4, 4, 4]);
     await check(page);
     expect((await toast(page)).up).toBe(false);
     // Negative: the other datasets kept their data.
-    expect((await (await request.get('/api/unit?id=Marine&dataset=stock')).json()).actorScale).toEqual([1, 1, 1]);
+    expect((await (await request.get(api.record('units', 'Marine', 'stock'))).json()).actorScale).toEqual([1, 1, 1]);
     expect(errors).toEqual([]);
   } finally {
     // The fixture as it was, and its catalog with it.
     await writeFile(ACTORS, original);
     await utimes(ACTORS, STAMP, STAMP);
-    const response = await request.post('/api/dataset/reload?id=fx', { timeout: 240_000 });
+    const response = await request.post(api.reload('fx'), { timeout: 240_000 });
     expect(response.status()).toBe(200);
   }
-  expect((await (await request.get('/api/unit?id=Marine&dataset=fx')).json()).actorScale).toEqual([2, 2, 2]);
+  expect((await (await request.get(api.record('units', 'Marine', 'fx'))).json()).actorScale).toEqual([2, 2, 2]);
   expect((await fx(request)).changed).toBe(false);
 });

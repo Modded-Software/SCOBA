@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { sceneOf } from './scene.mjs';
 
 // Alt + left hold on a unit drags the unit over the ground; the ground point
-// pressed stays under the mouse (public/js/controls.js, mode 'move').
+// pressed stays under the mouse (src/page/features/controls, mode 'move').
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0.8] };
 
@@ -42,7 +43,7 @@ test('alt + left drag on a unit moves it; the point pressed stays under the mous
   const errors = await open(page);
   const marine = await place(page, 'Marine');
   const before = await state(page);
-  const hash = await page.evaluate(() => location.hash);
+  const stored = (await sceneOf(page)).items[0];
   // Mouse events land on whole pixels.
   const from = (await onItem(page, marine)).map(Math.round);
   const to = (await onWorld(page, [2, 1, 0])).map(Math.round);
@@ -71,10 +72,13 @@ test('alt + left drag on a unit moves it; the point pressed stays under the mous
   // The camera stayed; nothing was selected (a drag is not a click).
   expect(after.camera.target).toEqual(before.camera.target);
   expect(after.pick.selected).toBe(null);
-  // The list row and the URL show the new place.
+  // The list row and the stored scene show the new place.
   expect(Number(await page.locator(`#scene li[data-id="${marine}"] input.x`).inputValue())).toBeCloseTo(item.x, 2);
   expect(Number(await page.locator(`#scene li[data-id="${marine}"] input.y`).inputValue())).toBeCloseTo(item.y, 2);
-  expect(await page.evaluate(() => location.hash)).not.toBe(hash);
+  const moved = (await sceneOf(page)).items[0];
+  expect([moved.x, moved.y]).not.toEqual([stored.x, stored.y]);
+  expect(moved.x).toBeCloseTo(item.x, 6);
+  expect(moved.y).toBeCloseTo(item.y, 6);
   expect(errors).toEqual([]);
 });
 

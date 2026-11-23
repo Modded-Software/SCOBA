@@ -95,15 +95,24 @@ bool gf_SlowWalkClips (int lp_player) {
 bool gf_SlowWalkWanted (int lp_player) {
     return gv_slowKey[lp_player] && gf_SlowWalkAllowed(lp_player);
 }
-// The speed buff of ramp level lp_level (1..c_SLOW_WALK_LEVELS).
-string gf_SlowWalkLevelBuff (int lp_level) {
+// The full slow buff of lp_hero: Kerrigan has her own (R-SLOW-22).
+string gf_SlowWalkBuff (unit lp_hero) {
+    if (gf_AnimHeroProfile(lp_hero) == c_ANIM_HERO_KERRIGAN) {
+        return c_SLOW_WALK_BUFF_KERRIGAN;
+    }
+    return c_SLOW_WALK_BUFF;
+}
+// The speed buff of lp_hero at ramp level lp_level (1..c_SLOW_WALK_LEVELS).
+string gf_SlowWalkLevelBuff (unit lp_hero, int lp_level) {
+    string lv_buff = gf_SlowWalkBuff(lp_hero);
+
     if (lp_level >= c_SLOW_WALK_LEVELS) {
-        return c_SLOW_WALK_BUFF;
+        return lv_buff;
     }
     if (lp_level < 10) {
-        return c_SLOW_WALK_BUFF + "Ramp0" + IntToString(lp_level);
+        return lv_buff + "Ramp0" + IntToString(lp_level);
     }
-    return c_SLOW_WALK_BUFF + "Ramp" + IntToString(lp_level);
+    return lv_buff + "Ramp" + IntToString(lp_level);
 }
 // The speed follows gf_SlowWalkWanted over c_SLOW_WALK_RAMP (R-SLOW-21):
 // one level buff at a time. Not allowed (jump, intro, death, other hero):
@@ -133,13 +142,13 @@ void gf_SlowWalkApply (int lp_player) {
     }
     if (gv_slowUnit[lp_player] != null && (gv_slowUnit[lp_player] != lv_hero || gv_slowLevel[lp_player] != lv_level)) {
         if (UnitIsValid(gv_slowUnit[lp_player])) {
-            UnitBehaviorRemove(gv_slowUnit[lp_player], gf_SlowWalkLevelBuff(gv_slowLevel[lp_player]), 1);
+            UnitBehaviorRemove(gv_slowUnit[lp_player], gf_SlowWalkLevelBuff(gv_slowUnit[lp_player], gv_slowLevel[lp_player]), 1);
         }
         gv_slowUnit[lp_player] = null;
         gv_slowLevel[lp_player] = 0;
     }
     if (lv_level > 0 && gv_slowUnit[lp_player] == null) {
-        UnitBehaviorAdd(lv_hero, gf_SlowWalkLevelBuff(lv_level), lv_hero, 1);
+        UnitBehaviorAdd(lv_hero, gf_SlowWalkLevelBuff(lv_hero, lv_level), lv_hero, 1);
         gv_slowUnit[lp_player] = lv_hero;
         gv_slowLevel[lp_player] = lv_level;
     }

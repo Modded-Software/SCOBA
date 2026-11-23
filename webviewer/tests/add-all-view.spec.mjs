@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
 
 // "add all" on a large list with size outliers (Melee Zerg: Hive 158,
 // Overlord 85, median 4.6): size clusters, each with its own cell
-// (addall.js clusterStarts). Also records, per run, the block's ground box,
+// (src/page/features/addall/layout.ts clusterStarts). Also records, per run, the block's ground box,
 // the camera, and how many new units stand in the uncovered part of the
 // canvas (operator 2026-11-21: "once they load in the units disappear"):
 // after each run the camera frames the new block, so all of them.
@@ -39,7 +40,7 @@ test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overla
   await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
   await page.selectOption('#family', 'is:Melee');
   await page.locator('#races button[data-race="Zerg"]').click();
-  const listed = await (await page.request.get('/api/units?' + new URLSearchParams({ limit: '500', family: 'Melee', race: 'Zerg' }))).json();
+  const listed = await (await page.request.get(api.records('units', { limit: '500', family: 'Melee', race: 'Zerg' }))).json();
   await expect.poll(() => page.locator('#unit-count').textContent()).toBe(`${listed.total} units`);
   for (let i = 1; i <= 2; i++) {
     const r = await addAllRun(page, listed.total);
@@ -70,7 +71,7 @@ test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overla
 
     // Size clusters (operator 2026-11-21): at most three, runs of the sizes
     // in ascending order, each cell its largest size plus the gap.
-    const GAP = 0.5; // addall.js
+    const GAP = 0.5; // features/addall/layout.ts
     expect(clusters.length).toBeGreaterThanOrEqual(2);
     expect(clusters.length).toBeLessThanOrEqual(3);
     const ks = r.layout.map((l) => l.cluster);

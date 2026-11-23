@@ -25,5 +25,4 @@ webviewer/build/
 webviewer/public/vendor/
 webviewer/data/
 webviewer/test-results/
-webviewer/.server.pid
 webviewer/local.env

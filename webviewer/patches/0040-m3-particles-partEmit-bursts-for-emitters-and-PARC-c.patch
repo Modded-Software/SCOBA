@@ -1,7 +1,7 @@
 From 5001d8de61f37a8076052e3280f7b71a2711c308 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 08:28:52 +0200
-Subject: [PATCH 40/51] m3 particles: partEmit bursts, for emitters and PARC
+Subject: [PATCH 40/55] m3 particles: partEmit bursts, for emitters and PARC
  copies
 
 A partEmit key owes its value in particles when the playhead steps over

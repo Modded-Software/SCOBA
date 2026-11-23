@@ -142,6 +142,56 @@ void gf_TpsPickScenery (string lp_section, string lp_type) {
     Wait(0.3, c_timeGame);
 }
 
+// The full table (every stock melee and campaign type): its size, a second
+// gf_HvLoad timed on a real-time timer, and the same totals after it (the
+// load writes the same entries again). Raw: a real-time timer may not move
+// within one script run; game time does not move without a Wait.
+void gf_TpsPickLoad () {
+    timer lv_clock;
+    fixed lv_game;
+
+    gf_DbgTpsReset("tps_pick_load");
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "Types", gv_hvTypeTotal);
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "Shapes", gv_hvShapeTotal);
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "FarTypes", gv_hvFarCount);
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "FarUnits", UnitGroupCount(gv_hvFarUnits, c_unitCountAll));
+    lv_clock = TimerCreate();
+    TimerStart(lv_clock, c_timerDurationInfinite, false, c_timeReal);
+    lv_game = GameGetMissionTime();
+    gv_hvTypeTotal = 0;
+    gv_hvShapeTotal = 0;
+    gv_hvFarCount = 0;
+    gf_HvLoad();
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "ReloadRealMs", FixedToInt(TimerGetElapsed(lv_clock) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "ReloadGameMs", FixedToInt((GameGetMissionTime() - lv_game) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "TypesAfter", gv_hvTypeTotal);
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "ShapesAfter", gv_hvShapeTotal);
+    BankValueSetFromInt(gv_dbgBank, "tps_pick_load", "FarTypesAfter", gv_hvFarCount);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_load", "ScvKnown", gf_HvTypeIndex("SCV") >= 0);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_load", "DehakaKnown", gf_HvTypeIndex("Dehaka") >= 0);
+    // Negative: a morph state has no volume.
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_load", "BurrowedKnown", DataTableValueExists(true, "HV_BanelingBurrowed"));
+    BankSave(gv_dbgBank);
+}
+
+// Far types are found through gv_hvFarUnits, which the region event fills.
+// An Overlord made after map start joins it and is picked; a Marine does
+// not join it.
+void gf_TpsPickFarGroup () {
+    unit lv_unit;
+    unit lv_marine;
+
+    lv_unit = gf_TpsPickBegin("tps_pick_fargroup", "Overlord", 30.0, 0.0);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_fargroup", "FarType", gv_hvFar[gf_HvTypeIndex("Overlord")]);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_fargroup", "InFarGroup", UnitGroupHasUnit(gv_hvFarUnits, lv_unit));
+    gf_TpsPickAim("tps_pick_fargroup", "tbody", lv_unit, 0.0, 0.0, 0.0);
+    lv_marine = gf_TpsPickSpawn("tps_pick_fargroup", "m", "Marine", 6.0, 0.0);
+    BankValueSetFromFlag(gv_dbgBank, "tps_pick_fargroup", "MarineInFarGroup", UnitGroupHasUnit(gv_hvFarUnits, lv_marine));
+    BankSave(gv_dbgBank);
+    UnitRemove(lv_marine);
+    gf_TpsPickEnd("tps_pick_fargroup", lv_unit);
+}
+
 void gf_DbgTpsPickRun () {
     unit lv_unit;
     unit lv_marine;
@@ -212,6 +262,23 @@ void gf_DbgTpsPickRun () {
     gf_TpsPickAim("tps_pick_flyer", "tbody", lv_unit, 0.0, 0.0, 0.0);
     gf_TpsPickAim("tps_pick_flyer", "tunder", lv_unit, 0.0, 0.0, -2.0);
     gf_TpsPickEnd("tps_pick_flyer", lv_unit);
+    // Types the old unit list missed or the classic skins changed (scripts/
+    // hitvolumes, every stock type measured). Body in; beside or above out.
+    lv_unit = gf_TpsPickBegin("tps_pick_scv", "SCV", 6.0, 0.0);
+    gf_TpsPickAim("tps_pick_scv", "tbody", lv_unit, 0.0, -0.29, 0.9);
+    gf_TpsPickAim("tps_pick_scv", "tside", lv_unit, 2.4, 0.0, 0.9);
+    gf_TpsPickEnd("tps_pick_scv", lv_unit);
+    lv_unit = gf_TpsPickBegin("tps_pick_drone", "Drone", 6.0, 0.0);
+    gf_TpsPickAim("tps_pick_drone", "tbody", lv_unit, 0.0, 0.09, 0.36);
+    gf_TpsPickAim("tps_pick_drone", "tabove", lv_unit, 0.0, 0.0, 1.5);
+    gf_TpsPickEnd("tps_pick_drone", lv_unit);
+    // Dehaka: a campaign hero whose unit actor is a CActorMissile.
+    lv_unit = gf_TpsPickBegin("tps_pick_dehaka", "Dehaka", 8.0, 0.0);
+    gf_TpsPickAim("tps_pick_dehaka", "tbody", lv_unit, 0.0, 0.0, 1.56);
+    gf_TpsPickAim("tps_pick_dehaka", "tside", lv_unit, 3.4, 0.0, 1.5);
+    gf_TpsPickEnd("tps_pick_dehaka", lv_unit);
+    gf_TpsPickFarGroup();
+    gf_TpsPickLoad();
     // The Hive is unpickable scenery: its top and side are out; a Marine in
     // front of it is still picked, and over the Marine nothing is.
     lv_unit = gf_TpsPickBegin("tps_pick_hive", "Hive", 30.0, 0.0);

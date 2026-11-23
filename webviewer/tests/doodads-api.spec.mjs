@@ -1,17 +1,18 @@
 import { test, expect } from '@playwright/test';
+import { api, facets as facetsOf } from './api.mjs';
 
-// The doodad catalog (tools/build_doodads.py, server-doodads.mjs): every
+// The doodad catalog (tools/build_doodads.py, src/games/sc2/server/doodads.ts): every
 // CActorDoodad of the game data with a model file the server can serve.
 
-const doodad = async (request, id) => (await request.get('/api/doodad?id=' + encodeURIComponent(id))).json();
-const search = async (request, query) => (await request.get('/api/doodads?' + query)).json();
+const doodad = async (request, id) => (await request.get(api.record('doodads', id))).json();
+const search = async (request, query) => (await request.get(api.records('doodads', query))).json();
 
-test('health and facets report the doodad catalog', async ({ request }) => {
-  const health = await (await request.get('/api/health')).json();
+test('the summary and the categories report the doodad catalog', async ({ request }) => {
+  const health = await (await request.get(api.summary())).json();
   console.log('health', JSON.stringify(health));
   expect(health.doodads).toBeGreaterThan(2000);
   expect(health.doodadsWithoutModelFile).toBeGreaterThanOrEqual(0);
-  const facets = await (await request.get('/api/facets')).json();
+  const facets = await facetsOf(request);
   expect(facets.doodadTypes).toEqual(expect.arrayContaining(['Props', 'Environment', 'Structures', 'CliffRamps']));
   expect(facets.tilesets).toEqual(expect.arrayContaining(['Char', 'Zerus', 'Aiur']));
   // Negative: the unit facets are still there, and hold no doodad type.
@@ -35,13 +36,13 @@ test('a doodad record holds its name, type, terrain sets, variations and look da
   expect(new Set(tree.files).size).toBe(tree.files.length);
   // Every listed file is a real M3.
   for (const file of [tree.files[0], tree.files.at(-1)]) {
-    const body = await (await request.get('/file?path=' + encodeURIComponent(file))).body();
+    const body = await (await request.get(api.file(file))).body();
     expect(body.subarray(0, 4).toString('latin1')).toBe('43DM');
   }
   // Negative: the search text is not sent, and an unknown id is not found.
   expect(tree.text).toBeUndefined();
-  expect((await request.get('/api/doodad?id=NoSuchDoodad')).status()).toBe(404);
-  expect((await request.get('/api/doodad')).status()).toBe(400);
+  expect((await request.get(api.record('doodads', 'NoSuchDoodad'))).status()).toBe(404);
+  expect((await request.get('/api/sc2/record/doodads?dataset=scoba')).status()).toBe(400);
 });
 
 test('a doodad that draws nothing in game is listed with its editor model', async ({ request }) => {
@@ -104,8 +105,8 @@ test('paging walks the whole list without repeats', async ({ request }) => {
 
 test('negative: doodads and units stay apart', async ({ request }) => {
   // A doodad id is no unit, and a unit id is no doodad.
-  expect((await request.get('/api/unit?id=AcidFalls')).status()).toBe(404);
-  expect((await request.get('/api/doodad?id=Marine')).status()).toBe(404);
-  const units = await (await request.get('/api/units?q=acidfalls')).json();
+  expect((await request.get(api.record('units', 'AcidFalls'))).status()).toBe(404);
+  expect((await request.get(api.record('doodads', 'Marine'))).status()).toBe(404);
+  const units = await (await request.get(api.records('units', 'q=acidfalls'))).json();
   expect(units.items.map((i) => i.id)).not.toContain('AcidFalls');
 });

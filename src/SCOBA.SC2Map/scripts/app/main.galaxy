@@ -103,6 +103,7 @@ void main () {
     InitGlobals();
     gf_HvLoad();
     gf_HvAliases();
+    gf_HvFarInit();
     gf_CamHeightLoad();
     gt_MapInit_Init();
     gt_SetAlliances_Init();

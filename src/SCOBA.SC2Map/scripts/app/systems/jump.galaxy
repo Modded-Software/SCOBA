@@ -20,10 +20,15 @@ void gf_JumpConfigInit () {
         }
     }
     // Clip name prefixes; the base and ",Leg" are added by gf_JumpClipNow.
-    // Built by scripts/jumpanim/bake.py. Kerrigan has none (O-JUMP-2).
+    // Tosh: scripts/jumpanim/bake.py; Kerrigan: jumpanim/donor.py (R-JUMP-23).
     gf_JumpConfigClip(c_ANIM_HERO_TOSH, c_JUMP_RISE, "Jump,Start");
     gf_JumpConfigClip(c_ANIM_HERO_TOSH, c_JUMP_AIR, "Jump");
     gf_JumpConfigClip(c_ANIM_HERO_TOSH, c_JUMP_LAND, "Jump,End");
+    gf_JumpConfigClip(c_ANIM_HERO_KERRIGAN, c_JUMP_RISE, "Jump,Start");
+    gf_JumpConfigClip(c_ANIM_HERO_KERRIGAN, c_JUMP_AIR, "Jump");
+    gf_JumpConfigClip(c_ANIM_HERO_KERRIGAN, c_JUMP_LAND, "Jump,End");
+    gv_jumpGaitCycle[c_ANIM_HERO_TOSH] = c_JUMP_GAIT_CYCLE;
+    gv_jumpGaitCycle[c_ANIM_HERO_KERRIGAN] = c_JUMP_GAIT_CYCLE_KERRIGAN;
     gv_jumpDirName[c_ANIM_DIR_FORWARD] = "Walk,Forward";
     gv_jumpDirName[c_ANIM_DIR_FORWARD_LEFT] = "Walk,Forward,Left";
     gv_jumpDirName[c_ANIM_DIR_LEFT] = "Walk,Left";
@@ -142,7 +147,7 @@ void gf_JumpGaitTrack (int lp_player) {
     // An aim or strafe walk clip advances from the moment it plays, moving or
     // not; outside a jump nothing else owns the lower bracket.
     if (lv_walking || (gf_JumpAimWalkState(gv_animFullState[lp_player]) && gv_jumpPhase[lp_player] == c_JUMP_NONE)) {
-        lv_phase = gv_jumpGait[lp_player] + c_JUMP_TICK * gf_JumpGaitRate(lp_player, lv_hero) / c_JUMP_GAIT_CYCLE;
+        lv_phase = gv_jumpGait[lp_player] + c_JUMP_TICK * gf_JumpGaitRate(lp_player, lv_hero) / gv_jumpGaitCycle[gf_AnimHeroProfile(lv_hero)];
         gv_jumpGait[lp_player] = lv_phase - IntToFixed(FixedToInt(lv_phase));
     }
     gv_jumpGaitWalking[lp_player] = lv_walking;
@@ -165,7 +170,7 @@ int gf_JumpGaitStride (int lp_player, int lp_dir) {
     return ModI(FixedToInt(lv_x + 0.5), c_JUMP_GAIT_STRIDES);
 }
 void gf_JumpSetClipTime (int lp_player, unit lp_hero, string lp_tag) {
-    fixed lv_time = gv_jumpGait[lp_player] * c_JUMP_GAIT_CYCLE;
+    fixed lv_time = gv_jumpGait[lp_player] * gv_jumpGaitCycle[gf_AnimHeroProfile(lp_hero)];
 
     // Unscaled clip time. libNtve_gf_SetAnimationTime writes the flag as 0/1;
     // libNtve_gf_AnimSetTime writes "False", which the engine rejects.
@@ -271,7 +276,9 @@ void gf_JumpAnimRelease (int lp_player) {
     fixed lv_phase;
 
     if (gv_jumpClipPlayed[lp_player] != "" && UnitIsValid(gv_jumpUnit[lp_player])) {
-        ActorSend(libNtve_gf_MainActorofUnit(gv_jumpUnit[lp_player]), "AnimClear " + c_ANIM_BRACKET_LOWER);
+        ActorSend(libNtve_gf_MainActorofUnit(gv_jumpUnit[lp_player]), "AnimClear " + c_ANIM_BRACKET_LOWER + " " + FixedToString(c_JUMP_RELEASE_BLEND, 3));
+        gv_jumpReleased[lp_player] = true;
+        gv_jumpReleaseBlendMs[lp_player] = FixedToInt(c_JUMP_RELEASE_BLEND * 1000.0);
     }
     gv_jumpClipPlayed[lp_player] = "";
     // Landed into the aim or strafe walk: that walk clip starts at the walk
@@ -330,6 +337,8 @@ void gf_JumpReset (int lp_player) {
     gv_jumpGaitResume[lp_player] = false;
     gv_jumpSetTimes[lp_player] = 0;
     gv_jumpSetTimeLog[lp_player] = "";
+    gv_jumpReleased[lp_player] = false;
+    gv_jumpReleaseBlendMs[lp_player] = -1;
 }
 // The Goliath leg thump at the hero's feet (R-JUMP-8).
 void gf_JumpThump (int lp_player, unit lp_hero) {

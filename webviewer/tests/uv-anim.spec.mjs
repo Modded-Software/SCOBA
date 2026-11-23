@@ -89,7 +89,7 @@ test('DestructibleBillboardScrollingText: the drawn picture changes as the text 
   await wait(page, 600);
   const diff = await page.evaluate(() => window.sc2viewer.changedSinceMark());
   console.log('changed since mark', JSON.stringify(diff));
-  // A still scene differs by under 40 pixels (inspect.js changedSinceMark).
+  // A still scene differs by under 40 pixels (src/page/features/inspect/frame.ts changedSinceMark).
   expect(diff.changed).toBeGreaterThan(200);
   expect(errors).toEqual([]);
 });

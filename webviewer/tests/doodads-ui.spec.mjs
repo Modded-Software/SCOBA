@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
+import { flush, sceneOf, settled } from './scene.mjs';
 
 // The doodads tab of the gallery, and doodads in the scene: variations,
-// random scale, the editor's angle rule, the URL, drag and "add all".
+// random scale, the editor's angle rule, the stored scene, drag and "add all".
 
-async function open(page, hash = '') {
+async function open(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + hash);
+  await page.goto('/');
   await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
   return errors;
 }
@@ -174,22 +176,20 @@ test('a doodad with one variation has no variation select', async ({ page }) => 
   await expect(page.locator('#scene li select.variation')).toHaveCount(0);
 });
 
-test('doodads are kept in the URL with their variation, next to units', async ({ page }) => {
+test('doodads are kept in the scene with their variation, next to units', async ({ page }) => {
   await open(page);
   await add(page, 'ZerusTree', { x: 4, y: 1, pick: 0.5, variation: 9, rot: 30 });
   await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: -3, y: 0, team: 2, pick: 0.5 }));
   await idle(page);
-  const hash = await page.evaluate(() => location.hash);
-  const saved = JSON.parse(decodeURIComponent(hash.slice(1)));
-  expect(saved[0]).toMatchObject({ d: 'ZerusTree', v: 9, x: 4, y: 1, r: 30, k: 0.5 });
-  expect(saved[0].u).toBeUndefined();
-  expect(saved[1]).toMatchObject({ u: 'Marine', x: -3 });
-  expect(saved[1].d).toBeUndefined();
+  const saved = (await sceneOf(page)).items;
+  expect(saved[0]).toMatchObject({ source: { category: 'doodads', record: 'ZerusTree', variant: 9 }, x: 4, y: 1, rot: 30, pick: 0.5 });
+  expect(saved[1]).toMatchObject({ source: { category: 'units', record: 'Marine', variant: null }, x: -3, options: { team: 2 } });
 
-  // A fresh page with that URL shows the same scene.
+  // A fresh page of the same browser opens the same stored scene.
+  await flush(page);
   const fresh = await page.context().newPage();
-  await open(fresh, hash);
-  await idle(fresh);
+  await open(fresh);
+  await settled(fresh);
   const items = (await state(fresh)).items;
   expect(items).toHaveLength(2);
   expect(items[0]).toMatchObject({ doodad: 'ZerusTree', unit: null, variation: 9, x: 4, y: 1, rot: 30 });
@@ -232,7 +232,7 @@ test('"add all" on the doodads tab adds every doodad of the list after a confirm
   await showDoodads(page);
   await page.fill('#doodad-search', 'aiur tree');
   await expect(page.locator('#doodads li').first()).toBeVisible();
-  const listed = await (await page.request.get('/api/doodads?q=aiur+tree&limit=500')).json();
+  const listed = await (await page.request.get(api.records('doodads', 'q=aiur+tree&limit=500'))).json();
   expect(listed.total).toBeGreaterThan(1);
   expect(listed.total).toBeLessThan(20);
   await page.click('#doodad-add-all');

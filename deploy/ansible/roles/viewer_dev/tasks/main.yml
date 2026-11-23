@@ -1,0 +1,263 @@
+# The model viewer dev server as a systemd user service. Every task can run
+# again: a second run with nothing changed reports no change and no restart.
+# State is read with modules (stat, systemd_service, listen_ports_facts).
+# The few commands write their output to a step log under viewer_steps_dir
+# (kept until the next run); the playbook reads that log back and shows it.
+
+- name: Start the step logs of this run afresh
+  ansible.builtin.file:
+    path: "{{ viewer_steps_dir }}"
+    state: absent
+  changed_when: false
+
+- name: Make the step log folder
+  ansible.builtin.file:
+    path: "{{ viewer_steps_dir }}"
+    state: directory
+    mode: "0755"
+  changed_when: false
+
+- name: Remove the viewer service
+  when: viewer_state == 'absent'
+  block:
+    - name: Stop and disable the units
+      ansible.builtin.systemd_service:
+        scope: user
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - "{{ viewer_unit }}-healthcheck.timer"
+        - "{{ viewer_unit }}.service"
+      register: viewer_stop
+      failed_when: viewer_stop is failed and 'Could not find the requested service' not in (viewer_stop.msg | default(''))
+
+    - name: Show the stop result
+      ansible.builtin.debug:
+        msg: "{{ viewer_stop.results | map(attribute='msg', default='stopped') | list }}"
+
+    - name: Remove the unit files
+      ansible.builtin.file:
+        path: "{{ viewer_unit_dir }}/{{ item }}"
+        state: absent
+      loop:
+        - "{{ viewer_unit }}.service"
+        - "{{ viewer_unit }}-healthcheck.service"
+        - "{{ viewer_unit }}-healthcheck.timer"
+      notify: Reload systemd user units
+
+- name: Stop the viewer service, keep its units
+  when: viewer_state == 'stopped'
+  block:
+    - name: Stop the health check timer, then the server
+      ansible.builtin.systemd_service:
+        scope: user
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - "{{ viewer_unit }}-healthcheck.timer"
+        - "{{ viewer_unit }}.service"
+
+    - name: Read the listening ports after the stop
+      community.general.listen_ports_facts:
+
+    - name: Require the port to be free
+      vars:
+        holders: "{{ ansible_facts.tcp_listen | selectattr('port', 'equalto', viewer_port | int) | list }}"
+      ansible.builtin.assert:
+        that: holders | length == 0
+        fail_msg: "Port {{ viewer_port }} is still held after the stop: {{ holders }}"
+        success_msg: "port {{ viewer_port }}: free"
+
+- name: Install and start the viewer service
+  when: viewer_state == 'present'
+  block:
+    # Preconditions. Each failure names its fix; nothing is installed as root.
+    - name: Read whether the user manager outlives the login (linger)
+      ansible.builtin.stat:
+        path: "/var/lib/systemd/linger/{{ ansible_facts.user_id }}"
+      register: viewer_linger
+
+    - name: Require linger, so the service starts at boot without a login
+      ansible.builtin.assert:
+        that: viewer_linger.stat.exists
+        fail_msg: "Linger is off for {{ ansible_facts.user_id }}. Run once as root: loginctl enable-linger {{ ansible_facts.user_id }}"
+        success_msg: "linger: on"
+
+    - name: Run node --version
+      ansible.builtin.shell: '"{{ viewer_node_bin }}/node" --version >> "{{ viewer_steps_dir }}/node.log" 2>&1'
+      args:
+        executable: /bin/bash
+      register: viewer_node_run
+      changed_when: false
+
+    - name: Read the node step log
+      ansible.builtin.slurp:
+        src: "{{ viewer_steps_dir }}/node.log"
+      register: viewer_node_log
+
+    - name: Require node {{ viewer_node_major }}
+      vars:
+        version: "{{ viewer_node_log.content | b64decode | trim }}"
+      ansible.builtin.assert:
+        that: (version | regex_replace('^v', '')).split('.')[0] | int == viewer_node_major
+        fail_msg: "{{ viewer_node_bin }}/node is {{ version }} (rc {{ viewer_node_run.rc }}), not {{ viewer_node_major }}. Set -e viewer_node_bin=<dir>."
+        success_msg: "node: {{ version }}"
+
+    - name: Find the machine settings (data folder)
+      ansible.builtin.stat:
+        path: "{{ viewer_dir }}/local.env"
+      register: viewer_local_env
+
+    - name: Require webviewer/local.env
+      ansible.builtin.assert:
+        that: viewer_local_env.stat.exists
+        fail_msg: "{{ viewer_dir }}/local.env is missing. It sets WEBVIEWER_DATA (see webviewer/scripts/paths.sh)."
+        success_msg: "local.env: present"
+
+    # Dependencies and the build, from the checkout. Each step is judged
+    # changed from its own log: the step prints what it did.
+    - name: Run the dependency and build steps
+      ansible.builtin.shell: '{{ item.cmd }} >> "{{ viewer_steps_dir }}/{{ item.name }}.log" 2>&1'
+      args:
+        executable: /bin/bash
+        chdir: "{{ viewer_dir }}"
+      environment:
+        PATH: "{{ viewer_path }}"
+        WEBVIEWER_DIR: "{{ viewer_dir }}"
+        REPO_ROOT: "{{ viewer_repo_root }}"
+      loop:
+        - { name: npm, cmd: "npm install --no-audit --no-fund" }
+        - { name: ref, cmd: "bash scripts/ref-setup.sh" }
+        - { name: build, cmd: "bash scripts/tool.sh build" }
+        - { name: catalog, cmd: "bash scripts/catalog.sh --if-missing" }
+      loop_control:
+        label: "{{ item.name }}"
+      register: viewer_steps
+      changed_when: false
+
+    - name: Read the step logs
+      ansible.builtin.slurp:
+        src: "{{ viewer_steps_dir }}/{{ item }}.log"
+      loop: [npm, ref, build, catalog]
+      register: viewer_step_logs
+
+    # Changed when the step did work: npm installed something, the renderer
+    # clone was rebuilt from the patches, a catalog was made.
+    - name: Show the step logs
+      vars:
+        text: "{{ item.content | b64decode }}"
+        quiet_marks: { npm: "up to date", ref: "holds all", build: "", catalog: "catalog present" }
+        mark: "{{ quiet_marks[item.item] }}"
+      ansible.builtin.debug:
+        msg: "{{ item.item }} (rc {{ (viewer_steps.results | selectattr('item.name', 'equalto', item.item) | first).rc }}): {{ text | trim }}"
+      loop: "{{ viewer_step_logs.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      changed_when: mark != '' and mark not in text
+
+    # The port must be free or held by this service: a stray server is named,
+    # not killed.
+    - name: Read the service state
+      ansible.builtin.systemd_service:
+        scope: user
+        name: "{{ viewer_unit }}.service"
+      register: viewer_unit_before
+
+    - name: Read the listening ports
+      community.general.listen_ports_facts:
+
+    - name: Refuse a port held by another process
+      vars:
+        holders: "{{ ansible_facts.tcp_listen | selectattr('port', 'equalto', viewer_port | int) | map(attribute='pid') | map('string') | list }}"
+        main_pid: "{{ viewer_unit_before.status.MainPID | default('0') | string }}"
+      ansible.builtin.assert:
+        that: holders | length == 0 or holders | unique == [main_pid]
+        fail_msg: >-
+          Port {{ viewer_port }} is held by pid {{ holders | join(', ') }}, not by {{ viewer_unit }}.service.
+          Stop that process (ps -o args -p {{ holders | join(',') }}), then run make viewer-provision again.
+        success_msg: "port {{ viewer_port }}: {{ 'free' if holders | length == 0 else 'held by the service, pid ' ~ main_pid }}"
+
+    - name: Make the user unit folder
+      ansible.builtin.file:
+        path: "{{ viewer_unit_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write the server unit
+      ansible.builtin.template:
+        src: viewer.service.j2
+        dest: "{{ viewer_unit_dir }}/{{ viewer_unit }}.service"
+        mode: "0644"
+      notify:
+        - Reload systemd user units
+        - Restart the viewer
+
+    - name: Write the health check unit and timer
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ viewer_unit_dir }}/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - { src: healthcheck.service.j2, dest: "{{ viewer_unit }}-healthcheck.service" }
+        - { src: healthcheck.timer.j2, dest: "{{ viewer_unit }}-healthcheck.timer" }
+      notify: Reload systemd user units
+
+    - name: Apply unit changes now
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and start the server
+      ansible.builtin.systemd_service:
+        scope: user
+        name: "{{ viewer_unit }}.service"
+        enabled: true
+        state: started
+
+    - name: Restart the server on request
+      when: viewer_restart | bool
+      ansible.builtin.systemd_service:
+        scope: user
+        name: "{{ viewer_unit }}.service"
+        state: restarted
+      changed_when: true
+
+    - name: Enable and start the health check timer
+      ansible.builtin.systemd_service:
+        scope: user
+        name: "{{ viewer_unit }}-healthcheck.timer"
+        enabled: true
+        state: started
+
+    # Proof: the server answers, and the answer comes from this service.
+    - name: Wait for the server to answer
+      ansible.builtin.uri:
+        url: "http://{{ viewer_host }}:{{ viewer_port }}/api/health"
+        return_content: true
+      register: viewer_health
+      until: viewer_health.status == 200
+      retries: "{{ (viewer_start_timeout | int) // 3 }}"
+      delay: 3
+
+    - name: Require the sc2 game in the health answer
+      ansible.builtin.assert:
+        that: viewer_health.json.games | selectattr('id', 'equalto', 'sc2') | selectattr('available') | list | length == 1
+        fail_msg: "Health answer without an available sc2 game: {{ viewer_health.content }}"
+        success_msg: "health: {{ viewer_health.content }}"
+
+    - name: Read the service state after the start
+      ansible.builtin.systemd_service:
+        scope: user
+        name: "{{ viewer_unit }}.service"
+      register: viewer_unit_after
+
+    - name: Read the listening ports after the start
+      community.general.listen_ports_facts:
+
+    - name: Require the listener to be the service
+      vars:
+        holders: "{{ ansible_facts.tcp_listen | selectattr('port', 'equalto', viewer_port | int) | map(attribute='pid') | map('string') | unique | list }}"
+        main_pid: "{{ viewer_unit_after.status.MainPID | string }}"
+      ansible.builtin.assert:
+        that: holders == [main_pid]
+        fail_msg: "Port {{ viewer_port }} answers, but from pid {{ holders }}, not from {{ viewer_unit }}.service (MainPID {{ main_pid }})."
+        success_msg: "{{ viewer_unit }}.service: http://{{ viewer_host }}:{{ viewer_port }}/ (pid {{ main_pid }}); step logs {{ viewer_steps_dir }}"

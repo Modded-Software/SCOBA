@@ -1,7 +1,7 @@
 From 68e9beceb0f16c4b99e4827ddaccdc99880bb160 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 14:21:06 +0200
-Subject: [PATCH 14/51] m3: keep each region's stored UV range for inspection
+Subject: [PATCH 14/55] m3: keep each region's stored UV range for inspection
 
 ---
  src/viewer/handlers/m3/model.ts  | 17 +++++++++++++++++

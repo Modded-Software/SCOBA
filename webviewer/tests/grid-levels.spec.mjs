@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // The ground grid at any zoom (operator 2026-11-21: "the visible part of the
 // grid scales with the world"; "make 7 hexagons build a bigger hexagon so
-// they don't get arbitrarily small"). ground.js: the quad grows with the
+// they don't get arbitrarily small"). src/page/core/render/ground.ts: the quad grows with the
 // camera distance; shaders/ground.frag: aperture-7 levels, the level per
 // pixel such that cells stay at least ground.minPx (24) pixels wide, the
 // finer level fading out below that over sqrt(7).

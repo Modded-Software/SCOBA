@@ -55,7 +55,7 @@ await copyFile(join(icons, AFTER), join(out, 'img', 'upscale.png'));
 await writeFile(join(out, 'index.html'), page.replace(DATA_MARK, JSON.stringify(pairs)));
 console.log(`hdtex fixture: ${pairs.length} entries in ${out}`);
 
-// The cache of upscaled model textures (server-textures.mjs serveHd), two textures:
+// The cache of upscaled model textures (src/games/sc2/server/textures.ts hdRoute), two textures:
 // - the Zergling's skin, whose "HD" file is another picture (`skin`), so the
 //   tests can tell the two sets apart in the view; it is not a large one;
 // - the Roach's skin, whose "HD" file is a 2048 picture (`large`). The Roach,

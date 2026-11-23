@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
 
 // Every skybox of the game loads without a viewer error. A skybox with a
 // mesh draws, every batch of it is drawn, and every texture it names loads.
@@ -32,8 +33,10 @@ const DIRECTIONS = [
 
 test('every skybox loads; one with a mesh draws all of it with all its textures @slow', async ({ page, request }) => {
   test.setTimeout(180_000);
-  const { items } = await (await request.get('/api/skyboxes')).json();
+  const { items, total } = await (await request.get(api.backdrops('limit=500'))).json();
   expect(items.length).toBeGreaterThanOrEqual(60);
+  // Every skybox, not the first page of them.
+  expect(items).toHaveLength(total);
 
   const problems = [];
   const warned = new Set();
@@ -117,7 +120,7 @@ test('every skybox loads; one with a mesh draws all of it with all its textures 
 
 test('an uncompressed DDS texture decodes: spacesinglenebula3.dds', async ({ page, request }) => {
   // spacesinglenebula*.dds are 24-bit uncompressed DDS files (no FourCC).
-  const head = await request.get('/asset?path=' + encodeURIComponent('assets/textures/spacesinglenebula3.dds'));
+  const head = await request.get(api.asset('assets/textures/spacesinglenebula3.dds'));
   expect(head.status()).toBe(200);
   const bytes = await head.body();
   expect(bytes.subarray(0, 4).toString('latin1')).toBe('DDS ');
@@ -128,15 +131,15 @@ test('an uncompressed DDS texture decodes: spacesinglenebula3.dds', async ({ pag
   // Decode it with the renderer's parser in the page: size and colours.
   await page.goto('/');
   await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
-  const image = await page.evaluate(async () => {
-    const buffer = await (await fetch('/asset?path=' + encodeURIComponent('assets/textures/spacesinglenebula3.dds'))).arrayBuffer();
-    const dds = new ModelViewer.parsers.dds.Image();
+  const image = await page.evaluate(async (url) => {
+    const buffer = await (await fetch(url)).arrayBuffer();
+    const dds = new window.sc2viewer.DdsImage();
     dds.load(buffer);
     const top = dds.getMipmap(0);
     let lit = 0;
     for (let i = 0; i < top.data.length; i += 4) if (top.data[i] + top.data[i + 1] + top.data[i + 2] > 60) lit++;
     return { width: dds.width, height: dds.height, mipmaps: dds.mipmaps(), bytes: top.data.length, lit, alpha: top.data[3] };
-  });
+  }, api.asset('assets/textures/spacesinglenebula3.dds'));
   console.log('nebula', JSON.stringify(image));
   expect(image.width).toBe(bytes.readUInt32LE(16));
   expect(image.height).toBe(bytes.readUInt32LE(12));

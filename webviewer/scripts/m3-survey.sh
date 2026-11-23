@@ -10,5 +10,5 @@ cd "$REPO_ROOT/scripts"
 PYTHONPATH="$REPO_ROOT/scripts:$REPO_ROOT/scripts/hdtex" uv run python ../webviewer/tools/m3_survey.py --data "$WEBVIEWER_DATA" \
   --parser "$WEBVIEWER_DIR/ref/mdx-m3-viewer/src/parsers/m3/indexentry.ts"
 cd "$WEBVIEWER_DIR"
-node tools/build-renderer.mjs
+bash scripts/tool.sh build
 node tools/parse-survey.mjs "$WEBVIEWER_DATA"

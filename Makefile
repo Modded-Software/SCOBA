@@ -134,7 +134,9 @@ pitch: ## Rebuild and run the 10-second pitch profile
 WEBVIEWER_DIR := $(REPO_ROOT)/webviewer
 WEBVIEWER := WEBVIEWER_DIR="$(WEBVIEWER_DIR)" $(SCRIPT_BASH) $(WEBVIEWER_DIR)/scripts
 
-.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-serve viewer-start viewer-stop viewer-restart viewer-status viewer-test viewer-test-all
+VIEWER_ANSIBLE := cd "$(REPO_ROOT)/deploy/ansible" && ansible-playbook viewer-dev.yml
+
+.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-serve viewer-provision viewer-unprovision viewer-start viewer-stop viewer-restart viewer-status viewer-logs viewer-test viewer-test-all
 viewer-install: ## Model viewer: install node deps and the test browser, build the renderer
 	$(WEBVIEWER)/setup.sh
 
@@ -150,19 +152,29 @@ viewer-dataset: ## Model viewer: make a new dataset from the full stock data (NA
 viewer-survey: ## Model viewer: report which unit models the parser can read
 	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/m3-survey.sh
 
-viewer-serve: ## Model viewer: run the server in the foreground
+viewer-serve: ## Model viewer: run the server in the foreground (PORT=n beside the service)
 	$(WEBVIEWER)/start.sh
 
-viewer-start: ## Model viewer: start the server in the background
-	$(WEBVIEWER)/up.sh
+viewer-provision: ## Model viewer: install or update the dev server as a systemd user service (Ansible), start it, check it
+	$(VIEWER_ANSIBLE) $(if $(RESTART),-e viewer_restart=true,)
 
-viewer-stop: ## Model viewer: stop the background server
-	$(WEBVIEWER)/down.sh
+viewer-unprovision: ## Model viewer: stop the dev server service and remove its units
+	$(VIEWER_ANSIBLE) -e viewer_state=absent
 
-viewer-restart: viewer-stop viewer-start ## Model viewer: restart the background server
+viewer-start: ## Model viewer: start the dev server service (Ansible) and check it
+	$(VIEWER_ANSIBLE)
 
-viewer-status: ## Model viewer: show whether the background server runs
-	$(WEBVIEWER)/status.sh
+viewer-stop: ## Model viewer: stop the dev server service and its health check (Ansible)
+	$(VIEWER_ANSIBLE) -e viewer_state=stopped
+
+viewer-restart: ## Model viewer: restart the dev server service (Ansible; rebuilds from the checkout)
+	$(VIEWER_ANSIBLE) -e viewer_restart=true
+
+viewer-status: ## Model viewer: show the dev server service and its health answer
+	$(WEBVIEWER)/service.sh status
+
+viewer-logs: ## Model viewer: show the last log lines of the dev server service (LINES=n)
+	$(WEBVIEWER)/service.sh logs
 
 viewer-test: ## Model viewer: run the Playwright integration tests (not the @slow surveys)
 	$(WEBVIEWER)/test.sh

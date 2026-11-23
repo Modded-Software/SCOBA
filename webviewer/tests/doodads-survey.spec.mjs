@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
 
 // A sample across the whole doodad catalog (every 29th doodad by default):
 // each one must load. What a model holds but the renderer does not draw is
@@ -17,7 +18,7 @@ test('every sampled doodad loads; none is rejected', async ({ page, request }) =
 
   const all = [];
   for (let offset = 0; ; offset += 500) {
-    const part = await (await request.get(`/api/doodads?offset=${offset}&limit=500`)).json();
+    const part = await (await request.get(api.records('doodads', { offset: String(offset), limit: '500' }))).json();
     all.push(...part.items);
     if (all.length >= part.total || part.items.length === 0) break;
   }

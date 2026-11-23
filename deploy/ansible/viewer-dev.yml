@@ -1,0 +1,20 @@
+# Provision the model viewer dev server as a systemd user service.
+#
+#   make viewer-provision     install or update, start, check health
+#   make viewer-start         the same: start and check
+#   make viewer-restart       restart (rebuilds from the checkout) and check
+#   make viewer-stop          stop the server and its health check
+#   make viewer-unprovision   stop and remove the units
+#
+# Variables (-e name=value): viewer_port, viewer_host, viewer_node_bin,
+# viewer_restart=true, viewer_state=present|stopped|absent.
+# Defaults: roles/viewer_dev/defaults/main.yml.
+- name: SC2 model viewer dev server
+  hosts: localhost
+  gather_facts: true
+  gather_subset: [min, user]
+  roles:
+    # The user manager's bus, for systemctl --user (set after the facts).
+    - role: viewer_dev
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.user_uid }}"

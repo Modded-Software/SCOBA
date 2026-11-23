@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // and model browser) on top, the instances (#instances: the scene list)
 // below. Selection is shared:
 // a click on a unit in the view marks its row; a click on a row's name
-// selects its unit in the view (pick.js select, scene.js markSelected).
+// selects its unit in the view (features/pick select, ui/instances.ts markSelected).
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0.8] };
 

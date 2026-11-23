@@ -269,6 +269,46 @@ void gf_HvAliases () {
     gf_HvAlias("SCOBAVistaOverlord", "Overlord");
 }
 
+// Units of far types (reach past the crosshair range). The pick tests
+// them wherever they stand. One group, kept by events: with every stock
+// type measured there are hundreds of far types, and one whole-map
+// UnitGroup per far type on each pick costs too much.
+unitgroup gv_hvFarUnits;
+trigger gt_HvFarEnter;
+
+void gf_HvFarTrack (unit lp_unit) {
+    string lv_key;
+
+    lv_key = "HV_" + UnitGetType(lp_unit);
+    if (DataTableValueExists(true, lv_key) && gv_hvFar[DataTableGetInt(true, lv_key)]) {
+        UnitGroupAdd(gv_hvFarUnits, lp_unit);
+    }
+}
+
+bool gt_HvFarEnter_Func (bool testConds, bool runActions) {
+    gf_HvFarTrack(EventUnit());
+    return true;
+}
+
+// After gf_HvLoad and gf_HvAliases: the units already on the map, then
+// every unit that enters it.
+// Runs in main(): the UnitGroupLoop functions are valid in trigger logic
+// only, so the loop indexes the group (1-based).
+void gf_HvFarInit () {
+    unitgroup lv_all;
+    int lv_i;
+    int lv_n;
+
+    gv_hvFarUnits = UnitGroupEmpty();
+    lv_all = UnitGroup(null, c_playerAny, RegionEntireMap(), UnitFilter(0, 0, 0, 0), 0);
+    lv_n = UnitGroupCount(lv_all, c_unitCountAll);
+    for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
+        gf_HvFarTrack(UnitGroupUnit(lv_all, lv_i));
+    }
+    gt_HvFarEnter = TriggerCreate("gt_HvFarEnter_Func");
+    TriggerAddEventUnitRegion(gt_HvFarEnter, null, RegionEntireMap(), true);
+}
+
 // The volume index of a unit type, or -1. A type without a volume is
 // counted and reported once.
 int gf_HvTypeIndex (string lp_type) {

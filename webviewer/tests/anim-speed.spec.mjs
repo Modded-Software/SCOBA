@@ -51,7 +51,7 @@ async function measure(page, id, ms) {
         };
         // Warm up first: a freshly loaded page stalls once (shaders, first
         // texture uploads), and the frame loop counts a stall as at most
-        // 100 ms (main.js MAX_STEP), by design.
+        // 100 ms (src/page/core/frame.ts MAX_STEP), by design.
         setTimeout(() => {
           start = then = performance.now();
           last = item().frame;

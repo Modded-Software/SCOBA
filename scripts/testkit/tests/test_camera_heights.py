@@ -8,6 +8,8 @@ from pathlib import Path
 
 from hitvolumes import camera_heights as C
 from project_root import project_root
+from testkit.checks import Checks
+from testkit.profiles import camheight
 
 BOX_AXES = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]
 
@@ -59,10 +61,24 @@ class HeightsTests(unittest.TestCase):
     def test_stale_detects_difference(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            self.assertTrue(C.stale(out, "x"))
+            self.assertTrue(C.stale(out, {C.FILE: "x"}))
             (out / C.FILE).write_text("x", encoding="utf-8")
-            self.assertEqual(C.stale(out, "x"), [])
-            self.assertTrue(C.stale(out, "y"))
+            self.assertEqual(C.stale(out, {C.FILE: "x"}), [])
+            self.assertTrue(C.stale(out, {C.FILE: "y"}))
+            # Negative: a chunk the generator no longer writes is reported.
+            (out / C.CHUNK.format(9)).write_text("", encoding="utf-8")
+            self.assertIn("not generated", "\n".join(C.stale(out, {C.FILE: "x"})))
+
+    def test_chunks_stay_under_the_line_limit(self) -> None:
+        units = {f"U{i:04d}": {"shapes": [{"k": "sphere", "c": [0, 0, 1], "r": 1.0}]} for i in range(1200)}
+        units["ToshSCOBA"] = self.data()["units"]["ToshSCOBA"]
+        files = C.render_files({"units": units})
+        self.assertGreater(len(files), 2)
+        for name, text in files.items():
+            self.assertLess(text.count("\n"), 512, name)
+        self.assertEqual(sum(t.count("gf_CamHeightType(") for t in files.values()), 1201)
+        for i in range(1, len(files)):
+            self.assertIn(f"gf_CamHeightLoad{i}();", files[C.FILE])
 
 
 class ScaleTests(unittest.TestCase):
@@ -105,3 +121,44 @@ class CommittedTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# Run combat/20261123-144957, clamp_tps_sweep: the bounce once the pitch held.
+BOUNCE = [5992] * 27 + [5156, 5253, 5433, 3750, 2812, 3277, 3250, 2906, 2250, 2324, 2503, 2640, 2250, 2328, 2484, 2625, 2250, 2328, 2488, 2625, 2250]
+BOUNCE_CLEAR = [500] * 27 + [-73, -241, -430, -316, 51, -276, -261, -80, 252, 228, 133, 61, 252, 226, 141, 69, 252, 226, 141, 69, 252]
+SWEEP_SAFE = [6000] * 28 + [3750, 3468, 3281, 3093] + [2906] * 16
+
+
+def clamp_rows(**change) -> dict:
+    """Every clamp case settled; `change` maps a section to replaced series."""
+    data = {}
+    for section in camheight.CLAMP_CASES:
+        sweep = section.endswith("sweep")
+        safe = SWEEP_SAFE if sweep else [6000] * 48
+        dist = [6000] * 28 + [3750, 3468, 3281, 3093] + [2906] * 16 if sweep else [5992] * 48
+        row = {"dist": dist, "safe": safe, "clear": [350] * 48, "pitches": [0] * 48, "desired1000": 6000}
+        row.update(change.get(section, {}))
+        data[section] = {k: " ".join(str(v) for v in val) if isinstance(val, list) else val for k, val in row.items()}
+    return data
+
+
+class ClampTests(unittest.TestCase):
+    def test_settled_passes(self) -> None:
+        checks = Checks(clamp_rows())
+        camheight.check_camclamp(checks)
+        self.assertEqual(checks.failures, 0)
+
+    def test_the_bounce_fails(self) -> None:
+        checks = Checks(clamp_rows(clamp_tps_sweep={"dist": BOUNCE, "clear": BOUNCE_CLEAR}))
+        camheight.check_camclamp(checks)
+        # Eye under the ground, reversals, not at the clamp.
+        self.assertEqual(checks.failures, 3)
+
+    def test_no_clamp_in_a_sweep_fails(self) -> None:
+        checks = Checks(clamp_rows(clamp_pnc_sweep={"safe": [6000] * 48, "dist": [5992] * 48}))
+        camheight.check_camclamp(checks)
+        self.assertEqual(checks.failures, 1)
+
+    def test_reversals_ignore_noise(self) -> None:
+        self.assertEqual(camheight.reversals([100, 105, 100, 105]), 0)
+        self.assertEqual(camheight.reversals([100, 200, 100, 200]), 2)

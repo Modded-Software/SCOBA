@@ -10,7 +10,7 @@
 #             into the dataset's map/ folder
 #
 # The dataset lands in the datasets folder (default $WEBVIEWER_DATA/datasets,
-# gitignored). Layout and rules: server-datasets.mjs. A map layer can be
+# gitignored). Layout and rules: src/games/sc2/server/datasets.ts. A map layer can be
 # added later by hand: <dataset>/map/Base.SC2Data/GameData/*.xml,
 # <dataset>/map/Assets/...
 set -euo pipefail
@@ -30,7 +30,7 @@ if [[ ! "$id" =~ ^[a-z0-9][a-z0-9_-]{0,39}$ || "$id" == "stock" || "$id" == "sco
   exit 2
 fi
 
-root="$(node tools/datasets.mjs dir)"
+root="$(bash scripts/tool.sh datasets dir)"
 target="$root/$id"
 if [[ -e "$target" ]]; then
   echo "ERROR: $target exists already" >&2

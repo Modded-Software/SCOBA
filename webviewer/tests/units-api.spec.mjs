@@ -1,16 +1,17 @@
 import { test, expect } from '@playwright/test';
+import { api, facets } from './api.mjs';
 
-const unit = async (request, id) => (await request.get('/api/unit?id=' + encodeURIComponent(id))).json();
-const search = async (request, query) => (await request.get('/api/units?' + query)).json();
+const unit = async (request, id) => (await request.get(api.record('units', id))).json();
+const search = async (request, query) => (await request.get(api.records('units', query))).json();
 
-test('health reports the unit catalog', async ({ request }) => {
-  const body = await (await request.get('/api/health')).json();
+test('the summary reports the unit catalog', async ({ request }) => {
+  const body = await (await request.get(api.summary())).json();
   expect(body.units).toBeGreaterThan(500);
   expect(body.unitsWithoutModelFile).toBeGreaterThanOrEqual(0);
 });
 
 test('facets list the races and kinds that exist', async ({ request }) => {
-  const body = await (await request.get('/api/facets')).json();
+  const body = await facets(request);
   expect(body.races).toEqual(expect.arrayContaining(['Terran', 'Protoss', 'Zerg', 'Neutral']));
   expect(body.kinds).toEqual(expect.arrayContaining(['Unit', 'Structure']));
 });
@@ -69,8 +70,8 @@ test('units come in pages: offset and limit cut one ordered list', async ({ requ
 });
 
 test('model files come in pages too', async ({ request }) => {
-  const whole = await (await request.get('/api/models?q=marine&limit=40')).json();
-  const tail = await (await request.get('/api/models?q=marine&limit=20&offset=20')).json();
+  const whole = await (await request.get(api.records('models', 'q=marine&limit=40'))).json();
+  const tail = await (await request.get(api.records('models', 'q=marine&limit=20&offset=20'))).json();
   expect(tail.total).toBe(whole.total);
   expect(tail.items).toEqual(whole.items.slice(20, 40));
 });
@@ -90,7 +91,7 @@ test('a unit record carries the data that changes its look', async ({ request })
   expect(marine.portrait).toMatch(/\.png$/);
 
   // The model file of a unit is a real, servable M3.
-  const file = await request.get('/file?path=' + encodeURIComponent(marine.file));
+  const file = await request.get(api.file(marine.file));
   expect(file.status()).toBe(200);
   expect((await file.body()).subarray(0, 4).toString('latin1')).toBe('43DM');
 
@@ -107,18 +108,18 @@ test('a unit of the map itself is in the catalog', async ({ request }) => {
 });
 
 test('unknown units and missing ids are refused', async ({ request }) => {
-  expect((await request.get('/api/unit?id=NoSuchUnitXyzzy')).status()).toBe(404);
-  expect((await request.get('/api/unit')).status()).toBe(400);
+  expect((await request.get(api.record('units', 'NoSuchUnitXyzzy'))).status()).toBe(404);
+  expect((await request.get('/api/sc2/record/units?dataset=scoba')).status()).toBe(400);
 });
 
 test('icons are PNG files, and only catalog icons are served', async ({ request }) => {
-  const res = await request.get('/icon/btn-unit-terran-marine.png');
+  const res = await request.get(api.icon('btn-unit-terran-marine.png'));
   expect(res.status()).toBe(200);
   expect(res.headers()['content-type']).toBe('image/png');
   expect((await res.body()).subarray(1, 4).toString('latin1')).toBe('PNG');
 
-  expect((await request.get('/icon/no-such-icon.png')).status()).toBe(404);
-  expect((await request.get('/icon/..%2Funits.json')).status()).toBe(404);
-  expect((await request.get('/icon/../units.json')).status()).toBe(404);
-  expect((await request.get('/icon/')).status()).toBe(404);
+  expect((await request.get(api.icon('no-such-icon.png'))).status()).toBe(404);
+  expect((await request.get(api.icon('..%2Funits.json'))).status()).toBe(404);
+  expect((await request.get('/api/sc2/icon/../units.json?dataset=scoba')).status()).toBe(404);
+  expect((await request.get('/api/sc2/icon/?dataset=scoba')).status()).toBe(404);
 });

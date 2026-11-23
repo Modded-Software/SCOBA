@@ -1,0 +1,38 @@
+# {{ ansible_managed }}
+# Source: deploy/ansible/roles/viewer_dev (make viewer-provision).
+[Unit]
+Description=SC2 model viewer dev server (http://{{ viewer_host }}:{{ viewer_port }}/)
+After=network.target
+# No start limit: a crash loop backs off (RestartSteps) instead of giving up.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory={{ viewer_dir }}
+Environment="PATH={{ viewer_path }}"
+Environment="WEBVIEWER_DIR={{ viewer_dir }}"
+Environment="REPO_ROOT={{ viewer_repo_root }}"
+Environment="PORT={{ viewer_port }}"
+Environment="HOST={{ viewer_host }}"
+# start.sh checks the patched renderer clone, rebuilds the page and the
+# server from the checkout, makes a missing catalog, then execs node: a
+# restart always serves the current code.
+ExecStart=/bin/bash {{ viewer_dir }}/scripts/start.sh
+Restart=always
+# 5 s after the first exit, growing to 60 s over 5 restarts in a row.
+RestartSec=5
+RestartSteps=5
+RestartMaxDelaySec=60
+# A hung server (the health check restarts it) is killed after 10 s.
+TimeoutStopSec=10
+MemoryHigh={{ viewer_memory_high }}
+MemoryMax={{ viewer_memory_max }}
+LogRateLimitIntervalSec=10s
+LogRateLimitBurst=500
+# The user manager's own output (the journal): make viewer-logs.
+StandardOutput=inherit
+StandardError=inherit
+SyslogIdentifier={{ viewer_unit }}
+
+[Install]
+WantedBy=default.target

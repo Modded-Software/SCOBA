@@ -14,15 +14,15 @@ from project_root import project_root
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .bank_checks import _delta, _no_damage, _report, _shots, _still
-from .camheight import check_camheight
-from .combat_kerrigan import check_breath, check_psi_probe, check_psi_watch, check_swing_watch, check_talons, check_weapons
+from .camheight import check_camclamp, check_camheight
+from .combat_kerrigan import check_breath, check_psi_probe, check_psi_watch, check_talons, check_weapons
 from .pose import check_combat_pose
 from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
 from .tps_shot import shot_clocks
 
 ROOT = project_root()
 
-GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "pose", "kerrigan", "psiprobe", "talons", "swingwatch", "psiwatch", "camheight")
+GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "pose", "kerrigan", "psiprobe", "talons", "psiwatch", "camheight", "camclamp")
 
 
 def selected_group() -> str:
@@ -395,9 +395,9 @@ GROUP_CHECKS = {
     "kerrigan": _check_kerrigan,
     "psiprobe": check_psi_probe,
     "talons": check_talons,
-    "swingwatch": check_swing_watch,
     "psiwatch": check_psi_watch,
     "camheight": check_camheight,
+    "camclamp": check_camclamp,
 }
 
 

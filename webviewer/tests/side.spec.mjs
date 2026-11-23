@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// The left column (public/js/side.js, core.js setStatus, scene.js filterList):
+// The left column (src/page/ui/drawers.ts, status.ts setStatus, instances.ts filterList):
 // - status messages are a toast at the top centre of the view, not a line
 //   in the gallery; they go away by themselves;
 // - the instances panel has a search that hides the rows that do not match;
@@ -201,24 +201,28 @@ test('the message log holds every message, in order, with its time and failure m
   expect(errors).toEqual([]);
 });
 
-test('a page module that does not load is reported as a failure, naming the file', async ({ page }) => {
+test('a page bundle that does not load is reported as a failure, naming the file', async ({ page }) => {
   const problems = [];
   page.on('console', (m) => {
     if (m.type() === 'error') problems.push(m.text());
   });
-  // The drawer tabs died this way: a server that did not serve side.js.
-  await page.route('**/js/side.js', (route) => route.fulfill({ status: 404, body: 'not found' }));
+  // The drawer tabs once died this way: a server that did not serve a page script.
+  await page.route('**/vendor/renderer.js', (route) => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('/');
-  await expect.poll(() => page.evaluate(() => window.SC2App.statusLog().shown.some((t) => t.includes('/js/side.js'))), { timeout: 10_000 }).toBe(true);
-  const shown = (await page.evaluate(() => window.SC2App.statusLog())).shown.filter((t) => t.includes('/js/side.js'));
+  const failure = page.locator('#load-failure');
+  await expect(failure).toBeVisible({ timeout: 10_000 });
+  const shown = await failure.textContent();
   console.log('reported', JSON.stringify(shown), JSON.stringify(problems));
-  expect(shown[0]).toMatch(/did not load/);
-  expect(problems.some((p) => p.includes('/js/side.js'))).toBe(true);
-  // Negative: a normal load reports no module.
-  await page.unroute('**/js/side.js');
+  expect(shown).toMatch(/did not load: \/vendor\/renderer\.js/);
+  expect(problems.some((p) => p.includes('did not load') && p.includes('/vendor/renderer.js'))).toBe(true);
+  expect(await page.evaluate(() => typeof window.sc2viewer)).toBe('undefined');
+  // Negative: a normal load reports nothing and hides the line.
+  await page.unroute('**/vendor/renderer.js');
+  problems.length = 0;
   await page.reload();
   await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
-  expect((await page.evaluate(() => window.SC2App.statusLog())).shown.filter((t) => t.includes('did not load'))).toEqual([]);
+  await expect(failure).toBeHidden();
+  expect(problems.filter((p) => p.includes('did not load'))).toEqual([]);
 });
 
 test('the instance search hides the rows that do not match, and only the rows', async ({ page }) => {

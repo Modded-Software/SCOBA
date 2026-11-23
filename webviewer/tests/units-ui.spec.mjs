@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { reloadScene, sceneOf } from './scene.mjs';
+import { api } from './api.mjs';
 
 function watch(page) {
   const problems = [];
@@ -23,7 +25,7 @@ const state = (page) => page.evaluate(() => window.sc2viewer.state());
 const pixels = (page) => page.evaluate(() => window.sc2viewer.pixels());
 const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle());
 const row = (page, id) => page.locator(`#units li[data-id="${id}"]`);
-const unitData = async (page, id) => (await page.request.get('/api/unit?id=' + id)).json();
+const unitData = async (page, id) => (await page.request.get(api.record('units', id))).json();
 const times = (a, b) => a.map((v, i) => v * b[i]);
 
 /** Find a unit in the panel and select it, so the preview shows it. */
@@ -73,7 +75,7 @@ test('the unit panel opens first and lists units with names and icons', async ({
   // The icon is a real image that loaded.
   const icon = zergling.locator('img.icon');
   // Icons are served per dataset (datasets-api.spec.mjs).
-  await expect(icon).toHaveAttribute('src', '/icon/btn-unit-zerg-zergling.png?dataset=scoba');
+  await expect(icon).toHaveAttribute('src', api.icon('btn-unit-zerg-zergling.png'));
   await expect.poll(() => icon.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   const filtered = Number.parseInt(await page.locator('#unit-count').textContent(), 10);
   expect(filtered).toBeLessThan(total);
@@ -120,7 +122,7 @@ test('selecting a unit shows a preview with portrait and data, and adds it', asy
   await expect(page.locator('#preview .facts')).toContainText('Terran');
   await expect(page.locator('#preview .facts')).toContainText('scale');
   const portrait = page.locator('#preview img.portrait');
-  await expect(portrait).toHaveAttribute('src', /^\/icon\/.+\.png\?dataset=scoba$/);
+  await expect(portrait).toHaveAttribute('src', /^\/api\/sc2\/icon\/.+\.png\?dataset=scoba$/);
   await expect.poll(() => portrait.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   // Selecting does not add.
   expect((await state(page)).items).toEqual([]);
@@ -133,7 +135,7 @@ test('selecting a unit shows a preview with portrait and data, and adds it', asy
   expect(s.items[0].texturesLoaded).toBeGreaterThan(0);
   const sceneRow = page.locator('#scene li').first();
   await expect(sceneRow.locator('.name')).toContainText('Marine');
-  await expect(sceneRow.locator('img.icon')).toHaveAttribute('src', '/icon/btn-unit-terran-marine.png?dataset=scoba');
+  await expect(sceneRow.locator('img.icon')).toHaveAttribute('src', api.icon('btn-unit-terran-marine.png'));
   expect((await pixels(page)).covered).toBeGreaterThan(500);
   expect(problems).toEqual([]);
 });
@@ -144,7 +146,7 @@ test('a unit with no portrait image previews with its icon', async ({ page }) =>
   expect((await unitData(page, 'Barracks')).portrait).toBeNull();
   await find(page, 'barracks', 'Barracks');
   const portrait = page.locator('#preview img.portrait');
-  await expect(portrait).toHaveAttribute('src', '/icon/btn-building-terran-barracks.png?dataset=scoba');
+  await expect(portrait).toHaveAttribute('src', api.icon('btn-building-terran-barracks.png'));
   await expect.poll(() => portrait.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   expect(problems).toEqual([]);
 });
@@ -397,17 +399,16 @@ test('team colour can be set per unit and changes the picture', async ({ page })
   expect(problems).toEqual([]);
 });
 
-test('placed units survive a reload through the URL', async ({ page }) => {
+test('placed units survive a reload through the scene store', async ({ page }) => {
   const problems = watch(page);
   await open(page);
   await dropUnit(page, 'marine', 'Marine', { x: 520, y: 300 });
   await addUnit(page, 'zergling', 'Zergling');
   await page.locator('#scene li').nth(1).locator('select.team').selectOption('3');
   const before = await state(page);
+  expect((await sceneOf(page)).items[1].options.team).toBe(3);
 
-  await page.reload();
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready && window.sc2viewer.state().items.length === 2);
-  await idle(page);
+  await reloadScene(page);
   const after = await state(page);
   const key = (i) => ({ unit: i.unit, x: +i.x.toFixed(3), y: +i.y.toFixed(3), team: i.team, sequence: i.sequence, scale: i.engineScale.map((v) => +v.toFixed(4)) });
   expect(after.items.map(key)).toEqual(before.items.map(key));

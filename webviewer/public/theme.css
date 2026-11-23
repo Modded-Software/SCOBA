@@ -1,5 +1,5 @@
 /* The theme: colour and shape tokens, the base look of controls, and the
-   look of the reusable components (components.js). The HD texture viewer
+   look of the reusable components (src/page/ui/components). The HD texture viewer
    (scripts/hdtex/compare.html) opens from disk, so it carries its own copy
    of the :root block; tests/texture-window.spec.mjs holds the two equal. */
 :root {

@@ -26,10 +26,15 @@ STACK = (
     "campaigns/void.sc2campaign",
     "campaigns/voidstory.sc2campaign",
 )
-CATALOGS = {"actor": "actordata.xml", "model": "modeldata.xml"}
-MAP_CATALOGS = {"actor": "ActorData.xml", "model": "ModelData.xml"}
+CATALOGS = {"actor": "actordata.xml", "model": "modeldata.xml", "unit": "unitdata.xml"}
+MAP_CATALOGS = {"actor": "ActorData.xml", "model": "ModelData.xml", "unit": "UnitData.xml"}
 TOKEN_RE = re.compile(r'token id="([^"]+)" value="([^"]*)"')
 SKIP_ATTRS = {"id", "parent", "default"}
+# Actor classes that draw a unit: some heroes (Dehaka, KerriganVoid) use a
+# CActorMissile as their unit actor.
+ACTOR_TAGS = ("CActorUnit", "CActorMissile")
+BIRTH_RE = re.compile(r"\s*UnitBirth\.([A-Za-z0-9_]+)\s*(?:;|$)")
+MORPH_RE = re.compile(r"MorphTo ([A-Za-z0-9_]+)")
 Vec3 = tuple[float, float, float]
 
 
@@ -41,6 +46,18 @@ class Resolution(NamedTuple):
     scale: Vec3
     actor_scale: Vec3
     model_scale: Vec3
+    # The ids the result was read from, nearest first (the stale check, fresh.py).
+    actors: tuple[str, ...] = ()
+    models: tuple[str, ...] = ()
+    # VariationCount: the engine draws <name>_00.m3 .. _<n-1>.m3 at random.
+    variations: int = 0
+
+    def files(self) -> list[str]:
+        """The m3 entries to look for, in order: the model path, then its
+        first variation. The volume is the first that exists."""
+        if self.variations > 0 and self.m3.lower().endswith(".m3"):
+            return [self.m3, self.m3[:-3] + "_00.m3"]
+        return [self.m3]
 
 
 def stock_paths(stock_dir: Path, catalog: str) -> list[Path]:
@@ -110,6 +127,18 @@ class Catalog:
         return found
 
 
+def birth_units(el: ET.Element) -> list[str]:
+    """Unit types whose birth creates this actor: On Terms="UnitBirth.X" Send="Create"."""
+    out = []
+    for on in el.findall("On"):
+        if (on.get("Send") or "").strip() != "Create":
+            continue
+        match = BIRTH_RE.match(on.get("Terms") or "")
+        if match:
+            out.append(match.group(1))
+    return out
+
+
 def expand(text: str, values: dict[str, str]) -> str:
     return re.sub(r"##([A-Za-z]+)##", lambda m: values.get(m.group(1), m.group(0)), text)
 
@@ -129,18 +158,33 @@ def vec3(text: str | None) -> Vec3:
 class GameData:
     def __init__(self, stock_dir: Path, map_dir: Path) -> None:
         data = map_dir / "Base.SC2Data" / "GameData"
-        self.actors = Catalog(stock_paths(stock_dir, "actor") + [data / MAP_CATALOGS["actor"]], ("CActorUnit",))
+        self.actors = Catalog(stock_paths(stock_dir, "actor") + [data / MAP_CATALOGS["actor"]], ACTOR_TAGS)
         self.models = Catalog(stock_paths(stock_dir, "model") + [data / MAP_CATALOGS["model"]], ("CModel",))
-
-    def actor_for(self, unit: str) -> str | None:
-        """The unit actor: the one named like the unit, else one listing it in unitName."""
-        if unit in self.actors.entries:
-            return unit
+        # unitName -> the first actor that lists it, in catalog order; and
+        # unit -> the first actor its birth creates (a morph state such as
+        # ArchiveSealed has no actor of its own).
+        self.by_unit_name: dict[str, str] = {}
+        self.by_birth: dict[str, str] = {}
+        # A morph state (BanelingBurrowed, a lowered gate) keeps the actor
+        # it morphed from and is drawn in another pose: no volume, only a reason.
+        self.by_morph: dict[str, str] = {}
         for ident, els in self.actors.entries.items():
             for el in els:
-                if unit in (el.get("unitName") or "").split(","):
-                    return ident
-        return None
+                for name in (el.get("unitName") or "").split(","):
+                    if name:
+                        self.by_unit_name.setdefault(name, ident)
+                for name in birth_units(el):
+                    self.by_birth.setdefault(name, ident)
+                for on in el.findall("On"):
+                    for name in MORPH_RE.findall(on.get("Terms") or ""):
+                        self.by_morph.setdefault(name, ident)
+
+    def actor_for(self, unit: str) -> str | None:
+        """The unit actor: the one named like the unit, else one listing it
+        in unitName, else one that a UnitBirth of the unit creates."""
+        if unit in self.actors.entries:
+            return unit
+        return self.by_unit_name.get(unit) or self.by_birth.get(unit)
 
     def unit_name(self, actor: str) -> str:
         for el in reversed(self.actors.entries[actor]):
@@ -164,4 +208,7 @@ class GameData:
         # actor. A script cannot read which, so the volume uses the maximum.
         model_scale = vec3(self.models.field(model, "ScaleMax"))
         scale = (actor_scale[0] * model_scale[0], actor_scale[1] * model_scale[1], actor_scale[2] * model_scale[2])
-        return Resolution(unit, actor, model, path, scale, actor_scale, model_scale)
+        actors = tuple(self.actors.chain(actor))
+        models = tuple(self.models.chain(model))
+        variations = int(self.models.field(model, "VariationCount") or 0)
+        return Resolution(unit, actor, model, path, scale, actor_scale, model_scale, actors, models, variations)

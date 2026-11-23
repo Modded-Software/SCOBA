@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { reloadScene, sceneOf } from './scene.mjs';
 
 const MARINE = 'mods\\liberty.sc2mod\\base.sc2assets\\assets\\units\\terran\\marine\\marine.m3';
 const ZEALOT = 'mods\\liberty.sc2mod\\base.sc2assets\\assets\\units\\protoss\\zealot\\zealot.m3';
@@ -16,8 +17,8 @@ function watch(page) {
   return problems;
 }
 
-async function open(page, hash = '') {
-  await page.goto('/' + hash);
+async function open(page) {
+  await page.goto('/');
   await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
   // These tests measure model pixels: no ground grid behind them.
   await page.evaluate(() => window.sc2viewer.setGrid(false));
@@ -304,7 +305,7 @@ test('drag sensitivity: rotate 0.004 rad per pixel, pan 0.0006 x distance per pi
   expect(c2.yaw).toBeCloseTo(c1.yaw, 6);
 });
 
-test('the scene survives a reload through the URL', async ({ page }) => {
+test('the scene survives a reload through the scene store', async ({ page }) => {
   const problems = watch(page);
   await open(page);
   await addByUi(page, 'terran\\marine\\marine.m3', MARINE);
@@ -317,11 +318,11 @@ test('the scene survives a reload through the URL', async ({ page }) => {
   const anim = page.locator('#scene li').nth(0).locator('select.anim');
   await anim.selectOption({ index: 2 });
   const before = await state(page);
-  expect(page.url()).toContain('#');
+  // Negative: the address holds none of it.
+  expect(new URL(page.url()).hash).toBe('');
+  expect((await sceneOf(page)).items).toHaveLength(2);
 
-  await page.reload();
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready && window.sc2viewer.state().items.length === 2);
-  await page.waitForFunction(() => window.sc2viewer.idle());
+  await reloadScene(page);
   const after = await state(page);
   const key = (i) => ({ path: i.path, x: i.x, y: i.y, rot: i.rot, scale: i.scale, sequence: i.sequence });
   expect(after.items.map(key)).toEqual(before.items.map(key));
@@ -350,7 +351,7 @@ test('clear asks first; cancel, Escape and the backdrop keep everything', async 
   await open(page);
   await addByUi(page, 'terran\\marine\\marine.m3', MARINE);
   await addByUi(page, 'protoss\\zealot\\zealot.m3', ZEALOT);
-  const hash = await page.evaluate(() => location.hash);
+  const stored = (await sceneOf(page)).items;
   const dialog = page.locator('#clear-dialog');
   await page.locator('#clear').click();
   await expect(dialog).toBeVisible();
@@ -369,7 +370,7 @@ test('clear asks first; cancel, Escape and the backdrop keep everything', async 
   const s = await state(page);
   expect(s.items.map((i) => i.path)).toEqual([MARINE, ZEALOT]);
   expect(s.sceneInstances).toBe(2);
-  expect(await page.evaluate(() => location.hash)).toBe(hash);
+  expect((await sceneOf(page)).items).toEqual(stored);
   expect(problems).toEqual([]);
 });
 
@@ -382,7 +383,7 @@ test('clear with an empty scene asks nothing and removes nothing', async ({ page
   expect(problems).toEqual([]);
 });
 
-test('clear empties the scene and the URL', async ({ page }) => {
+test('clear empties the scene, stored too', async ({ page }) => {
   const problems = watch(page);
   await open(page);
   await addByUi(page, 'terran\\marine\\marine.m3', MARINE);
@@ -395,8 +396,8 @@ test('clear empties the scene and the URL', async ({ page }) => {
   expect(s.items).toEqual([]);
   expect(s.sceneInstances).toBe(0);
   expect((await pixels(page)).covered).toBe(0);
-  await page.reload();
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
+  expect((await sceneOf(page)).items).toEqual([]);
+  await reloadScene(page);
   expect((await state(page)).items).toEqual([]);
   expect(problems).toEqual([]);
 });

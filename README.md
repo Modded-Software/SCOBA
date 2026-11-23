@@ -60,6 +60,7 @@ Two control modes have a contract and a state document:
 | `scripts/` | Build, validation, launch, and test tooling. |
 | `scripts/testkit/` | In-game test harness and profiles. |
 | `scripts/setup/deps.sh` | Dependency checks and installs behind `make init`, `install-deps`, `install-hdtex`. |
+| `deploy/ansible/` | Ansible playbook for the model viewer dev server (systemd user service). |
 | `scripts/setup/patches/stormex/` | Patches `deps.sh` applies to the stormex source before it builds. |
 | `.venv/src/stormex/` | The stormex source checkout built by setup. Not in git. |
 | `tools/stormex`, `tools/stormex.pins` | The CASC extractor and the pins it was built from, written by `make install-deps`. Not in git. |
@@ -147,6 +148,37 @@ window during a run: real mouse input makes the run invalid.
 Results are written to `out/test-runs/<profile>/<run>/summary.txt`.
 
 The testing rules for contributors and agents are in [AGENTS.md](AGENTS.md).
+
+## Model Viewer Dev Server
+
+The viewer runs as the systemd user service `sc2-viewer-dev` at
+`http://127.0.0.1:4517/`. Ansible makes it: `deploy/ansible/viewer-dev.yml`,
+role `viewer_dev`. It runs on this machine as the checkout's owner, with no
+root. Every start, stop and restart goes through the playbook.
+
+| Command | Does |
+| --- | --- |
+| `make viewer-provision` | Check linger, node 24 and `webviewer/local.env`; install the node packages; set up the renderer clone; build; make a missing catalog; write and enable the units; start; wait for `/api/health`; check that the port is held by the service. A second run changes nothing. `RESTART=1` restarts too. |
+| `make viewer-start` | The same as `viewer-provision`. |
+| `make viewer-restart` | Restart. A start rebuilds from the checkout, so this serves the current code. |
+| `make viewer-stop` | Stop the server and its health check. Check that the port is free. The units stay. |
+| `make viewer-unprovision` | Stop, disable and remove the units. |
+| `make viewer-status`, `make viewer-logs` | Show the unit and the health answer; the last log lines (`LINES=n`). Read only. |
+| `make viewer-serve` | The server in the foreground, for debugging. Beside the service it needs another `PORT`. |
+
+- The service starts at boot (linger), and restarts 5 s after it exits. In a
+  crash loop the wait grows to 60 s; it never gives up.
+- The timer `sc2-viewer-dev-healthcheck.timer` runs
+  `webviewer/scripts/healthcheck.sh` every 2 minutes. When the server does
+  not answer twice, 5 s apart, it is restarted. A server younger than 180 s
+  is still building and is left alone.
+- The playbook refuses to start when another process holds the port. It
+  names the pid and stops nothing.
+- Each command the playbook runs writes its output to a step log in
+  `~/.local/state/sc2-viewer-dev/steps/`, kept until the next run. The
+  playbook shows each log after its step.
+- Settings: `-e viewer_port=`, `viewer_host`, `viewer_node_bin`, in
+  `deploy/ansible/roles/viewer_dev/defaults/main.yml`.
 
 ## Desktop Entries
 

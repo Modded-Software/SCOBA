@@ -1,7 +1,7 @@
 From 757f8550ac6be2eac82fc03860aba3153155ca58 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sun, 22 Nov 2026 22:55:42 +0200
-Subject: [PATCH 35/51] M3 particles: material layers and oriented quad types
+Subject: [PATCH 35/55] M3 particles: material layers and oriented quad types
 
 The particle shader reuses layers.glsl: colour is the diffuse plus the
 emissive layers, alpha is the product of the alpha masks (WhiteoutFlakes

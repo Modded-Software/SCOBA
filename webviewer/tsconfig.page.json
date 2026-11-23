@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": [
+    "src/page/**/*.ts",
+    "src/games/*/page/**/*.ts",
+    "src/games/*/shared/**/*.ts",
+    "src/formats/**/*.ts",
+    "src/shared/**/*.ts"
+  ],
+  "exclude": []
+}

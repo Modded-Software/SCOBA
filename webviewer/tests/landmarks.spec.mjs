@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { api } from './api.mjs';
 
-// Landmarks (public/js/landmarks.js): named camera views in the view tools
+// Landmarks (src/page/features/landmarks): named camera views in the view tools
 // drop-down. "origin (0, 0, 0)" is always there. Each "add all" run frames its
 // new block and keeps that view as a landmark named after the list filters.
 
@@ -29,7 +30,7 @@ async function choose(page, id) {
 async function filterFew(page) {
   await page.selectOption('#family', 'is:Melee');
   await page.fill('#unit-search', 'zergling');
-  const listed = await (await page.request.get('/api/units?' + new URLSearchParams({ limit: '500', family: 'Melee', q: 'zergling' }))).json();
+  const listed = await (await page.request.get(api.records('units', { limit: '500', family: 'Melee', q: 'zergling' }))).json();
   await expect.poll(() => page.locator('#unit-count').textContent()).toBe(`${listed.total} units`);
   return listed;
 }

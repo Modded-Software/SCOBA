@@ -138,8 +138,13 @@ def has_tight(model) -> bool:
 
 
 def model_shapes(path: Path, scale: Vec3) -> tuple[str, list[Shape]]:
-    """(source, shapes) of one m3 file."""
-    model = m3.loadModel(str(path))
+    """(source, shapes) of one m3 file.
+
+    checkExpectedValue off: m3addon asserts that fields it calls unknown
+    hold the value its authors saw; newer stock models break that (PHSH,
+    CREP, VOL_) in fields the shapes do not read. Unknown sections still
+    fail."""
+    model = m3.loadModel(str(path), checkExpectedValue=False)
     if model.fuzzyHitTestObjects:
         return "fuzzy", [shape_record(model, s, scale) for s in model.fuzzyHitTestObjects]
     if has_tight(model):

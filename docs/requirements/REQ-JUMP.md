@@ -21,7 +21,6 @@ Out of scope for the MVP:
 
 - clearing cliffs, units, or doodads (pathing stays ground);
 - the aim ray origin while airborne;
-- jump clips for Kerrigan;
 - upper-body jump clips; takeoff sound and dust.
 
 Implementation lives in [SPEC-JUMP](../specifications/SPEC-JUMP.md).
@@ -66,7 +65,9 @@ Implementation lives in [SPEC-JUMP](../specifications/SPEC-JUMP.md).
 | R-JUMP-12 | The leg bones MUST keep their length in every jump clip (the build fails above 0.001). |
 | R-JUMP-13 | The jump MUST NOT write the upper bracket. Aiming, aim pitch, and attacks MUST keep working during the jump. |
 | R-JUMP-14 | After landing recovery, the legs MUST return to the normal clip choice (stand, walk, aim walk). |
-| R-JUMP-15 | Kerrigan MUST jump (R-JUMP-1 to 7) with her normal leg clips. |
+| R-JUMP-24 | The legs MUST blend back from the jump to stand or walk fast (operator 2026-11-23): the jump clip releases the lower bracket with a 0.05 s blend (`c_JUMP_RELEASE_BLEND`; before, the engine default), the first lower clip after it blends in over 0.05 s (`c_JUMP_RESUME_BLEND`; before, 0.15 s), and Kerrigan's End clip eases her legs back to the base in 125 ms (before, its whole 250 ms). A lower clip outside a jump MUST keep its own blend. |
+| R-JUMP-15 | Kerrigan MUST jump (R-JUMP-1 to 7). Revised 2026-11-23 (operator: she has no jump animation): her legs play jump clips (R-JUMP-23), not her normal leg clips. |
+| R-JUMP-23 | Kerrigan's jump clips MUST come from the legs of her own `Burrow 01` clip (operator 2026-11-23). Only the leap is used: the clip MUST be cut at the first moment after its apex where her lowest foot is back at its first-frame height ("until the legs get exactly back to ground level"); the dive into the ground MUST NOT play. The clip's own rise of the body MUST be removed: the jump script alone sets the height ("just the legs"). The stand jump MUST play that leg motion as it is. The walk jump MUST mix it per bone with the walk in the walk direction, at a fixed weight (0.5), two strides as for Tosh (R-JUMP-18). The clips MUST have the names Tosh's clips have, so the script picks them the same way, and MUST hold no upper-body bone. |
 
 ## 4. Open items
 
@@ -76,7 +77,7 @@ Implementation lives in [SPEC-JUMP](../specifications/SPEC-JUMP.md).
 | O-JUMP-4 | Closed by R-JUMP-18: the script tracks the walk phase itself. Left open: the takeoff clip begins up to a quarter cycle from the tracked phase (two strides); the 0.08 s blend covers it. |
 | O-JUMP-5 | The torso does not lean forward in the crouch (the reference hips flex about 46 degrees). A lean would turn the upper body, which the jump must not write (R-JUMP-13). |
 | O-JUMP-6 | The takeoff crouch lasts 0.15 s (operator 2026-11-17: 150 ms at most; was 0.133 s); the reference takes about 0.5 s down and 0.2 s up. The angles match; the speed is the game's. |
-| O-JUMP-2 | A leg source for Kerrigan. Her own `Jump End` is a candidate. |
+| O-JUMP-2 | Closed by R-JUMP-23: `Burrow 01`, cut at the ground. |
 | O-JUMP-3 | Upper-body jump clips while not aiming or attacking. |
 
 ## 5. Acceptance (operator checks)
@@ -90,3 +91,4 @@ Implementation lives in [SPEC-JUMP](../specifications/SPEC-JUMP.md).
 | AC-JUMP-5 | The jump height and the flight look believable: a short crouch, a quick rise, a slower top, a faster drop. |
 | AC-JUMP-6 | Jumping while walking: the legs push off from the walk, hold a stride in the air along the move direction, and land back into the walk on the leading foot. Jumping from idle: the legs crouch and tuck from the stand, feet at the stand width. No pop at the phase changes or at the release. |
 | AC-JUMP-7 | The camera rises and falls with the hero, smoothly, with no lag or step. |
+| AC-JUMP-8 | Kerrigan's jump: her legs fold and tuck as in the first part of `Burrow 01`, she does not sink into the ground, and the walk jump blends with her walk without a pop. |

@@ -165,7 +165,6 @@ void gf_AimPickScan (int lp_player, bool lp_enemyOnly, unitgroup lp_group, bool 
 // (R-TPS-84, SPEC-TPS 5.8). No margin: the volume is the unit's shape.
 unit gf_AimUnitAtCrosshair (int lp_player, bool lp_enemyOnly) {
     unitfilter lv_filter;
-    int lv_i;
 
     if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
         return null;
@@ -175,9 +174,8 @@ unit gf_AimUnitAtCrosshair (int lp_player, bool lp_enemyOnly) {
     gv_aimPickBestT = c_SCOBA_PICK_MAX_RANGE + 1.0;
     lv_filter = UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32)));
     gf_AimPickScan(lp_player, lp_enemyOnly, UnitGroup(null, c_playerAny, RegionCircle(Point(gv_aimPickOx, gv_aimPickOy), c_SCOBA_PICK_MAX_RANGE + c_HV_NEAR_REACH), lv_filter, 0), false);
-    for (lv_i = 0; lv_i < gv_hvFarCount; lv_i += 1) {
-        gf_AimPickScan(lp_player, lp_enemyOnly, UnitGroup(gv_hvTypeName[gv_hvFarType[lv_i]], c_playerAny, RegionEntireMap(), lv_filter, 0), true);
-    }
+    // Far-type units from the group the events keep (gf_HvFarInit).
+    gf_AimPickScan(lp_player, lp_enemyOnly, UnitGroupFilter(null, c_playerAny, gv_hvFarUnits, lv_filter, 0), true);
     return gv_aimPickBest;
 }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the catalogs of the datasets from their game data: units (units.json
-# and PNG icons) and doodads (doodads.json). Datasets: server-datasets.mjs.
+# and PNG icons) and doodads (doodads.json). Datasets: src/games/sc2/server/datasets.ts.
 #
 #   catalog.sh [--if-missing | --if-stale] [--extract] [--dataset ID]
 #
@@ -45,7 +45,7 @@ if [[ "$extract" -eq 1 || ! -d "$STOCK/mods" ]]; then
     -x -o "$STOCK"
 fi
 
-listing="$(node tools/datasets.mjs list)"
+listing="$(bash scripts/tool.sh datasets list)"
 if [[ -n "$only" ]] && ! grep -q "^${only}	" <<< "$listing"; then
   echo "ERROR: no dataset \"$only\". Datasets:" >&2
   cut -f1 <<< "$listing" >&2
@@ -62,7 +62,7 @@ while IFS=$'\t' read -r id stock map out; do
     continue
   fi
   # The fingerprint of the sources as they are now, before they are read.
-  built_from="$(cd "$WEBVIEWER_DIR" && node tools/datasets.mjs signature "$id")"
+  built_from="$(bash "$WEBVIEWER_DIR/scripts/tool.sh" datasets signature "$id")"
   if [[ "$if_stale" -eq 1 && "$present" -eq 1 && "$(cat "$out/signature.txt")" == "$built_from" ]]; then
     echo "catalog up to date: $id ($out)"
     continue

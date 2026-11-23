@@ -61,3 +61,130 @@ void gf_DbgCamHeightGroup () {
     UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBAHeroFighterMode", 0)), c_orderQueueReplace);
     Wait(4.0, c_timeGame);
 }
+
+// Camera ground clamp (operator 2026-11-23: the camera bounces off the
+// ground instead of settling where the arm meets the ground). Raw, every
+// game loop for c_DBG_CLAMP_LOOPS: the engine distance, the clamp's safe
+// distance, and the eye clearance over the ground. Eye: the engine target
+// on the ground plus the applied height offset, back along yaw and pitch
+// by the engine distance (the engine eye itself cannot be read).
+const int c_DBG_CLAMP_LOOPS = 48;
+const int c_DBG_CLAMP_STILL = 0;
+const int c_DBG_CLAMP_SWEEP = 1;  // pitch 30 to -30 over 32 loops, like a mouse look
+const int c_DBG_CLAMP_WALK = 2;   // the W loop from the first loop
+
+// Raw, every 0.02 s like the clamp tick: when the clamp's safe distance
+// changes, the tick, the new safe, the engine distance, pitch x10, yaw,
+// the target x, y and height, and the ground under the target (x1000).
+trigger gt_DbgClampTick;
+string gv_dbgClampLog;
+int gv_dbgClampTicks;
+int gv_dbgClampLast;
+bool gt_DbgClampTick_Func (bool testConds, bool runActions) {
+    int lv_safe = FixedToInt(gf_CameraSafeDistance(1, gv_cameraDistanceDesired[1]) * 1000.0);
+    point lv_t = CameraGetTarget(1);
+
+    gv_dbgClampTicks += 1;
+    if (lv_safe != gv_dbgClampLast && StringLength(gv_dbgClampLog) < 3500) {
+        gv_dbgClampLog = gv_dbgClampLog + IntToString(gv_dbgClampTicks) + ":" + IntToString(lv_safe) + "/" + IntToString(FixedToInt(CameraGetDistance(1) * 1000.0)) + "/" + IntToString(FixedToInt(CameraGetPitch(1) * 10.0)) + "/" + IntToString(FixedToInt(CameraGetYaw(1))) + "/" + IntToString(FixedToInt(PointGetX(lv_t) * 1000.0)) + "," + IntToString(FixedToInt(PointGetY(lv_t) * 1000.0)) + "," + IntToString(FixedToInt(PointGetHeight(lv_t) * 1000.0)) + "," + IntToString(FixedToInt(WorldHeight(c_heightMapGround, lv_t) * 1000.0)) + " ";
+    }
+    gv_dbgClampLast = lv_safe;
+    return true;
+}
+
+trigger gt_DbgClampForward;
+bool gt_DbgClampForward_Func (bool testConds, bool runActions) {
+    gf_ForwardBegin(1);
+    return true;
+}
+
+void gf_DbgClampTrace (string lp_s, int lp_mode) {
+    string lv_pitches = "";
+    string lv_dist = "";
+    string lv_safe = "";
+    string lv_clear = "";
+    fixed lv_pitch;
+    fixed lv_d;
+    fixed lv_ez;
+    point lv_t;
+    point lv_e;
+    int lv_i;
+
+    gv_dbgClampLog = "";
+    gv_dbgClampTicks = 0;
+    gv_dbgClampLast = -1;
+    TriggerEnable(gt_DbgClampTick, true);
+    if (lp_mode == c_DBG_CLAMP_WALK) {
+        gv_kEYFORWARD[1] = true;
+        TriggerExecute(gt_DbgClampForward, false, false);
+    }
+    for (lv_i = 0; lv_i < c_DBG_CLAMP_LOOPS; lv_i += 1) {
+        if (lp_mode == c_DBG_CLAMP_SWEEP && lv_i <= 32) {
+            CameraSetValue(1, c_cameraValuePitch, 30.0 - 60.0 * IntToFixed(lv_i) / 32.0, 0.0, -1, 10);
+        }
+        Wait(0.0625, c_timeGame);
+        lv_pitch = CameraGetPitch(1);
+        if (lv_pitch > 180.0) {
+            lv_pitch = lv_pitch - 360.0;
+        }
+        lv_d = CameraGetDistance(1);
+        lv_t = CameraGetTarget(1);
+        lv_e = PointWithOffsetPolar(lv_t, Cos(lv_pitch) * lv_d, CameraGetYaw(1) + 180.0);
+        // The camera height offset (gv_cameraHeightApplied reads 0 here,
+        // run combat/20261123-141551: init writes the engine directly).
+        lv_ez = WorldHeight(c_heightMapGround, lv_t) + gf_CameraHeightTotal(1) + Sin(lv_pitch) * lv_d;
+        lv_pitches = lv_pitches + IntToString(FixedToInt(lv_pitch * 10.0)) + " ";
+        lv_dist = lv_dist + IntToString(FixedToInt(lv_d * 1000.0)) + " ";
+        lv_safe = lv_safe + IntToString(FixedToInt(gf_CameraSafeDistance(1, gv_cameraDistanceDesired[1]) * 1000.0)) + " ";
+        lv_clear = lv_clear + IntToString(FixedToInt((lv_ez - WorldHeight(c_heightMapGround, lv_e)) * 1000.0)) + " ";
+    }
+    gv_kEYFORWARD[1] = false;
+    TriggerEnable(gt_DbgClampTick, false);
+    BankValueSetFromString(gv_dbgBank, lp_s, "tickLog", gv_dbgClampLog);
+    BankValueSetFromString(gv_dbgBank, lp_s, "pitches", lv_pitches);
+    BankValueSetFromString(gv_dbgBank, lp_s, "dist", lv_dist);
+    BankValueSetFromString(gv_dbgBank, lp_s, "safe", lv_safe);
+    BankValueSetFromString(gv_dbgBank, lp_s, "clear", lv_clear);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "pitch100", FixedToInt(lv_pitch * 100.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "desired1000", FixedToInt(gv_cameraDistanceDesired[1] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "height1000", FixedToInt(gv_cameraHeightApplied[1] * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "targetZ1000", FixedToInt(PointGetHeight(lv_t) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "groundZ1000", FixedToInt(WorldHeight(c_heightMapGround, lv_t) * 1000.0));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "tps", gf_TpsActive(1));
+    BankSave(gv_dbgBank);
+}
+
+// One case: arm lp_arm, pitch lp_pitch (negative looks up: the eye goes
+// below the target and meets the ground), TPS or Point & Click.
+void gf_DbgClampCase (string lp_s, bool lp_tps, fixed lp_arm, fixed lp_pitch, int lp_mode) {
+    gf_DbgReset(lp_s, false, true);
+    if (lp_tps) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.5, c_timeGame);
+    }
+    gv_cameraDistanceDesired[1] = lp_arm;
+    gf_CameraZoomApply(1);
+    CameraSetValue(1, c_cameraValuePitch, lp_pitch, 0.2, -1, 10);
+    gf_DbgClampTrace(lp_s, lp_mode);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    CameraSetValue(1, c_cameraValuePitch, 30.0, 0.2, -1, 10);
+    gv_cameraDistanceDesired[1] = gf_CameraArm(gv_tPSUNIT[1]);
+    gf_CameraZoomApply(1);
+    if (lp_tps) {
+        UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    }
+    Wait(0.5, c_timeGame);
+}
+
+void gf_DbgCamClampGroup () {
+    gt_DbgClampForward = TriggerCreate("gt_DbgClampForward_Func");
+    gt_DbgClampTick = TriggerCreate("gt_DbgClampTick_Func");
+    TriggerAddEventTimePeriodic(gt_DbgClampTick, 0.02, c_timeGame);
+    TriggerEnable(gt_DbgClampTick, false);
+    gf_DbgClampCase("clamp_tps_sweep", true, 6.0, 30.0, c_DBG_CLAMP_SWEEP);
+    gf_DbgClampCase("clamp_pnc_sweep", false, 6.0, 30.0, c_DBG_CLAMP_SWEEP);
+    gf_DbgClampCase("clamp_tps_walk", true, 6.0, -10.0, c_DBG_CLAMP_WALK);
+    gf_DbgClampCase("clamp_tps_up", true, 6.0, -10.0, c_DBG_CLAMP_STILL);
+    // Negative: the arm clear of the ground, no clamp.
+    gf_DbgClampCase("clamp_tps_free", true, 6.0, 30.0, c_DBG_CLAMP_STILL);
+}

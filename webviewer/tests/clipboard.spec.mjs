@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { sceneOf } from './scene.mjs';
 
-// The selected instances (public/js/clipboard.js, controls.js):
+// The selected instances (src/page/features/clipboard, controls):
 // - Ctrl+C copies them; Ctrl+X copies them and removes them;
 // - Ctrl+V adds the copies, the group's centre on the ground under the
 //   mouse, each keeping its place in the group; the pasted ones become the
@@ -39,7 +40,7 @@ const select = (page, ids) => page.evaluate((list) => window.SC2App.setSelection
 const selection = (page) => page.evaluate(() => window.SC2App.selectedIds());
 const onWorld = (page, p) => page.evaluate((q) => window.sc2viewer.screenOf(q), p);
 const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
-const hashCount = (page) => page.evaluate(() => (location.hash.length > 1 ? JSON.parse(decodeURIComponent(location.hash.slice(1))).length : 0));
+const storedCount = async (page) => (await sceneOf(page)).items.length;
 /** What a copy keeps of an instance. */
 const kept = (i) => ({ unit: i.unit, doodad: i.doodad, variation: i.variation, path: i.path, dataset: i.dataset, rot: i.rot, scale: i.scale, team: i.team, sequence: i.sequence, hd: i.hd, dataScale: i.dataScale });
 
@@ -83,8 +84,8 @@ test('ctrl+c, then ctrl+v: copies of the selected instances, centred under the m
     expect([a.x, a.y, a.rot]).toEqual([b.x, b.y, b.rot]);
   }
   expect(after.some((i) => i.id === zergling)).toBe(true);
-  // The URL holds all five.
-  expect(await hashCount(page)).toBe(5);
+  // The stored scene holds all five.
+  expect(await storedCount(page)).toBe(5);
   // A second paste adds two more: the copy stays.
   await page.keyboard.press('Control+v');
   await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
@@ -102,7 +103,7 @@ test('ctrl+x removes the selected instances; ctrl+v brings them back under the m
   const cut = await items(page);
   expect(cut.map((i) => i.id)).toEqual([marine]);
   expect(await selection(page)).toEqual([]);
-  expect(await hashCount(page)).toBe(1);
+  expect(await storedCount(page)).toBe(1);
   await page.keyboard.press('Control+v');
   await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
   const after = await items(page);

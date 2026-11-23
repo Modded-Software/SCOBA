@@ -270,12 +270,3 @@ def check_talons(checks) -> None:
         ok = engine is not None and SWING_ENGINE_RATE[0] <= engine <= SWING_ENGINE_RATE[1]
         _report(checks, f"{section} engine plays the swing at 2x the old rate", ok, f"rem,rem2,at,at2={clip} rate={engine} want {SWING_ENGINE_RATE}")
 
-
-def check_swing_watch(checks) -> None:
-    """Operator watch: which clip is Attack 01 is judged on screen. Raw:
-    the engine's clip lengths; each case must have played a clip."""
-    for tag in ("stock", "swing", "spell"):
-        print(f"swing_watch {tag} clip length ms: {checks.value('swing_watch', '', tag + 'LenMs')}")
-        checks.gt("swing_watch", "", tag + "LenMs", 0)
-    for n in range(6):
-        print(f"swing_watch rate probe {n} (scale, clip ms, game ms): {checks.value('swing_watch', '', f'rate{n}')}")
