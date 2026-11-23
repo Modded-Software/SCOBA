@@ -1,0 +1,128 @@
+From 30b0f01fd3a0e008d2104977ccac78cfa42d8bdb Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 08:47:04 +0200
+Subject: [PATCH 41/49] m3: alpha-mask layers take their multiply and add
+
+A textured alpha-mask layer's value is rgba * multiply + add before the
+clamp (WhiteoutFlakes M3LayerValue and LayerTint): multiply = brightMult
+(<= 0 reads 1) times the colour's alpha (all-zero colour reads 1), add =
+midtoneOffset, as the playing sequence has them. They were ignored, so
+the cut-out test removed most of the Giant Yeti and Ursadon bodies
+(blastmark4 mask, multiply 10, add 1).
+
+layers.glsl LayerSettings gets multiplyAdd; every other layer binds
+(1, 0) and draws as before.
+
+Known defects:
+- Multiply and add are not applied to the other layer types.
+---
+ src/viewer/handlers/m3/layer.ts               | 40 ++++++++++++++++++-
+ src/viewer/handlers/m3/shaders/layers.glsl.ts | 11 ++---
+ 2 files changed, 43 insertions(+), 8 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index 9423ab40..f4e6dd30 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -48,7 +48,7 @@ export default class M3Layer {
+   active = 0;
+   layer: Layer | null = null;
+   gl: WebGLRenderingContext;
+-  uniformMap: { map: string; enabled: string; op: string; channels: string; teamColorMode: string; invert: string; clampResult: string; uvCoordinate: string; uvRow0: string; uvRow1: string; useConstantColor: string; constantColor: string; };
++  uniformMap: { map: string; enabled: string; op: string; channels: string; teamColorMode: string; invert: string; clampResult: string; uvCoordinate: string; uvRow0: string; uvRow1: string; useConstantColor: string; constantColor: string; multiplyAdd: string; };
+   source = '';
+   texture: M3Texture | null = null;
+   flags = 0;
+@@ -73,6 +73,8 @@ export default class M3Layer {
+   /** Whether a sequence drives the offset, angle or tiling track. */
+   uvDriven = false;
+   uvTilingDriven = false;
++  /** Multiply and add at the last bind (multiplyAdd). */
++  lastMultiplyAdd = new Float32Array([1, 0]);
+ 
+   constructor(material: M3LayerOwner, index: number, layerReference: Reference, type: string, op: number) {
+     const model = material.model;
+@@ -98,6 +100,7 @@ export default class M3Layer {
+       uvRow1: settings + 'uvRow1',
+       useConstantColor: settings + 'useConstantColor',
+       constantColor: settings + 'constantColor',
++      multiplyAdd: settings + 'multiplyAdd',
+     };
+ 
+     // Since Gloss doesn't exist in all versions
+@@ -298,11 +301,46 @@ export default class M3Layer {
+ 
+       gl.uniform1f(uniforms[uniformMap.clampResult], this.clampResult);
+ 
++      const ma = this.multiplyAdd(instance);
++
++      gl.uniform2f(uniforms[uniformMap.multiplyAdd], ma[0], ma[1]);
++
+ 
+       gl.uniform1f(uniforms[uniformMap.uvCoordinate], this.uvCoordinate);
+     }
+   }
+ 
++  /**
++   * The multiply and add of a textured alpha-mask layer, as last bound:
++   * multiply = brightMult (<= 0 reads 1) times the colour's alpha (an
++   * all-zero colour reads 1), add = midtoneOffset; both as the playing
++   * sequence has them (WhiteoutFlakes LayerTint and rgbAdd). Every other
++   * layer, and a constant one (its multiply is in its colour): (1, 0).
++   */
++  multiplyAdd(instance: M3ModelInstance | undefined): Float32Array {
++    const out = this.lastMultiplyAdd;
++    const layer = this.layer;
++
++    out[0] = 1;
++    out[1] = 0;
++
++    if (layer && !this.constant && (this.type === 'alphaMask' || this.type === 'alphaMask2')) {
++      const value = (ref: Layer['brightMult']): number => (instance && instance.skeleton ? instance.skeleton.getValue(ref, instance) : <number>ref.initValue);
++      const c = <Uint8Array>layer.color.initValue;
++      const alpha = c[0] === 0 && c[1] === 0 && c[2] === 0 && c[3] === 0 ? 1 : c[3] / 255;
++      let mul = value(layer.brightMult);
++
++      if (!(mul > 0)) {
++        mul = 1;
++      }
++
++      out[0] = mul * alpha;
++      out[1] = value(layer.midtoneOffset);
++    }
++
++    return out;
++  }
++
+   unbind(shader: Shader): void {
+     if (this.active) {
+       this.gl.uniform1f(shader.uniforms[this.uniformMap.enabled], 0);
+diff --git a/src/viewer/handlers/m3/shaders/layers.glsl.ts b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+index ae53a39c..e8dc1749 100644
+--- a/src/viewer/handlers/m3/shaders/layers.glsl.ts
++++ b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+@@ -18,6 +18,9 @@ struct LayerSettings {
+   // bool multColor;
+   // bool addColor;
+   bool clampResult;
++  // x: multiply, y: add, after the invert and before the clamp
++  // (WhiteoutFlakes M3LayerValue: rgba * tint + add). (1, 0) leaves it.
++  vec2 multiplyAdd;
+   // Flag 0x400 with no texture: the layer value is constantColor, not a sample.
+   bool useConstantColor;
+   vec4 constantColor;
+@@ -228,13 +231,7 @@ vec4 computeLayerColor(sampler2D layer, LayerSettings layerSettings) {
+     result = vec4(1.0) - result;
+   }
+ 
+-  // if (layerSettings.multiplyEnable) {
+-  //   result *= layerSettings.multiplyAddAlpha.x;
+-  // }
+-
+-  // if (layerSettings.addEnable) {
+-  //   result += layerSettings.multiplyAddAlpha.y;
+-  // }
++  result = result * layerSettings.multiplyAdd.x + layerSettings.multiplyAdd.y;
+ 
+   if (layerSettings.clampResult) {
+     result = clamp(result, 0.0, 1.0);

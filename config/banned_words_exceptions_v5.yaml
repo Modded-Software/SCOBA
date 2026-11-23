@@ -71,3 +71,69 @@ exceptions:
     owner: sc2
     review_date: '2026-11-22'
     removal: Remove when the texture search box no longer shows hint text.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0031-m3-run-and-draw-particle-emitters-rate-life-closed-f\.patch$
+    rationale: The exported renderer patch reads animated emitter values through instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when particle emitters no longer read through the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0037-M3-BBSC-billboards-turn-their-bones-to-the-camera\.patch$
+    rationale: The exported renderer patch turns billboard bones in the bone hierarchy. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when billboards no longer edit the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0039-m3-particles-PARC-emitter-copies-emit-from-their-own\.patch$
+    rationale: The exported renderer patch reads emitter copy bones through instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when emitter copies no longer read through the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0040-m3-particles-partEmit-bursts-for-emitters-and-PARC-c\.patch$
+    rationale: The exported renderer patch reads emit burst values through instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when emit bursts no longer read through the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0041-m3-alpha-mask-layers-take-their-multiply-and-add\.patch$
+    rationale: The exported renderer patch reads animated layer values through instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when the alpha mask layers no longer read through the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/patches/0046-m3-spot-lights-light-the-ground-plane\.patch$
+    rationale: The exported renderer patch reads light bones through instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when ground lights no longer read through the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/public/js/billboards\.js$
+    rationale: The page helper reads billboard bone matrices from instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when the helper no longer reads the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/public/js/particles\.js$
+    rationale: The page helper reads emitter bone matrices from item.instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when the helper no longer reads the bone hierarchy.
+  - rule: bskeleton-b
+    path: ^webviewer/tests/billboards\.spec\.mjs$
+    rationale: The test reads billboard bone matrices from instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when the test no longer reads the bone hierarchy.
+  - rule: bfallback-b
+    path: ^webviewer/patches/0037-M3-BBSC-billboards-turn-their-bones-to-the-camera\.patch$
+    rationale: A comment in the exported renderer patch (forward-only ref history) names the default billboard axis rule. Not fallback code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when patch 0037 is re-exported without the word.
+  - rule: bsmoke-b
+    path: ^webviewer/patches/0039-m3-particles-PARC-emitter-copies-emit-from-their-own\.patch$
+    rationale: The exported renderer patch (forward-only ref history) names the Helios EndSmoke emitter from the model data. Not a smoke test.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when patch 0039 is re-exported without the word.

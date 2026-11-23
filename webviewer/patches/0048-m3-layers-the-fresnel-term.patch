@@ -1,0 +1,286 @@
+From 4e3b5b846b330e48e54b1c6c0188cd190e406ac8 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 09:28:07 +0200
+Subject: [PATCH 48/49] m3 layers: the fresnel term
+
+- layers.glsl: fresnelTerm (psmateriallayer.fx CalcFresnelTerm, the
+  WhiteoutFlakes abs arm): 1 - |N.V| to the exponent, inverted for mode
+  2, then saturate(f x fresnelMaxOffset + fresnelMin). N is the shading
+  normal, V the eye vector, both tangent space (v_eyeVec).
+- standard.frag computes the normal first and switches the term on;
+  particle and displacement layers take none.
+- layer.ts binds mode, exponent, min, offset; layerOptions.fresnel for
+  tests.
+
+Known defects:
+- The fresnel mask, translation and rotation are not applied.
+---
+ src/viewer/handlers/m3/handler.ts             |  5 +-
+ src/viewer/handlers/m3/layer.ts               | 17 ++++-
+ src/viewer/handlers/m3/shaders/layers.glsl.ts | 63 ++++++++-----------
+ .../handlers/m3/shaders/particle.vert.ts      |  2 +
+ .../handlers/m3/shaders/standard.frag.ts      | 22 ++++---
+ .../handlers/m3/shaders/standard.vert.ts      |  4 +-
+ 6 files changed, 66 insertions(+), 47 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/handler.ts b/src/viewer/handlers/m3/handler.ts
+index 3307a195..27739710 100644
+--- a/src/viewer/handlers/m3/handler.ts
++++ b/src/viewer/handlers/m3/handler.ts
+@@ -13,6 +13,7 @@ import { createParticleBuffers, ParticleBuffers, particleQuad, particleMotion }
+ import groundLightVert from './shaders/groundlight.vert';
+ import groundLightFrag from './shaders/groundlight.frag';
+ import { groundLight } from './groundlight';
++import { layerOptions } from './layer';
+ 
+ export interface M3HandlerObject {
+   standardShaders: Shader[];
+@@ -37,6 +38,8 @@ export interface M3HandlerObject {
+   groundLightOnly: number;
+   /** One light's state now (for the tests). */
+   groundLight: typeof groundLight;
++  /** Layer switches (fresnel) the tests turn off. */
++  layerOptions: typeof layerOptions;
+ }
+ 
+ export default {
+@@ -79,7 +82,7 @@ export default {
+     const particleBuffers = createParticleBuffers(gl);
+     const groundLightShader = webgl.createShader(groundLightVert, groundLightFrag);
+     const groundLightBuffer = <WebGLBuffer>gl.createBuffer();
+-    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleDisplacementShader, particleBuffers, particleQuad, particleMotion, particlesEnabled: true, groundLightShader, groundLightBuffer, groundLightsEnabled: true, groundLightOnly: -1, groundLight };
++    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleDisplacementShader, particleBuffers, particleQuad, particleMotion, particlesEnabled: true, groundLightShader, groundLightBuffer, groundLightsEnabled: true, groundLightOnly: -1, groundLight, layerOptions };
+ 
+     viewer.sharedCache.set('m3', handlerData);
+   },
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index f4e6dd30..06faee8e 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -30,6 +30,10 @@ const layerTypeToTextureUnit = {
+   ao: 14,
+ };
+ 
++
++/** Layer switches the tests turn off to compare frames. */
++export const layerOptions = { fresnel: true };
++
+ /** What a layer needs of its material: standard or displacement. */
+ export interface M3LayerOwner {
+   model: M3Model;
+@@ -48,7 +52,7 @@ export default class M3Layer {
+   active = 0;
+   layer: Layer | null = null;
+   gl: WebGLRenderingContext;
+-  uniformMap: { map: string; enabled: string; op: string; channels: string; teamColorMode: string; invert: string; clampResult: string; uvCoordinate: string; uvRow0: string; uvRow1: string; useConstantColor: string; constantColor: string; multiplyAdd: string; };
++  uniformMap: { map: string; enabled: string; op: string; channels: string; teamColorMode: string; invert: string; clampResult: string; uvCoordinate: string; uvRow0: string; uvRow1: string; useConstantColor: string; constantColor: string; multiplyAdd: string; fresnelMode: string; fresnelExponentBiasScale: string; };
+   source = '';
+   texture: M3Texture | null = null;
+   flags = 0;
+@@ -101,6 +105,8 @@ export default class M3Layer {
+       useConstantColor: settings + 'useConstantColor',
+       constantColor: settings + 'constantColor',
+       multiplyAdd: settings + 'multiplyAdd',
++      fresnelMode: settings + 'fresnelMode',
++      fresnelExponentBiasScale: settings + 'fresnelExponentBiasScale',
+     };
+ 
+     // Since Gloss doesn't exist in all versions
+@@ -305,6 +311,15 @@ export default class M3Layer {
+ 
+       gl.uniform2f(uniforms[uniformMap.multiplyAdd], ma[0], ma[1]);
+ 
++      // The fresnel term (layers.glsl fresnelTerm): mode, then exponent,
++      // fresnelMin and fresnelMaxOffset (max = min + offset, m3addon).
++      const l = this.layer;
++
++      gl.uniform1f(uniforms[uniformMap.fresnelMode], layerOptions.fresnel && l ? l.fresnelType : 0);
++
++      if (l) {
++        gl.uniform3f(uniforms[uniformMap.fresnelExponentBiasScale], l.fresnelExponent, l.fresnelMin, l.fresnelMaxOffset);
++      }
+ 
+       gl.uniform1f(uniforms[uniformMap.uvCoordinate], this.uvCoordinate);
+     }
+diff --git a/src/viewer/handlers/m3/shaders/layers.glsl.ts b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+index e8dc1749..0348cf3f 100644
+--- a/src/viewer/handlers/m3/shaders/layers.glsl.ts
++++ b/src/viewer/handlers/m3/shaders/layers.glsl.ts
+@@ -2,7 +2,8 @@ const shader = `
+ varying vec3 v_normal;
+ varying vec4 v_uv[2];
+ varying vec3 v_lightDir;
+-// varying vec3 v_eyeVec;
++// Surface to eye, tangent space (the fresnel term).
++varying vec3 v_eyeVec;
+ varying vec3 v_halfVec;
+ varying vec3 v_teamColor;
+ varying vec4 v_vertexColor;
+@@ -29,13 +30,18 @@ struct LayerSettings {
+   // LAYR offset, angle and tiling as two rows applied to (u, v, 1).
+   vec3 uvRow0;
+   vec3 uvRow1;
+-  // float fresnelMode;
+-  // float fresnelTransformMode;
+-  // mat4 fresnelTransform;
+-  // bool fresnelClamp;
+-  // vec3 fresnelExponentBiasScale;
++  // 0 none, 1 standard, 2 inverted.
++  float fresnelMode;
++  // exponent, bias (fresnelMin), scale (fresnelMaxOffset).
++  vec3 fresnelExponentBiasScale;
+ };
+ 
++// The fresnel term's inputs, tangent space. Set by standard.frag before any
++// layer; other shaders leave g_fresnel off and their layers take no term.
++bool g_fresnel = false;
++vec3 g_shadingNormal = vec3(0.0, 0.0, 1.0);
++vec3 g_toEye = vec3(0.0, 0.0, 1.0);
++
+ uniform float u_specularity;
+ uniform float u_specMult;
+ uniform float u_emisMult;
+@@ -123,28 +129,21 @@ uniform sampler2D u_aoMap;
+ #define LAYEROP_TEAMCOLOR_DIFFUSE_ADD 5.0
+ #define LAYEROP_ADD_NO_ALPHA 6.0
+ 
+-// float calculateFresnelTerm(vec3 normal, vec3 eyeToVertex, float exponent, mat4 fresnelTransform, float fresnelTransformMode, bool fresnelClamp) {
+-//   vec3 fresnelDir = eyeToVertex;
+-//   float result;
+-
+-//   if (fresnelTransformMode != FRESNELTRANSFORM_NONE) {
+-//     fresnelDir = (fresnelTransform * vec4(fresnelDir, 1.0)).xyz;
+-
+-//     if (fresnelTransformMode == FRESNELTRANSFORM_NORMALIZED) {
+-//       fresnelDir = normalize(fresnelDir);
+-//     }
+-//   }
++// psmateriallayer.fx CalcFresnelTerm (WhiteoutFlakes M3FresnelTerm, its
++// abs arm): 1 - |N.V|, to the exponent, inverted for mode 2, then
++// saturate(f * scale + bias). The fresnel transform is not applied.
++float fresnelTerm(LayerSettings layerSettings) {
++  vec3 p = layerSettings.fresnelExponentBiasScale;
++  float f = 1.0 - abs(dot(g_shadingNormal, g_toEye));
+ 
+-//   if (fresnelClamp) {
+-//     result = 1.0 - clamp(-dot(normal, fresnelDir), 0.0, 1.0);
+-//   } else {
+-//     result = 1.0 - abs(dot(normal, fresnelDir));
+-//   }
++  f = pow(max(f, 0.0001), p.x);
+ 
+-//   result = max(result, 0.0000001);
++  if (layerSettings.fresnelMode == FRESNELMODE_INVERTED) {
++    f = 1.0 - f;
++  }
+ 
+-//   return pow(result, exponent);
+-// }
++  return clamp(f * p.z + p.y, 0.0, 1.0);
++}
+ 
+ vec3 combineLayerColor(vec4 color, vec3 result, LayerSettings layerSettings) {
+   if (layerSettings.op == LAYEROP_MOD) {
+@@ -237,17 +236,9 @@ vec4 computeLayerColor(sampler2D layer, LayerSettings layerSettings) {
+     result = clamp(result, 0.0, 1.0);
+   }
+ 
+-  // if (layerSettings.fresnelMode != FRESNELMODE_NONE) {
+-  //   float fresnelTerm = calculateFresnelTerm(v_normal, v_eyeVec, layerSettings.fresnelExponentBiasScale.x, layerSettings.fresnelTransform, layerSettings.fresnelTransformMode, layerSettings.fresnelClamp);
+-    
+-  //   if (layerSettings.fresnelMode == FRESNELMODE_INVERTED) {
+-  //     fresnelTerm = 1.0 - fresnelTerm;
+-  //   }
+-    
+-  //   fresnelTerm = clamp(fresnelTerm * layerSettings.fresnelExponentBiasScale.z + layerSettings.fresnelExponentBiasScale.y, 0.0, 1.0);
+-    
+-  //   result *= fresnelTerm;
+-  // }
++  if (g_fresnel && layerSettings.fresnelMode != FRESNELMODE_NONE) {
++    result *= fresnelTerm(layerSettings);
++  }
+ 
+   return result;
+ }
+diff --git a/src/viewer/handlers/m3/shaders/particle.vert.ts b/src/viewer/handlers/m3/shaders/particle.vert.ts
+index 7eccfe1a..0da75671 100644
+--- a/src/viewer/handlers/m3/shaders/particle.vert.ts
++++ b/src/viewer/handlers/m3/shaders/particle.vert.ts
+@@ -12,6 +12,7 @@ varying vec3 v_normal;
+ varying vec4 v_uv[2];
+ varying vec3 v_lightDir;
+ varying vec3 v_halfVec;
++varying vec3 v_eyeVec;
+ varying vec3 v_teamColor;
+ varying vec4 v_vertexColor;
+ 
+@@ -25,6 +26,7 @@ void main() {
+   v_normal = vec3(0.0, 0.0, 1.0);
+   v_lightDir = vec3(0.0, 0.0, 1.0);
+   v_halfVec = vec3(0.0, 0.0, 1.0);
++  v_eyeVec = vec3(0.0, 0.0, 1.0);
+   v_teamColor = vec3(1.0);
+   v_vertexColor = a_color;
+   gl_Position = u_VP * vec4(a_position, 1.0);
+diff --git a/src/viewer/handlers/m3/shaders/standard.frag.ts b/src/viewer/handlers/m3/shaders/standard.frag.ts
+index 7e55150e..b198efe7 100644
+--- a/src/viewer/handlers/m3/shaders/standard.frag.ts
++++ b/src/viewer/handlers/m3/shaders/standard.frag.ts
+@@ -15,6 +15,20 @@ uniform vec4 u_pick;
+ uniform float u_alphaTest;
+ 
+ void main() {
++  // Lighting runs in tangent space: v_lightDir and v_halfVec are in it, and
++  // a surface with no normal map faces straight out, (0, 0, 1).
++  vec3 normal = vec3(0.0, 0.0, 1.0);
++
++  if (u_normalLayerSettings.enabled) {
++    normal = decodeNormal(u_normalMap, u_normalLayerSettings);
++  }
++
++  // Every layer's fresnel term reads the shading normal (WhiteoutFlakes
++  // m3_standard.slang: the normal first).
++  g_fresnel = true;
++  g_shadingNormal = normal;
++  g_toEye = normalize(v_eyeVec);
++
+   // Alpha comes from the alpha masks, not from the diffuse; blended
+   // materials use it, and the alpha test cuts by it.
+   float alpha = 1.0;
+@@ -37,14 +51,6 @@ void main() {
+     return;
+   }
+ 
+-  // Lighting runs in tangent space: v_lightDir and v_halfVec are in it, and
+-  // a surface with no normal map faces straight out, (0, 0, 1).
+-  vec3 normal = vec3(0.0, 0.0, 1.0);
+-
+-  if (u_normalLayerSettings.enabled) {
+-    normal = decodeNormal(u_normalMap, u_normalLayerSettings);
+-  }
+-
+   float lambertFactor = max(dot(normal, normalize(v_lightDir)), 0.0);
+ 
+   // The diffuse is the base colour; with no diffuse layer it is black, so
+diff --git a/src/viewer/handlers/m3/shaders/standard.vert.ts b/src/viewer/handlers/m3/shaders/standard.vert.ts
+index 83e4b8ef..7fbab509 100644
+--- a/src/viewer/handlers/m3/shaders/standard.vert.ts
++++ b/src/viewer/handlers/m3/shaders/standard.vert.ts
+@@ -33,7 +33,8 @@ attribute vec4 a_weights;
+ varying vec3 v_normal;
+ varying vec4 v_uv[2]; // Pack 4 vec2 in 2 vec4, to reduce the varyings count
+ varying vec3 v_lightDir;
+-// varying vec3 v_eyeVec;
++// Surface to eye, tangent space (the fresnel term).
++varying vec3 v_eyeVec;
+ varying vec3 v_halfVec;
+ varying vec3 v_teamColor;
+ varying vec4 v_vertexColor;
+@@ -91,6 +92,7 @@ void main() {
+ 
+   v_lightDir = TBN(lightDir, t, b, n);
+   v_halfVec = TBN(halfVec, t, b, n);
++  v_eyeVec = TBN(eyeVec, t, b, n);
+ 
+   v_normal = n;
+ 

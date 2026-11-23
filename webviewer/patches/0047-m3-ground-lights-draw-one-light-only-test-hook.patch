@@ -1,0 +1,66 @@
+From 296347e04d4ecf57de664de190d66be1b484a7f4 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 09:24:31 +0200
+Subject: [PATCH 47/49] m3 ground lights: draw one light only (test hook)
+
+groundLightOnly: an index into model.lights, -1 for all.
+
+Known defects:
+- None new.
+---
+ src/viewer/handlers/m3/groundlight.ts   | 4 ++--
+ src/viewer/handlers/m3/handler.ts       | 4 +++-
+ src/viewer/handlers/m3/modelinstance.ts | 2 +-
+ 3 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/groundlight.ts b/src/viewer/handlers/m3/groundlight.ts
+index 9831c242..8a65d634 100644
+--- a/src/viewer/handlers/m3/groundlight.ts
++++ b/src/viewer/handlers/m3/groundlight.ts
+@@ -80,9 +80,9 @@ export function groundLight(instance: M3ModelInstance, light: Light): GroundLigh
+ const quad = new Float32Array(12);
+ 
+ /** Add each spot light of the instance onto the ground plane. */
+-export function renderGroundLights(gl: WebGLRenderingContext, shader: Shader, buffer: WebGLBuffer, camera: Camera, instance: M3ModelInstance): void {
++export function renderGroundLights(gl: WebGLRenderingContext, shader: Shader, buffer: WebGLBuffer, camera: Camera, instance: M3ModelInstance, only = -1): void {
+   const model = <M3Model>instance.model;
+-  const spots = model.lights.filter((l) => l.lightType === SPOT);
++  const spots = model.lights.filter((l, i) => l.lightType === SPOT && (only < 0 || i === only));
+ 
+   if (!spots.length) {
+     return;
+diff --git a/src/viewer/handlers/m3/handler.ts b/src/viewer/handlers/m3/handler.ts
+index 9bc0ff37..3307a195 100644
+--- a/src/viewer/handlers/m3/handler.ts
++++ b/src/viewer/handlers/m3/handler.ts
+@@ -33,6 +33,8 @@ export interface M3HandlerObject {
+   groundLightBuffer: WebGLBuffer;
+   /** Draw spot lights on the ground (tests compare frames with and without). */
+   groundLightsEnabled: boolean;
++  /** Draw only this light (index into model.lights); -1 draws all. For the tests. */
++  groundLightOnly: number;
+   /** One light's state now (for the tests). */
+   groundLight: typeof groundLight;
+ }
+@@ -77,7 +79,7 @@ export default {
+     const particleBuffers = createParticleBuffers(gl);
+     const groundLightShader = webgl.createShader(groundLightVert, groundLightFrag);
+     const groundLightBuffer = <WebGLBuffer>gl.createBuffer();
+-    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleDisplacementShader, particleBuffers, particleQuad, particleMotion, particlesEnabled: true, groundLightShader, groundLightBuffer, groundLightsEnabled: true, groundLight };
++    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleDisplacementShader, particleBuffers, particleQuad, particleMotion, particlesEnabled: true, groundLightShader, groundLightBuffer, groundLightsEnabled: true, groundLightOnly: -1, groundLight };
+ 
+     viewer.sharedCache.set('m3', handlerData);
+   },
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index e06deb97..febbe7fa 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -96,7 +96,7 @@ export default class M3ModelInstance extends ModelInstance {
+ 
+     // Spot lights on the ground, before the particles.
+     if (model.lights.length && !this.solidOnly && m3Cache.groundLightsEnabled) {
+-      renderGroundLights(model.viewer.gl, m3Cache.groundLightShader, m3Cache.groundLightBuffer, (<Scene>this.scene).camera, this);
++      renderGroundLights(model.viewer.gl, m3Cache.groundLightShader, m3Cache.groundLightBuffer, (<Scene>this.scene).camera, this, m3Cache.groundLightOnly);
+     }
+ 
+     if (!systems.length || this.solidOnly || !this.particlesEnabled()) {

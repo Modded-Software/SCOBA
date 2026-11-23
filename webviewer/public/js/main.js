@@ -97,7 +97,7 @@
     requestAnimationFrame(frame);
   }
 
-  const api = ['add', 'addUnit', 'addDoodad', 'remove', 'clear', 'restart', 'state', 'pixels', 'colorStats', 'mark', 'changedSinceMark', 'idle', 'view', 'groundPixel', 'groundPixels', 'drawnAt', 'setSolidOnly', 'itemPixel', 'groundPeaks', 'worldToCanvas', 'setGrid', 'setSky', 'screenOf', 'itemScreen', 'pickState', 'setDisplacement', 'setConstantLayers', 'alphaTests', 'setAlphaTest', 'textureWindow', 'hdAssets'];
+  const api = ['add', 'addUnit', 'addDoodad', 'remove', 'clear', 'restart', 'state', 'pixels', 'colorStats', 'whiteShare', 'mark', 'changedSinceMark', 'idle', 'view', 'groundPixel', 'groundPixels', 'drawnAt', 'setSolidOnly', 'itemPixel', 'groundPeaks', 'worldToCanvas', 'setGrid', 'setSky', 'screenOf', 'itemScreen', 'pickState', 'setDisplacement', 'setConstantLayers', 'alphaTests', 'setAlphaTest', 'textureWindow', 'hdAssets', 'particles', 'setParticles', 'advanceParticles', 'playParticles', 'animKeys', 'particleSamples', 'setGroundLights', 'groundLights', 'setFresnel', 'setItemPosition', 'billboards'];
   window.sc2viewer = { ready: false, groundUnder: app.groundAt };
   for (const name of api) {
     if (typeof app[name] !== 'function') throw new Error('sc2viewer: module did not define ' + name);

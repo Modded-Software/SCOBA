@@ -1,0 +1,394 @@
+From 960bb633c5538d4eb635169e9cd1c56e89834303 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 23:20:46 +0200
+Subject: [PATCH 37/49] M3: BBSC billboards turn their bones to the camera
+
+Ported from WhiteoutFlakes io/m3/m3_billboard.cpp (CBBSolver::ApplyBillboard):
+types 0 to 6, look-at or view direction, the correction quaternions, the
+spin of root-level bones, and the division back through the parent so the
+subtree follows. Run per skeleton update in world space, as the game does.
+BBSC is parsed (billboardbehavior.ts); SC2 sets no BONE billboard flags.
+
+Known defects: at rest (sequence -1) the skin uses no bone matrices, so
+billboards show only while a sequence plays; type 4 is not applied, as in
+the game.
+---
+ src/parsers/m3/billboardbehavior.ts |  38 +++++
+ src/parsers/m3/indexentry.ts        |   3 +-
+ src/viewer/handlers/m3/billboard.ts | 211 ++++++++++++++++++++++++++++
+ src/viewer/handlers/m3/model.ts     |  10 ++
+ src/viewer/handlers/m3/skeleton.ts  |  21 +++
+ 5 files changed, 282 insertions(+), 1 deletion(-)
+ create mode 100644 src/parsers/m3/billboardbehavior.ts
+ create mode 100644 src/viewer/handlers/m3/billboard.ts
+
+diff --git a/src/parsers/m3/billboardbehavior.ts b/src/parsers/m3/billboardbehavior.ts
+new file mode 100644
+index 00000000..13be3045
+--- /dev/null
++++ b/src/parsers/m3/billboardbehavior.ts
+@@ -0,0 +1,38 @@
++import BinaryStream from '../../common/binarystream';
++import IndexEntry from './indexentry';
++import Reference from './reference';
++
++/**
++ * A billboard behaviour (BBSC, version 0, 48 bytes): which bone turns to
++ * the camera, and how. Layout from m3addon structures.xml; the meaning of
++ * the type, the look-at flag and the two correction quaternions from
++ * WhiteoutFlakes m3_billboard.h. SC2 billboards come only from here: the
++ * BONE billboard flags are set on no bone in the game data.
++ */
++export default class BillboardBehavior {
++  version = -1;
++  /** Dependent bones (U16_); empty in every record of the game data. */
++  dependents = new Reference();
++  boneIndex = 0;
++  /**
++   * 0, 1, 2: locked to world X, Y, Z; 3, 5: locked to the bone's own X, Y;
++   * 4: never applied; 6: free, the camera's up as the roll hint.
++   */
++  billboardType = 6;
++  /** 1: aim from the eye to the bone; 0: along the camera's view direction. */
++  cameraLookAt = 1;
++  /** Correction quaternion (x, y, z, w) of the axis-locked types 0 to 2. */
++  up = new Float32Array([0, 0, 0, 1]);
++  /** Correction quaternion (x, y, z, w) of type 6 on a bone with a bone parent. */
++  forward = new Float32Array([0, 0, 0, 1]);
++
++  load(stream: BinaryStream, version: number, index: IndexEntry[]): void {
++    this.version = version;
++    this.dependents.load(stream, index);
++    this.boneIndex = stream.readUint16();
++    this.billboardType = stream.readUint8();
++    this.cameraLookAt = stream.readUint8();
++    stream.readFloat32Array(this.up);
++    stream.readFloat32Array(this.forward);
++  }
++}
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index 4d24c40c..224e90f7 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -22,6 +22,7 @@ import UnsupportedEntry from './unsupportedentry';
+ import CompositeMaterial, { CompositeMaterialSection } from './compositematerial';
+ import DisplacementMaterial from './displacementmaterial';
+ import ParticleEmitter from './particleemitter';
++import BillboardBehavior from './billboardbehavior';
+ 
+ 
+ // Mapping from entry tags, to their constructors and known version->size values.
+@@ -83,7 +84,7 @@ const tagMapping = {
+   PHSH: [UnsupportedEntry, { 1: 132, 3: 300 }],
+   PHRB: [UnsupportedEntry, { 2: 104, 4: 80 }],
+   SSGS: [UnsupportedEntry, { 1: 108 }],
+-  BBSC: [UnsupportedEntry, { 0: 48 }],
++  BBSC: [BillboardBehavior, { 0: 48 }],
+   SRIB: [UnsupportedEntry, { 0: 272 }],
+   RIB_: [UnsupportedEntry, { 6: 748, 8: 756, 9: 760 }],
+   IKJT: [UnsupportedEntry, { 0: 32 }],
+diff --git a/src/viewer/handlers/m3/billboard.ts b/src/viewer/handlers/m3/billboard.ts
+new file mode 100644
+index 00000000..f9a67ca9
+--- /dev/null
++++ b/src/viewer/handlers/m3/billboard.ts
+@@ -0,0 +1,211 @@
++import { mat3, mat4, quat, vec3 } from 'gl-matrix';
++import BillboardBehavior from '../../../parsers/m3/billboardbehavior';
++
++/**
++ * SC2 billboards (BBSC), ported from WhiteoutFlakes io/m3/m3_billboard.cpp
++ * (CBBSolver::ApplyBillboard). Run per frame against the camera, in world
++ * space as the game does: the bone's world rotation is replaced by one that
++ * faces the camera, then divided back through its parent so its children
++ * follow. A gl-matrix 4x4 keeps the bone's axes in its first three columns,
++ * which is the same memory as the row-vector rows WhiteoutFlakes reads.
++ */
++
++/** The constants the engine tests against. */
++const AXIS_EPSILON = 2.384185791015625e-7;
++const DEGENERATE_LEN_SQ = 1e-4;
++const UNIT_TOLERANCE = 1e-3;
++
++/** The camera as a billboard sees it, in world space. */
++export interface BillboardCamera {
++  position: vec3;
++  /** The camera's x (right) axis: type 0's fallback. */
++  axisX: vec3;
++  /** Into the scene. */
++  forward: vec3;
++  /** Roll hint of type 6; fallback of types 1 and 2. */
++  up: vec3;
++}
++
++type V3 = [number, number, number];
++
++const len2 = (v: V3): number => v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
++const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
++const scaled = (v: V3, s: number): V3 => [v[0] * s, v[1] * s, v[2] * s];
++/** Unit length; a zero vector is left as it is. */
++const unit = (v: V3): V3 => (len2(v) > 0 ? scaled(v, 1 / Math.sqrt(len2(v))) : v);
++/** The aim turned a quarter inside its plane, renormalised in 2-D. */
++const quarter = (a: number, b: number): [number, number] => {
++  const l = a * a + b * b;
++
++  return l > 0 ? [a / Math.sqrt(l), b / Math.sqrt(l)] : [a, b];
++};
++const axis = (m: mat4 | Float32Array, r: number): V3 => [m[r * 4], m[r * 4 + 1], m[r * 4 + 2]];
++
++/**
++ * The basis a billboard gives one bone: rows 0 to 2 are its axes, written
++ * to `out` (9 numbers). False when the engine leaves the bone alone.
++ */
++export function billboardBasis(type: number, lookAt: boolean, cam: BillboardCamera, bone: mat4, out: Float32Array): boolean {
++  // The aim points away from the eye in both branches.
++  const d: V3 = lookAt ? unit([bone[12] - cam.position[0], bone[13] - cam.position[1], bone[14] - cam.position[2]]) : [cam.forward[0], cam.forward[1], cam.forward[2]];
++
++  if (Math.abs(d[0]) < AXIS_EPSILON && Math.abs(d[1]) < AXIS_EPSILON && Math.abs(d[2]) < AXIS_EPSILON) {
++    return false;
++  }
++
++  let rows: V3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
++
++  if (type === 0) {
++    // Locked to world X: local +Y aims along the direction in the YZ plane.
++    let v: V3 = [0, d[1], d[2]];
++
++    if (d[1] * d[1] + d[2] * d[2] < DEGENERATE_LEN_SQ) {
++      v = [cam.axisX[0], cam.axisX[1], cam.axisX[2]];
++    }
++
++    v = unit(v);
++    const p = quarter(-v[2], v[1]);
++
++    rows = [[1, 0, 0], v, [0, p[0], p[1]]];
++  } else if (type === 1) {
++    // Locked to world Y: local +X aims.
++    let v: V3 = [d[0], 0, d[2]];
++
++    if (d[2] * d[2] + d[0] * d[0] < DEGENERATE_LEN_SQ) {
++      v = [cam.up[0], cam.up[1], cam.up[2]];
++    }
++
++    v = unit(v);
++    const p = quarter(-v[2], v[0]);
++
++    rows = [v, [0, 1, 0], [p[0], 0, p[1]]];
++  } else if (type === 2) {
++    // Locked to world Z: the upright poster.
++    let v: V3 = [d[0], d[1], 0];
++
++    if (d[1] * d[1] + d[0] * d[0] < DEGENERATE_LEN_SQ) {
++      v = [cam.up[0], cam.up[1], cam.up[2]];
++    }
++
++    v = unit(v);
++    const p = quarter(v[1], -v[0]);
++
++    rows = [[p[0], p[1], 0], v, [0, 0, 1]];
++  } else if (type === 3 || type === 5) {
++    // Locked to the bone's own current X (3) or Y (5).
++    const a = unit(axis(bone, type === 3 ? 0 : 1));
++    const c = cross(a, d);
++
++    if (len2(c) < DEGENERATE_LEN_SQ) {
++      return false;
++    }
++
++    const cn = unit(c);
++
++    rows = type === 3 ? [a, cn, cross(a, cn)] : [cn, cross(a, cn), a];
++  } else if (type === 4) {
++    // Parsed by the game, never applied.
++    return false;
++  } else if (type === 6) {
++    // Free, the camera's up as the roll hint; parallel leaves identity.
++    const e = cross(d, [cam.up[0], cam.up[1], cam.up[2]]);
++
++    if (len2(e) >= DEGENERATE_LEN_SQ) {
++      const en = unit(e);
++
++      rows = [en, d, unit(cross(en, d))];
++    }
++  }
++
++  // The engine's gate: every row of unit length.
++  if (rows.some((r) => Math.abs(len2(r) - 1) >= UNIT_TOLERANCE)) {
++    return false;
++  }
++
++  for (let r = 0; r < 3; r++) {
++    out.set(rows[r], r * 3);
++  }
++
++  return true;
++}
++
++const basisHeap = new Float32Array(9);
++const q = quat.create();
++const parentQ = quat.create();
++const local = mat4.create();
++const m3Heap = mat3.create();
++
++/** A rotation from rows: normalised first two, the third rebuilt (M3Node_GetWorldRotationQuat). */
++function rotationOf(out: quat, m: mat4 | Float32Array): quat {
++  const x = unit(axis(m, 0));
++  const y = unit(axis(m, 1));
++  const z = unit(cross(x, y));
++
++  m3Heap.set([...x, ...y, ...z]);
++  quat.fromMat3(out, m3Heap);
++
++  return quat.normalize(out, out);
++}
++
++/**
++ * Apply one BBSC record to a bone's world matrix, in place.
++ * `spin`: the bone's own local rotation, for a bone whose parent is not a
++ * bone (it keeps spinning in the screen plane); null otherwise.
++ * `scale`: the bone's local scale. `parent`: the parent's world matrix (the
++ * instance's for a root bone). The bone's position is left as it is.
++ */
++export function applyBillboard(record: BillboardBehavior, cam: BillboardCamera, spin: quat | null, scale: vec3, parent: mat4, bone: mat4): boolean {
++  const type = record.billboardType;
++
++  if (!billboardBasis(type, record.cameraLookAt !== 0, cam, bone, basisHeap)) {
++    return false;
++  }
++
++  // Through a quaternion, as the engine does: it squares a skewed basis.
++  m3Heap.set(basisHeap);
++  quat.fromMat3(q, m3Heap);
++  quat.normalize(q, q);
++
++  if (spin) {
++    quat.mul(q, q, spin);
++  }
++
++  if (type <= 2) {
++    quat.mul(q, q, <quat>record.up);
++  } else if (type === 6 && !spin) {
++    quat.mul(q, q, <quat>record.forward);
++  }
++
++  // Into the parent's frame, then back out through the local scale and the parent.
++  quat.conjugate(parentQ, rotationOf(parentQ, parent));
++  quat.mul(q, parentQ, q);
++  quat.normalize(q, q);
++  mat4.fromQuat(local, q);
++
++  for (let r = 0; r < 3; r++) {
++    const s = scale[r];
++
++    for (let c = 0; c < 3; c++) {
++      let sum = 0;
++
++      for (let k = 0; k < 3; k++) {
++        sum += parent[k * 4 + c] * local[r * 4 + k];
++      }
++
++      bone[r * 4 + c] = sum * s;
++    }
++  }
++
++  return true;
++}
++
++/** The billboard camera of a scene camera: its eye and axes in world space. */
++export function billboardCamera(out: BillboardCamera, location: vec3, right: vec3, up: vec3, back: vec3): BillboardCamera {
++  vec3.copy(out.position, location);
++  vec3.normalize(out.axisX, right);
++  vec3.normalize(out.up, up);
++  vec3.scale(out.forward, back, -1);
++  vec3.normalize(out.forward, out.forward);
++
++  return out;
++}
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 011c1661..865085ef 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -32,6 +32,7 @@ import DisplacementMaterial from '../../../parsers/m3/displacementmaterial';
+ import { M3DisplacementMaterial } from './displacementmaterial';
+ import ParticleEmitter from '../../../parsers/m3/particleemitter';
+ import { particleDisplacement, particleMaterial } from './particlerender';
++import BillboardBehavior from '../../../parsers/m3/billboardbehavior';
+ 
+ // MATM material types: the order of the material lists in the model header
+ // (m3addon structures.xml, MODL).
+@@ -94,6 +95,8 @@ export default class M3Model extends Model {
+   allParticleEmitters: ParticleEmitter[] = [];
+   /** How many of particleEmitters draw with a displacement material. */
+   displacementEmitters = 0;
++  /** Billboard behaviour (BBSC) of a bone, by bone index. */
++  billboards = new Map<number, BillboardBehavior>();
+ 
+   constructor(bufferOrParser: ArrayBuffer | Parser, resourceData: HandlerResourceData) {
+     super(resourceData);
+@@ -174,6 +177,13 @@ export default class M3Model extends Model {
+       this.bones.push(new M3Bone(bone));
+     }
+ 
++    // Billboard behaviours, by bone (BBSC; the last record for a bone wins).
++    for (const record of model.billboardBehaviors.list(<BillboardBehavior[]>[])) {
++      if (record.boneIndex < this.bones.length) {
++        this.billboards.set(record.boneIndex, record);
++      }
++    }
++
+     this.boneLookup = model.boneLookup.list(new Uint16Array(0));
+ 
+     const sequences = model.sequences.get();
+diff --git a/src/viewer/handlers/m3/skeleton.ts b/src/viewer/handlers/m3/skeleton.ts
+index f5904ead..eeba7630 100644
+--- a/src/viewer/handlers/m3/skeleton.ts
++++ b/src/viewer/handlers/m3/skeleton.ts
+@@ -8,6 +8,9 @@ import M3Stc from './stc';
+ import M3Stg from './stg';
+ import M3Model from './model';
+ import { quat, vec3 } from 'gl-matrix';
++import { applyBillboard, billboardCamera, BillboardCamera } from './billboard';
++
++const cameraHeap: BillboardCamera = { position: vec3.create(), axisX: vec3.create(), forward: vec3.create(), up: vec3.create() };
+ 
+ /**
+  * M3 skeleton.
+@@ -22,6 +25,8 @@ export default class M3Skeleton {
+   stc: M3Stc[];
+   stg: M3Stg[];
+   boneLookup: Uint16Array;
++  /** Bones turned to the camera by BBSC records, counted over all updates (for the tests). */
++  billboarded = 0;
+ 
+   constructor(instance: M3ModelInstance) {
+     const model = <M3Model>instance.model;
+@@ -60,6 +65,9 @@ export default class M3Skeleton {
+     const instance = this.instance;
+     const nodes = this.nodes;
+     const modelNodes = this.modelNodes;
++    const billboards = (<M3Model>instance.model).billboards;
++    const scene = instance.scene;
++    const camera = billboards.size && scene ? billboardCamera(cameraHeap, scene.camera.location, scene.camera.directionX, scene.camera.directionY, scene.camera.directionZ) : null;
+ 
+     for (let i = 0, l = nodes.length; i < l; i++) {
+       const node = nodes[i];
+@@ -71,6 +79,19 @@ export default class M3Skeleton {
+ 
+       node.recalculateTransformation(instance);
+ 
++      // BBSC: turn to the camera after the bone is posed; its children follow
++      // because they compose onto this world matrix next.
++      const record = billboards.get(i);
++
++      if (record && camera) {
++        const parent = modelNode.parent;
++        const parentMatrix = parent === -1 ? instance.worldMatrix : nodes[parent].worldMatrix;
++
++        if (applyBillboard(record, camera, parent === -1 ? node.localRotation : null, node.localScale, parentMatrix, node.worldMatrix)) {
++          this.billboarded++;
++        }
++      }
++
+       // Recalculate and update child nodes.
+       // Note that this only affects normal nodes such as instances, and not skeletal nodes.
+       for (const child of node.children) {

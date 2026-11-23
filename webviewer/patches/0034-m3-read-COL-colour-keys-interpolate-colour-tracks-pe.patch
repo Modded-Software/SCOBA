@@ -1,0 +1,69 @@
+From 9e55b4efb9b1c66c08883856d626ac6efb2f0123 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 21:49:10 +0200
+Subject: [PATCH 34/49] m3: read COL colour keys; interpolate colour tracks per
+ channel
+
+---
+ src/parsers/m3/indexentry.ts |  9 ++++++++-
+ src/viewer/handlers/m3/sd.ts | 13 +++++++++++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index 7c8e9797..4d24c40c 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -97,7 +97,7 @@ const tagMapping = {
+  */
+ const SKIP_UNKNOWN_VERSION = new Set(['PAR_']);
+ 
+-export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[];
++export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[] | Uint8Array[];
+ export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | ParticleEmitter | UnsupportedEntry | string | number | Float32Array;
+ 
+ /**
+@@ -200,6 +200,13 @@ export default class IndexEntry {
+       for (let i = 0; i < entriesCount; i++) {
+         this.entries[i] = stream.readFloat32Array(4);
+       }
++    } else if (tag === '\0COL') {
++      // Colour keys (SDCC tracks): b, g, r, a, as the colour references store them.
++      this.entries = [];
++
++      for (let i = 0; i < entriesCount; i++) {
++        this.entries[i] = stream.readUint8Array(4);
++      }
+     } else if (tag === 'IREF') {
+       this.entries = [];
+ 
+diff --git a/src/viewer/handlers/m3/sd.ts b/src/viewer/handlers/m3/sd.ts
+index bf5c5a0a..13490054 100644
+--- a/src/viewer/handlers/m3/sd.ts
++++ b/src/viewer/handlers/m3/sd.ts
+@@ -6,6 +6,7 @@ import M3ParserSd from '../../../parsers/m3/sd';
+ const vector2Heap = vec2.create();
+ const vectorHeap = vec3.create();
+ const quatHeap = quat.create();
++const colorHeap = new Uint8Array(4);
+ 
+ /**
+  * Sequence data.
+@@ -74,6 +75,18 @@ export default class M3SdContainer {
+     const interpolationType = animationReference.interpolationType;
+     const fakeVa = <vec3>va; /// UGLY!!!
+ 
++    // Colour keys (b, g, r, a bytes): per channel, not as a quaternion.
++    if (<unknown>va instanceof Uint8Array) {
++      const ca = <Uint8Array><unknown>va;
++      const cb = <Uint8Array><unknown>vb;
++
++      for (let i = 0; i < 4; i++) {
++        colorHeap[i] = interpolationType === 0 ? ca[i] : Math.round(lerp(ca[i], cb[i], t));
++      }
++
++      return colorHeap;
++    }
++
+     if (fakeVa.length === 4) {
+       if (interpolationType === 0) {
+         return quat.copy(quatHeap, <quat>va);

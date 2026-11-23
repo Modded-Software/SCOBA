@@ -1,0 +1,29 @@
+From a8c1aea1a23d48bd7d85c6f45f03048e9437c9bd Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 21:37:46 +0200
+Subject: [PATCH 32/49] m3: report particle emitters of an unread PAR_ version
+
+---
+ src/viewer/handlers/m3/model.ts | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index b29922ba..82a7960f 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -256,7 +256,14 @@ export default class M3Model extends Model {
+    * a known layout, a material that is not standard) is listed as undrawn.
+    */
+   setupParticles(model: M3ParserModel): void {
+-    this.allParticleEmitters = model.particleEmitters.list(<ParticleEmitter[]>[]);
++    const reference = model.particleEmitters;
++
++    this.allParticleEmitters = reference.list(<ParticleEmitter[]>[]);
++
++    // A version the index entry does not know is skipped there, entries and all.
++    if (this.allParticleEmitters.length < reference.entries && reference.index) {
++      this.undrawnBatches.push(`particle emitters: ${reference.entries} of PAR_ version ${reference.index[reference.id].version} not read`);
++    }
+ 
+     this.allParticleEmitters.forEach((emitter, i) => {
+       if (!emitter.read) {

@@ -1,0 +1,140 @@
+From 1c087f5d1e4253f4bc53e35c205b66c20f178c5f Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 09:21:33 +0200
+Subject: [PATCH 45/49] m3 parser: lights (LITE v7)
+
+Type, bone, flags, colour, intensity, attenuation far and near, hot spot
+and falloff, at the m3addon offsets. model.lights lists them.
+
+Known defects:
+- Not drawn yet.
+---
+ src/parsers/m3/indexentry.ts    |  9 +++++----
+ src/parsers/m3/light.ts         | 30 +++++++++++++-----------------
+ src/viewer/handlers/m3/model.ts |  4 ++++
+ 3 files changed, 22 insertions(+), 21 deletions(-)
+
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index 07caf9f5..b86d2c0e 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -24,6 +24,7 @@ import DisplacementMaterial from './displacementmaterial';
+ import ParticleEmitter from './particleemitter';
+ import BillboardBehavior from './billboardbehavior';
+ import ParticleCopy from './particlecopy';
++import Light from './light';
+ 
+ 
+ // Mapping from entry tags, to their constructors and known version->size values.
+@@ -59,7 +60,7 @@ const tagMapping = {
+   FLAG: [Sd, { 0: 32 }],
+   // Unsupported entries
+   MSEC: [UnsupportedEntry, { 1: 72 }],
+-  LITE: [UnsupportedEntry, { 7: 212 }],
++  LITE: [Light, { 7: 212 }],
+   ATVL: [UnsupportedEntry, { 0: 116 }],
+   PATU: [UnsupportedEntry, { 4: 152 }],
+   TRGD: [UnsupportedEntry, { 0: 24 }],
+@@ -97,10 +98,10 @@ const tagMapping = {
+  * Tags whose unknown versions are skipped, not refused: the model still loads,
+  * without them (PAR_ version 14: 6 emitters in one file of the game data).
+  */
+-const SKIP_UNKNOWN_VERSION = new Set(['PAR_']);
++const SKIP_UNKNOWN_VERSION = new Set(['PAR_', 'LITE']);
+ 
+-export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | ParticleCopy[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[] | Uint8Array[];
+-export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | ParticleEmitter | ParticleCopy | UnsupportedEntry | string | number | Float32Array;
++export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | ParticleCopy[] | Light[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[] | Uint8Array[];
++export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | ParticleEmitter | ParticleCopy | Light | UnsupportedEntry | string | number | Float32Array;
+ 
+ /**
+  * An index entry.
+diff --git a/src/parsers/m3/light.ts b/src/parsers/m3/light.ts
+index bca01a21..cdc38927 100644
+--- a/src/parsers/m3/light.ts
++++ b/src/parsers/m3/light.ts
+@@ -3,42 +3,38 @@ import IndexEntry from './indexentry';
+ import { Float32AnimationReference, Vector3AnimationReference } from './animationreference';
+ 
+ /**
+- * A light.
++ * A light (LITE, version 7, 212 bytes). Layout from m3addon structures.xml:
++ * type 0 directional, 1 point, 2 spot; the cone angles in radians.
+  */
+ export default class Light {
+   version = -1;
+-  type = 0;
+-  unknown0 = 0;
+-  bone = -1;
++  lightType = 0;
++  boneIndex = 0;
++  /** 0x1 shadowCast, 0x2 specular, 0x4 affectedByAO, 0x8 lightOpaqueObjects, 0x10 lightTransparentObjects, 0x20 useTeamColor. */
+   flags = 0;
+-  unknown1 = 0;
+-  unknown2 = 0;
+   lightColor = new Vector3AnimationReference();
+   lightIntensity = new Float32AnimationReference();
+-  specularColor = new Vector3AnimationReference();
+-  specularIntensity = new Float32AnimationReference();
+   attenuationFar = new Float32AnimationReference();
+-  unknown3 = 0;
+   attenuationNear = new Float32AnimationReference();
+   hotSpot = new Float32AnimationReference();
+   falloff = new Float32AnimationReference();
+ 
+   load(stream: BinaryStream, version: number, _index: IndexEntry[]): void {
+     this.version = version;
+-    this.type = stream.readUint8();
+-    this.unknown0 = stream.readUint8();
+-    this.bone = stream.readInt16();
++    this.lightType = stream.readUint16();
++    this.boneIndex = stream.readUint16();
+     this.flags = stream.readUint32();
+-    this.unknown1 = stream.readUint32();
+-    this.unknown2 = stream.readInt32();
++    stream.seek(16);
+     this.lightColor.load(stream);
++    stream.seek(52);
+     this.lightIntensity.load(stream);
+-    this.specularColor.load(stream);
+-    this.specularIntensity.load(stream);
++    stream.seek(128);
+     this.attenuationFar.load(stream);
+-    this.unknown3 = stream.readFloat32();
++    stream.seek(152);
+     this.attenuationNear.load(stream);
++    stream.seek(172);
+     this.hotSpot.load(stream);
++    stream.seek(192);
+     this.falloff.load(stream);
+   }
+ }
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index ab7e5bf3..30531394 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -32,6 +32,7 @@ import DisplacementMaterial from '../../../parsers/m3/displacementmaterial';
+ import { M3DisplacementMaterial } from './displacementmaterial';
+ import ParticleEmitter from '../../../parsers/m3/particleemitter';
+ import ParticleCopy from '../../../parsers/m3/particlecopy';
++import Light from '../../../parsers/m3/light';
+ import { particleDisplacement, particleMaterial } from './particlerender';
+ import BillboardBehavior from '../../../parsers/m3/billboardbehavior';
+ 
+@@ -96,6 +97,8 @@ export default class M3Model extends Model {
+   allParticleEmitters: ParticleEmitter[] = [];
+   /** Every PARC entry; an emitter's copyIndices point into it. */
+   particleCopies: ParticleCopy[] = [];
++  /** Lights (LITE). Spot lights light the ground plane (groundlight.ts). */
++  lights: Light[] = [];
+   /** How many of particleEmitters draw with a displacement material. */
+   displacementEmitters = 0;
+   /** Billboard behaviour (BBSC) of a bone, by bone index. */
+@@ -275,6 +278,7 @@ export default class M3Model extends Model {
+ 
+     this.allParticleEmitters = reference.list(<ParticleEmitter[]>[]);
+     this.particleCopies = model.particleEmitterCopies.list(<ParticleCopy[]>[]);
++    this.lights = model.ligts.list(<Light[]>[]);
+ 
+     // A version the index entry does not know is skipped there, entries and all.
+     if (this.allParticleEmitters.length < reference.entries && reference.index) {

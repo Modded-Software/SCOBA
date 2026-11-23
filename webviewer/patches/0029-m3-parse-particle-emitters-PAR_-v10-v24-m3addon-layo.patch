@@ -1,0 +1,266 @@
+From 88e1b7d9189eefe2471ee7ac5eef53fe86545126 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 21:24:49 +0200
+Subject: [PATCH 29/49] m3: parse particle emitters (PAR_ v10-v24; m3addon
+ layout)
+
+---
+ src/parsers/m3/indexentry.ts      |  19 ++-
+ src/parsers/m3/particleemitter.ts | 197 ++++++++++++++++++++++++++++++
+ 2 files changed, 213 insertions(+), 3 deletions(-)
+ create mode 100644 src/parsers/m3/particleemitter.ts
+
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index 025740c8..7c8e9797 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -21,6 +21,7 @@ import Sd from './sd';
+ import UnsupportedEntry from './unsupportedentry';
+ import CompositeMaterial, { CompositeMaterialSection } from './compositematerial';
+ import DisplacementMaterial from './displacementmaterial';
++import ParticleEmitter from './particleemitter';
+ 
+ 
+ // Mapping from entry tags, to their constructors and known version->size values.
+@@ -70,7 +71,7 @@ const tagMapping = {
+   STBM: [UnsupportedEntry, { 0: 48 }],
+   LFSB: [UnsupportedEntry, { 2: 56 }],
+   LFLR: [UnsupportedEntry, { 2: 80, 3: 152 }],
+-  PAR_: [UnsupportedEntry, { 12: 1316, 17: 1460, 18: 1464, 19: 1464, 21: 1464, 22: 1484, 23: 1492, 24: 1496 }],
++  PAR_: [ParticleEmitter, { 10: 1304, 11: 1308, 12: 1316, 17: 1460, 18: 1464, 19: 1464, 21: 1464, 22: 1484, 23: 1492, 24: 1496 }],
+   PARC: [UnsupportedEntry, { 0: 40 }],
+   PROJ: [UnsupportedEntry, { 4: 388, 5: 382 }],
+   PHYJ: [UnsupportedEntry, { 0: 180 }],
+@@ -90,8 +91,14 @@ const tagMapping = {
+   WRP_: [UnsupportedEntry, { 1: 132 }],
+ };
+ 
+-export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[];
+-export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | UnsupportedEntry | string | number | Float32Array;
++/**
++ * Tags whose unknown versions are skipped, not refused: the model still loads,
++ * without them (PAR_ version 14: 6 emitters in one file of the game data).
++ */
++const SKIP_UNKNOWN_VERSION = new Set(['PAR_']);
++
++export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[];
++export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | ParticleEmitter | UnsupportedEntry | string | number | Float32Array;
+ 
+ /**
+  * An index entry.
+@@ -131,6 +138,12 @@ export default class IndexEntry {
+         return;
+       }
+ 
++      if (!entrySize && SKIP_UNKNOWN_VERSION.has(tag)) {
++        this.entries = [];
++        stream.seek(readerOffset);
++        return;
++      }
++
+       if (!entrySize) {
+         // Yey found a new version!
+         throw new Error(': Unsupported object version - tag ' + tag + ' and version ' + version);
+diff --git a/src/parsers/m3/particleemitter.ts b/src/parsers/m3/particleemitter.ts
+new file mode 100644
+index 00000000..47b95b01
+--- /dev/null
++++ b/src/parsers/m3/particleemitter.ts
+@@ -0,0 +1,197 @@
++import BinaryStream from '../../common/binarystream';
++import IndexEntry from './indexentry';
++import { Float32AnimationReference, PixelAnimationReference, Uint16AnimationReference, Vector3AnimationReference } from './animationreference';
++
++/**
++ * Byte offsets of the fields read, per layout: version 12, 17 to 21, 22 and
++ * 23, and 24. From m3addon structures.xml (PAR_), computed by its m3.py.
++ * Versions 10, 11 and 14 are not read (none or few in the game data).
++ */
++const LAYOUTS: { [version: number]: number } = { 12: 0, 17: 1, 18: 1, 19: 1, 21: 1, 22: 2, 23: 2, 24: 3 };
++
++const OFFSETS = {
++  emissionSpeed1: [8, 12, 12, 12],
++  emissionSpeed2: [28, 32, 32, 32],
++  emissionAngleX: [52, 52, 52, 52],
++  emissionAngleY: [72, 72, 72, 72],
++  emissionSpreadX: [92, 92, 92, 92],
++  emissionSpreadY: [112, 112, 112, 112],
++  lifespan1: [132, 132, 132, 132],
++  lifespan2: [152, 152, 152, 152],
++  zAcceleration: [188, 184, 184, 184],
++  middles: [192, 188, 188, 188],
++  holds: [-1, 204, 204, 204],
++  particleSizes1: [208, 220, 220, 220],
++  rotationValues1: [244, 256, 256, 256],
++  colors1: [280, 292, 292, 292],
++  drag: [340, 352, 352, 352],
++  mass: [348, 356, 356, 356],
++  maxParticles: [392, 396, 396, 400],
++  emissionRate: [396, 400, 400, 404],
++  emissionAreaType: [416, 420, 420, 424],
++  emissionAreaSize: [420, 424, 424, 428],
++  emissionAreaCutoutSize: [456, 460, 460, 464],
++  emissionAreaRadius: [492, 496, 496, 500],
++  emissionAreaCutoutRadius: [512, 516, 516, 520],
++  emissionType: [532, 548, 548, 552],
++  sizes2: [536, 552, 552, 556],
++  rotations2: [576, 592, 592, 596],
++  colors2: [616, 632, 632, 636],
++  partEmit: [684, 700, 700, 704],
++  images: [700, 716, 716, 720],
++  particleType: [752, 768, 768, 772],
++  flags: [1188, 1208, 1228, 1232],
++};
++
++/** Version 12 keeps the randomize choices as words; later ones as bits of additionalFlags. */
++const V12_RANDOMIZE = { speed: 48, lifespan: 172, mass: 344, trailing: 360 };
++
++/**
++ * A particle emitter (PAR_). Only what the viewer draws is read.
++ */
++export default class ParticleEmitter {
++  version = -1;
++  /** Read for this version: false for versions without a known layout. */
++  read = false;
++  boneIndex = 0;
++  materialReferenceIndex = 0;
++  /** 0x1 random speed, 0x2 random lifespan, 0x4 random mass, 0x8 world space. */
++  additionalFlags = 0;
++  emissionSpeed1 = new Float32AnimationReference();
++  emissionSpeed2 = new Float32AnimationReference();
++  emissionAngleX = new Float32AnimationReference();
++  emissionAngleY = new Float32AnimationReference();
++  emissionSpreadX = new Float32AnimationReference();
++  emissionSpreadY = new Float32AnimationReference();
++  lifespan1 = new Float32AnimationReference();
++  lifespan2 = new Float32AnimationReference();
++  zAcceleration = 0;
++  /** Size, colour, alpha, rotation: where the middle key sits in the life, 0 to 1. */
++  middles = new Float32Array([0.5, 0.5, 0.5, 0.5]);
++  /** Size, colour, alpha, rotation: hold time at the middle key. */
++  holds = new Float32Array(4);
++  /** Initial, middle, final size (x, y, z). */
++  particleSizes1 = new Vector3AnimationReference();
++  /** Initial, middle, final rotation, radians (x, y, z). */
++  rotationValues1 = new Vector3AnimationReference();
++  initialColor1 = new PixelAnimationReference();
++  middleColor1 = new PixelAnimationReference();
++  finalColor1 = new PixelAnimationReference();
++  drag = 0;
++  mass = 0;
++  mass2 = 0;
++  maxParticles = 0;
++  emissionRate = new Float32AnimationReference();
++  emissionAreaType = 0;
++  emissionAreaSize = new Vector3AnimationReference();
++  emissionAreaCutoutSize = new Vector3AnimationReference();
++  emissionAreaRadius = new Float32AnimationReference();
++  emissionAreaCutoutRadius = new Float32AnimationReference();
++  emissionType = 0;
++  randomizeWithParticleSizes2 = 0;
++  particleSizes2 = new Vector3AnimationReference();
++  randomizeWithRotationValues2 = 0;
++  rotationValues2 = new Vector3AnimationReference();
++  randomizeWithColor2 = 0;
++  initialColor2 = new PixelAnimationReference();
++  middleColor2 = new PixelAnimationReference();
++  finalColor2 = new PixelAnimationReference();
++  partEmit = new Uint16AnimationReference();
++  phase1StartImageIndex = 0;
++  phase1EndImageIndex = 0;
++  phase2EndImageIndex = 0;
++  phase2StartImageIndex = 0;
++  relativePhase1Length = 0;
++  numberOfColumns = 0;
++  numberOfRows = 0;
++  particleType = 0;
++  lengthWidthRatio = 1;
++  flags = 0;
++
++  load(stream: BinaryStream, version: number, _index: IndexEntry[]): void {
++    this.version = version;
++
++    const layout = LAYOUTS[version];
++
++    if (layout === undefined) {
++      return;
++    }
++
++    const at = (field: keyof typeof OFFSETS): BinaryStream => {
++      stream.seek(OFFSETS[field][layout]);
++
++      return stream;
++    };
++
++    this.read = true;
++    this.boneIndex = stream.readUint32();
++    this.materialReferenceIndex = stream.readUint32();
++
++    if (layout === 0) {
++      let flags = 0;
++
++      for (const [bit, offset] of [[1, V12_RANDOMIZE.speed], [2, V12_RANDOMIZE.lifespan], [4, V12_RANDOMIZE.mass], [8, V12_RANDOMIZE.trailing]]) {
++        stream.seek(offset);
++
++        if (stream.readUint32()) {
++          flags |= bit;
++        }
++      }
++
++      this.additionalFlags = flags;
++    } else {
++      this.additionalFlags = stream.readUint32();
++    }
++
++    this.emissionSpeed1.load(at('emissionSpeed1'));
++    this.emissionSpeed2.load(at('emissionSpeed2'));
++    this.emissionAngleX.load(at('emissionAngleX'));
++    this.emissionAngleY.load(at('emissionAngleY'));
++    this.emissionSpreadX.load(at('emissionSpreadX'));
++    this.emissionSpreadY.load(at('emissionSpreadY'));
++    this.lifespan1.load(at('lifespan1'));
++    this.lifespan2.load(at('lifespan2'));
++    this.zAcceleration = at('zAcceleration').readFloat32();
++    this.middles.set(at('middles').readFloat32Array(4));
++
++    if (layout > 0) {
++      this.holds.set(at('holds').readFloat32Array(4));
++    }
++
++    this.particleSizes1.load(at('particleSizes1'));
++    this.rotationValues1.load(at('rotationValues1'));
++    this.initialColor1.load(at('colors1'));
++    this.middleColor1.load(stream);
++    this.finalColor1.load(stream);
++    this.drag = at('drag').readFloat32();
++    this.mass = at('mass').readFloat32();
++    this.mass2 = stream.readFloat32();
++    this.maxParticles = at('maxParticles').readUint32();
++    this.emissionRate.load(at('emissionRate'));
++    this.emissionAreaType = at('emissionAreaType').readUint32();
++    this.emissionAreaSize.load(at('emissionAreaSize'));
++    this.emissionAreaCutoutSize.load(at('emissionAreaCutoutSize'));
++    this.emissionAreaRadius.load(at('emissionAreaRadius'));
++    this.emissionAreaCutoutRadius.load(at('emissionAreaCutoutRadius'));
++    this.emissionType = at('emissionType').readUint32();
++    this.randomizeWithParticleSizes2 = at('sizes2').readUint32();
++    this.particleSizes2.load(stream);
++    this.randomizeWithRotationValues2 = at('rotations2').readUint32();
++    this.rotationValues2.load(stream);
++    this.randomizeWithColor2 = at('colors2').readUint32();
++    this.initialColor2.load(stream);
++    this.middleColor2.load(stream);
++    this.finalColor2.load(stream);
++    this.partEmit.load(at('partEmit'));
++    this.phase1StartImageIndex = at('images').readUint8();
++    this.phase1EndImageIndex = stream.readUint8();
++    this.phase2EndImageIndex = stream.readUint8();
++    this.phase2StartImageIndex = stream.readUint8();
++    this.relativePhase1Length = stream.readFloat32();
++    this.numberOfColumns = stream.readUint16();
++    this.numberOfRows = stream.readUint16();
++    this.particleType = at('particleType').readUint32();
++    this.lengthWidthRatio = stream.readFloat32();
++    this.flags = at('flags').readUint32();
++  }
++}

@@ -24,10 +24,12 @@
 
       /**
        * Draw the displacement of a scene's drawn instances. Call right after
-       * the scene. Returns how many batches it drew.
+       * the scene. Returns how many mesh batches it drew; particle quads
+       * are counted on each emitter (sc2viewer.particles).
        */
       draw(scene, w, h) {
-        const instances = scene.instances.filter((i) => i.model.displacementBatches && i.model.displacementBatches.length);
+        // Displacement meshes, or emitters with a displacement material.
+        const instances = scene.instances.filter((i) => i.model.displacementBatches && (i.model.displacementBatches.length || i.model.displacementEmitters));
         if (!this.enabled || !instances.length) return 0;
         let drawn = 0;
         // The canvas has no alpha (alpha: false), so the copy is RGB.

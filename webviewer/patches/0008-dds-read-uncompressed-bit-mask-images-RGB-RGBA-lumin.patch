@@ -1,7 +1,7 @@
 From c3a4ec0514e8bb209c64c6b2311ff0f55fab1077 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 13:51:54 +0200
-Subject: [PATCH 08/28] dds: read uncompressed bit-mask images (RGB, RGBA,
+Subject: [PATCH 08/49] dds: read uncompressed bit-mask images (RGB, RGBA,
  luminance, alpha)
 
 ---

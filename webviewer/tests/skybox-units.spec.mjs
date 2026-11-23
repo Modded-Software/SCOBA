@@ -109,11 +109,9 @@ test('add all on Terran Campaign units (the operator\'s 142): the dialog names t
   // The sky was not touched by the run.
   expect(s.sky).toBe(null);
   // Known gap A4 (video textures): two layers name .ogv files the viewer
-  // cannot load; the server answers 404 and the browser logs each twice
-  // (the response and the console). Exactly these, nothing else.
-  const VIDEO = ['assets/textures/ipistolad.ogv', 'assets/textures/nukenoodles.ogv'];
-  const other = errors.filter((e) => !VIDEO.some((v) => e.includes(v)) && e !== 'Failed to load resource: the server responded with a status of 404 (Not Found)');
-  expect(other).toEqual([]);
-  for (const v of VIDEO) expect(errors.some((e) => e.includes(v)), v).toBe(true);
-  expect(errors.length).toBe(2 * VIDEO.length);
+  // cannot play. They are not fetched (no 404, no error); the model lists
+  // them as not drawn.
+  expect(errors).toEqual([]);
+  const undrawn = s.items.flatMap((i) => i.undrawn || []).filter((u) => u.includes('video texture'));
+  expect(undrawn.sort()).toEqual(['material 2: emissive layer: video texture assets/textures/ipistolad.ogv', 'material 3: emissive layer: video texture assets/textures/nukenoodles.ogv']);
 });

@@ -13,10 +13,13 @@ const EFFECT_MATERIALS = /\((displacement|lens flare)\)$/;
 // Files in the skybox folders that show nothing from the sky camera (at
 // their origin) in any direction, though they load, are not culled, and
 // draw from outside. Measured 2026-11-21, seen from 60 units:
-// - charskyparallax_prtmdl_group01: a prop (radius 7.5), 11207 px outside;
 // - planet_skybox_moon: radius 13.4 yet only 16 px outside, not explained;
 // - zerg_vision_border: a 0.1 unit model, 3 px outside.
-const EMPTY_FROM_INSIDE = ['charskyparallax_prtmdl_group01', 'planet_skybox_moon', 'zerg_vision_border'];
+const EMPTY_FROM_INSIDE = ['planet_skybox_moon', 'zerg_vision_border'];
+// Files that show from inside by their particles alone (particles drawn
+// since 2026-11-22): with particles off they are empty from inside too.
+// - charskyparallax_prtmdl_group01: a prop (radius 7.5), 11207 px outside.
+const PARTICLES_ONLY_FROM_INSIDE = ['charskyparallax_prtmdl_group01'];
 // Look all around: a sky part (a moon, a parallax group) sits in one direction.
 const DIRECTIONS = [
   [0, 0],
@@ -74,6 +77,19 @@ test('every skybox loads; one with a mesh draws all of it with all its textures 
       // Negative: a file with no mesh draws nothing.
       if (covered !== 0) problems.push(`${sky.id}: no mesh, yet ${covered} pixels drawn`);
       continue;
+    }
+    if (PARTICLES_ONLY_FROM_INSIDE.includes(sky.id)) {
+      // Negative: the same directions with particles off show nothing.
+      await page.evaluate(() => window.sc2viewer.setParticles(false));
+      let bare = 0;
+      for (const [yaw, pitch] of DIRECTIONS) {
+        await page.evaluate(([yaw, pitch]) => window.sc2viewer.view({ yaw, pitch }), [yaw, pitch]);
+        bare += (await page.evaluate(() => window.sc2viewer.pixels())).covered;
+      }
+      await page.evaluate(() => window.sc2viewer.setParticles(true));
+      report.push(`  ${sky.id} with particles off: covered=${bare}`);
+      if (!(covered > 0)) problems.push(`${sky.id}: its particles draw nothing from inside`);
+      if (bare !== 0) problems.push(`${sky.id}: ${bare} pixels from inside without particles`);
     }
     if (!s.skyLoaded) problems.push(`${sky.id}: a mesh, but no batch to draw`);
     if (s.skyTextures !== s.skyTexturesWanted) problems.push(`${sky.id}: ${s.skyTextures} of ${s.skyTexturesWanted} textures loaded`);

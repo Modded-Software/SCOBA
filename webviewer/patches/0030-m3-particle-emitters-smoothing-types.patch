@@ -1,0 +1,45 @@
+From b96a1490b05c1191f27232e1631a60a51f6a82c9 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 21:27:49 +0200
+Subject: [PATCH 30/49] m3: particle emitters: smoothing types
+
+---
+ src/parsers/m3/particleemitter.ts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/src/parsers/m3/particleemitter.ts b/src/parsers/m3/particleemitter.ts
+index 47b95b01..c4b58b0b 100644
+--- a/src/parsers/m3/particleemitter.ts
++++ b/src/parsers/m3/particleemitter.ts
+@@ -107,6 +107,9 @@ export default class ParticleEmitter {
+   particleType = 0;
+   lengthWidthRatio = 1;
+   flags = 0;
++  colorSmoothingType = 0;
++  sizeSmoothingType = 0;
++  rotationSmoothingType = 0;
+ 
+   load(stream: BinaryStream, version: number, _index: IndexEntry[]): void {
+     this.version = version;
+@@ -193,5 +196,21 @@ export default class ParticleEmitter {
+     this.particleType = at('particleType').readUint32();
+     this.lengthWidthRatio = stream.readFloat32();
+     this.flags = at('flags').readUint32();
++
++    // Smoothing: 0 linear, 1 smooth, 2 Bezier, 3 linear hold, 4 Bezier hold.
++    // Version 12 has flag bits for 1 and 2; later versions a word each,
++    // after the flags and, since version 18, the rotation flags.
++    if (layout === 0) {
++      const mode = (smooth: number, bezier: number): number => (this.flags & bezier ? 2 : this.flags & smooth ? 1 : 0);
++
++      this.colorSmoothingType = mode(0x2000, 0x4000);
++      this.sizeSmoothingType = mode(0x800, 0x1000);
++      this.rotationSmoothingType = mode(0x200, 0x400);
++    } else {
++      stream.seek(OFFSETS.flags[layout] + (version >= 18 ? 8 : 4));
++      this.colorSmoothingType = stream.readUint32();
++      this.sizeSmoothingType = stream.readUint32();
++      this.rotationSmoothingType = stream.readUint32();
++    }
+   }
+ }

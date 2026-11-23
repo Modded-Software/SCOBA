@@ -1,7 +1,7 @@
 From 1450058beaf84d97067e1c47b78eb3c95629f886 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 10:19:34 +0200
-Subject: [PATCH 05/28] m3 viewer: world-space lighting, ambient, blend modes,
+Subject: [PATCH 05/49] m3 viewer: world-space lighting, ambient, blend modes,
  alpha masks
 
 - Light, eye and half vectors in world space; the half vector is

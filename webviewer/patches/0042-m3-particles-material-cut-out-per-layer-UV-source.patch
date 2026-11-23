@@ -1,0 +1,176 @@
+From 7197a996495e4cf9b83da49b5fc0c9fda528a287 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 09:00:54 +0200
+Subject: [PATCH 42/49] m3 particles: material cut-out, per-layer UV source
+
+- particle.frag: u_alphaTest; mask alpha below the material threshold is
+  discarded, as in standard.frag. Helios debris drew as rectangles.
+- Vertex buffer gains the whole-quad UV (stride 11). particle.vert puts
+  the quad UV on coordinates 0 to 2 and the flipbook cell on 3.
+- particlerender binds a layer with uvSource 6 (particle flipbook) to the
+  cell; every other layer reads the whole quad (WhiteoutFlakes
+  m3_surface_table). Blimp steam drew as soft rectangles.
+- Displacement particles share the buffer layout and the UV rule.
+
+Known defects:
+- Light shaft emitters still re-burst on each loop (next change).
+---
+ src/viewer/handlers/m3/particlerender.ts      | 44 ++++++++++++++-----
+ .../handlers/m3/shaders/particle.frag.ts      |  8 ++++
+ .../handlers/m3/shaders/particle.vert.ts      | 10 +++--
+ 3 files changed, 49 insertions(+), 13 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/particlerender.ts b/src/viewer/handlers/m3/particlerender.ts
+index c78a1c31..e09c8ded 100644
+--- a/src/viewer/handlers/m3/particlerender.ts
++++ b/src/viewer/handlers/m3/particlerender.ts
+@@ -7,9 +7,30 @@ import type M3ModelInstance from './modelinstance';
+ import type M3ParticleSystem from './particlesystem';
+ import { M3StandardMaterial } from './standardmaterial';
+ import type { M3DisplacementMaterial } from './displacementmaterial';
++import type M3Layer from './layer';
++
++/** Floats per vertex: position 3, flipbook cell uv 2, quad uv 2, colour 4. */
++const STRIDE = 11;
++/** Layer uvSource of the particle flipbook: such a layer reads the cell (UV coordinate 3, particle.vert). */
++const FLIPBOOK_UV_SOURCE = 6;
++const CELL_UV_COORDINATE = 3;
++
++/** After a layer bind: a flipbook layer reads the cell, every other the whole quad. */
++function bindParticleUv(gl: WebGLRenderingContext, shader: Shader, layer: M3Layer): void {
++  if (layer.active && layer.layer && layer.layer.uvSource === FLIPBOOK_UV_SOURCE) {
++    gl.uniform1f(shader.uniforms[layer.uniformMap.uvCoordinate], CELL_UV_COORDINATE);
++  }
++}
+ 
+-/** Floats per vertex: position 3, uv 2, colour 4. */
+-const STRIDE = 9;
++/** The vertex attributes of the particle buffer, for a shader. */
++function particleAttribs(gl: WebGLRenderingContext, shader: Shader): void {
++  const attribs = shader.attribs;
++
++  gl.vertexAttribPointer(attribs['a_position'], 3, gl.FLOAT, false, STRIDE * 4, 0);
++  gl.vertexAttribPointer(attribs['a_uv'], 2, gl.FLOAT, false, STRIDE * 4, 12);
++  gl.vertexAttribPointer(attribs['a_quadUv'], 2, gl.FLOAT, false, STRIDE * 4, 20);
++  gl.vertexAttribPointer(attribs['a_color'], 4, gl.FLOAT, false, STRIDE * 4, 28);
++}
+ /** Quads per draw: the 16-bit element limit. */
+ export const MAX_QUADS = 16384;
+ /** Corner offsets: x, y (the billboard axes), in triangle-strip order of the quad. */
+@@ -318,6 +339,8 @@ function buildQuads(system: M3ParticleSystem, camera: Camera): number {
+       vertices[at++] = corners[k * 3 + 2];
+       vertices[at++] = uv[0] + (ox * 0.5 + 0.5) / cols;
+       vertices[at++] = uv[1] + (oy * -0.5 + 0.5) / rows;
++      vertices[at++] = ox * 0.5 + 0.5;
++      vertices[at++] = oy * -0.5 + 0.5;
+       vertices[at++] = look[2];
+       vertices[at++] = look[3];
+       vertices[at++] = look[4];
+@@ -334,7 +357,6 @@ function buildQuads(system: M3ParticleSystem, camera: Camera): number {
+  */
+ export function renderParticles(gl: WebGLRenderingContext, shader: Shader, buffers: ParticleBuffers, camera: Camera, model: M3Model, systems: M3ParticleSystem[], instance: M3ModelInstance): void {
+   const textureOverrides = instance.textureOverrides;
+-  const attribs = shader.attribs;
+   const uniforms = shader.uniforms;
+   let ready = false;
+ 
+@@ -358,15 +380,15 @@ export function renderParticles(gl: WebGLRenderingContext, shader: Shader, buffe
+ 
+     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vertexBuffer);
+     gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, quads * 4 * STRIDE), gl.DYNAMIC_DRAW);
+-    gl.vertexAttribPointer(attribs['a_position'], 3, gl.FLOAT, false, STRIDE * 4, 0);
+-    gl.vertexAttribPointer(attribs['a_uv'], 2, gl.FLOAT, false, STRIDE * 4, 12);
+-    gl.vertexAttribPointer(attribs['a_color'], 4, gl.FLOAT, false, STRIDE * 4, 20);
++    particleAttribs(gl, shader);
+ 
+     // Colour layers (diffuse, emissive 1 and 2) and the alpha masks.
+     gl.uniform1f(uniforms['u_emisMult'], material.emisMult);
++    gl.uniform1f(uniforms['u_alphaTest'], material.alphaTest);
+ 
+     for (const i of PARTICLE_LAYERS) {
+       material.layers[i].bind(shader, textureOverrides, instance);
++      bindParticleUv(gl, shader, material.layers[i]);
+     }
+ 
+     material.bindCommon();
+@@ -390,7 +412,6 @@ export function renderParticles(gl: WebGLRenderingContext, shader: Shader, buffe
+  * Call after everything else in the frame. Records the quads drawn.
+  */
+ export function renderDisplacementParticles(gl: WebGLRenderingContext, shader: Shader, buffers: ParticleBuffers, camera: Camera, model: M3Model, systems: M3ParticleSystem[], instance: M3ModelInstance, sceneMap: WebGLTexture, width: number, height: number): void {
+-  const attribs = shader.attribs;
+   const uniforms = shader.uniforms;
+   let ready = false;
+ 
+@@ -412,12 +433,15 @@ export function renderDisplacementParticles(gl: WebGLRenderingContext, shader: S
+ 
+     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vertexBuffer);
+     gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, quads * 4 * STRIDE), gl.DYNAMIC_DRAW);
+-    gl.vertexAttribPointer(attribs['a_position'], 3, gl.FLOAT, false, STRIDE * 4, 0);
+-    gl.vertexAttribPointer(attribs['a_uv'], 2, gl.FLOAT, false, STRIDE * 4, 12);
+-    gl.vertexAttribPointer(attribs['a_color'], 4, gl.FLOAT, false, STRIDE * 4, 20);
++    particleAttribs(gl, shader);
+ 
+     // The layers take units 9 and 11; the frame copy takes unit 0.
+     material.bind(shader, instance.textureOverrides, instance);
++
++    for (const layer of [material.normalLayer, material.strengthLayer]) {
++      bindParticleUv(gl, shader, layer);
++    }
++
+     gl.activeTexture(gl.TEXTURE0);
+     gl.bindTexture(gl.TEXTURE_2D, sceneMap);
+     gl.uniform1i(uniforms['u_sceneMap'], 0);
+diff --git a/src/viewer/handlers/m3/shaders/particle.frag.ts b/src/viewer/handlers/m3/shaders/particle.frag.ts
+index 2262cbb5..159e9138 100644
+--- a/src/viewer/handlers/m3/shaders/particle.frag.ts
++++ b/src/viewer/handlers/m3/shaders/particle.frag.ts
+@@ -10,6 +10,10 @@ ${precision}
+ 
+ ${layers}
+ 
++// The material's cut-out (alphaTestThreshold / 255; 0 is none): a pixel
++// whose mask alpha is below it is not drawn, as in standard.frag.
++uniform float u_alphaTest;
++
+ void main() {
+   float alpha = 1.0;
+ 
+@@ -21,6 +25,10 @@ void main() {
+     alpha *= computeLayerColor(u_alphaMask2Map, u_alphaMask2LayerSettings).a;
+   }
+ 
++  if (u_alphaTest > 0.0 && alpha < u_alphaTest) {
++    discard;
++  }
++
+   vec3 final = vec3(0.0);
+ 
+   if (u_diffuseLayerSettings.enabled) {
+diff --git a/src/viewer/handlers/m3/shaders/particle.vert.ts b/src/viewer/handlers/m3/shaders/particle.vert.ts
+index f098eb29..7eccfe1a 100644
+--- a/src/viewer/handlers/m3/shaders/particle.vert.ts
++++ b/src/viewer/handlers/m3/shaders/particle.vert.ts
+@@ -5,6 +5,7 @@ uniform mat4 u_VP;
+ 
+ attribute vec3 a_position;
+ attribute vec2 a_uv;
++attribute vec2 a_quadUv;
+ attribute vec4 a_color;
+ 
+ varying vec3 v_normal;
+@@ -15,9 +16,12 @@ varying vec3 v_teamColor;
+ varying vec4 v_vertexColor;
+ 
+ void main() {
+-  // Every UV source of a particle layer reads the quad's flipbook cell.
+-  v_uv[0] = vec4(a_uv, a_uv);
+-  v_uv[1] = vec4(a_uv, a_uv);
++  // UV coordinates 0 to 2: the whole quad, 0 to 1. Coordinate 3: the
++  // flipbook cell, for layers whose UV source is the particle flipbook
++  // (uvSource 6; particlerender binds them to it). WhiteoutFlakes
++  // m3_surface_table particleFlipbookUv.
++  v_uv[0] = vec4(a_quadUv, a_quadUv);
++  v_uv[1] = vec4(a_quadUv, a_uv);
+   v_normal = vec3(0.0, 0.0, 1.0);
+   v_lightDir = vec3(0.0, 0.0, 1.0);
+   v_halfVec = vec3(0.0, 0.0, 1.0);

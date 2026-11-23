@@ -1,0 +1,249 @@
+From 5001d8de61f37a8076052e3280f7b71a2711c308 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 08:28:52 +0200
+Subject: [PATCH 40/49] m3 particles: partEmit bursts, for emitters and PARC
+ copies
+
+A partEmit key owes its value in particles when the playhead steps over
+it (WhiteoutFlakes CrossSquirtKeys / SquirtBurst): the sum of the
+positive key values crossed since the last update, on top of the rate.
+Only animated references (animFlags bit 2) burst; nothing at rest.
+
+- M3SdContainer, M3Stc, M3Stg, M3Skeleton: crossed(animRef, from, to),
+  with the loop wrap; summed over every STC of the group with data.
+- M3ParticleSystem: frameWindow() tracks the playhead per update; after
+  a sequence change the window opens before 0, so a key at 0 fires.
+  bursts[] counts burst births per slot.
+
+Known defects:
+- Rule ported from WhiteoutFlakes; the in-game look is an operator check.
+---
+ src/viewer/handlers/m3/particlesystem.ts | 62 ++++++++++++++++++++++--
+ src/viewer/handlers/m3/sd.ts             | 31 ++++++++++++
+ src/viewer/handlers/m3/skeleton.ts       | 15 ++++++
+ src/viewer/handlers/m3/stc.ts            |  7 +++
+ src/viewer/handlers/m3/stg.ts            | 19 ++++++++
+ 5 files changed, 130 insertions(+), 4 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/particlesystem.ts b/src/viewer/handlers/m3/particlesystem.ts
+index fd1c9b5e..ffe861ca 100644
+--- a/src/viewer/handlers/m3/particlesystem.ts
++++ b/src/viewer/handlers/m3/particlesystem.ts
+@@ -89,6 +89,11 @@ export default class M3ParticleSystem {
+   slotSpawned: number[];
+   /** The inverse of `matrix`, for copies of an emitter-space emitter. */
+   inverse = mat4.create();
++  /** Burst births (partEmit) per slot since creation. */
++  bursts: number[];
++  /** The sequence and frame (ms) at the last update, for partEmit keys. */
++  lastSequence = -2;
++  lastFrame = 0;
+ 
+   constructor(instance: M3ModelInstance, emitter: ParticleEmitter, index: number, copies: ParticleCopy[] = []) {
+     this.instance = instance;
+@@ -104,6 +109,7 @@ export default class M3ParticleSystem {
+     }
+ 
+     this.slotSpawned = new Array(this.copies.length + 1).fill(0);
++    this.bursts = new Array(this.copies.length + 1).fill(0);
+     this.max = emitter.maxParticles > 0 ? emitter.maxParticles : DEFAULT_MAX;
+     this.worldSpace = !!(emitter.additionalFlags & WORLD_SPACE);
+ 
+@@ -194,12 +200,19 @@ export default class M3ParticleSystem {
+     this.updateLife();
+ 
+     let rate = Math.max(0, this.value(this.emitter.emissionRate));
++    const span = this.frameWindow(dt);
+ 
+     this.carry += rate * dt;
+ 
+-    const count = Math.floor(this.carry);
++    const whole = Math.floor(this.carry);
+ 
+-    this.carry -= count;
++    this.carry -= whole;
++
++    // partEmit: the keys the playhead stepped over owe a burst on top.
++    const burst = this.burst(this.emitter.partEmit, span);
++    const count = whole + burst;
++
++    this.bursts[0] += burst;
+ 
+     for (let k = 1; k <= count; k++) {
+       this.spawn(t0 + (dt * k) / count, k / count, origin, null);
+@@ -227,9 +240,14 @@ export default class M3ParticleSystem {
+       rate += r;
+       slot.carry += r * dt;
+ 
+-      const n = Math.floor(slot.carry);
++      const w = Math.floor(slot.carry);
++
++      slot.carry -= w;
+ 
+-      slot.carry -= n;
++      const b = this.burst(slot.copy.partEmit, span);
++      const n = w + b;
++
++      this.bursts[this.copies.indexOf(slot) + 1] += b;
+ 
+       for (let k = 1; k <= n; k++) {
+         this.spawn(t0 + (dt * k) / n, k / n, at, slot);
+@@ -244,6 +262,42 @@ export default class M3ParticleSystem {
+     this.rateMax = Math.max(this.rateMax, rate);
+   }
+ 
++  /**
++   * The playhead's move since the last update, in ms: [from, to], `from`
++   * excluded. Null when it did not move. After a sequence change the
++   * window opens before 0, so a key at the start fires.
++   */
++  frameWindow(dt: number): [number, number] | null {
++    const instance = this.instance;
++    const sequence = instance.sequence;
++    const to = instance.frame;
++    let from = this.lastFrame;
++
++    if (sequence !== this.lastSequence) {
++      from = to - dt * 1000;
++
++      if (from <= 0) {
++        from = -1;
++      }
++    }
++
++    this.lastSequence = sequence;
++    this.lastFrame = to;
++
++    return sequence === -1 || from === to ? null : [from, to];
++  }
++
++  /** The particles a partEmit track owes for this window (WhiteoutFlakes SquirtBurst). */
++  burst(ref: AnimationReference, window: [number, number] | null): number {
++    if (!window) {
++      return 0;
++    }
++
++    const skeleton = <NonNullable<M3ModelInstance['skeleton']>>this.instance.skeleton;
++
++    return Math.floor(skeleton.crossed(ref, this.instance, window[0], window[1]));
++  }
++
+   /** Drop the particles past their life, keeping the living packed at the front. */
+   retire(): void {
+     const time = this.time;
+diff --git a/src/viewer/handlers/m3/sd.ts b/src/viewer/handlers/m3/sd.ts
+index 13490054..45e9078d 100644
+--- a/src/viewer/handlers/m3/sd.ts
++++ b/src/viewer/handlers/m3/sd.ts
+@@ -36,6 +36,37 @@ export default class M3SdContainer {
+     }
+   }
+ 
++  /**
++   * The sum of the positive key values the playhead stepped over going from
++   * `from` (excluded) to `to` (included), in ms. `to` below `from` is a wrap:
++   * the keys after `from`, then those up to `to`. Values read signed
++   * (WhiteoutFlakes SquirtBurst: a negative key owes nothing).
++   */
++  crossed(index: number, from: number, to: number, runsConcurrent: number): number {
++    const sd = this.sd[index];
++
++    if (runsConcurrent && sd.biggestKey > 0) {
++      from = from % sd.biggestKey;
++      to = to % sd.biggestKey;
++    }
++
++    const keys = sd.keys;
++    const values = <number[]>sd.values;
++    let sum = 0;
++
++    for (let i = 0; i < keys.length; i++) {
++      const t = keys[i];
++      const hit = to >= from ? t > from && t <= to : t > from || t <= to;
++      const v = values[i];
++
++      if (hit && typeof v === 'number' && v > 0) {
++        sum += v;
++      }
++    }
++
++    return sum;
++  }
++
+   getValueUnsafe(index: number, animationReference: AnimationReference, frame: number, runsConcurrent: number): number | vec3 | quat | Uint8Array | null {
+     const sd = this.sd[index];
+ 
+diff --git a/src/viewer/handlers/m3/skeleton.ts b/src/viewer/handlers/m3/skeleton.ts
+index eeba7630..40a163b0 100644
+--- a/src/viewer/handlers/m3/skeleton.ts
++++ b/src/viewer/handlers/m3/skeleton.ts
+@@ -111,6 +111,21 @@ export default class M3Skeleton {
+     return animRef.initValue;
+   }
+ 
++  /**
++   * Positive key values of `animRef` the playing sequence crossed from
++   * `from` to `to` (ms). 0 at rest, and for a reference that does not
++   * animate (animFlags bit 2, as WhiteoutFlakes reads it).
++   */
++  crossed(animRef: AnimationReference, instance: M3ModelInstance, from: number, to: number): number {
++    const sequence = instance.sequence;
++
++    if (sequence === -1 || !(animRef.animFlags & 0x2)) {
++      return 0;
++    }
++
++    return this.stg[sequence].crossed(animRef, from, to);
++  }
++
+   getValue(animRef: AnimationReference, instance: M3ModelInstance): number {
+     return <number>this.getValueUnsafe(animRef, instance);
+   }
+diff --git a/src/viewer/handlers/m3/stc.ts b/src/viewer/handlers/m3/stc.ts
+index d418dedc..fc28dc65 100644
+--- a/src/viewer/handlers/m3/stc.ts
++++ b/src/viewer/handlers/m3/stc.ts
+@@ -45,6 +45,13 @@ export default class M3Stc {
+     }
+   }
+ 
++  /** Positive key values of `animRef` crossed from `from` to `to` (M3SdContainer.crossed). */
++  crossed(animRef: AnimationReference, from: number, to: number): number {
++    const ref = this.animRefs[animRef.animId];
++
++    return ref ? this.sd[ref[0]].crossed(ref[1], from, to, this.runsConcurrent) : 0;
++  }
++
+   getValueUnsafe(animRef: AnimationReference, instance: M3ModelInstance): number | vec3 | quat | Uint8Array | null {
+     const ref = this.animRefs[animRef.animId];
+ 
+diff --git a/src/viewer/handlers/m3/stg.ts b/src/viewer/handlers/m3/stg.ts
+index f0127db9..f2bd3645 100644
+--- a/src/viewer/handlers/m3/stg.ts
++++ b/src/viewer/handlers/m3/stg.ts
+@@ -21,6 +21,25 @@ export default class M3Stg {
+     this.stc = stc;
+   }
+ 
++  /**
++   * Positive key values of `animRef` crossed from `from` to `to`, summed
++   * over every STC of the group with data for it (WhiteoutFlakes sums
++   * every player's crossed keys).
++   */
++  crossed(animRef: AnimationReference, from: number, to: number): number {
++    let sum = 0;
++
++    for (const i of this.stcIndices) {
++      const stc = this.stc[i];
++
++      if (this.sts[stc.stsIndex].hasData(animRef)) {
++        sum += stc.crossed(animRef, from, to);
++      }
++    }
++
++    return sum;
++  }
++
+   getValueUnsafe(animRef: AnimationReference, instance: M3ModelInstance): number | vec3 | quat | Uint8Array | null {
+     const stcIndices = this.stcIndices;
+     const stcs = this.stc;

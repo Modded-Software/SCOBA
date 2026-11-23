@@ -1,0 +1,28 @@
+From b0487ebac4a73f79aa8e18bc363adb233959d75b Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 09:32:47 +0200
+Subject: [PATCH 49/49] m3 ground lights: albedo 0.25
+
+The six Shadow Battlecruiser spots overlapped into a white blob at
+albedo 0.5 (operator 2026-11-23).
+
+Known defects:
+- The albedo is a viewer choice; the in-game brightness is an operator
+  check.
+---
+ src/viewer/handlers/m3/groundlight.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/viewer/handlers/m3/groundlight.ts b/src/viewer/handlers/m3/groundlight.ts
+index 8a65d634..c47ee32d 100644
+--- a/src/viewer/handlers/m3/groundlight.ts
++++ b/src/viewer/handlers/m3/groundlight.ts
+@@ -13,7 +13,7 @@ import type M3Model from './model';
+  */
+ export const SPOT = 2;
+ /** The ground's diffuse reflectance (a viewer choice: there is no terrain texture). */
+-export const GROUND_ALBEDO = 0.5;
++export const GROUND_ALBEDO = 0.25;
+ 
+ export interface GroundLight {
+   position: Float32Array;

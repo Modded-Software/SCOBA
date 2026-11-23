@@ -389,6 +389,19 @@
     return { pixels: n, mean, brightness: (mean[0] + mean[1] + mean[2]) / 3, redShare: n ? red / n : 0, green, darkShare: n ? dark / n : 0 };
   }
 
+  /** The share of drawn (non-background) pixels that are near white: every channel above 235. */
+  function whiteShare() {
+    const { data } = grab();
+    let n = 0;
+    let white = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (isBackground(data[i], data[i + 1], data[i + 2])) continue;
+      n++;
+      if (data[i] > 235 && data[i + 1] > 235 && data[i + 2] > 235) white++;
+    }
+    return n ? white / n : 0;
+  }
+
   /**
    * Grid lines along one canvas row (from the top): the centres, in pixels
    * from the left, of the runs of grid-line pixels. A grid-line pixel is
@@ -444,5 +457,5 @@
     for (const item of app.items) item.instance.solidOnly = Boolean(on);
   }
 
-  Object.assign(app, { state, setConstantLayers, alphaTests, setAlphaTest, drawnAt, setSolidOnly, groundPixel, groundPixels, groundPeaks, worldToCanvas, mark, changedSinceMark, pixels, colorStats, gridLines, idle });
+  Object.assign(app, { state, setConstantLayers, alphaTests, setAlphaTest, whiteShare, drawnAt, setSolidOnly, groundPixel, groundPixels, groundPeaks, worldToCanvas, mark, changedSinceMark, pixels, colorStats, gridLines, idle });
 })();

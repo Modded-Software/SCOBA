@@ -67,9 +67,116 @@ its alpha-mask layers is at least min(t / 255, 1); the rest is discarded,
 in the pick draw too, so a cut-away pixel takes no mouse hit. The diffuse
 alpha does not count. Rule from WhiteoutFlakes `m3_surface_table.cpp` and
 `m3_standard.slang` (alpha < threshold is discarded, equal survives).
+Each textured mask is first multiplied and offset: value x (brightMult x
+colour alpha) + midtoneOffset, before its clamp (patch 0041). Without it
+the test cut most of the Giant Yeti and Ursadon bodies (mask multiply 10,
+add 1; operator report 2026-11-23). Other layer types do not take
+multiply and add yet.
 Operator report 2026-11-22: the vine and leaf cards of Zerus Large Tree
 drew as dark rectangles (vines 150, leaves 200). Measured: 309 of 1072
 samples of the tree are cut away, none added.
+
+Particle emitters, step 1 (part of E1; `particles.spec`, patches 0029 to
+0034). Parser `particleemitter.ts` reads PAR_ versions 10 to 24 at the
+m3addon offsets; checked against m3addon `m3.py` on one file per version
+(8 files, 1119 fields, 0 differences). The renderer runs each emitter on
+the CPU: births by rate (remainder carried, spread over the frame), life
+from lifespan 1 or a random value up to lifespan 2, start position in the
+emission area (point, plane, sphere, box, cylinder, disc; hollow middle),
+start velocity (cone, radial, axis, random), the closed-form motion with
+drag and vertical acceleration, size, rotation, colour and alpha over the
+life (smoothing modes 0 to 4), world or emitter space, flipbook cells by
+the two phases. Drawn in the material's blend mode with its layers
+(patch 0035): colour is the diffuse plus the emissive layers, alpha the
+product of the alpha masks, not the diffuse alpha (WhiteoutFlakes
+`m3_standard.slang`); before, masked and emissive-only materials drew as
+solid squares. Quads by particle type: billboard (0), tail and trail (1,
+10) stretched along the current velocity by max(tail, speed x tail), or
+the tail alone with `fixLengthTailParts`; pinned (9) from the birth point
+to the particle; terrain (5) flat; emitter-oriented (7) on the emitter
+axes. Measured: Battlecruiser tail quads lie along the travel (50 of 50,
+cosine above 0.95) and are at least tail x width long; billboards stay
+square; the Zerus Tree alpha masks (alpha channel) are bound per draw.
+Rules from WhiteoutFlakes
+`sc2_kernels_spawn.cpp`, `sc2_kernels_build.cpp`, `sc2_element_math.h`.
+Survey 2026-11-22 over the unit models: 782 models, 5009 emitters, all
+read; 4884 run (standard material), 105 with a displacement material
+run and draw after the frame like displacement meshes (patch 0036: the
+frame copy shifted along the normal map, times the strength layer and the
+particle alpha; Xel'Naga Shrine 41 of 41 drawn, none with displacement
+off), 20 with a composite material are reported as not drawn. Measured: Probe at rest
+25 births per second, 9 alive (rate x mean life 9.75); Zerus Tree 31 to 36
+of 35 expected; world-space spores stay put when the tree moves.
+Colour tracks (SDCC) keep their keys in `\0COL` index entries, which the
+parser did not read; particle colours sample them now, per channel
+(Nova Defensive Drone threw before the fix). Layer colours still play
+their rest value (A6). The skybox charskyparallax_prtmdl_group01 now
+shows from inside by its particles alone (`skyboxes.spec`).
+
+Done 2026-11-23 (`particles.spec`, patches 0038 to 0040): tails with
+`clampTailParts` (0x40000) are cut to the distance travelled
+(Searchlight); PARC copies emit from their own bones at their own rates
+into the emitter's particles (Helios: 4 jet fires, end exhaust and fire);
+`partEmit` bursts: each animated key the playhead steps over adds its
+value once, for emitters and copies (Stalker Attack). Rules from
+WhiteoutFlakes; the in-game look is an operator check.
+
+Done 2026-11-23 (`particle-materials.spec`, patch 0042): particles take
+the material cut-out like meshes (Helios debris: 11 of 25 quad points
+drawn with the test, 25 of 25 without; nothing drawn only with it on).
+Per-layer UV sources: a layer with uvSource 6 reads the flipbook cell,
+every other layer the whole quad (WhiteoutFlakes `m3_surface_table`).
+Blimp steam: centre 15, the four quad corners 0 (before, about a third of
+the centre). Patch 0043 parses the two floats after `lengthWidthRatio`
+(m3addon `unknownFloat7`, `unknown5AddedV21`), not used yet. Light shafts
+(Shadow Battlecruiser, type 9, `lightcone4`): measured steady, 21 to 25
+alive at rate 10 in Stand, Stand A, Walk and GLstand 01, with no re-fire
+on a loop. The quad, the motion and the UV match WhiteoutFlakes, except
+the far-end width scale (`instanceDistance`, a trapezoid). Which m3 field
+holds that scale is not confirmed. Operator 2026-11-23: the shafts look
+right in game.
+
+Done 2026-11-23 (`particle-ground.spec`, patch 0044): the ground plane.
+A flat invisible plane at world z = 0 stands in for terrain. Particles
+with `collideTerrain` (PAR_ flags 0x2) that cross it downwards restart at
+the contact (push-out 0.05) with the WhiteoutFlakes response: normal speed
+x -bounce, tangent x friction while moving, rest below 3 x dt
+(`sc2_kernels_move.cpp` CollideElement). `bounce` and `friction` are read
+32 and 28 bytes before `particleType`. Helios acid drips: before, they fell
+to z -478 with 48-unit tails until their 10 s life ended (they did die:
+40 alive at most); now all rest at z 0.05, every drip over 2 s old has
+touched down, emitters without the flag never do. Not done:
+`spawnOnBounce` children and the bounce count that kills (fields not
+located), collide-objects (0x4).
+
+Done 2026-11-23 (`ground-lights.spec`, patches 0045 to 0047): spot lights
+(LITE type 2) light the ground plane: colour x intensity x albedo 0.5 x
+N.L x the squared near-far window (WhiteoutFlakes `m3_deferred_light`) x
+the cone, full inside the hot spot, none past the falloff, along bone -z.
+Shadow Battlecruiser: six lit patches, each lit only inside its predicted
+cone and range and at least 60 % of it; nothing under the hull's centre or
+12 units away; a Marine (no lights) draws the same. Viewer choices, not
+confirmed: the albedo, and the angles read as half angles from the axis.
+The patch shapes are an operator check. Lights do not light meshes yet (E3).
+
+Done 2026-11-23 (`fresnel.spec`, patch 0048): the layer fresnel term
+(F1), psmateriallayer.fx CalcFresnelTerm as WhiteoutFlakes has it: 1 -
+|N.V| to the exponent, inverted for mode 2, then saturate(f x
+fresnelMaxOffset + fresnelMin), on mesh layers (not particles). Diablo,
+Lord of Terror (SpaceDiablo): its emissive plasma layer (x1.3, emissive
+x3.3, mode 1) drew over the whole body; mean brightness 220 to 119,
+near-white pixels 23.6 % to 0.9 %. Not done: the fresnel mask,
+translation and rotation.
+
+Not done (implemented nowhere, no test): particle types 2, 3, 4, 6 and 8 (29 emitters;
+drawn as billboards), the terrain type's `instanceAngle` (not parsed),
+emitter-oriented axes at birth for world space (the current axes are
+used), the pinned type's far-end width (`instanceDistance`), spline and mesh areas (68; spawn at the centre), soft
+edges M1, sorting, noise, forces, collision with objects and its children, trailing children, lit
+particles, the random flipbook start, the mid-key collapse of random
+colour and rotation, relative rotation. PAR_ version 14 (6 emitters, one
+file) is skipped and reported: implemented, not verified, because that
+file fails earlier on MODL version 24 (P1).
 
 ## Gaps by count
 
@@ -89,14 +196,14 @@ samples of the tree are cut away, none added.
 
 | Id | Part | Models | Entries |
 |---|---|---:|---:|
-| E1 | particle emitters (PAR_, PARC) | 783 | 5312 |
+| E1 | particle emitters (PAR_, PARC): step 1, bursts and PARC drawn, see "Already supported"; types 2, 3, 4, 6, 8 left | 783 | 5312 |
 | E3 | lights (LITE) | 566 | 1957 |
 | E2 | ribbons (RIB_, SRIB) | 203 | 1114 |
 | E6 | physics (rigid bodies, joints, cloth) | 149 | 862 |
 | E4 | projections: decals, shadow blobs (PROJ) | 87 | 91 |
 | E5 | forces and warps (FOR_, WRP_) | 71 | 129 |
 | E7 | turret parts, IK (PATU, IKJT) | 66 | 435 |
-| E8 | billboards (BBSC) | 45 | 60 |
+| E8 | billboards (BBSC): done (patch 0037); types 0 to 6 as WhiteoutFlakes `m3_billboard.cpp`, per frame in world space; Archon and Sentry keep their pose to the camera (`billboards.spec`); at rest (sequence -1) the skin uses no bones, so not shown | 45 | 60 |
 | E9 | non-visual: MSEC, ATVL, SSGS, SHBX, TRGD, DMSE | 1510 | 13337 |
 
 ### Standard material: layers never read (`L*`)
@@ -216,6 +323,10 @@ feature used only by particle materials waits for particles.
 1. **Particles (E1, 783).** Engines exhaust, weapon glows, ambient
    sparks. With them come the particle material features: soft edges M1
    (779), flipbook A3 and U6 (464, 395), vertex alpha M5. Largest job.
+   Step 1 done 2026-11-22 (`particles.spec`), with material layers and
+   the tail, pinned, terrain and emitter-oriented quads; bursts, PARC
+   copies and tail clamping 2026-11-23; next: the other quad types,
+   soft edges.
 2. ~~**UV transform and animation (A2 659, A1 534).**~~ Done 2026-11-21
    (`uv-anim.spec`, see "Already supported").
 3. ~~**Draw order and cutout (M3 698, M2 534).**~~ Draw order done
@@ -223,7 +334,7 @@ feature used only by particle materials waits for particles.
    "Already supported".
 4. **Environment reflection and fresnel (L2 484, U2 408, U3 70, U7 33,
    F1 506).** Metal and glass shine, rim glows. Needs an environment map
-   and the fresnel term (the shader holds a commented draft). Medium.
+   (the fresnel term is done 2026-11-23, `fresnel.spec`). Medium.
 5. ~~**Constant colour layers (A5, 493).**~~ Done 2026-11-21
    (`constant-color.spec`). Left: 46 models with a constant environment
    mask, with L2.
@@ -254,11 +365,14 @@ feature used only by particle materials waits for particles.
 18. Lens flare (T11 28), volume (T5 26), reflection (T10 10), terrain
     (T4 16), creep (T7 4), splat bake (T9 3). Unit counts; terrain is
     far more common on doodads (see "Doodads").
-19. Animated layer colour (A6 40), video textures (A4 26), render target
+19. Animated layer colour (A6 40), video textures (A4 26; not fetched
+    since patch 0036, the layer stays off and is listed as not drawn,
+    BlimpAds), render target
     channels (A9 22), blend modes 6 and 7 (M4 9), background object
     (M10 15).
 20. Forces and warps (E5 71) after particles; turrets and IK (E7 66) need
-    game data to aim; billboards (E8 45).
+    game data to aim; ~~billboards (E8 45)~~ done 2026-11-22 (patch 0037,
+    `billboards.spec`).
 21. Physics (E6 149): simulation, little to see in a still viewer.
 22. MODL version 24 (P1, 1 model).
 23. Not visual, not planned: E9.

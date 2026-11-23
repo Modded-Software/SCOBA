@@ -1,0 +1,397 @@
+From 9a35c308142ae28aef18cc53242f183a428f3115 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 08:20:10 +0200
+Subject: [PATCH 39/49] m3 particles: PARC emitter copies emit from their own
+ bones
+
+PARC records were skipped (UnsupportedEntry), so an emitter with copies
+emitted from its own bone only, and one whose own rate is 0 not at all.
+Helios: one jet fire instead of four; no end smoke or end fire.
+
+- parsers/m3/particlecopy.ts reads PARC (rate, partEmit, bone).
+- ParticleEmitter reads copyIndices (offsets from m3addon per version).
+- M3ParticleSystem: each copy is an emission slot of the emitter
+  (WhiteoutFlakes): own bone, rate and carry, one particle pool. Births
+  go to world space on the copy's bone, then back to emitter space for
+  an emitter-space emitter. Sizes scale by the bone's scale over the
+  emitter's (WhiteoutFlakes sizeBlend).
+- slotSpawned counts births per slot, for the tests.
+
+Known defects:
+- partEmit bursts are not run, for emitters or copies.
+- Copy semantics ported from WhiteoutFlakes; not compared with the game.
+---
+ src/parsers/m3/indexentry.ts             |   7 +-
+ src/parsers/m3/particlecopy.ts           |  26 +++++
+ src/parsers/m3/particleemitter.ts        |   9 +-
+ src/viewer/handlers/m3/model.ts          |   4 +
+ src/viewer/handlers/m3/modelinstance.ts  |   2 +-
+ src/viewer/handlers/m3/particlesystem.ts | 126 ++++++++++++++++++++---
+ 6 files changed, 153 insertions(+), 21 deletions(-)
+ create mode 100644 src/parsers/m3/particlecopy.ts
+
+diff --git a/src/parsers/m3/indexentry.ts b/src/parsers/m3/indexentry.ts
+index 224e90f7..07caf9f5 100644
+--- a/src/parsers/m3/indexentry.ts
++++ b/src/parsers/m3/indexentry.ts
+@@ -23,6 +23,7 @@ import CompositeMaterial, { CompositeMaterialSection } from './compositematerial
+ import DisplacementMaterial from './displacementmaterial';
+ import ParticleEmitter from './particleemitter';
+ import BillboardBehavior from './billboardbehavior';
++import ParticleCopy from './particlecopy';
+ 
+ 
+ // Mapping from entry tags, to their constructors and known version->size values.
+@@ -73,7 +74,7 @@ const tagMapping = {
+   LFSB: [UnsupportedEntry, { 2: 56 }],
+   LFLR: [UnsupportedEntry, { 2: 80, 3: 152 }],
+   PAR_: [ParticleEmitter, { 10: 1304, 11: 1308, 12: 1316, 17: 1460, 18: 1464, 19: 1464, 21: 1464, 22: 1484, 23: 1492, 24: 1496 }],
+-  PARC: [UnsupportedEntry, { 0: 40 }],
++  PARC: [ParticleCopy, { 0: 40 }],
+   PROJ: [UnsupportedEntry, { 4: 388, 5: 382 }],
+   PHYJ: [UnsupportedEntry, { 0: 180 }],
+   PHCC: [UnsupportedEntry, { 0: 76 }],
+@@ -98,8 +99,8 @@ const tagMapping = {
+  */
+ const SKIP_UNKNOWN_VERSION = new Set(['PAR_']);
+ 
+-export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[] | Uint8Array[];
+-export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | ParticleEmitter | UnsupportedEntry | string | number | Float32Array;
++export type EntryType = Md34[] | ModelHeader[] | Sequence[] | Stc[] | Stg[] | Sts[] | Bone[] | Division[] | Region[] | Batch[] | MaterialReference[] | StandardMaterial[] | Layer[] | Event[] | BoundingSphere[] | AttachmentPoint[] | Camera[] | Sd[] | CompositeMaterial[] | CompositeMaterialSection[] | DisplacementMaterial[] | ParticleEmitter[] | ParticleCopy[] | UnsupportedEntry[] | string | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Float32Array | Float32Array[] | Uint8Array[];
++export type SingleEntryType = Md34 | ModelHeader | Sequence | Stc | Stg | Sts | Bone | Division | Region | Batch | MaterialReference | StandardMaterial | Layer | Event | BoundingSphere | AttachmentPoint | Camera | Sd | CompositeMaterial | CompositeMaterialSection | DisplacementMaterial | ParticleEmitter | ParticleCopy | UnsupportedEntry | string | number | Float32Array;
+ 
+ /**
+  * An index entry.
+diff --git a/src/parsers/m3/particlecopy.ts b/src/parsers/m3/particlecopy.ts
+new file mode 100644
+index 00000000..b54c7277
+--- /dev/null
++++ b/src/parsers/m3/particlecopy.ts
+@@ -0,0 +1,26 @@
++import BinaryStream from '../../common/binarystream';
++import IndexEntry from './indexentry';
++import { Float32AnimationReference, Uint16AnimationReference } from './animationreference';
++
++/**
++ * A particle emitter copy (PARC, version 0, 40 bytes): one more place an
++ * emitter emits from, on its own bone at its own rate. Layout from m3addon
++ * structures.xml. WhiteoutFlakes m3_model_adapter: copies are emission
++ * slots of their emitter, not emitters; they share its particles.
++ */
++export default class ParticleCopy {
++  version = -1;
++  emissionRate = new Float32AnimationReference();
++  partEmit = new Uint16AnimationReference();
++  boneIndex = 0;
++
++  load(stream: BinaryStream, version: number, _index: IndexEntry[]): void {
++    this.version = version;
++    stream.seek(0);
++    this.emissionRate.load(stream);
++    stream.seek(20);
++    this.partEmit.load(stream);
++    stream.seek(36);
++    this.boneIndex = stream.readUint32();
++  }
++}
+diff --git a/src/parsers/m3/particleemitter.ts b/src/parsers/m3/particleemitter.ts
+index c4b58b0b..527b62dc 100644
+--- a/src/parsers/m3/particleemitter.ts
++++ b/src/parsers/m3/particleemitter.ts
+@@ -1,5 +1,6 @@
+ import BinaryStream from '../../common/binarystream';
+ import IndexEntry from './indexentry';
++import Reference from './reference';
+ import { Float32AnimationReference, PixelAnimationReference, Uint16AnimationReference, Vector3AnimationReference } from './animationreference';
+ 
+ /**
+@@ -41,6 +42,8 @@ const OFFSETS = {
+   images: [700, 716, 716, 720],
+   particleType: [752, 768, 768, 772],
+   flags: [1188, 1208, 1228, 1232],
++  // Version 17 is 4 bytes shorter than 18 to 21 here.
++  copyIndices: [1304, 1452, 1472, 1476],
+ };
+ 
+ /** Version 12 keeps the randomize choices as words; later ones as bits of additionalFlags. */
+@@ -110,8 +113,10 @@ export default class ParticleEmitter {
+   colorSmoothingType = 0;
+   sizeSmoothingType = 0;
+   rotationSmoothingType = 0;
++  /** Indices into the model's PARC records: more places this emitter emits from. */
++  copyIndices = new Reference();
+ 
+-  load(stream: BinaryStream, version: number, _index: IndexEntry[]): void {
++  load(stream: BinaryStream, version: number, index: IndexEntry[]): void {
+     this.version = version;
+ 
+     const layout = LAYOUTS[version];
+@@ -196,6 +201,8 @@ export default class ParticleEmitter {
+     this.particleType = at('particleType').readUint32();
+     this.lengthWidthRatio = stream.readFloat32();
+     this.flags = at('flags').readUint32();
++    stream.seek(version === 17 ? 1448 : OFFSETS.copyIndices[layout]);
++    this.copyIndices.load(stream, index);
+ 
+     // Smoothing: 0 linear, 1 smooth, 2 Bezier, 3 linear hold, 4 Bezier hold.
+     // Version 12 has flag bits for 1 and 2; later versions a word each,
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 865085ef..ab7e5bf3 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -31,6 +31,7 @@ import CompositeMaterial, { CompositeMaterialSection } from '../../../parsers/m3
+ import DisplacementMaterial from '../../../parsers/m3/displacementmaterial';
+ import { M3DisplacementMaterial } from './displacementmaterial';
+ import ParticleEmitter from '../../../parsers/m3/particleemitter';
++import ParticleCopy from '../../../parsers/m3/particlecopy';
+ import { particleDisplacement, particleMaterial } from './particlerender';
+ import BillboardBehavior from '../../../parsers/m3/billboardbehavior';
+ 
+@@ -93,6 +94,8 @@ export default class M3Model extends Model {
+   particleEmitters: ParticleEmitter[] = [];
+   /** Every PAR_ entry, read or not, in file order. */
+   allParticleEmitters: ParticleEmitter[] = [];
++  /** Every PARC entry; an emitter's copyIndices point into it. */
++  particleCopies: ParticleCopy[] = [];
+   /** How many of particleEmitters draw with a displacement material. */
+   displacementEmitters = 0;
+   /** Billboard behaviour (BBSC) of a bone, by bone index. */
+@@ -271,6 +274,7 @@ export default class M3Model extends Model {
+     const reference = model.particleEmitters;
+ 
+     this.allParticleEmitters = reference.list(<ParticleEmitter[]>[]);
++    this.particleCopies = model.particleEmitterCopies.list(<ParticleCopy[]>[]);
+ 
+     // A version the index entry does not know is skipped there, entries and all.
+     if (this.allParticleEmitters.length < reference.entries && reference.index) {
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index 0f3eee09..252b32cf 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -50,7 +50,7 @@ export default class M3ModelInstance extends ModelInstance {
+ 
+     this.boneTexture = new DataTexture(model.viewer.gl, 3, model.boneLookup.length * 4, 1);
+ 
+-    model.particleEmitters.forEach((emitter, i) => this.particleSystems.push(new M3ParticleSystem(this, emitter, i)));
++    model.particleEmitters.forEach((emitter, i) => this.particleSystems.push(new M3ParticleSystem(this, emitter, i, model.particleCopies)));
+   }
+ 
+   /** A bone's world matrix in the rest pose: the instance's times the bone's rest matrix. */
+diff --git a/src/viewer/handlers/m3/particlesystem.ts b/src/viewer/handlers/m3/particlesystem.ts
+index 8105b6fb..fd1c9b5e 100644
+--- a/src/viewer/handlers/m3/particlesystem.ts
++++ b/src/viewer/handlers/m3/particlesystem.ts
+@@ -1,5 +1,6 @@
+ import { mat4, vec3 } from 'gl-matrix';
+ import ParticleEmitter from '../../../parsers/m3/particleemitter';
++import ParticleCopy from '../../../parsers/m3/particlecopy';
+ import { AnimationReference } from '../../../parsers/m3/animationreference';
+ import type M3ModelInstance from './modelinstance';
+ import { curve, curve3, displacement } from './particlemath';
+@@ -19,8 +20,22 @@ const DEG = Math.PI / 180;
+ const SHAPE = { point: 0, plane: 1, sphere: 2, box: 3, cylinder: 4, disc: 5 };
+ 
+ const rand = (a: number, b: number): number => a + Math.random() * (b - a);
++
++/**
++ * One PARC copy of the emitter: it emits from its own bone at its own
++ * rate into the emitter's particles (WhiteoutFlakes: an emission slot).
++ */
++export interface CopySlot {
++  copy: ParticleCopy;
++  /** The copy bone's world matrix at the last update. */
++  matrix: mat4;
++  last: vec3;
++  hasLast: boolean;
++  carry: number;
++}
+ const heap = new Float32Array(3);
+ const heap3 = new Float32Array(3);
++const heapCopy = new Float32Array(3);
+ const colorHeap = new Uint8Array(4);
+ 
+ /**
+@@ -68,11 +83,27 @@ export default class M3ParticleSystem {
+   /** Start, middle, end colour, rgba 0 to 255. */
+   colors: Float32Array;
+   nextSerial = 0;
+-
+-  constructor(instance: M3ModelInstance, emitter: ParticleEmitter, index: number) {
++  /** PARC copies of this emitter, in copyIndices order. */
++  copies: CopySlot[] = [];
++  /** Births per slot since creation: the emitter first, then each copy. */
++  slotSpawned: number[];
++  /** The inverse of `matrix`, for copies of an emitter-space emitter. */
++  inverse = mat4.create();
++
++  constructor(instance: M3ModelInstance, emitter: ParticleEmitter, index: number, copies: ParticleCopy[] = []) {
+     this.instance = instance;
+     this.emitter = emitter;
+     this.index = index;
++
++    for (const ci of emitter.copyIndices.list(new Uint32Array(0))) {
++      const copy = copies[ci];
++
++      if (copy) {
++        this.copies.push({ copy, matrix: mat4.create(), last: vec3.create(), hasLast: false, carry: 0 });
++      }
++    }
++
++    this.slotSpawned = new Array(this.copies.length + 1).fill(0);
+     this.max = emitter.maxParticles > 0 ? emitter.maxParticles : DEFAULT_MAX;
+     this.worldSpace = !!(emitter.additionalFlags & WORLD_SPACE);
+ 
+@@ -107,14 +138,18 @@ export default class M3ParticleSystem {
+ 
+   /** The emitter's world matrix: its bone's, or the rest pose's when nothing plays. */
+   updateMatrix(): void {
++    this.boneMatrix(this.matrix, this.emitter.boneIndex);
++  }
++
++  /** A bone's world matrix, or its rest pose's when nothing plays. */
++  boneMatrix(out: mat4, bone: number): void {
+     const instance = this.instance;
+-    const bone = this.emitter.boneIndex;
+     const nodes = (<NonNullable<M3ModelInstance['skeleton']>>instance.skeleton).nodes;
+ 
+     if (instance.sequence !== -1 && nodes[bone]) {
+-      mat4.copy(this.matrix, <mat4>nodes[bone].worldMatrix);
++      mat4.copy(out, <mat4>nodes[bone].worldMatrix);
+     } else {
+-      instance.restBoneMatrix(this.matrix, bone);
++      instance.restBoneMatrix(out, bone);
+     }
+   }
+ 
+@@ -158,11 +193,7 @@ export default class M3ParticleSystem {
+     this.retire();
+     this.updateLife();
+ 
+-    const rate = Math.max(0, this.value(this.emitter.emissionRate));
+-
+-    this.rate = rate;
+-    this.rateMin = Math.min(this.rateMin, rate);
+-    this.rateMax = Math.max(this.rateMax, rate);
++    let rate = Math.max(0, this.value(this.emitter.emissionRate));
+ 
+     this.carry += rate * dt;
+ 
+@@ -171,10 +202,46 @@ export default class M3ParticleSystem {
+     this.carry -= count;
+ 
+     for (let k = 1; k <= count; k++) {
+-      this.spawn(t0 + (dt * k) / count, k / count, origin);
++      this.spawn(t0 + (dt * k) / count, k / count, origin, null);
+     }
+ 
+     vec3.copy(this.lastOrigin, <vec3>origin);
++
++    if (this.copies.length) {
++      mat4.invert(this.inverse, this.matrix);
++    }
++
++    for (const slot of this.copies) {
++      const at = heapCopy;
++
++      this.boneMatrix(slot.matrix, slot.copy.boneIndex);
++      mat4.getTranslation(<vec3>at, slot.matrix);
++
++      if (!slot.hasLast) {
++        vec3.copy(slot.last, <vec3>at);
++        slot.hasLast = true;
++      }
++
++      const r = Math.max(0, this.value(slot.copy.emissionRate));
++
++      rate += r;
++      slot.carry += r * dt;
++
++      const n = Math.floor(slot.carry);
++
++      slot.carry -= n;
++
++      for (let k = 1; k <= n; k++) {
++        this.spawn(t0 + (dt * k) / n, k / n, at, slot);
++      }
++
++      vec3.copy(slot.last, <vec3>at);
++    }
++
++    // The emitter and its copies together.
++    this.rate = rate;
++    this.rateMin = Math.min(this.rateMin, rate);
++    this.rateMax = Math.max(this.rateMax, rate);
+   }
+ 
+   /** Drop the particles past their life, keeping the living packed at the front. */
+@@ -329,8 +396,12 @@ export default class M3ParticleSystem {
+     out[2] *= speed;
+   }
+ 
+-  /** One birth at emitter time `birth`, `along` (0 to 1) the way from the last origin. */
+-  spawn(birth: number, along: number, origin: Float32Array): void {
++  /**
++   * One birth at emitter time `birth`, `along` (0 to 1) the way from the
++   * last origin. `slot`: a copy, emitting from its own bone; null for the
++   * emitter itself.
++   */
++  spawn(birth: number, along: number, origin: Float32Array, slot: CopySlot | null): void {
+     if (this.live >= this.max) {
+       this.dropped++;
+ 
+@@ -348,12 +419,14 @@ export default class M3ParticleSystem {
+     this.life[i] = rand(this.lifeMin, this.lifeMax);
+     this.mass[i] = e.additionalFlags & RANDOM_MASS ? rand(e.mass, e.mass2) : e.mass;
+ 
++    this.slotSpawned[slot ? this.copies.indexOf(slot) + 1 : 0]++;
+     this.spawnPosition(p);
+     this.spawnVelocity(v, p);
+ 
+-    if (this.worldSpace) {
+-      const m = this.matrix;
+-      const last = this.lastOrigin;
++    if (this.worldSpace || slot) {
++      // Into world space on the slot's bone, sliding from its last origin.
++      const m = slot ? slot.matrix : this.matrix;
++      const last = slot ? slot.last : this.lastOrigin;
+ 
+       vec3.transformMat3(<vec3>p, <vec3>p, mat3Of(m));
+       vec3.transformMat3(<vec3>v, <vec3>v, mat3Of(m));
+@@ -361,9 +434,25 @@ export default class M3ParticleSystem {
+       for (let k = 0; k < 3; k++) {
+         p[k] += last[k] + (origin[k] - last[k]) * along;
+       }
++
++      // A copy of an emitter-space emitter: back into the emitter's space.
++      if (slot && !this.worldSpace) {
++        vec3.transformMat4(<vec3>p, <vec3>p, this.inverse);
++        vec3.transformMat3(<vec3>v, <vec3>v, mat3Of(this.inverse));
++      }
+     }
+ 
+     this.sampleLook(i);
++
++    // A copy's sizes follow its bone's scale over the emitter's
++    // (WhiteoutFlakes InitSpawned sizeBlend).
++    if (slot) {
++      const blend = maxRow(slot.matrix) / (maxRow(this.matrix) || 1);
++
++      for (let k = 0; k < 3; k++) {
++        this.sizes[i * 3 + k] *= blend;
++      }
++    }
+   }
+ 
+   /** Size, rotation and colour keys of a new particle (SampleSize, SampleRotation, SampleColor). */
+@@ -467,6 +556,11 @@ export default class M3ParticleSystem {
+   }
+ }
+ 
++/** The longest of the three axis rows of a 4x4 matrix (WhiteoutFlakes MaxRowLenSq, rooted). */
++function maxRow(m: mat4): number {
++  return Math.max(Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10]));
++}
++
+ const mat3Heap = new Float32Array(9);
+ 
+ /** The upper 3x3 of a 4x4 matrix. */

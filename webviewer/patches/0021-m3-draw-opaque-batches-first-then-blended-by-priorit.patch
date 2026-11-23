@@ -1,7 +1,7 @@
 From be10a0186fb861c26f4cc93271801353df151bbe Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 15:45:54 +0200
-Subject: [PATCH 21/28] m3: draw opaque batches first, then blended by priority
+Subject: [PATCH 21/49] m3: draw opaque batches first, then blended by priority
 
 Opaque batches (blend mode 0) in file order, then blended batches by material priority ascending, stable, after WhiteoutFlakes TransparentOrder. Replaces the commented-out sort. M3Batch.fileOrder keeps the file position; M3ModelInstance.drawnOrder records what the last renderOpaque drew.
 ---

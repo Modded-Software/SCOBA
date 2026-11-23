@@ -1,0 +1,41 @@
+From 19330e66472704f33de238e4ba3cf9ca7f899ed0 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 09:05:06 +0200
+Subject: [PATCH 43/49] m3 parser: PAR_ unknownFloat7 and unknown5AddedV21
+
+Read the two floats after lengthWidthRatio (m3addon structures.xml),
+to find the type-9 far-end width (WhiteoutFlakes instanceDistance).
+
+Known defects:
+- Not used by the renderer yet.
+---
+ src/parsers/m3/particleemitter.ts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/parsers/m3/particleemitter.ts b/src/parsers/m3/particleemitter.ts
+index 527b62dc..3556996d 100644
+--- a/src/parsers/m3/particleemitter.ts
++++ b/src/parsers/m3/particleemitter.ts
+@@ -109,6 +109,10 @@ export default class ParticleEmitter {
+   numberOfRows = 0;
+   particleType = 0;
+   lengthWidthRatio = 1;
++  /** m3addon unknownFloat7 (default 1), after 8 unknown bytes. */
++  unknownFloat7 = 1;
++  /** m3addon unknown5AddedV21 (default 1, version 17 and later). */
++  unknown5AddedV21 = 1;
+   flags = 0;
+   colorSmoothingType = 0;
+   sizeSmoothingType = 0;
+@@ -200,6 +204,11 @@ export default class ParticleEmitter {
+     this.numberOfRows = stream.readUint16();
+     this.particleType = at('particleType').readUint32();
+     this.lengthWidthRatio = stream.readFloat32();
++    stream.skip(8);
++    this.unknownFloat7 = stream.readFloat32();
++    if (version >= 17) {
++      this.unknown5AddedV21 = stream.readFloat32();
++    }
+     this.flags = at('flags').readUint32();
+     stream.seek(version === 17 ? 1448 : OFFSETS.copyIndices[layout]);
+     this.copyIndices.load(stream, index);

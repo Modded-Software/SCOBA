@@ -128,6 +128,53 @@ test('the cut-out of Zerus Large Tree: vine and leaf cards draw only where their
   expect(errors).toEqual([]);
 });
 
+// The operator's case 2026-11-23: Giant Yeti and Ursadon drew with holes in
+// the body. Its alpha mask (blastmark4, blue channel) has multiply 10 and
+// add 1: mask x 10 + 1 >= 1 everywhere, so nothing is cut (WhiteoutFlakes
+// M3LayerValue: rgba * tint + add, before the clamp).
+for (const [unit, material] of [['GiantYeti', 'beast'], ['Ursadon', null]]) {
+  test(`${unit}: the body's alpha mask has its multiply and add; the body is not cut`, async ({ page }) => {
+    const errors = await open(page);
+    const id = await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0, pick: 0.5, sequence: -1, dataset: 'stock' }), unit);
+    await idle(page);
+    await page.evaluate((v) => window.sc2viewer.view(v), { ...VIEW, distance: 12, target: [0, 0, 1.5] });
+    // The body: the batch with the most vertices whose material has a textured alpha mask and a test.
+    const body = await page.evaluate(([i, name]) => {
+      const item = window.SC2App.items.find((x) => x.id === i);
+      const masked = item.model.batches.filter((b) => b.material.alphaTest > 0 && b.material.layers[8].active && !b.material.layers[8].constant && (!name || b.material.name === name));
+      masked.sort((a, b) => b.region.elements - a.region.elements);
+      const pick = masked[0];
+      // Draw only it.
+      window.__allBatches = item.model.batches.slice();
+      item.model.batches.length = 0;
+      item.model.batches.push(pick);
+      return { material: pick.material.name, alphaTest: pick.material.alphaTest };
+    }, [id, material]);
+    await frames(page);
+    const list = await silhouettes(page, id);
+    const ma = await page.evaluate((i) => {
+      const item = window.SC2App.items.find((x) => x.id === i);
+      const m = item.model.batches[0].material;
+      return { mask: Array.from(m.layers[8].lastMultiplyAdd), diffuse: Array.from(m.layers[0].lastMultiplyAdd) };
+    }, id);
+    const removed = list.filter((s) => s.off && !s.on);
+    console.log(unit, JSON.stringify(body), 'multiplyAdd', JSON.stringify(ma), 'samples', list.length, 'drawn', list.filter((s) => s.on).length, 'removed', removed.length);
+    expect(body.alphaTest).toBeGreaterThan(0);
+    // The file's values (m3addon: brightMult 10, midtoneOffset 1 on the Yeti body).
+    if (unit === 'GiantYeti') expect(ma.mask).toEqual([10, 1]);
+    // Negative: other layers keep (1, 0).
+    expect(ma.diffuse).toEqual([1, 0]);
+    expect(list.filter((s) => s.on).length).toBeGreaterThan(50);
+    expect(removed).toEqual([]);
+    await page.evaluate((i) => {
+      const item = window.SC2App.items.find((x) => x.id === i);
+      item.model.batches.length = 0;
+      item.model.batches.push(...window.__allBatches);
+    }, id);
+    expect(errors).toEqual([]);
+  });
+}
+
 test('negative: a model with no alpha test draws the same with the test on or off', async ({ page }) => {
   const errors = await open(page);
   const id = await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: 0, y: 0, pick: 0.5, sequence: -1, dataset: 'stock' }));

@@ -1,0 +1,108 @@
+From f7f3b9fbe77707aa54bb2bf683fa35f612f2bc14 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 08:09:37 +0200
+Subject: [PATCH 38/49] m3 particles: clampTailParts cuts tails to the distance
+ travelled
+
+PAR_ flags 0x40000 (clampTailParts): a tail never reaches farther than
+its particle has moved since birth (WhiteoutFlakes StepAnalytic). Before,
+every clamped beam was drawn at full length from birth, so light shafts
+stuck out far past their emitters.
+
+Adds particleMotion() (birth point and speed) for the tests.
+
+Known defects:
+- Rule ported from WhiteoutFlakes; not compared with the game.
+---
+ src/viewer/handlers/m3/handler.ts        |  6 +++--
+ src/viewer/handlers/m3/particlerender.ts | 29 ++++++++++++++++++++++--
+ 2 files changed, 31 insertions(+), 4 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/handler.ts b/src/viewer/handlers/m3/handler.ts
+index f285cf05..68d2fa00 100644
+--- a/src/viewer/handlers/m3/handler.ts
++++ b/src/viewer/handlers/m3/handler.ts
+@@ -9,7 +9,7 @@ import displacementFrag from './shaders/displacement.frag';
+ import particleVert from './shaders/particle.vert';
+ import particleFrag from './shaders/particle.frag';
+ import particleDisplacementFrag from './shaders/particledisplacement.frag';
+-import { createParticleBuffers, ParticleBuffers, particleQuad } from './particlerender';
++import { createParticleBuffers, ParticleBuffers, particleQuad, particleMotion } from './particlerender';
+ 
+ export interface M3HandlerObject {
+   standardShaders: Shader[];
+@@ -21,6 +21,8 @@ export interface M3HandlerObject {
+   particleBuffers: ParticleBuffers;
+   /** The four corners one particle is drawn with (for the tests). */
+   particleQuad: typeof particleQuad;
++  /** One particle's birth point and speed (for the tests). */
++  particleMotion: typeof particleMotion;
+   /** Run and draw particle emitters (tests compare frames with and without). */
+   particlesEnabled: boolean;
+ }
+@@ -63,7 +65,7 @@ export default {
+     const particleShader = webgl.createShader(particleVert, particleFrag);
+     const particleDisplacementShader = webgl.createShader(particleVert, particleDisplacementFrag);
+     const particleBuffers = createParticleBuffers(gl);
+-    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleDisplacementShader, particleBuffers, particleQuad, particlesEnabled: true };
++    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleDisplacementShader, particleBuffers, particleQuad, particleMotion, particlesEnabled: true };
+ 
+     viewer.sharedCache.set('m3', handlerData);
+   },
+diff --git a/src/viewer/handlers/m3/particlerender.ts b/src/viewer/handlers/m3/particlerender.ts
+index 1f51252a..c78a1c31 100644
+--- a/src/viewer/handlers/m3/particlerender.ts
++++ b/src/viewer/handlers/m3/particlerender.ts
+@@ -98,6 +98,8 @@ function cell(system: M3ParticleSystem, age: number, out: Float32Array): void {
+ const TYPE = { tail: 1, terrain: 5, emitter: 7, pinned: 9, trail: 10 };
+ /** PAR_ flags bit: the tail keeps its authored length (fixLengthTailParts). */
+ const FIXED_TAIL = 0x100000;
++/** PAR_ flags bit: the tail is cut to the distance travelled (clampTailParts). */
++const CLAMP_TAIL = 0x40000;
+ 
+ const vel = new Float32Array(3);
+ const axisA = new Float32Array(3);
+@@ -159,6 +161,16 @@ function worldStart(system: M3ParticleSystem, i: number, out: Float32Array): Flo
+   return out;
+ }
+ 
++/**
++ * Particle `i`'s birth point in world space into `start`, and its speed
++ * before the turn into world space (what the tail rules read).
++ */
++export function particleMotion(system: M3ParticleSystem, i: number, start: Float32Array): number {
++  worldStart(system, i, start);
++
++  return worldVelocity(system, i, vel);
++}
++
+ /**
+  * The quad's two axes and its half extents along them, by particle type
+  * (WhiteoutFlakes BuildQuad). `right` and `up` get unit axes; `out` gets
+@@ -177,11 +189,24 @@ function frame(system: M3ParticleSystem, i: number, camera: Camera, p: Float32Ar
+   if (type === TYPE.tail || type === TYPE.trail) {
+     // Along the travel: the length is the tail times the speed, at least the tail.
+     const speed = worldVelocity(system, i, up);
+-    const tail = e.lengthWidthRatio;
++    const fixed = e.flags & FIXED_TAIL;
++    let tail = e.lengthWidthRatio;
++
++    // clampTailParts: the tail never reaches behind the birth point
++    // (WhiteoutFlakes StepAnalytic). World units on both sides of the ratio.
++    if (e.flags & CLAMP_TAIL && speed > 0 && half > 0) {
++      const origin = worldStart(system, i, axisB);
++      const dist = Math.hypot(p[0] - origin[0], p[1] - origin[1], p[2] - origin[2]);
++      const budget = (fixed ? tail * speed : Math.max(tail, tail * speed)) * half;
++
++      if (dist < budget) {
++        tail = Math.min(dist / (speed * half), tail);
++      }
++    }
+ 
+     normalize(up);
+     normalize(cross(right, view, up));
+-    out[1] = half * (e.flags & FIXED_TAIL ? tail : Math.max(tail, speed * tail));
++    out[1] = half * (fixed ? tail : Math.max(tail, speed * tail));
+     out[2] = 0;
+ 
+     // A trail starts at the particle and reaches back.

@@ -98,6 +98,27 @@ Read these from Galaxy and write them to the bank:
   in `src/SCOBA.SC2Map`. Never hand-edit `out/`.
 - `out/SCOBA256.SC2Map` is rebuilt from `src/SCOBA.SC2Map` on every run.
 
+## Commit hook exemptions
+
+- The hooks run from `/opt/workspace-ci`. That is the CI deployment. Never
+  target it or the CI repo (`WORKSPACE-VM/config`). Both are out of scope.
+- SC2 exemptions live in this repo: `config/banned_words_exceptions_v5.yaml`
+  (banned words), `config/file_length_limits.yaml`,
+  `quality_exceptions.yaml`, and the rest listed in
+  `/opt/workspace-ci/config/exemption_files.yaml`.
+- These files are root-owned. The hook rejects them otherwise. The agent
+  never edits them. The agent writes a script under `/tmp/opencode/` that
+  calls `workspace-yaml-edit add <file> exceptions ...`, checks it with
+  `--dry-run`, and the operator runs it as root.
+- One entry = one rule id + one anchored exact path:
+  `rule` (id from `/opt/workspace-ci/config/banned_words.yaml`, e.g.
+  `bskeleton-b`), `path` (`^dir/file\.ext$`), `rationale` (why this file
+  needs the word, ending "Not X code."), `owner: sc2`, `review_date`,
+  `removal` (the condition that ends the need).
+- Values must not contain `: `. YAML would parse them as a mapping.
+- Exempt only words that are external names (upstream API, model data, HTML
+  attributes). Reword the agent's own prose instead.
+
 ## Docs
 
 - Requirements: `docs/requirements/`. Specifications: `docs/specifications/`.

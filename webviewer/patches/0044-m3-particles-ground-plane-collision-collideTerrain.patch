@@ -1,0 +1,318 @@
+From c7309b5fe30edd7acb8cbae4012f548826ba1722 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 09:19:10 +0200
+Subject: [PATCH 44/49] m3 particles: ground plane collision (collideTerrain)
+
+- particleground.ts: a flat invisible ground at world z = 0. Particles
+  with PAR_ flags 0x2 that cross it downwards restart their motion at the
+  contact (push-out 0.05) with the WhiteoutFlakes response: normal speed
+  x -bounce, tangent x friction when moving; rest below 3 x dt.
+- Parser reads bounce and friction (32 and 28 bytes before particleType).
+- Per particle: kick (motion clock), rest, bounces, born (spawn origin,
+  what tails and pinned quads read).
+
+Known defects:
+- spawnOnBounce children and the bounce count that kills are not read.
+- Collide-objects (0x4) is not done.
+---
+ src/parsers/m3/particleemitter.ts        |   7 ++
+ src/viewer/handlers/m3/particleground.ts | 139 +++++++++++++++++++++++
+ src/viewer/handlers/m3/particlerender.ts |   8 +-
+ src/viewer/handlers/m3/particlesystem.ts |  35 +++++-
+ 4 files changed, 185 insertions(+), 4 deletions(-)
+ create mode 100644 src/viewer/handlers/m3/particleground.ts
+
+diff --git a/src/parsers/m3/particleemitter.ts b/src/parsers/m3/particleemitter.ts
+index 3556996d..13a7f209 100644
+--- a/src/parsers/m3/particleemitter.ts
++++ b/src/parsers/m3/particleemitter.ts
+@@ -109,6 +109,9 @@ export default class ParticleEmitter {
+   numberOfRows = 0;
+   particleType = 0;
+   lengthWidthRatio = 1;
++  /** Ground contact response: the normal speed kept (x -1), and the tangent speed kept. */
++  bounce = 0;
++  friction = 1;
+   /** m3addon unknownFloat7 (default 1), after 8 unknown bytes. */
+   unknownFloat7 = 1;
+   /** m3addon unknown5AddedV21 (default 1, version 17 and later). */
+@@ -202,6 +205,10 @@ export default class ParticleEmitter {
+     this.relativePhase1Length = stream.readFloat32();
+     this.numberOfColumns = stream.readUint16();
+     this.numberOfRows = stream.readUint16();
++    // bounce and friction: after columnWidth and rowHeight, 32 and 28 bytes before particleType.
++    stream.seek(OFFSETS.particleType[layout] - 32);
++    this.bounce = stream.readFloat32();
++    this.friction = stream.readFloat32();
+     this.particleType = at('particleType').readUint32();
+     this.lengthWidthRatio = stream.readFloat32();
+     stream.skip(8);
+diff --git a/src/viewer/handlers/m3/particleground.ts b/src/viewer/handlers/m3/particleground.ts
+new file mode 100644
+index 00000000..679794b4
+--- /dev/null
++++ b/src/viewer/handlers/m3/particleground.ts
+@@ -0,0 +1,139 @@
++import { mat4, vec3 } from 'gl-matrix';
++import { velocityAt } from './particlemath';
++import type M3ParticleSystem from './particlesystem';
++
++/**
++ * The viewer's ground: a flat, invisible plane at world z = 0, which
++ * particles with `collideTerrain` hit (WhiteoutFlakes CollideElement on a
++ * terrain query). The scene has no terrain mesh; this plane stands in.
++ */
++export const GROUND_Z = 0;
++
++/** PAR_ flags bit: the particles collide with the terrain. */
++export const COLLIDE_TERRAIN = 0x2;
++/** The terrain push-out along the normal (kParticleCollideRadius). */
++const COLLIDE_RADIUS = 0.05;
++/** The tangential (friction) term needs |v|² above this (kFrictionSpeedSq). */
++const FRICTION_SPEED_SQ = 0.01;
++/** A landed particle rests when |v|² < this x dt (kRestPerDt). */
++const REST_PER_DT = 3;
++
++const now = new Float32Array(3);
++const before = new Float32Array(3);
++const vel = new Float32Array(3);
++const inverse = mat4.create();
++
++/**
++ * Collide the live particles of `system` with the ground over the last
++ * `dt` seconds. A particle that crossed the plane downwards restarts its
++ * closed-form motion at the contact, pushed out by the collide radius, with
++ * the response velocity: the normal part times -bounce, plus the tangent
++ * part times friction when the particle moves; below the rest speed it
++ * stays put. WhiteoutFlakes steps with Euler and sweeps the segment; this
++ * finds the crossing on the closed-form path between the two times.
++ */
++export function collideGround(system: M3ParticleSystem, dt: number): void {
++  const e = system.emitter;
++
++  if (!(e.flags & COLLIDE_TERRAIN) || dt <= 0) {
++    return;
++  }
++
++  const local = !system.worldSpace;
++
++  if (local && !mat4.invert(inverse, system.matrix)) {
++    return;
++  }
++
++  const time = system.time;
++
++  for (let i = 0; i < system.live; i++) {
++    if (system.rest[i]) {
++      continue;
++    }
++
++    system.positionAt(now, i, time);
++
++    if (now[2] >= GROUND_Z) {
++      continue;
++    }
++
++    const from = Math.max(system.kick[i], time - dt);
++
++    system.positionAt(before, i, from);
++
++    // Born under the ground, or already below at the step's start: no crossing.
++    if (before[2] < GROUND_Z) {
++      continue;
++    }
++
++    // The contact: where the step's segment meets the plane.
++    const f = (before[2] - GROUND_Z) / (before[2] - now[2]);
++    const hit = now;
++
++    for (let k = 0; k < 3; k++) {
++      hit[k] = before[k] + (now[k] - before[k]) * f;
++    }
++
++    hit[2] = GROUND_Z + COLLIDE_RADIUS;
++
++    // The velocity at the contact, in world space.
++    const v = system.velocity;
++    const at = from + (time - from) * f - system.kick[i];
++
++    velocityAt(vel, at, v[i * 3], v[i * 3 + 1], v[i * 3 + 2], system.mass[i], e.drag, e.zAcceleration);
++
++    if (local) {
++      vec3.transformMat3(<vec3>vel, <vec3>vel, mat3(system.matrix));
++    }
++
++    const d = vel[2];
++
++    if (d >= 0) {
++      continue;
++    }
++
++    // Normal (0, 0, 1): vn = (0, 0, d).
++    const r = [0, 0, -e.bounce * d];
++
++    if (vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2] > FRICTION_SPEED_SQ) {
++      r[0] += e.friction * vel[0];
++      r[1] += e.friction * vel[1];
++    }
++
++    system.bounces[i]++;
++    system.kick[i] = time;
++
++    if (r[0] * r[0] + r[1] * r[1] + r[2] * r[2] < REST_PER_DT * dt) {
++      r.fill(0);
++      system.rest[i] = 1;
++    }
++
++    if (local) {
++      vec3.transformMat4(<vec3>hit, <vec3>hit, inverse);
++      vec3.transformMat3(<vec3>vel, <vec3>r, mat3(inverse));
++    } else {
++      vel.set(r);
++    }
++
++    system.start.set(hit, i * 3);
++    v.set(vel, i * 3);
++  }
++}
++
++const m3 = new Float32Array(9);
++
++/** The upper 3x3 of a 4x4 matrix. */
++function mat3(m: mat4): Float32Array {
++  m3[0] = m[0];
++  m3[1] = m[1];
++  m3[2] = m[2];
++  m3[3] = m[4];
++  m3[4] = m[5];
++  m3[5] = m[6];
++  m3[6] = m[8];
++  m3[7] = m[9];
++  m3[8] = m[10];
++
++  return m3;
++}
+diff --git a/src/viewer/handlers/m3/particlerender.ts b/src/viewer/handlers/m3/particlerender.ts
+index e09c8ded..0eae5a75 100644
+--- a/src/viewer/handlers/m3/particlerender.ts
++++ b/src/viewer/handlers/m3/particlerender.ts
+@@ -155,7 +155,11 @@ function worldVelocity(system: M3ParticleSystem, i: number, out: Float32Array):
+   const e = system.emitter;
+   const v = system.velocity;
+ 
+-  velocityAt(out, system.time - system.birth[i], v[i * 3], v[i * 3 + 1], v[i * 3 + 2], system.mass[i], e.drag, e.zAcceleration);
++  if (system.rest[i]) {
++    out.fill(0);
++  } else {
++    velocityAt(out, system.time - system.kick[i], v[i * 3], v[i * 3 + 1], v[i * 3 + 2], system.mass[i], e.drag, e.zAcceleration);
++  }
+ 
+   const speed = Math.hypot(out[0], out[1], out[2]);
+ 
+@@ -173,7 +177,7 @@ function worldVelocity(system: M3ParticleSystem, i: number, out: Float32Array):
+ 
+ /** Where particle `i` was born, in world space. */
+ function worldStart(system: M3ParticleSystem, i: number, out: Float32Array): Float32Array {
+-  out.set(system.start.subarray(i * 3, i * 3 + 3));
++  out.set(system.born.subarray(i * 3, i * 3 + 3));
+ 
+   if (!system.worldSpace) {
+     vec3.transformMat4(<vec3>out, <vec3>out, system.matrix);
+diff --git a/src/viewer/handlers/m3/particlesystem.ts b/src/viewer/handlers/m3/particlesystem.ts
+index ffe861ca..6f70d17c 100644
+--- a/src/viewer/handlers/m3/particlesystem.ts
++++ b/src/viewer/handlers/m3/particlesystem.ts
+@@ -4,6 +4,7 @@ import ParticleCopy from '../../../parsers/m3/particlecopy';
+ import { AnimationReference } from '../../../parsers/m3/animationreference';
+ import type M3ModelInstance from './modelinstance';
+ import { curve, curve3, displacement } from './particlemath';
++import { collideGround } from './particleground';
+ 
+ /** additionalFlags bits (m3addon structures.xml, PAR_). */
+ const RANDOM_SPEED = 0x1;
+@@ -72,6 +73,14 @@ export default class M3ParticleSystem {
+   serial: Int32Array;
+   /** Birth times on the emitter clock: 64-bit like the clock, so a new particle's age is never below 0. */
+   birth: Float64Array;
++  /** Where the closed-form motion restarts: the birth, or the last ground contact. */
++  kick: Float64Array;
++  /** 1 once a particle has come to rest on the ground: it stays at `start`. */
++  rest: Uint8Array;
++  /** Ground contacts so far. */
++  bounces: Uint16Array;
++  /** Birth position, 3 each (WhiteoutFlakes spawnOrigin): a bounce moves `start`, not this. */
++  born: Float32Array;
+   life: Float32Array;
+   mass: Float32Array;
+   /** Start position and start velocity, 3 each. */
+@@ -117,6 +126,10 @@ export default class M3ParticleSystem {
+ 
+     this.serial = new Int32Array(n);
+     this.birth = new Float64Array(n);
++    this.kick = new Float64Array(n);
++    this.rest = new Uint8Array(n);
++    this.bounces = new Uint16Array(n);
++    this.born = new Float32Array(n * 3);
+     this.life = new Float32Array(n);
+     this.mass = new Float32Array(n);
+     this.start = new Float32Array(n * 3);
+@@ -197,6 +210,7 @@ export default class M3ParticleSystem {
+ 
+     this.time += dt;
+     this.retire();
++    collideGround(this, dt);
+     this.updateLife();
+ 
+     let rate = Math.max(0, this.value(this.emitter.emissionRate));
+@@ -319,6 +333,10 @@ export default class M3ParticleSystem {
+   move(from: number, to: number): void {
+     this.serial[to] = this.serial[from];
+     this.birth[to] = this.birth[from];
++    this.kick[to] = this.kick[from];
++    this.rest[to] = this.rest[from];
++    this.bounces[to] = this.bounces[from];
++    this.born.copyWithin(to * 3, from * 3, from * 3 + 3);
+     this.life[to] = this.life[from];
+     this.mass[to] = this.mass[from];
+     this.start.copyWithin(to * 3, from * 3, from * 3 + 3);
+@@ -470,6 +488,9 @@ export default class M3ParticleSystem {
+     this.spawned++;
+     this.serial[i] = this.nextSerial++;
+     this.birth[i] = birth;
++    this.kick[i] = birth;
++    this.rest[i] = 0;
++    this.bounces[i] = 0;
+     this.life[i] = rand(this.lifeMin, this.lifeMax);
+     this.mass[i] = e.additionalFlags & RANDOM_MASS ? rand(e.mass, e.mass2) : e.mass;
+ 
+@@ -496,6 +517,7 @@ export default class M3ParticleSystem {
+       }
+     }
+ 
++    this.born.set(p, i * 3);
+     this.sampleLook(i);
+ 
+     // A copy's sizes follow its bone's scale over the emitter's
+@@ -566,11 +588,20 @@ export default class M3ParticleSystem {
+    * `out` gets x, y, z.
+    */
+   position(out: Float32Array, i: number): Float32Array {
++    return this.positionAt(out, i, this.time);
++  }
++
++  /** Particle `i`'s world position at emitter time `time` (not before its last kick). */
++  positionAt(out: Float32Array, i: number, time: number): Float32Array {
+     const e = this.emitter;
+     const v = this.velocity;
+-    const age = this.time - this.birth[i];
++    const age = Math.max(0, time - this.kick[i]);
+ 
+-    displacement(out, age, v[i * 3], v[i * 3 + 1], v[i * 3 + 2], this.mass[i], e.drag, e.zAcceleration);
++    if (this.rest[i]) {
++      out.fill(0);
++    } else {
++      displacement(out, age, v[i * 3], v[i * 3 + 1], v[i * 3 + 2], this.mass[i], e.drag, e.zAcceleration);
++    }
+ 
+     for (let k = 0; k < 3; k++) {
+       out[k] += this.start[i * 3 + k];

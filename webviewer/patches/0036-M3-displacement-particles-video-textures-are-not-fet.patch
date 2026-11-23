@@ -1,0 +1,299 @@
+From 8c3d72382a16331fa768113a1d3946388c3b807c Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 23:15:48 +0200
+Subject: [PATCH 36/49] M3: displacement particles; video textures are not
+ fetched
+
+Emitters with a displacement material (type 2) run and draw after the
+frame, like displacement meshes: each quad shows the frame copy shifted
+along the material's normal map, the shift times the strength layer and
+the particle's alpha. They are no longer listed as not drawn.
+
+A layer whose texture is a video (.ogv) is not loaded: the viewer plays
+no video, and the path is not in the game storage (404). The layer stays
+off and the model lists it as not drawn.
+
+Known defects: displacement particles are not sorted; a video layer draws
+nothing in its place.
+---
+ src/viewer/handlers/m3/handler.ts             |  6 +-
+ src/viewer/handlers/m3/layer.ts               |  6 +-
+ src/viewer/handlers/m3/model.ts               |  8 ++-
+ src/viewer/handlers/m3/modelinstance.ts       | 34 ++++++-----
+ src/viewer/handlers/m3/particlerender.ts      | 58 +++++++++++++++++++
+ .../m3/shaders/particledisplacement.frag.ts   | 40 +++++++++++++
+ 6 files changed, 133 insertions(+), 19 deletions(-)
+ create mode 100644 src/viewer/handlers/m3/shaders/particledisplacement.frag.ts
+
+diff --git a/src/viewer/handlers/m3/handler.ts b/src/viewer/handlers/m3/handler.ts
+index 33e27d59..f285cf05 100644
+--- a/src/viewer/handlers/m3/handler.ts
++++ b/src/viewer/handlers/m3/handler.ts
+@@ -8,6 +8,7 @@ import standardFrag from './shaders/standard.frag';
+ import displacementFrag from './shaders/displacement.frag';
+ import particleVert from './shaders/particle.vert';
+ import particleFrag from './shaders/particle.frag';
++import particleDisplacementFrag from './shaders/particledisplacement.frag';
+ import { createParticleBuffers, ParticleBuffers, particleQuad } from './particlerender';
+ 
+ export interface M3HandlerObject {
+@@ -15,6 +16,8 @@ export interface M3HandlerObject {
+   /** Displacement materials, per texture coordinate count like the standard ones. */
+   displacementShaders: Shader[];
+   particleShader: Shader;
++  /** Particles with a displacement material. */
++  particleDisplacementShader: Shader;
+   particleBuffers: ParticleBuffers;
+   /** The four corners one particle is drawn with (for the tests). */
+   particleQuad: typeof particleQuad;
+@@ -58,8 +61,9 @@ export default {
+     }
+ 
+     const particleShader = webgl.createShader(particleVert, particleFrag);
++    const particleDisplacementShader = webgl.createShader(particleVert, particleDisplacementFrag);
+     const particleBuffers = createParticleBuffers(gl);
+-    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleBuffers, particleQuad, particlesEnabled: true };
++    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleDisplacementShader, particleBuffers, particleQuad, particlesEnabled: true };
+ 
+     viewer.sharedCache.set('m3', handlerData);
+   },
+diff --git a/src/viewer/handlers/m3/layer.ts b/src/viewer/handlers/m3/layer.ts
+index a907d527..9423ab40 100644
+--- a/src/viewer/handlers/m3/layer.ts
++++ b/src/viewer/handlers/m3/layer.ts
+@@ -115,7 +115,11 @@ export default class M3Layer {
+       } else if (path) {
+         const source = (<string>path).toLowerCase();
+ 
+-        if (source.length) {
++        // A video texture (.ogv, Theora) is not loaded: the viewer plays no
++        // video. The layer stays off and the model lists it as not drawn.
++        if (source.endsWith('.ogv')) {
++          model.undrawnBatches.push(`material ${material.index}: ${type} layer: video texture ${source}`);
++        } else if (source.length) {
+           this.source = source;
+           this.active = 1;
+ 
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 82a7960f..011c1661 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -31,7 +31,7 @@ import CompositeMaterial, { CompositeMaterialSection } from '../../../parsers/m3
+ import DisplacementMaterial from '../../../parsers/m3/displacementmaterial';
+ import { M3DisplacementMaterial } from './displacementmaterial';
+ import ParticleEmitter from '../../../parsers/m3/particleemitter';
+-import { particleMaterial } from './particlerender';
++import { particleDisplacement, particleMaterial } from './particlerender';
+ 
+ // MATM material types: the order of the material lists in the model header
+ // (m3addon structures.xml, MODL).
+@@ -92,6 +92,8 @@ export default class M3Model extends Model {
+   particleEmitters: ParticleEmitter[] = [];
+   /** Every PAR_ entry, read or not, in file order. */
+   allParticleEmitters: ParticleEmitter[] = [];
++  /** How many of particleEmitters draw with a displacement material. */
++  displacementEmitters = 0;
+ 
+   constructor(bufferOrParser: ArrayBuffer | Parser, resourceData: HandlerResourceData) {
+     super(resourceData);
+@@ -268,6 +270,10 @@ export default class M3Model extends Model {
+     this.allParticleEmitters.forEach((emitter, i) => {
+       if (!emitter.read) {
+         this.undrawnBatches.push(`particle emitter ${i}: PAR_ version ${emitter.version} not read`);
++      } else if (particleDisplacement(this, emitter.materialReferenceIndex)) {
++        // Drawn after the frame, over its copy (renderDisplacement).
++        this.particleEmitters.push(emitter);
++        this.displacementEmitters++;
+       } else if (!particleMaterial(this, emitter.materialReferenceIndex)) {
+         const map = this.materialMaps[emitter.materialReferenceIndex];
+ 
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index 04317b6a..0f3eee09 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -10,7 +10,7 @@ import { STANDARD_MATERIAL_OFFSET } from './standardmaterial';
+ import { M3HandlerObject } from './handler';
+ import M3Node from './node';
+ import M3ParticleSystem from './particlesystem';
+-import { renderParticles } from './particlerender';
++import { renderDisplacementParticles, renderParticles } from './particlerender';
+ 
+ const boneHeap = mat4.create();
+ 
+@@ -214,26 +214,28 @@ export default class M3ModelInstance extends ModelInstance {
+   renderDisplacement(sceneMap: WebGLTexture, width: number, height: number): void {
+     const model = <M3Model>this.model;
+     const batches = model.displacementBatches;
+-
+-    if (!batches.length) {
+-      return;
+-    }
+-
+     const gl = model.viewer.gl;
+     const m3Cache = <M3HandlerObject>model.viewer.sharedCache.get('m3');
+-    const shader = m3Cache.displacementShaders[model.uvSetCount - 1];
+ 
+-    this.useShader(shader);
++    if (batches.length) {
++      const shader = m3Cache.displacementShaders[model.uvSetCount - 1];
+ 
+-    gl.activeTexture(gl.TEXTURE0);
+-    gl.bindTexture(gl.TEXTURE_2D, sceneMap);
+-    gl.uniform1i(shader.uniforms['u_sceneMap'], 0);
+-    gl.uniform2f(shader.uniforms['u_viewSize'], width, height);
++      this.useShader(shader);
+ 
+-    for (const batch of batches) {
+-      batch.material.bind(shader, this.textureOverrides, this);
+-      batch.region.render(shader);
+-      batch.material.unbind(shader);
++      gl.activeTexture(gl.TEXTURE0);
++      gl.bindTexture(gl.TEXTURE_2D, sceneMap);
++      gl.uniform1i(shader.uniforms['u_sceneMap'], 0);
++      gl.uniform2f(shader.uniforms['u_viewSize'], width, height);
++
++      for (const batch of batches) {
++        batch.material.bind(shader, this.textureOverrides, this);
++        batch.region.render(shader);
++        batch.material.unbind(shader);
++      }
++    }
++
++    if (model.displacementEmitters && !this.solidOnly && this.particlesEnabled()) {
++      renderDisplacementParticles(gl, m3Cache.particleDisplacementShader, m3Cache.particleBuffers, (<Scene>this.scene).camera, model, this.particleSystems, this, sceneMap, width, height);
+     }
+   }
+ 
+diff --git a/src/viewer/handlers/m3/particlerender.ts b/src/viewer/handlers/m3/particlerender.ts
+index bd56cb5f..1f51252a 100644
+--- a/src/viewer/handlers/m3/particlerender.ts
++++ b/src/viewer/handlers/m3/particlerender.ts
+@@ -6,6 +6,7 @@ import type M3Model from './model';
+ import type M3ModelInstance from './modelinstance';
+ import type M3ParticleSystem from './particlesystem';
+ import { M3StandardMaterial } from './standardmaterial';
++import type { M3DisplacementMaterial } from './displacementmaterial';
+ 
+ /** Floats per vertex: position 3, uv 2, colour 4. */
+ const STRIDE = 9;
+@@ -14,6 +15,7 @@ export const MAX_QUADS = 16384;
+ /** Corner offsets: x, y (the billboard axes), in triangle-strip order of the quad. */
+ const CORNERS = [[-1, -1], [-1, 1], [1, 1], [1, -1]];
+ const MATERIAL_STANDARD = 1;
++const MATERIAL_DISPLACEMENT = 2;
+ /** Layers a particle draws with: diffuse, emissive, emissive 2, alpha mask, alpha mask 2. */
+ const PARTICLE_LAYERS = [0, 4, 5, 8, 9];
+ 
+@@ -55,6 +57,17 @@ export function particleMaterial(model: M3Model, materialReferenceIndex: number)
+   return model.materials[1][map.materialIndex] || null;
+ }
+ 
++/** The displacement material an emitter draws with, or null. */
++export function particleDisplacement(model: M3Model, materialReferenceIndex: number): M3DisplacementMaterial | null {
++  const map = model.materialMaps[materialReferenceIndex];
++
++  if (!map || map.materialType !== MATERIAL_DISPLACEMENT) {
++    return null;
++  }
++
++  return model.displacementMaterials[map.materialIndex] || null;
++}
++
+ /** Flipbook cell of a particle at `age`, as u, v offset and cell size (ParticleUv). */
+ function cell(system: M3ParticleSystem, age: number, out: Float32Array): void {
+   const e = system.emitter;
+@@ -344,3 +357,48 @@ export function renderParticles(gl: WebGLRenderingContext, shader: Shader, buffe
+     gl.depthMask(true);
+   }
+ }
++
++/**
++ * Draw the particles of emitters with a displacement material: each quad
++ * shows `sceneMap` (the frame so far, `width` x `height`) shifted along the
++ * material's normal map, the shift scaled by the particle's alpha.
++ * Call after everything else in the frame. Records the quads drawn.
++ */
++export function renderDisplacementParticles(gl: WebGLRenderingContext, shader: Shader, buffers: ParticleBuffers, camera: Camera, model: M3Model, systems: M3ParticleSystem[], instance: M3ModelInstance, sceneMap: WebGLTexture, width: number, height: number): void {
++  const attribs = shader.attribs;
++  const uniforms = shader.uniforms;
++  let ready = false;
++
++  for (const system of systems) {
++    const material = particleDisplacement(model, system.emitter.materialReferenceIndex);
++
++    if (!material || !system.live) {
++      continue;
++    }
++
++    if (!ready) {
++      shader.use();
++      gl.uniformMatrix4fv(uniforms['u_VP'], false, camera.viewProjectionMatrix);
++      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.elementBuffer);
++      ready = true;
++    }
++
++    const quads = buildQuads(system, camera);
++
++    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vertexBuffer);
++    gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, quads * 4 * STRIDE), gl.DYNAMIC_DRAW);
++    gl.vertexAttribPointer(attribs['a_position'], 3, gl.FLOAT, false, STRIDE * 4, 0);
++    gl.vertexAttribPointer(attribs['a_uv'], 2, gl.FLOAT, false, STRIDE * 4, 12);
++    gl.vertexAttribPointer(attribs['a_color'], 4, gl.FLOAT, false, STRIDE * 4, 20);
++
++    // The layers take units 9 and 11; the frame copy takes unit 0.
++    material.bind(shader, instance.textureOverrides, instance);
++    gl.activeTexture(gl.TEXTURE0);
++    gl.bindTexture(gl.TEXTURE_2D, sceneMap);
++    gl.uniform1i(uniforms['u_sceneMap'], 0);
++    gl.uniform2f(uniforms['u_viewSize'], width, height);
++    gl.drawElements(gl.TRIANGLES, quads * 6, gl.UNSIGNED_SHORT, 0);
++    material.unbind(shader);
++    system.quads = quads;
++  }
++}
+diff --git a/src/viewer/handlers/m3/shaders/particledisplacement.frag.ts b/src/viewer/handlers/m3/shaders/particledisplacement.frag.ts
+new file mode 100644
+index 00000000..de0041fe
+--- /dev/null
++++ b/src/viewer/handlers/m3/shaders/particledisplacement.frag.ts
+@@ -0,0 +1,40 @@
++import precision from '../../shaders/precision.glsl';
++import layers from './layers.glsl';
++
++// A displacement particle (heat haze, shock rings): like displacement.frag,
++// the quad shows the frame behind it shifted along the normal map, and the
++// shift fades with the particle's alpha (its colour curve over the life).
++const shader = `
++${precision}
++
++${layers}
++
++uniform sampler2D u_sceneMap;
++uniform vec2 u_viewSize;
++uniform float u_strength;
++
++void main() {
++  vec2 bend = vec2(0.0);
++
++  if (u_normalLayerSettings.enabled) {
++    vec4 texel = texture2D(u_normalMap, getUV(u_normalLayerSettings));
++
++    bend = 2.0 * texel.wy - 1.0;
++  }
++
++  float strength = u_strength * v_vertexColor.a;
++
++  if (u_alphaMaskLayerSettings.enabled) {
++    vec4 s = computeLayerColor(u_alphaMaskMap, u_alphaMaskLayerSettings);
++
++    strength *= u_alphaMaskLayerSettings.channels == CHANNELSELECT_RGB ? s.r : s.a;
++  }
++
++  vec2 shift = bend * strength * (u_viewSize.y / 1080.0) / u_viewSize;
++  vec2 uv = gl_FragCoord.xy / u_viewSize + shift;
++
++  gl_FragColor = vec4(texture2D(u_sceneMap, uv).rgb, 1.0);
++}
++`;
++
++export default shader;

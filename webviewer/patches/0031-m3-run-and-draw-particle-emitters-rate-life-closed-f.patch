@@ -1,0 +1,1057 @@
+From 244d4d03f29457b4ed2a78a64d1d4fdb13eabe0e Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Sun, 22 Nov 2026 21:34:34 +0200
+Subject: [PATCH 31/49] m3: run and draw particle emitters (rate, life,
+ closed-form motion, life curves, billboards)
+
+---
+ src/viewer/handlers/m3/handler.ts             |  11 +-
+ src/viewer/handlers/m3/model.ts               |  27 +
+ src/viewer/handlers/m3/modelinstance.ts       |  56 ++
+ src/viewer/handlers/m3/particlemath.ts        | 100 ++++
+ src/viewer/handlers/m3/particlerender.ts      | 190 +++++++
+ src/viewer/handlers/m3/particlesystem.ts      | 484 ++++++++++++++++++
+ .../handlers/m3/shaders/particle.frag.ts      |  31 ++
+ .../handlers/m3/shaders/particle.vert.ts      |  19 +
+ 8 files changed, 917 insertions(+), 1 deletion(-)
+ create mode 100644 src/viewer/handlers/m3/particlemath.ts
+ create mode 100644 src/viewer/handlers/m3/particlerender.ts
+ create mode 100644 src/viewer/handlers/m3/particlesystem.ts
+ create mode 100644 src/viewer/handlers/m3/shaders/particle.frag.ts
+ create mode 100644 src/viewer/handlers/m3/shaders/particle.vert.ts
+
+diff --git a/src/viewer/handlers/m3/handler.ts b/src/viewer/handlers/m3/handler.ts
+index 9677658e..e5662b5f 100644
+--- a/src/viewer/handlers/m3/handler.ts
++++ b/src/viewer/handlers/m3/handler.ts
+@@ -6,11 +6,18 @@ import Model from './model';
+ import standardVert from './shaders/standard.vert';
+ import standardFrag from './shaders/standard.frag';
+ import displacementFrag from './shaders/displacement.frag';
++import particleVert from './shaders/particle.vert';
++import particleFrag from './shaders/particle.frag';
++import { createParticleBuffers, ParticleBuffers } from './particlerender';
+ 
+ export interface M3HandlerObject {
+   standardShaders: Shader[];
+   /** Displacement materials, per texture coordinate count like the standard ones. */
+   displacementShaders: Shader[];
++  particleShader: Shader;
++  particleBuffers: ParticleBuffers;
++  /** Run and draw particle emitters (tests compare frames with and without). */
++  particlesEnabled: boolean;
+ }
+ 
+ export default {
+@@ -48,7 +55,9 @@ export default {
+       displacementShaders[i] = webgl.createShader(`#define EXPLICITUV${i}\n${standardVert}`, displacementFrag);
+     }
+ 
+-    const handlerData: M3HandlerObject = { standardShaders, displacementShaders };
++    const particleShader = webgl.createShader(particleVert, particleFrag);
++    const particleBuffers = createParticleBuffers(gl);
++    const handlerData: M3HandlerObject = { standardShaders, displacementShaders, particleShader, particleBuffers, particlesEnabled: true };
+ 
+     viewer.sharedCache.set('m3', handlerData);
+   },
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 730a5301..b29922ba 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -30,6 +30,8 @@ import MaterialReference from '../../../parsers/m3/materialreference';
+ import CompositeMaterial, { CompositeMaterialSection } from '../../../parsers/m3/compositematerial';
+ import DisplacementMaterial from '../../../parsers/m3/displacementmaterial';
+ import { M3DisplacementMaterial } from './displacementmaterial';
++import ParticleEmitter from '../../../parsers/m3/particleemitter';
++import { particleMaterial } from './particlerender';
+ 
+ // MATM material types: the order of the material lists in the model header
+ // (m3addon structures.xml, MODL).
+@@ -86,6 +88,10 @@ export default class M3Model extends Model {
+    * else, over a copy of the frame (M3ModelInstance.renderDisplacement).
+    */
+   displacementBatches: { region: M3Region; material: M3DisplacementMaterial }[] = [];
++  /** Particle emitters (PAR_) whose layout was read; each instance runs them. */
++  particleEmitters: ParticleEmitter[] = [];
++  /** Every PAR_ entry, read or not, in file order. */
++  allParticleEmitters: ParticleEmitter[] = [];
+ 
+   constructor(bufferOrParser: ArrayBuffer | Parser, resourceData: HandlerResourceData) {
+     super(resourceData);
+@@ -211,6 +217,7 @@ export default class M3Model extends Model {
+     }
+ 
+     this.addGlobalAnims();
++    this.setupParticles(model);
+ 
+     /*
+     if (parser.fuzzyHitTestObjects.length > 0) {
+@@ -244,6 +251,26 @@ export default class M3Model extends Model {
+     }
+   }
+ 
++  /**
++   * The particle emitters. One the renderer cannot run (a version without
++   * a known layout, a material that is not standard) is listed as undrawn.
++   */
++  setupParticles(model: M3ParserModel): void {
++    this.allParticleEmitters = model.particleEmitters.list(<ParticleEmitter[]>[]);
++
++    this.allParticleEmitters.forEach((emitter, i) => {
++      if (!emitter.read) {
++        this.undrawnBatches.push(`particle emitter ${i}: PAR_ version ${emitter.version} not read`);
++      } else if (!particleMaterial(this, emitter.materialReferenceIndex)) {
++        const map = this.materialMaps[emitter.materialReferenceIndex];
++
++        this.undrawnBatches.push(`particle emitter ${i}: ${map ? typeName(map.materialType) : 'no material'}`);
++      } else {
++        this.particleEmitters.push(emitter);
++      }
++    });
++  }
++
+   addInstance(): M3ModelInstance {
+     return new M3ModelInstance(this);
+   }
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index 648b5eef..79c6c137 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -9,6 +9,8 @@ import M3Skeleton from './skeleton';
+ import { STANDARD_MATERIAL_OFFSET } from './standardmaterial';
+ import { M3HandlerObject } from './handler';
+ import M3Node from './node';
++import M3ParticleSystem from './particlesystem';
++import { renderParticles } from './particlerender';
+ 
+ const boneHeap = mat4.create();
+ 
+@@ -31,6 +33,8 @@ export default class M3ModelInstance extends ModelInstance {
+   boneTexture: DataTexture | null = null;
+   /** File positions (M3Batch.fileOrder) of the batches the last renderOpaque drew, in draw order. */
+   drawnOrder: number[] = [];
++  /** One per particle emitter of the model, in model order. */
++  particleSystems: M3ParticleSystem[] = [];
+ 
+   constructor(model: M3Model) {
+     super(model);
+@@ -45,6 +49,56 @@ export default class M3ModelInstance extends ModelInstance {
+     }
+ 
+     this.boneTexture = new DataTexture(model.viewer.gl, 3, model.boneLookup.length * 4, 1);
++
++    model.particleEmitters.forEach((emitter, i) => this.particleSystems.push(new M3ParticleSystem(this, emitter, i)));
++  }
++
++  /** A bone's world matrix in the rest pose: the instance's times the bone's rest matrix. */
++  restBoneMatrix(out: mat4, bone: number): mat4 {
++    const reference = (<M3Model>this.model).initialReference[bone];
++
++    if (!reference) {
++      return mat4.copy(out, this.worldMatrix);
++    }
++
++    mat4.invert(out, <mat4>reference);
++
++    return mat4.mul(out, this.worldMatrix, out);
++  }
++
++  particlesEnabled(): boolean {
++    return (<M3HandlerObject>this.model.viewer.sharedCache.get('m3')).particlesEnabled;
++  }
++
++  /** Run the particle emitters for `dt` seconds of game time. Switched off, they hold nothing. */
++  updateParticles(dt: number): void {
++    const on = this.particlesEnabled();
++
++    for (const system of this.particleSystems) {
++      if (on) {
++        system.update(dt);
++      } else {
++        system.live = 0;
++        system.hasLast = false;
++      }
++    }
++  }
++
++  override renderTranslucent(): void {
++    const systems = this.particleSystems;
++
++    for (const system of systems) {
++      system.quads = 0;
++    }
++
++    if (!systems.length || this.solidOnly || !this.particlesEnabled()) {
++      return;
++    }
++
++    const model = <M3Model>this.model;
++    const m3Cache = <M3HandlerObject>model.viewer.sharedCache.get('m3');
++
++    renderParticles(model.viewer.gl, m3Cache.particleShader, m3Cache.particleBuffers, (<Scene>this.scene).camera, model, systems, this.textureOverrides);
+   }
+ 
+   /**
+@@ -281,6 +335,8 @@ export default class M3ModelInstance extends ModelInstance {
+ 
+       this.updateSkeletonAndBoneTexture(dt);
+     }
++
++    this.updateParticles(dt);
+   }
+ 
+   setTeamColor(id: number): this {
+diff --git a/src/viewer/handlers/m3/particlemath.ts b/src/viewer/handlers/m3/particlemath.ts
+new file mode 100644
+index 00000000..72c257bd
+--- /dev/null
++++ b/src/viewer/handlers/m3/particlemath.ts
+@@ -0,0 +1,100 @@
++/**
++ * Particle math of the game, as WhiteoutFlakes has it
++ * (renderer/sc2/sc2_element_math.h): the value of a life curve, and the
++ * closed-form motion under drag and a vertical acceleration.
++ */
++
++/** Below this drag the game uses this drag, and 100 for its inverse (sc2_constants.h). */
++export const DRAG_FLOOR = 0.01;
++const INV_DRAG_UNDER_FLOOR = 100;
++
++const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
++const bezier = (a: number, b: number, c: number, t: number): number => {
++  const u = 1 - t;
++
++  return a * u * u + b * 2 * t * u + c * t * t;
++};
++const saturate = (x: number): number => Math.min(1, Math.max(0, x));
++const smooth = (a: number, b: number, s: number): number => (b - a) * (s * s) * (s * -2 + 3) + a;
++
++/**
++ * One scalar life curve: start, middle and end value, at `age` 0 to 1.
++ * `mode`: 0 linear, 1 smooth, 2 Bezier, 3 linear hold, 4 Bezier hold
++ * (InterpolateValue, the scalar form: size, alpha, rotation).
++ */
++export function curve(age: number, v0: number, v1: number, v2: number, mid: number, hold: number, mode: number): number {
++  if (mode === 2) {
++    return bezier(v0, v1, v2, age);
++  }
++
++  if (mode === 1) {
++    return age < mid ? smooth(v0, v1, age / mid) : smooth(v1, v2, (age - mid) / (1 - mid));
++  }
++
++  if (mode === 3) {
++    const t0 = mid - hold;
++    const t1 = mid + hold;
++
++    if (age < t0) {
++      return lerp(v0, v1, age / t0);
++    }
++
++    return age < t1 ? v1 : lerp(v1, v2, (age - t1) / (1 - t1));
++  }
++
++  if (mode === 4) {
++    const t0 = mid - hold;
++    const t1 = mid + hold;
++
++    return age < t0 ? bezier(v0, v1, v1, age / t0) : bezier(v1, v1, v2, saturate((age - t1) / (1 - t1)));
++  }
++
++  return age < mid ? lerp(v0, v1, age / mid) : lerp(v1, v2, (age - mid) / (1 - mid));
++}
++
++/**
++ * The colour form of the curve (InterpolateValue3): the same, except mode
++ * 1 smooths the lerp factor, and mode 4 bends towards the lerped keys with
++ * a flat middle.
++ */
++export function curve3(age: number, v0: number, v1: number, v2: number, mid: number, hold: number, mode: number): number {
++  if (mode === 1) {
++    const s = (x: number): number => x * x * (3 - 2 * x);
++
++    return age < mid ? lerp(v0, v1, s(saturate(age / mid))) : lerp(v1, v2, s(saturate((age - mid) / (1 - mid))));
++  }
++
++  if (mode === 4) {
++    const t0 = mid - hold;
++    const t1 = mid + hold;
++
++    if (age < t0) {
++      return bezier(v0, lerp(v0, v1, hold), v1, age / t0);
++    }
++
++    return age < t1 ? v1 : bezier(v1, lerp(v1, v2, hold), v2, (age - t1) / (1 - t1));
++  }
++
++  return curve(age, v0, v1, v2, mid, hold, mode);
++}
++
++/**
++ * How far a particle has moved after `t` seconds, per axis, from its start
++ * velocity, with drag and a vertical acceleration `accelZ`
++ * (CalculateDisplacementAndVelocity). Writes into `out`.
++ */
++export function displacement(out: Float32Array, t: number, vx: number, vy: number, vz: number, mass: number, drag: number, accelZ: number): Float32Array {
++  const d = Math.max(DRAG_FLOOR, drag);
++  const invDrag = drag < DRAG_FLOOR ? INV_DRAG_UNDER_FLOOR : 1 / drag;
++  const k = mass * invDrag;
++  // Gravity enters negated: g = -accelZ, so a positive acceleration pulls up.
++  const mgod = -accelZ * mass * invDrag;
++  const e = Math.exp((-d / mass) * t);
++  const reach = k * (1 - e);
++
++  out[0] = vx * reach;
++  out[1] = vy * reach;
++  out[2] = (vz + mgod) * reach - mgod * t;
++
++  return out;
++}
+diff --git a/src/viewer/handlers/m3/particlerender.ts b/src/viewer/handlers/m3/particlerender.ts
+new file mode 100644
+index 00000000..96b307e2
+--- /dev/null
++++ b/src/viewer/handlers/m3/particlerender.ts
+@@ -0,0 +1,190 @@
++import Shader from '../../gl/shader';
++import Camera from '../../camera';
++import Texture from '../../texture';
++import type M3Model from './model';
++import type M3ParticleSystem from './particlesystem';
++import { M3StandardMaterial, STANDARD_MATERIAL_OFFSET } from './standardmaterial';
++
++/** Floats per vertex: position 3, uv 2, colour 4. */
++const STRIDE = 9;
++/** Quads per draw: the 16-bit element limit. */
++export const MAX_QUADS = 16384;
++/** Corner offsets: x, y (the billboard axes), in triangle-strip order of the quad. */
++const CORNERS = [[-1, -1], [-1, 1], [1, 1], [1, -1]];
++const MATERIAL_STANDARD = 1;
++
++const heap = new Float32Array(3);
++const look = new Float32Array(6);
++let vertices = new Float32Array(0);
++
++/** The GL objects all particle draws share. */
++export interface ParticleBuffers {
++  vertexBuffer: WebGLBuffer;
++  elementBuffer: WebGLBuffer;
++}
++
++export function createParticleBuffers(gl: WebGLRenderingContext): ParticleBuffers {
++  const elements = new Uint16Array(MAX_QUADS * 6);
++
++  for (let q = 0; q < MAX_QUADS; q++) {
++    const v = q * 4;
++
++    elements.set([v, v + 1, v + 2, v, v + 2, v + 3], q * 6);
++  }
++
++  const elementBuffer = <WebGLBuffer>gl.createBuffer();
++
++  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementBuffer);
++  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, elements, gl.STATIC_DRAW);
++
++  return { vertexBuffer: <WebGLBuffer>gl.createBuffer(), elementBuffer };
++}
++
++/** The standard material an emitter draws with, or null. */
++export function particleMaterial(model: M3Model, materialReferenceIndex: number): M3StandardMaterial | null {
++  const map = model.materialMaps[materialReferenceIndex];
++
++  if (!map || map.materialType !== MATERIAL_STANDARD) {
++    return null;
++  }
++
++  return model.materials[1][map.materialIndex] || null;
++}
++
++/** Flipbook cell of a particle at `age`, as u, v offset and cell size (ParticleUv). */
++function cell(system: M3ParticleSystem, age: number, out: Float32Array): void {
++  const e = system.emitter;
++  const cols = e.numberOfColumns || 1;
++  const rows = e.numberOfRows || 1;
++
++  out[0] = 0;
++  out[1] = 0;
++
++  if (cols * rows <= 1) {
++    return;
++  }
++
++  const mid = e.relativePhase1Length;
++  let index;
++
++  if (age <= mid) {
++    index = e.phase1StartImageIndex + Math.floor((e.phase1EndImageIndex - e.phase1StartImageIndex) * (age / mid) + 0.5);
++  } else {
++    index = e.phase1EndImageIndex + Math.floor((e.phase2EndImageIndex - e.phase1EndImageIndex) * ((age - mid) / (1 - mid)) + 0.5);
++  }
++
++  out[0] = (index % cols) / cols;
++  out[1] = Math.floor(index / cols) / rows;
++}
++
++/**
++ * Write the quads of one emitter into the vertex array: camera-facing,
++ * turned by the particle's rotation about the view direction. Returns how
++ * many were written.
++ */
++function buildQuads(system: M3ParticleSystem, camera: Camera): number {
++  const n = Math.min(system.live, MAX_QUADS);
++
++  if (vertices.length < n * 4 * STRIDE) {
++    vertices = new Float32Array(Math.max(n, 64) * 4 * STRIDE * 2);
++  }
++
++  const e = system.emitter;
++  const right = camera.directionX;
++  const up = camera.directionY;
++  const scale = system.scale();
++  const cols = e.numberOfColumns || 1;
++  const rows = e.numberOfRows || 1;
++  const uv = new Float32Array(2);
++  let at = 0;
++
++  for (let i = 0; i < n; i++) {
++    const p = system.position(heap, i);
++
++    system.look(i, look);
++    cell(system, system.age(i), uv);
++
++    const half = look[0] * scale;
++    const c = Math.cos(look[1]);
++    const s = Math.sin(look[1]);
++
++    for (const [ox, oy] of CORNERS) {
++      // The corner on the camera axes, turned by the rotation.
++      const x = ox * c - oy * s;
++      const y = ox * s + oy * c;
++
++      vertices[at++] = p[0] + (right[0] * x + up[0] * y) * half;
++      vertices[at++] = p[1] + (right[1] * x + up[1] * y) * half;
++      vertices[at++] = p[2] + (right[2] * x + up[2] * y) * half;
++      vertices[at++] = uv[0] + (ox * 0.5 + 0.5) / cols;
++      vertices[at++] = uv[1] + (oy * -0.5 + 0.5) / rows;
++      vertices[at++] = look[2];
++      vertices[at++] = look[3];
++      vertices[at++] = look[4];
++      vertices[at++] = look[5];
++    }
++  }
++
++  return n;
++}
++
++/**
++ * Draw the particles of an instance's emitters, each in its material's
++ * blend mode. Records on each system how many quads it drew.
++ */
++export function renderParticles(gl: WebGLRenderingContext, shader: Shader, buffers: ParticleBuffers, camera: Camera, model: M3Model, systems: M3ParticleSystem[], textureOverrides: Map<number, Texture>): void {
++  const attribs = shader.attribs;
++  const uniforms = shader.uniforms;
++  let ready = false;
++
++  for (const system of systems) {
++    system.quads = 0;
++
++    const material = particleMaterial(model, system.emitter.materialReferenceIndex);
++
++    if (!material || !system.live) {
++      continue;
++    }
++
++    if (!ready) {
++      shader.use();
++      gl.uniformMatrix4fv(uniforms['u_VP'], false, camera.viewProjectionMatrix);
++      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.elementBuffer);
++      ready = true;
++    }
++
++    const quads = buildQuads(system, camera);
++
++    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vertexBuffer);
++    gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, quads * 4 * STRIDE), gl.DYNAMIC_DRAW);
++    gl.vertexAttribPointer(attribs['a_position'], 3, gl.FLOAT, false, STRIDE * 4, 0);
++    gl.vertexAttribPointer(attribs['a_uv'], 2, gl.FLOAT, false, STRIDE * 4, 12);
++    gl.vertexAttribPointer(attribs['a_color'], 4, gl.FLOAT, false, STRIDE * 4, 20);
++
++    // The diffuse layer gives the picture; without one, the emissive layer.
++    const layer = [material.layers[0], material.layers[4]].find((l) => l.active && !l.constant && l.texture);
++    const texture = layer ? textureOverrides.get(material.index * STANDARD_MATERIAL_OFFSET + layer.index) || (<NonNullable<typeof layer.texture>>layer.texture).texture : null;
++
++    gl.uniform1f(uniforms['u_hasMap'], layer ? 1 : 0);
++    gl.uniform1f(uniforms['u_channels'], layer ? layer.colorChannels : 1);
++
++    if (layer) {
++      const m3Texture = <NonNullable<typeof layer.texture>>layer.texture;
++
++      model.viewer.webgl.bindTextureAndWrap(texture, 0, m3Texture.wrapS, m3Texture.wrapT);
++      gl.uniform1i(uniforms['u_map'], 0);
++    }
++
++    material.bindCommon();
++    // A quad faces the camera: no side to cull.
++    gl.disable(gl.CULL_FACE);
++    gl.drawElements(gl.TRIANGLES, quads * 6, gl.UNSIGNED_SHORT, 0);
++    system.quads = quads;
++  }
++
++  if (ready) {
++    gl.disable(gl.BLEND);
++    gl.enable(gl.CULL_FACE);
++    gl.depthMask(true);
++  }
++}
+diff --git a/src/viewer/handlers/m3/particlesystem.ts b/src/viewer/handlers/m3/particlesystem.ts
+new file mode 100644
+index 00000000..e3c9c030
+--- /dev/null
++++ b/src/viewer/handlers/m3/particlesystem.ts
+@@ -0,0 +1,484 @@
++import { mat4, vec3 } from 'gl-matrix';
++import ParticleEmitter from '../../../parsers/m3/particleemitter';
++import { AnimationReference } from '../../../parsers/m3/animationreference';
++import type M3ModelInstance from './modelinstance';
++import { curve, curve3, displacement } from './particlemath';
++
++/** additionalFlags bits (m3addon structures.xml, PAR_). */
++const RANDOM_SPEED = 0x1;
++const RANDOM_LIFESPAN = 0x2;
++const RANDOM_MASS = 0x4;
++const WORLD_SPACE = 0x8;
++/** flags bit: the emission area has a hollow middle. */
++const CUTOUT = 0x10;
++/** Emitters that hold no count of their own get this many. */
++const DEFAULT_MAX = 1000;
++const DEG = Math.PI / 180;
++
++/** Emission area shapes (WhiteoutFlakes SpawnShape). */
++const SHAPE = { point: 0, plane: 1, sphere: 2, box: 3, cylinder: 4, disc: 5 };
++
++const rand = (a: number, b: number): number => a + Math.random() * (b - a);
++const heap = new Float32Array(3);
++const heap3 = new Float32Array(3);
++const colorHeap = new Uint8Array(4);
++
++/**
++ * One particle emitter of one instance: its particles and their life.
++ * Particles of a world-space emitter keep world positions; the others
++ * keep emitter positions and follow the emitter.
++ */
++export default class M3ParticleSystem {
++  instance: M3ModelInstance;
++  emitter: ParticleEmitter;
++  index: number;
++  max: number;
++  worldSpace: boolean;
++  /** The emitter's world matrix, from its bone, at the last update. */
++  matrix = mat4.create();
++  /** Where the emitter was at the update before, for births spread over a frame. */
++  lastOrigin = vec3.create();
++  hasLast = false;
++  /** Emitter clock, seconds. */
++  time = 0;
++  carry = 0;
++  live = 0;
++  spawned = 0;
++  dropped = 0;
++  rateMin = Infinity;
++  rateMax = -Infinity;
++  /** Sampled this update. */
++  rate = 0;
++  lifeMin = 0;
++  lifeMax = 0;
++  /** Quads built at the last render. */
++  quads = 0;
++  // Per particle, by slot.
++  serial: Int32Array;
++  birth: Float32Array;
++  life: Float32Array;
++  mass: Float32Array;
++  /** Start position and start velocity, 3 each. */
++  start: Float32Array;
++  velocity: Float32Array;
++  /** Start, middle, end size; start, middle, end rotation (radians). */
++  sizes: Float32Array;
++  rotations: Float32Array;
++  /** Start, middle, end colour, rgba 0 to 255. */
++  colors: Float32Array;
++  nextSerial = 0;
++
++  constructor(instance: M3ModelInstance, emitter: ParticleEmitter, index: number) {
++    this.instance = instance;
++    this.emitter = emitter;
++    this.index = index;
++    this.max = emitter.maxParticles > 0 ? emitter.maxParticles : DEFAULT_MAX;
++    this.worldSpace = !!(emitter.additionalFlags & WORLD_SPACE);
++
++    const n = this.max;
++
++    this.serial = new Int32Array(n);
++    this.birth = new Float32Array(n);
++    this.life = new Float32Array(n);
++    this.mass = new Float32Array(n);
++    this.start = new Float32Array(n * 3);
++    this.velocity = new Float32Array(n * 3);
++    this.sizes = new Float32Array(n * 3);
++    this.rotations = new Float32Array(n * 3);
++    this.colors = new Float32Array(n * 12);
++  }
++
++  value(ref: AnimationReference): number {
++    return (<NonNullable<M3ModelInstance['skeleton']>>this.instance.skeleton).getValue(ref, this.instance);
++  }
++
++  vector(ref: AnimationReference, out: Float32Array): Float32Array {
++    return (<NonNullable<M3ModelInstance['skeleton']>>this.instance.skeleton).getValue3(out, ref, this.instance);
++  }
++
++  color(ref: AnimationReference): Uint8Array {
++    const c = <Uint8Array>(<NonNullable<M3ModelInstance['skeleton']>>this.instance.skeleton).getValueUnsafe(ref, this.instance);
++
++    colorHeap.set(c);
++
++    return colorHeap;
++  }
++
++  /** The emitter's world matrix: its bone's, or the rest pose's when nothing plays. */
++  updateMatrix(): void {
++    const instance = this.instance;
++    const bone = this.emitter.boneIndex;
++    const nodes = (<NonNullable<M3ModelInstance['skeleton']>>instance.skeleton).nodes;
++
++    if (instance.sequence !== -1 && nodes[bone]) {
++      mat4.copy(this.matrix, <mat4>nodes[bone].worldMatrix);
++    } else {
++      instance.restBoneMatrix(this.matrix, bone);
++    }
++  }
++
++  /** The uniform scale of the emitter matrix: the length of its first column. */
++  scale(): number {
++    const m = this.matrix;
++
++    return Math.hypot(m[0], m[1], m[2]) || 1;
++  }
++
++  /** Lifespan range, sampled. */
++  updateLife(): void {
++    const e = this.emitter;
++    const l1 = this.value(e.lifespan1);
++
++    if (e.additionalFlags & RANDOM_LIFESPAN) {
++      const l2 = this.value(e.lifespan2);
++
++      this.lifeMin = Math.min(l1, l2);
++      this.lifeMax = Math.max(l1, l2);
++    } else {
++      this.lifeMin = this.lifeMax = l1;
++    }
++  }
++
++  /** Run the emitter for `dt` seconds: retire, then emit. */
++  update(dt: number): void {
++    const origin = heap3;
++
++    this.updateMatrix();
++    mat4.getTranslation(<vec3>origin, this.matrix);
++
++    if (!this.hasLast) {
++      vec3.copy(this.lastOrigin, <vec3>origin);
++      this.hasLast = true;
++    }
++
++    const t0 = this.time;
++
++    this.time += dt;
++    this.retire();
++    this.updateLife();
++
++    const rate = Math.max(0, this.value(this.emitter.emissionRate));
++
++    this.rate = rate;
++    this.rateMin = Math.min(this.rateMin, rate);
++    this.rateMax = Math.max(this.rateMax, rate);
++
++    this.carry += rate * dt;
++
++    const count = Math.floor(this.carry);
++
++    this.carry -= count;
++
++    for (let k = 1; k <= count; k++) {
++      this.spawn(t0 + (dt * k) / count, k / count, origin);
++    }
++
++    vec3.copy(this.lastOrigin, <vec3>origin);
++  }
++
++  /** Drop the particles past their life, keeping the living packed at the front. */
++  retire(): void {
++    const time = this.time;
++    let n = 0;
++
++    for (let i = 0; i < this.live; i++) {
++      if (time - this.birth[i] <= this.life[i]) {
++        if (n !== i) {
++          this.move(i, n);
++        }
++
++        n++;
++      }
++    }
++
++    this.live = n;
++  }
++
++  move(from: number, to: number): void {
++    this.serial[to] = this.serial[from];
++    this.birth[to] = this.birth[from];
++    this.life[to] = this.life[from];
++    this.mass[to] = this.mass[from];
++    this.start.copyWithin(to * 3, from * 3, from * 3 + 3);
++    this.velocity.copyWithin(to * 3, from * 3, from * 3 + 3);
++    this.sizes.copyWithin(to * 3, from * 3, from * 3 + 3);
++    this.rotations.copyWithin(to * 3, from * 3, from * 3 + 3);
++    this.colors.copyWithin(to * 12, from * 12, from * 12 + 12);
++  }
++
++  /** A start position in the emission area, in emitter space (SampleSpawnPosition). */
++  spawnPosition(out: Float32Array): void {
++    const e = this.emitter;
++    const shape = e.emissionAreaType;
++    const size = this.vector(e.emissionAreaSize, heap);
++    const sx = size[0];
++    const sy = size[1];
++    const sz = size[2];
++    const cutout = !!(e.flags & CUTOUT);
++    const radius = (): number => (cutout ? rand(this.value(e.emissionAreaCutoutRadius), this.value(e.emissionAreaRadius)) : Math.random() * this.value(e.emissionAreaRadius));
++
++    out[0] = out[1] = out[2] = 0;
++
++    if (shape === SHAPE.plane) {
++      out[0] = rand(-sx / 2, sx / 2);
++      out[1] = rand(-sy / 2, sy / 2);
++    } else if (shape === SHAPE.sphere) {
++      const r = radius();
++      const w = rand(-1, 1);
++      const az = Math.random() * 2 * Math.PI;
++      const ring = r * Math.sqrt(1 - w * w);
++
++      out[0] = ring * Math.sin(az);
++      out[1] = ring * Math.cos(az);
++      out[2] = r * w;
++    } else if (shape === SHAPE.box) {
++      out[0] = rand(-sx / 2, sx / 2);
++      out[1] = rand(-sy / 2, sy / 2);
++      out[2] = rand(-sz / 2, sz / 2);
++
++      if (cutout) {
++        const inner = this.vector(e.emissionAreaCutoutSize, heap);
++        const axis = Math.floor(Math.random() * 3);
++        const outer = [sx, sy, sz][axis];
++        const v = rand(-(outer - inner[axis]) / 2, (outer - inner[axis]) / 2);
++
++        out[axis] = v >= 0 ? v + inner[axis] / 2 : v - inner[axis] / 2;
++      }
++    } else if (shape === SHAPE.cylinder || shape === SHAPE.disc) {
++      const r = radius();
++      const z = shape === SHAPE.cylinder ? sz * (Math.random() - 0.5) : 0;
++      const th = Math.random() * 2 * Math.PI;
++
++      out[0] = r * Math.cos(th);
++      out[1] = r * Math.sin(th);
++      out[2] = z;
++    }
++  }
++
++  /** The farthest a start position can be from the emitter, in emitter units. */
++  areaReach(): number {
++    const e = this.emitter;
++    const s = this.vector(e.emissionAreaSize, heap);
++    const r = this.value(e.emissionAreaRadius);
++
++    switch (e.emissionAreaType) {
++      case SHAPE.plane: return Math.hypot(s[0], s[1]) / 2;
++      case SHAPE.sphere: case SHAPE.disc: return r;
++      case SHAPE.box: return Math.hypot(s[0], s[1], s[2]) / 2;
++      case SHAPE.cylinder: return Math.hypot(r, s[2] / 2);
++      default: return 0;
++    }
++  }
++
++  /** The farthest speed a particle can start with. */
++  topSpeed(): number {
++    const e = this.emitter;
++    const s1 = Math.abs(this.value(e.emissionSpeed1));
++
++    return e.additionalFlags & RANDOM_SPEED ? Math.max(s1, Math.abs(this.value(e.emissionSpeed2))) : s1;
++  }
++
++  /** A start velocity, in emitter space (SampleSpawnVelocity). */
++  spawnVelocity(out: Float32Array, position: Float32Array): void {
++    const e = this.emitter;
++    const s1 = this.value(e.emissionSpeed1);
++    const speed = e.additionalFlags & RANDOM_SPEED ? rand(s1, this.value(e.emissionSpeed2)) : s1;
++    const type = e.emissionType;
++
++    if (type === 1 || type === 2) {
++      // Radial: away from the centre; axis: up or down the z axis.
++      const len = Math.hypot(position[0], position[1], position[2]);
++
++      if (type === 2) {
++        out[0] = out[1] = 0;
++        out[2] = position[2] >= 0 ? 1 : -1;
++      } else if (len > 0) {
++        out[0] = position[0] / len;
++        out[1] = position[1] / len;
++        out[2] = position[2] / len;
++      } else {
++        out[0] = out[1] = out[2] = 0;
++      }
++    } else if (type === 3) {
++      const w = rand(-1, 1);
++      const az = Math.random() * 2 * Math.PI;
++      const ring = Math.sqrt(1 - w * w);
++
++      out[0] = ring * Math.sin(az);
++      out[1] = ring * Math.cos(az);
++      out[2] = w;
++    } else {
++      // The cone: yaw and pitch in degrees, spreads in radians.
++      const a = this.value(e.emissionAngleX) * DEG;
++      const b = this.value(e.emissionAngleY) * DEG;
++      const horizontal = this.value(e.emissionSpreadX);
++      const vertical = this.value(e.emissionSpreadY);
++      const h = rand(Math.PI - horizontal, Math.PI + horizontal);
++      const v = rand(-vertical, vertical);
++      const cv = Math.cos(v);
++      const sv = Math.sin(v);
++
++      out[0] = cv * Math.sin(h - b);
++      out[1] = Math.sin(a) * cv * Math.cos(h - b) + Math.cos(a) * sv;
++      out[2] = Math.sin(a) * sv - Math.cos(a) * cv * Math.cos(h - b);
++    }
++
++    out[0] *= speed;
++    out[1] *= speed;
++    out[2] *= speed;
++  }
++
++  /** One birth at emitter time `birth`, `along` (0 to 1) the way from the last origin. */
++  spawn(birth: number, along: number, origin: Float32Array): void {
++    if (this.live >= this.max) {
++      this.dropped++;
++
++      return;
++    }
++
++    const e = this.emitter;
++    const i = this.live++;
++    const p = this.start.subarray(i * 3, i * 3 + 3);
++    const v = this.velocity.subarray(i * 3, i * 3 + 3);
++
++    this.spawned++;
++    this.serial[i] = this.nextSerial++;
++    this.birth[i] = birth;
++    this.life[i] = rand(this.lifeMin, this.lifeMax);
++    this.mass[i] = e.additionalFlags & RANDOM_MASS ? rand(e.mass, e.mass2) : e.mass;
++
++    this.spawnPosition(p);
++    this.spawnVelocity(v, p);
++
++    if (this.worldSpace) {
++      const m = this.matrix;
++      const last = this.lastOrigin;
++
++      vec3.transformMat3(<vec3>p, <vec3>p, mat3Of(m));
++      vec3.transformMat3(<vec3>v, <vec3>v, mat3Of(m));
++
++      for (let k = 0; k < 3; k++) {
++        p[k] += last[k] + (origin[k] - last[k]) * along;
++      }
++    }
++
++    this.sampleLook(i);
++  }
++
++  /** Size, rotation and colour keys of a new particle (SampleSize, SampleRotation, SampleColor). */
++  sampleLook(i: number): void {
++    const e = this.emitter;
++    const sizes = this.sizes;
++    const s1 = this.vector(e.particleSizes1, heap);
++    const t = Math.random();
++
++    sizes.set(s1, i * 3);
++
++    if (e.randomizeWithParticleSizes2) {
++      const s2 = this.vector(e.particleSizes2, heap);
++
++      for (let k = 0; k < 3; k++) {
++        sizes[i * 3 + k] += t * (s2[k] - sizes[i * 3 + k]);
++      }
++    }
++
++    const rotations = this.rotations;
++
++    rotations.set(this.vector(e.rotationValues1, heap), i * 3);
++
++    if (e.randomizeWithRotationValues2) {
++      const r2 = this.vector(e.rotationValues2, heap);
++
++      for (let k = 0; k < 3; k++) {
++        rotations[i * 3 + k] = rand(rotations[i * 3 + k], r2[k]);
++      }
++    }
++
++    const keys = [e.initialColor1, e.middleColor1, e.finalColor1];
++    const randomKeys = [e.initialColor2, e.middleColor2, e.finalColor2];
++    const colors = this.colors;
++
++    for (let n = 0; n < 3; n++) {
++      // Stored b, g, r, a. One integer lerp factor per key, 0 to 255.
++      const c = this.color(keys[n]);
++      const base = [c[2], c[1], c[0], c[3]];
++
++      if (e.randomizeWithColor2) {
++        const r = this.color(randomKeys[n]);
++        const other = [r[2], r[1], r[0], r[3]];
++        const f = Math.floor(Math.random() * 256);
++
++        for (let k = 0; k < 4; k++) {
++          base[k] += (f * (other[k] - base[k])) >> 8;
++        }
++      }
++
++      colors.set(base, i * 12 + n * 4);
++    }
++  }
++
++  /**
++   * A particle's world position now. For the tests and the quads.
++   * `out` gets x, y, z.
++   */
++  position(out: Float32Array, i: number): Float32Array {
++    const e = this.emitter;
++    const v = this.velocity;
++    const age = this.time - this.birth[i];
++
++    displacement(out, age, v[i * 3], v[i * 3 + 1], v[i * 3 + 2], this.mass[i], e.drag, e.zAcceleration);
++
++    for (let k = 0; k < 3; k++) {
++      out[k] += this.start[i * 3 + k];
++    }
++
++    if (!this.worldSpace) {
++      vec3.transformMat4(<vec3>out, <vec3>out, this.matrix);
++    }
++
++    return out;
++  }
++
++  /** Age 0 to 1 of particle `i`. */
++  age(i: number): number {
++    return Math.min(1, Math.max(0, (this.time - this.birth[i]) / this.life[i]));
++  }
++
++  /** Half size, rotation and rgba (0 to 1) of particle `i` now. */
++  look(i: number, out: Float32Array): void {
++    const e = this.emitter;
++    const age = this.age(i);
++    const s = this.sizes;
++    const r = this.rotations;
++    const c = this.colors;
++    const m = e.middles;
++    const h = e.holds;
++    const o = i * 12;
++
++    out[0] = curve(age, s[i * 3], s[i * 3 + 1], s[i * 3 + 2], m[0], h[0], e.sizeSmoothingType) * 0.5;
++    out[1] = curve(age, r[i * 3], r[i * 3 + 1], r[i * 3 + 2], m[3], h[3], e.rotationSmoothingType);
++
++    for (let k = 0; k < 3; k++) {
++      out[2 + k] = curve3(age, c[o + k], c[o + 4 + k], c[o + 8 + k], m[1], h[1], e.colorSmoothingType) / 255;
++    }
++
++    out[5] = curve(age, c[o + 3], c[o + 7], c[o + 11], m[2], h[2], e.colorSmoothingType) / 255;
++  }
++}
++
++const mat3Heap = new Float32Array(9);
++
++/** The upper 3x3 of a 4x4 matrix. */
++function mat3Of(m: mat4): Float32Array {
++  mat3Heap[0] = m[0];
++  mat3Heap[1] = m[1];
++  mat3Heap[2] = m[2];
++  mat3Heap[3] = m[4];
++  mat3Heap[4] = m[5];
++  mat3Heap[5] = m[6];
++  mat3Heap[6] = m[8];
++  mat3Heap[7] = m[9];
++  mat3Heap[8] = m[10];
++
++  return mat3Heap;
++}
+diff --git a/src/viewer/handlers/m3/shaders/particle.frag.ts b/src/viewer/handlers/m3/shaders/particle.frag.ts
+new file mode 100644
+index 00000000..cbb4a220
+--- /dev/null
++++ b/src/viewer/handlers/m3/shaders/particle.frag.ts
+@@ -0,0 +1,31 @@
++import precision from '../../shaders/precision.glsl';
++
++// A particle: its material's colour texture times the particle colour.
++// A material without a texture layer draws the particle colour alone.
++// u_channels 1: the texture has alpha (RGBA); otherwise its alpha is 1.
++const shader = `
++${precision}
++
++uniform sampler2D u_map;
++uniform float u_hasMap;
++uniform float u_channels;
++
++varying vec2 v_uv;
++varying vec4 v_color;
++
++void main() {
++  vec4 texel = vec4(1.0);
++
++  if (u_hasMap > 0.5) {
++    texel = texture2D(u_map, v_uv);
++
++    if (u_channels != 1.0) {
++      texel.a = 1.0;
++    }
++  }
++
++  gl_FragColor = texel * v_color;
++}
++`;
++
++export default shader;
+diff --git a/src/viewer/handlers/m3/shaders/particle.vert.ts b/src/viewer/handlers/m3/shaders/particle.vert.ts
+new file mode 100644
+index 00000000..910e10c0
+--- /dev/null
++++ b/src/viewer/handlers/m3/shaders/particle.vert.ts
+@@ -0,0 +1,19 @@
++// Particle quads: built on the CPU in world space (particlerender.ts).
++const shader = `
++uniform mat4 u_VP;
++
++attribute vec3 a_position;
++attribute vec2 a_uv;
++attribute vec4 a_color;
++
++varying vec2 v_uv;
++varying vec4 v_color;
++
++void main() {
++  v_uv = a_uv;
++  v_color = a_color;
++  gl_Position = u_VP * vec4(a_position, 1.0);
++}
++`;
++
++export default shader;
