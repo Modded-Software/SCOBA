@@ -1,7 +1,7 @@
 From 6e6fe43053a8c3cdf707e17c0c98d214d72dedb1 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 15:49:42 +0200
-Subject: [PATCH 22/49] m3: draw order comment: distance key not applied
+Subject: [PATCH 22/51] m3: draw order comment: distance key not applied
 
 The comment claimed camera distance is equal within one model. That is not verified; it now only says the key is not applied.
 ---

@@ -37,6 +37,9 @@ void gf_AnimConfigInit () {
             gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_ATTACK_AIM, "Attack,Arm,Alternate,01", 0.0);
             gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_ATTACK_SPELL_AIM, "Spell,Arm,Alternate,01", 0.0);
         }
+        if (lv_profile == c_ANIM_HERO_KERRIGAN) {
+            gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_ATTACK_MELEE, "Attack,Arm,Alternate,Close", 0.0);
+        }
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_IDLE, "Stand,Leg", true, 0.15, 0.0);
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_WALK, "Walk,Leg", true, 0.15, lv_walk_speed);
         gf_AnimConfigLower(lv_profile, c_ANIM_LOWER_WALK_BACK, "Walk,Leg", true, 0.15, lv_walk_speed);
@@ -45,7 +48,7 @@ void gf_AnimConfigInit () {
         gf_AnimConfigAimAll(lv_profile, c_ANIM_LOWER_TURN_RIGHT, "Attack,Stand,Right");
         gf_AnimConfigAimWalk(lv_profile, c_ANIM_LOWER_WALK);
         gf_AnimConfigAimWalk(lv_profile, c_ANIM_LOWER_WALK_BACK);
-        // Slow walk: Tosh only (R-SLOW-5); other heroes keep empty clips.
+        // Slow walk clips: Tosh only; Kerrigan slows her own walk (R-SLOW-5).
         if (lv_profile == c_ANIM_HERO_TOSH) {
             gf_AnimConfigAimSlow(lv_profile, c_ANIM_LOWER_WALK_SLOW);
             gf_AnimConfigAimSlow(lv_profile, c_ANIM_LOWER_WALK_SLOW_BACK);

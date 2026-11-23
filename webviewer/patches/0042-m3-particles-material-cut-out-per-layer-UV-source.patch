@@ -1,7 +1,7 @@
 From 7197a996495e4cf9b83da49b5fc0c9fda528a287 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 09:00:54 +0200
-Subject: [PATCH 42/49] m3 particles: material cut-out, per-layer UV source
+Subject: [PATCH 42/51] m3 particles: material cut-out, per-layer UV source
 
 - particle.frag: u_alphaTest; mask alpha below the material threshold is
   discarded, as in standard.frag. Helios debris drew as rectangles.

@@ -1,0 +1,237 @@
+From bce6a587452ced08047b50ce1f7d1f999b9f52d0 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 12:14:45 +0200
+Subject: [PATCH 51/51] m3 particles: the per-step motion (CanUseGpuMotion)
+ keeps the authored drag
+
+---
+ src/parsers/m3/particleemitter.ts        | 23 ++++++++++++
+ src/viewer/handlers/m3/particleground.ts |  2 +-
+ src/viewer/handlers/m3/particlemath.ts   | 46 ++++++++++++++++++++----
+ src/viewer/handlers/m3/particlerender.ts |  2 +-
+ src/viewer/handlers/m3/particlesystem.ts | 35 +++++++++++++++++-
+ 5 files changed, 98 insertions(+), 10 deletions(-)
+
+diff --git a/src/parsers/m3/particleemitter.ts b/src/parsers/m3/particleemitter.ts
+index 13a7f209..550176a5 100644
+--- a/src/parsers/m3/particleemitter.ts
++++ b/src/parsers/m3/particleemitter.ts
+@@ -19,6 +19,7 @@ const OFFSETS = {
+   emissionSpreadY: [112, 112, 112, 112],
+   lifespan1: [132, 132, 132, 132],
+   lifespan2: [152, 152, 152, 152],
++  killSphere: [176, 172, 172, 172],
+   zAcceleration: [188, 184, 184, 184],
+   middles: [192, 188, 188, 188],
+   holds: [-1, 204, 204, 204],
+@@ -27,6 +28,11 @@ const OFFSETS = {
+   colors1: [280, 292, 292, 292],
+   drag: [340, 352, 352, 352],
+   mass: [348, 356, 356, 356],
++  // local, world, local fallback, world fallback: four uint16 force channel masks.
++  forceChannels: [364, 368, 368, 368],
++  noiseAmplitude: [372, 376, 376, 380],
++  // Version 17 is 4 bytes shorter than 18 to 21 here (1348).
++  windMultiplier: [1204, 1352, 1372, 1376],
+   maxParticles: [392, 396, 396, 400],
+   emissionRate: [396, 400, 400, 404],
+   emissionAreaType: [416, 420, 420, 424],
+@@ -83,6 +89,13 @@ export default class ParticleEmitter {
+   drag = 0;
+   mass = 0;
+   mass2 = 0;
++  /** Particles die inside this distance of the emitter (0: off). */
++  killSphere = 0;
++  /** FOR_ channel masks: local | world << 16, and the fallback pair the runtime tests. */
++  forces = 0;
++  forcesFallback = 0;
++  noiseAmplitude = 0;
++  windMultiplier = 0;
+   maxParticles = 0;
+   emissionRate = new Float32AnimationReference();
+   emissionAreaType = 0;
+@@ -166,6 +179,7 @@ export default class ParticleEmitter {
+     this.emissionSpreadY.load(at('emissionSpreadY'));
+     this.lifespan1.load(at('lifespan1'));
+     this.lifespan2.load(at('lifespan2'));
++    this.killSphere = at('killSphere').readFloat32();
+     this.zAcceleration = at('zAcceleration').readFloat32();
+     this.middles.set(at('middles').readFloat32Array(4));
+ 
+@@ -181,6 +195,15 @@ export default class ParticleEmitter {
+     this.drag = at('drag').readFloat32();
+     this.mass = at('mass').readFloat32();
+     this.mass2 = stream.readFloat32();
++    const local = at('forceChannels').readUint16();
++    const world = stream.readUint16();
++    const localFallback = stream.readUint16();
++    const worldFallback = stream.readUint16();
++    this.forces = (local | (world << 16)) >>> 0;
++    this.forcesFallback = (localFallback | (worldFallback << 16)) >>> 0;
++    this.noiseAmplitude = at('noiseAmplitude').readFloat32();
++    stream.seek(version === 17 ? 1348 : OFFSETS.windMultiplier[layout]);
++    this.windMultiplier = stream.readFloat32();
+     this.maxParticles = at('maxParticles').readUint32();
+     this.emissionRate.load(at('emissionRate'));
+     this.emissionAreaType = at('emissionAreaType').readUint32();
+diff --git a/src/viewer/handlers/m3/particleground.ts b/src/viewer/handlers/m3/particleground.ts
+index 679794b4..37b6e2aa 100644
+--- a/src/viewer/handlers/m3/particleground.ts
++++ b/src/viewer/handlers/m3/particleground.ts
+@@ -81,7 +81,7 @@ export function collideGround(system: M3ParticleSystem, dt: number): void {
+     const v = system.velocity;
+     const at = from + (time - from) * f - system.kick[i];
+ 
+-    velocityAt(vel, at, v[i * 3], v[i * 3 + 1], v[i * 3 + 2], system.mass[i], e.drag, e.zAcceleration);
++    velocityAt(vel, at, v[i * 3], v[i * 3 + 1], v[i * 3 + 2], system.mass[i], e.drag, e.zAcceleration, system.euler);
+ 
+     if (local) {
+       vec3.transformMat3(<vec3>vel, <vec3>vel, mat3(system.matrix));
+diff --git a/src/viewer/handlers/m3/particlemath.ts b/src/viewer/handlers/m3/particlemath.ts
+index 33db8eb5..57d0af14 100644
+--- a/src/viewer/handlers/m3/particlemath.ts
++++ b/src/viewer/handlers/m3/particlemath.ts
+@@ -78,14 +78,39 @@ export function curve3(age: number, v0: number, v1: number, v2: number, mid: num
+   return curve(age, v0, v1, v2, mid, hold, mode);
+ }
+ 
++/** Below this drag over mass the motion counts as free: no drag at all. */
++const FREE = 1e-6;
++
++/**
++ * The drag and its inverse the motion uses. The closed form (GPU motion)
++ * floors the drag; the per-step path (Euler, WhiteoutFlakes StepEuler)
++ * takes it as authored, so a drag of 0 there is no drag.
++ */
++function dragLanes(drag: number, euler: boolean): [number, number] {
++  if (euler) {
++    return [drag, 1 / drag];
++  }
++
++  return [Math.max(DRAG_FLOOR, drag), drag < DRAG_FLOOR ? INV_DRAG_UNDER_FLOOR : 1 / drag];
++}
++
+ /**
+  * How far a particle has moved after `t` seconds, per axis, from its start
+  * velocity, with drag and a vertical acceleration `accelZ`
+- * (CalculateDisplacementAndVelocity). Writes into `out`.
++ * (CalculateDisplacementAndVelocity). Writes into `out`. `euler`: the
++ * emitter runs the per-step path, whose drag has no floor (StepEuler is
++ * this closed form, stepped).
+  */
+-export function displacement(out: Float32Array, t: number, vx: number, vy: number, vz: number, mass: number, drag: number, accelZ: number): Float32Array {
+-  const d = Math.max(DRAG_FLOOR, drag);
+-  const invDrag = drag < DRAG_FLOOR ? INV_DRAG_UNDER_FLOOR : 1 / drag;
++export function displacement(out: Float32Array, t: number, vx: number, vy: number, vz: number, mass: number, drag: number, accelZ: number, euler = false): Float32Array {
++  if (euler && drag / mass < FREE) {
++    out[0] = vx * t;
++    out[1] = vy * t;
++    out[2] = vz * t + 0.5 * accelZ * t * t;
++
++    return out;
++  }
++
++  const [d, invDrag] = dragLanes(drag, euler);
+   const k = mass * invDrag;
+   // Gravity enters negated: g = -accelZ, so a positive acceleration pulls up.
+   const mgod = -accelZ * mass * invDrag;
+@@ -103,9 +128,16 @@ export function displacement(out: Float32Array, t: number, vx: number, vy: numbe
+  * A particle's velocity after `t` seconds: the other half of
+  * CalculateDisplacementAndVelocity, (v0·drag + m·g)·invDrag·e − m·g·invDrag.
+  */
+-export function velocityAt(out: Float32Array, t: number, vx: number, vy: number, vz: number, mass: number, drag: number, accelZ: number): Float32Array {
+-  const d = Math.max(DRAG_FLOOR, drag);
+-  const invDrag = drag < DRAG_FLOOR ? INV_DRAG_UNDER_FLOOR : 1 / drag;
++export function velocityAt(out: Float32Array, t: number, vx: number, vy: number, vz: number, mass: number, drag: number, accelZ: number, euler = false): Float32Array {
++  if (euler && drag / mass < FREE) {
++    out[0] = vx;
++    out[1] = vy;
++    out[2] = vz + accelZ * t;
++
++    return out;
++  }
++
++  const [d, invDrag] = dragLanes(drag, euler);
+   const mg = -accelZ * mass;
+   const e = Math.exp((-d / mass) * t);
+ 
+diff --git a/src/viewer/handlers/m3/particlerender.ts b/src/viewer/handlers/m3/particlerender.ts
+index 0eae5a75..543186a8 100644
+--- a/src/viewer/handlers/m3/particlerender.ts
++++ b/src/viewer/handlers/m3/particlerender.ts
+@@ -158,7 +158,7 @@ function worldVelocity(system: M3ParticleSystem, i: number, out: Float32Array):
+   if (system.rest[i]) {
+     out.fill(0);
+   } else {
+-    velocityAt(out, system.time - system.kick[i], v[i * 3], v[i * 3 + 1], v[i * 3 + 2], system.mass[i], e.drag, e.zAcceleration);
++    velocityAt(out, system.time - system.kick[i], v[i * 3], v[i * 3 + 1], v[i * 3 + 2], system.mass[i], e.drag, e.zAcceleration, system.euler);
+   }
+ 
+   const speed = Math.hypot(out[0], out[1], out[2]);
+diff --git a/src/viewer/handlers/m3/particlesystem.ts b/src/viewer/handlers/m3/particlesystem.ts
+index 6f70d17c..babfea04 100644
+--- a/src/viewer/handlers/m3/particlesystem.ts
++++ b/src/viewer/handlers/m3/particlesystem.ts
+@@ -13,6 +13,35 @@ const RANDOM_MASS = 0x4;
+ const WORLD_SPACE = 0x8;
+ /** flags bit: the emission area has a hollow middle. */
+ const CUTOUT = 0x10;
++/**
++ * flags that move an emitter off the closed-form motion: sort, collide
++ * terrain, trailing particles, model particles, 0x10000000, and bit 31
++ * (WhiteoutFlakes CanUseGpuMotion, 0x10480003).
++ */
++const EULER_FLAGS = 0x10480003;
++const CPU_BOUNDS = 0x80000000;
++/** Particle types that read the ground every step: terrain, terrain direction. */
++const TERRAIN_TYPES = [5, 6];
++/** CanUseGpuMotion: wind, kill sphere and noise at or above this need steps. */
++const MOTION_GATE = 0.001;
++
++/**
++ * Whether the game moves this emitter's particles with the closed form
++ * (WhiteoutFlakes CanUseGpuMotion), decided once per emitter. Otherwise it
++ * steps them each frame, with the authored drag.
++ */
++export function canUseGpuMotion(e: ParticleEmitter): boolean {
++  return (
++    !TERRAIN_TYPES.includes(e.particleType) &&
++    e.forcesFallback === 0 &&
++    (e.flags & EULER_FLAGS) === 0 &&
++    (e.flags & CPU_BOUNDS) === 0 &&
++    e.windMultiplier < MOTION_GATE &&
++    e.killSphere < MOTION_GATE &&
++    e.noiseAmplitude < MOTION_GATE
++  );
++}
++
+ /** Emitters that hold no count of their own get this many. */
+ const DEFAULT_MAX = 1000;
+ const DEG = Math.PI / 180;
+@@ -104,6 +133,9 @@ export default class M3ParticleSystem {
+   lastSequence = -2;
+   lastFrame = 0;
+ 
++  /** The emitter runs the per-step motion (drag without a floor), not the closed form. */
++  euler = false;
++
+   constructor(instance: M3ModelInstance, emitter: ParticleEmitter, index: number, copies: ParticleCopy[] = []) {
+     this.instance = instance;
+     this.emitter = emitter;
+@@ -121,6 +153,7 @@ export default class M3ParticleSystem {
+     this.bursts = new Array(this.copies.length + 1).fill(0);
+     this.max = emitter.maxParticles > 0 ? emitter.maxParticles : DEFAULT_MAX;
+     this.worldSpace = !!(emitter.additionalFlags & WORLD_SPACE);
++    this.euler = !canUseGpuMotion(emitter);
+ 
+     const n = this.max;
+ 
+@@ -600,7 +633,7 @@ export default class M3ParticleSystem {
+     if (this.rest[i]) {
+       out.fill(0);
+     } else {
+-      displacement(out, age, v[i * 3], v[i * 3 + 1], v[i * 3 + 2], this.mass[i], e.drag, e.zAcceleration);
++      displacement(out, age, v[i * 3], v[i * 3 + 1], v[i * 3 + 2], this.mass[i], e.drag, e.zAcceleration, this.euler);
+     }
+ 
+     for (let k = 0; k < 3; k++) {

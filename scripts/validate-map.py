@@ -301,7 +301,7 @@ def check_catalogs(map_dir: Path) -> None:
     # Cooldown clock: every hero weapon shot sets the Weapon Attack button
     # cooldown to the weapon period, in data.
     effects = ET.parse(gamedata / "EffectData.xml").getroot()
-    for effect_id, period in (("SCOBAAttackCooldown10", "1"), ("SCOBAAttackCooldown15", "1.5"), TOSH_CLOCK):
+    for effect_id, period in (("SCOBAAttackCooldown10", "1"), TOSH_CLOCK):
         cost = effects.find(f"CEffectModifyUnit[@id='{effect_id}']/Cost")
         if cost is None:
             fail(f"missing cooldown effect: {effect_id}")
@@ -319,8 +319,8 @@ def check_catalogs(map_dir: Path) -> None:
     if tosh_time is None or tosh_time.get("TimeUse") != TOSH_CLOCK[1]:
         fail(f"Tosh weapon cooldown must be {TOSH_CLOCK[1]}, as its button clock")
     talons = effects.find("CEffectCreatePersistent[@id='RazorTalonsPersistent']/InitialEffect")
-    if talons is None or talons.get("value") != "SCOBAAttackCooldown15":
-        fail("RazorTalonsPersistent must start SCOBAAttackCooldown15")
+    if talons is None or talons.get("value") != "SCOBAAttackCooldown10":
+        fail("RazorTalonsPersistent must start SCOBAAttackCooldown10")
     psi_effect = weapon_tree.getroot().find("CWeaponLegacy[@id='QueenOfBladesPsiBlast']/Effect")
     if psi_effect is None or psi_effect.get("value") != "SCOBAPsiBlastShot":
         fail("QueenOfBladesPsiBlast must fire SCOBAPsiBlastShot")

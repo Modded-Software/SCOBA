@@ -119,6 +119,34 @@ fixed gf_AnimAttackSpeed (int lp_player, string lp_weapon) {
     return lv_speed * lv_rate;
 }
 
+// Kerrigan's talons: the swing clip (operator 2026-11-23).
+bool gf_AnimMelee (unit lp_hero, string lp_weapon) {
+    return UnitGetType(lp_hero) == "KerriganSCOBA" && (lp_weapon == "RazorTalons" || lp_weapon == "RazorTalonsAuto");
+}
+
+// Play rate, start and hold of an attack clip. The melee swing plays the
+// whole clip in c_ANIM_MELEE_PLAY_TIME; the others a cut at the weapon rate.
+fixed gf_AnimAttackScale (int lp_player, int lp_state) {
+    if (lp_state == c_ANIM_UPPER_ATTACK_MELEE) {
+        return c_ANIM_MELEE_CLIP_LENGTH / c_ANIM_MELEE_PLAY_TIME;
+    }
+    return c_ANIM_ATTACK_TIME_SCALE * gv_animAttackSpeed[lp_player];
+}
+
+fixed gf_AnimAttackStartTime (int lp_state) {
+    if (lp_state == c_ANIM_UPPER_ATTACK_MELEE) {
+        return 0.0;
+    }
+    return c_ANIM_ATTACK_START_TIME;
+}
+
+fixed gf_AnimAttackHold (int lp_player, int lp_state) {
+    if (lp_state == c_ANIM_UPPER_ATTACK_MELEE) {
+        return c_ANIM_MELEE_PLAY_TIME;
+    }
+    return c_ANIM_ATTACK_DURATION / gv_animAttackSpeed[lp_player];
+}
+
 void gf_AnimAttackStart (int lp_player, string lp_weapon, unit lp_target) {
     unit lv_hero;
     int lv_profile;
@@ -145,8 +173,22 @@ void gf_AnimAttackStart (int lp_player, string lp_weapon, unit lp_target) {
     if ((UnitGetType(lv_hero) == "Kerrigan" || UnitGetType(lv_hero) == "KerriganSCOBA") && lp_weapon == "QueenOfBladesPsiBlast") {
         lv_state = c_ANIM_UPPER_ATTACK_SPELL;
     }
+    if (gf_AnimMelee(lv_hero, lp_weapon)) {
+        lv_state = c_ANIM_UPPER_ATTACK_MELEE;
+    }
+    if (lv_state == c_ANIM_UPPER_ATTACK_MELEE) {
+        // The swing alone on the upper body (operator 2026-11-23): her pitch
+        // pose is the Psi Blast cast frame and covered it. No pose, no
+        // linger; a pose left by a Psi Blast goes.
+        gf_AnimUpperClear(lp_player);
+        gv_animAttackState[lp_player] = lv_state;
+        gv_animAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + gf_AnimAttackHold(lp_player, lv_state);
+        gv_animReadyUntil[lp_player] = -1.0;
+        gf_AnimUpperAttackStart(lp_player, lv_state);
+        return;
+    }
     gv_animAttackState[lp_player] = lv_state;
-    gv_animAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + (c_ANIM_ATTACK_DURATION / gv_animAttackSpeed[lp_player]);
+    gv_animAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + gf_AnimAttackHold(lp_player, lv_state);
     gv_animReadyUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + c_ANIM_READY_LINGER;
     gf_AnimTargetPitchBegin(lp_player, lp_target);
     gf_AnimUpperAttackStart(lp_player, lv_state);
@@ -213,6 +255,7 @@ int gf_AnimLowerState (int lp_player) {
 }
 // Slow walk (R-SLOW-13): a walk state becomes its slow state while the
 // slow buff is on, and back when it is off. Other states pass through.
+// Without slow clips (Kerrigan) the walk states stay.
 int gf_AnimSlowState (int lp_player, int lp_state) {
     int lv_base = lp_state;
 
@@ -222,7 +265,7 @@ int gf_AnimSlowState (int lp_player, int lp_state) {
     else if (lp_state == c_ANIM_LOWER_WALK_SLOW_BACK) {
         lv_base = c_ANIM_LOWER_WALK_BACK;
     }
-    if (!gv_slowOn[lp_player]) {
+    if (!gv_slowOn[lp_player] || !gf_SlowWalkClips(lp_player)) {
         return lv_base;
     }
     if (lv_base == c_ANIM_LOWER_WALK) {
@@ -276,9 +319,10 @@ void gf_AnimTick (int lp_player) {
                 lv_lower = c_ANIM_LOWER_NONE;
             }
         }
-        else if (gv_slowOn[lp_player]) {
+        else if (gv_slowOn[lp_player] && gf_SlowWalkClips(lp_player)) {
             // Free walk and Point & Click face the move: the forward slow
-            // clip replaces the stock walk (R-SLOW-14).
+            // clip replaces the stock walk (R-SLOW-14). Kerrigan keeps the
+            // stock walk, which the engine slows with her speed.
             lv_lower = gf_AnimLowerState(lp_player);
             if (lv_lower == c_ANIM_LOWER_WALK || lv_lower == c_ANIM_LOWER_WALK_BACK || gf_SlowWalkState(lv_lower)) {
                 lv_lower = c_ANIM_LOWER_WALK_SLOW;
@@ -311,7 +355,7 @@ void gf_AnimTick (int lp_player) {
             gv_animAttackTarget[lp_player] = null;
         }
         gf_AnimUpperSet(lp_player, lv_upper);
-        if (lv_upper != c_ANIM_UPPER_NONE && !gf_SlowWalkUpperOn(lv_upper)) {
+        if (lv_upper != c_ANIM_UPPER_NONE && lv_upper != c_ANIM_UPPER_ATTACK_MELEE && !gf_SlowWalkUpperOn(lv_upper)) {
             gf_AnimTargetPitchTick(lp_player);
         }
     }

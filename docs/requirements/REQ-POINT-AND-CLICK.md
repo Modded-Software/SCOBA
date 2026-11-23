@@ -40,7 +40,8 @@ Implementation lives in
   button while its cooldown runs.
 - **In range**: the hero can hit the target from where it stands.
 - **Order mode**: the player commands an owned unit instead of the hero. It is
-  entered with F, Ctrl + E, or the Order button.
+  entered with Ctrl + E or the Order button (not F, operator
+  2026-11-23).
 
 ## 3. Requirements
 

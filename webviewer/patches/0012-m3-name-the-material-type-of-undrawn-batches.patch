@@ -1,7 +1,7 @@
 From f0e9eea901c7245fc93ab101f74c891eba240fe1 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 13:59:53 +0200
-Subject: [PATCH 12/49] m3: name the material type of undrawn batches
+Subject: [PATCH 12/51] m3: name the material type of undrawn batches
 
 ---
  src/viewer/handlers/m3/model.ts | 10 ++++++----

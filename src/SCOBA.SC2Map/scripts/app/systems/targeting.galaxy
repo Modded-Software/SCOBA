@@ -288,6 +288,20 @@ void gf_TpsLeftClick (int lp_player) {
     gf_LeftClickTarget(lp_player, gf_AimUnitAtCrosshair(lp_player, false));
 }
 
+// TPS left mouse down (operator 2026-11-23): aiming, the aim shot; else the
+// UI target and Kerrigan's talons swing at once, not on release.
+void gf_TpsLeftPress (int lp_player) {
+    if (!gf_TpsActive(lp_player)) {
+        return;
+    }
+    if (gv_aIMACTIVE[lp_player]) {
+        gf_AimShotPress(lp_player);
+        return;
+    }
+    gf_TpsLeftClick(lp_player);
+    gf_TalonsSwing(lp_player);
+}
+
 bool gt_TargetClick_Func (bool testConds, bool runActions) {
     int lv_player;
 
@@ -318,9 +332,7 @@ bool gt_TargetClick_Func (bool testConds, bool runActions) {
             gv_mOUSELEFTPRESSPITCH[lv_player] = CameraGetPitch(lv_player);
             gv_unitClickCandidate[lv_player] = null;
             gv_unitPressHighlight[lv_player] = gv_unitHighlight[lv_player];
-            if (gv_aIMACTIVE[lv_player]) {
-                gf_AimShotPress(lv_player);
-            }
+            gf_TpsLeftPress(lv_player);
         }
         return true;
     }
@@ -385,13 +397,9 @@ bool gt_TargetRelease_Func (bool testConds, bool runActions) {
                 return true;
             }
             gv_tpsPressed[lv_player] = false;
-            lv_drag = (AbsF(gf_AnimYawDelta(CameraGetYaw(lv_player), gv_mOUSELEFTPRESSYAW[lv_player])) >= c_SCOBA_CLICK_DRAG_ANGLE) || (AbsF(CameraGetPitch(lv_player) - gv_mOUSELEFTPRESSPITCH[lv_player]) >= c_SCOBA_CLICK_DRAG_ANGLE);
             gv_unitClickCandidate[lv_player] = null;
             gv_unitPressHighlight[lv_player] = null;
-            // The TPS left click acts on release, like the PNC one.
-            if (!lv_drag) {
-                gf_TpsLeftClick(lv_player);
-            }
+            // The TPS left click acted on the press (gf_TpsLeftPress).
             gf_SelectHeroForce(lv_player);
         }
         return true;

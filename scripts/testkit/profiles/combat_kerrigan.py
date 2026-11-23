@@ -1,7 +1,8 @@
 """Kerrigan checks of the combat group `kerrigan` (operator 2026-11-22).
 
-Psi Blast is her only attack: the engine holds no talons weapon on her, the
-shots are Psi Blast effects at any distance, and no talons effect runs.
+Psi Blast is her ranged attack at any distance. Her talons are the F swing
+(operator 2026-11-23) and the auto twin RazorTalonsAuto, which the engine
+uses only with Attack auto; the stock RazorTalons is gone from her.
 Her aim pose breathes (R-TPS-19): every pitch clip play is followed by one
 breath sync, and the engine's clip stands at the game clock's place in the
 breath. Tosh's aim pose is still: no sync.
@@ -15,19 +16,21 @@ from heroanim.rig import HEROES
 from .bank_checks import _report
 
 PSI = "QueenOfBladesPsiBlast"
+TALONS_AUTO = "RazorTalonsAuto"
 BREATH_MS = HEROES["kerrigan"].breath_ms
 # The clip position is read some game loops after the clock (query wait).
 PHASE_TOL_MS = 400
 
 
-def check_weapons(checks, section: str, shots: int) -> None:
-    """`shots`: the Psi Blast effects the scenario must add, at least."""
+def check_weapons(checks, section: str, shots: int, auto: bool = False) -> None:
+    """`shots`: the Psi Blast effects the scenario must add, at least.
+    `auto`: Attack auto, where the engine must use the talons twin."""
     for tag in ("w0", "w1"):
         checks.eq(section, tag, "Type", "KerriganSCOBA")
-        checks.eq(section, tag, "Weapons", 2)
+        checks.eq(section, tag, "Weapons", 3)
         checks.eq(section, tag, "Weapon1", PSI)
         checks.eq(section, tag, "Weapon2", PSI + "Auto")
-        checks.eq(section, tag, "Weapon3", "")
+        checks.eq(section, tag, "Weapon3", TALONS_AUTO)
         checks.eq(section, tag, "MinRange1000", 0)
         # Negative (R-TPS-65): the engine holds no Poison Nova on her.
         checks.false(section, tag, "Nova")
@@ -35,8 +38,13 @@ def check_weapons(checks, section: str, shots: int) -> None:
     talons = [checks.value(section, tag, "TalonsFx") for tag in ("w0", "w1")]
     ok = None not in psi and psi[1] - psi[0] >= shots
     _report(checks, f"{section} shots are Psi Blast effects", ok, f"psi={psi} want +{shots}")
-    # Negative: no talons effect, in the whole run so far.
-    ok = None not in talons and talons[1] == 0
+    print(f"{section} raw: psi={psi} talons={talons}")
+    if auto:
+        ok = None not in talons and talons[1] > talons[0]
+        _report(checks, f"{section} engine uses the talons with Attack auto", ok, f"talons={talons}")
+        return
+    # Negative: Attack single, no talons effect in the scenario.
+    ok = None not in talons and talons[1] == talons[0]
     _report(checks, f"{section} no talons effect", ok, f"talons={talons}")
 
 
@@ -169,3 +177,105 @@ def check_psi_watch(checks) -> None:
     for tag, unit_type in WATCH:
         checks.eq(section, "", f"{tag}Type", unit_type)
         checks.lt(section, "", f"{tag}Life1", checks.value(section, "", f"{tag}Life0"))
+
+
+# Talons swing on the TPS left click (operator 2026-11-23): the stock hits,
+# 25 at 0 and 0.3 s. Cooldown 1 s; the 2 s clip plays in 0.75 s.
+SWING_DAMAGE = 50
+SWING_HITS = 2
+SWING_COOLDOWN_MS = 1000
+SWING_CLIP_MS = 2000
+SWING_HOLD_MS = 750
+SWING_RATE100 = (266, 267)
+# Engine clip time over game time is about 0.72 x the scale (probe, run
+# combat/20261123-112703): the old 1.33 reads 1.0, the new 2.67 reads 2.0.
+# Over 0.5 s, +-125 ms of reading steps: 2.0 reads 1.75 to 2.25; scale 2.0
+# (1.43) at most 1.68.
+SWING_ENGINE_RATE = (1.72, 2.3)
+# Presses inside the cooldown: no rate probe, it would delay them.
+SWING_MULTI_PRESS = ("talons_cd",)
+SWING_HALF_ARC = 45
+SWING_ANGLE_MARGIN = 5
+# Misses by reach or by hero, not by angle.
+SWING_REACH_CASES = ("talons_out", "talons_tosh", "talons_click_pnc")
+# section: (enemies hit, enemies not hit, swings, Kerrigan)
+SWING_CASES = {
+    "talons_front": ((0,), (), 1, True),
+    "talons_arc": ((0, 1), (), 1, True),
+    "talons_edge": ((0,), (), 1, True),
+    "talons_out": ((), (0,), 1, True),
+    "talons_side": ((), (0, 1), 1, True),
+    "talons_back": ((), (0,), 1, True),
+    "talons_empty": ((), (), 1, True),
+    "talons_cd": ((0,), (), 1, True),
+    "talons_tosh": ((), (0,), 0, False),
+    # Ring of 8 every 45 degrees from 22.5 off her facing: +-22.5 are hit.
+    "talons_ring_f50": ((0, 7), (1, 2, 3, 4, 5, 6), 1, True),
+    "talons_ring_f140": ((0, 7), (1, 2, 3, 4, 5, 6), 1, True),
+    # Negatives: the press while aiming, and in PNC, does not swing.
+    "talons_click_aim": ((), (), 0, True),
+    "talons_click_pnc": ((), (0,), 0, True),
+}
+# section: (TPS on, aiming) at the press.
+SWING_MODES = {"talons_click_aim": (True, True), "talons_click_pnc": (False, False)}
+SWING_RAW = ("heroType", "swings", "damages", "hits", "cd0Ms", "cd1Ms", "animState", "facing0", "facing1", "weapons", "dist100_0", "angle_0", "dist100_1", "angle_1", "life0_0", "life1_0", "life0_1", "life1_1") + tuple(f"angle_{i}" for i in range(2, 8)) + ("pressMs0", "pressMs1", "pressMs2")
+
+
+def check_talons(checks) -> None:
+    """Every enemy in her front arc and reach takes both hits; one beside,
+    behind or out of reach takes none. She swings with no target, a press
+    inside the cooldown starts nothing, and Tosh has no swing."""
+    for section, (hit, missed, swings, kerrigan) in SWING_CASES.items():
+        print(f"{section} raw: " + " ".join(f"{key}={checks.value(section, '', key)}" for key in SWING_RAW))
+        checks.eq(section, "", "heroType", "KerriganSCOBA" if kerrigan else "ToshSCOBA")
+        checks.eq(section, "", "swings", swings)
+        checks.eq(section, "", "damages", SWING_HITS * len(hit))
+        for i in hit:
+            life = [checks.value(section, "", f"life{n}_{i}") for n in (0, 1)]
+            ok = None not in life and life[0] - life[1] == SWING_DAMAGE
+            _report(checks, f"{section} enemy {i} takes the swing", ok, f"life={life} want -{SWING_DAMAGE}")
+        for i in missed:
+            life = [checks.value(section, "", f"life{n}_{i}") for n in (0, 1)]
+            ok = None not in life and life[0] == life[1]
+            _report(checks, f"{section} enemy {i} is not hit", ok, f"life={life}")
+        # The enemies stood where the case put them: in the arc or clear of it.
+        for i in hit + (() if section in SWING_REACH_CASES else missed):
+            angle = checks.value(section, "", f"angle_{i}")
+            off = None if angle is None else abs((angle + 540) % 360 - 180)
+            ok = off is not None and (off <= SWING_HALF_ARC - SWING_ANGLE_MARGIN if i in hit else off >= SWING_HALF_ARC + SWING_ANGLE_MARGIN)
+            _report(checks, f"{section} enemy {i} placed {'in' if i in hit else 'outside'} the arc", ok, f"angle={angle}")
+        tps, aim = SWING_MODES.get(section, (True, False))
+        checks.eq(section, "", "tps", tps)
+        checks.eq(section, "", "aim", aim)
+        if not kerrigan or swings == 0:
+            continue
+        checks.eq(section, "", "cd0Ms", 0)
+        cd = checks.value(section, "", "cd1Ms")
+        ok = cd is not None and SWING_COOLDOWN_MS - 200 <= cd <= SWING_COOLDOWN_MS
+        _report(checks, f"{section} swing starts the attack cooldown", ok, f"cd={cd} want ~{SWING_COOLDOWN_MS}")
+        checks.eq(section, "", "animState", checks.value(section, "", "attackState"))
+        # Engine state: the attack bracket holds the Attack 01 copy (2 s).
+        length = checks.value(section, "", "clipLenMs")
+        ok = length is not None and abs(length - SWING_CLIP_MS) <= 50
+        checks.eq(section, "", "pitchStep", 0)
+        _report(checks, f"{section} engine plays the Attack 01 swing clip", ok, f"len={length} rem={checks.value(section, '', 'clipRemMs')} clip={checks.value(section, '', 'clipName')} want {SWING_CLIP_MS}")
+        checks.eq(section, "", "weapons", 3)
+        rate = checks.value(section, "", "rate100")
+        _report(checks, f"{section} swing play rate", rate in SWING_RATE100, f"rate100={rate} want {SWING_RATE100}")
+        checks.eq(section, "", "holdMs", SWING_HOLD_MS)
+        if section in SWING_MULTI_PRESS:
+            continue
+        clip = [checks.value(section, "", key) for key in ("clipRemMs", "clipRem2Ms", "clipAtMs", "clipAt2Ms")]
+        engine = None if None in clip or clip[3] <= clip[2] else (clip[0] - clip[1]) / (clip[3] - clip[2])
+        ok = engine is not None and SWING_ENGINE_RATE[0] <= engine <= SWING_ENGINE_RATE[1]
+        _report(checks, f"{section} engine plays the swing at 2x the old rate", ok, f"rem,rem2,at,at2={clip} rate={engine} want {SWING_ENGINE_RATE}")
+
+
+def check_swing_watch(checks) -> None:
+    """Operator watch: which clip is Attack 01 is judged on screen. Raw:
+    the engine's clip lengths; each case must have played a clip."""
+    for tag in ("stock", "swing", "spell"):
+        print(f"swing_watch {tag} clip length ms: {checks.value('swing_watch', '', tag + 'LenMs')}")
+        checks.gt("swing_watch", "", tag + "LenMs", 0)
+    for n in range(6):
+        print(f"swing_watch rate probe {n} (scale, clip ms, game ms): {checks.value('swing_watch', '', f'rate{n}')}")

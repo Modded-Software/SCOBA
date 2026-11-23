@@ -12,7 +12,7 @@ from flora.build import balance_problems, family_problems, objects_xml, Plan
 from flora.grid import disk_cells, distance_to, shortest_path, value_noise
 from flora.lanes import Placed, detours, find_lanes, place_hazards, settle
 from flora.rules import RULES, context
-from flora.scatter import scatter
+from flora.scatter import Plant, scatter
 from flora.scene import FINE, Region, Scene, Tree, Unit, tree_grid
 from flora.terrain import Terrain
 
@@ -292,6 +292,17 @@ class BuildTests(unittest.TestCase):
         self.assertIn('<Flag Index="HeightAbsolute" Value="1"/>', xml)
         # Negative case: z 0 buried props off low ground (operator probe).
         self.assertNotIn(',0" Rotation', xml)
+
+    def test_small_flora_sits_higher(self) -> None:
+        # Operator probe 2026-11-23: under scale 2.0 at ground +3.0 (row C).
+        terrain, _ = world()
+        plants = [Plant("ZerusPlant", 1.5, 2.5, 0.0, 1.99, 0), Plant("ZerusBrambles", 3.5, 2.5, 0.0, 2.0, 0), Plant("ZerusPlant", 5.5, 2.5, 0.0, 0.6, 0)]
+        xml = objects_xml(Plan([], [Placed("ZerusTarPit", 7.5, 2.5, 0.0, 0, "Zerg", 0, 18.0)], plants, [], []), 500, terrain)
+        self.assertIn('Position="1.5,2.5,13.0000"', xml)
+        self.assertIn('Position="5.5,2.5,13.0000"', xml)
+        # Negative cases: scale 2.0 keeps GROUND_LIFT; a hazard keeps its lift.
+        self.assertIn('Position="3.5,2.5,12.6000"', xml)
+        self.assertIn('Position="7.5,2.5,12.7000"', xml)
 
     def test_hazard_sits_on_the_lowest_footprint_ground(self) -> None:
         # Operator 2026-11-16: the centre height left an edge floating.

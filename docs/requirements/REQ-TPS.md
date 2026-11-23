@@ -121,7 +121,8 @@ Implementation lives in [SPEC-TPS](../specifications/SPEC-TPS.md).
 | R-TPS-60 | An aim shot MUST NOT move the hero. |
 | R-TPS-61 | An aim shot MUST NOT stop or slow a walking hero. |
 | R-TPS-62 | A proxy shot whose proxy is above the ground MUST show no hit effect: no impact model and no impact sound. A proxy shot that lands on the ground keeps its hit effect. |
-| R-TPS-63 | Added 2026-11-22 by the operator. Kerrigan's attack MUST be Psi Blast, in both modes and at every distance. She MUST NOT attack with Razor Talons. |
+| R-TPS-63 | Added 2026-11-22 by the operator; changed 2026-11-23. Kerrigan's ranged attack MUST be Psi Blast, in both modes and at every distance. The engine MUST use her Razor Talons on its own only with Attack `auto`. |
+| R-TPS-66 | Added 2026-11-23 by the operator. In TPS without aim, the left mouse button down MUST swing Kerrigan's Razor Talons at once, with or without a target, and pick the UI target as the click did on release before. It MUST NOT swing while aiming or in Point & Click. The swing MUST hit every enemy in a 90 degree arc in front of her, within 1 of her edge, and no other unit. It MUST play `Attack 01` on her upper body and back talons, in 0.75 s (2x the first 1.5 s fit). Its cooldown MUST be 1 s. F MUST NOT start Order mode; Order is Ctrl + E. |
 | R-TPS-64 | Added 2026-11-22 by the operator. A Psi Blast that reaches its target unit MUST deal its damage to that unit, at every distance within range. |
 | R-TPS-65 | Added 2026-11-22 by the operator. Kerrigan MUST NOT have the Poison Nova ability. |
 

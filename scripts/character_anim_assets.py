@@ -27,7 +27,7 @@ sys.path.insert(0, str(M3_VENDOR))
 import m3
 
 MARKER = ".character_anim_assets"
-MARKER_VERSION = "48\n"  # 48: rigs in heroanim.rig, torso pitch axis from the rest pose, feet turn with the pelvis, aim pose breathing; 47: head pitch about the head's own left-right axis; 46: head pitch +-30 (R-TPS-16); 45: slow walk arm clips (R-SLOW-19); 44: slow walk leg clips from Walk Slow (R-SLOW-10, 11); 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
+MARKER_VERSION = "50\n"  # 50: the swing clip moves her back talons; 49: Kerrigan talons swing clip from Attack 01; 48: rigs in heroanim.rig, torso pitch axis from the rest pose, feet turn with the pelvis, aim pose breathing; 47: head pitch about the head's own left-right axis; 46: head pitch +-30 (R-TPS-16); 45: slow walk arm clips (R-SLOW-19); 44: slow walk leg clips from Walk Slow (R-SLOW-10, 11); 43: stand jump legs together at the apogee, walk plays on slowly in the air; 42: jump knee and ankle angles from motion capture; 41: jump poses from the hero's own stand and walk, two strides (R-JUMP-16, 18)
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 CLIP_JOBS = (
     ("Attack", "Attack Arm Alternate", "upper"),
@@ -37,6 +37,9 @@ CLIP_JOBS = (
     ("Stand Left", "Stand Left Leg", "lower"),
     ("Stand Right", "Stand Right Leg", "lower"),
 )
+
+# The melee swing (rig.melee_source): spine up, legs left to the leg clips.
+MELEE_CLIP = "Attack Arm Alternate Close"
 
 AIM_ATTACK_JOBS = (
     ("Attack", "Attack Arm Alternate 01"),
@@ -255,6 +258,16 @@ def generate_model(source: Path, target: Path, rig: HeroRig, jump: bool = False,
             raise KeyError(new_name)
         group_ids = attack_ids if bone_group == "upper" else lower_ids
         make_clip(model, group, source_clip, group_ids, new_name, bone_group, rig.unit_speed)
+    if rig.melee_source:
+        if rig.melee_source not in groups or rig.melee_source not in clips:
+            raise KeyError(rig.melee_source)
+        group = clone(groups[rig.melee_source])
+        group.name = MELEE_CLIP
+        model.sequenceTransformationGroups.append(group)
+        groups[MELEE_CLIP] = group
+        melee_lower = tuple(root for root in rig.lower_roots if root not in rig.melee_roots)
+        melee_ids, _ = classify_bones(model, rig.upper_roots + rig.melee_roots, melee_lower)
+        make_clip(model, group, clips[rig.melee_source], melee_ids, MELEE_CLIP, "upper", rig.unit_speed)
     pitch_ids = set()
     for bone in model.bones:
         if bone.name in rig.pitch_bones:

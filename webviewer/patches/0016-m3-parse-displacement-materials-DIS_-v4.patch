@@ -1,7 +1,7 @@
 From 1a56c7000954061628d7ddf5223f538a73bf5c9c Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 14:53:10 +0200
-Subject: [PATCH 16/49] m3: parse displacement materials (DIS_ v4)
+Subject: [PATCH 16/51] m3: parse displacement materials (DIS_ v4)
 
 ---
  src/parsers/m3/displacementmaterial.ts | 32 ++++++++++++++++++++++++++

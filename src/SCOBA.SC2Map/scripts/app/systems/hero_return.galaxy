@@ -20,8 +20,18 @@ int gf_HeroStatProp (int lp_i) {
     return c_unitPropMovementSpeed;
 }
 
+// Kerrigan's weapons: the engine gives KerriganSCOBA the stock RazorTalons
+// beside her data slots (run combat/20261122-144438). It fires outside
+// Attack auto, so it goes; the talons are F and RazorTalonsAuto.
+void gf_HeroWeaponsSet (unit lp_hero) {
+    if (UnitGetType(lp_hero) == c_SCOBA_UNIT_KERRIGAN) {
+        UnitWeaponRemove(lp_hero, c_SCOBA_WEAPON_TALONS);
+    }
+}
+
 // The hero abilities at map start (app/init and every return).
 void gf_HeroAbilitiesDefault (unit lp_hero) {
+    gf_HeroWeaponsSet(lp_hero);
     UnitAbilityEnable(lp_hero, "SCOBAAutoAttackStatus", true);
     UnitAbilityShow(lp_hero, "SCOBAAutoAttackStatus", true);
     UnitAbilityEnable(lp_hero, "SCOBAAutoAttackToggle", true);

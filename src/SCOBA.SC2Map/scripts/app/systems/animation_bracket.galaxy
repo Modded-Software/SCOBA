@@ -171,6 +171,10 @@ void gf_AnimAimAttackStart (int lp_player, string lp_weapon) {
     if ((UnitGetType(lv_hero) == "Kerrigan" || UnitGetType(lv_hero) == "KerriganSCOBA") && lp_weapon == "QueenOfBladesPsiBlast") {
         lv_state = c_ANIM_UPPER_ATTACK_SPELL_AIM;
     }
+    if (gf_AnimMelee(lv_hero, lp_weapon)) {
+        lv_state = c_ANIM_UPPER_ATTACK_MELEE;
+    }
+    gv_animAimAttackState[lp_player] = lv_state;
     lv_clip = gv_animUpperClip[lv_profile][lv_state];
     if (lv_clip == "") {
         return;
@@ -180,10 +184,10 @@ void gf_AnimAimAttackStart (int lp_player, string lp_weapon) {
     gv_animUpperStarts[lp_player] += 1;
     gf_AnimEvent(lp_player, "aim_attack_start", lv_clip, lv_flags);
     gf_ProbeEvent(lp_player, "aim_attack_start", lv_clip, lv_flags);
-    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_AIM_ATTACK, lv_clip, lv_flags, c_ANIM_AIM_ATTACK_BLEND, c_ANIM_AIM_ATTACK_BLEND, c_ANIM_ATTACK_TIME_SCALE * gf_AnimAttackSpeedOf(lp_player), c_animTimeVariantAsTimeScale));
-    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_BRACKET_AIM_ATTACK + " " + FixedToString(c_ANIM_ATTACK_START_TIME, c_fixedPrecisionAny) + " 0");
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_AIM_ATTACK, lv_clip, lv_flags, c_ANIM_AIM_ATTACK_BLEND, c_ANIM_AIM_ATTACK_BLEND, gf_AnimAttackScale(lp_player, lv_state), c_animTimeVariantAsTimeScale));
+    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_BRACKET_AIM_ATTACK + " " + FixedToString(gf_AnimAttackStartTime(lv_state), c_fixedPrecisionAny) + " 0");
     
-    gv_animAimAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + (c_ANIM_ATTACK_DURATION / gf_AnimAttackSpeedOf(lp_player));
+    gv_animAimAttackUntil[lp_player] = TimerGetElapsed(gv_sCOBA_Clock) + gf_AnimAttackHold(lp_player, lv_state);
     gv_animAimUpperOn[lp_player] = true;
 }
 void gf_AnimAimAttackClear (int lp_player) {
@@ -226,8 +230,8 @@ void gf_AnimUpperAttackStart (int lp_player, int lp_state) {
     gf_AnimEvent(lp_player, "upper_start", lv_clip, lv_flags);
     gf_ProbeEvent(lp_player, "upper_start", lv_clip, lv_flags);
     ActorSend(lv_actor, "AnimClear " + c_ANIM_BRACKET_ATTACK);
-    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_ATTACK, lv_clip, lv_flags, 0.0, 0.0, c_ANIM_ATTACK_TIME_SCALE * gf_AnimAttackSpeedOf(lp_player), c_animTimeVariantAsTimeScale));
-    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_BRACKET_ATTACK + " " + FixedToString(c_ANIM_ATTACK_START_TIME, c_fixedPrecisionAny) + " 0");
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_ANIM_BRACKET_ATTACK, lv_clip, lv_flags, 0.0, 0.0, gf_AnimAttackScale(lp_player, lp_state), c_animTimeVariantAsTimeScale));
+    ActorSend(lv_actor, "AnimSetTime " + c_ANIM_BRACKET_ATTACK + " " + FixedToString(gf_AnimAttackStartTime(lp_state), c_fixedPrecisionAny) + " 0");
     
     gv_animUpperState[lp_player] = lp_state;
     gv_animUpperClipIndex[lp_player] = lp_state;

@@ -355,6 +355,8 @@ trigger gt_TargetClick;
 trigger gt_TargetRelease;
 trigger[7] gt_UnitClick;
 trigger gt_OrderKey;
+int[8] gv_talonsSwings;  // swings started on F, for tests
+int[8] gv_animAimAttackState;  // the last aim attack clip state, for tests
 trigger gt_OrderButton;
 trigger gt_OrderCancel;
 trigger gt_TargetRing;

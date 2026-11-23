@@ -49,6 +49,11 @@ class HeroRig(BaseModel):
     # side of its frame, once per breath_ms. 0 frames: a still pose.
     breath_frames: int = 0
     breath_ms: int = 0
+    # The stock clip of the melee swing (F); "" for none. Baked upper body
+    # only, from the spine up, as MELEE_CLIP (character_anim_assets).
+    melee_source: str = ""
+    # Lower roots whose bones the swing moves too (her back talons).
+    melee_roots: tuple[str, ...] = ()
 
     @property
     def aim_pose_clip(self) -> str:
@@ -105,6 +110,11 @@ HEROES: dict[str, HeroRig] = {
         aim_source="Spell",
         breath_frames=4,
         breath_ms=4000,
+        # Operator 2026-11-23: the talons swing is Attack 01, not Attack.
+        melee_source="Attack 01",
+        # Operator 2026-11-23: the back talons are upper body. Their chains
+        # (Bone34 to Bone51, both sides) hang on Root, a lower root.
+        melee_roots=("Bone34", "Bone34(mirrored)"),
     ),
 }
 

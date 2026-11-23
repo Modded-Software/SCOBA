@@ -12,13 +12,16 @@ import re
 from pathlib import Path
 
 import m3
-from character_anim_assets import AIM_DIRECTIONS, AIM_PITCH_GROUP, AIM_PITCH_STEPS
+from character_anim_assets import AIM_DIRECTIONS, AIM_PITCH_GROUP, AIM_PITCH_STEPS, MELEE_CLIP
+from character_anim_assets import bone_anim_ids as bone_ids
 from heroanim.rig import HEROES, HeroRig
 from jumpanim.kin import bone_world, clip_pose, group_clip
 from walkanim.strafe import check as check_strafe
 
 BREATH_CONST_RE = re.compile(r"const fixed c_ANIM_BREATH_(\w+) = ([0-9.]+);")
 BREATH_CONFIG_RE = re.compile(r"gv_animBreathPeriod\[c_ANIM_HERO_(\w+)\] = c_ANIM_BREATH_(\w+);")
+MELEE_LENGTH_RE = re.compile(r"const fixed c_ANIM_MELEE_CLIP_LENGTH = ([0-9.]+);")
+MELEE_CONFIG = 'gf_AnimConfigUpper(lv_profile, c_ANIM_UPPER_ATTACK_MELEE, "Attack,Arm,Alternate,Close", 0.0);'
 # A nod moves the head up-down and front-back; a roll moves it sideways.
 # The torso nods about its own left-right axis as the aim pose holds it,
 # and the pose itself turns the torso (Tosh stands side-on: measured share
@@ -98,6 +101,46 @@ def check_breath_script(galaxy: str, fail) -> str:
     return f"script breath periods match the rigs: {want}"
 
 
+def bone_chain_names(model, name: str) -> list[str]:
+    """The bone and its parents, by name."""
+    index = next(i for i, bone in enumerate(model.bones) if bone.name == name)
+    chain = []
+    while index >= 0:
+        chain.append(model.bones[index].name)
+        index = model.bones[index].parent
+    return chain
+
+
+def check_melee(model, label: str, rig: HeroRig, galaxy: str, fail) -> str:
+    """The talons swing clip (operator 2026-11-23): baked from the rig's
+    melee source, as long as it, and the script plays it for that length."""
+    lengths = {sequence.name: sequence.animEndInMS - sequence.animStartInMS for sequence in model.sequences}
+    if not rig.melee_source:
+        if MELEE_CLIP in lengths:
+            fail(f"{label}: has {MELEE_CLIP}, but the rig has no melee swing")
+        return f"{label}: no melee swing"
+    if MELEE_CLIP not in lengths:
+        fail(f"{label}: {MELEE_CLIP} missing; the swing would play the default clip")
+    if lengths[MELEE_CLIP] != lengths[rig.melee_source]:
+        fail(f"{label}: {MELEE_CLIP} is {lengths[MELEE_CLIP]} ms, {rig.melee_source} is {lengths[rig.melee_source]} ms")
+    # Every talon bone the source moves moves in the swing (operator
+    # 2026-11-23: the bake had left her back talons out).
+    names = {bone.name: bone for bone in model.bones}
+    collections = {stc.name.replace("_full", ""): stc for stc in model.sequenceTransformationCollections}
+    source_ids = set(collections[rig.melee_source].animIds)
+    clip_ids = set(collections[MELEE_CLIP].animIds)
+    talons = [name for name in names if any(chain in bone_chain_names(model, name) for chain in rig.melee_roots)]
+    missing = [name for name in talons if (set(bone_ids(names[name])) & source_ids) - clip_ids]
+    if not talons or missing:
+        fail(f"{label}: {MELEE_CLIP} leaves out talon bones {missing or rig.melee_roots}")
+    found = MELEE_LENGTH_RE.findall(galaxy)
+    if found != [f"{lengths[rig.melee_source] / 1000.0:.1f}"]:
+        fail(f"c_ANIM_MELEE_CLIP_LENGTH {found} differs from {rig.melee_source} ({lengths[rig.melee_source]} ms)")
+    if MELEE_CONFIG not in galaxy:
+        fail(f"the script does not configure {MELEE_CLIP} for the swing")
+    return f"{label}: talons swing {MELEE_CLIP} from {rig.melee_source}, {lengths[MELEE_CLIP]} ms, {len(talons)} talon bones"
+
+
 def check_heroes(map_dir: Path, galaxy: str, fail) -> None:
     for key, rig in HEROES.items():
         model = m3.loadModel(str(map_dir / rig.target))
@@ -105,4 +148,5 @@ def check_heroes(map_dir: Path, galaxy: str, fail) -> None:
         clips = [("Attack Walk " + name, yaw, reverse) for name, yaw, reverse in AIM_DIRECTIONS]
         print(f"hero: {check_strafe(model, key, rig.turn_bone, rig.leg_roots, 'Walk Leg', clips, fail)}")
         print(f"hero: {check_breath(model, key, rig, fail)}")
+        print(f"hero: {check_melee(model, key, rig, galaxy, fail)}")
     print(f"hero: {check_breath_script(galaxy, fail)}")

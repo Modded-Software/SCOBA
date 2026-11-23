@@ -18,9 +18,24 @@ HERO_WEAPONS = ("Tosh", "RazorTalons", "QueenOfBladesPsiBlast")
 FRIENDLY_FIRE_BEHAVIOR = "SCOBAFriendlyFireBlock"
 
 HERO_UNITS = ("ToshSCOBA", "KerriganSCOBA")
-# Operator 2026-11-22: Psi Blast is Kerrigan's only attack. Her stock slot 1
-# (RazorTalons) is replaced; slot 0 is the stock QueenOfBladesPsiBlast.
-KERRIGAN_WEAPON_SLOTS = [("1", "QueenOfBladesPsiBlastAuto")]
+# Operator 2026-11-23: Psi Blast is Kerrigan's ranged attack; the talons
+# swing on F. Her stock slot 1 is the Psi Blast auto twin; the talons auto
+# twin is appended and the engine uses it only with Attack auto. Slot 0 is
+# the stock QueenOfBladesPsiBlast.
+KERRIGAN_WEAPON_SLOTS = [("1", "QueenOfBladesPsiBlastAuto"), (None, "RazorTalonsAuto")]
+# The F swing: the stock talons hits on each enemy in a front arc the
+# script picks (operator 2026-11-23; an engine arc ignored her facing).
+SWING = "SCOBATalonsSwingHit"
+SWING_DAMAGE = "RazorTalonsDamage"
+SWING_PERIODS = ["0", "0.3"]
+SWING_SCRIPT = (
+    'const string c_SCOBA_EFFECT_TALONS_SWING = "SCOBATalonsSwingHit";',
+    'const string c_SCOBA_EFFECT_TALONS_CLOCK = "SCOBAAttackCooldown10";',
+    "const fixed c_SCOBA_TALONS_ARC = 90.0;",
+    "const fixed c_SCOBA_TALONS_REACH = 1.0;",
+)
+# The swing is on the TPS left mouse down without aim (operator 2026-11-23).
+SWING_PRESS = "    gf_TpsLeftClick(lp_player);\n    gf_TalonsSwing(lp_player);\n}"
 # Operator 2026-11-22: the missile's impact effect gets the target unit
 # (R-TPS-64), and Kerrigan has no Poison Nova (R-TPS-65).
 PSI_BLAST_LAUNCH = "PsiBlastLaunchMissile"
@@ -83,18 +98,55 @@ def check_link(cooldown: ET.Element | None, owner: str) -> ET.Element:
 
 
 def check_kerrigan_weapons(gamedata: Path, weapons: dict) -> None:
-    """Psi Blast only, at any distance: no talons slot, no minimum range."""
+    """Psi Blast at any distance, the talons twin for Attack auto."""
     unit = ET.parse(gamedata / "UnitData.xml").getroot().find("CUnit[@id='KerriganSCOBA']")
     if unit is None:
         fail("missing unit: KerriganSCOBA")
     slots = [(slot.get("index"), slot.get("Link")) for slot in unit.findall("WeaponArray")]
     if slots != KERRIGAN_WEAPON_SLOTS:
-        fail(f"KerriganSCOBA weapon slots must be {KERRIGAN_WEAPON_SLOTS} (Psi Blast only), got {slots}")
+        fail(f"KerriganSCOBA weapon slots must be {KERRIGAN_WEAPON_SLOTS}, got {slots}")
     minimum = weapons["QueenOfBladesPsiBlast"].find("MinimumRange")
     if minimum is None or float(minimum.get("value")) != 0.0:
-        fail("QueenOfBladesPsiBlast must have MinimumRange 0: it is Kerrigan's only attack")
+        fail("QueenOfBladesPsiBlast must have MinimumRange 0: Kerrigan fires it at any distance")
     if weapons["QueenOfBladesPsiBlastAuto"].find("MinimumRange") is not None:
         fail("QueenOfBladesPsiBlastAuto must inherit the minimum range")
+
+
+def check_kerrigan_talons(map_dir: Path) -> None:
+    """The TPS left mouse down without aim swings the talons: the stock hits on each enemy in a 90 degree arc
+    within 1 of her edge, with the button clock. F is not the Order key, and
+    the stock RazorTalons is removed."""
+    effects = ET.parse(map_dir / GAMEDATA / "EffectData.xml").getroot()
+    swing = effects.find(f"CEffectCreatePersistent[@id='{SWING}']")
+    if swing is None:
+        fail(f"missing effect: {SWING}")
+    where = swing.find("WhichLocation")
+    periodic = [element.get("value") for element in swing.findall("PeriodicEffectArray")]
+    periods = [element.get("value") for element in swing.findall("PeriodicPeriodArray")]
+    count = swing.find("PeriodCount")
+    if where is None or where.get("Value") != "TargetUnit":
+        fail(f"{SWING} must hit the target unit")
+    if periodic != [SWING_DAMAGE] or periods != SWING_PERIODS or count is None or count.get("value") != "2":
+        fail(f"{SWING} must run {SWING_DAMAGE} twice at {SWING_PERIODS}, got {periodic} {periods}")
+    constants = read(map_dir / "scripts" / "app" / "core" / "constants.galaxy")
+    for line in SWING_SCRIPT:
+        if line not in constants:
+            fail(f"constants.galaxy must hold {line}")
+    if "c_keyF" in read(map_dir / SYSTEMS / "input.galaxy"):
+        fail("input.galaxy must not bind F: Order is Ctrl+E (operator 2026-11-23)")
+    targeting = read(map_dir / SYSTEMS / "targeting.galaxy")
+    if SWING_PRESS not in targeting or targeting.count("gf_TpsLeftPress(lv_player);") != 1:
+        fail("the TPS left mouse down must target and swing at once (gf_TpsLeftPress)")
+    if "c_keyF" in read(map_dir / SYSTEMS / "combat_attack.galaxy") or "gf_TpsLeftClick(lv_player);" in targeting:
+        fail("no F swing, and no TPS left click on release (operator 2026-11-23)")
+    if "UnitWeaponRemove(lp_hero, c_SCOBA_WEAPON_TALONS);" not in read(map_dir / SYSTEMS / "hero_return.galaxy"):
+        fail("gf_HeroWeaponsSet must remove the stock RazorTalons from Kerrigan")
+    # Cooldown 1 s (operator 2026-11-23): period and cost.
+    weapon = ET.parse(map_dir / GAMEDATA / "WeaponData.xml").getroot().find("CWeaponLegacy[@id='RazorTalons']")
+    period = None if weapon is None else weapon.find("Period")
+    cost = None if weapon is None else weapon.find("Cost/Cooldown")
+    if period is None or period.get("value") != "1" or cost is None or cost.get("TimeUse") != "1":
+        fail("RazorTalons must have Period 1 and cooldown TimeUse 1")
 
 
 def check_kerrigan_psi_blast(gamedata: Path) -> None:
@@ -147,6 +199,7 @@ def check_aim_shot_data(map_dir: Path) -> None:
         check_link(weapon.find("Cost/Cooldown"), weapon_id)
     check_kerrigan_weapons(gamedata, weapons)
     check_kerrigan_psi_blast(gamedata)
+    check_kerrigan_talons(map_dir)
 
     for name in ("AbilData.xml", "EffectData.xml", "ActorData.xml", "UnitData.xml"):
         text = read(gamedata / name)
@@ -197,14 +250,24 @@ def check_aim_shot_script(map_dir: Path, combined: str) -> None:
     # cannot stop a walking hero (R-TPS-61).
     # Product scripts only: a test map also carries its harness.
     app_text = "\n".join(read(path) for path in sorted((map_dir / "scripts" / "app").rglob("*.galaxy")))
-    if app_text.count("UnitCreateEffectUnit(") != 1 or "UnitCreateEffectUnit(lv_hero, lv_effect, lv_target);" not in aim_text:
+    # Two: the aim shot and the talons swing hit (operator 2026-11-23).
+    if aim_text.count("UnitCreateEffectUnit(") != 1 or "UnitCreateEffectUnit(lv_hero, lv_effect, lv_target);" not in aim_text:
         fail("the aim shot must run the weapon effect once, in aim_shooting.galaxy")
+    if app_text.count("UnitCreateEffectUnit(") != 2 or "UnitCreateEffectUnit(lv_hero, c_SCOBA_EFFECT_TALONS_SWING, lv_u);" not in read(map_dir / SYSTEMS / "combat_attack.galaxy"):
+        fail("only the aim shot and the talons swing hit may create a unit effect")
     if "UnitIssueOrder(" in aim_text or "gf_AttackOrder(" in aim_text:
         fail("aim shooting must not issue an order")
     if 'CatalogFieldValueGet(c_gameCatalogWeapon, lp_weapon, "Effect", lp_player)' not in aim_text:
         fail("the aim shot effect must be read from the weapon data")
-    if app_text.count("UnitAddCooldown(") != 1 or '"Cost.Cooldown.TimeUse"' not in aim_text:
+    # Two starts of the attack cooldown: the aim shot and the F talons swing
+    # (operator 2026-11-23), each once, each with the weapon's own time.
+    swing_text = read(map_dir / SYSTEMS / "combat_attack.galaxy")
+    if aim_text.count("UnitAddCooldown(") != 1 or '"Cost.Cooldown.TimeUse"' not in aim_text:
         fail("the aim shot must start the attack cooldown once, with the weapon's own cooldown time")
+    if swing_text.count("UnitAddCooldown(") != 1 or "c_SCOBA_WEAPON_TALONS, \"Cost.Cooldown.TimeUse\"" not in swing_text:
+        fail("the talons swing must start the attack cooldown once, with the talons cooldown time")
+    if app_text.count("UnitAddCooldown(") != 2:
+        fail("only the aim shot and the talons swing may start the attack cooldown")
     if "c_TPS_PROXY_AIR_HEIGHT" not in aim_text or "c_SCOBA_SHOT_TOSH_AIR" not in aim_text:
         fail("a shot at the proxy in the air must run the air effect")
     for name in ("strafe.galaxy", "combat_fsm.galaxy"):

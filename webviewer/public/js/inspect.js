@@ -141,6 +141,8 @@
       // Culling: the model's bounding sphere radius, and whether the last
       // frame drew the instance (false when it was culled).
       boundsRadius: item.model.bounds.r,
+      // The rest-pose vertex box (model space, before the data and instance scale).
+      vertexBox: [[...item.model.vertexMin], [...item.model.vertexMax]],
       undrawn: [...item.model.undrawnBatches],
       displacementBatches: item.model.displacementBatches.length,
       // Per region: the UV transform the renderer applies (scale, offset),

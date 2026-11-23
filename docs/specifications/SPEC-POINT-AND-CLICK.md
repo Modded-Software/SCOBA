@@ -76,7 +76,7 @@ passed in that run unless another run is named.
 | R-PNC-42, 45 | [tested] | `single_shot`, `weapon_button`. |
 | R-PNC-43 | [tested] | `auto_to_single`. |
 | R-PNC-44 | [tested] | `switch_single_stand`, `switch_auto_move`, hero state and button state. |
-| R-PNC-46 | [tested] | Read one game loop after the shot effect (`gf_DbgClockRead`; the 0.25 s Tosh period is over by the old 0.5 s read): `EarlyCdMs`, `EarlyBtnMs` above 0, at most the weapon cooldown for Tosh; Kerrigan above 0 only (her 1.5 s button clock is not her first weapon's). Every shot path: `single_shot`, `weapon_button`, `auto_click`, `auto_stand_in`, `talons_single`, `psiblast_single`, `talons_auto`. Since 2026-11-22 the Kerrigan sections are `psi_close_single`, `psiblast_single`, `psi_close_auto` (SPEC-TPS 5.5a); not run. The clock overlay is [operator]. |
+| R-PNC-46 | [tested] | Read one game loop after the shot effect (`gf_DbgClockRead`; the 0.25 s Tosh period is over by the old 0.5 s read): `EarlyCdMs`, `EarlyBtnMs` above 0, at most the weapon cooldown for Tosh; Kerrigan above 0 only (her button clock is not her first weapon's). Every shot path: `single_shot`, `weapon_button`, `auto_click`, `auto_stand_in`, `talons_single`, `psiblast_single`, `talons_auto`. Since 2026-11-22 the Kerrigan sections are `psi_close_single`, `psiblast_single`, `psi_close_auto` (SPEC-TPS 5.5a); not run. The clock overlay is [operator]. |
 | R-PNC-47 | [tested] | `startup`, hero state and button state. |
 | R-PNC-48 | [tested] | `toggle buttons match hero state` over every snapshot; `auto_to_single`; both switch scenarios. |
 | R-PNC-50, 53 | [tested] | `wasd_stand`, `auto_stand_out`. |
@@ -248,8 +248,9 @@ Right hold matches middle hold (R-PNC-68):
   [tested] `weapon_button`
 - The clock is drawn by the engine from the button ability's own cooldown:
   `<Cooldown Link="Abil/SCOBAAutoAttackStatus" Location="Ability" TimeUse="1"/>`.
-- Data starts it on every shot (F14). `SCOBAAttackCooldown10` and
-  `SCOBAAttackCooldown15` set it to 1 s and 1.5 s. [tested]
+- Data starts it on every shot (F14). `SCOBAAttackCooldown10` sets it to
+  1 s; the talons used `SCOBAAttackCooldown15` (1.5 s) until 2026-11-23.
+  [tested]
   - `Tosh` fires the set `SCOBAToshShot`: `ToshU`, then the cooldown effect.
   - `RazorTalonsPersistent` runs it as `InitialEffect`.
   - `PsiBlastLaunchMissile` runs it as `LaunchEffect`.

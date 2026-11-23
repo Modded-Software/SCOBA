@@ -66,8 +66,9 @@ def balance_problems(hazards: list[Placed], lane_count: int) -> list[str]:
 def doodad_xml(ident: int, kind: str, x: float, y: float, z: float, rotation: float, scale: float, variation: int) -> str:
     """Absolute z (HeightOffset + HeightAbsolute), the format of the editor-placed trees.
 
-    z is the computed ground plus config.GROUND_LIFT: operator probe 2026-11-15
-    (scripts/flora/probe.py) chose row F, ground +1.0. z 0 buries props off low ground.
+    z is the computed ground plus lift_of(kind, scale): operator probe
+    2026-11-15 (scripts/flora/probe.py) chose row F, ground +1.0; z 0 buried
+    props off low ground. Probe 2026-11-23: small flora at ground +3.0.
     """
     return (
         f'    <ObjectDoodad Id="{ident}" Variation="{variation}" Position="{x:g},{y:g},{z:.4f}" Rotation="{rotation:g}"'
@@ -78,9 +79,15 @@ def doodad_xml(ident: int, kind: str, x: float, y: float, z: float, rotation: fl
     )
 
 
-def lift_of(kind: str) -> float:
-    """Placed z above the computed ground: hazards get HAZARD_LIFT more."""
-    return config.GROUND_LIFT + (config.HAZARD_LIFT if kind in config.HAZARD_VARIATIONS else 0.0)
+def lift_of(kind: str, scale: float | None = None) -> float:
+    """Placed z above the computed ground: hazards get HAZARD_LIFT more;
+    a plant whose scale is under SMALL_SCALE gets SMALL_LIFT (operator
+    2026-11-23). No scale: GROUND_LIFT."""
+    if kind in config.HAZARD_VARIATIONS:
+        return config.GROUND_LIFT + config.HAZARD_LIFT
+    if scale is not None and scale < config.SMALL_SCALE:
+        return config.SMALL_LIFT
+    return config.GROUND_LIFT
 
 
 def hazard_ground(terrain: terrain_mod.Terrain, x: float, y: float, half: float) -> float:
@@ -104,7 +111,7 @@ def objects_xml(p: Plan, next_id: int, terrain: terrain_mod.Terrain) -> str:
         entries.append(doodad_xml(ident, h.kind, h.x, h.y, z, h.rotation, 1.0, variation))
         ident += 1
     for plant in p.plants:
-        z = terrain_mod.ground_z(terrain, plant.x, plant.y) + config.GROUND_LIFT
+        z = terrain_mod.ground_z(terrain, plant.x, plant.y) + lift_of(plant.kind, plant.scale)
         entries.append(doodad_xml(ident, plant.kind, plant.x, plant.y, z, plant.rotation, plant.scale, plant.variation))
         ident += 1
     if ident > 2**31 - 1:
@@ -232,9 +239,10 @@ def check_flora(map_dir: Path) -> list[str]:
     if want != have:
         problems.append(f"placed flora differs from the plan: {len(have)} placed, {len(want)} planned")
     terrain = terrain_mod.load(map_dir)
+    scales = {(pl.kind, f"{pl.x:g}", f"{pl.y:g}"): pl.scale for pl in p.plants}
     off_ground = [
         (k, x, y, z) for k, x, y, z, a in placed
-        if not a or abs(z - terrain_mod.ground_z(terrain, x, y) - lift_of(k)) > GROUND_TOLERANCE
+        if not a or abs(z - terrain_mod.ground_z(terrain, x, y) - lift_of(k, scales.get((k, f"{x:g}", f"{y:g}")))) > GROUND_TOLERANCE
     ]
     if off_ground:
         problems.append(f"{len(off_ground)} flora doodads are not at their ground lift, e.g. {off_ground[:3]}")
@@ -303,5 +311,5 @@ def crush_rows(p: Plan, terrain: terrain_mod.Terrain, objects: str) -> list[tupl
         ident = ids.get((pl.kind, f"{pl.x:g},{pl.y:g}"))
         if ident is None:
             raise ValueError(f"crush: no placed doodad for {pl.kind} at ({pl.x:g},{pl.y:g})")
-        rows.append((pl.kind, pl.x, pl.y, round(terrain_mod.ground_z(terrain, pl.x, pl.y) + config.GROUND_LIFT, 3), pl.scale, ident))
+        rows.append((pl.kind, pl.x, pl.y, round(terrain_mod.ground_z(terrain, pl.x, pl.y) + lift_of(pl.kind, pl.scale), 3), pl.scale, ident))
     return rows

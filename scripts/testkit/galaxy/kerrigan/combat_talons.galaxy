@@ -1,0 +1,241 @@
+// Combat harness: Kerrigan's talons swing on the TPS left mouse down
+// (R-TPS-66) and the swing clip rate probe (T43). Split from
+// combat_kerrigan.galaxy (file length limit); included after it, whose
+// gv_dbgSwingDmg and gv_dbgSwingHit it reads, and before combat.galaxy.
+
+// Talons swing on the TPS left mouse down (operator 2026-11-23). lp_n
+// enemies at lp_dist from the hero, enemy i at lp_angle + i * lp_step off
+// her facing. lp_presses calls of the press handler (gf_TpsLeftPress),
+// 0.2 s apart, with TPS on unless gv_dbgTalonsPnc, aiming if
+// gv_dbgTalonsAim. Bank: swings, damage events, each
+// enemy's life, the attack cooldown after the first press, raw distance,
+// angle and facing. gv_dbgTalonsFacing >= 0 sets her facing first.
+unit[8] gv_dbgTalonsUnit;
+fixed gv_dbgTalonsFacing = -1.0;
+bool gv_dbgTalonsPnc;
+bool gv_dbgTalonsAim;
+
+void gf_DbgTalonsLife (string lp_s, string lp_key) {
+    int lv_i;
+    unit lv_u;
+    point lv_at = UnitGetPosition(gv_tPSUNIT[1]);
+    string lv_n;
+
+    for (lv_i = 0; lv_i < 8; lv_i += 1) {
+        lv_u = gv_dbgTalonsUnit[lv_i];
+        lv_n = IntToString(lv_i);
+        if (UnitIsValid(lv_u)) {
+            BankValueSetFromInt(gv_dbgBank, lp_s, lp_key + lv_n, FixedToInt(UnitGetPropertyFixed(lv_u, c_unitPropLife, c_unitPropCurrent)));
+        }
+        // Where each stood just before the swing.
+        if (UnitIsValid(lv_u) && lp_key == "life0_") {
+            BankValueSetFromInt(gv_dbgBank, lp_s, "dist100_" + lv_n, FixedToInt(DistanceBetweenPoints(lv_at, UnitGetPosition(lv_u)) * 100.0));
+            BankValueSetFromInt(gv_dbgBank, lp_s, "angle_" + lv_n, FixedToInt(AngleBetweenPoints(lv_at, UnitGetPosition(lv_u)) - UnitGetFacing(gv_tPSUNIT[1])));
+        }
+    }
+}
+
+void gf_DbgTalonsCase (string lp_s, fixed lp_dist, fixed lp_angle, int lp_n, fixed lp_step, int lp_presses, bool lp_kerrigan) {
+    unit lv_hero;
+    int lv_swings;
+    int lv_dmg;
+    int lv_i;
+
+    gf_DbgReset(lp_s, false, true);
+    if (lp_kerrigan) {
+        gf_DbgUseKerrigan();
+    }
+    lv_hero = gv_tPSUNIT[1];
+    if (!gv_dbgTalonsPnc) {
+        UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+        Wait(0.3, c_timeGame);
+    }
+    if (gv_dbgTalonsAim) {
+        gf_AimBegin(1);
+        Wait(0.5, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "tps", gf_TpsActive(1));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "aim", gv_aIMACTIVE[1]);
+    if (gv_dbgTalonsFacing >= 0.0) {
+        UnitSetFacing(lv_hero, gv_dbgTalonsFacing, 0.0);
+        Wait(0.2, c_timeGame);
+    }
+    for (lv_i = 0; lv_i < 8; lv_i += 1) {
+        gv_dbgTalonsUnit[lv_i] = null;
+        if (lv_i < lp_n) {
+            // Exact spots: placement search moved a ring (run 20261123-100936).
+            UnitCreate(1, "Zergling", c_unitCreateIgnorePlacement, 4, PointWithOffsetPolar(UnitGetPosition(lv_hero), lp_dist, UnitGetFacing(lv_hero) + lp_angle + lp_step * IntToFixed(lv_i)), 0.0);
+            gv_dbgTalonsUnit[lv_i] = UnitLastCreated();
+            UnitSetState(UnitLastCreated(), c_unitStateStunned, true);
+            UnitSetPropertyFixed(UnitLastCreated(), c_unitPropLifeMax, 500.0);
+            UnitSetPropertyFixed(UnitLastCreated(), c_unitPropLife, 500.0);
+        }
+    }
+    Wait(0.3, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lp_s, "heroType", UnitGetType(lv_hero));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "facing0", FixedToInt(UnitGetFacing(lv_hero)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "cd0Ms", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+    gf_DbgTalonsLife(lp_s, "life0_");
+    lv_swings = gv_talonsSwings[1];
+    lv_dmg = gv_dbgSwingDmg;
+    gv_dbgSwingHit = "";
+    for (lv_i = 0; lv_i < lp_presses; lv_i += 1) {
+        gf_TpsLeftPress(1);
+        if (lv_i == 0) {
+            BankValueSetFromInt(gv_dbgBank, lp_s, "cd1Ms", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
+            BankValueSetFromInt(gv_dbgBank, lp_s, "animState", gv_animAttackState[1]);
+            // Raw: the clip the engine holds on the attack bracket.
+            Wait(0.1, c_timeGame);
+            AnimLengthQueryByName(libNtve_gf_MainActorofUnit(lv_hero), c_ANIM_BRACKET_ATTACK, false);
+            AnimLengthQueryWait();
+            BankValueSetFromInt(gv_dbgBank, lp_s, "clipLenMs", FixedToInt(AnimLengthSync(AnimLengthQueryLastCreated()) * 1000.0));
+            BankValueSetFromInt(gv_dbgBank, lp_s, "clipRemMs", FixedToInt(AnimLengthRemainingSync(AnimLengthQueryLastCreated()) * 1000.0));
+            BankValueSetFromInt(gv_dbgBank, lp_s, "clipAtMs", FixedToInt(GameGetMissionTime() * 1000.0));
+            BankValueSetFromInt(gv_dbgBank, lp_s, "rate100", FixedToInt(gf_AnimAttackScale(1, c_ANIM_UPPER_ATTACK_MELEE) * 100.0));
+            BankValueSetFromInt(gv_dbgBank, lp_s, "holdMs", FixedToInt(gf_AnimAttackHold(1, c_ANIM_UPPER_ATTACK_MELEE) * 1000.0));
+            // Raw: the engine play rate, clip time over game time. 0.5 s:
+            // readings step by 62.5 ms (run combat/20261123-112938). Not
+            // with more presses: they must stay inside the 1 s cooldown.
+            if (lp_presses == 1) {
+                Wait(0.5, c_timeGame);
+                AnimLengthQueryByName(libNtve_gf_MainActorofUnit(lv_hero), c_ANIM_BRACKET_ATTACK, false);
+                AnimLengthQueryWait();
+                BankValueSetFromInt(gv_dbgBank, lp_s, "clipRem2Ms", FixedToInt(AnimLengthRemainingSync(AnimLengthQueryLastCreated()) * 1000.0));
+                BankValueSetFromInt(gv_dbgBank, lp_s, "clipAt2Ms", FixedToInt(GameGetMissionTime() * 1000.0));
+            }
+            BankValueSetFromString(gv_dbgBank, lp_s, "clipName", gv_animUpperClip[c_ANIM_HERO_KERRIGAN][gv_animAttackState[1]]);
+            // Negative: no pitch pose (her Psi Blast cast frame) over it.
+            BankValueSetFromInt(gv_dbgBank, lp_s, "pitchStep", gv_animTargetPitchStep[1]);
+        }
+        BankValueSetFromInt(gv_dbgBank, lp_s, "pressMs" + IntToString(lv_i), FixedToInt(GameGetMissionTime() * 1000.0));
+        Wait(0.1, c_timeGame);
+    }
+    Wait(1.0, c_timeGame);
+    gf_DbgTalonsLife(lp_s, "life1_");
+    BankValueSetFromInt(gv_dbgBank, lp_s, "swings", gv_talonsSwings[1] - lv_swings);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "damages", gv_dbgSwingDmg - lv_dmg);
+    BankValueSetFromString(gv_dbgBank, lp_s, "hits", gv_dbgSwingHit);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "facing1", FixedToInt(UnitGetFacing(lv_hero)));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "weapons", UnitWeaponCount(lv_hero));
+    BankValueSetFromInt(gv_dbgBank, lp_s, "attackState", c_ANIM_UPPER_ATTACK_MELEE);
+    BankSave(gv_dbgBank);
+    if (gv_dbgTalonsAim) {
+        gf_AimEnd(1);
+    }
+    if (!gv_dbgTalonsPnc) {
+        UnitIssueOrder(lv_hero, Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+        Wait(0.3, c_timeGame);
+    }
+}
+
+void gf_DbgTalonsGroup () {
+    gf_DbgTalonsCase("talons_front", 1.45, 0.0, 1, 0.0, 1, true);
+    gf_DbgTalonsCase("talons_arc", 1.45, -30.0, 2, 60.0, 1, true);
+    gf_DbgTalonsCase("talons_edge", 1.6, 0.0, 1, 0.0, 1, true);
+    // Negatives: out of reach, beside her, behind her.
+    gf_DbgTalonsCase("talons_out", 2.6, 0.0, 1, 0.0, 1, true);
+    gf_DbgTalonsCase("talons_side", 1.45, 90.0, 2, 180.0, 1, true);
+    gf_DbgTalonsCase("talons_back", 1.45, 180.0, 1, 0.0, 1, true);
+    // No target at all: she swings.
+    gf_DbgTalonsCase("talons_empty", 0.0, 0.0, 0, 0.0, 1, true);
+    // Negative: presses inside the cooldown start nothing.
+    gf_DbgTalonsCase("talons_cd", 1.45, 0.0, 1, 0.0, 3, true);
+    // Negative: Tosh has no swing.
+    gf_DbgTalonsCase("talons_tosh", 1.45, 0.0, 1, 0.0, 1, false);
+    // Two facings, enemies every 45 degrees from 22.5: the 2 in front are hit.
+    gv_dbgTalonsFacing = 50.0;
+    gf_DbgTalonsCase("talons_ring_f50", 1.5, 22.5, 8, 45.0, 1, true);
+    gv_dbgTalonsFacing = 140.0;
+    gf_DbgTalonsCase("talons_ring_f140", 1.5, 22.5, 8, 45.0, 1, true);
+    gv_dbgTalonsFacing = -1.0;
+    // Negatives: aiming, the press is the aim shot; in PNC it is no swing.
+    gv_dbgTalonsAim = true;
+    gf_DbgTalonsCase("talons_click_aim", 0.0, 0.0, 0, 0.0, 1, true);
+    gv_dbgTalonsAim = false;
+    gv_dbgTalonsPnc = true;
+    gf_DbgTalonsCase("talons_click_pnc", 1.45, 0.0, 1, 0.0, 1, true);
+    gv_dbgTalonsPnc = false;
+}
+
+// Operator watch (2026-11-23): the swing shows the Spell pose. Labelled,
+// one after another on the bound Kerrigan: 1 stock Attack 01 whole body,
+// 2 the F swing (baked copy), 3 stock Spell whole body (control). Raw:
+// the engine's clip length on the watch bracket. Which move is right:
+// operator check.
+const string c_DBG_WATCH_BRACKET = "SCOBAWatch";
+
+void gf_DbgSwingWatchOne (string lp_s, string lp_tag, string lp_label, string lp_clip) {
+    unit lv_hero = gv_tPSUNIT[1];
+    actor lv_actor = libNtve_gf_MainActorofUnit(lv_hero);
+    int lv_tag;
+    int lv_i;
+
+    TextTagCreate(StringToText(lp_label), 24, UnitGetPosition(lv_hero), 3.0, true, false, PlayerGroupAll());
+    lv_tag = TextTagLastCreated();
+    Wait(1.0, c_timeGame);
+    for (lv_i = 0; lv_i < 3; lv_i += 1) {
+        if (lp_clip == "") {
+            gf_TalonsSwing(1);
+        }
+        else {
+            ActorSend(lv_actor, MakeMsgAnimPlay(c_DBG_WATCH_BRACKET, lp_clip, c_animFlagFullMatch | c_animFlagNonLooping, 0.1, 0.1, 1.0, c_animTimeVariantAsTimeScale));
+        }
+        Wait(0.1, c_timeGame);
+        if (lv_i == 0) {
+            AnimLengthQueryByName(lv_actor, c_DBG_WATCH_BRACKET, false);
+            if (lp_clip == "") {
+                AnimLengthQueryByName(lv_actor, c_ANIM_BRACKET_ATTACK, false);
+            }
+            AnimLengthQueryWait();
+            BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "LenMs", FixedToInt(AnimLengthSync(AnimLengthQueryLastCreated()) * 1000.0));
+        }
+        Wait(2.4, c_timeGame);
+        ActorSend(lv_actor, "AnimClear " + c_DBG_WATCH_BRACKET);
+    }
+    BankSave(gv_dbgBank);
+    TextTagDestroy(lv_tag);
+}
+
+// Raw probe: the swing clip at several time scales; the engine's clip
+// time over game time for each (run 112207 read 2.0 for 2.67).
+void gf_DbgSwingRate (string lp_s, int lp_n, fixed lp_scale) {
+    actor lv_actor = libNtve_gf_MainActorofUnit(gv_tPSUNIT[1]);
+    fixed lv_r1;
+    fixed lv_t1;
+
+    ActorSend(lv_actor, MakeMsgAnimPlay(c_DBG_WATCH_BRACKET, "Attack,Arm,Alternate,Close", c_animFlagFullMatch | c_animFlagNonLooping, 0.0, 0.0, lp_scale, c_animTimeVariantAsTimeScale));
+    Wait(0.0625, c_timeGame);
+    AnimLengthQueryByName(lv_actor, c_DBG_WATCH_BRACKET, false);
+    AnimLengthQueryWait();
+    lv_r1 = AnimLengthRemainingSync(AnimLengthQueryLastCreated());
+    lv_t1 = GameGetMissionTime();
+    Wait(0.375, c_timeGame);
+    AnimLengthQueryByName(lv_actor, c_DBG_WATCH_BRACKET, false);
+    AnimLengthQueryWait();
+    BankValueSetFromString(gv_dbgBank, lp_s, "rate" + IntToString(lp_n), FixedToString(lp_scale, 3) + " " + IntToString(FixedToInt((lv_r1 - AnimLengthRemainingSync(AnimLengthQueryLastCreated())) * 1000.0)) + " " + IntToString(FixedToInt((GameGetMissionTime() - lv_t1) * 1000.0)));
+    ActorSend(lv_actor, "AnimClear " + c_DBG_WATCH_BRACKET);
+    Wait(0.2, c_timeGame);
+}
+
+void gf_DbgSwingWatchGroup () {
+    fixed lv_dist;
+
+    gf_DbgReset("swing_watch", false, true);
+    gf_DbgUseKerrigan();
+    gf_DbgClearEnemies();
+    lv_dist = gv_cameraDistanceDesired[1];
+    gv_cameraDistanceDesired[1] = 6.0;
+    Wait(1.0, c_timeGame);
+    gf_DbgSwingWatchOne("swing_watch", "stock", "1: stock ATTACK 01 (whole body)", "Attack,01");
+    gf_DbgSwingWatchOne("swing_watch", "swing", "2: F swing (map copy)", "");
+    gf_DbgSwingWatchOne("swing_watch", "spell", "3: stock SPELL (control)", "Spell");
+    gf_DbgSwingRate("swing_watch", 0, 1.0);
+    gf_DbgSwingRate("swing_watch", 1, 1.3333);
+    gf_DbgSwingRate("swing_watch", 2, 2.0);
+    gf_DbgSwingRate("swing_watch", 3, 2.5);
+    gf_DbgSwingRate("swing_watch", 4, 2.6667);
+    gf_DbgSwingRate("swing_watch", 5, 3.0);
+    BankSave(gv_dbgBank);
+    gv_cameraDistanceDesired[1] = lv_dist;
+    Wait(0.5, c_timeGame);
+}

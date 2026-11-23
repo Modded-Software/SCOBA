@@ -68,6 +68,16 @@
         flags: e.flags,
         additionalFlags: e.additionalFlags,
         worldSpace: s.worldSpace,
+        // Motion: closed form, or per-step (euler: drag without its floor).
+        euler: s.euler,
+        drag: e.drag,
+        mass: [e.mass, e.mass2],
+        zAcceleration: e.zAcceleration,
+        forces: e.forces,
+        forcesFallback: e.forcesFallback,
+        killSphere: e.killSphere,
+        noiseAmplitude: e.noiseAmplitude,
+        windMultiplier: e.windMultiplier,
         max: s.max,
         rateInit: e.emissionRate.initValue,
         lifeInit: [e.lifespan1.initValue, e.lifespan2.initValue],
@@ -103,9 +113,14 @@
     return { enabled: m3().particlesEnabled, emitters, quads: systems.reduce((n, s) => n + s.quads, 0) };
   }
 
-  /** Run one item's emitters for `seconds` of game time in steps of `step` seconds. */
+  /**
+   * Run one item's emitters for `seconds` of game time in steps of `step`
+   * seconds, with the frame loop's clock stopped for it (time scale 0), so
+   * its particles move only here and stay put while a test measures them.
+   */
   function advanceParticles(id, seconds, step = 1 / 60) {
     const item = find(id);
+    item.instance.timeScale = 0;
     const steps = Math.round(seconds / step);
     for (let i = 0; i < steps; i++) item.instance.updateParticles(step);
     return steps;

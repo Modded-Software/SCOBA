@@ -12,7 +12,8 @@ const int c_ANIM_UPPER_ATTACK_AIM = 8;
 const int c_ANIM_UPPER_ATTACK_SPELL_AIM = 9;
 const int c_ANIM_UPPER_WALK_SLOW = 10;       // slow walk arms, not aiming (R-SLOW-19)
 const int c_ANIM_UPPER_WALK_SLOW_BACK = 11;  // the same in reverse, back leg clips
-const int c_ANIM_UPPER_COUNT = 12;
+const int c_ANIM_UPPER_ATTACK_MELEE = 12;  // Kerrigan's talons swing, Attack 01 (operator 2026-11-23)
+const int c_ANIM_UPPER_COUNT = 13;
 
 const int c_ANIM_LOWER_NONE = 0;
 const int c_ANIM_LOWER_IDLE = 1;
@@ -72,6 +73,10 @@ const fixed c_ANIM_ATTACK_SPEED_MIN = 0.25;
 const fixed c_ANIM_ATTACK_DURATION = 0.5;
 const fixed c_ANIM_ATTACK_TIME_SCALE = 2.0;
 const fixed c_ANIM_ATTACK_START_TIME = 0.35;
+// The talons swing plays all of Attack 01 (2 s) from 0 in the play time,
+// held that long (operator 2026-11-23: 2x the 1.5 s fit, so 0.75 s).
+const fixed c_ANIM_MELEE_CLIP_LENGTH = 2.0;
+const fixed c_ANIM_MELEE_PLAY_TIME = 0.75;
 // Tosh's attack clip plays this much faster on top of the weapon-period
 // factor; its hold shortens to match (operator 2026-11-17: 2x).
 const fixed c_ANIM_ATTACK_RATE_TOSH = 2.0;

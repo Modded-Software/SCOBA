@@ -32,9 +32,11 @@
             <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1"/>
         </Cost>
     </CWeaponLegacy>
+    <!-- Talons cooldown 1 s (operator 2026-11-23); was the stock 1.5. -->
     <CWeaponLegacy id="RazorTalons">
+        <Period value="1"/>
         <Cost>
-            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1.5"/>
+            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="1"/>
         </Cost>
     </CWeaponLegacy>
     <CWeaponLegacy id="Tosh">

@@ -18,7 +18,6 @@ bool gt_OrderKey_Func (bool testConds, bool runActions) {
 
 void gt_OrderKey_Init () {
     gt_OrderKey = TriggerCreate("gt_OrderKey_Func");
-    TriggerAddEventKeyPressed(gt_OrderKey, c_playerAny, c_keyF, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
     TriggerAddEventKeyPressed(gt_OrderKey, c_playerAny, c_keyE, true, c_keyModifierStateIgnore, c_keyModifierStateRequire, c_keyModifierStateIgnore);
 }
 
@@ -83,10 +82,15 @@ bool gf_SlowWalkAllowed (int lp_player) {
     if (!UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
         return false;
     }
-    if (gf_AnimHeroProfile(lv_hero) != c_ANIM_HERO_TOSH) {
+    if (gf_AnimHeroProfile(lv_hero) != c_ANIM_HERO_TOSH && gf_AnimHeroProfile(lv_hero) != c_ANIM_HERO_KERRIGAN) {
         return false;
     }
     return gv_jumpPhase[lp_player] == c_JUMP_NONE;
+}
+// Tosh has slow walk clips. Kerrigan (operator 2026-11-23) keeps her own
+// walk clips, slowed with her speed (feet planted): no slow states.
+bool gf_SlowWalkClips (int lp_player) {
+    return UnitIsValid(gv_tPSUNIT[lp_player]) && gf_AnimHeroProfile(gv_tPSUNIT[lp_player]) == c_ANIM_HERO_TOSH;
 }
 bool gf_SlowWalkWanted (int lp_player) {
     return gv_slowKey[lp_player] && gf_SlowWalkAllowed(lp_player);

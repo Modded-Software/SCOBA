@@ -137,3 +137,9 @@ exceptions:
     owner: sc2
     review_date: '2026-11-23'
     removal: Remove when patch 0039 is re-exported without the word.
+  - rule: bfallback-b
+    path: ^webviewer/patches/0051-m3-particles-the-per-step-motion-CanUseGpuMotion-kee\.patch$
+    rationale: The exported renderer patch (forward-only ref history) names the PAR_ force channel pair localForcesFallback and worldForcesFallback, as WhiteoutLib and WhiteoutFlakes CanUseGpuMotion call them. Not fallback code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when patch 0051 is re-exported without the word.

@@ -11,6 +11,7 @@ Operator 2026-11-20. Things that are in every game and take no part in it.
 | R-SCN-3 | Withdrawn (operator 2026-11-20: "delete the orbiting wraiths"). No scenery Wraith MUST exist. Old text: Two Wraiths MUST circle the Psi Destroyer on elliptical paths for the whole game. The long diameter of each ellipse MUST be at least 48 cells (operator 2026-11-20). They MUST NOT take part in the game: no fight, no damage taken, not counted as air creeps. |
 | R-SCN-4 | One more empty Zerg drop pod MUST fall on the exact camera spot of intro shot S7 (the shot that looks up at the Overmind). It MUST hit the ground at the cut from S6 into S7, on the first pass. Once per game (operator 2026-11-20). |
 | R-SCN-5 | Every tree doodad MUST play its animation at 0.25 of its normal speed, for the whole game (operator 2026-11-21). This holds for all `ZerusTree` doodads and their footprint clones, and for the two intro S2 trees (R-INTRO-17). The particles the trees emit (the rising vapour) MUST rise at 0.25 of their normal speed too (operator 2026-11-21). |
+| R-SCN-6 | Flora doodads whose largest scale axis is under 2.0 MUST sit on the visible ground, not below it (operator 2026-11-23: the small plants were underground). The height is the one the operator picked in the height probe (`flora/probe.py`, row C: computed ground + 3.0). Trees, hazards, flora of scale 2.0 and more, and the other doodads MUST keep their heights. |
 
 ## 2. Acceptance
 
@@ -20,6 +21,7 @@ Operator 2026-11-20. Things that are in every game and take no part in it.
 | AC-SCN-2 | In the first S6 shot three Zerg pods fall in the foreground and hit the ground. |
 | AC-SCN-3 | Withdrawn with R-SCN-3. |
 | AC-SCN-4 | As the view cuts to the look-up Overmind shot, a pod hits the ground at the camera. |
+| AC-SCN-6 | Small plants, grass and vines stand on the ground, not in it and not floating. |
 
 ## 3. Open points
 

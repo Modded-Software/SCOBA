@@ -23,7 +23,7 @@ GROUPS = ("walk", "mode", "hero", "jump")
 SECTIONS = {
     "walk": ("slow_free", "slow_pnc"),
     "mode": ("slow_strafe", "slow_back", "slow_aim"),
-    "hero": ("slow_kerrigan", "slow_switch", "slow_intro"),
+    "hero": ("slow_kerrigan", "slow_kerrigan_aim", "slow_switch", "slow_intro"),
     "jump": ("slow_jump_aim", "slow_jump_pnc"),
 }
 # R-SLOW-2, 3, 5: travel ratios against the normal walk window.
@@ -230,24 +230,64 @@ def check_aim(checks) -> None:
     _facing_kept(checks, s)
 
 
-def check_kerrigan(checks) -> None:
-    s = "slow_kerrigan"
+# Kerrigan's slow script walk clip: engine clip time over game time per
+# unit of script scale (about 0.72, SPEC-TPS T43); over 1 s the slow clip
+# does not wrap. The normal clip wraps (run slowwalk/20261123-114214):
+# its rate is the script scale x the same factor, raw only.
+KERRIGAN_ENGINE_PER_SCALE = (0.6, 0.85)
+KERRIGAN_ENGINE_SLOW_MAX = 0.45
+
+
+def _kerrigan(checks, s: str, lower: int) -> None:
+    """Kerrigan slow walk (operator 2026-11-23): Tosh's 30 % buff and
+    ramp, her own walk clips slowed with her speed. Negatives: no slow
+    clip, no slow arms, no buff without Shift and after it."""
     checks.true(s, "", "heroIsKerrigan")
-    checks.eq(s, "slow", "Buff", 0)
-    checks.false(s, "slow", "SlowOn")
-    checks.true(s, "slow", "SlowKey")
-    _ratio(checks, s, "slow", SAME_RATIO, "Kerrigan keeps her speed")
-    upper = checks.value(s, "slow", "Upper")
-    _report(checks, f"{s} no slow arms", upper not in (UPPER_SLOW, UPPER_SLOW_BACK), f"upper={upper}")
+    checks.eq(s, "", "resetBuff", 0)
+    checks.eq(s, "", "starts", 1)
+    for tag, buff in (("ref", 0), ("slow", 1), ("after", 0)):
+        checks.eq(s, tag, "Buff", buff)
+        checks.eq(s, tag, "SlowOn", buff == 1)
+        checks.eq(s, tag, "FullState", lower)
+        clip = checks.value(s, tag, "Clip") or ""
+        _report(checks, f"{s} {tag} no slow clip", "Slow" not in clip, f"clip={clip!r}")
+        upper = checks.value(s, tag, "Upper")
+        _report(checks, f"{s} {tag} no slow arms", upper not in (UPPER_SLOW, UPPER_SLOW_BACK), f"upper={upper}")
+    _ratio(checks, s, "slow", SLOW_RATIO, "Kerrigan slow walk is 30 % speed")
+    _ratio(checks, s, "after", SAME_RATIO, "Kerrigan normal speed after the release")
+
+
+def check_kerrigan(checks) -> None:
+    _kerrigan(checks, "slow_kerrigan", LOWER_NONE)
+
+
+def check_kerrigan_aim(checks) -> None:
+    """Aiming she walks on the script walk clip: its rate follows her speed."""
+    s = "slow_kerrigan_aim"
+    _kerrigan(checks, s, LOWER_WALK)
+    scale = [checks.value(s, tag, "WalkScale1000") for tag in ("ref", "slow")]
+    ratio = None if None in scale or not scale[0] else scale[1] / scale[0]
+    _report(checks, f"{s} walk clip rate is 30 %", ratio is not None and SLOW_RATIO[0] <= ratio <= SLOW_RATIO[1], f"scale1000={scale} ratio={ratio}")
+    for tag in ("ref", "slow"):
+        print(f"{s} {tag} engine clip raw: " + " ".join(f"{key}={checks.value(s, tag, key)}" for key in ("ClipLenMs", "ClipAdvMs", "ClipGameMs")))
+    length, adv, game = (checks.value(s, "slow", key) for key in ("ClipLenMs", "ClipAdvMs", "ClipGameMs"))
+    rate = None if None in (length, adv, game) or not length or not game else (adv % length) / game
+    per = None if rate is None or None in scale or not scale[1] else rate * 1000 / scale[1]
+    ok = per is not None and KERRIGAN_ENGINE_PER_SCALE[0] <= per <= KERRIGAN_ENGINE_PER_SCALE[1]
+    _report(checks, f"{s} engine plays her walk at the slow script rate", ok, f"rate={rate} scale1000={scale[1]} per={per} want {KERRIGAN_ENGINE_PER_SCALE}")
+    normal = None if per is None or not scale[0] else per * scale[0] / 1000
+    ok = normal is not None and rate < KERRIGAN_ENGINE_SLOW_MAX * normal
+    _report(checks, f"{s} engine walk is slowed", ok, f"slow={rate} normal={normal} want < {KERRIGAN_ENGINE_SLOW_MAX} x")
 
 
 def check_switch(checks) -> None:
     s = "slow_switch"
     checks.eq(s, "", "toshBuffBefore", 1)
     checks.eq(s, "", "toshBuffAway", 0)
-    checks.eq(s, "", "kerriganBuff", 0)
-    checks.eq(s, "", "levelAway", 0)
-    checks.false(s, "", "slowOnAway")
+    # Kerrigan slow walks too (operator 2026-11-23): Shift held, she gets it.
+    checks.eq(s, "", "kerriganBuff", 1)
+    checks.eq(s, "", "levelAway", 16)
+    checks.true(s, "", "slowOnAway")
     checks.eq(s, "", "toshBuffBack", 1)
     checks.true(s, "", "slowOnBack")
     checks.eq(s, "", "toshBuffEnd", 0)
@@ -299,6 +339,7 @@ CHECKS = {
     "slow_back": check_back,
     "slow_aim": check_aim,
     "slow_kerrigan": check_kerrigan,
+    "slow_kerrigan_aim": check_kerrigan_aim,
     "slow_switch": check_switch,
     "slow_intro": check_intro,
     "slow_jump_aim": check_jump_aim,

@@ -22,6 +22,12 @@ RELIEF = 4.0
 RELIEF_RADIUS = 3
 # Water: depth bands below the water surface (map WaterData height).
 GROUND_LIFT = 2.6  # placed z = computed ground + this (operator 2026-11-16: 2.85, then -0.25)
+# Small flora (largest scale axis under SMALL_SCALE) sits SMALL_LIFT over the
+# computed ground: operator probe 2026-11-23 (flora/probe.py) chose row C,
+# ground +3.0; at GROUND_LIFT it looked underground. Larger flora keeps
+# GROUND_LIFT. Hazards and trees are not flora plants: unchanged.
+SMALL_SCALE = 2.0
+SMALL_LIFT = 3.0
 DOODAD_LIFT = 1.85  # non-flora absolute doodads are raised by this (operator 2026-11-16)
 # Trees are lowered by their final scale: (scale above, sink), largest first. Not cumulative.
 TREE_SINK = ((6.0, 2.0), (4.0, 1.0))  # operator 2026-11-16: scale > 4 z-1, scale > 6 z-2

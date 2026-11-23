@@ -1,5 +1,5 @@
 """Host tests for the hero rig bake helpers and their checks (operator
-2026-11-22: Kerrigan's aim breathing, her own strafing, Psi Blast only)."""
+2026-11-22: Kerrigan's aim breathing, her own strafing; 2026-11-23: talons on F)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from types import SimpleNamespace as Part
 
 from heroanim import breath
 from heroanim.rig import FRAME_MS, HEROES
-from heroanim.validate import check_breath_script
+from heroanim.validate import MELEE_CONFIG, check_breath_script
 from testkit.checks import Checks
 from testkit.profiles import combat_kerrigan
 from validate_aim_shot import check_aim_shot_data
@@ -60,6 +60,19 @@ class RigTest(unittest.TestCase):
         self.assertEqual((rig.aim_source, rig.breath_frames, rig.breath_ms), ("Spell", 4, 4000))
         self.assertEqual(rig.leg_roots, ("Dummy01", "Dummy02"))
 
+    def test_kerrigan_swings_attack_01(self) -> None:
+        # Operator 2026-11-23: the talons swing is Attack 01.
+        self.assertEqual(HEROES["kerrigan"].melee_source, "Attack 01")
+        self.assertEqual(HEROES["tosh"].melee_source, "")
+        # Her back talons swing with it.
+        self.assertEqual(HEROES["kerrigan"].melee_roots, ("Bone34", "Bone34(mirrored)"))
+        self.assertTrue(set(HEROES["kerrigan"].melee_roots) <= set(HEROES["kerrigan"].lower_roots))
+
+    def test_the_swing_clip_is_configured(self) -> None:
+        text = galaxy()
+        self.assertIn(MELEE_CONFIG, text)
+        self.assertIn("const fixed c_ANIM_MELEE_CLIP_LENGTH = 2.0;", text)
+
     def test_tosh_is_unchanged(self) -> None:
         rig = HEROES["tosh"]
         self.assertEqual((rig.aim_source, rig.breath_frames, rig.breath_ms, rig.leg_roots), ("Attack", 0, 0, ()))
@@ -101,6 +114,7 @@ class KerriganWeaponDataTest(unittest.TestCase):
         root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, root)
         shutil.copytree(MAP / "Base.SC2Data", root / "Base.SC2Data")
+        shutil.copytree(MAP / "scripts", root / "scripts")
         path = root / "Base.SC2Data" / "GameData" / name
         text = path.read_text(encoding="utf-8")
         self.assertEqual(text.count(old), 1)
@@ -110,8 +124,25 @@ class KerriganWeaponDataTest(unittest.TestCase):
     def test_map_data_passes(self) -> None:
         check_aim_shot_data(MAP)
 
-    def test_a_talons_slot_is_refused(self) -> None:
-        root = self._copy('<WeaponArray index="1" Link="QueenOfBladesPsiBlastAuto"/>', '<WeaponArray Link="QueenOfBladesPsiBlastAuto"/>\n        <WeaponArray Link="RazorTalonsAuto"/>', "UnitData.xml")
+    def test_the_stock_talons_slot_is_refused(self) -> None:
+        root = self._copy('<WeaponArray Link="RazorTalonsAuto"/>', '<WeaponArray Link="RazorTalons"/>', "UnitData.xml")
+        with self.assertRaises(SystemExit):
+            check_aim_shot_data(root)
+
+    def test_a_missing_talons_twin_is_refused(self) -> None:
+        root = self._copy('        <WeaponArray Link="RazorTalonsAuto"/>\n', "", "UnitData.xml")
+        with self.assertRaises(SystemExit):
+            check_aim_shot_data(root)
+
+    def test_a_single_swing_hit_is_refused(self) -> None:
+        root = self._copy('<PeriodCount value="2"/>\n        <PeriodicEffectArray value="RazorTalonsDamage"/>', '<PeriodCount value="1"/>\n        <PeriodicEffectArray value="RazorTalonsDamage"/>', "EffectData.xml")
+        with self.assertRaises(SystemExit):
+            check_aim_shot_data(root)
+
+    def test_a_wide_swing_arc_is_refused(self) -> None:
+        root = self._copy('<WeaponArray Link="RazorTalonsAuto"/>', '<WeaponArray Link="RazorTalonsAuto"/>', "UnitData.xml")
+        path = root / "scripts" / "app" / "core" / "constants.galaxy"
+        path.write_text(path.read_text(encoding="utf-8").replace("c_SCOBA_TALONS_ARC = 90.0;", "c_SCOBA_TALONS_ARC = 360.0;"), encoding="utf-8")
         with self.assertRaises(SystemExit):
             check_aim_shot_data(root)
 
@@ -144,12 +175,46 @@ class KerriganWeaponDataTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             check_aim_shot_data(root)
 
+    def _script(self, root: Path, name: str, old: str, new: str) -> None:
+        path = root / "scripts" / "app" / "systems" / name
+        text = path.read_text(encoding="utf-8")
+        self.assertEqual(text.count(old), 1)
+        path.write_text(text.replace(old, new), encoding="utf-8")
 
-def weapon_rows(talons: int = 0, psi: tuple[int, int] = (0, 3), second: str = PSI + "Auto", nova: bool = False) -> dict:
+    def test_f_on_the_order_key_is_refused(self) -> None:
+        root = self._copy('<WeaponArray Link="RazorTalonsAuto"/>', '<WeaponArray Link="RazorTalonsAuto"/>', "UnitData.xml")
+        key = "    TriggerAddEventKeyPressed(gt_OrderKey, c_playerAny, c_keyE,"
+        self._script(root, "input.galaxy", key, key.replace("c_keyE", "c_keyF") + " c_keyModifierStateIgnore);\n" + key)
+        with self.assertRaises(SystemExit):
+            check_aim_shot_data(root)
+
+    def test_a_kept_stock_talons_weapon_is_refused(self) -> None:
+        root = self._copy('<WeaponArray Link="RazorTalonsAuto"/>', '<WeaponArray Link="RazorTalonsAuto"/>', "UnitData.xml")
+        self._script(root, "hero_return.galaxy", "UnitWeaponRemove(lp_hero, c_SCOBA_WEAPON_TALONS);", "")
+        with self.assertRaises(SystemExit):
+            check_aim_shot_data(root)
+
+
+def weapon_rows(talons: tuple[int, int] = (4, 4), psi: tuple[int, int] = (0, 3), third: str = "RazorTalonsAuto", count: int = 3, nova: bool = False) -> dict:
     rows = {}
-    for tag, shots in zip(("w0", "w1"), psi):
-        rows.update({tag + "Type": "KerriganSCOBA", tag + "Weapons": 2, tag + "Weapon1": PSI, tag + "Weapon2": second, tag + "Weapon3": "", tag + "MinRange1000": 0, tag + "Nova": nova, tag + "PsiFx": shots, tag + "TalonsFx": talons})
+    for tag, shots, cuts in zip(("w0", "w1"), psi, talons):
+        rows.update({tag + "Type": "KerriganSCOBA", tag + "Weapons": count, tag + "Weapon1": PSI, tag + "Weapon2": PSI + "Auto", tag + "Weapon3": third, tag + "MinRange1000": 0, tag + "Nova": nova, tag + "PsiFx": shots, tag + "TalonsFx": cuts})
     return {"s": rows}
+
+
+def swing_rows(**change) -> dict:
+    """Every swing section healthy; `change` maps section to changed keys."""
+    data = {}
+    for section, (hit, missed, swings, kerrigan) in combat_kerrigan.SWING_CASES.items():
+        tps, aim = combat_kerrigan.SWING_MODES.get(section, (True, False))
+        row = {"tps": tps, "aim": aim, "heroType": "KerriganSCOBA" if kerrigan else "ToshSCOBA", "swings": swings, "damages": 2 * len(hit), "cd0Ms": 0, "cd1Ms": 1000, "animState": 5, "attackState": 5, "weapons": 3, "clipLenMs": 2000, "pitchStep": 0, "rate100": 266, "holdMs": 750, "clipRemMs": 1700, "clipRem2Ms": 700, "clipAtMs": 1000, "clipAt2Ms": 1500}
+        for i in hit:
+            row.update({f"life0_{i}": 500, f"life1_{i}": 450, f"angle_{i}": 22 - 45 * (i % 2)})
+        for i in missed:
+            row.update({f"life0_{i}": 500, f"life1_{i}": 500, f"angle_{i}": 0 if section in combat_kerrigan.SWING_REACH_CASES else 180})
+        row.update(change.get(section, {}))
+        data[section] = row
+    return data
 
 
 def breath_rows(shift: int = 0, tosh_syncs: int = 0, still_sync: int = 0) -> dict:
@@ -218,25 +283,105 @@ class KerriganProfileTest(unittest.TestCase):
         combat_kerrigan.check_psi_probe(checks)
         self.assertGreater(checks.failures, 0)
 
-    def test_psi_blast_only_passes(self) -> None:
+    def test_single_weapons_pass(self) -> None:
         checks = Checks(weapon_rows())
         combat_kerrigan.check_weapons(checks, "s", 3)
         self.assertEqual(checks.failures, 0)
+
+    def test_auto_with_talons_passes(self) -> None:
+        checks = Checks(weapon_rows(talons=(4, 6), psi=(0, 0)))
+        combat_kerrigan.check_weapons(checks, "s", 0, auto=True)
+        self.assertEqual(checks.failures, 0)
+
+    def test_auto_without_talons_fails(self) -> None:
+        checks = Checks(weapon_rows(psi=(0, 2)))
+        combat_kerrigan.check_weapons(checks, "s", 0, auto=True)
+        self.assertEqual(checks.failures, 1)
+
+    def test_the_stock_talons_weapon_fails(self) -> None:
+        checks = Checks(weapon_rows(third="RazorTalons", count=4))
+        combat_kerrigan.check_weapons(checks, "s", 3)
+        self.assertEqual(checks.failures, 4)
+
+    def test_swings_healthy_pass(self) -> None:
+        checks = Checks(swing_rows())
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 0)
+
+    def test_a_hit_behind_her_fails(self) -> None:
+        checks = Checks(swing_rows(talons_back={"damages": 2, "life1_0": 450}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 2)
+
+    def test_a_hit_beside_her_fails(self) -> None:
+        checks = Checks(swing_rows(talons_side={"damages": 2, "life1_1": 450}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 2)
+
+    def test_no_swing_without_a_target_fails(self) -> None:
+        checks = Checks(swing_rows(talons_empty={"swings": 0, "cd1Ms": 0}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 2)
+
+    def test_a_swing_inside_the_cooldown_fails(self) -> None:
+        checks = Checks(swing_rows(talons_cd={"swings": 2, "damages": 4, "life1_0": 400}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 3)
+
+    def test_the_old_swing_speed_fails(self) -> None:
+        checks = Checks(swing_rows(talons_front={"rate100": 133, "holdMs": 1500, "clipRem2Ms": 1200}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 3)
+
+    def test_the_old_cooldown_fails(self) -> None:
+        checks = Checks(swing_rows(talons_front={"cd1Ms": 1500}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 1)
+
+    def test_a_swing_while_aiming_fails(self) -> None:
+        checks = Checks(swing_rows(talons_click_aim={"swings": 1}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 1)
+
+    def test_a_swing_in_pnc_fails(self) -> None:
+        checks = Checks(swing_rows(talons_click_pnc={"swings": 1, "damages": 2, "life1_0": 450}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 3)
+
+    def test_a_swing_on_tosh_fails(self) -> None:
+        checks = Checks(swing_rows(talons_tosh={"swings": 1}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 1)
+
+    def test_the_default_attack_clip_fails(self) -> None:
+        checks = Checks(swing_rows(talons_front={"clipLenMs": 1000}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 1)
+
+    def test_the_cast_pose_over_the_swing_fails(self) -> None:
+        checks = Checks(swing_rows(talons_front={"pitchStep": 40}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 1)
+
+    def test_an_enemy_moved_into_the_arc_fails(self) -> None:
+        checks = Checks(swing_rows(talons_side={"angle_0": 30}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 1)
+
+    def test_one_hit_instead_of_two_fails(self) -> None:
+        checks = Checks(swing_rows(talons_front={"damages": 1, "life1_0": 475}))
+        combat_kerrigan.check_talons(checks)
+        self.assertEqual(checks.failures, 2)
 
     def test_a_nova_ability_on_the_unit_fails(self) -> None:
         checks = Checks(weapon_rows(nova=True))
         combat_kerrigan.check_weapons(checks, "s", 3)
         self.assertEqual(checks.failures, 2)
 
-    def test_a_talons_effect_fails(self) -> None:
-        checks = Checks(weapon_rows(talons=1))
+    def test_a_talons_effect_in_single_fails(self) -> None:
+        checks = Checks(weapon_rows(talons=(4, 5)))
         combat_kerrigan.check_weapons(checks, "s", 3)
-        self.assertGreater(checks.failures, 0)
-
-    def test_a_talons_weapon_fails(self) -> None:
-        checks = Checks(weapon_rows(second="RazorTalonsAuto"))
-        combat_kerrigan.check_weapons(checks, "s", 3)
-        self.assertGreater(checks.failures, 0)
+        self.assertEqual(checks.failures, 1)
 
     def test_too_few_psi_blast_effects_fail(self) -> None:
         checks = Checks(weapon_rows(psi=(0, 2)))

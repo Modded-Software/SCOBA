@@ -196,7 +196,8 @@ class SlowWalkTest(unittest.TestCase):
         # R-SLOW-19: two upper states, their clips match the bake and the profile.
         self.assertEqual(galaxy_const("c_ANIM_UPPER_WALK_SLOW"), slowwalk.UPPER_SLOW)
         self.assertEqual(galaxy_const("c_ANIM_UPPER_WALK_SLOW_BACK"), slowwalk.UPPER_SLOW_BACK)
-        self.assertEqual(galaxy_const("c_ANIM_UPPER_COUNT"), 12)
+        # 13: the talons swing state follows them (operator 2026-11-23).
+        self.assertEqual(galaxy_const("c_ANIM_UPPER_COUNT"), 13)
         arms = sorted(clip.replace(",", " ") for clip in slow.ARM_RE.findall(ANIMATION_AIM_GALAXY.read_text(encoding="utf-8")))
         self.assertEqual(arms, sorted((slow.ARM, slow.ARM_BACK)))
         self.assertEqual(sorted((slowwalk.ARM, slowwalk.ARM_BACK)), sorted(a.replace(" ", ",") for a in arms))

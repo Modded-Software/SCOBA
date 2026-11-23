@@ -1,5 +1,6 @@
-// Combat harness: Kerrigan (operator 2026-11-22). Psi Blast is her only
-// attack, and her aim pose breathes (R-TPS-19). Included after
+// Combat harness: Kerrigan (operator 2026-11-22). Psi Blast is her ranged
+// attack, the talons swing on F (operator 2026-11-23), and her aim pose
+// breathes (R-TPS-19). Included after
 // combat_cam.galaxy and before combat.galaxy, which calls these.
 
 // The ability she must not have (R-TPS-65).
@@ -72,6 +73,22 @@ bool gt_DbgPsiHit_Func (bool testConds, bool runActions) {
     return true;
 }
 
+// The talons damage effect (F swing and the auto weapon): events, and
+// the type of each unit it hit.
+const string c_DBG_SWING_DAMAGE = "RazorTalonsDamage";
+int gv_dbgSwingDmg;
+string gv_dbgSwingHit;
+trigger gt_DbgSwingDmg;
+
+bool gt_DbgSwingDmg_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    gv_dbgSwingDmg += 1;
+    gv_dbgSwingHit = gv_dbgSwingHit + UnitGetType(EventPlayerEffectUsedUnit(c_effectUnitTarget)) + " ";
+    return true;
+}
+
 void gf_DbgKerriganInit () {
     gt_DbgPsiHit = TriggerCreate("gt_DbgPsiHit_Func");
     TriggerAddEventUnitDamaged(gt_DbgPsiHit, null, c_unitDamageTypeAny, c_unitDamageEither, null);
@@ -82,6 +99,8 @@ void gf_DbgKerriganInit () {
     gt_DbgKerriganFx = TriggerCreate("gt_DbgKerriganFx_Func");
     TriggerAddEventPlayerEffectUsed(gt_DbgKerriganFx, c_playerAny, c_SCOBA_EFFECT_TALONS);
     TriggerAddEventPlayerEffectUsed(gt_DbgKerriganFx, c_playerAny, c_SCOBA_EFFECT_PSIBLAST);
+    gt_DbgSwingDmg = TriggerCreate("gt_DbgSwingDmg_Func");
+    TriggerAddEventPlayerEffectUsed(gt_DbgSwingDmg, c_playerAny, c_DBG_SWING_DAMAGE);
 }
 
 // The bound unit's weapons as the engine has them, and the effect counters.

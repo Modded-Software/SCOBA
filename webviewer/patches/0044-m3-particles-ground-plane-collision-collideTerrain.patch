@@ -1,7 +1,7 @@
 From c7309b5fe30edd7acb8cbae4012f548826ba1722 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 09:19:10 +0200
-Subject: [PATCH 44/49] m3 particles: ground plane collision (collideTerrain)
+Subject: [PATCH 44/51] m3 particles: ground plane collision (collideTerrain)
 
 - particleground.ts: a flat invisible ground at world z = 0. Particles
   with PAR_ flags 0x2 that cross it downwards restart their motion at the

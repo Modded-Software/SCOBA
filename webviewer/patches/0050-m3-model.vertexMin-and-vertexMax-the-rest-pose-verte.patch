@@ -1,0 +1,37 @@
+From a2708973e65b738b8024e3ad7296f677bc499888 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Mon, 23 Nov 2026 11:50:04 +0200
+Subject: [PATCH 50/51] m3: model.vertexMin and vertexMax, the rest-pose vertex
+ box
+
+---
+ src/viewer/handlers/m3/model.ts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 30531394..71481af0 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -80,6 +80,9 @@ export default class M3Model extends Model {
+   vertexCount = 0;
+   /** Distance of the farthest rest-pose vertex from the model origin. */
+   vertexReach = 0;
++  /** The box of the rest-pose vertices (model space). */
++  vertexMin = [Infinity, Infinity, Infinity];
++  vertexMax = [-Infinity, -Infinity, -Infinity];
+   /**
+    * Batches the renderer cannot draw (material types other than standard,
+    * displacement and composite), one line each, so the caller can report them.
+@@ -405,6 +408,12 @@ export default class M3Model extends Model {
+       const z = view.getFloat32(at + 8, true);
+ 
+       this.vertexReach = Math.max(this.vertexReach, Math.hypot(x, y, z));
++      this.vertexMin[0] = Math.min(this.vertexMin[0], x);
++      this.vertexMin[1] = Math.min(this.vertexMin[1], y);
++      this.vertexMin[2] = Math.min(this.vertexMin[2], z);
++      this.vertexMax[0] = Math.max(this.vertexMax[0], x);
++      this.vertexMax[1] = Math.max(this.vertexMax[1], y);
++      this.vertexMax[2] = Math.max(this.vertexMax[2], z);
+     }
+ 
+     // The stored range of the first UV set per region, for inspection.

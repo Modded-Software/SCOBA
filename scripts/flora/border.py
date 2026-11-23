@@ -100,7 +100,8 @@ def plan(t, objects: str) -> list[tuple[str, int, float, float, float, float, fl
     """(type, variation, x, y, z, rotation, scale) of the border plants.
 
     Trees: z on the fitted ground (lift_doodads adds DOODAD_LIFT later, as
-    for the editor trees). Brambles: z = ground + GROUND_LIFT like flora."""
+    for the editor trees). Brambles: z = ground + the flora lift by scale
+    (SMALL_LIFT under SMALL_SCALE, else GROUND_LIFT)."""
     rng = random.Random(f"{config.SEED}:border")
     pool = tree_pool(objects)
     zones = keepouts(objects)
@@ -116,6 +117,8 @@ def plan(t, objects: str) -> list[tuple[str, int, float, float, float, float, fl
         var = rng.randrange(config.FAMILIES[BRAMBLE].variations)
         if not clear(x, y, zones):
             continue
-        z = ground(t, x, y) + config.GROUND_LIFT
-        out.append((BRAMBLE, var, x, y, z, rng.uniform(0, 2 * math.pi), rng.uniform(low, high) * BORDER_SCALE))
+        rotation = rng.uniform(0, 2 * math.pi)
+        scale = rng.uniform(low, high) * BORDER_SCALE
+        z = ground(t, x, y) + (config.SMALL_LIFT if scale < config.SMALL_SCALE else config.GROUND_LIFT)
+        out.append((BRAMBLE, var, x, y, z, rotation, scale))
     return out

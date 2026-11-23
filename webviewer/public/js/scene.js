@@ -284,6 +284,40 @@
     for (const item of items) applySequence(item);
   }
 
+  // ---- camera focus ----
+
+  const HALF_FOV = Math.PI / 8; // half the vertical field of view (core.js FOV)
+  const FOCUS_MARGIN = 1.3; // the instance's sphere fills 1 / 1.3 of the view height
+  const FOCUS_MIN = 2;
+  const FOCUS_MIN_REACH = 0.25;
+
+  /**
+   * Point the camera at the middle of the item's rest-pose vertex box, from
+   * where the box's sphere fits the view. The culling sphere (bounds) also
+   * holds every animation, so it is several times too big for this. Yaw and
+   * pitch stay; the camera jumps.
+   */
+  function focus(item) {
+    const s = item.dataScale.map((v) => v * item.scale);
+    // A model with no vertices has an empty box: its culling sphere stands in.
+    const empty = !Number.isFinite(item.model.vertexMin[0]);
+    const r = item.model.bounds.r;
+    const lo = empty ? [-r, -r, -r] : item.model.vertexMin;
+    const hi = empty ? [r, r, r] : item.model.vertexMax;
+    const mid = [0, 1, 2].map((i) => ((lo[i] + hi[i]) / 2) * s[i]);
+    const reach = Math.max(FOCUS_MIN_REACH, Math.hypot(...[0, 1, 2].map((i) => ((hi[i] - lo[i]) / 2) * s[i])));
+    const a = (item.rot * Math.PI) / 180;
+    const target = [item.x + mid[0] * Math.cos(a) - mid[1] * Math.sin(a), item.y + mid[0] * Math.sin(a) + mid[1] * Math.cos(a), app.baseHeight(item.unit) + mid[2]];
+    app.view({ target, distance: Math.max(FOCUS_MIN, (FOCUS_MARGIN * reach) / Math.sin(HALF_FOV)) });
+  }
+
+  /** Focus the camera on the item with this id (as ctrl + click on its row does). */
+  app.focus = (id) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) throw new Error(`focus: no instance ${id}`);
+    focus(item);
+  };
+
   // ---- scene list ----
 
   function numberInput(item, field, step) {
@@ -367,10 +401,12 @@
     row.dataset.search = [name, item.unit ? item.unit.id : '', item.path].join(' ').toLowerCase();
     // A click on the row's name selects the unit in the view (pick.js).
     // With shift it adds the unit to the selection or takes it out.
+    // With ctrl it selects the unit and points the camera at it.
     row.querySelector('.head').addEventListener('click', (e) => {
       if (e.target === removeButton) return;
       if (e.shiftKey) app.toggleSelected(item.id);
       else app.select(item.id);
+      if (e.ctrlKey && !e.shiftKey) focus(item);
     });
     // A double-click opens the texture window on the unit's textures (textures.js).
     row.querySelector('.head').addEventListener('dblclick', (e) => {

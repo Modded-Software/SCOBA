@@ -168,6 +168,20 @@ x3.3, mode 1) drew over the whole body; mean brightness 220 to 119,
 near-white pixels 23.6 % to 0.9 %. Not done: the fresnel mask,
 translation and rotation.
 
+Done 2026-11-23 (`particle-motion.spec`, patch 0051): the two motion
+paths (WhiteoutFlakes `CanUseGpuMotion`). An emitter with sort,
+collideTerrain, trailing or model particles, flag bit 31, a second-pair force
+channel, wind, a kill sphere or noise is stepped per frame (`StepEuler`),
+and its drag is the authored one; every other emitter uses the closed form,
+whose drag floors to 0.01. Operator 2026-11-23: the Zerus Tree spores did
+not rise. Their emitters sort (flags 0x200001), with drag 0, mass 0.001 and
+no FOR_ forces in the model: the closed form stopped them after 0.1 x
+their speed (about 0.07). Now each spore over 1 s old climbs 0.31 to 0.42 a
+second (variation 9, 6 s). The parser reads `killSphere`, the four force
+channel masks, `noiseAmplitude` and `windMultiplier`; forces, wind, noise
+and the kill sphere are still not applied. Whether the spores look right
+is an operator check.
+
 Not done (implemented nowhere, no test): particle types 2, 3, 4, 6 and 8 (29 emitters;
 drawn as billboards), the terrain type's `instanceAngle` (not parsed),
 emitter-oriented axes at birth for world space (the current axes are

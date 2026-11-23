@@ -172,20 +172,52 @@ void gf_SwWalk (string lp_section, int lp_mode) {
     BankSave(gv_dbgBank);
 }
 
-// Negative: Shift does not slow Kerrigan (R-SLOW-5).
-void gf_SwKerrigan () {
-    string lv_s = "slow_kerrigan";
+// Raw engine rate of the lower bracket clip: clip time it advanced over
+// game time, and the clip length (a looping walk may wrap).
+void gf_SwLowerRate (string lp_section, string lp_tag) {
+    actor lv_actor = libNtve_gf_MainActorofUnit(gv_tPSUNIT[1]);
+    fixed lv_r1;
+    fixed lv_t1;
 
-    gf_SwReset(lv_s, c_SW_PNC);
+    AnimLengthQueryByName(lv_actor, c_ANIM_BRACKET_LOWER, false);
+    AnimLengthQueryWait();
+    lv_r1 = AnimLengthRemainingSync(AnimLengthQueryLastCreated());
+    lv_t1 = GameGetMissionTime();
+    Wait(1.0, c_timeGame);
+    AnimLengthQueryByName(lv_actor, c_ANIM_BRACKET_LOWER, false);
+    AnimLengthQueryWait();
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ClipLenMs", FixedToInt(AnimLengthSync(AnimLengthQueryLastCreated()) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ClipAdvMs", FixedToInt((lv_r1 - AnimLengthRemainingSync(AnimLengthQueryLastCreated())) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "ClipGameMs", FixedToInt((GameGetMissionTime() - lv_t1) * 1000.0));
+}
+
+// Kerrigan slow walk (operator 2026-11-23): the same 30 % buff and ramp;
+// her own walk clips, slowed with her speed; no slow clips, no slow arms.
+// lp_mode c_SW_PNC: the stock walk; c_SW_AIM: the script walk clip, its
+// engine rate read too.
+void gf_SwKerrigan (string lp_s, int lp_mode) {
+    gf_SwReset(lp_s, lp_mode);
     gf_HeroSwitchTo(gv_heroKerrigan);
     Wait(0.5, c_timeGame);
-    gf_SwStart(c_SW_PNC);
+    gv_slowPresses[1] = 0;
+    gv_slowStarts[1] = 0;
+    gf_SwStart(lp_mode);
     Wait(c_SW_SETTLE, c_timeGame);
-    gf_SwWindow(lv_s, "ref");
+    gf_SwWindow(lp_s, "ref");
+    if (lp_mode == c_SW_AIM) {
+        gf_SwLowerRate(lp_s, "ref");
+    }
     gf_SlowWalkSet(1, true);
-    Wait(c_SW_SETTLE, c_timeGame);
-    gf_SwWindow(lv_s, "slow");
-    BankValueSetFromFlag(gv_dbgBank, lv_s, "heroIsKerrigan", gv_tPSUNIT[1] == gv_heroKerrigan);
+    Wait(c_SLOW_WALK_RAMP + c_SW_SETTLE, c_timeGame);
+    gf_SwWindow(lp_s, "slow");
+    if (lp_mode == c_SW_AIM) {
+        gf_SwLowerRate(lp_s, "slow");
+    }
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "heroIsKerrigan", gv_tPSUNIT[1] == gv_heroKerrigan);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "starts", gv_slowStarts[1]);
+    gf_SlowWalkSet(1, false);
+    Wait(c_SLOW_WALK_RAMP + c_SW_SETTLE, c_timeGame);
+    gf_SwWindow(lp_s, "after");
     gf_SwStop();
     gf_HeroSwitchTo(gv_heroTosh);
     Wait(0.5, c_timeGame);
@@ -297,7 +329,8 @@ bool gt_SlowWalkTest_Func (bool testConds, bool runActions) {
         gf_SwWalk("slow_aim", c_SW_AIM);
     }
     if (gf_DbgGroup("hero")) {
-        gf_SwKerrigan();
+        gf_SwKerrigan("slow_kerrigan", c_SW_PNC);
+        gf_SwKerrigan("slow_kerrigan_aim", c_SW_AIM);
         gf_SwSwitch();
         gf_SwIntro();
     }

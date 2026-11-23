@@ -90,3 +90,55 @@ void gt_AttackEvent_Init () {
     TriggerAddEventUnitAbility(gt_WeaponAttackCmd, UnitRefFromVariable("gv_tPSUNIT[5]"), AbilityCommand("SCOBAAutoAttackStatus", 0), c_unitAbilStageExecute, false);
     TriggerAddEventUnitAbility(gt_WeaponAttackCmd, UnitRefFromVariable("gv_tPSUNIT[6]"), AbilityCommand("SCOBAAutoAttackStatus", 0), c_unitAbilStageExecute, false);
 }
+
+fixed gf_TalonsRadius (unit lp_unit) {
+    return StringToFixed(CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lp_unit), "Radius", c_playerAny));
+}
+
+// True for an enemy ground unit in the swing: within c_SCOBA_TALONS_REACH
+// edge to edge, its centre within half of c_SCOBA_TALONS_ARC of her facing.
+bool gf_TalonsInSwing (int lp_player, unit lp_hero, unit lp_unit) {
+    point lv_at = UnitGetPosition(lp_hero);
+    fixed lv_off;
+
+    if (lp_unit == lp_hero || UnitGetOwner(lp_unit) == 0 || UnitFilterMatch(lp_unit, lp_player, UnitFilter((1 << c_targetFilterAir), 0, 0, 0))) {
+        return false;
+    }
+    if (!libNtve_gf_PlayerIsEnemy(lp_player, UnitGetOwner(lp_unit), libNtve_ge_PlayerRelation_Enemy)) {
+        return false;
+    }
+    if (DistanceBetweenPoints(lv_at, UnitGetPosition(lp_unit)) > gf_TalonsRadius(lp_hero) + c_SCOBA_TALONS_REACH + gf_TalonsRadius(lp_unit)) {
+        return false;
+    }
+    lv_off = ModF(AngleBetweenPoints(lv_at, UnitGetPosition(lp_unit)) - UnitGetFacing(lp_hero) + 540.0, 360.0) - 180.0;
+    return AbsF(lv_off) <= c_SCOBA_TALONS_ARC / 2.0;
+}
+
+// Kerrigan's talons swing (operator 2026-11-23), on the TPS left mouse
+// down without aim (gf_TpsLeftPress). Every enemy in her front arc takes
+// SCOBATalonsSwingHit. It swings with no target, standing or walking. The attack cooldown gates it as it gates the aim shot
+// (gf_AimShotPress). Other heroes do nothing on F.
+void gf_TalonsSwing (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+    unitgroup lv_near;
+    unit lv_u;
+    int lv_i;
+
+    if (!gf_IsHeroPlayer(lp_player) || !UnitIsValid(lv_hero) || !UnitIsAlive(lv_hero)) {
+        return;
+    }
+    if (UnitGetType(lv_hero) != c_SCOBA_UNIT_KERRIGAN || UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) > 0.0) {
+        return;
+    }
+    gv_talonsSwings[lp_player] += 1;
+    UnitCreateEffectPoint(lv_hero, c_SCOBA_EFFECT_TALONS_CLOCK, UnitGetPosition(lv_hero));
+    lv_near = UnitGroup(null, c_playerAny, RegionCircle(UnitGetPosition(lv_hero), gf_TalonsRadius(lv_hero) + c_SCOBA_TALONS_REACH + 2.0), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterStasis - 32)) | (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32)) | (1 << (c_targetFilterInvulnerable - 32))), 0);
+    for (lv_i = 1; lv_i <= UnitGroupCount(lv_near, c_unitCountAll); lv_i += 1) {
+        lv_u = UnitGroupUnit(lv_near, lv_i);
+        if (gf_TalonsInSwing(lp_player, lv_hero, lv_u)) {
+            UnitCreateEffectUnit(lv_hero, c_SCOBA_EFFECT_TALONS_SWING, lv_u);
+        }
+    }
+    UnitAddCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN, StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, c_SCOBA_WEAPON_TALONS, "Cost.Cooldown.TimeUse", lp_player)));
+    gf_AnimAttackStart(lp_player, c_SCOBA_WEAPON_TALONS, null);
+}

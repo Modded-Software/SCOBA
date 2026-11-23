@@ -764,13 +764,17 @@
         <WeaponArray Link="ToshAuto"/>
         <BehaviorArray Link="SCOBAFriendlyFireBlock"/>
     </CUnit>
-    <!-- Psi Blast is her only attack (operator 2026-11-22: not the
-         talons). Stock slot 0 is QueenOfBladesPsiBlast and stays; stock
-         slot 1, RazorTalons, becomes the Psi Blast auto twin. -->
+    <!-- Psi Blast is her ranged attack; the talons swing on F
+         (operator 2026-11-23). Stock slot 0 is QueenOfBladesPsiBlast and
+         stays; stock slot 1 becomes the Psi Blast auto twin. The talons
+         auto twin is appended: the engine uses it only with Attack auto
+         (SCOBAAttackSingle disables it). The engine still gives her the
+         stock RazorTalons as a third weapon; gf_HeroWeaponsSet removes it. -->
     <CUnit id="KerriganSCOBA" parent="Kerrigan">
         <DeathTime value="-1"/>
         <DefaultAcquireLevel value="Offensive"/>
         <WeaponArray index="1" Link="QueenOfBladesPsiBlastAuto"/>
+        <WeaponArray Link="RazorTalonsAuto"/>
         <BehaviorArray Link="SCOBAFriendlyFireBlock"/>
     </CUnit>
     <!-- Air creeps (REQ-AIR-CREEP). Flying height 72. Speed and acceleration:

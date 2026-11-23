@@ -27,13 +27,15 @@ class Row:
         self.name, self.label, self.flags, self.dz, self.variation = name, label, flags, dz, variation
 
 
+# Operator 2026-11-15: row "ground +1.0, absolute" chosen; "z 0, no flags"
+# buried props (the engine ground was flat then). 2026-11-23: small plants
+# look underground at ground + 2.6 (GROUND_LIFT); the engine ground is baked
+# from the terrain since 2026-11-19. These rows decide the new rule.
 ROWS = (
-    Row("A", "z 0, no flags, no Variation", (), None, None),
-    Row("B", "z 0, no flags, Variation 1", (), None, 1),
-    Row("C", "ground -0.5, absolute", ABS, -0.5, None),
-    Row("D", "ground +0, absolute", ABS, 0.0, None),
-    Row("E", "ground +0.5, absolute", ABS, 0.5, None),
-    Row("F", "ground +1.0, absolute", ABS, 1.0, None),
+    Row("A", "z 0, no flags (engine places it)", (), None, None),
+    Row("B", "ground +2.6, absolute (now)", ABS, 2.6, None),
+    Row("C", "ground +3.0, absolute", ABS, 3.0, None),
+    Row("D", "ground +3.4, absolute", ABS, 3.4, None),
 )
 
 

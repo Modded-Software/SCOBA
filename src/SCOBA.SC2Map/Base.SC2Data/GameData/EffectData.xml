@@ -44,10 +44,6 @@
         <ImpactUnit Value="Caster"/>
         <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="1"/>
     </CEffectModifyUnit>
-    <CEffectModifyUnit id="SCOBAAttackCooldown15">
-        <ImpactUnit Value="Caster"/>
-        <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="1.5"/>
-    </CEffectModifyUnit>
     <!-- TESTING (operator 2026-11-16): Tosh 0.25 s; his shots used SCOBAAttackCooldown10. -->
     <CEffectModifyUnit id="SCOBAAttackCooldown01">
         <ImpactUnit Value="Caster"/>
@@ -74,8 +70,19 @@
         <EffectArray value="SCOBAAttackCooldown01"/>
     </CEffectSet>
     <CEffectCreatePersistent id="RazorTalonsPersistent">
-        <InitialEffect value="SCOBAAttackCooldown15"/>
+        <InitialEffect value="SCOBAAttackCooldown10"/>
         <WhichLocation Value="TargetUnitOrPoint"/>
+    </CEffectCreatePersistent>
+    <!-- Talons swing on the TPS left click (operator 2026-11-23). The script picks the
+         enemies in her front arc (gf_TalonsSwing): an engine arc search
+         ignored her facing (run combat/20261123-100936). Each enemy takes
+         the stock talons hits, 25 at 0 and 0.3 s. -->
+    <CEffectCreatePersistent id="SCOBATalonsSwingHit">
+        <WhichLocation Value="TargetUnit"/>
+        <PeriodCount value="2"/>
+        <PeriodicEffectArray value="RazorTalonsDamage"/>
+        <PeriodicPeriodArray value="0"/>
+        <PeriodicPeriodArray value="0.3"/>
     </CEffectCreatePersistent>
     <!-- Psi Blast shot (operator 2026-11-22): the stock missile beside the
          button clock, as SCOBAToshShot. PsiBlastLaunchMissile is stock: as

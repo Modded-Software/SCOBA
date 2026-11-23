@@ -61,6 +61,13 @@ const string c_SCOBA_WEAPON_PSIBLAST = "QueenOfBladesPsiBlast";
 const string c_SCOBA_EFFECT_TOSH = "ToshU";
 const string c_SCOBA_EFFECT_TALONS = "RazorTalonsPersistent";
 const string c_SCOBA_EFFECT_PSIBLAST = "PsiBlastLaunchMissile";
+// The talons swing on F (operator 2026-11-23): its hit on each enemy,
+// its button clock, its arc and its reach past her edge, and the hero.
+const string c_SCOBA_EFFECT_TALONS_SWING = "SCOBATalonsSwingHit";
+const string c_SCOBA_EFFECT_TALONS_CLOCK = "SCOBAAttackCooldown10";
+const fixed c_SCOBA_TALONS_ARC = 90.0;
+const fixed c_SCOBA_TALONS_REACH = 1.0;
+const string c_SCOBA_UNIT_KERRIGAN = "KerriganSCOBA";
 // The Tosh shot that ends in the air: the effect the handler sees, and the
 // effect set an aim shot runs.
 const string c_SCOBA_EFFECT_TOSH_AIR = "SCOBAToshAirU";

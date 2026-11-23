@@ -41,7 +41,8 @@ class BorderTest(unittest.TestCase):
     def test_heights_follow_the_bowl(self) -> None:
         t = bowl()
         for kind, _v, x, y, z, _r, _s in border.plan(t, OBJECTS):
-            want = border.ground(t, x, y) + (config.GROUND_LIFT if kind == border.BRAMBLE else 0.0)
+            lift = config.SMALL_LIFT if _s < config.SMALL_SCALE else config.GROUND_LIFT
+            want = border.ground(t, x, y) + (lift if kind == border.BRAMBLE else 0.0)
             self.assertAlmostEqual(z, want, places=6)
             # Negative case: never at the bowl floor (z 4) on the rim.
             self.assertGreater(z, 10.0)

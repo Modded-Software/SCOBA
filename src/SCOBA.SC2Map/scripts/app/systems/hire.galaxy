@@ -110,7 +110,8 @@ void gf_HireButtonApply (int lp_player) {
     DialogSetVisible(gv_sCOBAOrderDialog, PlayerGroupSingle(lp_player), lv_own || lv_hire);
 }
 
-// The F key and the button: hire a hireable target, else Order.
+// Ctrl+E and the button: hire a hireable target, else Order (F freed,
+// operator 2026-11-23).
 void gf_OrderPress (int lp_player) {
     unit lv_unit = gv_unitTarget[lp_player];
 
