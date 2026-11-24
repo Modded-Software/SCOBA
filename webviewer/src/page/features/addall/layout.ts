@@ -2,13 +2,14 @@
 // large clusters, each with its own cell size; on a map with units
 // already, the block goes next to them.
 
-import { app, type GroundBox, type Item, type LayoutEntry } from '../../core/app';
+import type { SceneService } from '../../core/context';
+import type { GroundBox, Item, LayoutEntry } from '../../core/types';
 
 const GAP = 0.5; // world units between neighbours
 const CLUSTERS = 3; // small, medium, large
 
 /** Bounding size on the ground: the diameter of the model's bounds, scaled as drawn. */
-const size = (item: Item): number => 2 * item.model.bounds.r * Math.max(item.dataScale[0], item.dataScale[1]) * item.scale;
+const size = (item: Item): number => 2 * item.model.bounds.r * Math.max(item.placement.scale[0], item.placement.scale[1]) * item.scale;
 
 /** Ground box of items, each a square of its size around its centre; null for none. */
 function footprint(list: readonly Item[]): GroundBox | null {
@@ -59,7 +60,7 @@ function clusterStarts(sizes: readonly number[]): number[] {
  * goes next to them, GAP away: below them when their footprint is wider
  * than deep, else to the right, so repeated runs stay together.
  */
-export function arrange(list: readonly Item[], others: readonly Item[] = []): LayoutEntry[] {
+export function arrange(scene: Pick<SceneService, 'setPosition'>, list: readonly Item[], others: readonly Item[] = []): LayoutEntry[] {
   const sorted = [...list].sort((a, b) => size(a) - size(b));
   const starts = clusterStarts(sorted.map(size));
   const clusters = starts.map((start, k) => {
@@ -91,11 +92,10 @@ export function arrange(list: readonly Item[], others: readonly Item[] = []): La
     c.members.forEach((item, i) => {
       const col = i % c.cols;
       const row = Math.floor(i / c.cols);
-      app().setPosition(item, left + (col + 0.5) * c.cell, top - (row + 0.5) * c.cell);
+      scene.setPosition(item, left + (col + 0.5) * c.cell, top - (row + 0.5) * c.cell);
       layout.push({ id: item.id, size: size(item), x: item.x, y: item.y, cluster: k, cell: c.cell });
     });
     left += c.width;
   });
-  app().saveScene();
   return layout;
 }

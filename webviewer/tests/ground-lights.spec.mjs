@@ -24,11 +24,11 @@ const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null,
 async function lightAt(page, points, only = -1) {
   return page.evaluate(([pts, o]) => {
     const v = window.sc2viewer;
-    v.setGroundLights(true, o);
+    v.probe('m3', 'setGroundLights', true, o);
     const on = v.groundPixels(pts);
-    v.setGroundLights(false);
+    v.probe('m3', 'setGroundLights', false);
     const off = v.groundPixels(pts);
-    v.setGroundLights(true);
+    v.probe('m3', 'setGroundLights', true);
     return on.map((p, n) => p.rgb.reduce((s, c, k) => s + Math.abs(c - off[n].rgb[k]), 0));
   }, [points, only]);
 }
@@ -38,14 +38,14 @@ test('Shadow Battlecruiser: six spot lights each light an ellipse on the ground;
   const id = await page.evaluate(() => window.sc2viewer.addUnit('ShadowBattlecruiser', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
   await idle(page);
   await page.evaluate((i) => {
-    window.sc2viewer.setParticles(false);
-    window.sc2viewer.playParticles(i, 'Stand', 0.5);
+    window.sc2viewer.probe('m3', 'setParticles', false);
+    window.sc2viewer.probe('m3', 'playParticles', i, 'Stand', 0.5);
     // Leave the meshes out: the ground under the hull is in view.
     const item = window.SC2App.items.find((x) => x.id === i);
-    item.model.batches.length = 0;
+    item.model.m3.batches.length = 0;
   }, id);
   await page.evaluate(() => window.sc2viewer.view({ yaw: -Math.PI / 2, pitch: 1.45, distance: 30, target: [0, 0, 0] }));
-  const lights = await page.evaluate((i) => window.sc2viewer.groundLights(i), id);
+  const lights = await page.evaluate((i) => window.sc2viewer.probe('m3', 'groundLights', i), id);
   console.log('lights', JSON.stringify(lights.map((l) => ({ hit: l.hit && l.hit.map((x) => Number(x.toFixed(2))), far: l.far, hot: l.hotSpot, fall: l.falloff }))));
   const spots = lights.map((l, index) => ({ ...l, index })).filter((l) => l.type === 2);
   expect(spots.length).toBe(6);
@@ -85,7 +85,7 @@ test('Shadow Battlecruiser: six spot lights each light an ellipse on the ground;
   const grid = [];
   for (let x = -10; x <= 10; x += 0.5) for (let y = -8; y <= 8; y += 0.5) grid.push([x, y, 0]);
   const peak = await page.evaluate((pts) => {
-    window.sc2viewer.setGroundLights(true);
+    window.sc2viewer.probe('m3', 'setGroundLights', true);
     return Math.max(...window.sc2viewer.groundPixels(pts).map((p) => Math.max(...p.rgb)));
   }, grid);
   console.log('peak channel', peak);
@@ -100,7 +100,7 @@ test('negative: a unit without lights draws the same with ground lights on and o
   const errors = await open(page);
   const id = await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
   await idle(page);
-  const lights = await page.evaluate((i) => window.sc2viewer.groundLights(i), id);
+  const lights = await page.evaluate((i) => window.sc2viewer.probe('m3', 'groundLights', i), id);
   expect(lights.filter((l) => l.type === 2)).toEqual([]);
   await page.evaluate(() => window.sc2viewer.view({ yaw: -Math.PI / 2, pitch: 1.2, distance: 8, target: [0, 0, 0] }));
   const d = await lightAt(page, [[0, 0, 0], [1, 0, 0], [0, 1, 0], [-1, -1, 0]]);

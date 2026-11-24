@@ -33,20 +33,20 @@ test('the doodads tab lists the doodads; search and the two filters narrow the l
   await expect(page.locator('#tab-doodads')).toHaveClass(/\bon\b/);
   await expect(page.locator('#doodads li').first()).toBeVisible();
   const total = (text) => Number.parseInt(text, 10);
-  const all = total(await page.locator('#doodad-count').textContent());
+  const all = total(await page.locator('#count-doodads').textContent());
   expect(all).toBeGreaterThan(2000);
 
-  await page.selectOption('#doodad-type', 'CliffRamps');
-  await expect.poll(async () => total(await page.locator('#doodad-count').textContent())).toBeLessThan(all);
-  const ramps = total(await page.locator('#doodad-count').textContent());
+  await page.selectOption('#filter-doodads-type', 'CliffRamps');
+  await expect.poll(async () => total(await page.locator('#count-doodads').textContent())).toBeLessThan(all);
+  const ramps = total(await page.locator('#count-doodads').textContent());
   expect(ramps).toBeGreaterThan(50);
-  await page.selectOption('#doodad-tileset', 'Char');
-  await expect.poll(async () => total(await page.locator('#doodad-count').textContent())).toBeLessThan(ramps);
+  await page.selectOption('#filter-doodads-tileset', 'Char');
+  await expect.poll(async () => total(await page.locator('#count-doodads').textContent())).toBeLessThan(ramps);
   for (const text of await page.locator('#doodads li .sub').allTextContents()) expect(text).toContain('CliffRamps');
 
-  await page.selectOption('#doodad-type', '');
-  await page.selectOption('#doodad-tileset', '');
-  await page.fill('#doodad-search', 'zerus tree');
+  await page.selectOption('#filter-doodads-type', '');
+  await page.selectOption('#filter-doodads-tileset', '');
+  await page.fill('#search-doodads', 'zerus tree');
   await expect(row(page, 'ZerusTree')).toBeVisible();
   await expect(row(page, 'ZerusTree').locator('.sub')).toContainText('variations');
   await expect(row(page, 'ZerusTree').locator('.sub')).toContainText('in map');
@@ -58,17 +58,17 @@ test('the doodads tab lists the doodads; search and the two filters narrow the l
 test('a click previews a doodad; "add to scene" places it with a variation and a scale from its range', async ({ page }) => {
   const errors = await open(page);
   await showDoodads(page);
-  await page.fill('#doodad-search', 'zerus tree');
+  await page.fill('#search-doodads', 'zerus tree');
   await row(page, 'ZerusTree').click();
-  await expect(page.locator('#doodad-preview .name')).toHaveText('Zerus Tree');
-  await expect(page.locator('#doodad-preview .facts')).toContainText('scale 4 to 6');
-  await expect(page.locator('#doodad-preview .facts')).toContainText('random angle');
-  await expect(page.locator('#doodad-preview .facts')).toContainText('anim ×0.25');
-  await expect(page.locator('#doodad-preview .facts')).toContainText('terrain sets: Zerus');
+  await expect(page.locator('#preview-doodads .name')).toHaveText('Zerus Tree');
+  await expect(page.locator('#preview-doodads .facts')).toContainText('scale 4 to 6');
+  await expect(page.locator('#preview-doodads .facts')).toContainText('random angle');
+  await expect(page.locator('#preview-doodads .facts')).toContainText('anim ×0.25');
+  await expect(page.locator('#preview-doodads .facts')).toContainText('terrain sets: Zerus');
   // Negative: previewing adds nothing.
   expect((await state(page)).items).toEqual([]);
 
-  await page.click('#doodad-preview-add');
+  await page.click('#preview-add-doodads');
   await idle(page);
   const s = await state(page);
   expect(s.items).toHaveLength(1);
@@ -202,7 +202,7 @@ test('dragging a doodad shows its preview; the drop keeps the previewed variatio
   await open(page);
   await page.evaluate(() => window.sc2viewer.setGrid(false));
   await showDoodads(page);
-  await page.fill('#doodad-search', 'zerus tree');
+  await page.fill('#search-doodads', 'zerus tree');
   await expect(row(page, 'ZerusTree')).toBeVisible();
   await row(page, 'ZerusTree').hover();
   await page.mouse.down();
@@ -230,18 +230,18 @@ test('dragging a doodad shows its preview; the drop keeps the previewed variatio
 test('"add all" on the doodads tab adds every doodad of the list after a confirm', async ({ page }) => {
   const errors = await open(page);
   await showDoodads(page);
-  await page.fill('#doodad-search', 'aiur tree');
+  await page.fill('#search-doodads', 'aiur tree');
   await expect(page.locator('#doodads li').first()).toBeVisible();
   const listed = await (await page.request.get(api.records('doodads', 'q=aiur+tree&limit=500'))).json();
   expect(listed.total).toBeGreaterThan(1);
   expect(listed.total).toBeLessThan(20);
-  await page.click('#doodad-add-all');
+  await page.click('#add-all-doodads');
   await expect(page.locator('#add-all-dialog .question')).toHaveText(`Are you sure you want to add ${listed.total} doodads to the map?`);
   // Negative: "cancel" adds nothing.
   await page.click('#add-all-no');
   expect((await state(page)).items).toEqual([]);
 
-  await page.click('#doodad-add-all');
+  await page.click('#add-all-doodads');
   await page.click('#add-all-yes');
   await page.waitForFunction(() => !window.SC2App.addAllState().running && window.SC2App.addAllState().asked > 0, null, { timeout: 60_000 });
   await idle(page);

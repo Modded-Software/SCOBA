@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 // The operator's case: the hanging vine and leaf cards of Zerus Large Tree
 // drew as dark rectangles.
 // The truth is the drawn frame (sc2viewer.drawnAt, grid off, mouse away),
-// read with the model's alpha tests on and off (sc2viewer.setAlphaTest).
+// read with the model's alpha tests on and off (sc2viewer.probe('m3', 'setAlphaTest', ...)).
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.25, distance: 24, target: [0, 0, 4] };
 const STEP = 6; // px between samples
@@ -53,9 +53,9 @@ async function mouseAway(page) {
 async function silhouettes(page, id) {
   await mouseAway(page);
   const box = await page.evaluate((i) => {
-    window.sc2viewer.setAlphaTest(i, false);
+    window.sc2viewer.probe('m3', 'setAlphaTest', i, false);
     const b = window.sc2viewer.pixels();
-    window.sc2viewer.setAlphaTest(i, true);
+    window.sc2viewer.probe('m3', 'setAlphaTest', i, true);
     return b;
   }, id);
   expect(box.covered).toBeGreaterThan(1000);
@@ -64,9 +64,9 @@ async function silhouettes(page, id) {
   const around = points.flatMap(([x, y]) => [[x, y], [x - NEAR, y], [x + NEAR, y], [x, y - NEAR], [x, y + NEAR]]);
   const [on, off, onView] = await page.evaluate(([i, list, centres]) => {
     const withTest = window.sc2viewer.drawnAt(list);
-    window.sc2viewer.setAlphaTest(i, false);
+    window.sc2viewer.probe('m3', 'setAlphaTest', i, false);
     const without = window.sc2viewer.drawnAt(list);
-    window.sc2viewer.setAlphaTest(i, true);
+    window.sc2viewer.probe('m3', 'setAlphaTest', i, true);
     const bare = centres.map(([x, y]) => document.elementFromPoint(x, y) === document.getElementById('view'));
     return [withTest, without, bare];
   }, [id, around, points]);
@@ -91,7 +91,7 @@ test('the cut-out of Zerus Large Tree: vine and leaf cards draw only where their
   await frames(page);
 
   // The thresholds the file holds: vines 150, leaves 200, trunk 0 (no test).
-  const tests = await page.evaluate((i) => window.sc2viewer.alphaTests(i), id);
+  const tests = await page.evaluate((i) => window.sc2viewer.probe('m3', 'alphaTests', i), id);
   console.log('alpha tests', JSON.stringify(tests));
   const of = (name) => tests.find((t) => t.material === name).alphaTest;
   expect(of('vinesss')).toBeCloseTo(150 / 255, 4);
@@ -121,10 +121,10 @@ test('the cut-out of Zerus Large Tree: vine and leaf cards draw only where their
   expect(wrong).toEqual([]);
 
   // Negative: with the test off, a cut-away pixel is a hit again (the hit follows the test).
-  await page.evaluate((i) => window.sc2viewer.setAlphaTest(i, false), id);
+  await page.evaluate((i) => window.sc2viewer.probe('m3', 'setAlphaTest', i, false), id);
   const [first] = removed;
   expect(await hoverAt(page, first.x, first.y)).toBe(id);
-  await page.evaluate((i) => window.sc2viewer.setAlphaTest(i, true), id);
+  await page.evaluate((i) => window.sc2viewer.probe('m3', 'setAlphaTest', i, true), id);
   expect(errors).toEqual([]);
 });
 
@@ -141,20 +141,20 @@ for (const [unit, material] of [['GiantYeti', 'beast'], ['Ursadon', null]]) {
     // The body: the batch with the most vertices whose material has a textured alpha mask and a test.
     const body = await page.evaluate(([i, name]) => {
       const item = window.SC2App.items.find((x) => x.id === i);
-      const masked = item.model.batches.filter((b) => b.material.alphaTest > 0 && b.material.layers[8].active && !b.material.layers[8].constant && (!name || b.material.name === name));
+      const masked = item.model.m3.batches.filter((b) => b.material.alphaTest > 0 && b.material.layers[8].active && !b.material.layers[8].constant && (!name || b.material.name === name));
       masked.sort((a, b) => b.region.elements - a.region.elements);
       const pick = masked[0];
       // Draw only it.
-      window.__allBatches = item.model.batches.slice();
-      item.model.batches.length = 0;
-      item.model.batches.push(pick);
+      window.__allBatches = item.model.m3.batches.slice();
+      item.model.m3.batches.length = 0;
+      item.model.m3.batches.push(pick);
       return { material: pick.material.name, alphaTest: pick.material.alphaTest };
     }, [id, material]);
     await frames(page);
     const list = await silhouettes(page, id);
     const ma = await page.evaluate((i) => {
       const item = window.SC2App.items.find((x) => x.id === i);
-      const m = item.model.batches[0].material;
+      const m = item.model.m3.batches[0].material;
       return { mask: Array.from(m.layers[8].lastMultiplyAdd), diffuse: Array.from(m.layers[0].lastMultiplyAdd) };
     }, id);
     const removed = list.filter((s) => s.off && !s.on);
@@ -168,8 +168,8 @@ for (const [unit, material] of [['GiantYeti', 'beast'], ['Ursadon', null]]) {
     expect(removed).toEqual([]);
     await page.evaluate((i) => {
       const item = window.SC2App.items.find((x) => x.id === i);
-      item.model.batches.length = 0;
-      item.model.batches.push(...window.__allBatches);
+      item.model.m3.batches.length = 0;
+      item.model.m3.batches.push(...window.__allBatches);
     }, id);
     expect(errors).toEqual([]);
   });
@@ -181,11 +181,11 @@ test('negative: a model with no alpha test draws the same with the test on or of
   await idle(page);
   await page.evaluate((v) => window.sc2viewer.view(v), { ...VIEW, distance: 6, target: [0, 0, 1] });
   await frames(page);
-  const tests = await page.evaluate((i) => window.sc2viewer.alphaTests(i), id);
+  const tests = await page.evaluate((i) => window.sc2viewer.probe('m3', 'alphaTests', i), id);
   console.log('Marine alpha tests', JSON.stringify(tests));
   expect(tests.length).toBeGreaterThan(0);
   expect(tests.every((t) => t.alphaTest === 0)).toBe(true);
-  expect(await page.evaluate((i) => window.sc2viewer.setAlphaTest(i, true), id)).toBe(0);
+  expect(await page.evaluate((i) => window.sc2viewer.probe('m3', 'setAlphaTest', i, true), id)).toBe(0);
   const list = await silhouettes(page, id);
   expect(list.filter((s) => s.on).length).toBeGreaterThan(20);
   expect(list.filter((s) => s.on !== s.off)).toEqual([]);

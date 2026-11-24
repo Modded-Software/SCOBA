@@ -9,7 +9,7 @@
 // sin(pitch) whatever pan, orbit or mouse-look did to the target. The eye
 // never comes closer than MIN_HEIGHT to the ground.
 
-import { app, type CameraState, type Vec3 } from '../../core/app';
+import type { CameraState, Vec3 } from './types';
 
 const NOTCH_SHARE = 0.15;
 const MIN_HEIGHT = 0.3;
@@ -37,14 +37,14 @@ export interface Zoom {
   notchShare(distance: number, ctrl: boolean): number;
 }
 
-export function createZoom(camera: CameraState): Zoom {
+export function createZoom(camera: CameraState, rig: { eye(): Vec3; applyCamera(): void }): Zoom {
   /**
    * Put the target on the ground along the view line, the eye staying put.
    * False when the view line does not meet the ground in front of the eye.
    */
   function targetToGround(): boolean {
     const s = Math.sin(camera.pitch);
-    const eye = app().eye();
+    const eye = rig.eye();
     if (s < MIN_SIN || eye[2] <= 0) return false;
     const t = eye[2] / s;
     const dir = direction(camera.yaw, camera.pitch);
@@ -92,7 +92,7 @@ export function createZoom(camera: CameraState): Zoom {
       camera.distance = Math.exp(from + (to - from) * k);
       zoomFrame = requestAnimationFrame(zoomStep);
     }
-    app().applyCamera();
+    rig.applyCamera();
   }
 
   function wheel(e: WheelEvent): void {
@@ -103,7 +103,7 @@ export function createZoom(camera: CameraState): Zoom {
     // A glide already started from the ground; a new zoom anchors first.
     if (!gliding) {
       targetToGround();
-      app().applyCamera();
+      rig.applyCamera();
     }
     const start = zoomGoal ?? camera.distance;
     const step = Math.log(1 + notchShare(start, e.ctrlKey)) * notches;

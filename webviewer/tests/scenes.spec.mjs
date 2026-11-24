@@ -240,7 +240,7 @@ test('an item the server does not have is reported and left out; the other items
   expect(await units(page)).toEqual(['Marine']);
   const messages = await log(page);
   expect(messages).toContain('NoSuchUnitXyzzy');
-  expect(messages).toContain('scene item 3: game "ghost" is not shown here');
+  expect(messages).toContain('scene item 3: game "ghost": the server has no game "ghost"');
   expect(messages).toContain('scene item 4: no category "nosuch"');
 });
 

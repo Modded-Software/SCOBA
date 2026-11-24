@@ -6,7 +6,7 @@
 
 import { SCENE_ID_RULE } from '../../shared/scene';
 import { ID_RULE } from '../../shared/protocol';
-import type { CameraState, Landmark, SkyChoice } from './app';
+import type { CameraState, Landmark, SkyChoice } from './types';
 import { messageOf } from './dom';
 
 const PREFIX = 'viewer.';
@@ -48,7 +48,7 @@ function parseView(value: unknown, what: string): CameraState {
 }
 
 export interface DrawersSetting {
-  panel: boolean;
+  gallery: boolean;
   instances: boolean;
 }
 
@@ -79,10 +79,18 @@ export const settings = {
   drawers: {
     key: 'drawers',
     parse(value: unknown): DrawersSetting {
-      const panel = field(value, 'panel');
+      const gallery = field(value, 'gallery');
       const instances = field(value, 'instances');
-      if (typeof panel !== 'boolean' || typeof instances !== 'boolean') throw new Error('not two drawer flags');
-      return { panel, instances };
+      if (typeof gallery !== 'boolean' || typeof instances !== 'boolean') throw new Error('not two drawer flags');
+      return { gallery, instances };
+    },
+  },
+  /** The gallery's game (R-VIEW-22). */
+  game: {
+    key: 'game',
+    parse(value: unknown): string {
+      if (typeof value !== 'string' || !ID_RULE.test(value)) throw new Error('not a game id');
+      return value;
     },
   },
   view: {
@@ -95,8 +103,12 @@ export const settings = {
       const id = field(sky, 'id');
       const name = field(sky, 'name');
       const file = field(sky, 'file');
-      if (!filled(id) || !filled(name) || !filled(file)) throw new Error('the sky is not a skybox');
-      return { grid, sky: { id, name, file } };
+      if (!filled(id) || !filled(name) || !filled(file)) throw new Error('the sky is not a backdrop');
+      const game = field(sky, 'game');
+      const dataset = field(sky, 'dataset');
+      if (game === undefined && dataset === undefined) return { grid, sky: { id, name, file } };
+      if (typeof game !== 'string' || !ID_RULE.test(game) || typeof dataset !== 'string' || !ID_RULE.test(dataset)) throw new Error('the backdrop names no game and dataset');
+      return { grid, sky: { id, name, file, game, dataset } };
     },
   },
   landmarks: {

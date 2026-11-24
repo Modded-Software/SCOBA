@@ -1,56 +1,78 @@
 // Drawing, the grid glow and the frame loop (the old js/main.js, without
-// the startup, which is page/main.ts). The scene is kept by features/scenes.
+// the startup, which is page/main.ts). With the host it makes the render
+// service (core/context.ts RenderHost).
 
+import type { GameRegistry, RenderHost, SceneService, SelectionService, CameraService } from './context';
+import type { EventBus, ViewerEvents } from './bus';
+import type { Host } from './host';
 import type { Spot } from './render/ground';
-import { app, type CoreApi, type FrameApi } from './app';
 
 const GLOW = 2.5; // how far the glow reaches past a unit's radius, or from the mouse
 
-export function installFrame(core: CoreApi): FrameApi & { start(): void } {
-  const { viewer, scene, skyScene, canvas, camera, items, ground, BACKGROUND } = core;
+export interface FrameDeps {
+  readonly host: Host;
+  readonly camera: CameraService;
+  readonly scene: SceneService;
+  readonly selection: SelectionService;
+  readonly games: GameRegistry;
+  readonly events: EventBus<ViewerEvents>;
+}
+
+export function createFrame({ host, camera: view, scene: items, selection, games, events }: FrameDeps): RenderHost & { start(): void } {
+  const { viewer, scene, skyScene, canvas, ground, outline, postPasses, BACKGROUND } = host;
+  const { camera } = view;
+  let displaced = 0;
+
+  /** Every post pass after one scene: how many parts they drew. */
+  function afterScene(drawn: typeof scene): number {
+    return postPasses.reduce((n, pass) => n + (pass.enabled ? pass.draw(drawn, canvas.width, canvas.height) : 0), 0);
+  }
 
   /**
    * Grid glow spots: under the mouse and under each unit, [x, y, radius,
-   * hd]. hd is 1 for a model with a 2048 texture or larger (features/hd isHd): its glow is blue.
+   * class]. The class is the game's rule (glowOf): 0 the standard glow, 1
+   * the second (SC2: blue, a model with a 2048 texture or larger).
    */
   function glowSpots(): Spot[] {
-    const a = app();
-    const spots: Spot[] = a.pointer ? [[a.pointer[0], a.pointer[1], GLOW, 0]] : [];
-    for (const item of items) spots.push([item.x, item.y, (item.unit ? item.unit.radius : 0.5) + GLOW, a.isHd(item) ? 1 : 0]);
+    const pointer = view.pointer();
+    const spots: Spot[] = pointer ? [[pointer[0], pointer[1], GLOW, 0]] : [];
+    for (const item of items.items) spots.push([item.x, item.y, (item.placement.radius ?? 0.5) + GLOW, games.partsOf(item.game).glowOf(item)]);
     return spots;
   }
 
   /** One frame: background, sky (and its displacement), ground, units (and theirs), mouse-over outline. */
   function draw(dt: number): void {
-    const a = app();
     const gl = viewer.gl;
     viewer.update(dt);
-    a.endOneShots();
-    a.updatePick();
+    items.endOneShots();
+    // What is under the mouse, the highlight and the rings (features/pick).
+    events.emit('frame', { dt });
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.scissor(0, 0, canvas.width, canvas.height);
     gl.depthMask(true);
     gl.clearColor(BACKGROUND[0], BACKGROUND[1], BACKGROUND[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    a.displacedBatches = 0;
-    if (a.sky && a.sky.instance) {
+    displaced = 0;
+    const sky = items.sky();
+    if (sky && sky.instance) {
       skyScene.render();
-      a.displacedBatches += a.displacement.draw(skyScene, canvas.width, canvas.height);
+      displaced += afterScene(skyScene);
       // The sky is behind everything: forget its depth.
       gl.depthMask(true);
       gl.clear(gl.DEPTH_BUFFER_BIT);
     }
     ground.draw(scene.camera, camera.target, glowSpots(), camera.distance);
     scene.render();
-    a.displacedBatches += a.displacement.draw(scene, canvas.width, canvas.height);
+    displaced += afterScene(scene);
     // The mouse-over outline, when the hovered unit is drawn this frame.
-    const hovered = a.hoveredItem();
-    if (hovered && scene.instances.includes(hovered.instance)) a.outline.draw(hovered.instance, canvas.width, canvas.height);
+    const hovered = selection.hovered();
+    if (hovered && hovered.instance.drawn) outline.draw(hovered.instance, canvas.width, canvas.height);
   }
 
-  /** Draw displacement materials or not (tests compare the two). */
-  function setDisplacement(on: boolean): void {
-    app().displacement.enabled = Boolean(on);
+  function setPostPass(id: string, on: boolean): void {
+    const pass = postPasses.find((p) => p.id === id);
+    if (!pass) throw new Error(`no post pass ${id}`);
+    pass.enabled = Boolean(on);
   }
 
   // ---- frame loop ----
@@ -63,14 +85,18 @@ export function installFrame(core: CoreApi): FrameApi & { start(): void } {
   function frame(now: number): void {
     const dt = lastTime === null ? 0 : Math.min(now - lastTime, MAX_STEP);
     lastTime = now;
-    app().resize();
+    host.resize();
     draw(dt);
     requestAnimationFrame(frame);
   }
 
-  function start(): void {
-    requestAnimationFrame(frame);
-  }
-
-  return { displacedBatches: 0, draw, setDisplacement, start };
+  return {
+    ...host,
+    draw,
+    setPostPass,
+    displacedBatches: () => displaced,
+    start: () => {
+      requestAnimationFrame(frame);
+    },
+  };
 }

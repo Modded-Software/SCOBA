@@ -2,8 +2,8 @@
 
 import type M3ParticleSystem from '@renderer/viewer/handlers/m3/particlesystem';
 import type M3Layer from '@renderer/viewer/handlers/m3/layer';
-import { app, type Item } from '../../page/core/app';
-import { m3Shared } from '../../page/core/library';
+import type { Item } from '../../page/core/types';
+import { m3Instance, m3Model, m3Shared } from './adapter';
 
 const position = new Float32Array(3);
 const quad = new Float32Array(12);
@@ -14,14 +14,15 @@ const originOf = (m: ArrayLike<number>): number[] => [m[12] ?? 0, m[13] ?? 0, m[
 /** The layers a particle draws with, and the one that gives its texture. */
 function layersOf(item: Item, s: M3ParticleSystem): { materialType: number; blendMode: number | null; layers: M3Layer[]; layer: M3Layer | undefined } {
   const e = s.emitter;
-  const map = item.model.materialMaps[e.materialReferenceIndex];
+  const model = m3Model(item.model);
+  const map = model.materialMaps[e.materialReferenceIndex];
   if (!map) throw new Error(`emitter ${s.index}: no material reference ${e.materialReferenceIndex}`);
   // Type 2: a displacement material (normal and strength layers); otherwise standard.
-  const displacement = map.materialType === 2 ? item.model.displacementMaterials[map.materialIndex] : undefined;
+  const displacement = map.materialType === 2 ? model.displacementMaterials[map.materialIndex] : undefined;
   if (displacement) {
     return { materialType: map.materialType, blendMode: null, layers: [displacement.normalLayer, displacement.strengthLayer].filter((l) => l.active), layer: undefined };
   }
-  const material = item.model.materials[1][map.materialIndex];
+  const material = model.materials[1][map.materialIndex];
   if (!material) throw new Error(`emitter ${s.index}: no material ${map.materialIndex}`);
   const pick = (n: number): M3Layer | undefined => material.layers[n];
   const layer = [pick(0), pick(4)].find((l) => l && l.active && !l.constant && l.texture);
@@ -100,9 +101,9 @@ export function emitterState(item: Item, s: M3ParticleSystem, withParticles: boo
     quads: s.quads,
   };
   if (withParticles) {
-    const scene = item.instance.scene;
+    const scene = m3Instance(item.instance).scene;
     if (!scene) throw new Error(`item ${item.id} is in no scene`);
-    const m3 = m3Shared(app().viewer);
+    const m3 = m3Shared(scene.viewer);
     const particles = [];
     for (let i = 0; i < s.live; i++) {
       s.position(position, i);

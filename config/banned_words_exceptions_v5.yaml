@@ -155,3 +155,9 @@ exceptions:
     owner: sc2
     review_date: '2026-11-23'
     removal: Remove when this patch no longer carries that upstream line as context.
+  - rule: bplaceholders-b
+    path: ^webviewer/src/page/ui/gallery/pane\.ts$
+    rationale: The HTML input attribute placeholder sets the grey hint text of each gallery search box. It is the standard attribute name, not placeholder code.
+    owner: sc2
+    review_date: '2026-11-23'
+    removal: Remove when the gallery search boxes no longer show hint text.

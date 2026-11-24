@@ -2,9 +2,13 @@
 // The model's layers name them, the dataset serves them, and the
 // renderer's DDS reader decodes them.
 
-import { app } from '../../core/app';
-import { make, messageOf } from '../../core/dom';
-import { DdsImage, loadM3, type ModelViewer } from '../../core/library';
+import type { GameContext } from '../../../../page/core/context';
+
+/** What reading the originals needs: the model loader and the dataset routes. */
+export type OriginalsDeps = Pick<GameContext, 'render' | 'api'>;
+import { make, messageOf } from '../../../../page/core/dom';
+import { DdsImage } from '../../../../page/core/library';
+import { SC2 } from '../game';
 
 const DDS_FOURCC = 84; // byte offset of the pixel format's FourCC in a DDS file
 
@@ -36,8 +40,8 @@ function pngUrl(width: number, height: number, rgba: Uint8ClampedArray<ArrayBuff
 }
 
 /** One texture file, decoded: its colour, and its alpha when that is not one value all over. */
-async function decode(source: string, dataset: string, urls: string[]): Promise<Original> {
-  const response = await fetch(String(app().pathSolver(dataset)(source)));
+async function decode({ api }: OriginalsDeps, source: string, dataset: string, urls: string[]): Promise<Original> {
+  const response = await fetch(String(api.pathSolver(dataset, SC2)(source)));
   if (!response.ok) throw new Error(`${response.status}`);
   if (!source.endsWith('.dds')) throw new Error('not a DDS file');
   const bytes = await response.arrayBuffer();
@@ -60,18 +64,15 @@ async function decode(source: string, dataset: string, urls: string[]): Promise<
   return { texture: source.split('\\').pop() ?? source, format: fourCC || 'uncompressed', size: [width, height], planes };
 }
 
-/** Every texture the layers of a model file name, decoded; and the ones that failed, with why. */
-export async function originals(viewer: ModelViewer, file: string, dataset: string, urls: string[]): Promise<{ textures: Original[]; failed: string[] }> {
-  const model = await loadM3(viewer, app().modelUrl(file, dataset), app().pathSolver(dataset));
+/** Every texture a model file names, decoded; and the ones that failed, with why. */
+export async function originals(deps: OriginalsDeps, file: string, dataset: string, urls: string[]): Promise<{ textures: Original[]; failed: string[] }> {
+  const model = await deps.render.loadModel(deps.api.modelUrl(file, dataset, SC2), deps.api.pathSolver(dataset, SC2));
   if (!model) throw new Error(`cannot load ${file}`);
-  const sources = new Set<string>();
-  for (const material of model.materials[1]) {
-    for (const layer of material.layers) if (layer.active && !layer.constant && layer.source) sources.add(layer.source.replaceAll('/', '\\'));
-  }
+  const sources = new Set(model.textures.map((source) => source.replaceAll('/', '\\')));
   const textures: Original[] = [];
   const failed: string[] = [];
   for (const source of [...sources].sort()) {
-    await decode(source, dataset, urls).then(
+    await decode(deps, source, dataset, urls).then(
       (texture) => textures.push(texture),
       (error: unknown) => failed.push(`${source.split('\\').pop() ?? source} (${messageOf(error)})`),
     );

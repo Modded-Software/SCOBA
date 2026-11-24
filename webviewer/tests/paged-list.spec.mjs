@@ -31,7 +31,7 @@ test('the unit list shows one page first and the whole total', async ({ page }) 
   await open(page);
   await expect(rows(page)).toHaveCount(PAGE);
   const total = (await (await page.request.get(api.records('units', 'limit=1'))).json()).total;
-  await expect(page.locator('#unit-count')).toHaveText(`${total} units`);
+  await expect(page.locator('#count-units')).toHaveText(`${total} units`);
 });
 
 test('scrolling to the end loads the next page, in order, without repeats', async ({ page }) => {
@@ -47,10 +47,10 @@ test('scrolling to the end loads the next page, in order, without repeats', asyn
 
 test('a filtered list loads to its end and then asks for nothing more', async ({ page }) => {
   await open(page);
-  await page.locator('#races button[data-race="Zerg"]').click();
+  await page.locator('#filter-units-race button[data-race="Zerg"]').click();
   const total = (await (await page.request.get(api.records('units', 'race=Zerg&limit=1'))).json()).total;
   expect(total).toBeGreaterThan(PAGE);
-  await expect(page.locator('#unit-count')).toHaveText(`${total} units`);
+  await expect(page.locator('#count-units')).toHaveText(`${total} units`);
   for (let i = 0; i < Math.ceil(total / PAGE) + 1; i++) {
     await scrollToEnd(page);
     await page.waitForTimeout(150);
@@ -65,7 +65,7 @@ test('a new search starts again at the first page', async ({ page }) => {
   await open(page);
   await scrollToEnd(page);
   await expect(rows(page)).toHaveCount(2 * PAGE);
-  await page.fill('#unit-search', 'marine');
+  await page.fill('#search-units', 'marine');
   await expect(rows(page).first()).toHaveAttribute('data-id', 'Marine');
   const count = await rows(page).count();
   expect(count).toBeLessThanOrEqual(PAGE);

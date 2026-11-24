@@ -76,7 +76,7 @@ const measured = (page, images) =>
   );
 
 async function unitRow(page, name) {
-  await page.fill('#unit-search', name);
+  await page.fill('#search-units', name);
   const row = page.locator('#units li', { has: page.locator('.name', { hasText: new RegExp(`^${name}$`, 'i') }) }).first();
   await expect(row).toBeVisible();
   return row;
@@ -89,7 +89,7 @@ test('the window is hidden at first; a double-click on a unit of the gallery ope
   const row = await unitRow(page, 'Marine');
   // Negative: one click previews the unit and opens nothing.
   await row.click();
-  await expect(page.locator('#preview .name')).toHaveText('Marine');
+  await expect(page.locator('#preview-units .name')).toHaveText('Marine');
   await expect(page.locator('#texture-window')).toBeHidden();
 
   await row.dblclick();
@@ -128,7 +128,7 @@ test('the window is hidden at first; a double-click on a unit of the gallery ope
 test('a double-click on a doodad of the gallery opens the window with the doodad\'s textures', async ({ page }) => {
   const errors = await open(page);
   await page.click('#tab-doodads');
-  await page.fill('#doodad-search', 'zerus tree');
+  await page.fill('#search-doodads', 'zerus tree');
   const row = page.locator('#doodads li[data-id="ZerusTree"]');
   await expect(row).toBeVisible();
   await row.dblclick();

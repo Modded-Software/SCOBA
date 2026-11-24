@@ -30,17 +30,17 @@ const times = (a, b) => a.map((v, i) => v * b[i]);
 
 /** Find a unit in the panel and select it, so the preview shows it. */
 async function find(page, query, id) {
-  await page.fill('#unit-search', query);
+  await page.fill('#search-units', query);
   await expect(row(page, id)).toBeVisible();
   await row(page, id).click();
-  await expect(page.locator('#preview .name')).toBeVisible();
+  await expect(page.locator('#preview-units .name')).toBeVisible();
 }
 
 /** Add a unit with the preview's add button. */
 async function addUnit(page, query, id) {
   const before = await page.locator('#scene li').count();
   await find(page, query, id);
-  await page.locator('#preview-add').click();
+  await page.locator('#preview-add-units').click();
   await expect(page.locator('#scene li')).toHaveCount(before + 1);
   await idle(page);
 }
@@ -48,7 +48,7 @@ async function addUnit(page, query, id) {
 /** Drag a unit row onto the canvas at a canvas position. */
 async function dropUnit(page, query, id, position) {
   const before = await page.locator('#scene li').count();
-  await page.fill('#unit-search', query);
+  await page.fill('#search-units', query);
   await expect(row(page, id)).toBeVisible();
   await row(page, id).dragTo(page.locator('canvas#view'), { targetPosition: position });
   await expect(page.locator('#scene li')).toHaveCount(before + 1);
@@ -58,14 +58,14 @@ async function dropUnit(page, query, id, position) {
 test('the unit panel opens first and lists units with names and icons', async ({ page }) => {
   const problems = watch(page);
   await open(page);
-  await expect(page.locator('#unit-search')).toBeVisible();
-  await expect(page.locator('#search')).toBeHidden();
+  await expect(page.locator('#search-units')).toBeVisible();
+  await expect(page.locator('#search-models')).toBeHidden();
   // With no query the panel lists units and says how many there are.
   await expect(page.locator('#units li').first()).toBeVisible();
-  const total = Number.parseInt(await page.locator('#unit-count').textContent(), 10);
+  const total = Number.parseInt(await page.locator('#count-units').textContent(), 10);
   expect(total).toBeGreaterThan(500);
 
-  await page.fill('#unit-search', 'zergling');
+  await page.fill('#search-units', 'zergling');
   const zergling = row(page, 'Zergling');
   await expect(zergling).toBeVisible();
   await expect(zergling.locator('.name')).toHaveText('Zergling');
@@ -77,37 +77,37 @@ test('the unit panel opens first and lists units with names and icons', async ({
   // Icons are served per dataset (datasets-api.spec.mjs).
   await expect(icon).toHaveAttribute('src', api.icon('btn-unit-zerg-zergling.png'));
   await expect.poll(() => icon.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
-  const filtered = Number.parseInt(await page.locator('#unit-count').textContent(), 10);
+  const filtered = Number.parseInt(await page.locator('#count-units').textContent(), 10);
   expect(filtered).toBeLessThan(total);
 
-  await page.fill('#unit-search', 'no-such-unit-xyzzy');
+  await page.fill('#search-units', 'no-such-unit-xyzzy');
   await expect(page.locator('#units li')).toHaveCount(0);
-  await expect(page.locator('#unit-count')).toHaveText('0 units');
+  await expect(page.locator('#count-units')).toHaveText('0 units');
   expect(problems).toEqual([]);
 });
 
 test('race and kind filters narrow the list', async ({ page }) => {
   const problems = watch(page);
   await open(page);
-  await page.locator('#races button[data-race="Protoss"]').click();
-  await expect(page.locator('#races button[data-race="Protoss"]')).toHaveClass(/on/);
+  await page.locator('#filter-units-race button[data-race="Protoss"]').click();
+  await expect(page.locator('#filter-units-race button[data-race="Protoss"]')).toHaveClass(/on/);
   await expect(page.locator('#units li').first()).toBeVisible();
   await expect(page.locator('#units li .sub').first()).toContainText('Protoss');
   const subs = await page.locator('#units li .sub').allTextContents();
   expect(subs.every((text) => text.includes('Protoss'))).toBe(true);
 
-  await page.selectOption('#kind', 'Structure');
-  await page.fill('#unit-search', 'gateway');
+  await page.selectOption('#filter-units-kind', 'Structure');
+  await page.fill('#search-units', 'gateway');
   await expect(row(page, 'Gateway')).toBeVisible();
   // Negative: a Protoss unit that is not a structure is filtered out.
-  await page.fill('#unit-search', 'zealot');
+  await page.fill('#search-units', 'zealot');
   await expect(page.locator('#units li')).toHaveCount(0);
-  await page.selectOption('#kind', '');
+  await page.selectOption('#filter-units-kind', '');
   await expect(row(page, 'Zealot')).toBeVisible();
   // Negative: a Terran unit does not show under Protoss.
-  await page.fill('#unit-search', 'marine');
+  await page.fill('#search-units', 'marine');
   await expect(row(page, 'Marine')).toHaveCount(0);
-  await page.locator('#races button[data-race=""]').click();
+  await page.locator('#filter-units-race button[data-race=""]').click();
   await expect(row(page, 'Marine')).toBeVisible();
   expect(problems).toEqual([]);
 });
@@ -115,19 +115,19 @@ test('race and kind filters narrow the list', async ({ page }) => {
 test('selecting a unit shows a preview with portrait and data, and adds it', async ({ page }) => {
   const problems = watch(page);
   await open(page);
-  await expect(page.locator('#preview .name')).toHaveCount(0);
+  await expect(page.locator('#preview-units .name')).toHaveCount(0);
   await find(page, 'marine', 'Marine');
   await expect(row(page, 'Marine')).toHaveClass(/selected/);
-  await expect(page.locator('#preview .name')).toHaveText('Marine');
-  await expect(page.locator('#preview .facts')).toContainText('Terran');
-  await expect(page.locator('#preview .facts')).toContainText('scale');
-  const portrait = page.locator('#preview img.portrait');
+  await expect(page.locator('#preview-units .name')).toHaveText('Marine');
+  await expect(page.locator('#preview-units .facts')).toContainText('Terran');
+  await expect(page.locator('#preview-units .facts')).toContainText('scale');
+  const portrait = page.locator('#preview-units img.portrait');
   await expect(portrait).toHaveAttribute('src', /^\/api\/sc2\/icon\/.+\.png\?dataset=scoba$/);
   await expect.poll(() => portrait.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   // Selecting does not add.
   expect((await state(page)).items).toEqual([]);
 
-  await page.locator('#preview-add').click();
+  await page.locator('#preview-add-units').click();
   await expect(page.locator('#scene li')).toHaveCount(1);
   await idle(page);
   const s = await state(page);
@@ -145,7 +145,7 @@ test('a unit with no portrait image previews with its icon', async ({ page }) =>
   await open(page);
   expect((await unitData(page, 'Barracks')).portrait).toBeNull();
   await find(page, 'barracks', 'Barracks');
-  const portrait = page.locator('#preview img.portrait');
+  const portrait = page.locator('#preview-units img.portrait');
   await expect(portrait).toHaveAttribute('src', api.icon('btn-building-terran-barracks.png'));
   await expect.poll(() => portrait.evaluate((img) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   expect(problems).toEqual([]);
@@ -190,9 +190,9 @@ test('dragging a unit onto the canvas places it where it is dropped', async ({ p
 test('a drag that ends off the canvas places nothing', async ({ page }) => {
   const problems = watch(page);
   await open(page);
-  await page.fill('#unit-search', 'marine');
+  await page.fill('#search-units', 'marine');
   await expect(row(page, 'Marine')).toBeVisible();
-  await row(page, 'Marine').dragTo(page.locator('#unit-search'));
+  await row(page, 'Marine').dragTo(page.locator('#search-units'));
   await page.waitForTimeout(300);
   expect((await state(page)).items).toEqual([]);
   await expect(page.locator('#scene li')).toHaveCount(0);
@@ -211,7 +211,7 @@ test('a drop above the horizon places nothing and says why', async ({ page }) =>
   const pitch = (await state(page)).camera.pitch;
   expect(pitch).toBeLessThan(0.1);
   expect(pitch).toBeGreaterThan(0);
-  await page.fill('#unit-search', 'marine');
+  await page.fill('#search-units', 'marine');
   await expect(row(page, 'Marine')).toBeVisible();
   await row(page, 'Marine').dragTo(page.locator('canvas#view'), { targetPosition: { x: 700, y: 40 } });
   await expect(page.locator('#status')).toContainText('horizon');
@@ -225,14 +225,14 @@ test('a drop above the horizon places nothing and says why', async ({ page }) =>
 test('the preview\'s "add to scene" adds a unit; a double-click on the row does not', async ({ page }) => {
   const problems = watch(page);
   await open(page);
-  await page.fill('#unit-search', 'zergling');
+  await page.fill('#search-units', 'zergling');
   // Negative: a double-click opens the texture window (texture-window.spec) and adds nothing.
   await row(page, 'Zergling').dblclick();
   await expect(page.locator('#texture-window')).toBeVisible();
-  await expect(page.locator('#preview .name')).toHaveText('Zergling');
+  await expect(page.locator('#preview-units .name')).toHaveText('Zergling');
   expect((await state(page)).items).toEqual([]);
   await page.click('#texture-window .window-close');
-  await page.click('#preview-add');
+  await page.click('#preview-add-units');
   await expect(page.locator('#scene li')).toHaveCount(1);
   await idle(page);
   const s = await state(page);
@@ -422,17 +422,17 @@ test('units and raw models share one scene', async ({ page }) => {
   await open(page);
   await addUnit(page, 'marine', 'Marine');
   await page.locator('#tab-models').click();
-  await expect(page.locator('#search')).toBeVisible();
-  await expect(page.locator('#unit-search')).toBeHidden();
-  await page.fill('#search', 'protoss\\zealot\\zealot.m3');
-  await page.locator('#results button').first().click();
+  await expect(page.locator('#search-models')).toBeVisible();
+  await expect(page.locator('#search-units')).toBeHidden();
+  await page.fill('#search-models', 'protoss\\zealot\\zealot.m3');
+  await page.locator('#models button').first().click();
   await expect(page.locator('#scene li')).toHaveCount(2);
   await idle(page);
   const s = await state(page);
   expect(s.items.map((i) => i.unit)).toEqual(['Marine', null]);
   expect(s.sceneInstances).toBe(2);
   await page.locator('#tab-units').click();
-  await expect(page.locator('#unit-search')).toBeVisible();
+  await expect(page.locator('#search-units')).toBeVisible();
   // For a person to look at. It decides nothing.
   await page.screenshot({ path: 'test-results/shots/unit-panel.png' });
   expect(problems).toEqual([]);

@@ -2,8 +2,9 @@
 // and the message log, a dialog a click on the toast opens
 // (SPEC-VIEWER 16.1).
 
-import { app, type StatusApi, type StatusOptions } from '../core/app';
-import { make } from '../core/dom';
+import type { Rect, StatusOptions } from '../core/types';
+import type { StatusService } from '../core/context';
+import { make, messageOf } from '../core/dom';
 import { Dialog } from './components/dialog';
 import { Toast } from './components/toast';
 
@@ -17,7 +18,7 @@ interface Waiting {
   brief: boolean;
 }
 
-export function installStatus(): StatusApi {
+export function installStatus(visibleRect: () => Rect): StatusService {
   const statusToast = new Toast({ id: 'status', place: 'top', role: 'status' });
   /** The next step: show the next message, or take the toast down. */
   let statusTimer: ReturnType<typeof setTimeout> | undefined;
@@ -57,7 +58,7 @@ export function installStatus(): StatusApi {
   /** Put the status toast at the centre of the visible view (again, after a panel opens or closes). */
   function placeStatus(): void {
     if (!statusToast.isUp) return;
-    const view = app().visibleRect();
+    const view = visibleRect();
     statusToast.node.style.left = `${(view.left + view.right) / 2}px`;
   }
 
@@ -96,7 +97,7 @@ export function installStatus(): StatusApi {
     statusToast.node.classList.toggle('failure', next.failure);
     if (statusToast.isUp) statusToast.text.textContent = next.text;
     else {
-      const view = app().visibleRect();
+      const view = visibleRect();
       statusToast.show(next.text, (view.left + view.right) / 2);
     }
     statusShownAt = performance.now();
@@ -131,10 +132,34 @@ export function installStatus(): StatusApi {
   });
   statusToast.node.title = 'click: all messages';
 
-  return {
+  /**
+   * End of the line for a failed user action (add, drop, pick a sky): the
+   * action already put the message in the status line; this also logs it.
+   */
+  function reportFailure(error: unknown): void {
+    console.warn('sc2viewer:', error);
+    setStatus(messageOf(error), { failure: true });
+  }
+
+  const service: StatusService = {
     setStatus,
+    reportFailure,
+    pending: 0,
+    /** Run a load with the pending count up; a failure goes on the status line and on to the caller. */
+    async busy<T>(work: () => Promise<T>): Promise<T> {
+      service.pending++;
+      try {
+        return await work();
+      } catch (error) {
+        setStatus(messageOf(error), { failure: true });
+        throw error;
+      } finally {
+        service.pending--;
+      }
+    },
     statusState: () => ({ text: statusToast.text.textContent, up: statusToast.isUp, failure: statusToast.node.classList.contains('failure') }),
     statusLog: () => ({ shown: [...statusLog], waiting: statusQueue.length, lastUpMs: statusLastUpMs }),
     placeStatus,
   };
+  return service;
 }

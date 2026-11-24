@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Two panels stacked in one column on the left: the gallery (#panel: unit
+// Two panels stacked in one column on the left: the gallery (#gallery: unit
 // and model browser) on top, the instances (#instances: the scene list)
 // below. Selection is shared:
 // a click on a unit in the view marks its row; a click on a row's name
@@ -38,15 +38,15 @@ test('the gallery and the instances are two panels, stacked on the left, not ove
   const errors = await open(page);
   await place(page, [['Marine', 0, 0]]);
   // The gallery holds the browser and not the scene list; the instances panel the reverse.
-  await expect(page.locator('#panel #tabs')).toHaveCount(1);
-  await expect(page.locator('#panel #units')).toHaveCount(1);
-  await expect(page.locator('#panel #scene')).toHaveCount(0);
+  await expect(page.locator('#gallery #tabs')).toHaveCount(1);
+  await expect(page.locator('#gallery #units')).toHaveCount(1);
+  await expect(page.locator('#gallery #scene')).toHaveCount(0);
   await expect(page.locator('#instances #scene li')).toHaveCount(1);
   await expect(page.locator('#instances #clear')).toHaveCount(1);
   await expect(page.locator('#instances #units')).toHaveCount(0);
   await expect(page.locator('#instance-count')).toHaveText('(1)');
   // Stacked on the left (operator 2026-11-21): one column, gallery on top.
-  const gallery = await page.locator('#panel').boundingBox();
+  const gallery = await page.locator('#gallery').boundingBox();
   const instances = await page.locator('#instances').boundingBox();
   const width = page.viewportSize().width;
   expect(instances.x).toBeCloseTo(gallery.x, 0);
@@ -66,7 +66,7 @@ test('the gallery and the instances are two panels, stacked on the left, not ove
 test('negative: the panel heights do not follow their content', async ({ page }) => {
   const errors = await open(page);
   const height = page.viewportSize().height;
-  const heights = async () => [await page.locator('#panel').boundingBox(), await page.locator('#instances').boundingBox()].map((b) => b.height);
+  const heights = async () => [await page.locator('#gallery').boundingBox(), await page.locator('#instances').boundingBox()].map((b) => b.height);
   const empty = await heights();
   await place(page, [['Marine', 0, 0], ['Zealot', 2, 0], ['Probe', -2, 0], ['SCV', 0, 2], ['Drone', 0, -2], ['Stalker', 2, 2], ['Zergling', -2, -2]]);
   const full = await heights();
@@ -80,14 +80,14 @@ test('negative: the panel heights do not follow their content', async ({ page })
 
 test('the half-height gallery keeps the unit list usable with a preview open', async ({ page }) => {
   const errors = await open(page);
-  await page.locator('#unit-search').fill('ultralisk');
+  await page.locator('#search-units').fill('ultralisk');
   const row = page.locator('#units li[data-id="Ultralisk"]');
   await row.click();
-  await expect(page.locator('#preview .name')).toHaveText('Ultralisk');
+  await expect(page.locator('#preview-units .name')).toHaveText('Ultralisk');
   const list = await page.locator('#units').boundingBox();
   const rowBox = await row.boundingBox();
-  const preview = await page.locator('#preview').boundingBox();
-  const gallery = await page.locator('#panel').boundingBox();
+  const preview = await page.locator('#preview-units').boundingBox();
+  const gallery = await page.locator('#gallery').boundingBox();
   console.log(`gallery ${gallery.height}: list ${list.height}, row ${rowBox.height}, preview ${preview.height}`);
   // At least three rows show, and nothing lies over the list.
   expect(list.height).toBeGreaterThanOrEqual(3 * rowBox.height);

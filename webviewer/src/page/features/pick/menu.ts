@@ -3,7 +3,8 @@
 // unit goes back to its own animation; with "loop" checked it becomes the
 // unit's own and loops. The menu stays open until Escape or a click elsewhere.
 
-import { app, type Item, type MenuState } from '../../core/app';
+import type { GameRegistry, SceneService, StatusService } from '../../core/context';
+import type { Item, MenuState } from '../../core/types';
 import { find, make } from '../../core/dom';
 
 export interface AnimMenu {
@@ -19,7 +20,13 @@ export interface AnimMenu {
   state(): MenuState | null;
 }
 
-export function createMenu(byId: (id: number) => Item | null): AnimMenu {
+export interface MenuDeps {
+  readonly scene: SceneService;
+  readonly games: GameRegistry;
+  readonly status: StatusService;
+}
+
+export function createMenu({ scene, games, status }: MenuDeps, byId: (id: number) => Item | null): AnimMenu {
   let menu: { node: HTMLElement; itemId: number } | null = null;
   const menuItem = (): Item | null => (menu ? byId(menu.itemId) : null);
   // Loop the chosen animation (it becomes the unit's own), or play it once
@@ -43,29 +50,30 @@ export function createMenu(byId: (id: number) => Item | null): AnimMenu {
 
   function open(item: Item, clientX: number, clientY: number): void {
     close();
-    const entries = item.model.sequences.map((s, i) => {
+    const entries = item.instance.sequences.map((s, i) => {
       const button = make('button', { type: 'button', textContent: s.name });
       button.dataset.sequence = String(i);
       // The menu stays open: the next pick is one click away.
       button.addEventListener('click', () => {
-        if (loopChoice) app().loopSequence(item, i);
-        else app().playOnce(item, i);
+        if (loopChoice) scene.loopSequence(item, i);
+        else scene.playOnce(item, i);
         markPlaying();
       });
       return make('li', {}, [button]);
     });
-    const title = make('div', { className: 'title', textContent: item.unit ? item.unit.name : (item.path.split('\\').pop() ?? item.path) });
+    const title = make('div', { className: 'title', textContent: item.source ? item.source.record.name : (item.path.split('\\').pop() ?? item.path) });
     const loop = make('input', { type: 'checkbox', className: 'loop', checked: loopChoice });
     loop.addEventListener('change', () => {
       loopChoice = loop.checked;
     });
     const loopLabel = make('label', { className: 'loop-choice', title: 'checked: the animation loops; unchecked: it plays once, then idle' }, [loop, 'loop']);
     const choices = [loopLabel];
-    // A model with both texture sets: the HD one on or off (features/hd).
-    if (item.hdLayers) {
-      const hd = make('input', { type: 'checkbox', className: 'hd', checked: item.hd });
-      hd.addEventListener('change', () => app().setHd(item, hd.checked).catch(app().reportFailure));
-      choices.push(make('label', { className: 'loop-choice hd-choice', title: 'checked: the upscaled HD textures; unchecked: the standard ones (Ctrl+H)' }, [hd, 'hd']));
+    // The item's game's check boxes, where they apply (SC2: the HD texture set of a model that has both).
+    for (const toggle of games.partsOf(item.game).menuToggles) {
+      if (!toggle.when(item)) continue;
+      const box = make('input', { type: 'checkbox', className: toggle.className, checked: toggle.checked(item) });
+      box.addEventListener('change', () => toggle.set(item, box.checked).catch(status.reportFailure));
+      choices.push(make('label', { className: `loop-choice ${toggle.className}-choice`, title: toggle.title }, [box, toggle.label]));
     }
     const body = entries.length ? make('ul', {}, entries) : make('div', { className: 'empty', textContent: 'no animations' });
     const node = make('div', { id: 'anim-menu', className: 'anim-menu' }, [title, ...choices, body]);
@@ -79,14 +87,16 @@ export function createMenu(byId: (id: number) => Item | null): AnimMenu {
     markPlaying();
   }
 
-  /** Show the open menu's checkboxes as the choices are now (changed by a key, features/hd). */
+  /** Show the open menu's checkboxes as the choices are now (changed by a key: Ctrl+L, SC2 Ctrl+H). */
   function refresh(): void {
     const item = menuItem();
     if (!item || !menu) return;
     const loop = find(menu.node, 'input.loop', HTMLInputElement);
     if (loop) loop.checked = loopChoice;
-    const hd = find(menu.node, 'input.hd', HTMLInputElement);
-    if (hd) hd.checked = item.hd;
+    for (const toggle of games.partsOf(item.game).menuToggles) {
+      const box = find(menu.node, `input.${toggle.className}`, HTMLInputElement);
+      if (box) box.checked = toggle.checked(item);
+    }
   }
 
   /** Switch the "loop" choice (Ctrl+L). Returns the new choice. */
@@ -110,16 +120,20 @@ export function createMenu(byId: (id: number) => Item | null): AnimMenu {
   function state(): MenuState | null {
     if (!menu) return null;
     const node = menu.node;
-    const hd = find(node, 'input.hd', HTMLInputElement);
-    return {
+    const shown: MenuState = {
       item: menu.itemId,
       entries: entryButtons(node).map((b) => b.textContent),
       // The marked entries (exactly one while an animation plays).
       playing: [...node.querySelectorAll('button.playing')].map((b) => b.textContent),
       loop: find(node, 'input.loop', HTMLInputElement)?.checked ?? false,
-      // The "hd" checkbox, when the menu has one (a model with both texture sets).
-      hd: hd ? hd.checked : undefined,
     };
+    // Each game check box the menu has, by its class (SC2 "hd"); absent when the menu has none.
+    const item = menuItem();
+    for (const toggle of item ? games.partsOf(item.game).menuToggles : []) {
+      const box = find(node, `input.${toggle.className}`, HTMLInputElement);
+      if (box) shown[toggle.className] = box.checked;
+    }
+    return shown;
   }
 
   return { item: menuItem, itemId: () => (menu ? menu.itemId : null), open, close, markPlaying, refresh, toggleLoop, loop: () => loopChoice, state };

@@ -86,7 +86,26 @@ export async function loadDoodads(catalogDir: string, assets: AssetLookup): Prom
     let hits = list.filter((d) => (!type || d.type === type) && (!tileset || d.tilesets.includes(tileset)) && words.every((word) => d.text.includes(word)));
     // The map's own doodads first among equals.
     if (words.length) hits = sortBy(hits, (d) => rank(d, textQuery) * 2 + (d.fields['inMap'] ? 0 : 1));
-    const brief = (d: Doodad): Record<string, unknown> => ({ id: d.id, name: d.name, type: d.type, inMap: d.fields['inMap'], variations: d.files.length, editorOnly: d.editorOnly });
+    // The RecordSummary fields, then the SC2 ones. sub: "Props · ZerusTree · 8 variations · editor only · in map".
+    const notes = (d: Doodad): string => {
+      const out = [d.type, d.id];
+      if (d.files.length > 1) out.push(`${d.files.length} variations`);
+      if (d.editorOnly) out.push('editor only');
+      if (d.fields['inMap']) out.push('in map');
+      return out.join(' · ');
+    };
+    const brief = (d: Doodad): Record<string, unknown> => ({
+      id: d.id,
+      name: d.name,
+      sub: notes(d),
+      icon: null,
+      placeable: true,
+      notPlaceableAs: null,
+      type: d.type,
+      inMap: d.fields['inMap'],
+      variations: d.files.length,
+      editorOnly: d.editorOnly,
+    });
     return { total: hits.length, items: hits.slice(offset, offset + limit).map(brief) };
   }
 

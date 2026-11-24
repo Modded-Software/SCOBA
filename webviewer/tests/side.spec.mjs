@@ -34,7 +34,7 @@ const selectRow = (page, id) => page.locator(`#scene li[data-id="${id}"] .head .
 
 /** Wait until no slide runs: the drawers, their tabs and the toast are where they stop. */
 const settled = (page) =>
-  page.waitForFunction(() => ['panel', 'instances', 'panel-tab', 'instances-tab', 'status'].every((id) => document.getElementById(id).getAnimations().length === 0));
+  page.waitForFunction(() => ['gallery', 'instances', 'gallery-handle', 'instances-handle', 'game-tabs', 'status'].every((id) => document.getElementById(id).getAnimations().length === 0));
 
 /** The toast's centre is the visible view's centre, and it sits at the top. */
 async function expectCentred(page) {
@@ -61,7 +61,7 @@ test('a status message shows at the top centre of the view, not in the gallery, 
   expect(done.lastUpMs).toBeGreaterThanOrEqual(100);
   expect(done.lastUpMs).toBeLessThan(4500);
   await expect(page.locator('#status')).toBeHidden();
-  await expect(page.locator('#panel #status, #side #status')).toHaveCount(0);
+  await expect(page.locator('#gallery #status, #side #status')).toHaveCount(0);
 
   await selectRow(page, marine);
   const pressed = Date.now();
@@ -97,8 +97,8 @@ test('a failure shows as a failure; it re-centres when a drawer closes; a click 
   expect((await status(page)).up).toBe(true);
   await expect(page.locator('#status')).toContainText('nope.m3');
   // Closing the gallery and the instances moves it to the canvas centre.
-  await page.locator('#panel-tab').click();
-  await page.locator('#instances-tab').click();
+  await page.locator('#gallery-handle').click();
+  await page.locator('#instances-handle').click();
   await settled(page);
   expect((await visible(page)).left).toBe(0);
   await expectCentred(page);
@@ -267,22 +267,22 @@ test('the instance search hides the rows that do not match, and only the rows', 
 test('each panel is a drawer: its tab slides it out to the left and back; the choice is kept', async ({ page }) => {
   const errors = await open(page);
   const box = (id) => page.locator(id).boundingBox();
-  const open0 = { gallery: await box('#panel'), instances: await box('#instances') };
+  const open0 = { gallery: await box('#gallery'), instances: await box('#instances') };
   expect(open0.gallery.x).toBe(0);
   expect(open0.instances.x).toBe(0);
   expect((await visible(page)).left).toBe(open0.gallery.width);
 
   // The gallery out; the instances stay.
-  await page.locator('#panel-tab').click();
+  await page.locator('#gallery-handle').click();
   await settled(page);
-  const g = await box('#panel');
+  const g = await box('#gallery');
   expect(g.x + g.width).toBeLessThanOrEqual(0);
   expect((await box('#instances')).x).toBe(0);
-  expect((await box('#panel-tab')).x).toBe(0);
-  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ panel: false, instances: true });
+  expect((await box('#gallery-handle')).x).toBe(0);
+  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ gallery: false, instances: true });
   // A closed panel takes no keys.
   expect(await page.evaluate(() => {
-    const input = document.getElementById('unit-search');
+    const input = document.getElementById('search-units');
     input.focus();
     return document.activeElement === input;
   })).toBe(false);
@@ -290,24 +290,24 @@ test('each panel is a drawer: its tab slides it out to the left and back; the ch
   expect((await visible(page)).left).toBe(open0.instances.width);
 
   // The instances out too: the whole view is free.
-  await page.locator('#instances-tab').click();
+  await page.locator('#instances-handle').click();
   await settled(page);
   expect((await visible(page)).left).toBe(0);
 
   // Kept over a reload.
   await page.reload();
   await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready))).toBe(true);
-  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ panel: false, instances: false });
+  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ gallery: false, instances: false });
   expect((await visible(page)).left).toBe(0);
 
   // Back in.
-  await page.locator('#panel-tab').click();
-  await page.locator('#instances-tab').click();
+  await page.locator('#gallery-handle').click();
+  await page.locator('#instances-handle').click();
   await settled(page);
-  expect(await box('#panel')).toEqual(open0.gallery);
+  expect(await box('#gallery')).toEqual(open0.gallery);
   expect(await box('#instances')).toEqual(open0.instances);
   expect(await page.evaluate(() => {
-    const input = document.getElementById('unit-search');
+    const input = document.getElementById('search-units');
     input.focus();
     return document.activeElement === input;
   })).toBe(true);
@@ -333,8 +333,8 @@ test('with the drawers closed, a unit where the panels were is under the mouse; 
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y).closest('#side') !== null, at)).toBe(true);
   // Closed: the same point reaches the view and hovers the unit.
-  await page.locator('#panel-tab').click();
-  await page.locator('#instances-tab').click();
+  await page.locator('#gallery-handle').click();
+  await page.locator('#instances-handle').click();
   await settled(page);
   const now = await page.evaluate((id) => window.sc2viewer.itemPixel(id), marine);
   expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y).id, now)).toBe('view');

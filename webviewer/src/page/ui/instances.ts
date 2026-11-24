@@ -1,14 +1,32 @@
 // The scene list in the instances panel: one row per item, where the
 // selected items' rows are marked; the instance search; the clear button.
+// It follows the scene and the selection through their events.
 
-import { app, type CoreApi, type InstancesApi, type Item } from '../core/app';
+import type { Item } from '../core/types';
+import type { ApiClient, CameraService, GameRegistry, SceneService, SelectionService, StatusService, UiService } from '../core/context';
+import type { EventBus, ItemField, ViewerEvents } from '../core/bus';
 import { byId, byIdAs, find, make, rows } from '../core/dom';
 import { ConfirmDialog } from './components/dialog';
 
 type NumberField = 'x' | 'y' | 'rot' | 'scale';
 
-export function installInstances(core: CoreApi): InstancesApi {
-  const { items, shown, TEAMS } = core;
+export interface InstancesDeps {
+  readonly scene: SceneService;
+  readonly selection: SelectionService;
+  readonly games: GameRegistry;
+  readonly api: ApiClient;
+  readonly camera: CameraService;
+  readonly status: StatusService;
+  readonly events: EventBus<ViewerEvents>;
+  readonly iconNode: UiService['iconNode'];
+}
+
+/** A number as the list shows it: three decimals at most. */
+const shown = (value: number): string => String(Math.round(value * 1000) / 1000);
+
+export function installInstances({ scene, selection, games, api, camera, status, events, iconNode }: InstancesDeps): void {
+  const { items } = scene;
+  const edited = (what: string): void => events.emit('scene-edited', { what });
   const sceneList = byId('scene');
 
   function numberInput(item: Item, field: NumberField, step: number): HTMLLabelElement {
@@ -20,8 +38,8 @@ export function installInstances(core: CoreApi): InstancesApi {
         return;
       }
       item[field] = value;
-      app().applyTransform(item);
-      app().saveScene();
+      scene.applyTransform(item);
+      edited('row');
     });
     return make('label', {}, [field, input]);
   }
@@ -29,54 +47,58 @@ export function installInstances(core: CoreApi): InstancesApi {
   const option = (value: string, text: string): HTMLOptionElement => make('option', { value, textContent: text });
 
   function listRow(item: Item): HTMLLIElement {
-    const unit = item.unit;
-    const name = unit ? unit.name : (item.path.split('\\').pop() ?? item.path);
+    const record = item.source ? item.source.record : null;
+    const { placement } = item;
+    const name = record ? record.name : (item.path.split('\\').pop() ?? item.path);
     const removeButton = make('button', { className: 'remove', textContent: '×', title: 'remove' });
-    removeButton.addEventListener('click', () => app().remove(item.id));
-    const anim = make('select', { className: 'anim' }, [option('-1', '(none)'), ...item.model.sequences.map((s, i) => option(String(i), s.name))]);
+    removeButton.addEventListener('click', () => scene.remove(item.id));
+    const anim = make('select', { className: 'anim' }, [option('-1', '(none)'), ...item.instance.sequences.map((s, i) => option(String(i), s.name))]);
     anim.value = String(item.sequence);
     anim.addEventListener('change', () => {
       item.sequence = Number.parseInt(anim.value, 10);
-      app().applySequence(item);
-      app().saveScene();
+      scene.applySequence(item);
+      edited('row');
     });
+    // Team colours the instance's format knows (SPEC-VIEWER 6.2); none: no control.
+    const teams = item.capabilities.teamColor ? item.capabilities.teamColor.count : 0;
     const team = make(
       'select',
       { className: 'team', title: 'team colour' },
-      Array.from({ length: TEAMS }, (_, i) => option(String(i), 'team ' + (i + 1))),
+      Array.from({ length: teams }, (_, i) => option(String(i), 'team ' + (i + 1))),
     );
     team.value = String(item.team);
     team.addEventListener('change', () => {
       item.team = Number.parseInt(team.value, 10);
-      app().applyLook(item);
-      app().saveScene();
+      scene.applyLook(item);
+      edited('row');
     });
-    const head: HTMLElement[] = [make('span', { className: 'name', textContent: name, title: unit ? `${unit.id}  ${item.path}` : item.path }), removeButton];
-    if (unit && !unit.doodad) head.unshift(app().iconNode(unit.icon, item.dataset));
-    // A doodad has model variations in place of a team colour.
+    const head: HTMLElement[] = [make('span', { className: 'name', textContent: name, title: record ? `${record.id}  ${item.path}` : item.path }), removeButton];
+    if (placement.icon) head.unshift(iconNode(placement.icon.name, item.dataset, item.game));
+    // A record without a team colour (an SC2 doodad) has its model variants in its place.
     const controls: HTMLElement[] = [anim];
-    if (!unit || !unit.doodad) controls.push(team);
-    else if (unit.variations > 1) {
-      const count = unit.variations;
+    if (placement.team) {
+      if (teams > 0) controls.push(team);
+    } else if (placement.variants > 1) {
+      const count = placement.variants;
       const variation = make(
         'select',
         { className: 'variation', title: 'model variation' },
         Array.from({ length: count }, (_, i) => option(String(i), `variation ${i + 1} of ${count}`)),
       );
-      variation.value = String(item.variation);
-      variation.addEventListener('change', () => app().setVariation(item, Number.parseInt(variation.value, 10)).catch(app().reportFailure));
+      variation.value = String(placement.variant);
+      variation.addEventListener('change', () => scene.setVariation(item, Number.parseInt(variation.value, 10)).catch(status.reportFailure));
       controls.push(variation);
     }
     // Where the item's data and textures come from; another choice swaps them.
-    const all = app().datasets();
+    const all = api.datasets(item.game);
     if (all.length > 1) {
       const source = make('select', { className: 'dataset', title: "dataset: where this instance's data and textures come from" }, all.map((d) => option(d.id, d.label)));
       source.value = item.dataset;
       source.addEventListener('change', () =>
-        app()
+        scene
           .setItemDataset(item, source.value)
           .catch((error: unknown) => {
-            app().reportFailure(error);
+            status.reportFailure(error);
             // It stays as it was: show that.
             source.value = item.dataset;
           }),
@@ -90,21 +112,23 @@ export function installInstances(core: CoreApi): InstancesApi {
       make('div', { className: 'row' }, [numberInput(item, 'x', 0.5), numberInput(item, 'y', 0.5), numberInput(item, 'rot', 15), numberInput(item, 'scale', 0.1)]),
     ]);
     row.dataset.id = String(item.id);
-    if (unit) row.dataset[unit.doodad ? 'doodad' : 'unit'] = unit.id;
-    // What the instance search matches: the name, the unit or doodad id, the model file.
-    row.dataset.search = [name, unit ? unit.id : '', item.path].join(' ').toLowerCase();
+    // data-<noun>: the record's id ("data-unit", "data-doodad").
+    const noun = games.nounOf(item);
+    if (record && noun) row.dataset[noun] = record.id;
+    // What the instance search matches: the name, the record id, the model file.
+    row.dataset.search = [name, record ? record.id : '', item.path].join(' ').toLowerCase();
     // A click on the row's name selects the unit in the view (features/pick).
     // With shift it adds the unit to the selection or takes it out.
     // With ctrl it selects the unit and points the camera at it.
     headNode.addEventListener('click', (e) => {
       if (e.target === removeButton) return;
-      if (e.shiftKey) app().toggleSelected(item.id);
-      else app().select(item.id);
-      if (e.ctrlKey && !e.shiftKey) app().focusItem(item);
+      if (e.shiftKey) selection.toggleSelected(item.id);
+      else selection.select(item.id);
+      if (e.ctrlKey && !e.shiftKey) camera.focusItem(item);
     });
-    // A double-click opens the texture window on the unit's textures (features/textures).
+    // A double-click opens what the game shows for the item (SC2: the texture window).
     headNode.addEventListener('dblclick', (e) => {
-      if (e.target !== removeButton) app().openTexturesOf(item).catch(app().reportFailure);
+      if (e.target !== removeButton) games.partsOf(item.game).openItem(item).catch(status.reportFailure);
     });
     return row;
   }
@@ -138,11 +162,11 @@ export function installInstances(core: CoreApi): InstancesApi {
   function renderList(): void {
     sceneList.replaceChildren(...items.map(listRow));
     filterList();
-    markSelected(new Set(app().selectedIds()), app().selectedId());
+    markSelected(new Set(selection.selectedIds()), selection.selectedId());
   }
 
   /** Show an item's field in its list row. */
-  function showItemField(item: Item, field: 'sequence' | 'rot' | 'x' | 'y'): void {
+  function showItemField(item: Item, field: ItemField): void {
     if (field === 'sequence') {
       const select = find(sceneList, `li[data-id="${item.id}"] select.anim`, HTMLSelectElement);
       if (select) select.value = String(item.sequence);
@@ -162,9 +186,13 @@ export function installInstances(core: CoreApi): InstancesApi {
       const asking = clearDialog.ask();
       // A stray Enter must not remove everything.
       clearDialog.no.focus();
-      if (await asking) app().clear();
+      if (await asking) scene.clear();
     })();
   });
 
-  return { renderList, markSelected, showItemField };
+  events.on('item-added', renderList);
+  events.on('items-removed', renderList);
+  events.on('item-swapped', renderList);
+  events.on('item-changed', ({ item, field }) => showItemField(item, field));
+  events.on('selection-changed', ({ ids, last }) => markSelected(ids, last));
 }

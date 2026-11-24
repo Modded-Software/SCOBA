@@ -25,7 +25,7 @@ async function open(page) {
 const units = async (page, query) => (await page.request.get(api.records('units', { limit: '500', ...query }))).json();
 const state = (page) => page.evaluate(() => window.sc2viewer.state());
 const run = (page) => page.evaluate(() => window.SC2App.addAllState());
-const count = (page) => page.locator('#unit-count').textContent();
+const count = (page) => page.locator('#count-units').textContent();
 
 test('api: the family facet lists Melee; family=Melee returns Melee units only', async ({ page }) => {
   const facets = await facetsOf(page.request);
@@ -49,24 +49,24 @@ test('ui: the family select filters the list, and "any family" takes the filter 
   await open(page);
   const all = await units(page, {});
   await expect.poll(() => count(page)).toBe(`${all.total} units`);
-  await page.selectOption('#family', 'is:Melee');
+  await page.selectOption('#filter-units-family', 'is:Melee');
   const melee = await units(page, { family: 'Melee' });
   await expect.poll(() => count(page)).toBe(`${melee.total} units`);
   // With race Zerg on top.
-  await page.locator('#races button[data-race="Zerg"]').click();
+  await page.locator('#filter-units-race button[data-race="Zerg"]').click();
   const zerg = await units(page, { family: 'Melee', race: 'Zerg' });
   await expect.poll(() => count(page)).toBe(`${zerg.total} units`);
   // Negative: back to any family.
-  await page.locator('#races button[data-race=""]').click();
-  await page.selectOption('#family', 'any');
+  await page.locator('#filter-units-race button[data-race=""]').click();
+  await page.selectOption('#filter-units-family', 'any');
   await expect.poll(() => count(page)).toBe(`${all.total} units`);
   expect(problems).toEqual([]);
 });
 
 /** Filter the list to a few Melee units: search "zergling". */
 async function filterFew(page) {
-  await page.selectOption('#family', 'is:Melee');
-  await page.fill('#unit-search', 'zergling');
+  await page.selectOption('#filter-units-family', 'is:Melee');
+  await page.fill('#search-units', 'zergling');
   const listed = await units(page, { family: 'Melee', q: 'zergling' });
   await expect.poll(() => count(page)).toBe(`${listed.total} units`);
   expect(listed.total).toBeGreaterThan(1);
@@ -77,7 +77,7 @@ test('add all: the dialog asks with the count; "add" adds every listed unit, lai
   const problems = watch(page);
   await open(page);
   const listed = await filterFew(page);
-  await page.locator('#add-all').click();
+  await page.locator('#add-all-units').click();
   await expect(page.locator('#add-all-dialog')).toBeVisible();
   await expect(page.locator('#add-all-dialog .question')).toHaveText(`Are you sure you want to add ${listed.total} units to the map?`);
   await page.locator('#add-all-yes').click();
@@ -113,7 +113,7 @@ test('add all: the dialog asks with the count; "add" adds every listed unit, lai
 
 /** Click "add all", confirm, wait for the run and the loads; the run state. */
 async function addAllRun(page, total) {
-  await page.locator('#add-all').click();
+  await page.locator('#add-all-units').click();
   await page.locator('#add-all-yes').click();
   await expect.poll(async () => {
     const r = await run(page);
@@ -195,7 +195,7 @@ for (const [how, act] of [
     const problems = watch(page);
     await open(page);
     await filterFew(page);
-    await page.locator('#add-all').click();
+    await page.locator('#add-all-units').click();
     await expect(page.locator('#add-all-dialog')).toBeVisible();
     await act(page);
     await expect(page.locator('#add-all-dialog')).toBeHidden();

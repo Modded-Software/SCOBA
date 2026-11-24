@@ -1,6 +1,6 @@
 // itemPixel, for the tests: a page pixel on an item's picture.
 
-import { app, type Item, type Vec2 } from '../../core/app';
+import type { Item, Vec2, Vec3 } from './types';
 import { cylinder } from './geometry';
 
 // The search around the unit's column, in page pixels.
@@ -15,10 +15,10 @@ const PIXEL_MARGINS = [12, 6, 3];
  * searched over the column's box on screen widened by PIXEL_REACH; null
  * when there is none. `on(x, y)`: the item is the one at that pixel.
  */
-export function itemPixelOf(item: Item, on: (x: number, y: number) => boolean): Vec2 | null {
+export function itemPixelOf(screenOf: (point: Vec3) => Vec2 | null, item: Item, on: (x: number, y: number) => boolean): Vec2 | null {
   const c = cylinder(item);
-  const foot = app().screenOf([c.x, c.y, c.z0]);
-  const top = app().screenOf([c.x, c.y, c.z1]);
+  const foot = screenOf([c.x, c.y, c.z0]);
+  const top = screenOf([c.x, c.y, c.z1]);
   if (!foot || !top) return null;
   const points: Vec2[] = [];
   for (let y = Math.min(foot[1], top[1]) - PIXEL_REACH; y <= Math.max(foot[1], top[1]) + PIXEL_REACH; y += PIXEL_STEP) {

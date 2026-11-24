@@ -18,7 +18,7 @@ const OTHER_UNIFORMS = 32;
 /** Rings the shader holds: the selected one, the mouse-over, and the other selected ones. */
 const MAX_RINGS = 96;
 
-/** Where the grid glows: x, y, radius, and 1 for a model with HD textures (blue). */
+/** Where the grid glows: x, y, radius, and the glow class: 0 standard, 1 the second (the game's rule; SC2: HD textures, blue). */
 export type Spot = readonly [number, number, number, number];
 
 /** A ring on the ground around a unit. */
@@ -48,7 +48,7 @@ export interface Ground {
   spotsDrawn: number;
   line: Rgb;
   fill: Rgb;
-  /** The same two for the glow of a model that has HD textures: blue. */
+  /** The same two for the second glow class (SC2: a model with HD textures): blue. */
   lineHd: Rgb;
   fillHd: Rgb;
   /**

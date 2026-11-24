@@ -31,8 +31,8 @@ test('Zerus Tree spores rise at their emission speed: sorted, they take the per-
   const id = await page.evaluate(() => window.sc2viewer.addDoodad('ZerusTree', { x: 0, y: 0, rot: 0, variation: 9, sequence: 0, dataset: 'stock' }));
   await idle(page);
   const stand = await page.evaluate((i) => window.sc2viewer.state().items.find((t) => t.id === i).sequences[0], id);
-  await page.evaluate(([i, s]) => window.sc2viewer.playParticles(i, s, 6), [id, stand]);
-  const st = await page.evaluate((i) => window.sc2viewer.particles(i, true), id);
+  await page.evaluate(([i, s]) => window.sc2viewer.probe('m3', 'playParticles', i, s, 6), [id, stand]);
+  const st = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
   expect(st.emitters.length).toBe(2);
   for (const e of st.emitters) {
     const old = e.particles.filter((p) => p.age > 1);
@@ -53,8 +53,8 @@ test('negative: an emitter without those flags keeps the closed form and its dra
   const errors = await open(page);
   const id = await page.evaluate(() => window.sc2viewer.addUnit('Probe', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
   await idle(page);
-  await page.evaluate((i) => window.sc2viewer.playParticles(i, 'Stand', 2), id);
-  const st = await page.evaluate((i) => window.sc2viewer.particles(i, true), id);
+  await page.evaluate((i) => window.sc2viewer.probe('m3', 'playParticles', i, 'Stand', 2), id);
+  const st = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
   const closed = st.emitters.filter((e) => !e.euler);
   console.log('probe', JSON.stringify(st.emitters.map((e) => ({ bone: e.bone, flags: e.flags, euler: e.euler, drag: e.drag, forcePair2: e.forcesFallback, wind: e.windMultiplier, kill: e.killSphere, noise: e.noiseAmplitude }))));
   expect(closed.length).toBeGreaterThan(0);

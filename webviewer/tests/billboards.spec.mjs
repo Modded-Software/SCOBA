@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // light cones and lens flares. Rules: WhiteoutFlakes io/m3/m3_billboard.cpp
 // (CBBSolver::ApplyBillboard); layout: m3addon structures.xml BBSC.
 // Truth: the bone world matrices the renderer skins with, read for two
-// camera views at one animation time (sc2viewer.billboards).
+// camera views at one animation time (sc2viewer.probe('m3', 'billboards', ...)).
 
 async function open(page) {
   const errors = [];
@@ -31,8 +31,8 @@ const twoViews = (page, id) => page.evaluate((i) => {
   const item = window.SC2App.items.find((x) => x.id === i);
   const read = (yaw) => {
     v.view({ yaw, pitch: 0.5, distance: 60, target: [0, 0, 1] });
-    item.instance.skeleton.update(0);
-    return v.billboards(i);
+    item.instance.m3.skeleton.update(0);
+    return v.probe('m3', 'billboards', i);
   };
   return [read(0), read(Math.PI / 2)];
 }, id);
@@ -78,8 +78,8 @@ test('negative: a model without BBSC records turns no bone, and its bones keep t
     const item = window.SC2App.items.find((x) => x.id === i);
     const read = (yaw) => {
       window.sc2viewer.view({ yaw, pitch: 0.5, distance: 60, target: [0, 0, 1] });
-      item.instance.skeleton.update(0);
-      return Array.from(item.instance.skeleton.nodes[1].worldMatrix);
+      item.instance.m3.skeleton.update(0);
+      return Array.from(item.instance.m3.skeleton.nodes[1].worldMatrix);
     };
     return [read(0), read(Math.PI / 2)];
   }, id);

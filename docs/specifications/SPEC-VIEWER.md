@@ -194,8 +194,9 @@ Every format's model and instance satisfy these. Features use nothing else.
 interface ViewerModel {
   readonly format: FormatId;
   readonly bounds: { readonly r: number };      // culling sphere
-  readonly vertexMin: Vec3;                     // rest pose box
-  readonly vertexMax: Vec3;
+  readonly vertexMin: ArrayLike<number>;        // rest pose box
+  readonly vertexMax: ArrayLike<number>;
+  readonly loaded: boolean;                     // has geometry to draw
   readonly undrawn: readonly string[];          // parts not drawn (R-VIEW-81)
   readonly textures: readonly string[];         // references it names
   addInstance(): ViewerInstance;
@@ -203,7 +204,7 @@ interface ViewerModel {
 
 interface ViewerInstance {
   readonly model: ViewerModel;
-  readonly sequences: readonly { readonly name: string }[];
+  readonly sequences: readonly { readonly name: string; readonly length: number }[];  // length in ms
   setLocation(at: Vec3): void;
   setRotation(turn: Quat): void;
   setScale(by: Vec3): void;
@@ -211,15 +212,26 @@ interface ViewerInstance {
   setLoop(loop: boolean): void;                 // true: repeat. false: play to the end and hold
   timeScale: number;
   readonly sequenceEnded: boolean;              // the playhead passed the end in the last step
+  readonly sequence: number;                    // the one set, -1 for none
+  readonly frame: number;                       // playhead, ms
+  readonly location: ArrayLike<number>;         // what the renderer holds
+  readonly rotation: ArrayLike<number>;
+  readonly scaling: ArrayLike<number>;
   show(): void;
   hide(): void;
+  readonly shown: boolean;                      // not hidden
+  attach(scene: RenderScene): void;
   detach(): void;
+  readonly attached: boolean;                   // in a scene
+  readonly drawn: boolean;                      // drawn in the last frame: shown and not culled
   highlight: number;                            // mouse-over brightness
   solidOnly: boolean;                           // draw solid parts only
   renderOpaque(): void;                         // alone, for the outline mask
   renderPick(r: number, g: number, b: number): void;  // flat colour, solid parts
 }
 ```
+
+The types are in `src/page/core/plugin.ts`.
 
 `sequences` is on the instance, not on the model. The renderer library
 keeps one model per file. Two items may share a model file and have
@@ -232,15 +244,21 @@ and from the page's use of them:
 | Member | M3 classes today |
 | --- | --- |
 | `bounds`, `vertexMin`, `vertexMax`, `addInstance` | the same |
-| `setLocation`, `setRotation`, `setScale`, `setSequence`, `timeScale`, `sequenceEnded`, `show`, `hide`, `detach`, `highlight`, `solidOnly`, `renderOpaque`, `renderPick` | the same |
+| `setLocation`, `setRotation`, `setScale`, `setSequence`, `timeScale`, `sequenceEnded`, `sequence`, `frame`, `show`, `hide`, `detach`, `highlight`, `solidOnly`, `renderOpaque`, `renderPick` | the same |
 | `format` | absent |
-| `sequences` | on the model |
+| `loaded` | `batches.length > 0` |
+| `sequences` | on the model; `length` is `interval[1] - interval[0]` |
 | `undrawn` | `undrawnBatches` |
-| `textures` | read out of `materials` by the page |
+| `textures` | read out of `materials` |
 | `setLoop(loop)` | `setSequenceLoopMode(2)` and `(1)`. Mode 0, "as the file says", is not used by the page. |
+| `location`, `rotation`, `scaling` | `localLocation`, `localRotation`, `localScale` |
+| `shown`, `attached`, `drawn` | `rendered`, `scene`, `scene.instances` (the list drawn in the last frame) |
+| `attach(scene)` | `scene.addInstance(instance)` |
 
-The format module `m3` closes these gaps with an adapter. The library is
-not changed for them.
+The format module `m3` closes these gaps with an adapter
+(`src/formats/m3/adapter.ts`). The library is not changed for them. The
+adapter keeps the library object as `m3`. Format code and the tests reach
+the M3 members through it (`item.model.m3`, `item.instance.m3`).
 
 ### 6.2 Capabilities
 
@@ -253,9 +271,20 @@ interface Capabilities {
   textureOverride?: {
     slots(): readonly TextureSlot[];
     set(slot: TextureSlot, texture: Texture | null): void;
+    applied(): number;                          // slots that hold another texture now
   };
 }
+
+interface TextureSlot {
+  readonly source: string;                      // in-model path of the texture
+  ownSize(): number;                            // longest side of its own texture once loaded; 0 before
+}
 ```
+
+M3 gives all three: 14 team colours, the vertex colour as tint, and one
+slot per active layer that names a texture file. Core reads the team
+count from `teamColor.count`. An item without `teamColor` has no team
+control in its list row.
 
 A new capability is a new optional member plus the feature that uses it.
 Existing formats are not edited.
@@ -267,12 +296,15 @@ interface FormatModule {
   readonly id: FormatId;
   readonly extensions: readonly string[];        // ".ext", lower case
   readonly handlers: readonly RendererHandler[]; // model and texture readers
+  /** The library's loaded resource as this format's model; null when it is not one. */
+  adopt(resource: unknown): ViewerModel | null;
   /** The bytes of a model file, as the object its handler takes. */
   parse?(bytes: Uint8Array, name: string): unknown;
   /** Give an instance animations kept outside its model file. */
   attachClips?(instance: ViewerInstance, clips: readonly Clip[], resolver: AssetResolver): Promise<void>;
   capabilities(instance: ViewerInstance): Capabilities;
-  readonly postPasses?: readonly PostPass[];     // draws after the scene
+  postPasses?(viewer: RenderHost): readonly PostPass[];  // draws after the scene, made once per viewer
+  inspect?(instance: ViewerInstance): Record<string, unknown>;  // what only the format knows, for state()
   readonly probes?: Readonly<Record<string, Probe>>;  // inspection for tests
 }
 
@@ -298,8 +330,18 @@ interface PostPass {
   clips for such a format is a failure, reported.
 - A format refuses what it cannot read (R-VIEW-82): its parser throws with
   the file, the record and the version.
+- Core loads a file with the library, then asks each format to `adopt` the
+  result. The first that returns a model owns it. No format: the load fails.
+- Core sums what every post pass drew after each scene, sky and units
+  (`state().displacedBatches`). A test turns one pass off by its id.
+- `inspect` gives the format's part of `sc2viewer.state()`: for M3 the
+  geometry layout, layers, draw order, regions and engine look.
 - `probes` replace format-only members of the test object. They are reached
-  as `viewer.probe(format, name, ...)`.
+  as `sc2viewer.probe(format, name, ...)` (step 6). `probes(context)`
+  takes the render and scene services and is made once (`core/testapi.ts`
+  `createProbe`). The M3 probes are in `src/formats/m3/` (`particles.ts`,
+  `billboards.ts`, `layers.ts`). An unknown format or name throws an error
+  that names it: `probe.spec`.
 
 ### 6.4 Game plugin
 
@@ -358,6 +400,31 @@ placement's `clips`, in that order. A format whose files hold their own
 animations gets an empty `clips`. Core hands the clips to the format
 (`attachClips`) before it asks the game for the rest animation.
 
+As built in step 5b, the page side is `PageGame` in
+`src/page/core/plugin.ts`; SC2 gives it in `src/games/sc2/page/game.ts`.
+It differs from the sketch above:
+
+- `categories`: each category's route name and noun (`units`, `unit`).
+  The noun names the list row's data attribute (`data-unit`), the drag
+  type (`application/x-sc2-unit`) and the item's key in `state()`.
+- `checkRecord(category, body)`: the game checks what the server sent,
+  field by field (`src/games/sc2/page/records.ts`). Core holds the result
+  as a `GameRecord`: id, name, file, dataset.
+- `place` and `describe` take the category too. `place` gets a wish with
+  `otherwise`: a variant the record lacks is replaced by a random one
+  (an add), by the first (a dataset swap) or refused (the variant select:
+  "ZerusTree has no variation 12").
+- `Placement` also holds `radius` (the grid glow and the room in a row),
+  `hitRadius` (the pick ray; null for an SC2 doodad: its model's bounds),
+  `team` (shows the team control) and `icon` (the list row's icon box).
+  `clips` is not built: SC2 has none.
+- `backdrop`: the word for a backdrop record, "skybox".
+- `itemOptions` and `install` are built as `GameParts` and the game's
+  install function (section 6.6), not as members of `PageGame`.
+  `resolver` is not built: the server resolves the paths.
+- The gallery's plugin is `games.plugin()`; `games.game()` is its id.
+  An item's plugin is `games.pluginOf(item.game)`.
+
 ### 6.5 Scene item
 
 ```ts
@@ -377,6 +444,16 @@ interface SceneItem<D> {
   options: JsonObject;       // read and written through the game's itemOptions
 }
 ```
+
+As built in step 5b (`Item` in `src/page/core/app.ts`): `source` is
+`{ category, record: GameRecord }` or null for a bare file; `placement`,
+`model`, `instance`, `capabilities`, place, angle, scale, sequence,
+one-shot and team as above. `game` is the game that placed it (step 6).
+Step 5c adds `options`, checked by the game's `itemOptions` (SC2: `hd`, on
+unless false; unknown keys are dropped). `team` stays a field of the
+item: the team colour is a format capability (`teamColor`) that the
+placement shows or hides, so it is not one game's. A scene document
+keeps both in its item's `options`.
 
 ### 6.6 Features
 
@@ -415,8 +492,46 @@ interface FeatureContext {
   a menu entry, what a double-click on a record or an instance opens.
 - What each feature does, with its numbers, is in section 16.
 
-Events: `item-added`, `item-removed`, `item-changed`, `selection-changed`,
-`game-changed`, `dataset-changed`, `camera-changed`, `frame`.
+As built in step 6 (`src/page/core/context.ts`, `src/page/main.ts`):
+
+- There is no page object and no `app()`. `main.ts` builds the
+  services in order, each from the ones before it: `status` (ui/status),
+  `events` (core/bus), `store`, the render host (core/host), `games`
+  and `api` (core/datasets), `camera` (core/view, with zoom, framing,
+  focus and the landmarks of core/landmarks), the sky (core/sky), `scene`
+  (core/scene, with the sky), `selection` (core/selection: the
+  selection, the hover, the select rectangle, the hit tests), `render`
+  (core/frame on the host), `ui` (ui/kit: drawers, scene list, game
+  tabs, gallery, icons, floating windows), `testApi` (core/testapi).
+- Then each game installs with the context (`GameContext` is the
+  `FeatureContext`) and gives its `GameParts`, then each feature in
+  `FEATURES` installs.
+- Features: `dataset-reload`, `controls` (with turning the selection to
+  face the mouse), `landmarks` (the drop-down), `add-all`, `drag`, `sky`
+  (the buttons and the picker), `pick`, `select`, `clipboard`, `inspect`,
+  `scenes`. Focus, zoom and framing moved to the camera service, the hit
+  tests to the selection service, the sky state to the scene service.
+- `ui.addGalleryTool` gives each matching pane a button with id
+  `<tool>-<category>` ("add all": `add-all-units`). `ui.setRowDrag` is
+  what a drag of a gallery row does (features/drag).
+- `GameParts`: `itemReady`, `glowOf`, `itemFacts`, `itemOptions`,
+  `menuToggles`, `openItem`, `openRecord`, `prepareGame`. A game adds
+  its test API through `testApi` like a feature. SC2 gives them in
+  `src/games/sc2/page/parts.ts`.
+- `testApi.app` and `testApi.viewer` make `window.SC2App` and
+  `window.sc2viewer`; a member given twice throws. `testApi.statePart`
+  adds a key to `sc2viewer.state()` (pick, ghost).
+- The m3 test probes (particles, billboards, layers) are factories that
+  take the context; `main.ts` adds them to `sc2viewer`.
+
+Events (core/bus.ts, typed by `ViewerEvents`): `item-added`,
+`items-removed`, `item-swapped`, `item-changed` (a field its row shows),
+`scene-edited` (write the scene document), `selection-changed`,
+`game-changed`, `dataset-changed`, `view-changed` (sky, grid),
+`landmarks-changed`, `camera-changed`, `frame`, and two that collect
+work: `startup` (the page is ready when all of it is done) and `flush`
+(writes end before a dataset reload). A listener that throws is
+reported; the others still run.
 
 ## 7. Server interface
 
@@ -674,13 +789,15 @@ A module reads and writes only through it. Keys, all under `viewer.`:
 | Key | Holds | Module |
 | --- | --- | --- |
 | `camera` | yaw, pitch, distance, target | `core/camera.ts` |
-| `drawers` | which drawers are open | `ui/drawers.ts` |
+| `drawers` | which drawers are open: `{ gallery, instances }` | `ui/drawers.ts` |
+| `game` | the chosen game (R-VIEW-22) | `core/datasets.ts` |
 | `dataset.<game>` | the chosen dataset of a game | `core/datasets.ts` |
-| `view` | the grid toggle and the backdrop | `features/sky` |
-| `landmarks` | the landmarks and the chosen one | `features/landmarks` |
+| `view` | the grid toggle and the backdrop, with its game and dataset | `core/sky.ts` |
+| `landmarks` | the landmarks and the chosen one | `core/landmarks.ts` |
 | `scene` | the id of the open scene | `features/scenes` |
 
-- `game` (the chosen game) comes with the game tabs, step 6.
+- `game`: only a choice is stored. The game shown at startup in place of
+  a refused one is not stored, so the stored game opens again later.
 - Each read returns the value and how it went: `none`, `restored`, or
   `refused: <why>`. A refused value is reported and not used; the next
   write replaces it (R-VIEW-73).
@@ -722,12 +839,18 @@ passed in it. Nothing here is [verified]: see section 2.
 | --- | --- | --- |
 | R-VIEW-1 to 8 | [plan] | |
 | R-VIEW-9 | [today] | `local.env`, `.gitignore` |
-| R-VIEW-10 to 12 | [plan] | TypeScript today: the page (`src/page`, `src/formats/m3`, `src/shared`), the server (`src/server`, `src/games/sc2/server`) and `src/tools`. The survey tools under `tools/` and the tests are still JavaScript (step 8). |
+| R-VIEW-10, 11 | [plan] | TypeScript today: the page (`src/page`, `src/formats/m3`, `src/shared`), the server (`src/server`, `src/games/sc2/server`) and `src/tools`. The survey tools under `tools/` and the tests are still JavaScript (step 8). |
+| R-VIEW-12 | [today] | Step 6: no page object, no `app()`; each module takes typed services (section 6.6). `scripts/typecheck.sh` and the import rule. No test asserts the clause yet. |
 | R-VIEW-13 | [today] | `scripts/typecheck.sh`, first in `scripts/test.sh`; it passed in run `full88` (section 13). `typecheck.spec` asserts that a type error ends the check. |
-| R-VIEW-14 | [plan] | Today: `window.sc2viewer` plus direct reads of the shared object in 19 test files. |
-| R-VIEW-20 to 23 | [plan] | |
-| R-VIEW-24 | [plan] | Today the handles are at the top: `side.spec`. |
-| R-VIEW-25 to 27 | [plan] | |
+| R-VIEW-14 | [plan] | Today: `window.sc2viewer` and `window.SC2App`, put together from what the features hand to `testApi` (`core/testapi.ts`); a format's members only through `probe`. Tests still read item internals (`SC2App.items`, `.instance.m3`); typed in step 8. |
+| R-VIEW-20 | [today] | `game-tabs.spec`: one tab per game the server lists, vertical, at the top of the gallery's right edge. Only SC2 has a page module. |
+| R-VIEW-21 | [today] | `ui/gametabs.ts`, `core/datasets.ts` `setGame`. A switch to a second game is not tested until there is one (step 7). |
+| R-VIEW-22 | [today] | `game-tabs.spec`: a choice is stored, kept over a reload; a refused stored game falls back and stays stored. |
+| R-VIEW-23 | [today] | `game-tabs.spec`: with the gallery closed the tabs are at the window edge; a click opens the gallery. |
+| R-VIEW-24 | [today] | `game-tabs.spec`, `side.spec`: the handles at the bottom of each panel's right edge. |
+| R-VIEW-25 | [today] | `ui/gallery`: the panes from the game's categories. `units-ui.spec`, `doodads-ui.spec`, `datasets-ui.spec`. |
+| R-VIEW-26 | [plan] | Items carry their game; one game only today (step 7). |
+| R-VIEW-27 | [today] | `game-tabs.spec`: a game the server cannot open and one with no page module are disabled, the reason as the title. |
 | R-VIEW-28 | [today] | `side.spec` |
 | R-VIEW-30 to 33 | [today] | `datasets-ui.spec`, `datasets-api.spec` |
 | R-VIEW-34 | [today] | `datasets-toast.spec` |
@@ -755,7 +878,7 @@ passed in it. Nothing here is [verified]: see section 2.
 | R-VIEW-65 | [today] | `viewer.spec` |
 | R-VIEW-70 | [today] | `scenes.spec`, `viewer.spec`, `units-ui.spec`, `doodads-ui.spec`, `datasets-ui.spec`, `hd-textures.spec` (step 4c, run `t-4c`) |
 | R-VIEW-71 | [today] | `scenes.spec`: ten faulty files, each refused with its path |
-| R-VIEW-72, 73 | [today] | `camera-persist.spec`, `landmarks-store.spec`, `side.spec`, `scenes.spec` (the open scene). The chosen game is [plan] (step 6). |
+| R-VIEW-72, 73 | [today] | `camera-persist.spec`, `landmarks-store.spec`, `side.spec`, `scenes.spec` (the open scene), `game-tabs.spec` (the chosen game). |
 | R-VIEW-74 to 77 | [today] | `scenes.spec` |
 | R-VIEW-80 | [today] | `viewer.spec` |
 | R-VIEW-81 | [today] | `displacement.spec`, `particles.spec` |
@@ -924,7 +1047,20 @@ runs while building; one full run, `full93`, with the operator's leave.
 | `t-scenes4` | `scenes.spec` after a types-only move: 11 passed |
 | `full93` | Start 15:52:52 UTC. Every test, `@slow` too (operator allowed). 314 tests: 314 passed. Exit 0, 327 s. It closes steps 4b and 4c. |
 | `t-swallow` | After full93, four promise errors that were dropped are now reported (dataset reload, scene open queue, paged list, picker search; the commit hook found them). `datasets-toast`, `paged-list`, `scenes`, `ground-sky`, `typecheck`: 30 passed. |
+| `s5a-1`, `s5a-2` | Step 5a, the format interfaces (below). 28 spec files: the typecheck and the import rule, the scene and its list, HD, the texture window, drag, pick, sky, displacement, cutout, fresnel, billboards, ground lights, particles, constant colour, geometry, draw order, UV, animation speed, bounds, the galleries, scenes, clipboard. `s5a-1`: 87 passed, 53 s. `s5a-2`: 96 passed, 62 s. No full run yet. |
+| `s5b-1` | Step 5b, first try: 74 failed, 37 passed. The game plugin was `game` on the page object, and the datasets part's `game()` (the game id) hid it. Renamed `gamePlugin`; `merge` now refuses a member two parts both have. |
+| `s5b-2` to `s5b-5` | Step 5b (below). 45 spec files: the scene and its list, the galleries, datasets, drag, clipboard, scenes, pick, move, sky, textures, HD, add all, selection, focus, landmarks, camera, and the M3 set of 5a. `s5b-2`: 111 passed, 63 s. `s5b-3`: 79 passed, 71 s. `s5b-4`: 67 passed, 55 s. `s5b-5` (`datasets-toast`, `--no-deps`): 1 passed. No full run yet. |
+| `s5c-1`, `s5c-2` | Step 5c (below). 15 spec files: add all and its view, clipboard, datasets UI, doodads UI, drag, HD, instances, landmarks, pick, scenes, skybox units, the texture window, units UI, ground and sky. `s5c-1`: 107 passed, 79 s. `s5c-2` (`datasets-toast`, `--no-deps`): 1 passed. Typecheck and import rule: 92 files, 0 forbidden imports. |
+| `full94` | Start 20:17:10 UTC, on HEAD `fe40bfe` with the step 5 changes uncommitted. Every test, `@slow` too (operator allowed after step 5). 314 tests: 314 passed. Exit 0, 327 s. It closes step 5. |
 | `live1` to `live3` | The real server (`scripts/start.sh`, port 4600, real `scoba` and `stock` data) in a real browser: page on the new routes only, a gallery Marine drawn and back after a reload, two named scenes, export and import, an old address scene refused, a bad import refused, settings back under `viewer.*`. `live1`: 4 passed, 1 failed (the test hid the gallery before using its dataset select; test fixed). `live2` and `live3` (after the error fix): 5 passed. |
+| `s6-1`, `s6-2` | Step 6, the generic gallery (below), with the test ids renamed. `s6-1`: 128 passed, 1 failed (`datasets-ui`: a dataset change emptied the search; the search now stays). `s6-2` (`datasets-ui`): 7 passed. |
+| `s6d-1` to `s6d-5` | Step 6, the game tabs and the handles. `s6d-1`: 23 passed, 3 failed (`game-tabs.spec`: the choice was not stored when the game was already shown; now every choice is stored, and the game shown at startup in place of a refused one is not). `s6d-2` (`game-tabs`): 5 passed. `s6d-3` (20 files): 132 passed, 1 failed (`scenes.spec` expected the old refusal text; the refusal now names its reason). `s6d-4` (`scenes`): 11 passed. `s6d-5` (`datasets-toast`, `--no-deps`): 1 passed. |
+| `sE-1` | Step 6, the features on the context (below): `game-tabs`, `side`, `instances`: 19 passed. |
+| `full95` | Start 21:22 UTC. Every test. 310 passed, 3 failed, 6 did not run. `clipboard.spec` (2): `SC2App.pointer` was a function, not the point; it is a getter now. `particle-motion.spec`: one spore rose 0.2987, the floor is 0.3. |
+| `sE-2`, `sE-3` | `clipboard`, `particle-motion`: 9 passed. `particle-motion`, `--repeat-each=8`: 16 passed. The `full95` miss came under the load of the whole suite. The 6 that did not run are the `slow` and `shared` projects, which wait on `main`. |
+| `sP-1` | The M3 probes behind `sc2viewer.probe` (6.3). `probe.spec` (new, 2 tests: a probe answers, the old names are gone, an unknown format or name is an error) and the 10 files that call a probe: 38 passed. |
+| `full96` | Start 21:40:12 UTC, on HEAD `fe40bfe` with steps 5 and 6 uncommitted. Every test, `@slow` too. 321 tests: 321 passed. Exit 0, 325 s. It closes step 6. |
+| `live5` to `live7` | The real server, as `live1`. `live5`: 1 passed, 4 failed; `live6`: 3 passed, 2 failed. Both used the ids from before step 6 (`#unit-search`, `#races`, `#unit-count`, `#panel-tab`, `#preview-add`, drawer `panel`); the live test now uses the new ids. `live7`: 5 passed. |
 
 - Library HEAD `7ac1103a`, 55 patches.
 - `t-scenes`: the test read a doodad's name from `unit`; it is in
@@ -945,18 +1081,78 @@ runs while building; one full run, `full93`, with the operator's leave.
   `landmarks-store.spec` use the new keys; a new negative proves the old
   key is not read. New: `scenes.spec`, 11 tests.
 - Operator check: the look of the scene list and its dialogs.
+- Step 5a built: the types of 6.1 to 6.3 (`src/page/core/plugin.ts`), the
+  M3 format module (`src/formats/m3/format.ts`, `adapter.ts`), the M3
+  layer probes moved from `features/inspect` to `src/formats/m3/layers.ts`.
+  Items hold a `ViewerModel`, a `ViewerInstance` and their `Capabilities`.
+  Core loads through the formats (`loadModel`, `formatOf`); no page module
+  outside `src/formats/m3` names an M3 class. HD uses `textureOverride`;
+  team colour and tint go through `teamColor` and `tint`; the displacement
+  pass is a `PostPass`. `SC2App.lib`, `TEAMS` and `SC2App.setDisplacement`
+  are gone; `sc2viewer.setDisplacement` stays. Six specs read the library
+  objects through `.m3` now.
+- Step 5b built: `PageGame` (6.4 as built) and SC2's
+  (`src/games/sc2/page/`: `game.ts` placement and play rate, `rules.ts`
+  data scale, `records.ts` record checks, `describe.ts` preview cards,
+  `api.ts` the test API's `addUnit` and `addDoodad`). Core adds a record
+  by category (`addRecord`) and applies the placement; `core/rules.ts`
+  is gone; no core file reads a unit or doodad field. The gallery cards
+  take their lines from `describe`. `state()` keys `unit`, `doodad`,
+  `variation` and `dataScale` stay, made from the category nouns and the
+  placement. `SC2App.addUnit`, `addDoodad` and `doodadPlacement` are gone
+  (`sc2viewer.addUnit` and `addDoodad` stay); `add-all-view.spec` reads
+  `source.record`.
+- Step 5c moved what was still SC2 in shared page code to the game.
+  The SC2 record types are in `src/games/sc2/shared/records.ts`;
+  `src/shared/records.ts` keeps the shapes of every game (`Page`, the
+  datasets, `Backdrop`). `src/games/sc2/page/` gained `parts.ts` (what
+  SC2 adds, section 6.6), `hd.ts` (the HD sets, Ctrl+H, the "hd" menu
+  check box, the blue glow rule), `textures/` (the texture window) and
+  `gallery/` (the units and doodads tabs, their filters, the facets and
+  the landmark names). `features/hd`, `features/textures` and the two
+  tabs in `ui/gallery` are gone; `ui/gallery` keeps the tab switch and
+  the model file search. `features/addall` takes its list from the
+  game (`addAllSource`). `hd` is an item option (section 6.5). Ctrl+L
+  and the double-click on an instance are in `features/pick`.
+  `SC2App.filterName`, `sc2viewer.textureWindow` and `hdAssets` stay.
+- Still SC2 after 5c (step 6): `index.html` holds the SC2 tabs, their
+  filters and buttons, and the sky picker says "skybox". Done in step 6:
+  `index.html` has no game's tabs; the picker title stays "skybox".
+- Step 6 built: the generic gallery (`ui/gallery/index.ts`, `pane.ts`)
+  from `CategoryInfo` (`rows`, `icons`) and `RecordSummary`; the game
+  tabs (`ui/gametabs.ts`, 10.1); the handles at the bottom of each
+  panel; `#panel` is `#gallery`; the settings `game` and
+  `drawers: { gallery, instances }`; the datasets per game
+  (`core/datasets.ts`); items, the sky, the clipboard and scene items
+  carry their game. `src/games/sc2/page/gallery/` is gone;
+  `names.ts` holds the landmark names.
+- Step 6 also put the features on the context of 6.6 (as built there).
+  `core/app.ts` is gone; the data types are `core/types.ts`. New in core:
+  `bus.ts`, `context.ts` (the services), `selection.ts`, `sky.ts`,
+  `view.ts`, `landmarks.ts`, `focus.ts`, `framebox.ts`, `zoom.ts`,
+  `geometry.ts`, `probe.ts`, `testapi.ts`. `features/focus` is gone.
+  The bus is `bus.ts`, not `events.ts`: a `.ts` file of that name hides
+  `events.d.ts`, the library's `events` module (O-VSPEC-1c).
 
 Order of work:
 
 1. Baseline: one full run of the current tests, recorded. Done, above.
 2. Tooling: compiler, bundles, type check in the test run. Done, above.
 3. Page to typed modules, behaviour unchanged. Done, above.
-4. Server to core and one backend (4a, done, above), new routes (4b,
-   above). Then 4c: scene documents and stored settings (section 10),
-   in IndexedDB, named, with export and import; the URL holds no scene
-   (operator 2026-11-23).
+4. Server to core and one backend (4a), new routes (4b), scene documents
+   and stored settings (4c, section 10), in IndexedDB, named, with export
+   and import; the URL holds no scene (operator 2026-11-23). Done, above
+   (`full93`).
 5. Interfaces of sections 5 to 7; the existing game becomes a plugin.
-6. Game tabs and handles.
+   5a, the format interfaces and M3 as a format module: done, above
+   (`s5a-1`, `s5a-2`). 5b, the game plugin of 6.4 and generic scene
+   items: done, above (`s5b-2` to `s5b-5`). 5c, the feature context of
+   6.6, `itemOptions`, `hd`, `textures` and the gallery tabs to
+   `games/sc2`, the SC2 record types to `games/sc2/shared`: done, above
+   (`s5c-1`, `s5c-2`). Full run `full94`: 314 passed.
+6. Game tabs and handles, the generic gallery, and the features on the
+   context of 6.6 (no page object), the format probes of 6.3. Done,
+   above (`full96`: 321 passed).
 7. The second game and the second format.
 8. Tests to TypeScript. Documents to the final state.
 

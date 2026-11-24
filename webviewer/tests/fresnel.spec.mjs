@@ -17,7 +17,7 @@ async function open(page) {
   await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
   await page.evaluate(() => {
     window.sc2viewer.setGrid(false);
-    window.sc2viewer.setParticles(false);
+    window.sc2viewer.probe('m3', 'setParticles', false);
   });
   return errors;
 }
@@ -27,20 +27,20 @@ const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null,
 /** Fresnel layers of one item: material, layer type, mode, exponent, min, max offset. */
 const fresnelLayers = (page, id) => page.evaluate((i) => {
   const item = window.SC2App.items.find((x) => x.id === i);
-  return item.model.materials[1].flatMap((m) => m.layers.filter((l) => l.active && l.layer && l.layer.fresnelType).map((l) => [m.name, l.type, l.layer.fresnelType, l.layer.fresnelExponent, l.layer.fresnelMin, l.layer.fresnelMaxOffset]));
+  return item.model.m3.materials[1].flatMap((m) => m.layers.filter((l) => l.active && l.layer && l.layer.fresnelType).map((l) => [m.name, l.type, l.layer.fresnelType, l.layer.fresnelExponent, l.layer.fresnelMin, l.layer.fresnelMaxOffset]));
 }, id);
 
 /** Frame statistics with fresnel on and off; also the share of near-white pixels. */
 async function onOff(page) {
   return page.evaluate(() => {
     const v = window.sc2viewer;
-    v.setFresnel(true);
+    v.probe('m3', 'setFresnel', true);
     const on = v.colorStats();
     const onWhite = v.whiteShare();
-    v.setFresnel(false);
+    v.probe('m3', 'setFresnel', false);
     const off = v.colorStats();
     const offWhite = v.whiteShare();
-    v.setFresnel(true);
+    v.probe('m3', 'setFresnel', true);
     return { on: { ...on, white: onWhite }, off: { ...off, white: offWhite } };
   });
 }

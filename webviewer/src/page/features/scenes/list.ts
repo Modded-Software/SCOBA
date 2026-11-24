@@ -3,8 +3,8 @@
 // first. At the end: new, export, import. A refused stored scene is listed
 // with its reason and can only be deleted.
 
-import type { ScenesState } from '../../core/app';
-import { app } from '../../core/app';
+import type { ScenesState } from '../../core/types';
+import type { StatusService } from '../../core/context';
 import { byId, byIdAs, make } from '../../core/dom';
 import { ConfirmDialog } from '../../ui/components/dialog';
 import { Dropdown } from '../../ui/components/dropdown';
@@ -25,12 +25,12 @@ const TRASH = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true
 /** A file name for a scene: its name with only letters, digits, "-" and "_". */
 export const fileName = (name: string): string => `${name.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'scene'}.scene.json`;
 
-export function installSceneList(actions: SceneListActions): { render(): void } {
+export function installSceneList(status: StatusService, actions: SceneListActions): { render(): void } {
   const button = byId('scenes-button');
   const listNode = byId('scenes-list');
   const fileInput = byIdAs('scenes-import-file', HTMLInputElement);
   const dropdown = new Dropdown({ root: byId('scenes'), button, list: listNode });
-  const report = (error: unknown): void => app().reportFailure(error);
+  const report = (error: unknown): void => status.reportFailure(error);
   const run = (work: () => Promise<unknown>): void => {
     dropdown.close();
     work().catch(report);
@@ -89,7 +89,7 @@ export function installSceneList(actions: SceneListActions): { render(): void } 
     file
       .text()
       .then((text) => actions.importScene(text))
-      .then(() => app().setStatus(`imported scene from ${file.name}`))
+      .then(() => status.setStatus(`imported scene from ${file.name}`))
       .catch(report);
   });
 

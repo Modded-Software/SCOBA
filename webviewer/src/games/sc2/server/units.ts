@@ -81,7 +81,20 @@ export async function loadUnits(catalogDir: string, assets: AssetLookup): Promis
       // The map's own units first among equals, then melee units, then the rest.
       hits = sortBy(hits, (u) => rank(u, textQuery) * 4 + (u.fields['inMap'] ? 0 : u.family === 'Melee' ? 1 : 2));
     }
-    const brief = (u: Unit): Record<string, unknown> => ({ id: u.id, name: u.name, race: u.race, kind: u.kind, family: u.family, icon: u.fields['icon'], inMap: u.fields['inMap'], skybox: u.skybox });
+    // The RecordSummary fields (sub, placeable), then the SC2 ones. A skybox unit is a backdrop: "add all" leaves it out.
+    const brief = (u: Unit): Record<string, unknown> => ({
+      id: u.id,
+      name: u.name,
+      sub: `${u.race} · ${u.kind} · ${u.id}${u.skybox ? ' · skybox' : ''}`,
+      icon: u.fields['icon'] ?? null,
+      placeable: !u.skybox,
+      notPlaceableAs: u.skybox ? 'skybox unit' : null,
+      race: u.race,
+      kind: u.kind,
+      family: u.family,
+      inMap: u.fields['inMap'],
+      skybox: u.skybox,
+    });
     return { total: hits.length, items: hits.slice(offset, offset + limit).map(brief) };
   }
 

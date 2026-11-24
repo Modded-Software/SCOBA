@@ -197,15 +197,15 @@ test('Delete removes the selected instances and no others', async ({ page }) => 
   await dragRect(page, await around(page, [marine, zealot]));
   expect((await pick(page)).selection).toEqual([marine, zealot]);
   // Negative: while typing in a field, Delete edits the text and removes nothing.
-  await page.fill('#unit-search', 'abc');
-  await page.focus('#unit-search');
+  await page.fill('#search-units', 'abc');
+  await page.focus('#search-units');
   await page.keyboard.press('Home');
   await page.keyboard.press('Delete');
-  await expect(page.locator('#unit-search')).toHaveValue('bc');
+  await expect(page.locator('#search-units')).toHaveValue('bc');
   expect((await state(page)).items).toHaveLength(3);
   expect((await pick(page)).selection).toEqual([marine, zealot]);
 
-  await page.locator('#unit-search').blur();
+  await page.locator('#search-units').blur();
   await page.keyboard.press('Delete');
   const s = await state(page);
   expect(s.items.map((i) => i.id)).toEqual([zergling]);

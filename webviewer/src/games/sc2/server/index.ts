@@ -1,7 +1,7 @@
 // The SC2 game on the server (SPEC-VIEWER-SC2): its settings, its files
 // and datasets, and its answers to the protocol of SPEC-VIEWER section 8.
-// The record and row bodies are today's (the unit and doodad records of
-// src/shared/records.ts); RecordSummary and RecordDetail are step 5.
+// The record and row bodies are the unit and doodad records of
+// src/games/sc2/shared/records.ts.
 
 import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -26,10 +26,19 @@ const filter = (id: string, label: string, kind: FilterInfo['kind'], values: rea
 function categories(data: Dataset): CategoryInfo[] {
   const u = data.units.facets;
   const d = data.doodads.facets;
+  const lower = (v: string): string => v.toLowerCase();
   return [
-    { id: 'units', label: 'units', noun: 'unit', addAll: true, filters: [filter('race', 'race', 'buttons', u.races), filter('kind', 'kind', 'select', u.kinds), filter('family', 'family', 'select', u.families, (v) => v || 'no family')] },
-    { id: 'doodads', label: 'doodads', noun: 'doodad', addAll: true, filters: [filter('type', 'type', 'select', d.types), filter('tileset', 'terrain', 'select', d.tilesets)] },
-    { id: 'models', label: 'models', noun: 'model file', addAll: false, filters: [] },
+    {
+      id: 'units',
+      label: 'units',
+      noun: 'unit',
+      addAll: true,
+      rows: 'records',
+      icons: true,
+      filters: [filter('race', 'race', 'buttons', u.races, lower), filter('kind', 'kind', 'select', u.kinds, lower), filter('family', 'family', 'select', u.families, (v) => (v ? v.toLowerCase() : '(no family)'))],
+    },
+    { id: 'doodads', label: 'doodads', noun: 'doodad', addAll: true, rows: 'records', icons: false, filters: [filter('type', 'type', 'select', d.types, lower), filter('tileset', 'terrain', 'select', [...d.tilesets].sort())] },
+    { id: 'models', label: 'models', noun: 'model file', addAll: false, rows: 'files', icons: false, filters: [] },
   ];
 }
 

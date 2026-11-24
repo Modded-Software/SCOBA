@@ -151,10 +151,10 @@ test('Ctrl+H switches the selected instance only, and back; not with nothing sel
   expect(distance(hd, await colour(page))).toBeGreaterThan(2);
 
   // Negative: the key in a text field is the field's.
-  await page.locator('#unit-search').focus();
+  await page.locator('#search-units').focus();
   await page.keyboard.press('Control+h');
   expect((await hdOf(page, near)).hd).toBe(false);
-  await page.locator('#unit-search').blur();
+  await page.locator('#search-units').blur();
 
   await page.keyboard.press('Control+h');
   await expect.poll(async () => (await hdOf(page, near)).applied).toBe(layers);
@@ -175,7 +175,7 @@ test('Ctrl+H and Ctrl+L never reach the browser: no selection, a selection, a te
   /** Whether a keydown sent to `where` had its default action cancelled (true: the browser does nothing). */
   const cancelled = (key, where, mods = { ctrlKey: true }) =>
     page.evaluate(([k, w, m]) => {
-      const target = w === 'frame' ? document.getElementById('texture-frame').contentDocument.body : w === 'field' ? document.getElementById('unit-search') : document.body;
+      const target = w === 'frame' ? document.getElementById('texture-frame').contentDocument.body : w === 'field' ? document.getElementById('search-units') : document.body;
       if (w === 'field') target.focus();
       const sent = new (target.ownerDocument.defaultView.KeyboardEvent)('keydown', { key: k, bubbles: true, cancelable: true, ...m });
       const done = !target.dispatchEvent(sent);

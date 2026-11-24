@@ -5,7 +5,7 @@
 
 import type ModelViewer from '@renderer/viewer/viewer';
 import type Shader from '@renderer/viewer/gl/shader';
-import type ModelInstance from '@renderer/viewer/modelinstance';
+import type { ViewerInstance } from '../plugin';
 import { attrib, quadBuffer, shaderSource, uniform, type Rgb } from './gl';
 
 /** Texels between blur taps: the feather is about 13 px wide. */
@@ -17,7 +17,7 @@ export interface Outline {
   /** Settles once the shaders have loaded; rejects with the reason when they cannot. */
   ready: Promise<void>;
   /** Draw the glow around `instance` onto the canvas. Call after the scene. Nothing until the shaders have loaded. */
-  draw(instance: ModelInstance, w: number, h: number): void;
+  draw(instance: ViewerInstance, w: number, h: number): void;
 }
 
 interface Target {

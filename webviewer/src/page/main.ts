@@ -1,120 +1,141 @@
 // The page. src/tools/build.ts bundles this file for the browser.
 //
-// The parts install in the order the old page scripts loaded, so event
-// listeners register in the same order. Each part gets the parts before
-// it; at call time every part reads the whole through app().
+// main.ts is the composition root (SPEC-VIEWER 6.6): it builds the
+// services of core and ui, each from the ones before it, then installs
+// the games and the features with one FeatureContext. Nothing reads a
+// shared page object: the services and the events are all there is. The
+// test API is what the features hand to testApi.
 
-import { app, merge, setApp, type App } from './core/app';
-import { createCore } from './core/host';
-import { installDatasets } from './core/datasets';
-import { installScene } from './core/scene';
-import { installFrame } from './core/frame';
+import type { Feature, FeatureContext, Store } from './core/context';
+import { createDatasets } from './core/datasets';
+import { collect, createEventBus, type ViewerEvents } from './core/bus';
+import { createFrame } from './core/frame';
+import { createHost, visibleRect } from './core/host';
 import { DdsImage } from './core/library';
+import { createScene } from './core/scene';
+import { createSelection } from './core/selection';
+import { clearSetting, readSetting, writeSetting } from './core/settings';
+import { createSky } from './core/sky';
+import { createProbe, createTestApi } from './core/testapi';
+import { createView } from './core/view';
 import { installStatus } from './ui/status';
-import { installDrawers } from './ui/drawers';
-import { installInstances } from './ui/instances';
-import { installUnits } from './ui/gallery/units';
-import { installDoodads } from './ui/gallery/doodads';
-import { installDatasetReload } from './features/dataset-reload';
-import { installControls } from './features/controls';
-import { installFocus } from './features/focus';
-import { installLandmarks } from './features/landmarks';
-import { installAddAll } from './features/addall';
-import { installDrag } from './features/drag';
-import { installSky } from './features/sky';
-import { installPick } from './features/pick';
-import { installSelect } from './features/select';
-import { installClipboard } from './features/clipboard';
-import { installInspect } from './features/inspect';
-import { installTextures } from './features/textures';
-import { installHd } from './features/hd';
-import { installScenes } from './features/scenes';
-import { createDisplacement } from '../formats/m3/displacement';
-import { particlesApi } from '../formats/m3/particles';
-import { billboardsApi } from '../formats/m3/billboards';
+import { installUi } from './ui/kit';
+import { datasetReloadFeature } from './features/dataset-reload';
+import { controlsFeature } from './features/controls';
+import { landmarksFeature } from './features/landmarks';
+import { addAllFeature } from './features/addall';
+import { dragFeature } from './features/drag';
+import { skyFeature } from './features/sky';
+import { pickFeature } from './features/pick';
+import { selectFeature } from './features/select';
+import { clipboardFeature } from './features/clipboard';
+import { inspectFeature } from './features/inspect';
+import { scenesFeature } from './features/scenes';
+import { m3Format } from '../formats/m3/format';
+import { DISPLACEMENT } from '../formats/m3/displacement';
+import { sc2Game } from '../games/sc2/page/game';
+import { installSc2Page } from '../games/sc2/page/parts';
 
-// core.js and side.js.
-const core = merge(merge(createCore(createDisplacement), installStatus()), installDrawers());
-// datasets.js.
-const withData = merge(merge(core, installDatasets()), installDatasetReload());
-// controls.js, scene.js (with the focus and the scene list), panels.js, doodads.js.
-const withScene = merge(merge(merge(merge(withData, installControls(withData)), installScene(withData)), installFocus()), installInstances(withData));
-const withGallery = merge(merge(withScene, installUnits(withScene)), installDoodads(withScene));
-// landmarks.js, addall.js, drag.js, sky.js.
-const withTools = merge(merge(merge(merge(withGallery, installLandmarks(withGallery)), installAddAll()), installDrag(withGallery)), installSky(withGallery));
-// pick.js, select.js, clipboard.js.
-const withPick = merge(merge(merge(withTools, installPick(withTools)), installSelect(withTools)), installClipboard(withTools));
-// inspect.js, textures.js, hd.js, particles.js, billboards.js.
-const inspect = installInspect();
-const withViews = merge(merge(withPick, installTextures(withPick)), installHd(withPick));
-// The scene documents (SPEC-VIEWER section 10.2).
-const withScenes = merge(withViews, installScenes());
-// main.js.
-const frame = installFrame(withScenes);
-const whole: App = merge(withScenes, frame);
-setApp(whole);
+// The model formats, the games and the features: one line each (SPEC-VIEWER 1, 4, 6.6).
+const FORMATS = [m3Format];
+const GAMES = [{ game: sc2Game, install: installSc2Page }];
+/** In the order the old page scripts loaded, so listeners register in the same order. */
+const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature];
 
-/** What the tests and the console reach: the whole object, inspection included. */
-const sc2App = merge(merge(merge(whole, inspect), particlesApi), billboardsApi);
+// ---- the services, each from the ones before it ----
 
-/** The test API: a fixed list of the parts' functions. */
-const sc2viewer = {
-  ready: false,
-  groundUnder: whole.groundAt,
-  add: whole.add,
-  addUnit: whole.addUnit,
-  addDoodad: whole.addDoodad,
-  remove: whole.remove,
-  clear: whole.clear,
-  restart: whole.restart,
-  view: whole.view,
-  itemPixel: whole.itemPixel,
-  setGrid: whole.setGrid,
-  setSky: whole.setSky,
-  screenOf: whole.screenOf,
-  itemScreen: whole.itemScreen,
-  pickState: whole.pickState,
-  setDisplacement: whole.setDisplacement,
-  textureWindow: whole.textureWindow,
-  hdAssets: whole.hdAssets,
-  /** The scene documents: read the open one, the list; make, open, rename, delete, export, import; wait for writes. */
-  scenes: {
-    state: whole.scenesState,
-    document: whole.sceneDocument,
-    flush: whole.flushScenes,
-    create: whole.newScene,
-    open: whole.openScene,
-    rename: whole.renameScene,
-    remove: whole.deleteScene,
-    exportText: whole.exportScene,
-    importText: whole.importScene,
+const status = installStatus(visibleRect);
+const events = createEventBus<ViewerEvents>(status.reportFailure);
+const store: Store = { read: readSetting, write: writeSetting, clear: clearSetting };
+const host = createHost(FORMATS, status.setStatus);
+const { games, api, setupDatasets } = createDatasets(
+  GAMES.map((g) => g.game),
+  store,
+  events,
+);
+const camera = createView(host, store, events);
+const sky = createSky({ host, games, api, status, store, events });
+const scene = createScene({ host, games, api, status, events, sky });
+const selection = createSelection({ host, camera, items: scene.items, events });
+const render = createFrame({ host, camera, scene, selection, games, events });
+const ui = installUi({ games, api, scene, selection, camera, status, store, events });
+const tests = createTestApi();
+
+const context: FeatureContext = { games, render, scene, selection, camera, status, store, events, api, ui, testApi: tests.builder };
+
+// ---- the games, then the features ----
+
+for (const { game, install } of GAMES) games.addParts(game.id, install(context));
+for (const feature of FEATURES) feature.install(context);
+
+// ---- the test API (window.SC2App, window.sc2viewer) ----
+
+tests.builder.app({
+  canvas: render.canvas,
+  ground: render.ground,
+  items: scene.items,
+  eye: camera.eye,
+  view: camera.view,
+  zoomGoal: camera.zoomGoal,
+  cameraRestore: camera.cameraRestore,
+  /** The ground point under the mouse, as a value (the tests read SC2App.pointer). */
+  get pointer() {
+    return camera.pointer();
   },
-  ...inspect,
-  ...particlesApi,
-  ...billboardsApi,
+  hitAt: selection.hitAt,
+  itemAt: selection.itemAt,
+  selectedIds: selection.selectedIds,
+  setSelection: selection.setSelection,
+  toggleSelected: selection.toggleSelected,
+  setPosition: scene.setPosition,
+  setVariation: scene.setVariation,
+  setStatus: status.setStatus,
+  statusLog: status.statusLog,
+  statusState: status.statusState,
+  visibleRect: render.visibleRect,
+  drawerState: ui.drawerState,
+});
+tests.builder.viewer({
+  groundUnder: camera.groundAt,
+  remove: scene.remove,
+  clear: scene.clear,
+  restart: scene.restart,
+  view: camera.view,
+  itemPixel: selection.itemPixel,
+  setGrid: scene.setGrid,
+  setSky: scene.setSky,
+  screenOf: camera.screenOf,
+  itemScreen: selection.itemScreen,
+  setDisplacement: (on: boolean) => render.setPostPass(DISPLACEMENT, on),
+  /** The games: the tabs' list, the gallery's game, and choosing one. */
+  games: { list: games.gamesInfo, current: games.game, choose: games.setGame, refusal: games.gameRefusal },
+  /** A format's own test members: probe('m3', 'particles', id) (SPEC-VIEWER 6.3). */
+  probe: createProbe(FORMATS, context),
   /** The renderer's DDS reader, for the tests that decode a texture in the page. */
   DdsImage,
-};
+});
+
+const sc2viewer = tests.viewer();
+const sc2App = tests.app();
 
 declare global {
   interface Window {
-    SC2App: typeof sc2App;
-    sc2viewer: typeof sc2viewer;
+    SC2App: Readonly<Record<string, unknown>>;
+    sc2viewer: Record<string, unknown>;
   }
 }
 
 window.SC2App = sc2App;
 window.sc2viewer = sc2viewer;
 
-// Startup. The datasets first: every list and every item reads one.
-whole.resize();
-whole.applyCamera();
-frame.start();
-const a = app();
-a.setupDatasets()
-  .then(() => a.setupHd())
-  .then(() => Promise.all([a.setupUnits(), a.setupDoodads(), a.setupScenes(), a.restoreView(), a.ground.ready, a.outline.ready]))
-  .catch((error: unknown) => a.reportFailure(error))
+// ---- startup: the datasets first; every list and every item reads one ----
+
+host.resize();
+camera.applyCamera();
+render.start();
+setupDatasets()
+  .then(() => Promise.all([collect(events, 'startup'), render.ground.ready, render.outline.ready]))
+  .catch(status.reportFailure)
   .finally(() => {
-    sc2viewer.ready = true;
+    sc2viewer['ready'] = true;
   });

@@ -6,8 +6,8 @@ import { test, expect } from '@playwright/test';
 // renderer/particle/sc2 (sc2_kernels_spawn, sc2_kernels_build) and
 // renderer/sc2/sc2_element_math.h. Field layout: m3addon structures.xml,
 // checked field by field against its m3.py on one file per version.
-// Truth: the emitter state the renderer keeps (sc2viewer.particles), and the
-// drawn frame with particles on and off (sc2viewer.setParticles).
+// Truth: the emitter state the renderer keeps (sc2viewer.probe('m3', 'particles', ...)), and the
+// drawn frame with particles on and off (sc2viewer.probe('m3', 'setParticles', ...)).
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.3, distance: 6, target: [0, 0, 1] };
 
@@ -33,9 +33,9 @@ const unit = async (page, id, sequence) => {
   await idle(page);
   return item;
 };
-const state = (page, id, positions = false) => page.evaluate(([i, p]) => window.sc2viewer.particles(i, p), [id, positions]);
+const state = (page, id, positions = false) => page.evaluate(([i, p]) => window.sc2viewer.probe('m3', 'particles', i, p), [id, positions]);
 /** Run an item's emitters for `seconds` of game time in 1/60 s steps (the frame loop keeps running too). */
-const advance = (page, id, seconds) => page.evaluate(([i, s]) => window.sc2viewer.advanceParticles(i, s, 1 / 60), [id, seconds]);
+const advance = (page, id, seconds) => page.evaluate(([i, s]) => window.sc2viewer.probe('m3', 'advanceParticles', i, s, 1 / 60), [id, seconds]);
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /** Everything a live particle must satisfy, as a list of what failed (empty when all is well). */
@@ -104,12 +104,12 @@ test('Probe at rest: the particles draw; switched off, nothing is drawn and noth
   const change = await page.evaluate((i) => {
     const v = window.sc2viewer;
     v.mark();
-    const quadsOn = v.particles(i).quads;
-    v.setParticles(false);
+    const quadsOn = v.probe('m3', 'particles', i).quads;
+    v.probe('m3', 'setParticles', false);
     const off = v.changedSinceMark();
     v.mark();
     const offAgain = v.changedSinceMark();
-    v.setParticles(true);
+    v.probe('m3', 'setParticles', true);
     return { off, offAgain, quadsOn };
   }, id);
   console.log('Probe change', JSON.stringify(change), JSON.stringify((await state(page, id)).emitters.map((e) => [e.blendMode, e.map, e.mapLoaded, e.mapPath])));
@@ -119,15 +119,15 @@ test('Probe at rest: the particles draw; switched off, nothing is drawn and noth
   // Negative: two frames without particles are the same picture.
   expect(change.offAgain.changed).toBeLessThan(50);
   // Negative: while off, no quads, and the emitters do not run.
-  await page.evaluate(() => window.sc2viewer.setParticles(false));
+  await page.evaluate(() => window.sc2viewer.probe('m3', 'setParticles', false));
   const before = await state(page, id);
   await advance(page, id, 0.5);
   // `quads` is what the last drawn frame drew: draw one.
   const after = await page.evaluate((i) => {
     window.sc2viewer.mark();
-    return window.sc2viewer.particles(i);
+    return window.sc2viewer.probe('m3', 'particles', i);
   }, id);
-  await page.evaluate(() => window.sc2viewer.setParticles(true));
+  await page.evaluate(() => window.sc2viewer.probe('m3', 'setParticles', true));
   expect(after.quads).toBe(0);
   expect(after.emitters[0].spawned).toBe(before.emitters[0].spawned);
   expect(after.emitters[0].live).toBe(0);
@@ -172,10 +172,10 @@ test('Zerus Tree: world-space spores stay where they were born when the tree mov
   // one call, so no frame of the page runs between them.
   const { first, moved } = await page.evaluate((i) => {
     const v = window.sc2viewer;
-    const first = v.particles(i, true);
-    v.setItemPosition(i, 5, 0);
+    const first = v.probe('m3', 'particles', i, true);
+    v.probe('m3', 'setItemPosition', i, 5, 0);
     v.mark();
-    return { first, moved: v.particles(i, true) };
+    return { first, moved: v.probe('m3', 'particles', i, true) };
   }, id);
   const before = new Map(first.emitters[0].particles.map((p) => [p.serial, p.position]));
   const stayed = moved.emitters[0].particles.filter((p) => before.has(p.serial));
@@ -218,9 +218,9 @@ test('Battlecruiser at rest: tail particles are stretched along their travel; bi
   // Two snapshots 0.05 s apart in one call: the travel of each particle between them.
   const { first, second } = await page.evaluate((i) => {
     const v = window.sc2viewer;
-    const first = v.particles(i, true);
-    v.advanceParticles(i, 0.05, 1 / 60);
-    return { first, second: v.particles(i, true) };
+    const first = v.probe('m3', 'particles', i, true);
+    v.probe('m3', 'advanceParticles', i, 0.05, 1 / 60);
+    return { first, second: v.probe('m3', 'particles', i, true) };
   }, id);
   const tails = second.emitters.filter((e) => e.particleType === 1 && e.live > 0);
   console.log('Battlecruiser tail emitters', JSON.stringify(tails.map((e) => [e.index, e.live, e.tail])));
@@ -298,14 +298,14 @@ test('Stalker Attack (partEmit): each key the playhead steps over bursts its val
   // The oracle: the positive keys of Attack, read from the model data.
   const { keys, end } = await page.evaluate(([i, ref]) => {
     const item = window.SC2App.items.find((x) => x.id === i);
-    const seq = item.model.sequences.find((s) => s.name === 'Attack');
-    return { keys: window.sc2viewer.animKeys(i, 'Attack', ref), end: seq.interval[1] };
+    const seq = item.model.m3.sequences.find((s) => s.name === 'Attack');
+    return { keys: window.sc2viewer.probe('m3', 'animKeys', i, 'Attack', ref), end: seq.interval[1] };
   }, [id, e0.partEmit]);
   const want = keys.filter(([t, v]) => t >= 0 && t <= end && v > 0).reduce((n, [, v]) => n + v, 0);
   console.log('Stalker Attack partEmit keys', JSON.stringify(keys), 'end', end, 'want', want);
   expect(want).toBeGreaterThan(0);
   // Once through Attack, held at its last frame.
-  const reached = await page.evaluate((i) => window.sc2viewer.playParticles(i, 'Attack', 3), id);
+  const reached = await page.evaluate((i) => window.sc2viewer.probe('m3', 'playParticles', i, 'Attack', 3), id);
   const after = await state(page, id);
   console.log('Stalker Attack bursts', JSON.stringify(after.emitters.map((e) => [e.bursts, e.spawned])), 'frame', reached);
   expect(reached).toBe(end);
@@ -314,7 +314,7 @@ test('Stalker Attack (partEmit): each key the playhead steps over bursts its val
   // Held at the end: more time owes nothing more.
   await page.evaluate((i) => {
     const item = window.SC2App.items.find((x) => x.id === i);
-    for (let k = 0; k < 60; k++) item.instance.updateAnimations(1 / 60);
+    for (let k = 0; k < 60; k++) item.instance.m3.updateAnimations(1 / 60);
   }, id);
   expect((await state(page, id)).emitters[0].bursts[0]).toBe(want);
   expect(errors).toEqual([]);
@@ -400,7 +400,7 @@ test('Xel Naga Shrine: emitters with a displacement material run and draw over t
     const v = window.sc2viewer;
     v.setDisplacement(false);
     v.mark();
-    const r = v.particles(i).emitters.filter((e) => e.materialType === 2).map((e) => e.quads);
+    const r = v.probe('m3', 'particles', i).emitters.filter((e) => e.materialType === 2).map((e) => e.quads);
     v.setDisplacement(true);
     return r;
   }, id);
@@ -430,9 +430,9 @@ test('negative: a model without emitters has none, and the particle switch chang
   expect(s.quads).toBe(0);
   const change = await page.evaluate(() => {
     const v = window.sc2viewer;
-    v.setParticles(false);
+    v.probe('m3', 'setParticles', false);
     v.mark();
-    v.setParticles(true);
+    v.probe('m3', 'setParticles', true);
     return v.changedSinceMark();
   });
   expect(change.changed).toBeLessThan(50);

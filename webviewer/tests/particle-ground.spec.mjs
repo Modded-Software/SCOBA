@@ -24,8 +24,8 @@ test('Helios acid drips stop at the ground; emitters without collideTerrain pass
   const id = await page.evaluate(() => window.sc2viewer.addUnit('BattlecruiserHelios', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
   await idle(page);
   // 12 s of Stand in 1/60 s steps: drips live 10 s and fall from about z 4.
-  await page.evaluate((i) => window.sc2viewer.playParticles(i, 'Stand', 12), id);
-  const st = await page.evaluate((i) => window.sc2viewer.particles(i, true), id);
+  await page.evaluate((i) => window.sc2viewer.probe('m3', 'playParticles', i, 'Stand', 12), id);
+  const st = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
   const drip = st.emitters.find((e) => e.bone === 21);
   console.log('drip', JSON.stringify({ flags: drip.flags, bounce: drip.bounce, friction: drip.friction, live: drip.live, z: drip.particles.map((p) => Number(p.position[2].toFixed(3))), bounces: drip.particles.map((p) => p.bounces), rest: drip.particles.map((p) => p.rest) }));
   expect(drip.flags & 0x2).toBe(2);
@@ -47,8 +47,8 @@ test('negative: a colliding particle that has not reached the ground keeps its p
   const errors = await open(page);
   const id = await page.evaluate(() => window.sc2viewer.addUnit('BattlecruiserHelios', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
   await idle(page);
-  await page.evaluate((i) => window.sc2viewer.playParticles(i, 'Stand', 0.4), id);
-  const st = await page.evaluate((i) => window.sc2viewer.particles(i, true), id);
+  await page.evaluate((i) => window.sc2viewer.probe('m3', 'playParticles', i, 'Stand', 0.4), id);
+  const st = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
   const drip = st.emitters.find((e) => e.bone === 21);
   expect(drip.particles.length).toBeGreaterThan(0);
   for (const p of drip.particles) {

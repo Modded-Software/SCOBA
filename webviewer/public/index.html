@@ -2,55 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>SC2 unit viewer</title>
+  <title>model viewer</title>
   <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <canvas id="view"></canvas>
   <div id="side">
-  <aside id="panel">
-    <div id="panel-top">
+  <aside id="gallery">
+    <div id="gallery-top">
       <select id="dataset" title="dataset: where the lists and new instances come from"></select>
-      <nav id="tabs">
-        <button id="tab-units" class="on">units</button>
-        <button id="tab-doodads">doodads</button>
-        <button id="tab-models">models</button>
-      </nav>
+      <!-- One tab and one pane per category of the game, built by src/page/ui/gallery. -->
+      <nav id="tabs"></nav>
     </div>
-    <section id="pane-units">
-      <input id="unit-search" type="search" placeholder="search units by name or id" autocomplete="off" spellcheck="false">
-      <div id="races"></div>
-      <div id="unit-tools">
-        <select id="kind" title="kind"></select>
-        <select id="family" title="family (Melee: ladder and multiplayer)"></select>
-        <span id="unit-count"></span><button id="add-all" title="add every unit of the list to the scene">add all</button>
-      </div>
-      <ul id="units" class="rows"></ul>
-      <div id="preview"></div>
-    </section>
-    <section id="pane-doodads" hidden>
-      <input id="doodad-search" type="search" placeholder="search doodads by name or id" autocomplete="off" spellcheck="false">
-      <div id="doodad-tools">
-        <select id="doodad-type" title="doodad type"></select>
-        <select id="doodad-tileset" title="terrain set that lists the doodad"></select>
-        <span id="doodad-count"></span><button id="doodad-add-all" title="add every doodad of the list to the scene">add all</button>
-      </div>
-      <ul id="doodads" class="rows"></ul>
-      <div id="doodad-preview"></div>
-    </section>
-    <section id="pane-models" hidden>
-      <input id="search" type="search" placeholder="search model files" autocomplete="off" spellcheck="false">
-      <ul id="results"></ul>
-    </section>
   </aside>
   <aside id="instances">
     <div id="scene-head"><span>instances <span id="instance-count"></span></span><button id="clear" title="remove all">clear</button></div>
     <input id="instance-search" type="search" placeholder="search instances by name, id or file" autocomplete="off" spellcheck="false">
     <ul id="scene" class="rows"></ul>
   </aside>
-  <button id="panel-tab" class="drawer-tab" title="hide the gallery" aria-controls="panel"></button>
-  <button id="instances-tab" class="drawer-tab" title="hide the instances" aria-controls="instances"></button>
+  <!-- One tab per game the server lists, built by src/page/ui/gametabs.ts. -->
+  <nav id="game-tabs" aria-label="games"></nav>
+  <button id="gallery-handle" class="drawer-handle" title="hide the gallery" aria-controls="gallery"></button>
+  <button id="instances-handle" class="drawer-handle" title="hide the instances" aria-controls="instances"></button>
   </div>
   <nav id="view-tools">
     <div id="scenes">

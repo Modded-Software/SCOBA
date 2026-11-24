@@ -1,120 +1,131 @@
-// The scene state the tests read: sc2viewer.state().
+// The scene state the tests read: sc2viewer.state(). What only a format
+// knows of an instance comes from that format (FormatModule.inspect).
 
-import { app, type Item } from '../../core/app';
-import { constantLayers, drawOrder, texturesLoaded, texturesWanted, uvLayers } from './layers';
+import type { FeatureContext } from '../../core/context';
+import type { Item } from '../../core/types';
+import type { ViewerInstance } from '../../core/plugin';
 
-const sequenceName = (item: Item, index: number): string | null => (index >= 0 ? (item.model.sequences[index]?.name ?? null) : null);
+export function createState({ render, scene, camera: view, games, testApi }: Pick<FeatureContext, 'render' | 'scene' | 'camera' | 'games' | 'testApi'>): () => Record<string, unknown> {
+  const sequenceName = (item: Item, index: number): string | null => (index >= 0 ? (item.instance.sequences[index]?.name ?? null) : null);
 
-function itemState(item: Item): Record<string, unknown> {
-  const unit = item.unit;
-  const playing = item.instance.sequence >= 0 ? item.model.sequences[item.instance.sequence] : undefined;
-  return {
-    id: item.id,
-    path: item.path,
-    // Where its data and textures come from.
-    dataset: item.dataset,
-    // A unit or a doodad, never both; a bare model file is neither.
-    unit: unit && !unit.doodad ? unit.id : null,
-    doodad: unit && unit.doodad ? unit.id : null,
-    variation: item.variation,
-    name: unit ? unit.name : null,
-    // Loaded means the model has geometry to draw.
-    loaded: item.model.batches.length > 0,
-    x: item.x,
-    y: item.y,
-    rot: item.rot,
-    scale: item.scale,
-    team: item.team,
-    dataScale: [...item.dataScale],
-    sequence: item.instance.sequence,
-    sequenceName: sequenceName(item, item.instance.sequence),
-    sequences: item.model.sequences.map((s) => s.name),
-    // What the renderer holds.
-    frame: item.instance.frame,
-    rate: item.instance.timeScale,
-    highlight: item.instance.highlight,
-    // The animation from the menu while it plays once, by name; else null.
-    oneShot: item.oneShot !== null ? sequenceName(item, item.oneShot) : null,
-    // The playing sequence's length in ms.
-    sequenceLength: playing ? (playing.interval[1] ?? 0) - (playing.interval[0] ?? 0) : 0,
-    location: Array.from(item.instance.localLocation),
-    rotation: Array.from(item.instance.localRotation),
-    engineScale: Array.from(item.instance.localScale),
-    engineTeam: item.instance.teamColor,
-    tint: Array.from(item.instance.vertexColor),
-    texturesLoaded: texturesLoaded(item.model),
-    // HD textures (features/hd): the choice, the layers that have both sets, and
-    // the texture overrides the renderer's instance holds.
-    hd: item.hd,
-    hdLayers: item.hdLayers,
-    hdApplied: item.instance.textureOverrides.size,
-    // The longest side of any texture the model has, and whether that makes its grid glow blue.
-    largestTexture: item.largestTexture,
-    blueGlow: app().isHd(item),
-    // Geometry layout as the renderer reads it.
-    vertexStride: item.model.vertexSize,
-    vertexCount: item.model.vertexCount,
-    vertexBytes: item.model.vertexBytes,
-    // Element indices: bytes each, and the largest stored (vertexCount - 1 unless they wrapped).
-    elementBytes: item.model.elementBytes,
-    elementMax: item.model.elementMax,
-    // Culling: the model's bounding sphere radius, and whether the last
-    // frame drew the instance (false when it was culled).
-    boundsRadius: item.model.bounds.r,
-    // The rest-pose vertex box (model space, before the data and instance scale).
-    vertexBox: [[...item.model.vertexMin], [...item.model.vertexMax]],
-    undrawn: [...item.model.undrawnBatches],
-    displacementBatches: item.model.displacementBatches.length,
-    // Per region: the UV transform the renderer applies (scale, offset),
-    // the stored range of the first UV set, and that range decoded.
-    regionUv: item.model.regions.map((r) => ({
-      scale: r.uvScale,
-      offset: r.uvOffset,
-      raw: [...r.rawUvRange],
-      range: r.rawUvRange.map((c) => c * r.uvScale + r.uvOffset),
-    })),
-    uvLayers: uvLayers(item.model),
-    constantLayers: constantLayers(item.model),
-    drawOrder: drawOrder(item),
-    drawn: app().scene.instances.includes(item.instance),
-  };
-}
+  /** The format's own facts of an instance; none when the format tells nothing. */
+  function formatFacts(instance: ViewerInstance): Record<string, unknown> {
+    const format = render.formatOf(instance.model);
+    return format.inspect ? format.inspect(instance) : {};
+  }
 
-export function state(): Record<string, unknown> {
-  const a = app();
-  const sky = a.sky;
-  const skyModel = sky ? sky.model : null;
-  const camera = a.camera;
-  return {
-    items: a.items.map(itemState),
-    sceneInstances: a.scene.grid.cells.reduce((n, cell) => n + cell.instances.length, 0),
-    grid: a.ground.enabled,
-    pointer: a.pointer ? [...a.pointer] : null,
-    ghost: a.ghostState(),
-    pick: a.pickState(),
-    // Displacement batches the last frame drew (sky and units).
-    displacedBatches: a.displacedBatches,
-    rings: a.ground.rings.map((r) => (r ? { x: r.x, y: r.y, radius: r.radius, width: r.width } : null)),
-    sky: sky ? { id: sky.id, name: sky.name, file: sky.file } : null,
-    // Loaded: the sky model has geometry to draw.
-    skyLoaded: Boolean(skyModel && skyModel.batches.length > 0),
-    skyTextures: skyModel ? texturesLoaded(skyModel) : 0,
-    skyTexturesWanted: skyModel ? texturesWanted(skyModel) : 0,
-    // What the sky file holds: vertices, batches drawn, batches not drawn.
-    skyVertices: skyModel ? skyModel.vertexCount : 0,
-    skyBatches: skyModel ? skyModel.batches.length : 0,
-    skyUndrawn: skyModel ? [...skyModel.undrawnBatches] : [],
-    skyBoundsRadius: skyModel ? skyModel.bounds.r : 0,
-    // Whether the last frame drew the sky instance (false when culled).
-    skyDrawn: Boolean(sky && sky.instance && a.skyScene.instances.includes(sky.instance)),
-    skySequence: sky && sky.instance && skyModel && sky.instance.sequence >= 0 ? (skyModel.sequences[sky.instance.sequence]?.name ?? null) : null,
-    camera: {
-      yaw: camera.yaw,
-      pitch: camera.pitch,
-      distance: camera.distance,
-      target: [...camera.target],
-      aspect: a.scene.camera.aspect,
-      zoomGoal: a.zoomGoal(),
-    },
-  };
+  /** One key per category noun of the game: the item's record id under its own noun, null under the others. */
+  function recordKeys(item: Item): Record<string, string | null> {
+    const noun = games.nounOf(item);
+    const out: Record<string, string | null> = {};
+    for (const category of games.pluginOf(item.game).categories) out[category.noun] = item.source && category.noun === noun ? item.source.record.id : null;
+    return out;
+  }
+
+  function itemState(item: Item): Record<string, unknown> {
+    const record = item.source ? item.source.record : null;
+    const playing = item.instance.sequence >= 0 ? item.instance.sequences[item.instance.sequence] : undefined;
+    const facts = formatFacts(item.instance);
+    return {
+      id: item.id,
+      path: item.path,
+      game: item.game,
+      // Where its data and textures come from.
+      dataset: item.dataset,
+      // Its record under its category's noun (SC2: unit, doodad); a bare model file has none.
+      ...recordKeys(item),
+      // Which of the record's model files (an SC2 doodad's variation); null when it has one.
+      variation: item.placement.variant,
+      name: record ? record.name : null,
+      // Loaded means the model has geometry to draw.
+      loaded: item.model.loaded,
+      x: item.x,
+      y: item.y,
+      rot: item.rot,
+      scale: item.scale,
+      team: item.team,
+      dataScale: [...item.placement.scale],
+      sequence: item.instance.sequence,
+      sequenceName: sequenceName(item, item.instance.sequence),
+      sequences: item.instance.sequences.map((s) => s.name),
+      // What the renderer holds.
+      frame: item.instance.frame,
+      rate: item.instance.timeScale,
+      highlight: item.instance.highlight,
+      // The animation from the menu while it plays once, by name; else null.
+      oneShot: item.oneShot !== null ? sequenceName(item, item.oneShot) : null,
+      // The playing sequence's length in ms.
+      sequenceLength: playing ? playing.length : 0,
+      location: Array.from(item.instance.location),
+      rotation: Array.from(item.instance.rotation),
+      engineScale: Array.from(item.instance.scaling),
+      engineTeam: facts['engineTeam'],
+      tint: facts['tint'],
+      texturesLoaded: facts['texturesLoaded'],
+      // The texture overrides the renderer's instance holds (SC2: its HD set).
+      hdApplied: item.capabilities.textureOverride ? item.capabilities.textureOverride.applied() : 0,
+      // The game's facts (SC2: hd, hdLayers, largestTexture, blueGlow).
+      ...games.partsOf(item.game).itemFacts(item),
+      // Geometry layout as the renderer reads it (the format's facts).
+      vertexStride: facts['vertexStride'],
+      vertexCount: facts['vertexCount'],
+      vertexBytes: facts['vertexBytes'],
+      elementBytes: facts['elementBytes'],
+      elementMax: facts['elementMax'],
+      // Culling: the model's bounding sphere radius, and whether the last
+      // frame drew the instance (false when it was culled).
+      boundsRadius: item.model.bounds.r,
+      // The rest-pose vertex box (model space, before the data and instance scale).
+      vertexBox: [Array.from(item.model.vertexMin), Array.from(item.model.vertexMax)],
+      undrawn: [...item.model.undrawn],
+      displacementBatches: facts['displacementBatches'],
+      regionUv: facts['regionUv'],
+      uvLayers: facts['uvLayers'],
+      constantLayers: facts['constantLayers'],
+      drawOrder: facts['drawOrder'],
+      drawn: item.instance.drawn,
+    };
+  }
+
+  function state(): Record<string, unknown> {
+    const sky = scene.sky();
+    const skyModel = sky ? sky.model : null;
+    const skyInstance = sky ? sky.instance : null;
+    const skyFacts = skyInstance ? formatFacts(skyInstance) : {};
+    const camera = view.camera;
+    return {
+      items: scene.items.map(itemState),
+      sceneInstances: render.scene.grid.cells.reduce((n, cell) => n + cell.instances.length, 0),
+      grid: render.ground.enabled,
+      pointer: view.pointer()?.slice() ?? null,
+      // What the features add (pick, ghost).
+      ...testApi.stateParts(),
+      // Displacement batches the last frame drew (sky and units).
+      displacedBatches: render.displacedBatches(),
+      rings: render.ground.rings.map((r) => (r ? { x: r.x, y: r.y, radius: r.radius, width: r.width } : null)),
+      sky: sky ? { id: sky.id, name: sky.name, file: sky.file } : null,
+      // Loaded: the sky model has geometry to draw.
+      skyLoaded: Boolean(skyModel && skyModel.loaded),
+      skyTextures: skyFacts['texturesLoaded'] ?? 0,
+      skyTexturesWanted: skyFacts['texturesWanted'] ?? 0,
+      // What the sky file holds: vertices, batches drawn, batches not drawn.
+      skyVertices: skyFacts['vertexCount'] ?? 0,
+      skyBatches: skyFacts['batches'] ?? 0,
+      skyUndrawn: skyModel ? [...skyModel.undrawn] : [],
+      skyBoundsRadius: skyModel ? skyModel.bounds.r : 0,
+      // Whether the last frame drew the sky instance (false when culled).
+      skyDrawn: Boolean(skyInstance && skyInstance.drawn),
+      skySequence: skyInstance && skyInstance.sequence >= 0 ? (skyInstance.sequences[skyInstance.sequence]?.name ?? null) : null,
+      camera: {
+        yaw: camera.yaw,
+        pitch: camera.pitch,
+        distance: camera.distance,
+        target: [...camera.target],
+        aspect: render.scene.camera.aspect,
+        zoomGoal: view.zoomGoal(),
+      },
+    };
+  }
+
+  return state;
 }

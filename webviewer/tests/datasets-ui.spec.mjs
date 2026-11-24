@@ -41,8 +41,8 @@ test('the gallery panel lists the datasets at its top left; the default one is c
   await expect(select).toHaveValue('scoba');
   // It sits at the top left of the gallery panel, in one row with the tabs.
   // (A row of its own leaves the unit list under three rows: instances.spec.mjs.)
-  await expect(page.locator('#panel #dataset')).toHaveCount(1);
-  const [box, tabs, panel, search] = [await select.boundingBox(), await page.locator('#tabs').boundingBox(), await page.locator('#panel').boundingBox(), await page.locator('#unit-search').boundingBox()];
+  await expect(page.locator('#gallery #dataset')).toHaveCount(1);
+  const [box, tabs, panel, search] = [await select.boundingBox(), await page.locator('#tabs').boundingBox(), await page.locator('#gallery').boundingBox(), await page.locator('#search-units').boundingBox()];
   expect(box.y - panel.y).toBeLessThan(12);
   expect(box.x - panel.x).toBeLessThan(12);
   expect(box.x + box.width).toBeLessThanOrEqual(tabs.x);
@@ -64,18 +64,18 @@ test('the gallery panel lists the datasets at its top left; the default one is c
 
 test('choosing a dataset relists the gallery; new instances come from it; the choice survives a reload', async ({ page }) => {
   const errors = await open(page);
-  await page.fill('#unit-search', 'toshscoba');
+  await page.fill('#search-units', 'toshscoba');
   await expect(page.locator('#units li[data-id="ToshSCOBA"]')).toBeVisible();
   await page.selectOption('#dataset', 'stock');
   // The map's own unit is not in the stock data.
-  await expect(page.locator('#unit-count')).toHaveText('0 units');
+  await expect(page.locator('#count-units')).toHaveText('0 units');
   await expect(page.locator('#units li[data-id="ToshSCOBA"]')).toHaveCount(0);
-  await page.fill('#unit-search', 'marine');
+  await page.fill('#search-units', 'marine');
   await expect(page.locator('#units li[data-id="Marine"]')).toBeVisible();
   // The preview card and the add button read the stock data.
   await page.locator('#units li[data-id="Marine"]').click();
-  await expect(page.locator('#preview .facts')).toContainText('scale 1');
-  await page.click('#preview-add');
+  await expect(page.locator('#preview-units .facts')).toContainText('scale 1');
+  await page.click('#preview-add-units');
   await idle(page);
   let item = (await state(page)).items[0];
   expect(item).toMatchObject({ unit: 'Marine', dataset: 'stock' });
@@ -83,7 +83,7 @@ test('choosing a dataset relists the gallery; new instances come from it; the ch
   expect(item.path).toMatch(/\\marine\\marine\.m3$/);
   // Doodads follow too: the stock Zerus tree is not the map's.
   await page.click('#tab-doodads');
-  await page.fill('#doodad-search', 'zerus tree');
+  await page.fill('#search-doodads', 'zerus tree');
   await expect(page.locator('#doodads li[data-id="ZerusTree"] .sub')).not.toContainText('in map');
 
   await reloadScene(page);
@@ -93,7 +93,7 @@ test('choosing a dataset relists the gallery; new instances come from it; the ch
   expect(item).toMatchObject({ unit: 'Marine', dataset: 'stock' });
   // Negative: back on scoba the map's unit is listed again.
   await page.selectOption('#dataset', 'scoba');
-  await page.fill('#unit-search', 'toshscoba');
+  await page.fill('#search-units', 'toshscoba');
   await expect(page.locator('#units li[data-id="ToshSCOBA"]')).toBeVisible();
   expect(errors).toEqual([]);
 });

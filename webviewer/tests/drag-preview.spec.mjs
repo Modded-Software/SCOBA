@@ -17,7 +17,7 @@ const row = (page, id) => page.locator(`#units li[data-id="${id}"]`);
 
 /** Press on a unit row and drag the pointer to canvas point (x, y). */
 async function dragOver(page, id, x, y) {
-  await page.fill('#unit-search', id.toLowerCase());
+  await page.fill('#search-units', id.toLowerCase());
   await expect(row(page, id)).toBeVisible();
   await row(page, id).hover();
   await page.mouse.down();

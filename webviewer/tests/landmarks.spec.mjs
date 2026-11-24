@@ -28,15 +28,15 @@ async function choose(page, id) {
 }
 
 async function filterFew(page) {
-  await page.selectOption('#family', 'is:Melee');
-  await page.fill('#unit-search', 'zergling');
+  await page.selectOption('#filter-units-family', 'is:Melee');
+  await page.fill('#search-units', 'zergling');
   const listed = await (await page.request.get(api.records('units', { limit: '500', family: 'Melee', q: 'zergling' }))).json();
-  await expect.poll(() => page.locator('#unit-count').textContent()).toBe(`${listed.total} units`);
+  await expect.poll(() => page.locator('#count-units').textContent()).toBe(`${listed.total} units`);
   return listed;
 }
 
 async function addAllRun(page, total) {
-  await page.locator('#add-all').click();
+  await page.locator('#add-all-units').click();
   await page.locator('#add-all-yes').click();
   await expect.poll(async () => {
     const r = await run(page);
@@ -113,7 +113,7 @@ test('negative: a cancelled add all adds no landmark and leaves the camera', asy
   const errors = await open(page);
   await filterFew(page);
   const before = await camera(page);
-  await page.locator('#add-all').click();
+  await page.locator('#add-all-units').click();
   await page.locator('#add-all-no').click();
   await expect(page.locator('#add-all-dialog')).toBeHidden();
   expect((await landmarks(page)).map((l) => l.name)).toEqual(['origin (0, 0, 0)']);

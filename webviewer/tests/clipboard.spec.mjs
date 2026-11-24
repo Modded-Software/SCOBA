@@ -144,7 +144,7 @@ test('off the view, ctrl+v puts the copies where they were copied from', async (
   const [, zealot] = await place(page);
   await select(page, [zealot]);
   // The mouse on the gallery panel, not on the view.
-  const panel = await page.locator('#panel').boundingBox();
+  const panel = await page.locator('#gallery').boundingBox();
   await page.mouse.move(panel.x + panel.width / 2, panel.y + panel.height / 2);
   expect(await page.evaluate(() => window.SC2App.pointer)).toBe(null);
   await page.locator('body').press('Control+c');

@@ -83,13 +83,13 @@ test('every skybox loads; one with a mesh draws all of it with all its textures 
     }
     if (PARTICLES_ONLY_FROM_INSIDE.includes(sky.id)) {
       // Negative: the same directions with particles off show nothing.
-      await page.evaluate(() => window.sc2viewer.setParticles(false));
+      await page.evaluate(() => window.sc2viewer.probe('m3', 'setParticles', false));
       let bare = 0;
       for (const [yaw, pitch] of DIRECTIONS) {
         await page.evaluate(([yaw, pitch]) => window.sc2viewer.view({ yaw, pitch }), [yaw, pitch]);
         bare += (await page.evaluate(() => window.sc2viewer.pixels())).covered;
       }
-      await page.evaluate(() => window.sc2viewer.setParticles(true));
+      await page.evaluate(() => window.sc2viewer.probe('m3', 'setParticles', true));
       report.push(`  ${sky.id} with particles off: covered=${bare}`);
       if (!(covered > 0)) problems.push(`${sky.id}: its particles draw nothing from inside`);
       if (bare !== 0) problems.push(`${sky.id}: ${bare} pixels from inside without particles`);

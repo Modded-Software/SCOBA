@@ -220,6 +220,21 @@ Design, [plan]. `src/games/sc2/`:
 The "From" column names the step 3 and 4a modules (SPEC-VIEWER section
 13); the JavaScript files they came from are gone.
 
+As built (SPEC-VIEWER section 13, steps 5b and 5c): `page/` holds
+`game.ts`, `rules.ts`, `records.ts`, `describe.ts`, `api.ts`,
+`parts.ts`, `hd.ts`, `textures/` and `gallery/`; `shared/records.ts`
+holds the record types. The "From" files are gone, except
+`page/core/scene.ts`, which no longer holds doodad rules.
+
+Step 6: `gallery/` is gone; core's gallery draws the SC2 tabs from the
+categories, and `names.ts` keeps the landmark names. `parts.ts`
+(`installSc2Page`) takes the FeatureContext (SPEC-VIEWER 6.6) and gives
+its test members through `testApi`: the adds of `api.ts` on
+`sc2viewer`; `textureWindow` and `hdAssets` on both; `filterName` on
+`SC2App`.
+`hd.ts` and `textures/` take the context, not a page object. The M3
+probes are reached as `sc2viewer.probe('m3', name, ...)`.
+
 Routes before step 4b, and in the protocol of the core specification.
 Step 4b switched the server, the page and the tests to the right column.
 The left column is gone: each of its routes answers 404 (`server.spec`).

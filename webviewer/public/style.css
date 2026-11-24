@@ -8,55 +8,62 @@ html, body { overflow: hidden; }
    its tab slides it out to the left (src/page/ui/drawers.ts). The column itself takes no
    mouse, so the view under a closed drawer is reachable. */
 #side { position: fixed; top: 0; left: 0; width: 320px; height: 100vh; display: flex; flex-direction: column; pointer-events: none; }
-#panel, #instances { height: 50vh; flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px; min-height: 0; overflow: hidden; pointer-events: auto; background: var(--glass); backdrop-filter: blur(14px); border-right: 1px solid var(--line); transition: transform 0.2s ease-out; }
+#gallery, #instances { height: 50vh; flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px; min-height: 0; overflow: hidden; pointer-events: auto; background: var(--glass); backdrop-filter: blur(14px); border-right: 1px solid var(--line); transition: transform 0.2s ease-out; }
 #instances { border-top: 1px solid var(--line); }
-#panel.closed, #instances.closed { transform: translateX(calc(-100% - 1px)); }
-.drawer-tab { position: absolute; left: 320px; width: 16px; height: 44px; padding: 0; pointer-events: auto; color: var(--dim); background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-left: none; border-radius: 0 var(--radius) var(--radius) 0; transition: left 0.2s ease-out; }
-.drawer-tab:hover { color: var(--text); }
-.drawer-tab.closed { left: 0; }
-#panel-tab { top: 8px; }
-#instances-tab { top: calc(50vh + 8px); }
+#gallery.closed, #instances.closed { transform: translateX(calc(-100% - 1px)); }
+/* The handles: at the bottom of each panel's right edge (R-VIEW-24). */
+.drawer-handle { position: absolute; left: 320px; width: 16px; height: 44px; padding: 0; pointer-events: auto; color: var(--dim); background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-left: none; border-radius: 0 var(--radius) var(--radius) 0; transition: left 0.2s ease-out; }
+.drawer-handle:hover { color: var(--text); }
+.drawer-handle.closed { left: 0; }
+#gallery-handle { top: calc(50vh - 52px); }
+#instances-handle { top: calc(100vh - 52px); }
+/* The game tabs: stacked on the gallery's right edge from its top, the text
+   turned vertical (R-VIEW-20); at the window edge with the gallery closed. */
+#game-tabs { position: absolute; left: 320px; top: 8px; display: flex; flex-direction: column; gap: 2px; pointer-events: auto; transition: left 0.2s ease-out; }
+#game-tabs.closed { left: 0; }
+#game-tabs button { width: 22px; min-height: 44px; padding: 6px 0; writing-mode: vertical-rl; color: var(--dim); background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-left: none; border-radius: 0 var(--radius) var(--radius) 0; }
+#game-tabs button.on { color: var(--text); background: var(--panel); }
+#game-tabs button:disabled { opacity: 0.45; cursor: not-allowed; }
 #instance-search { width: 100%; flex: none; }
-#panel > section { flex: 1 1 0; }
+#gallery > section { flex: 1 1 0; }
 section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 
 /* The gallery's top row: the dataset at the left, then the tabs. */
-#panel-top { display: flex; gap: 6px; flex: none; }
+#gallery-top { display: flex; gap: 6px; flex: none; }
 #dataset { flex: none; width: 96px; }
 #tabs { display: flex; flex: 1; min-width: 0; padding: 2px; gap: 2px; background: var(--raised); border-radius: var(--radius); }
 #tabs button { flex: 1; height: 22px; padding: 0; border-radius: calc(var(--radius) - 2px); }
 #tabs button.on { color: var(--text); background: var(--panel); }
 
-#unit-search, #doodad-search, #search { width: 100%; flex: none; }
-/* Kept short: the gallery is half the window and the list gets the rest. */
-#races { display: flex; gap: 2px; flex-wrap: wrap; flex: none; }
-#races button { height: 22px; padding: 0 7px; }
-#unit-tools, #doodad-tools { display: flex; gap: 4px; align-items: center; flex: none; }
-#unit-tools select, #doodad-tools select { flex: 0 1 88px; min-width: 0; height: 24px; }
-#unit-count, #doodad-count { color: var(--dim); flex: 1 0 auto; text-align: right; white-space: nowrap; font-size: 11px; }
-#add-all, #doodad-add-all { flex: none; height: 24px; padding: 0 7px; }
+/* A category pane (src/page/ui/gallery/pane.ts). Kept short: the gallery is
+   half the window and the list gets the rest. */
+.pane > input[type="search"] { width: 100%; flex: none; }
+.filter-buttons { display: flex; gap: 2px; flex-wrap: wrap; flex: none; }
+.filter-buttons button { height: 22px; padding: 0 7px; }
+.pane .tools { display: flex; gap: 4px; align-items: center; flex: none; }
+.pane .tools select { flex: 0 1 88px; min-width: 0; height: 24px; }
+.pane .count { color: var(--dim); flex: 1 0 auto; text-align: right; white-space: nowrap; font-size: 11px; }
+.pane .add-all { flex: none; height: 24px; padding: 0 7px; }
 
-#units, #doodads, #results, #scene { overflow-y: auto; flex: 1 1 0; min-height: 0; }
-#units li { display: flex; gap: 8px; align-items: center; padding: 2px 4px; cursor: grab; }
-#doodads li { padding: 3px 8px; cursor: grab; }
+.pane .rows, #scene { overflow-y: auto; flex: 1 1 0; min-height: 0; }
+.rows.records li { display: flex; gap: 8px; align-items: center; padding: 2px 4px; min-height: 36px; cursor: grab; }
 .icon { width: 32px; height: 32px; flex: none; object-fit: contain; background: var(--bg); border-radius: 4px; }
 .icon.none { border: 1px dashed var(--line); }
-#units .text { min-width: 0; }
-#units .name, #doodads .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rows.records .text { min-width: 0; }
+.rows.records .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* The preview cards: a fixed height, so the list above keeps its size. */
-#preview:empty, #doodad-preview:empty { display: none; }
-#preview, #doodad-preview { display: flex; flex: none; height: 72px; gap: 8px; padding: 5px; background: var(--raised); border-radius: var(--radius); }
-#doodad-preview { flex-direction: column; gap: 2px; padding: 5px 8px; }
-#preview .portrait { width: 62px; height: 62px; flex: none; object-fit: contain; background: var(--bg); border-radius: 4px; }
-#preview .body { min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-#preview .top, #doodad-preview .top { display: flex; gap: 6px; align-items: center; }
-#preview .name, #doodad-preview .name { font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#preview .facts, #doodad-preview .facts { color: var(--dim); font-size: 11px; flex: 1; min-height: 0; overflow-y: auto; }
-#preview .facts div, #doodad-preview .facts div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#preview-add, #doodad-preview-add { flex: none; height: 20px; padding: 0 8px; color: var(--accent); background: var(--accent-bg); }
+.preview:empty { display: none; }
+.preview { display: flex; flex: none; height: 72px; gap: 8px; padding: 5px; background: var(--raised); border-radius: var(--radius); }
+.preview .portrait { width: 62px; height: 62px; flex: none; object-fit: contain; background: var(--bg); border-radius: 4px; }
+.preview .body { min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.preview .top { display: flex; gap: 6px; align-items: center; }
+.preview .name { font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview .facts { color: var(--dim); font-size: 11px; flex: 1; min-height: 0; overflow-y: auto; }
+.preview .facts div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-add { flex: none; height: 20px; padding: 0 8px; color: var(--accent); background: var(--accent-bg); }
 
-#results button { width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; direction: rtl; }
+.rows.files button { width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; direction: rtl; }
 
 /* The page bundle did not load (index.html): the message, top centre. */
 #load-failure { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); margin: 0; padding: 6px 12px; color: var(--warn); background: #000c; }

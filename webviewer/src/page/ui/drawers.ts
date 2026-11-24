@@ -1,24 +1,27 @@
-// The two panels on the left, the gallery (#panel) and the instances
-// (#instances), are drawers: a tab at each one's right edge slides it out
+// The two panels on the left, the gallery (#gallery) and the instances
+// (#instances), are drawers: a handle at the bottom of each one's right
+// edge (R-VIEW-24) slides it out
 // to the left and back. A closed panel takes no keys (inert) and leaves the
-// view free (app.visibleRect). Which are open is a setting (core/settings.ts).
+// view free (core/host.ts visibleRect). Which are open is a setting (core/settings.ts).
 
-import { app, type DrawersApi } from '../core/app';
+import type { Store, UiService } from '../core/context';
 import { byId } from '../core/dom';
-import { readSetting, settings, writeSetting, type DrawersSetting } from '../core/settings';
+import { settings, type DrawersSetting } from '../core/settings';
 
-type DrawerId = 'panel' | 'instances';
+type DrawerId = 'gallery' | 'instances';
 
 const DRAWERS: readonly { id: DrawerId; tab: string; name: string }[] = [
-  { id: 'panel', tab: 'panel-tab', name: 'gallery' },
-  { id: 'instances', tab: 'instances-tab', name: 'instances' },
+  { id: 'gallery', tab: 'gallery-handle', name: 'gallery' },
+  { id: 'instances', tab: 'instances-handle', name: 'instances' },
 ];
 
-const isDrawer = (id: string): id is DrawerId => id === 'panel' || id === 'instances';
+const isDrawer = (id: string): id is DrawerId => id === 'gallery' || id === 'instances';
 
-export function installDrawers(): DrawersApi {
+export type DrawersApi = Pick<UiService, 'setDrawer' | 'drawerState'>;
+
+export function installDrawers(store: Store, placeStatus: () => void): DrawersApi {
   // Both open when none are stored, or the stored value is refused.
-  const open: DrawersSetting = readSetting(settings.drawers).value ?? { panel: true, instances: true };
+  const open: DrawersSetting = store.read(settings.drawers).value ?? { gallery: true, instances: true };
 
   function apply(): void {
     for (const { id, tab, name } of DRAWERS) {
@@ -31,21 +34,23 @@ export function installDrawers(): DrawersApi {
       button.title = `${open[id] ? 'hide' : 'show'} the ${name}`;
       button.setAttribute('aria-expanded', String(open[id]));
     }
+    // The game tabs slide with the gallery and stay at the window edge (ui/gametabs.ts).
+    byId('game-tabs').classList.toggle('closed', !open.gallery);
   }
 
-  /** Open or close one drawer ('panel' or 'instances'); no `to`: the other way. */
+  /** Open or close one drawer ('gallery' or 'instances'); no `to`: the other way. */
   function setDrawer(id: string, to?: boolean): void {
     if (!isDrawer(id)) throw new Error(`drawer: no drawer "${id}"`);
     open[id] = to === undefined ? !open[id] : Boolean(to);
-    writeSetting(settings.drawers, { ...open });
+    store.write(settings.drawers, { ...open });
     apply();
     // The status toast stays centred on the part of the view that shows.
-    app().placeStatus();
+    placeStatus();
   }
 
   for (const { id, tab } of DRAWERS) byId(tab).addEventListener('click', () => setDrawer(id));
   // The toast moves when the slide ends: the panel's box is final then.
-  for (const { id } of DRAWERS) byId(id).addEventListener('transitionend', () => app().placeStatus());
+  for (const { id } of DRAWERS) byId(id).addEventListener('transitionend', () => placeStatus());
   apply();
 
   return {

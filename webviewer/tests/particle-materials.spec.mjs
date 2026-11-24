@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Particle materials, measured on the drawn frame: one particle drawn alone
-// (sc2viewer.particleSamples), its colour change read at points of its quad.
+// (sc2viewer.probe('m3', 'particleSamples', ...)), its colour change read at points of its quad.
 // - The cut-out (alphaTestThreshold) applies to particles as to meshes
 //   (WhiteoutFlakes m3_standard.slang: mask alpha < threshold is discarded).
 //   Operator 2026-11-23: Helios debris drew as rectangles.
@@ -35,8 +35,8 @@ const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null,
 async function oneParticle(page, unit, bone, seconds, near = false, widths = 6) {
   const id = await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0, rot: 0, pick: 0.5, sequence: -1, dataset: 'stock' }), unit);
   await idle(page);
-  await page.evaluate(([i, s]) => window.sc2viewer.advanceParticles(i, s, 1 / 60), [id, seconds]);
-  const s = await page.evaluate((i) => window.sc2viewer.particles(i, true), id);
+  await page.evaluate(([i, s]) => window.sc2viewer.probe('m3', 'advanceParticles', i, s, 1 / 60), [id, seconds]);
+  const s = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
   const e = s.emitters.find((x) => x.bone === bone);
   expect(e, `emitter on bone ${bone}`).toBeTruthy();
   expect(e.particles.length).toBeGreaterThan(0);
@@ -57,12 +57,12 @@ test('Helios debris: the particle cut-out removes the transparent part of the ca
   // (opaque, cut-out 2 / 255, mask metal_debris2 alpha, 2 x 2 flipbook).
   const { id, index, k, emitter } = await oneParticle(page, 'BattlecruiserHelios', 23, 3, true);
   expect(emitter.blendMode).toBe(0);
-  const tests = await page.evaluate((i) => window.sc2viewer.alphaTests(i), id);
+  const tests = await page.evaluate((i) => window.sc2viewer.probe('m3', 'alphaTests', i), id);
   expect(tests.find((t) => t.material === 'Standard_24ww').alphaTest).toBeCloseTo(2 / 255, 6);
-  const on = await page.evaluate(([i, n, q, g]) => window.sc2viewer.particleSamples(i, n, q, g), [id, index, k, GRID]);
-  await page.evaluate((i) => window.sc2viewer.setAlphaTest(i, false), id);
-  const off = await page.evaluate(([i, n, g]) => window.sc2viewer.particleSamples(i, n, 0, g), [id, index, GRID]);
-  await page.evaluate((i) => window.sc2viewer.setAlphaTest(i, true), id);
+  const on = await page.evaluate(([i, n, q, g]) => window.sc2viewer.probe('m3', 'particleSamples', i, n, q, g), [id, index, k, GRID]);
+  await page.evaluate((i) => window.sc2viewer.probe('m3', 'setAlphaTest', i, false), id);
+  const off = await page.evaluate(([i, n, g]) => window.sc2viewer.probe('m3', 'particleSamples', i, n, 0, g), [id, index, GRID]);
+  await page.evaluate((i) => window.sc2viewer.probe('m3', 'setAlphaTest', i, true), id);
   const drawn = (list) => list.filter((d) => d !== null && d > 0).length;
   console.log('Helios debris samples on', JSON.stringify(on), 'off', JSON.stringify(off));
   expect(on.every((d) => d !== null)).toBe(true);
@@ -84,7 +84,7 @@ test('Blimp tank steam: its whole-quad mask fades to nothing at the quad corners
   expect(emitter.blendMode).toBe(1);
   const CORNERS = [[0.03, 0.03], [0.97, 0.03], [0.03, 0.97], [0.97, 0.97]];
   const points = [[0.5, 0.5], ...CORNERS];
-  const d = await page.evaluate(([i, n, q, g]) => window.sc2viewer.particleSamples(i, n, q, g), [id, index, k, points]);
+  const d = await page.evaluate(([i, n, q, g]) => window.sc2viewer.probe('m3', 'particleSamples', i, n, q, g), [id, index, k, points]);
   console.log('Blimp steam centre and corners', JSON.stringify(d));
   expect(d.every((x) => x !== null)).toBe(true);
   expect(d[0]).toBeGreaterThan(3);
@@ -100,12 +100,12 @@ test('negative: a flipbook layer (uvSource 6) still reads its cell: Helios jet f
   const { id, index, k } = await oneParticle(page, 'BattlecruiserHelios', 25, 0.2);
   const cells = await page.evaluate(([i, n, q]) => {
     const item = window.SC2App.items.find((x) => x.id === i);
-    const mat = item.model.materials[1][item.model.materialMaps[item.instance.particleSystems.find((s) => s.index === n).emitter.materialReferenceIndex].materialIndex];
+    const mat = item.model.m3.materials[1][item.model.m3.materialMaps[item.instance.m3.particleSystems.find((s) => s.index === n).emitter.materialReferenceIndex].materialIndex];
     return [0, 4, 5].map((l) => mat.layers[l]).filter((l) => l.active).map((l) => l.layer.uvSource);
   }, [id, index, k]);
   expect(cells.length).toBeGreaterThan(0);
   expect(cells.every((u) => u === 6)).toBe(true);
-  const d = await page.evaluate(([i, n, q]) => window.sc2viewer.particleSamples(i, n, q, [[0.5, 0.5]]), [id, index, k]);
+  const d = await page.evaluate(([i, n, q]) => window.sc2viewer.probe('m3', 'particleSamples', i, n, q, [[0.5, 0.5]]), [id, index, k]);
   expect(d[0]).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });

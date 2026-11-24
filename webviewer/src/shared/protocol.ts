@@ -50,6 +50,23 @@ export interface CategoryInfo {
   noun: string;
   filters: FilterInfo[];
   addAll: boolean;
+  /** 'records': rows are RecordSummary, previewed and placed by record; 'files': rows are model file paths, added as bare files. */
+  rows: 'records' | 'files';
+  /** Its rows and preview show the record's icon box. */
+  icons: boolean;
+}
+
+/** A row of GET /api/<game>/records/<category> for a 'records' category. A game may add its own fields. */
+export interface RecordSummary {
+  id: string;
+  name: string;
+  /** The grey line under the name. */
+  sub: string;
+  icon: string | null;
+  /** False: "add all" leaves it out (an SC2 skybox unit). */
+  placeable: boolean;
+  /** The word for it when not placeable: "skybox unit". */
+  notPlaceableAs: string | null;
 }
 
 export type AssetKind = 'model' | 'texture' | 'animation' | 'material';

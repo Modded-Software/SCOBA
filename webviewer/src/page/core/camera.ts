@@ -2,7 +2,7 @@
 // and rays between page pixels and the world.
 
 import type Scene from '@renderer/viewer/scene';
-import type { CameraState, Ray, Vec2, Vec3 } from './app';
+import type { CameraState, Ray, Vec2, Vec3 } from './types';
 import { readSetting, settings, writeSetting, type Restore } from './settings';
 
 export const UP: Vec3 = [0, 0, 1];

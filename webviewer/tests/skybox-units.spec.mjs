@@ -77,12 +77,12 @@ test('add all on Terran Campaign units (the operator\'s 142): the dialog names t
   const errors = await open(page);
   const listed = await units(page, { family: 'Campaign', race: 'Terran', kind: 'Unit' });
   console.log(`listed ${listed.total}; skybox among them: ${listed.items.filter((u) => u.skybox).map((u) => u.id).join(', ')}`);
-  await page.selectOption('#family', 'is:Campaign');
-  await page.locator('#races button[data-race="Terran"]').click();
-  await page.selectOption('#kind', 'Unit');
-  await expect.poll(() => page.locator('#unit-count').textContent()).toBe(`${listed.total} units`);
+  await page.selectOption('#filter-units-family', 'is:Campaign');
+  await page.locator('#filter-units-race button[data-race="Terran"]').click();
+  await page.selectOption('#filter-units-kind', 'Unit');
+  await expect.poll(() => page.locator('#count-units').textContent()).toBe(`${listed.total} units`);
   const want = listed.total - SKY_UNITS.length;
-  await page.locator('#add-all').click();
+  await page.locator('#add-all-units').click();
   await expect(page.locator('#add-all-dialog .question')).toHaveText(
     `Are you sure you want to add ${want} units to the map? 4 skybox units are left out: ${SKY_UNITS.join(', ')}.`,
   );

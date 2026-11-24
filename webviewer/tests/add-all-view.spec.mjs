@@ -11,7 +11,7 @@ import { api } from './api.mjs';
 const run = (page) => page.evaluate(() => window.SC2App.addAllState());
 
 async function addAllRun(page, total) {
-  await page.locator('#add-all').click();
+  await page.locator('#add-all-units').click();
   await page.locator('#add-all-yes').click();
   await expect.poll(async () => {
     const r = await run(page);
@@ -38,10 +38,10 @@ test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overla
   test.setTimeout(300_000);
   await page.goto('/');
   await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
-  await page.selectOption('#family', 'is:Melee');
-  await page.locator('#races button[data-race="Zerg"]').click();
+  await page.selectOption('#filter-units-family', 'is:Melee');
+  await page.locator('#filter-units-race button[data-race="Zerg"]').click();
   const listed = await (await page.request.get(api.records('units', { limit: '500', family: 'Melee', race: 'Zerg' }))).json();
-  await expect.poll(() => page.locator('#unit-count').textContent()).toBe(`${listed.total} units`);
+  await expect.poll(() => page.locator('#count-units').textContent()).toBe(`${listed.total} units`);
   for (let i = 1; i <= 2; i++) {
     const r = await addAllRun(page, listed.total);
     const xs = r.layout.map((l) => l.x);
@@ -56,7 +56,7 @@ test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overla
       const sizes = rows.map((x) => x[1]).sort((a, b) => a - b);
       console.log(`sizes: median ${sizes[sizes.length >> 1]}, p90 ${sizes[Math.floor(sizes.length * 0.9)]}, max ${sizes.at(-1)}`);
       console.log('largest: ' + JSON.stringify(rows.sort((a, b) => b[1] - a[1]).slice(0, 12)));
-      const radii = await page.evaluate((ids) => ids.map((id) => window.SC2App.items.find((x) => x.id === id)).map((x) => [x.unit.id, x.unit.radius]), r.layout.map((l) => l.id));
+      const radii = await page.evaluate((ids) => ids.map((id) => window.SC2App.items.find((x) => x.id === id)).map((x) => [x.source.record.id, x.source.record.radius]), r.layout.map((l) => l.id));
       console.log('unit radius of the largest: ' + JSON.stringify(radii.filter(([u]) => rows.slice(0, 12).some((x) => x[0] === u))));
     }
     const clusters = [...new Set(r.layout.map((l) => l.cluster))].map((k) => {

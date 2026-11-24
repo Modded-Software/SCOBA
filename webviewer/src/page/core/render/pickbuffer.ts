@@ -2,18 +2,18 @@
 // The instances are drawn in flat colours, one per instance, into a buffer
 // of a single pixel (the viewport is shifted so that the asked pixel lands
 // on it), with depth, and the pixel is read back: the nearest solid surface
-// wins, exactly as on screen. The flat-colour draw is the renderer's
-// M3ModelInstance.renderPick.
+// wins, exactly as on screen. The flat-colour draw is the instance's
+// renderPick (SPEC-VIEWER 6.1).
 
 import type ModelViewer from '@renderer/viewer/viewer';
-import type M3ModelInstance from '@renderer/viewer/handlers/m3/modelinstance';
+import type { ViewerInstance } from '../plugin';
 
 export interface PickBuffer {
   /**
    * The index in `instances` of the one drawn at canvas pixel (x, y), or -1.
    * x, y count drawing-buffer pixels from the top left; w, h is the buffer size.
    */
-  read(instances: readonly M3ModelInstance[], x: number, y: number, w: number, h: number): number;
+  read(instances: readonly ViewerInstance[], x: number, y: number, w: number, h: number): number;
 }
 
 export function createPickBuffer(viewer: ModelViewer): PickBuffer {

@@ -29,8 +29,8 @@ async function open(page) {
 /** Add a model through the UI: type in the search box, click the result. */
 async function addByUi(page, query, path) {
   const before = await page.locator('#scene li').count();
-  await page.fill('#search', query);
-  await page.locator(`#results button[data-path="${path.replaceAll('\\', '\\\\')}"]`).click();
+  await page.fill('#search-models', query);
+  await page.locator(`#models button[data-path="${path.replaceAll('\\', '\\\\')}"]`).click();
   await expect(page.locator('#scene li')).toHaveCount(before + 1);
   await page.waitForFunction(() => window.sc2viewer.idle());
 }
@@ -43,7 +43,7 @@ test('empty page: canvas, search box, empty scene, blank render', async ({ page 
   const problems = watch(page);
   await open(page);
   await expect(page.locator('canvas#view')).toBeVisible();
-  await expect(page.locator('#search')).toBeVisible();
+  await expect(page.locator('#search-models')).toBeVisible();
   await expect(page.locator('#scene li')).toHaveCount(0);
   expect((await state(page)).items).toEqual([]);
   expect((await pixels(page)).covered).toBe(0);
@@ -53,14 +53,14 @@ test('empty page: canvas, search box, empty scene, blank render', async ({ page 
 test('search lists models and narrows as typed', async ({ page }) => {
   const problems = watch(page);
   await open(page);
-  await page.fill('#search', 'marine');
-  await expect(page.locator('#results button').first()).toBeVisible();
-  const many = await page.locator('#results button').count();
+  await page.fill('#search-models', 'marine');
+  await expect(page.locator('#models button').first()).toBeVisible();
+  const many = await page.locator('#models button').count();
   expect(many).toBeGreaterThan(1);
-  await page.fill('#search', 'terran\\marine\\marine.m3');
-  await expect(page.locator('#results button')).toHaveCount(1);
-  await page.fill('#search', 'no-such-model-xyzzy');
-  await expect(page.locator('#results button')).toHaveCount(0);
+  await page.fill('#search-models', 'terran\\marine\\marine.m3');
+  await expect(page.locator('#models button')).toHaveCount(1);
+  await page.fill('#search-models', 'no-such-model-xyzzy');
+  await expect(page.locator('#models button')).toHaveCount(0);
   expect(problems).toEqual([]);
 });
 

@@ -45,9 +45,9 @@ test('Ghost: the Standard_7 constant emissive is red, bound, and draws pixels', 
   // One synchronous call, so no animation frame runs between the two renders.
   const { off, on } = await page.evaluate((id) => {
     const v = window.sc2viewer;
-    const count = v.setConstantLayers(id, false);
+    const count = v.probe('m3', 'setConstantLayers', id, false);
     v.mark();
-    v.setConstantLayers(id, true);
+    v.probe('m3', 'setConstantLayers', id, true);
     return { off: count, on: v.changedSinceMark() };
   }, item.id);
   console.log(`Ghost constant layer: layers ${off} ${JSON.stringify(on)}`);
@@ -82,6 +82,6 @@ test('negative: Marine has no constant colour layer', async ({ page }) => {
   const errors = await open(page);
   const item = await drawn(page, 'Marine');
   expect(item.constantLayers).toEqual([]);
-  expect(await page.evaluate((id) => window.sc2viewer.setConstantLayers(id, false), item.id)).toBe(0);
+  expect(await page.evaluate((id) => window.sc2viewer.probe('m3', 'setConstantLayers', id, false), item.id)).toBe(0);
   expect(errors).toEqual([]);
 });
