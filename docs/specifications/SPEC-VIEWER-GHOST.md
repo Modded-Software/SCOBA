@@ -587,7 +587,7 @@ decide the run.
 | `gs-1` (2026-11-24, fork at `6925432` plus the uncommitted survey) | 17 of 17 passed, exit 0 |
 | `gs-neg` | a build folder of 3 models and 2 clips, one of each cut by bytes and one with bytes added: 6 failed, exit 1. Cut files refused, added bytes reported. |
 | `gs-unset` | `GHOST_PATH=`: stops with the setting named, exit 1 |
-| `gs-2` (2026-11-24, fork at `883fc9d`) | 45 of 45 passed, exit 0 |
+| `gs-2` (2026-11-24, fork code of `f3d434c`) | 45 of 45 passed, exit 0 |
 | `gs-neg-nms` | a copy of `3D/Motions` with a line of a name only and a line of 9 flags: the 4 NMS checks of entries and flags failed, exit 1 |
 | `gs-neg-not` | `Global.not` cut to half: refused ("invalid NOT template offsets"); all 6 NOT checks failed, exit 1 |
 | `gs-neg-dds` | one texture cut to 40000 bytes: reported short (39872 of 87392 bytes); the DDS checks failed, exit 1 |
