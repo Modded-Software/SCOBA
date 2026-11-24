@@ -119,6 +119,30 @@ test('mouse-over: a feathered green glow surrounds the silhouette, only while ho
   expect(errors).toEqual([]);
 });
 
+test('selected units stay lit, without the glow; a unit not selected is not lit', async ({ page }) => {
+  const errors = await open(page);
+  const [marine, zealot, zergling] = await place(page, [['Marine', -1.5, 0], ['Zealot', 1.5, 0], ['Zergling', 0, 1.5]]);
+  // Grid off: no rings; the drawn pixels are the units alone. The mouse on the ground.
+  await page.evaluate(() => window.sc2viewer.setGrid(false));
+  const ground = await onWorld(page, [3, -2, 0]);
+  await page.mouse.move(ground[0], ground[1]);
+  await expect.poll(async () => (await pick(page)).hovered).toBe(null);
+  const plain = await page.evaluate(() => window.sc2viewer.colorStats());
+  await page.evaluate((ids) => window.SC2App.setSelection(ids), [marine, zealot]);
+  await expect.poll(async () => (await itemOf(page, marine)).highlight).toBe(1);
+  expect((await itemOf(page, zealot)).highlight).toBe(1);
+  const lit = await page.evaluate(() => window.sc2viewer.colorStats());
+  console.log('selected brightness', plain.brightness.toFixed(1), '->', lit.brightness.toFixed(1), 'green', plain.green, '->', lit.green);
+  expect(lit.brightness).toBeGreaterThan(plain.brightness * 1.1);
+  // Negative: no glow; the unit not selected is not lit.
+  expect(lit.green).toBeLessThan(20);
+  expect((await itemOf(page, zergling)).highlight).toBe(0);
+  // Cleared: none is lit.
+  await page.evaluate(() => window.SC2App.setSelection([]));
+  await expect.poll(async () => (await state(page)).items.map((i) => i.highlight)).toEqual([0, 0, 0]);
+  expect(errors).toEqual([]);
+});
+
 test('left click selects; another unit takes the selection; the ground clears it; a drag does not select', async ({ page }) => {
   const errors = await open(page);
   const [marine, zealot] = await place(page, [['Marine', -1.5, 0], ['Zealot', 1.5, 0]]);

@@ -21,8 +21,8 @@ html, body { overflow: hidden; }
    turned vertical (R-VIEW-20); at the window edge with the gallery closed. */
 #game-tabs { position: absolute; left: 320px; top: 8px; display: flex; flex-direction: column; gap: 2px; pointer-events: auto; transition: left 0.2s ease-out; }
 #game-tabs.closed { left: 0; }
-#game-tabs button { width: 22px; min-height: 44px; padding: 6px 0; writing-mode: vertical-rl; color: var(--dim); background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-left: none; border-radius: 0 var(--radius) var(--radius) 0; }
-#game-tabs button.on { color: var(--text); background: var(--panel); }
+#game-tabs button { width: 26px; min-height: 44px; padding: 6px 0; writing-mode: vertical-rl; font-size: 14px; color: var(--dim); background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-left: none; border-radius: 0 var(--radius) var(--radius) 0; }
+#game-tabs button.on { color: var(--text); background: var(--panel); font-weight: 700; }
 #game-tabs button:disabled { opacity: 0.45; cursor: not-allowed; }
 #instance-search { width: 100%; flex: none; }
 #gallery > section { flex: 1 1 0; }

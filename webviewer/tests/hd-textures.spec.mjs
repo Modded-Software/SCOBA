@@ -116,13 +116,14 @@ test('negative: a model with one set has no "hd" checkbox, and Ctrl+H changes no
   const errors = await open(page);
   const marine = await place(page, 'Marine');
   expect(await hdOf(page, marine)).toEqual({ hd: true, layers: 0, applied: 0 });
-  const before = await colour(page);
   await menu(page, marine);
   await expect(page.locator('#anim-menu input.loop')).toHaveCount(1);
   await expect(page.locator('#anim-menu input.hd')).toHaveCount(0);
   expect((await state(page)).pick.menu.hd).toBeUndefined();
   await page.keyboard.press('Escape');
   await selectRow(page, marine);
+  // Selected, so lit (pick): the colour to compare is the selected one.
+  const before = await colour(page);
   await page.keyboard.press('Control+h');
   await expect(page.locator('#status')).toHaveText('no HD textures for the selected');
   expect(await hdOf(page, marine)).toEqual({ hd: true, layers: 0, applied: 0 });

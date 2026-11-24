@@ -706,7 +706,9 @@ Rules:
 - `#side`: the column at the left. `#gallery` on top, `#instances` below,
   each half the window height.
 - `#game-tabs`: one `button[data-game]` per game, stacked, text turned
-  vertical, on the gallery's right edge from its top (R-VIEW-20).
+  vertical, on the gallery's right edge from its top (R-VIEW-20). The
+  text is the game's `tab` (`SC2`, `SC: G`), 14 px; the chosen tab is
+  bold (operator 2026-11-24).
 - `#gallery-handle`, `#instances-handle`: at the bottom of each panel's
   right edge (R-VIEW-24).
 - Gallery closed: the game tabs and the gallery handle slide to the window
@@ -1074,6 +1076,8 @@ runs while building; one full run, `full93`, with the operator's leave.
 | `full98` | Start 08:50:24 UTC, on HEAD `b2ca220` with step 7 uncommitted; nodsdk fork `cdef57b`. Every test, `@slow` too. 348 tests: 348 passed. Exit 0, 346 s. |
 | `gh8` | The commit hook read the GLSL `void main()` inside `src/formats/nod/shaders.ts` as a discarded JS call. The shaders moved to `public/shaders/nod.vert` and `nod.frag`, as the other page shaders; each model waits for them. New negative: without `nod.frag` a model fails, the file named. 6 files: 43 passed. |
 | `full99` | Start 09:01:02 UTC, as `full98` plus `gh8`. Every test, `@slow` too. 349 tests: 349 passed. Exit 0, 339 s. It closes step 7. |
+| `tab1`, `full100` | The game tabs: Ghost's tab text `SC: G`, 14 px, the chosen tab bold (10.1). `tab1` (6 files): 42 passed. `full100` (start 09:14:40 UTC): 349 passed, exit 0, 351 s. |
+| `lit1` | Selected instances stay lit, without the glow (16.4). New test in `pick.spec`: brightness 80.1 to 118.0 with two of three selected, green 0; the third not lit; cleared, none lit. 7 files: 39 passed. `full101`: 343 passed, 1 failed: `hd-textures.spec` compared the Marine's colour before it was selected with its colour after, and a selected unit is now lit. The test now takes the reference colour once the unit is selected. `lit2` (`hd-textures`): 8 passed. `full102`: 350 passed, exit 0. |
 | `live8` | The dev server after `make viewer-restart`, as `live1`, with one Ghost case added: the Ghost tab, `zerg_critter` from its gallery, drawn (6571 pixels), `stand` playing, stored as `ghost`/`build`, back after a reload, no failed request. 6 passed. `live9`: the same after the shader move of `gh8` and a second `make viewer-restart`: 6 passed, the same 6571 pixels. |
 
 - Library HEAD `7ac1103a`, 55 patches.
@@ -1257,7 +1261,8 @@ constant of the code. Nothing here names a game.
 - A click selects it. Another instance takes the selection. A click on the
   ground clears it. A drag does not select.
 - Shift + click adds an instance to the selection or takes it out.
-- Every selected instance gets a ring.
+- Every selected instance gets a ring and stays drawn brighter, as under
+  the mouse, without the glow (operator 2026-11-24; `pick.spec`).
 - A click on a row name selects the same way, with shift too. Ctrl + click
   on a row name also points the camera at the instance.
 - The rectangle selects every instance whose foot, middle or top is inside

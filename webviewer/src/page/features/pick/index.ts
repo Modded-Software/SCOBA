@@ -2,6 +2,7 @@
 // the hit tests are the selection service (core/selection.ts).
 // - mouse-over: the unit brightens, a feathered green glow runs around its
 //   outline (core/render/outline.ts, drawn by the frame) and a thin ring shows under it;
+// - every selected unit stays brightened as under the mouse, without the glow;
 // - left click: selects the unit under the mouse (green ring); a click on
 //   the ground or the sky deselects, a click on another unit selects that;
 //   the instances panel marks the selected unit's row (and a row click
@@ -47,10 +48,11 @@ export const pickFeature: Feature = {
       const under = mouse && !menu.item() ? selection.itemAt(mouse[0], mouse[1]) : null;
       const hovered = under ? under.id : null;
       selection.setHovered(hovered);
-      for (const item of items) item.instance.highlight = item.id === hovered ? 1 : 0;
-      // Rings: [the one selected last, mouse-over, the other selected ones...].
       const last = selection.selectedId();
       const chosen = selection.selectedIds();
+      // Lit: the unit under the mouse and every selected one. The outline glow is the hovered one's only (frame.ts).
+      for (const item of items) item.instance.highlight = item.id === hovered || chosen.includes(item.id) ? 1 : 0;
+      // Rings: [the one selected last, mouse-over, the other selected ones...].
       const others: Ring[] = [];
       for (const id of chosen) {
         const r = id !== last ? ring(byId(id), SELECT_RING) : null;

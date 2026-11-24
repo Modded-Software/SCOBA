@@ -25,7 +25,7 @@ try {
   banners.push(ghost.banner());
 } catch (error) {
   if (!(error instanceof GameUnavailable)) throw error;
-  unavailable.push({ id: 'ghost', label: 'StarCraft: Ghost', tab: 'Ghost', reason: error.message });
+  unavailable.push({ id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC: G', reason: error.message });
   banners.push(`ghost: not available: ${error.message}`);
 }
 

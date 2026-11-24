@@ -63,7 +63,7 @@ export async function startGhost(core: CoreSettings, env: NodeJS.ProcessEnv = pr
   return {
     id: 'ghost',
     label: 'StarCraft: Ghost',
-    tab: 'Ghost',
+    tab: 'SC: G',
     defaultDataset: GHOST_DATASET,
     hasDataset: (id) => id === GHOST_DATASET,
     async datasets() {

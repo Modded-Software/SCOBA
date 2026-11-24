@@ -26,7 +26,7 @@ test('ghost is available', async ({ request }) => {
   const games = await (await request.get('/api/games')).json();
   const ghost = games.games.find((game) => game.id === 'ghost');
   expect(ghost, 'GHOST_PATH must name the build for this spec').toBeTruthy();
-  expect(ghost).toEqual({ id: 'ghost', label: 'StarCraft: Ghost', tab: 'Ghost', available: true, reason: null });
+  expect(ghost).toEqual({ id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC: G', available: true, reason: null });
   expect(games.default).toBe('sc2');
   const health = await (await request.get('/api/health')).json();
   expect(health.games).toContainEqual({ id: 'ghost', available: true });

@@ -19,7 +19,7 @@ wrong so far.
 | --- | --- |
 | Game id | `ghost` |
 | Label | StarCraft: Ghost |
-| Tab text | Ghost |
+| Tab text | SC: G (operator 2026-11-24) |
 | Formats | `nod` (models, with NAD clips, NSA materials and DDS textures) |
 | Datasets | one: `build`, the extracted game build |
 
