@@ -57,7 +57,7 @@ export function createNodProbes({ scene }: Pick<FeatureContext, 'scene'>): Reado
   /** Per group: material, drawn kind (null: not drawn), triangles, texture, why it is not drawn. */
   function groups(itemId: number): Record<string, unknown>[] {
     const instance = find(itemId);
-    return instance.model.groups.map((g) => ({ index: g.index, material: g.material, kind: g.look.kind, shader: g.look.shader, triangles: g.indexCount / 3, texture: g.look.texture, textureLoaded: g.texture !== null, undrawn: g.look.undrawn, drawnLast: instance.lastDrawn.includes(g.index) }));
+    return instance.model.groups.map((g) => ({ index: g.index, material: g.material, kind: g.look.kind, shader: g.look.shader, triangles: g.indexCount / 3, texture: g.look.texture, textureLoaded: g.texture !== null, undrawn: g.look.undrawn, why: g.look.why, drawnLast: instance.lastDrawn.includes(g.index) }));
   }
 
   /** The bone matrices now (global x move(offset)), 16 numbers each; the clip and the playhead. */

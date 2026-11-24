@@ -5,13 +5,16 @@
 
 import type { CategoryInfo } from '../../../shared/protocol';
 import type { DatasetInfo } from '../../../shared/records';
-import { HttpError, type GameBackend } from '../../../server/core/backend';
+import { HttpError, type GameBackend, type UnavailableGame } from '../../../server/core/backend';
 import type { CoreSettings } from '../../../server/core/settings';
 import { findIn, ghostSettings, indexBuild, type BuildIndex } from './build';
 import { buildCatalog, searchActors, searchModels, type Catalog } from './catalog';
 import { createExporter } from './exporter';
 
 export const GHOST_DATASET = 'build';
+
+/** How Ghost is named, available or not: server/main.ts lists it with these when it cannot start. */
+export const GHOST_GAME: Omit<UnavailableGame, 'reason'> = { id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC: G' };
 
 const CATEGORIES: CategoryInfo[] = [
   {
@@ -61,9 +64,7 @@ export async function startGhost(core: CoreSettings, env: NodeJS.ProcessEnv = pr
   const known = (path: string): string | null => state.index.byLower.get(path.replaceAll('\\', '/').toLowerCase()) ?? null;
 
   return {
-    id: 'ghost',
-    label: 'StarCraft: Ghost',
-    tab: 'SC: G',
+    ...GHOST_GAME,
     defaultDataset: GHOST_DATASET,
     hasDataset: (id) => id === GHOST_DATASET,
     async datasets() {

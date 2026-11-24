@@ -208,7 +208,8 @@ Routes below `/api/sc2/x/`:
 
 ## 9. As a game module
 
-Design, [plan]. `src/games/sc2/`:
+[today], built in steps 4 to 7; the table is the design it was built
+from, the paragraphs below it say what was built. `src/games/sc2/`:
 
 | Part | Holds | From |
 | --- | --- | --- |
@@ -230,8 +231,16 @@ Step 6: `gallery/` is gone; core's gallery draws the SC2 tabs from the
 categories, and `names.ts` keeps the landmark names. `parts.ts`
 (`installSc2Page`) takes the FeatureContext (SPEC-VIEWER 6.6) and gives
 its test members through `testApi`: the adds of `api.ts` on
-`sc2viewer`; `textureWindow` and `hdAssets` on both; `filterName` on
-`SC2App`.
+`sc2viewer`; `hdAssets` on both; `filterName` on `SC2App`.
+
+Step 7 rework (2026-11-24): the texture window is core's
+(`page/core/texturewindow.ts`), shared with Ghost; `sc2viewer.textureWindow`
+is core's member. `textures/index.ts` checks the build of the compare page
+and asks the window for the page `/api/sc2/x/textures/` with its read of the
+originals (`textures/originals.ts`). The DDS decode is core's
+(`page/core/ddsdecode.ts`). The "not a DDS file" refusal stays here: a
+file is fetched first, so a missing one says its status, then a name that
+does not end in `.dds` is refused.
 `hd.ts` and `textures/` take the context, not a page object. The M3
 probes are reached as `sc2viewer.probe('m3', name, ...)`.
 
@@ -286,11 +295,13 @@ baseline run `full85` ([SPEC-VIEWER](SPEC-VIEWER.md), section 13).
 After the move to a game module these must pass with the same assertions,
 through the new routes and the typed test object.
 
-Negative cases the module adds [plan]:
+Negative cases the module adds:
 
-- a doodad row has no team colour control; a unit row has no variation
-  control;
-- an instance of another game shows neither, and no "hd" box.
+- [plan] a doodad row has no team colour control; a unit row has no
+  variation control;
+- [today] an instance of another game has no team colour control and no
+  `hd` (`ghost-mix.spec`). Its variation control and the menu's "hd" box
+  are not asserted.
 
 ## 11. Open points
 

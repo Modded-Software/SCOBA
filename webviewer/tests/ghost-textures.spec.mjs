@@ -1,124 +1,174 @@
-// The Ghost texture window (SPEC-VIEWER-GHOST 8): a double-click on an
-// instance or a gallery row opens one card per material, with the texture
-// decoded in the page. Needs GHOST_PATH. The state of the window and the
-// DOM decide; how the cards look is an operator check.
+// Ghost in the shared texture window (core/texturewindow.ts, SPEC-VIEWER-GHOST 8):
+// the bare texture viewer page (/texture-viewer.html), handed every texture
+// file a model's materials name, decoded, with what draws with it. Opened by
+// a double-click on an instance, an instance row, or a gallery row (actors
+// and models). Needs GHOST_PATH. The window's state, the page's hdtex API and
+// measured boxes decide; how it looks is an operator check.
 import { test, expect } from '@playwright/test';
 import { open, add, frameItem } from './ghost.mjs';
 
-const windowOf = (page) => page.evaluate(() => window.sc2viewer.ghostTextureWindow());
-const done = (page) => expect.poll(async () => (await windowOf(page)).state, { timeout: 20_000 }).toBe('done');
-const card = (page, material) => page.locator(`#ghost-texture-list .card[data-material="${material}"]`);
+const win = (page) => page.evaluate(() => window.sc2viewer.textureWindow());
+const textureFrame = (page) => page.frames().find((frame) => frame.url().includes('/texture-viewer.html'));
 
-/** Double-click the item in the view. */
-async function openOn(page, id) {
-  await frameItem(page, id);
-  const at = await page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
-  expect(at, 'the item has a pixel to click').not.toBeNull();
-  await page.mouse.dblclick(at[0], at[1]);
+/** The page's own state once it shows `user` and the textures were handed to it. */
+async function inside(page, user) {
+  await expect
+    .poll(async () => {
+      const frame = textureFrame(page);
+      if (!frame) return 'no frame';
+      return frame.evaluate(() => (window.hdtex ? window.hdtex.state().user : 'loading')).catch((error) => error.message);
+    })
+    .toBe(user);
+  await expect.poll(async () => (await win(page)).originals, { timeout: 20_000 }).toBe('done');
+  return textureFrame(page).evaluate(() => ({ ...window.hdtex.state(), entries: window.hdtex.entries(), problems: window.hdtex.problems() }));
 }
 
-test('a double-click on a Ghost instance opens its materials; each texture decoded at its size', async ({ page }) => {
+/** Boxes of the window, its frame, and the page's list rows and card, in page pixels. */
+async function layout(page) {
+  const frame = textureFrame(page);
+  const [windowBox, frameBox] = [await page.locator('#texture-window').boundingBox(), await page.locator('#texture-frame').boundingBox()];
+  const inner = await frame.evaluate(() => ({
+    rows: [...document.querySelectorAll('#list .row')].map((r) => r.getBoundingClientRect()).map((b) => ({ top: b.top, bottom: b.bottom, height: b.height })),
+    cards: document.getElementById('cards').getBoundingClientRect().toJSON(),
+    width: innerWidth,
+  }));
+  return { windowBox, frameBox, ...inner };
+}
+
+/** The layout checks: the frame fills the window body; rows have height and do not overlap. */
+function expectSound({ windowBox, frameBox, rows, cards, width }) {
+  expect(frameBox.x).toBeGreaterThanOrEqual(windowBox.x - 1);
+  expect(frameBox.x + frameBox.width).toBeLessThanOrEqual(windowBox.x + windowBox.width + 1);
+  expect(frameBox.height).toBeGreaterThan(windowBox.height * 0.8);
+  expect(rows.length).toBeGreaterThan(0);
+  for (const row of rows) expect(row.height).toBeGreaterThan(10);
+  for (let i = 1; i < rows.length; i++) expect(rows[i].top, `row ${i} starts below row ${i - 1}`).toBeGreaterThanOrEqual(rows[i - 1].bottom - 0.5);
+  expect(cards.width).toBeGreaterThan(100);
+  expect(cards.right).toBeLessThanOrEqual(width + 1);
+}
+
+/** The facts on the page's card of the entry shown now, as "name: value". */
+const cardFacts = (page) => textureFrame(page).evaluate(() => [...document.querySelectorAll('#cards dt')].map((dt) => `${dt.textContent}: ${dt.nextElementSibling ? dt.nextElementSibling.textContent : ''}`));
+
+async function closeWindow(page) {
+  await page.locator('#texture-window .window-close').click();
+  await expect(page.locator('#texture-window')).toBeHidden();
+}
+
+test('a double-click on a Ghost instance opens the shared texture window on its textures, with what draws with them', async ({ page }) => {
   const errors = await open(page);
   const id = await add(page, '3D/Models/crate.nod');
-  await openOn(page, id);
-  await done(page);
-  const w = await windowOf(page);
-  expect([w.open, w.file]).toEqual([true, '3D/Models/crate.nod']);
-  expect(w.cards.map((c) => [c.material, c.kind, c.groups])).toEqual([['chestCrate2', 'solid', [0]]]);
-  const [crate] = w.cards;
-  expect(crate.texture).toMatch(/\.dds$/i);
-  expect(crate.failed).toBeNull();
-  expect(crate.decoded.size[0]).toBeGreaterThan(0);
-  expect(crate.decoded.planes[0]).toBe('color');
-  // The picture in the card is the decoded texture, at its size.
-  const img = card(page, 'chestCrate2').locator('figure.color img');
-  await expect(img).toHaveCount(1);
-  await expect.poll(() => img.evaluate((n) => n.naturalWidth)).toBe(crate.decoded.size[0]);
-  expect(await img.evaluate((n) => n.naturalHeight)).toBe(crate.decoded.size[1]);
-  await expect(card(page, 'chestCrate2')).toContainText('drawn solid');
-  // Negative: the SC2 texture window did not open.
-  expect((await page.evaluate(() => window.sc2viewer.textureWindow())).open).toBe(false);
-  // Escape in the list closes the window.
-  await page.locator('#ghost-texture-list').focus();
-  await page.keyboard.press('Escape');
-  expect((await windowOf(page)).open).toBe(false);
+  await frameItem(page, id);
+  const at = await page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
+  await page.mouse.dblclick(at[0], at[1]);
+  await expect(page.locator('#texture-window')).toBeVisible();
+  await expect(page.locator('#texture-window .window-title')).toContainText('crate.nod');
+  const shown = await inside(page, 'crate.nod');
+  expect(await win(page)).toMatchObject({ open: true, user: 'crate.nod', file: '3D/Models/crate.nod', dataset: 'build' });
+  expect(shown.embed).toBe(true);
+  expect(shown.problems).toEqual([]);
+  // One texture file: its colour plane first, every entry an original alone.
+  const [entry] = shown.entries;
+  expect(entry.plane).toBe('color');
+  expect(new Set(shown.entries.map((e) => e.texture)).size).toBe(1);
+  for (const e of shown.entries) expect(e.category).toBe('Original only');
+  expect(entry.texture).toMatch(/\.dds$/i);
+  expect(entry.facts).toEqual([['material chestCrate2', expect.stringMatching(/^(shader \S+|no shader) · drawn solid · groups 0 · \d+ triangles$/)]]);
+  // The entry's picture is the decoded texture at the size listed.
+  const size = await textureFrame(page).evaluate(async (src) => {
+    const image = new Image();
+    image.src = src;
+    await image.decode();
+    return [image.naturalWidth, image.naturalHeight];
+  }, entry.image);
+  expect(size).toEqual(entry.size);
+  expect(await cardFacts(page)).toContainEqual(expect.stringMatching(/^material chestCrate2: .*drawn solid/));
+  expectSound(await layout(page));
+  // Negative: the SC2 page was not opened.
+  expect(page.frames().some((f) => f.url().includes('/api/sc2/x/textures/'))).toBe(false);
   expect(errors).toEqual([]);
 });
 
-test('a double-click on a gallery row opens the actor model; a cutout material shows its alpha', async ({ page }) => {
+test('gallery rows open it: an actor of the actors pane and a file of the models pane; the scene stays empty', async ({ page }) => {
   const errors = await open(page);
   await page.locator('#game-tabs button[data-game="ghost"]').click();
   await page.fill('#search-actors', 'zerg_critter');
   await page.locator('#actors li[data-id="zerg_critter"]').dblclick();
-  await done(page);
-  const w = await windowOf(page);
-  expect(w.file).toBe('3D/Models/zergling.nod');
-  expect(w.cards.length).toBeGreaterThan(0);
-  for (const c of w.cards) expect([c.material, c.failed, c.decoded === null]).toEqual([c.material, null, c.texture === null]);
-  // Negative: nothing was added to the scene.
+  const actor = await inside(page, 'zerg_critter');
+  expect((await win(page)).file).toBe('3D/Models/zergling.nod');
+  expect(actor.entries.length).toBeGreaterThan(0);
+  for (const e of actor.entries) expect(e.facts.length, e.texture).toBeGreaterThan(0);
+  expectSound(await layout(page));
+  // The models pane: the same file, by its own id.
+  await closeWindow(page);
+  await page.locator('#tab-models').click();
+  await page.fill('#search-models', 'zergling');
+  const row = page.locator('#models li[data-id]', { has: page.locator('.name', { hasText: /^zergling(\.nod)?$/i }) }).first();
+  await expect(row).toBeVisible();
+  const modelId = await row.getAttribute('data-id');
+  await row.dblclick();
+  const model = await inside(page, modelId);
+  expect((await win(page)).file).toBe('3D/Models/zergling.nod');
+  expect(model.entries.map((e) => e.texture)).toEqual(actor.entries.map((e) => e.texture));
+  // Negative: a double-click adds nothing to the scene.
   expect((await page.evaluate(() => window.sc2viewer.state())).items).toEqual([]);
-  // A cutout material: its texture has an alpha plane, shown beside the colour.
-  // The window covers the view: close it first.
-  await page.locator('#ghost-texture-list').focus();
-  await page.keyboard.press('Escape');
-  const vine = await add(page, '3D/Models/AR_Plant_Vine_01.nod');
-  await openOn(page, vine);
-  await expect.poll(async () => (await windowOf(page)).file).toBe('3D/Models/AR_Plant_Vine_01.nod');
-  await done(page);
-  const cut = (await windowOf(page)).cards.find((c) => c.kind === 'cutout');
-  expect(cut, 'a cutout card').toBeDefined();
-  expect(cut.decoded.planes).toEqual(['color', 'alpha']);
-  await expect(card(page, cut.material).locator('figure.alpha img')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
-test('materials not drawn: the reason in words; no texture, no picture; sky hidden by its shader', async ({ page }) => {
+test('an instance row opens it; a cutout texture shows its alpha plane', async ({ page }) => {
+  const errors = await open(page);
+  const id = await add(page, '3D/Models/AR_Plant_Vine_01.nod');
+  await page.locator(`#scene li[data-id="${id}"] .head .name`).dblclick();
+  const shown = await inside(page, 'AR_Plant_Vine_01.nod');
+  const cut = shown.entries.filter((e) => e.facts.some(([, v]) => v.includes('drawn cutout')));
+  expect(cut.length, JSON.stringify(shown.entries.map((e) => [e.texture, e.plane, e.facts]))).toBeGreaterThan(0);
+  const planes = shown.entries.filter((e) => e.texture === cut[0].texture).map((e) => e.plane);
+  expect(planes).toEqual(['color', 'alpha']);
+  expect(errors).toEqual([]);
+});
+
+test('materials not drawn: the reason, on the texture card or in the problems when there is no texture', async ({ page }) => {
   const errors = await open(page);
   const cases = [
-    ['3_3_2_Room01_FieldPanel02', (c) => c.undrawn !== null && c.undrawn.endsWith('shader dynamic is not drawn'), 'not drawn: shader dynamic is not drawn'],
-    ['pCannon_collide', (c) => c.undrawn !== null && c.undrawn.endsWith('found by no step of the material lookup'), 'not drawn: found by no step of the material lookup'],
-    ['swdemoSKY', (c) => c.shader === 'sky', 'not drawn (hidden by its shader)'],
+    ['3D/Models/3_3_2_Room01_FieldPanel02.nod', 'not drawn: shader dynamic is not drawn'],
+    ['3D/Models/pCannon_collide.nod', 'not drawn: found by no step of the material lookup'],
+    ['3D/Models/swdemoSKY.nod', 'not drawn: hidden by its shader'],
   ];
-  for (const [name, which, words] of cases) {
-    const id = await add(page, `3D/Models/${name}.nod`);
-    // The instance row: a model that draws little may have no pixel in the view to click.
+  for (const [file, words] of cases) {
+    const id = await add(page, file);
     await page.locator(`#scene li[data-id="${id}"] .head .name`).dblclick();
-    await expect.poll(async () => (await windowOf(page)).file).toBe(`3D/Models/${name}.nod`);
-    await done(page);
-    const found = (await windowOf(page)).cards.filter(which);
-    expect(found.length, `${name}: ${JSON.stringify((await windowOf(page)).cards)}`).toBeGreaterThan(0);
-    for (const c of found) {
-      expect(c.kind).toBeNull();
-      await expect(card(page, c.material)).toContainText(words);
-      // Negative: a material with no texture file has no picture.
-      if (c.texture === null) await expect(card(page, c.material).locator('img')).toHaveCount(0);
+    const user = file.split('/').pop();
+    const shown = await inside(page, user);
+    const said = [...shown.entries.flatMap((e) => e.facts.map(([, v]) => v)), ...shown.problems];
+    expect(said.some((s) => s.includes(words)), `${file}: ${JSON.stringify(said)}`).toBe(true);
+    // Negative: a material without a texture file has no entry, only its problem line.
+    for (const p of shown.problems.filter((s) => s.includes(': no texture file'))) {
+      const material = p.slice(0, p.indexOf(': no texture file'));
+      expect(shown.entries.some((e) => e.facts.some(([n]) => n === `material ${material}`))).toBe(false);
     }
+    await closeWindow(page);
     await page.evaluate((i) => window.sc2viewer.remove(i), id);
   }
   expect(errors).toEqual([]);
 });
 
-test('negative: a texture that does not load is named on its card; the window still lists the model', async ({ page }) => {
+test('negative: a texture that does not load is named in the problems; the instance keeps its own', async ({ page }) => {
   const errors = await open(page);
-  // The crate loads with its texture; only after that does its texture answer 404.
   const id = await add(page, '3D/Models/crate.nod');
   let gone = 0;
   await page.route('**/api/ghost/asset?*', (route) => {
-    const url = new URL(route.request().url());
-    if (url.searchParams.get('kind') === 'texture') {
+    if (new URL(route.request().url()).searchParams.get('kind') === 'texture') {
       gone++;
       return route.fulfill({ status: 404, body: 'gone' });
     }
     return route.continue();
   });
   await page.locator(`#scene li[data-id="${id}"] .head .name`).dblclick();
-  await done(page);
-  const [only] = (await windowOf(page)).cards;
-  expect([only.material, only.failed, only.decoded]).toEqual(['chestCrate2', '404', null]);
-  await expect(card(page, 'chestCrate2')).toContainText('texture not read: 404');
-  await expect(card(page, 'chestCrate2').locator('img')).toHaveCount(0);
+  const shown = await inside(page, 'crate.nod');
+  expect(shown.entries).toEqual([]);
+  expect(shown.problems).toEqual([expect.stringMatching(/\.dds \(404\)$/i)]);
   expect(gone).toBe(1);
-  // Negative: the instance in the scene keeps its texture.
-  expect((await page.evaluate(() => window.sc2viewer.probe('nod', 'groups', window.sc2viewer.state().items[0].id)))[0].textureLoaded).toBe(true);
+  const groups = await page.evaluate((i) => window.sc2viewer.probe('nod', 'groups', i), id);
+  expect(groups[0].textureLoaded).toBe(true);
   expect(errors).toEqual([]);
 });

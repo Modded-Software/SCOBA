@@ -2,9 +2,7 @@
 // (SPEC-VIEWER-GHOST 2, 7). Every export is written once per dataset
 // signature below the cache folder and served from there.
 //
-// A model is served as one container the nod format reads:
-//   "NODX", uint32 version 1, uint32 JSON length, the JSON (padded with
-//   blanks to 4 bytes), then the model binary of `NODExport nod`.
+// A model is served as one container the nod format reads (container.ts).
 // The JSON is { model, materials }: the model description and the
 // materials export of its material names. A model NODExport refuses is a
 // container whose JSON is { error }: the page names it (R-VIEW-82).
@@ -15,11 +13,11 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promise
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { isFile } from '../../../server/core/http';
+import { packContainer } from './container';
 
 const run = promisify(execFile);
 /** The parsers log every file they read: room for a model's worth of lines. */
 const OUTPUT = 64 * 1024 * 1024;
-export const CONTAINER_MAGIC = 'NODX';
 
 /** An exit code of a child process, when it has one. */
 function exitCode(error: unknown): number | null {
@@ -131,13 +129,7 @@ export function createExporter(exe: string, root: string, cache: string): Export
         } else {
           body = { error: `${rel}: ${String(model['error'])}` };
         }
-        const text = JSON.stringify(body);
-        const padded = text + ' '.repeat((4 - (Buffer.byteLength(text) % 4)) % 4);
-        const head = Buffer.alloc(12);
-        head.write(CONTAINER_MAGIC, 0, 'latin1');
-        head.writeUInt32LE(1, 4);
-        head.writeUInt32LE(Buffer.byteLength(padded), 8);
-        await put(out, Buffer.concat([head, Buffer.from(padded), binary]));
+        await put(out, packContainer(body, binary));
       });
     },
     async clip(signature, rel) {

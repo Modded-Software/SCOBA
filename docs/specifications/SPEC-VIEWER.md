@@ -846,9 +846,15 @@ passed in it. Nothing here is [verified]: see section 2.
 
 | Requirement | State | Where |
 | --- | --- | --- |
-| R-VIEW-1 to 8 | [plan] | |
+| R-VIEW-1 | [today] | `core-names.spec`: the code of `page/core`, `page/ui`, `page/features` and `server/core` (comments read out) holds no game id and no game model or clip file extension. Comments still name SC2 examples. The test object names `sc2viewer`, `SC2App` are left as they are (R-VIEW-14, step 8). The DDS decode in core (`page/core/ddsdecode.ts`) serves the textures of both games. |
+| R-VIEW-2 | [plan] | Not shown. Step 7 added Ghost with core edits as well (game tabs, the texture window moved into core, `TEMPLATE_PAGE`). The rule is shown only when a game is added without one. |
+| R-VIEW-3 | [plan] | Not shown, for the same reason: the nod format came with core edits in step 7. |
+| R-VIEW-4 | [today] | The import rule (`scripts/typecheck.sh`, `import-rule.spec`): core imports no game and no format; games and formats reach core through `page/core/plugin.ts`, `page/core/context.ts` and `server/core/backend.ts`. |
+| R-VIEW-5 | [today] | `contract.spec` (page): in each game a record is previewed, added, selected, moved, copied, pasted, kept and removed through the same features. `ghost-mix.spec`: both games and formats in one scene. |
+| R-VIEW-6 | [today] | `ghost-mix.spec`: the team control is on an SC2 unit and absent on a Ghost instance; no `hd` on a Ghost instance. |
+| R-VIEW-7 | [today] | The import rule; `import-rule.spec` "a game imports another game is refused". |
 | R-VIEW-9 | [today] | `local.env`, `.gitignore` |
-| R-VIEW-10, 11 | [plan] | TypeScript today: the page (`src/page`, `src/formats/m3`, `src/shared`), the server (`src/server`, `src/games/sc2/server`) and `src/tools`. The survey tools under `tools/` and the tests are still JavaScript (step 8). |
+| R-VIEW-10, 11 | [plan] | TypeScript today: the page (`src/page`, `src/formats/m3`, `src/formats/nod`, `src/shared`), the server (`src/server`, `src/games/*/server`) and `src/tools`. The survey tools under `tools/` and the tests are still JavaScript: step 8, not started. |
 | R-VIEW-12 | [today] | Step 6: no page object, no `app()`; each module takes typed services (section 6.6). `scripts/typecheck.sh` and the import rule. No test asserts the clause yet. |
 | R-VIEW-13 | [today] | `scripts/typecheck.sh`, first in `scripts/test.sh`; it passed in run `full88` (section 13). `typecheck.spec` asserts that a type error ends the check. |
 | R-VIEW-14 | [plan] | Today: `window.sc2viewer` and `window.SC2App`, put together from what the features hand to `testApi` (`core/testapi.ts`); a format's members only through `probe`. Tests still read item internals (`SC2App.items`, `.instance.m3`); typed in step 8. |
@@ -868,7 +874,7 @@ passed in it. Nothing here is [verified]: see section 2.
 | R-VIEW-41 | [today] | `units-ui.spec`, `doodads-ui.spec` |
 | R-VIEW-42 | [today] | `drag-preview.spec`, `units-ui.spec`, `doodads-ui.spec` |
 | R-VIEW-43 | [today] | `add-all.spec`, `add-all-view.spec`, `landmarks.spec`, `skybox-units.spec` |
-| R-VIEW-44 | [plan] | Today the rules sit in core: `page/core/rules.ts`, `page/core/scene.ts`. |
+| R-VIEW-44 | [today] | `page/core/scene.ts` applies what the game's `place`, `placeFile`, `restSequence` and `playRate` return; core holds no record rule (`page/core/rules.ts` is gone). `units-ui.spec` (SC2 scale, height, rate), `ghost-gallery.spec` (a Ghost actor's file). |
 | R-VIEW-45 | [today] | `skybox-units.spec` |
 | R-VIEW-50 | [today] | `viewer.spec`, `instances.spec` |
 | R-VIEW-51 | [today] | `side.spec` |
@@ -894,7 +900,7 @@ passed in it. Nothing here is [verified]: see section 2.
 | R-VIEW-81 | [today] | `displacement.spec`, `particles.spec` |
 | R-VIEW-82 | [today] | The nod format: `ghost-look.spec` (a refused model fails with its message), `ghost-anim.spec` (clips refused with the reason), `make viewer-ghost-export-check` (changed files refused by NODExport). M3: not asserted. |
 | R-VIEW-90 | [today] | For the [today] rows only. |
-| R-VIEW-91 | [plan] | Step 7: two games (sc2, ghost) and two formats (m3, nod) pass their tests. The contract tests are not yet one suite run per game. |
+| R-VIEW-91 | [today] | `contract.spec`: one suite run for every game `/api/games` lists, protocol and page; it needs two available games. The formats (m3, nod) pass the instance tests of their games. The capability part of section 11 is `ghost-mix.spec`, not yet in the suite. |
 | R-VIEW-92 | [today] | M3 and the six Ghost formats: see the game specifications. |
 | R-VIEW-93 | [today] | `AGENTS.md` |
 
@@ -1079,6 +1085,7 @@ runs while building; one full run, `full93`, with the operator's leave.
 | `tab1`, `full100` | The game tabs: Ghost's tab text `SC: G`, 14 px, the chosen tab bold (10.1). `tab1` (6 files): 42 passed. `full100` (start 09:14:40 UTC): 349 passed, exit 0, 351 s. |
 | `lit1` | Selected instances stay lit, without the glow (16.4). New test in `pick.spec`: brightness 80.1 to 118.0 with two of three selected, green 0; the third not lit; cleared, none lit. 7 files: 39 passed. `full101`: 343 passed, 1 failed: `hd-textures.spec` compared the Marine's colour before it was selected with its colour after, and a selected unit is now lit. The test now takes the reference colour once the unit is selected. `lit2` (`hd-textures`): 8 passed. `full102`: 350 passed, exit 0. |
 | `tw1` to `tw3` | The Ghost texture window (SPEC-VIEWER-GHOST 8); the DDS decode moved from SC2's `textures/originals.ts` to `page/core/ddsdecode.ts`, used by both games. `tw1` (`ghost-textures`, `texture-window`, `hd-textures`): 19 passed, 1 failed (the test double-clicked the view under the open window; it closes the window first). `tw2` (`ghost-textures`): 4 passed. `tw3` (the other Ghost specs): 19 passed. No full run (operator 2026-11-24: targeted specs only). |
+| `rw1`, `rw2` | The rework of the texture window: one window in core (`page/core/texturewindow.ts`) for both games, Ghost on the bare texture viewer page; Ghost's own card window and its CSS are gone. With it: `GroupLook.why`; the Ghost container in `games/ghost/server/container.ts` with its head in `shared/nodx.ts`; `GHOST_GAME`; the drag preview's state key `ghost` renamed `dragPreview`; new specs `contract`, `core-names`, `ghost-gallery`. Targeted only, no `@slow`, no full run (operator 2026-11-24). `rw1` (15 files, 84 tests): 83 passed, 1 failed: `contract.spec` expected `loaded` true for Ghost's first actor, `_actorProps`, whose model `dflt.nod` has only a group no step finds, so it draws nothing; the test now holds `loaded` the same over the reload and logs it. `rw2` (`contract`): 2 passed, exit 0. |
 | `live8` | The dev server after `make viewer-restart`, as `live1`, with one Ghost case added: the Ghost tab, `zerg_critter` from its gallery, drawn (6571 pixels), `stand` playing, stored as `ghost`/`build`, back after a reload, no failed request. 6 passed. `live9`: the same after the shader move of `gh8` and a second `make viewer-restart`: 6 passed, the same 6571 pixels. |
 
 - Library HEAD `7ac1103a`, 55 patches.
@@ -1301,9 +1308,9 @@ constant of the code. Nothing here names a game.
 ### 16.7 Clipboard
 
 - The clipboard is kept in the page. It is not the system clipboard.
-- A copy keeps what defines the item: dataset, record or file, variant,
-  scale, angle, animation, pick, item options. The game is added to this
-  list [plan].
+- A copy keeps what defines the item: game, dataset, record or file,
+  variant, scale, angle, animation, pick, item options
+  (`features/clipboard`; `ghost-mix.spec`, `contract.spec`).
 - A paste keeps the shape of the group. Its centre goes under the pointer.
   With the pointer off the view, the copies go where they were copied
   from.

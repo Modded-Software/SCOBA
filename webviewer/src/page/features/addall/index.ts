@@ -119,6 +119,8 @@ export const addAllFeature: Feature = {
     });
     testApi.app({
       addAll,
+      /** The landmark name add all gives a list of the gallery game (its listName). */
+      listName: (category: string, query: Record<string, string>) => games.plugin().listName(category, query),
       addAllState: () => ({ ...run, failed: [...run.failed], skipped: [...run.skipped], layout: run.layout.map((l) => ({ ...l })), dialogOpen: confirm.dialog.isOpen, question: question.textContent }),
     });
   },

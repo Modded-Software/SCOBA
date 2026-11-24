@@ -17,6 +17,7 @@ import { createSelection } from './core/selection';
 import { clearSetting, readSetting, writeSetting } from './core/settings';
 import { createSky } from './core/sky';
 import { createProbe, createTestApi } from './core/testapi';
+import { createTextureWindow } from './core/texturewindow';
 import { createView } from './core/view';
 import { installStatus } from './ui/status';
 import { installUi } from './ui/kit';
@@ -66,8 +67,10 @@ const selection = createSelection({ host, camera, items: scene.items, events });
 const render = createFrame({ host, camera, scene, selection, games, events });
 const ui = installUi({ games, api, scene, selection, camera, status, store, events });
 const tests = createTestApi();
+// Ctrl+H (SC2's HD switch) and Ctrl+L (the loop choice) stay the viewer's inside the texture window's frame.
+const textureWindow = createTextureWindow(ui, render, ['h', 'l']);
 
-const context: FeatureContext = { games, render, scene, selection, camera, status, store, events, api, ui, testApi: tests.builder };
+const context: FeatureContext = { games, render, scene, selection, camera, status, store, events, api, ui, textureWindow, testApi: tests.builder };
 
 // ---- the games, then the features ----
 
@@ -119,6 +122,8 @@ tests.builder.viewer({
   probe: createProbe(FORMATS, context),
   /** The renderer's DDS reader, for the tests that decode a texture in the page. */
   DdsImage,
+  /** The texture window of every game: open, whose textures, how reading them went. */
+  textureWindow: textureWindow.state,
 });
 
 const sc2viewer = tests.viewer();

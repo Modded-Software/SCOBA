@@ -1,13 +1,13 @@
 // Drag a record from its gallery list into the view. While dragged, a
-// preview (the ghost) stands on the ground under the pointer; a drop adds
-// the record there, looking as the preview did. The gallery rows call it
-// through ui.setRowDrag.
+// preview stands on the ground under the pointer; a drop adds the record
+// there, looking as the preview did. The gallery rows call it through
+// ui.setRowDrag. The tests read the preview as sc2viewer.state().dragPreview.
 
-import type { AddOptions, GhostState, Vec2 } from '../../core/types';
+import type { AddOptions, DragPreviewState, Vec2 } from '../../core/types';
 import type { Feature } from '../../core/context';
 import type { GameCategory, Placement, ViewerInstance } from '../../core/plugin';
 
-interface Ghost {
+interface Preview {
   category: GameCategory;
   id: string;
   /** The game's placement, once the record is read: its variant and angle are what a drop keeps. */
@@ -28,13 +28,13 @@ export const dragFeature: Feature = {
     const dragType = (category: GameCategory): string => `application/x-${game().id}-${category.noun}`;
 
     /** While a record is dragged: its preview; otherwise null. */
-    let ghost: Ghost | null = null;
+    let preview: Preview | null = null;
 
     /** Load the dragged record's model, hidden until the drag is over the ground. */
-    async function startGhost(category: GameCategory, id: string): Promise<void> {
-      endGhost();
-      const mine: Ghost = { category, id, placement: null, instance: null, pick: Math.random(), at: null };
-      ghost = mine;
+    async function startPreview(category: GameCategory, id: string): Promise<void> {
+      endPreview();
+      const mine: Preview = { category, id, placement: null, instance: null, pick: Math.random(), at: null };
+      preview = mine;
       status.pending++;
       try {
         const record = await api.record(category.id, id);
@@ -44,7 +44,7 @@ export const dragFeature: Feature = {
         if (placement.asBackdrop) return;
         mine.placement = placement;
         const model = await render.loadModel(api.modelUrl(placement.file, record.dataset), api.pathSolver(record.dataset));
-        if (ghost !== mine) return; // the drag ended meanwhile
+        if (preview !== mine) return; // the drag ended meanwhile
         if (!model) throw new Error('cannot load ' + placement.file);
         const instance = model.addInstance();
         const sequence = game().restSequence(instance.sequences);
@@ -59,7 +59,7 @@ export const dragFeature: Feature = {
         instance.hide();
         instance.attach(scene);
         mine.instance = instance;
-        placeGhost();
+        placePreview();
       } catch (error) {
         status.setStatus(error instanceof Error ? error.message : String(error), { failure: true });
         throw error;
@@ -69,19 +69,19 @@ export const dragFeature: Feature = {
     }
 
     /** Show the preview at its ground point, or hide it when it has none. */
-    function placeGhost(): void {
-      if (!ghost || !ghost.instance || !ghost.placement) return;
-      if (!ghost.at) {
-        ghost.instance.hide();
+    function placePreview(): void {
+      if (!preview || !preview.instance || !preview.placement) return;
+      if (!preview.at) {
+        preview.instance.hide();
         return;
       }
-      ghost.instance.setLocation([ghost.at[0], ghost.at[1], ghost.placement.height]);
-      ghost.instance.show();
+      preview.instance.setLocation([preview.at[0], preview.at[1], preview.placement.height]);
+      preview.instance.show();
     }
 
-    function endGhost(): void {
-      if (ghost && ghost.instance) ghost.instance.detach();
-      ghost = null;
+    function endPreview(): void {
+      if (preview && preview.instance) preview.instance.detach();
+      preview = null;
     }
 
     /** dragstart on a list row: `noun` names the record's category ("unit"). */
@@ -92,7 +92,7 @@ export const dragFeature: Feature = {
         e.dataTransfer.setData('text/plain', record.name);
         e.dataTransfer.effectAllowed = 'copy';
       }
-      startGhost(category, record.id).catch(status.reportFailure);
+      startPreview(category, record.id).catch(status.reportFailure);
     }
 
     // Drop a record on the view: it lands on the ground under the pointer.
@@ -108,17 +108,17 @@ export const dragFeature: Feature = {
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
       canvas.classList.add('drop');
       camera.setPointer(camera.eventGround(e));
-      if (ghost) {
-        ghost.at = camera.pointer();
-        placeGhost();
+      if (preview) {
+        preview.at = camera.pointer();
+        placePreview();
       }
     });
     canvas.addEventListener('dragleave', () => {
       canvas.classList.remove('drop');
       camera.setPointer(null);
-      if (ghost) {
-        ghost.at = null;
-        placeGhost();
+      if (preview) {
+        preview.at = null;
+        placePreview();
       }
     });
     canvas.addEventListener('drop', (e) => {
@@ -127,9 +127,9 @@ export const dragFeature: Feature = {
       if (!category) return;
       e.preventDefault();
       // The preview's choices, when it got as far as making them.
-      const seen = ghost && ghost.placement ? ghost.placement : null;
-      const pick = ghost ? ghost.pick : undefined;
-      endGhost();
+      const seen = preview && preview.placement ? preview.placement : null;
+      const pick = preview ? preview.pick : undefined;
+      endPreview();
       const point = camera.eventGround(e);
       if (!point) {
         status.setStatus('drop it on the ground, not above the horizon');
@@ -144,20 +144,20 @@ export const dragFeature: Feature = {
     });
 
     /** The drag preview, for the tests: null when nothing is dragged. */
-    function ghostState(): GhostState | null {
-      if (!ghost) return null;
+    function previewState(): DragPreviewState | null {
+      if (!preview) return null;
       return {
-        kind: ghost.category.noun,
-        unit: ghost.id,
-        variation: ghost.placement ? ghost.placement.variant : null,
-        rot: ghost.placement ? ghost.placement.rot : 0,
-        loaded: Boolean(ghost.instance),
-        shown: Boolean(ghost.instance && ghost.instance.shown),
-        location: ghost.instance ? Array.from(ghost.instance.location) : null,
+        kind: preview.category.noun,
+        unit: preview.id,
+        variation: preview.placement ? preview.placement.variant : null,
+        rot: preview.placement ? preview.placement.rot : 0,
+        loaded: Boolean(preview.instance),
+        shown: Boolean(preview.instance && preview.instance.shown),
+        location: preview.instance ? Array.from(preview.instance.location) : null,
       };
     }
 
-    ui.setRowDrag({ start: startDrag, end: endGhost });
-    testApi.statePart('ghost', ghostState);
+    ui.setRowDrag({ start: startDrag, end: endPreview });
+    testApi.statePart('dragPreview', previewState);
   },
 };

@@ -12,8 +12,8 @@ import { installTextures } from './textures';
 export function installSc2Page(context: GameContext): GameParts {
   const textures = installTextures(context);
   const hd = installHd(context);
-  const gameTestApi = { textureWindow: textures.textureWindow, hdAssets: hd.hdAssets };
-  // The SC2 adds (unit, doodad, hd, variation) and the texture window, for the tests.
+  const gameTestApi = { hdAssets: hd.hdAssets };
+  // The SC2 adds (unit, doodad, hd, variation) and the HD sets, for the tests.
   context.testApi.viewer({ ...sc2SceneApi(context.scene), ...gameTestApi });
   // The landmark name of a unit query (features/addall).
   context.testApi.app({ ...gameTestApi, filterName });

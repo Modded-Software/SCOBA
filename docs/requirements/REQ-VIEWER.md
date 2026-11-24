@@ -1,12 +1,14 @@
 # REQ-VIEWER: Asset Viewer
 
-**Date:** 2026-11-23
+**Date:** 2026-11-24
 **Status:** Stated by the operator on 2026-11-23 where the source column says
 "operator". The rows marked "today" restate what the viewer already does, in
 game-neutral words. The rows marked "derived" follow from the operator's goal
-and are the author's wording. Awaiting operator review of this text. Not built
-in the form this text demands. The specification lists the state of each
-requirement.
+and are the author's wording. Awaiting operator review of this text. Partly
+built: two games (sc2, ghost) and two formats (m3, nod) run through the
+extension points. Open: R-VIEW-2 and 3 (shown only by a game or format
+added without a core edit), R-VIEW-10, 11 and 14 (step 8). SPEC-VIEWER
+section 12 lists the state of each requirement.
 
 ## 1. Scope
 

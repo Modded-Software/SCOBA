@@ -4,6 +4,8 @@
 // reported. Needs GHOST_PATH. Engine state only: probes and the pick.
 import { test, expect } from '@playwright/test';
 import { open, add, probe, itemOf, frameItem, triangleHits } from './ghost.mjs';
+// Built by src/tools/build.ts from src/games/ghost/server/container.ts.
+import { packContainer } from '../build/ghost-container.mjs';
 
 const ratio = ({ hit, miss }) => hit / Math.max(1, hit + miss);
 
@@ -34,11 +36,12 @@ test('an unknown shader and a material no step finds: not drawn, named in undraw
     const id = await add(page, `3D/Models/${name}.nod`);
     await frameItem(page, id);
     const groups = await probe(page, 'groups', id);
-    const named = groups.filter((g) => g.undrawn !== null && g.undrawn.endsWith(why));
+    const named = groups.filter((g) => g.why === why);
     expect(named.length, `${name}: ${JSON.stringify(groups)}`).toBeGreaterThan(0);
     const item = await itemOf(page, id);
     for (const g of named) {
       expect(g.kind).toBeNull();
+      expect(g.undrawn).toBe(`${g.material}: ${why}`);
       // Negative: a named group is not drawn.
       expect(g.drawnLast).toBe(false);
       expect(item.undrawn).toContain(`group ${g.index} ${g.undrawn}`);
@@ -59,22 +62,14 @@ test('a sky material: not drawn and not named', async ({ page }) => {
   expect(sky.length, JSON.stringify(groups)).toBeGreaterThan(0);
   const item = await itemOf(page, id);
   for (const g of sky) {
-    expect([g.kind, g.undrawn, g.drawnLast]).toEqual([null, null, false]);
+    expect([g.kind, g.undrawn, g.why, g.drawnLast]).toEqual([null, null, null, false]);
     expect(item.undrawn.some((u) => u.startsWith(`group ${g.index} `))).toBe(false);
   }
   expect(errors).toEqual([]);
 });
 
-/** A NODX container whose JSON is { error }: what the server sends for a model NODExport refused. */
-function refusedBody(message) {
-  let json = JSON.stringify({ error: message });
-  while (json.length % 4) json += ' ';
-  const head = Buffer.alloc(12);
-  head.write('NODX', 0, 'latin1');
-  head.writeUInt32LE(1, 4);
-  head.writeUInt32LE(json.length, 8);
-  return Buffer.concat([head, Buffer.from(json, 'latin1')]);
-}
+/** A container whose JSON is { error }: what the server sends for a model NODExport refused, by the server's own code. */
+const refusedBody = (message) => packContainer({ error: message });
 
 test('negative: without its shader file a model does not load, and the file is named', async ({ page }) => {
   await page.route('**/shaders/nod.frag', (route) => route.fulfill({ status: 404, body: 'gone' }));

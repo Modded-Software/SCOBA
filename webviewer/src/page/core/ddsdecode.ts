@@ -34,11 +34,20 @@ function pngUrl(width: number, height: number, rgba: Uint8ClampedArray<ArrayBuff
   });
 }
 
-/** Fetch a DDS file and decode its first level; `name` is how the texture is listed. */
-export async function decodeDds(url: string, name: string, urls: string[]): Promise<DecodedTexture> {
+/** Fetch a file; its status as the error when it is not there. */
+export async function fetchTexture(url: string): Promise<Response> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${response.status}`);
-  const bytes = await response.arrayBuffer();
+  return response;
+}
+
+/** Fetch a DDS file and decode its first level; `name` is how the texture is listed. */
+export async function decodeDds(url: string, name: string, urls: string[]): Promise<DecodedTexture> {
+  return decodeDdsBytes(await (await fetchTexture(url)).arrayBuffer(), name, urls);
+}
+
+/** Decode the first level of a fetched DDS file. */
+export async function decodeDdsBytes(bytes: ArrayBuffer, name: string, urls: string[]): Promise<DecodedTexture> {
   const image = new DdsImage();
   image.load(bytes);
   const { width, height, data } = image.getMipmap(0);

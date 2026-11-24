@@ -1,6 +1,6 @@
-// What a nod model draws with, per mesh group, for a game's texture
-// window (SPEC-VIEWER-GHOST 7): the material, its shader, how the group
-// is drawn or why not, and its texture file.
+// What a nod model draws with, per mesh group, for the texture window
+// (SPEC-VIEWER-GHOST 8): the material, its shader, how the group is drawn
+// or why not, and its texture file.
 
 import type { ViewerModel } from '../../page/core/plugin';
 import { NodView } from './adapter';
@@ -12,10 +12,10 @@ export interface NodLook {
   /** solid, cutout, add, blend; null when the group is not drawn. */
   kind: string | null;
   /** Why it is not drawn, when it is named (materials.ts); null when drawn or left out unnamed. */
-  undrawn: string | null;
+  why: string | null;
   twoSided: boolean;
   triangles: number;
-  /** The texture file, relative to the build; null when the group has none. */
+  /** The material's texture file, relative to the build, drawn or not; null when it has none. */
   texture: string | null;
 }
 
@@ -27,9 +27,9 @@ export function nodLooks(model: ViewerModel): NodLook[] {
     material: g.material,
     shader: g.look.shader,
     kind: g.look.kind,
-    undrawn: g.look.undrawn,
+    why: g.look.why,
     twoSided: g.look.twoSided,
     triangles: g.indexCount / 3,
-    texture: g.look.texture,
+    texture: g.look.textureFile,
   }));
 }

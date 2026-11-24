@@ -1,5 +1,5 @@
-// What Ghost adds to the shared page (SPEC-VIEWER 6.6): the texture
-// window (textures.ts), opened by a double-click, and its test member. No
+// What Ghost adds to the shared page (SPEC-VIEWER 6.6): its textures in
+// the shared texture window (textures.ts), opened by a double-click. No
 // item options, no menu toggles, no second grid glow (SPEC-VIEWER-GHOST 6,
 // 7: no capabilities). main.ts installs this.
 
@@ -8,7 +8,6 @@ import { installGhostTextures } from './textures';
 
 export function installGhostPage(context: GameContext): GameParts {
   const textures = installGhostTextures(context);
-  context.testApi.viewer({ ghostTextureWindow: textures.ghostTextureWindow });
   return {
     itemReady: async () => {},
     glowOf: () => 0,

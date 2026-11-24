@@ -98,7 +98,7 @@ export function createState({ render, scene, camera: view, games, testApi }: Pic
       sceneInstances: render.scene.grid.cells.reduce((n, cell) => n + cell.instances.length, 0),
       grid: render.ground.enabled,
       pointer: view.pointer()?.slice() ?? null,
-      // What the features add (pick, ghost).
+      // What the features add (pick, dragPreview).
       ...testApi.stateParts(),
       // Displacement batches the last frame drew (sky and units).
       displacedBatches: render.displacedBatches(),

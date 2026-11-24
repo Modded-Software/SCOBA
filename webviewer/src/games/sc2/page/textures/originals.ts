@@ -3,7 +3,7 @@
 // decode (page/core/ddsdecode.ts) reads them.
 
 import type { GameContext } from '../../../../page/core/context';
-import { decodeDds, type DecodedTexture } from '../../../../page/core/ddsdecode';
+import { decodeDdsBytes, fetchTexture, type DecodedTexture } from '../../../../page/core/ddsdecode';
 import { messageOf } from '../../../../page/core/dom';
 import { SC2 } from '../game';
 
@@ -13,10 +13,15 @@ export type OriginalsDeps = Pick<GameContext, 'render' | 'api'>;
 /** One decoded texture, as the texture viewer page takes it. */
 export type Original = DecodedTexture;
 
-/** One texture file, decoded: its colour, and its alpha when that is not one value all over. */
-function decode({ api }: OriginalsDeps, source: string, dataset: string, urls: string[]): Promise<Original> {
-  if (!source.endsWith('.dds')) return Promise.reject(new Error('not a DDS file'));
-  return decodeDds(String(api.pathSolver(dataset, SC2)(source)), source.split('\\').pop() ?? source, urls);
+/**
+ * One texture file, decoded: its colour, and its alpha when that is not one
+ * value all over. Fetched first, so a missing file says its status; then a
+ * name that is not a ".dds" file is refused (a layer may name other files).
+ */
+async function decode({ api }: OriginalsDeps, source: string, dataset: string, urls: string[]): Promise<Original> {
+  const response = await fetchTexture(String(api.pathSolver(dataset, SC2)(source)));
+  if (!source.endsWith('.dds')) throw new Error('not a DDS file');
+  return decodeDdsBytes(await response.arrayBuffer(), source.split('\\').pop() ?? source, urls);
 }
 
 /** Every texture a model file names, decoded; and the ones that failed, with why. */

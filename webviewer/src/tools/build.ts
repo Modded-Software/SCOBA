@@ -1,6 +1,7 @@
 // Bundle the page with the renderer from the ref repo (ref/mdx-m3-viewer),
 // and the server. Writes public/vendor/renderer.js (browser,
-// src/page/main.ts), build/server.js (Node, src/server/main.ts) and
+// src/page/main.ts), build/server.js (Node, src/server/main.ts),
+// build/ghost-container.mjs (the Ghost model container, for the tests) and
 // build/m3parser.cjs (the M3 parser alone, for Node tools).
 //
 // Every change to the library is a commit in the ref repo. The build
@@ -90,6 +91,16 @@ await build({
   target: 'node24',
   packages: 'external',
   sourcemap: true,
+});
+
+// The Ghost model container alone, for the tests (tests/ghost-look.spec.mjs).
+await build({
+  ...common,
+  entryPoints: ['src/games/ghost/server/container.ts'],
+  outfile: 'build/ghost-container.mjs',
+  platform: 'node',
+  format: 'esm',
+  target: 'node24',
 });
 
 await build({

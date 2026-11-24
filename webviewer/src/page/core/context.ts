@@ -31,6 +31,7 @@ import type { Ground } from './render/ground';
 import type { Outline } from './render/outline';
 import type { PickBuffer } from './render/pickbuffer';
 import type { Read, Setting } from './settings';
+import type { TextureWindow } from './texturewindow';
 
 /** The games: what main.ts registered, the server lists, and the gallery shows (core/games.ts, core/datasets.ts). */
 export interface GameRegistry {
@@ -266,7 +267,7 @@ export interface UiService {
 export interface TestApiBuilder {
   app(members: Readonly<Record<string, unknown>>): void;
   viewer(members: Readonly<Record<string, unknown>>): void;
-  /** A key of sc2viewer.state() that a feature knows (pick, ghost). */
+  /** A key of sc2viewer.state() that a feature knows (pick, dragPreview). */
   statePart(name: string, read: () => unknown): void;
   /** Every state part, read now (features/inspect). */
   stateParts(): Record<string, unknown>;
@@ -283,6 +284,8 @@ export interface FeatureContext {
   readonly events: EventBus<ViewerEvents>;
   readonly api: ApiClient;
   readonly ui: UiService;
+  /** The one texture window; a game opens it on its textures (core/texturewindow.ts). */
+  readonly textureWindow: TextureWindow;
   readonly testApi: TestApiBuilder;
 }
 

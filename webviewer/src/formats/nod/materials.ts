@@ -21,8 +21,12 @@ export interface GroupLook {
   kind: DrawKind | null;
   /** The texture file, relative to the build; null when not drawn. */
   texture: string | null;
-  /** Why it is not drawn, when it is named (R-VIEW-81); null otherwise. */
+  /** Why it is not drawn, when it is named (R-VIEW-81), as "<material>: <why>"; null otherwise. */
   undrawn: string | null;
+  /** The `why` of `undrawn` alone; null when `undrawn` is. */
+  why: string | null;
+  /** The material's texture file, drawn or not; null when it names none or it is missing. */
+  textureFile: string | null;
   /** The `shader` value, lower case; '' when the material has none. */
   shader: string;
   /** `cull cull_off`: both sides drawn. Else back faces are culled. */
@@ -31,16 +35,16 @@ export interface GroupLook {
 
 /** The look of a group whose material is `name`; `material` is its export, undefined when the export has none. */
 export function lookOf(name: string, material: NodMaterial | undefined): GroupLook {
-  const named = (why: string, shader = ''): GroupLook => ({ kind: null, texture: null, undrawn: `${name}: ${why}`, shader, twoSided: false });
+  const textureFile = material?.textures['texture'] ?? null;
+  const named = (why: string, shader = ''): GroupLook => ({ kind: null, texture: null, undrawn: `${name}: ${why}`, why, shader, twoSided: false, textureFile });
   if (!material) return named('no material in the export');
   if (material.step === 'none') return named('found by no step of the material lookup');
   const value = (key: string): string => (material.properties.find(([k]) => k.toLowerCase() === key)?.[1] ?? '').toLowerCase();
   const shader = value('shader');
   const twoSided = value('cull') === 'cull_off';
-  if (shader.startsWith('constraint_') || HIDDEN.includes(shader)) return { kind: null, texture: null, undrawn: null, shader, twoSided };
+  if (shader.startsWith('constraint_') || HIDDEN.includes(shader)) return { kind: null, texture: null, undrawn: null, why: null, shader, twoSided, textureFile };
   const kind: DrawKind | null = SOLID.includes(shader) ? 'solid' : CUTOUT.includes(shader) ? 'cutout' : ADD.includes(shader) ? 'add' : BLEND.includes(shader) ? 'blend' : null;
   if (kind === null) return named(`shader ${shader} is not drawn`, shader);
-  const texture = material.textures['texture'];
-  if (texture === undefined || texture === null) return named('its texture file is missing', shader);
-  return { kind, texture, undrawn: null, shader, twoSided };
+  if (textureFile === null) return named('its texture file is missing', shader);
+  return { kind, texture: textureFile, undrawn: null, why: null, shader, twoSided, textureFile };
 }

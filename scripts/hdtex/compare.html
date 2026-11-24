@@ -263,6 +263,7 @@ function describe() {
   const facts = [["seam", number(current.seam_source, 2)]];
   if (current.users.length) { facts.push(["used by", current.users.join(", ")]); }
   if (current.note) { facts.push(["shown", current.note]); }
+  for (const fact of current.facts || []) { facts.push(fact); }
   cards.append(card("Original", current.before_size.join("x"), facts));
   for (const layer of current.layers) {
     cards.append(card(layer.variant, layer.size.join("x"), [
@@ -408,8 +409,10 @@ let problems = []; // textures of the user the model viewer could not show
 
 // The model viewer, which shows this page in a window, hands over the
 // textures a unit's model uses, decoded: [{ texture, format, size, planes:
-// [{ plane, image }] }]. A texture the page has no entry for gets one per
-// plane, with the original alone. `failed` names the ones it could not decode.
+// [{ plane, image }], facts? }]. A texture the page has no entry for gets
+// one per plane, with the original alone; `facts` ([name, value] pairs,
+// such as what a model draws with it) go on its card. `failed` names the
+// ones it could not show.
 function addOriginals(user, textures, failed) {
   const known = new Set(PAIRS.map((item) => item.texture.toLowerCase()));
   for (const texture of textures) {
@@ -425,7 +428,7 @@ function addOriginals(user, textures, failed) {
       PAIRS.push({
         id: `${texture.texture.toLowerCase().replace(/\.[^.]+$/, "")}.${plane.plane}`,
         source: "original", category: ORIGINAL_ONLY, users: [user], texture: texture.texture, role: "", plane: plane.plane,
-        format: texture.format, before: plane.image, thumb: plane.image, before_size: texture.size, note: "", seam_source: null, layers: [],
+        format: texture.format, before: plane.image, thumb: plane.image, before_size: texture.size, note: "", seam_source: null, layers: [], facts: texture.facts || [],
       });
     }
   }
@@ -437,7 +440,7 @@ function addOriginals(user, textures, failed) {
 window.hdtex = {
   addOriginals,
   problems: () => [...problems],
-  entries: () => visible.map((index) => ({ id: PAIRS[index].id, texture: PAIRS[index].texture, plane: PAIRS[index].plane, category: PAIRS[index].category, size: PAIRS[index].before_size, layers: PAIRS[index].layers.length, image: PAIRS[index].before })),
+  entries: () => visible.map((index) => ({ id: PAIRS[index].id, texture: PAIRS[index].texture, plane: PAIRS[index].plane, category: PAIRS[index].category, size: PAIRS[index].before_size, layers: PAIRS[index].layers.length, image: PAIRS[index].before, facts: PAIRS[index].facts || [] })),
   state: () => ({
     user: state.user,
     embed,

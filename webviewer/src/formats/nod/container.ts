@@ -1,5 +1,6 @@
 // The model container the Ghost server serves for a .nod file
-// (src/games/ghost/server/exporter.ts; SPEC-VIEWER-GHOST 7):
+// (src/games/ghost/server/container.ts; head constants in src/shared/nodx.ts;
+// SPEC-VIEWER-GHOST 7):
 //   "NODX", uint32 version 1, uint32 JSON length, the JSON, then the binary
 //   of `NODExport nod`: vertices of 52 bytes (float3 position, float3
 //   normal, float2 uv, uint8[4] model bone numbers, float[4] weights), then
@@ -7,8 +8,8 @@
 // The JSON is { model, materials }, or { error } for a model the exporter
 // refused. Every field is checked; a body that is not one is refused.
 
-export const MAGIC = 'NODX';
-const VERSION = 1;
+import { NODX_MAGIC as MAGIC, NODX_VERSION as VERSION } from '../../shared/nodx';
+
 export const STRIDE = 52;
 
 export interface NodBone {

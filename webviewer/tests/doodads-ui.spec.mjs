@@ -210,19 +210,19 @@ test('dragging a doodad shows its preview; the drop keeps the previewed variatio
   await page.mouse.move(box.x + 700, box.y + 450, { steps: 8 });
   await idle(page);
   await page.mouse.move(box.x + 701, box.y + 450, { steps: 2 });
-  const ghost = (await state(page)).ghost;
-  console.log('ghost', JSON.stringify(ghost));
-  expect(ghost).toMatchObject({ kind: 'doodad', unit: 'ZerusTree', shown: true });
-  expect(ghost.variation).toBeGreaterThanOrEqual(0);
+  const preview = (await state(page)).dragPreview;
+  console.log('dragPreview', JSON.stringify(preview));
+  expect(preview).toMatchObject({ kind: 'doodad', unit: 'ZerusTree', shown: true });
+  expect(preview.variation).toBeGreaterThanOrEqual(0);
   // Negative: the preview is not a scene item.
   expect((await state(page)).items).toEqual([]);
   const at = await page.evaluate(([x, y]) => window.sc2viewer.groundUnder(x, y), [701, 450]);
   await page.mouse.up();
   await idle(page);
   const s = await state(page);
-  expect(s.ghost).toBe(null);
+  expect(s.dragPreview).toBe(null);
   expect(s.items).toHaveLength(1);
-  expect(s.items[0]).toMatchObject({ doodad: 'ZerusTree', variation: ghost.variation, rot: ghost.rot });
+  expect(s.items[0]).toMatchObject({ doodad: 'ZerusTree', variation: preview.variation, rot: preview.rot });
   expect(s.items[0].x).toBeCloseTo(at[0], 2);
   expect(s.items[0].y).toBeCloseTo(at[1], 2);
 });

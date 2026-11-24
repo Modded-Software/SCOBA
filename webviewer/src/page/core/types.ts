@@ -121,7 +121,8 @@ export interface AddAllRun {
   skipped: string[];
 }
 
-export interface GhostState {
+/** The record being dragged into the view (features/drag): sc2viewer.state().dragPreview. */
+export interface DragPreviewState {
   kind: string;
   unit: string;
   variation: number | null;

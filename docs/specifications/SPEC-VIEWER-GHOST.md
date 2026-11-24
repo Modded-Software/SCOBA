@@ -27,7 +27,10 @@ wrong so far.
 
 State:
 
-- **[plan]**: not in the code. Everything in this document is [plan].
+- **[today]**: in the code. Sections 3 to 8 are [today], with the tests of
+  section 9, except where a row says [plan] and except section 11.
+- **[plan]**: not in the code: section 11, and the open points of section
+  12 that say "not designed" or "not planned".
 
 Source of a fact:
 
@@ -593,7 +596,7 @@ Probes for tests (`window.sc2viewer.probe('nod', name, ...)`):
 | Probe | Gives |
 | --- | --- |
 | `layout` | vertex and index counts, stride, bones, material names, group table |
-| `groups` | per group: material, kind drawn (null: not drawn), shader, triangles, texture and whether it loaded, why it is not drawn, whether the last frame drew it |
+| `groups` | per group: material, kind drawn (null: not drawn), shader, triangles, texture and whether it loaded, why it is not drawn (`undrawn` "material: why", and `why` alone), whether the last frame drew it |
 | `bones` | the clip, the playhead, bone matrices and globals now |
 | `positions` | skinned positions now (Y mirrored), every n-th vertex; the file's positions of the same vertices |
 | `axes` | per triangle: whether its corners face its vertex normals, as drawn and unmirrored |
@@ -614,9 +617,10 @@ tags, motion flags, markers.
 | Part | Holds |
 | --- | --- |
 | `server/build.ts` | the settings (`GHOST_PATH`, `NODSDK_EXPORT`), the index of the build, its signature, file lookup without regard to case |
-| `server/exporter.ts` | NODExport runs, the cache `<cache>/ghost/<signature>/`, the model container |
+| `server/exporter.ts` | NODExport runs, the cache `<cache>/ghost/<signature>/` |
+| `server/container.ts` | the model container |
 | `server/catalog.ts` | the two categories from `NODExport catalog`, filters and search |
-| `server/index.ts` | `startGhost`: the game for the protocol |
+| `server/index.ts` | `startGhost`: the game for the protocol; `GHOST_GAME`, the id, label and tab text that `server/main.ts` also lists when the game cannot start |
 | `page/` | `place`, `describe`, the rest animation, the gallery parts, the texture window (`textures.ts`) |
 | `shared/` | the actor and model record types |
 
@@ -624,21 +628,29 @@ tags, motion flags, markers.
 by material name, answered as JSON (a control character in the name gives
 400); `animation` by clip name, answered as the clip's JSON.
 
-The texture window (operator 2026-11-24): a double-click on a gallery
-row, an instance row or an instance in the view opens it on that model.
-One card per material its groups use, in group order: the shader, how it
-is drawn (kind, both sides) or why not (the `undrawn` reason; "hidden by
-its shader" for `sky` and the rest of that list), the groups and
-triangles, the texture file, and the texture decoded in the page with
-core's DDS decode (`page/core/ddsdecode.ts`): format, size, colour, and
-alpha when it is not one value. A texture that does not load is named on
-its card. The format gives the cards' data (`formats/nod/looks.ts`). Test
-member: `sc2viewer.ghostTextureWindow()`.
+The texture window (operator 2026-11-24): the one window of core
+(`page/core/texturewindow.ts`), the same as SC2's, on the bare texture
+viewer page (`/texture-viewer.html`, served from
+`scripts/hdtex/compare.html` with no HD pairs). A double-click on a
+gallery row (actors and models), an instance row or an instance in the
+view opens it on that model. `page/textures.ts` hands the page every
+texture file the model's materials name, decoded with core's DDS decode
+(`page/core/ddsdecode.ts`): colour, and alpha when it is not one value.
+Each entry carries one fact per material that uses it: shader, how it is
+drawn (kind, both sides) or why not (`GroupLook.why`; "hidden by its
+shader" for `sky` and the rest of that list), groups and triangles. The
+format gives that data (`formats/nod/looks.ts`). A material without a
+texture file, and a texture that does not load, are in the page's
+problems. Test members: `sc2viewer.textureWindow()` and the page's
+`hdtex.entries()`, `hdtex.problems()`.
 
-The model container that `/api/ghost/file` serves: `NODX`, uint32
-version 1, uint32 JSON length (the JSON padded with spaces to 4 bytes),
-the JSON `{model, materials}` or `{error}`, then the binary of
-`NODExport nod`.
+The model container that `/api/ghost/file` serves
+(`server/container.ts`; the head constants in `src/shared/nodx.ts`, read
+by the format too): `NODX`, uint32 version 1, uint32 JSON length (the
+JSON padded with spaces to 4 bytes), the JSON `{model, materials}` or
+`{error}`, then the binary of `NODExport nod`. The build also writes
+`build/ghost-container.mjs` from it, so `ghost-look.spec` makes its
+refused container with the server's code.
 
 When `GHOST_PATH` is not set, when it has no `3D/Models`, or when
 NODExport is not built, the game is listed as not available with the
@@ -698,10 +710,12 @@ On the server and in the page (Playwright, `webviewer/tests/`):
 | Key joins | `ghost-anim` | more joins hold with `t` in frames than in 0..1; raw counts logged | the 0..1 reading |
 | Shared model | `ghost-anim` | `zerg_critter` and `zergling_burrowed`, one file: each lists its own set's motions | the two lists differ |
 | Clips left out | `ghost-anim` | a clip answered 404 and the foreign `deathblown` are left out; the status says 2; the console names the 404 one. Alone, the foreign clip is named with the bone it lacks | one sequence of the dropped name fewer |
-| Materials | `ghost-look` | a `cutout` group of `AR_Plant_Vine_01` is picked inside fewer of its triangles than the solid `crate` (5 points lower or more); `sky` is not drawn and not named | an unknown shader (`dynamic`) and a material no step finds (`pCannon_collide`) are named and not drawn |
+| Materials | `ghost-look` | a `cutout` group of `AR_Plant_Vine_01` is picked inside fewer of its triangles than the solid `crate` (5 points lower or more); `sky` is not drawn and not named (`undrawn` and `why` null) | an unknown shader (`dynamic`) and a material no step finds (`pCannon_collide`) are not drawn; the probe's `why` is the reason and `undrawn` is "material: why" |
 | Material lookup | `ghost-mix` | `zergling` and `crate` draw every group with a texture; `undrawn` is empty | |
 | Refusal | `ghost-look`; `ex-1` | a container with `{error}` fails to load with its message; the changed files of `ex-1` are refused by NODExport | another model of the game still loads |
-| Texture window | `ghost-textures` | a double-click on `crate` in the view: one card, `chestCrate2`, solid, its texture decoded at its size; a gallery row double-click on `zerg_critter`: `zergling.nod`, every texture read; the cutout card of `AR_Plant_Vine_01` has an alpha plane; `dynamic`, `pCannon_collide` and sky give their reasons in words | the SC2 window stays closed; nothing is added; a material without a texture has no picture; a texture answered 404 is named on its card, and the instance keeps its own |
+| Texture window | `ghost-textures` | the shared window on `/texture-viewer.html`. A double-click on `crate` in the view: one texture, its colour plane first, the fact `material chestCrate2` "drawn solid, groups 0", the picture at the size listed, on the page's card. An actor row (`zerg_critter`) and a models row (`zergling`): `zergling.nod`, the same textures, each with its facts. An instance row of `AR_Plant_Vine_01`: the cutout texture has colour and alpha planes. `dynamic`, `pCannon_collide` and sky give their reasons in words. Layout, measured: the frame fills the window; the list rows have height and do not overlap; the card fits the page | the SC2 page is not opened; nothing is added; a material without a texture file has no entry, only its problem line; a texture answered 404 is named in the problems, and the instance keeps its own |
+| Gallery | `ghost-gallery` | the preview names an actor and its model; its add button and a row dragged into the view add it; the `motion` and `skin` buttons give the server's counts; add all adds the listed actors with the landmark `Animated Ghost actors "zergling"`; the game's list names; a dataset reload with nothing changed keeps the signature and the summary | one click adds nothing; a cancelled add all adds nothing; no skinned model under `rigid`; no toast; the SC2 tab names its list its own way; GET and an unknown dataset are refused |
+| Contract | `contract` (core) | the shared routes and the shared page flow, run for each available game | unknown ids, categories and datasets give 404 |
 | Shader files | `ghost-look` | | `nod.frag` answered 404: the model fails with "nod: 404 /shaders/nod.frag" and is not added |
 | Capabilities | `ghost-mix` | the SC2 unit's row has the team control, its state `hd` | the Ghost row has no team control, its state no `hd` |
 | Two games | `ghost-mix` | a unit and a model: selected together, moved, copied, pasted off the view, stored with their games, back after a reload | each comes back as its own game's file |
@@ -716,13 +730,26 @@ On the server and in the page (Playwright, `webviewer/tests/`):
 - Whether a `cutout`, `add` or `blend` group looks right: the tests prove
   only which groups are drawn and where the pick finds them.
 - The game tabs, the gallery of this game and its filter buttons.
-- The look of the texture window and its cards.
+- The look of the texture window on this game's textures (the tests
+  measure only that its parts do not overlap).
 
 ## 11. Deferred
 
-Not in this change: model bundles (`.nmb`, `.nnb`), levels (`.nil`,
-`.nsd`, `.npd`), packed textures (`.xpr`), collision meshes (`.noc`),
-terrain, the special shader looks of 4.4, sound.
+Not in this change, each [plan] and not designed:
+
+| Item | State |
+| --- | --- |
+| Icons in the gallery | The build's `UI` textures are not matched to templates; no rule is known. |
+| Sky backdrops | Models with `sky` materials (O-GHOST-6). `/api/ghost/backdrops` answers an empty page. |
+| Level props | The props of a level (`.nil`, `.nsd`, `.npd`) as a category (O-GHOST-6). |
+| Other formats | Model bundles (`.nmb`, `.nnb`), packed textures (`.xpr`), collision meshes (`.noc`), terrain, sound. |
+| Shader looks | Environment maps, detail, glow and bump layers of 4.4; `ghostsuit` and `cloak` are drawn solid. |
+| Motion flags | Kept as data, not acted on (O-GHOST-4). |
+| Foreign clips | Clips for another model's bones are left out and named (O-GHOST-15). |
+| DXT2 | 10 textures refused by the library's reader (O-GHOST-5). A reader would be a commit in the library fork with its own test. |
+
+The research points of section 12 (O-GHOST-1, 3, 7, 8, 10 to 14) are
+open as written there; this change does not answer them.
 
 ## 12. Open points
 
