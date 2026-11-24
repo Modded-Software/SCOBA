@@ -10,6 +10,10 @@
 #            pins file matches the current pins.
 #   upscale  clone upscale-on-arc next to this repo (if absent), check that it
 #            holds the pinned commit, and run its `make install`.
+#   nodsdk   build the parser library of webviewer/ref/nodsdk-scghost (the
+#            StarCraft: Ghost formats; cloned at its pin by make viewer-install)
+#            into webviewer/build/nodsdk. Needs the GLM headers: sudo make
+#            init.
 #   check    report every dependency as OK, MISSING or OPTIONAL. Exit 1 when a
 #            required one is missing.
 #
@@ -20,6 +24,8 @@
 #   STORMEX_PATH      PATH for the stormex build: the system compiler and linker
 #                     (default: /usr/local/bin:/usr/bin:/bin)
 #   UPSCALE_DIR       the upscale-on-arc checkout (default: ../upscale-on-arc)
+#   NODSDK_SRC        the nodsdk-scghost checkout (default: webviewer/ref/nodsdk-scghost)
+#   NODSDK_BUILD      its build folder (default: webviewer/build/nodsdk)
 #   BNET_PREFIX, SC2_DIR, STEAM_ROOT  as in scripts/launch-scoba.sh
 set -euo pipefail
 
@@ -45,6 +51,11 @@ STORMEX_SRC="${STORMEX_SRC:-$ROOT_DIR/.venv/src/stormex}"
 STORMEX_PATH="${STORMEX_PATH:-/usr/local/bin:/usr/bin:/bin}"
 STORMEX_PATCHES="$ROOT_DIR/scripts/setup/patches/stormex"
 UPSCALE_DIR="${UPSCALE_DIR:-$(dirname "$ROOT_DIR")/upscale-on-arc}"
+NODSDK_SRC="${NODSDK_SRC:-$ROOT_DIR/webviewer/ref/nodsdk-scghost}"
+NODSDK_BUILD="${NODSDK_BUILD:-$ROOT_DIR/webviewer/build/nodsdk}"
+NODSDK_LIB="$NODSDK_BUILD/cmake/libasset_parsers.a"
+NODSDK_SURVEY="$NODSDK_BUILD/cmake/NODSurvey"
+GLM_HEADER=/usr/include/glm/glm.hpp
 STEAM_ROOT="${STEAM_ROOT:-$HOME/.var/app/com.valvesoftware.Steam/data/Steam}"
 BNET_PREFIX="${BNET_PREFIX:-$HOME/Games/battlenet-prefix}"
 SC2_DIR="${SC2_DIR:-$BNET_PREFIX/pfx/drive_c/Program Files (x86)/StarCraft II}"
@@ -175,6 +186,21 @@ cmd_upscale() {
     make -C "$UPSCALE_DIR" install
 }
 
+# The parser library only: no viewer, no editors, no tests. The compiler
+# and linker come from STORMEX_PATH, as for stormex: GLM is a system package.
+cmd_nodsdk() {
+    local cmake
+    cmake="$(command -v cmake)" || die "cmake is not installed"
+    [[ -d "$NODSDK_SRC/.git" ]] || die "no nodsdk-scghost checkout at $NODSDK_SRC; run: make viewer-install"
+    [[ -f "$GLM_HEADER" ]] || die "GLM headers missing ($GLM_HEADER); run: sudo make init"
+    PATH="$STORMEX_PATH" "$cmake" -S "$NODSDK_SRC" -B "$NODSDK_BUILD" -DCMAKE_BUILD_TYPE=Release \
+        -DNODSDK_BUILD_VIEWER=OFF -DNODSDK_BUILD_EDITORS=OFF -DBUILD_TESTING=OFF
+    PATH="$STORMEX_PATH" "$cmake" --build "$NODSDK_BUILD" --target asset_parsers NODSurvey --parallel "$(nproc)"
+    [[ -f "$NODSDK_LIB" ]] || die "the build did not write $NODSDK_LIB"
+    [[ -x "$NODSDK_SURVEY" ]] || die "the build did not write $NODSDK_SURVEY"
+    say "built the nodsdk parser library and NODSurvey: $NODSDK_BUILD/cmake"
+}
+
 # --- check -------------------------------------------------------------------
 
 MISSING=0
@@ -217,6 +243,16 @@ cmd_check() {
     else
         report MISSING stormex "$STORMEX is absent, not $STORMEX_TAG, or not built from the current pins; run: make install-deps"
     fi
+    if [[ -f "$GLM_HEADER" ]]; then
+        report OK glm "$GLM_HEADER"
+    else
+        report MISSING glm "GLM headers, needed to build the nodsdk parsers; run: sudo make init"
+    fi
+    if [[ -f "$NODSDK_LIB" && -x "$NODSDK_SURVEY" ]]; then
+        report OK nodsdk "$NODSDK_BUILD/cmake"
+    else
+        report MISSING nodsdk "the nodsdk parser library is not built; run: make install-deps"
+    fi
     if [[ -f "$SC2_DIR/StarCraft II.exe" ]]; then
         report OK starcraft2 "$SC2_DIR"
     else
@@ -253,6 +289,7 @@ case "${1:-}" in
     venv) cmd_venv ;;
     stormex) cmd_stormex ;;
     upscale) cmd_upscale ;;
+    nodsdk) cmd_nodsdk ;;
     check) cmd_check ;;
-    *) die "usage: deps.sh venv|stormex|upscale|check" ;;
+    *) die "usage: deps.sh venv|stormex|upscale|nodsdk|check" ;;
 esac

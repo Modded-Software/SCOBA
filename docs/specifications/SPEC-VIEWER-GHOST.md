@@ -1,9 +1,11 @@
 # SPEC-VIEWER-GHOST: StarCraft: Ghost in the Asset Viewer
 
-**Date:** 2026-11-23
-**Status:** Design. Nothing is built. No parser exists and no test has run.
+**Date:** 2026-11-24
+**Status:** Design. Built: the NOD, NAD, NSA, NMS, NOT and DDS surveys
+(section 9), on the parsers of our nodsdk-scghost fork. Nothing in the
+viewer yet.
 Every file layout below carries its source. Only the rows marked [checked]
-were measured on the real files. A row marked [docs] or [scripts] is a
+or [survey] were measured on the real files. A row marked [docs] or [scripts] is a
 claim by someone else and may be wrong: section 4.3 lists those found
 wrong so far.
 **Requirements:** [REQ-VIEWER](../requirements/REQ-VIEWER.md)
@@ -30,6 +32,10 @@ Source of a fact:
 - **[checked]**: measured on the game build of this machine on 2026-11-23,
   with shell tools (file lists, byte dumps, counts). The survey tools of
   section 9 must repeat every such fact.
+- **[survey]**: asserted over every file of its kind by
+  `webviewer/scripts/ghost-survey.sh` (section 9), on 2026-11-24.
+- **[sdk]**: the parsers of the OpenNOD SDK, `nodsdk-scghost`, in our fork
+  `Modded-Software/nodsdk-scghost` (upstream `aknavj/nodsdk-scghost`).
 - **[docs]**: the format notes in `webviewer/ref/nodsdk-docs` at commit
   `f2110b37`. Not confirmed here.
 - **[scripts]**: the helper scripts of the `GhostPC` project on this machine
@@ -42,9 +48,18 @@ Source of a fact:
 
 Rules for the sources:
 
-- Neither ref repository states a license. They are read. No code is
-  copied from them. `scripts/ref-docs-setup.sh` clones both at the pinned
-  commits; both are outside git.
+- `nodsdk-docs` and `scghost-rev` state no license. They are read. No code
+  is copied from them.
+- `nodsdk-scghost` is GPL v3. The Ghost readers are its parsers. Our
+  changes are commits in our fork, not patches. The viewer uses them only
+  through programs built in the fork (`NODSurvey` today), run as separate
+  processes. No SDK code is copied into this repository.
+- `nodsdk-radiant` (BSD, LGPL, GPL by file) is read for the level formats
+  only.
+- `webviewer/scripts/ref-docs-setup.sh` clones all four at pinned commits,
+  outside git. `scripts/setup/deps.sh nodsdk` builds the fork's parser
+  library and `NODSurvey` into `webviewer/build/nodsdk`. GLM, which the
+  parsers need, comes from `sudo make init`.
 - No game data is in the repository (R-VIEW-9). Tests that need bytes of a
   game file read them from the build at run time.
 
@@ -98,7 +113,7 @@ All numbers are little-endian [docs]. Names are matched without case
 | Vertex sets | at 0x24, per set: uint32 type, uint32 count. Room for 4. | [scripts]; fits the 4 files |
 | Index count | uint32 at 0x44 | [scripts]; fits the 4 files |
 | Header size | 92 bytes. The first material name starts at 92. | [checked] on 4 files |
-| Material names | 32 bytes each, zero-padded. A name of 32 letters has no zero at its end: 7 of the 1340 names are that long. The name is the 32 bytes up to the first zero. | [docs]; fits the 4 files; lengths [checked] on all files |
+| Material names | 32 bytes each, zero-padded. A name of 32 letters has no zero at its end: 26 of the 1340 names are that long. The name is the 32 bytes up to the first zero. | [docs]; fits the 4 files; lengths [survey] |
 | Bones | 64 bytes each: float3 position, 3x3 turn (rows), float3 offset, then 4 bytes; parent at +62, 0xFF for none | [docs], [scripts]; the parent byte [checked] on the 32 bones of `zergling.nod`: each names an earlier bone, the first has 0xFF |
 | Bone links | the bytes at +60 and +61 look like the next bone under the same parent and the first bone under this one, 0xFF for none. Not read. | [checked] on `zergling.nod`; the meaning is a reading, not a source |
 | Vertices | per set, `count` x stride. Type 0: 32 bytes (position, normal, uv). Type 1: 36 (plus a uint32 palette index). Type 2: 48 (plus 3 float weights and 4 uint8 palette indices; the fourth weight is 1 minus the sum). | [docs]; strides fit the 4 files |
@@ -136,6 +151,29 @@ A group with one bone uses the rigid vertex type; the others use the
 skinned types. The model has 32 bones. This fits. It is five groups of two
 files, not a survey (O-GHOST-1).
 
+The survey over all 1401 files [survey], with the parser of [sdk] (it has
+the group fields at 0x21, 0x35 and 0x36, as above) and two additions of our
+fork: it reads the blend data and the colours after the markers, and says
+how many bytes the layout explains.
+
+| Fact | Over all files |
+| --- | --- |
+| Read | 1401 of 1401, each to its last byte |
+| Vertex sets | 1650: type 0 1379, type 1 154, type 2 102, type 3 11, type 4 3, type 5 1 |
+| Mesh groups | 7747. 9 are empty: no index, no vertex. |
+| Bones per group | 0 to 20. 0 only in the 9 empty groups. |
+| Rigid and skinned | every group with geometry and at most one bone is on a rigid set (type 0 or 3); every other one on a skinned set |
+| Palettes | every valid entry is a bone of the model |
+| Bone parents | each an earlier bone, or 0xFF |
+| Indices | per model, the strip and list counts of all groups and detail levels add up to the index count |
+| Vertices | per vertex set, the group vertex counts (0x1C) add up to the set's count |
+| Index range | every detail level 0 index is below its group's vertex count |
+| Blend data | count 0 in every file |
+| Colours | in 4 files |
+| Group byte 0x1E | 0, or 2 in 21 groups |
+| Group bytes 0x1F, 0x37 | always 0 |
+| Group byte 0x20 | 0 to 255, 0 in 2198 groups. Not a count the survey matches. |
+
 ### 4.2 NAD, the animation clip
 
 | Part | Layout | Source |
@@ -154,8 +192,26 @@ files, not a survey (O-GHOST-1).
 The 4 clips [checked]: `zergling_stand`, `zergling_walk`, `zergling_run`,
 `zergling_idle`. Read with this layout, each ends on its last byte. The
 second field is never above 31; the model has 32 bones. The third is 0 or
-1. `walk` and `run` hold 4 tags each. A survey over all 1551 clips is
-still to run (O-GHOST-3).
+1. `walk` and `run` hold 4 tags each.
+
+The survey over all 1551 clips [survey], with the parser of [sdk] (12-byte
+track header, as above) and our fork's count of the bytes read:
+
+| Fact | Over all clips |
+| --- | --- |
+| Read | 1551 of 1551, each to its last byte; version 4; flags 0 |
+| Tracks | 36472: 33382 turn, 3090 position. No other kind. |
+| Keys | 669847, in frame order, inside the clip length |
+| Bone numbers | 0 to 127. Whether each fits its model is a check of the motion set, not of the clip. |
+| Last key | holds not-a-number in all 36472 tracks |
+| Other keys | 6 hold not-a-number |
+| Tags | 2168 |
+| Shape tracks | none |
+| Key joins | the curve of a key, at its end, against the next key's value (error below 0.001, relative): `t` in frames: 587182 of 588762 turn joins, 44396 of 44607 position joins. `t` from 0 to 1: 314874 and 23315. `t` in seconds: 95032 and 14985. So `t` is in frames. |
+
+The joins that miss in frames (1580 turn, 211 position) are not explained.
+An angle that wraps by 360 degrees between keys would be one reason; the
+survey does not test it.
 
 Bone pose, per bone, parents first [docs]:
 
@@ -168,7 +224,7 @@ What decides the open parts of this:
 | Part | Source | Decided by |
 | --- | --- | --- |
 | The meaning of `offset` | [docs] | the rest-pose test of section 9: a wrong reading moves the vertices |
-| The range of `t` inside a key | [docs] | the key-join test of section 9: the curve of one key must end where the next key starts |
+| The range of `t` inside a key | [docs] | Decided [survey]: frames since the key (4.2, key joins). |
 | The order of the three angles | [docs]. [code] has one builder of a turn from three angles, `mathMatrix_Build34`: the X angle first, then Y, then Z, on row vectors. [code] does not show that a clip uses it. | no test of this document. A pose with no clip has all angles 0, so the rest-pose test cannot see the order. It is an operator check (section 10, O-GHOST-9). |
 
 ### 4.3 Where the sources are wrong
@@ -179,19 +235,27 @@ What decides the open parts of this:
 | [docs] collision meshes are in `3D/Collision` | The build has no such folder. The 419 `.noc` files are in `3D/Models`. |
 | [docs] NSA keys `diffuseMap`, `shaderType`, `blendMode` | The 52 files use `texture` (3570 times), `shader` (4231), `blend` (39). `diffuseMap` and `shaderType` do not occur. |
 | [docs] file counts ("about 80 models") | 1401 `.nod`. |
-| [docs] a material is found in the NSA files | Only 907 of the 1340 material names are in an NSA file. [code] goes on to a `.nas` file, then to the texture of the same name (4.4). |
+| [docs] a material is found in the NSA files | Only 908 of the 1340 material names are in an NSA file [survey]. [code] goes on to a `.nas` file, then to the texture of the same name (4.4). |
 | [code] mesh group: bone count at 0x2A, palette at 0x2D, vertex set at 0x42 | A palette at 0x2D and a vertex set at 0x42 lie past the end of a 56-byte group. The files have them at 0x21 and 0x36, and the bone count at 0x35 (4.1). |
 
 ### 4.4 NSA, the materials
 
 Text. A name, then `{`, `key value` lines, `}` [docs]. A line that starts
-with `;` or `/` is a comment [code]; the files hold 542 and 147 such lines
-[checked].
+with `;` or `/`, after blanks, is a comment [code]. The files hold 689 such
+lines [survey]. The [sdk] reader read them as names and properties; our
+fork skips them.
 
-What the 52 files hold [checked]: 4835 material blocks with 1467 different
-names. 812 names are defined more than once. The files have 4905 `{` and
-4904 `}`: one block is not closed. The reader reports it with file and
-line; it does not guess where the block ends.
+What the 52 files hold [survey], comments skipped: 4492 material blocks
+with 1439 different names. 792 names are defined more than once. 4905 `{`
+and 4905 `}`: every block closes. (A count by text search, comments
+included, found one block not closed: a commented brace.) A block that
+does not close is reported with file and line.
+
+Nested blocks: only the 83 `dynamic` materials hold them (passes and
+stages). Their lines stay flat properties of the material. 4 of them have
+more than 32 properties, the reader's limit; 8 lines are dropped and
+counted. `dynamic` is not drawn (table below), so no drawn material loses
+a property.
 
 Which definition of a name counts:
 
@@ -216,15 +280,14 @@ How a NOD material name becomes a material, in this order [code]:
 4. else the material `dflt`.
 
 What this means for the 1340 different material names of the 1401 models
-(4922 material slots) [checked]:
+(4922 material slots) [survey], by `NODMaterialLibrary` of our fork:
 
 | Names | Slots | Found as |
 | --- | --- | --- |
-| 907 | 3014 | step 1. 694 of them are in `3dmaterials.nsa`. |
-| 355 | 1749 | step 3. Not in any archive; a texture of that name exists. `zergling` and `chestCrate2` (`crate.nod`) are two of them. |
-| 78 | 159 | none of steps 1 to 3 from the files counted: `collide`, `clothattach`, `fakeclip`, `deflector`, `*_physclip`, `hitregion_user*`, and the 7 names cut at 32 letters |
-
-Step 2 was not counted over all names: the build has 2 `.nas` files.
+| 908 | 3015 | step 1 |
+| 0 | 0 | step 2. The build has 2 `.nas` files; no model names them. |
+| 353 | 1744 | step 3. Not in any archive; a texture of that name exists. `zergling` and `chestCrate2` (`crate.nod`) are two of them. |
+| 79 | 163 | none of steps 1 to 3: `collide`, `clothattach`, `fakeclip`, `deflector`, `*_physclip`, `hitregion_user*`, `dflt` itself, and names cut at 32 letters |
 
 A group of the last row is not drawn, and named. These names read as
 physics and hit shapes; the viewer does not put `dflt` on them. Whether
@@ -242,9 +305,9 @@ found by name in `3D/Materials` and the folders under `Materials`, with
 `.dds` added [docs]. Text after the first blank in the value is dropped
 [docs].
 
-Textures on disk [checked]:
+Textures on disk [survey]:
 
-- The archives name 837 different textures. 792 exist as a file. 45 do
+- The archives name 870 different textures. 824 exist as a file. 46 do
   not; one of them is `$lightmap`, which is not a file name.
 - 8 texture names exist in more than one folder. `MaterialDirs.txt` lists
   12 folders, `Materials\Colors` first. The viewer takes `3D/Materials`
@@ -254,8 +317,8 @@ Textures on disk [checked]:
 - Materials named `hitRegion_*` and `attach_*` use `texture dflt`.
 
 `shader` values and how they are drawn. The grouping is [docs]; whether it
-looks right is an operator check. The files use 64 different values in
-4231 `shader` lines [checked]. The four most used: `glossenvmap` (875), `normal` (704), `glow`
+looks right is an operator check. The files use 64 different values
+[survey] in 4231 `shader` lines [checked]. The four most used: `glossenvmap` (875), `normal` (704), `glow`
 (598), `masked` (286).
 
 | `shader` | Drawn as |
@@ -290,6 +353,21 @@ Flags seen [checked]: `noloop`, `endpause`, `variable`, `lowpriority`,
 `resetmotion`, `movespeed`, and one misspelt `lowpriotity`. The viewer
 keeps them as data. It acts on none of them (O-GHOST-4).
 
+The survey over all 163 files [survey], with the parser of [sdk] and our
+fork's counts of the lines it did not keep:
+
+| Fact | Over all files |
+| --- | --- |
+| Read | 163 of 163. 100 have a model of the same name. |
+| Entries | 2027. None without a clip file; none with more than 8 flags. |
+| Flags | the 14 spellings above |
+| Clip match | 1073 exact; 676 only without case; 216 only with `.nad` appended to a name without an extension; 62 entries name 20 clips that are not in `3D/Anims` |
+| Case twins | no two clips of `3D/Anims` differ only by case |
+
+The viewer finds a clip without case, and appends `.nad` to a name that
+has no extension. That the game does so is not confirmed; without the
+second rule 216 entries would have no clip.
+
 ### 4.6 NOT, the templates
 
 | Part | Layout | Source |
@@ -307,6 +385,21 @@ keeps them as data. It acts on none of them (O-GHOST-4).
 different `.nms` files, 155 of which exist [checked, by text search]. The
 id that carries the motion set is not in the notes; the files give it
 (id 13, above).
+
+The survey [survey], with `NOTDatabase` of [sdk], each template expanded
+through its `basedon` chain:
+
+| Fact | Over all templates |
+| --- | --- |
+| Read | 1224, every property at full width; no name defined twice |
+| Expansion | 1223 expand. `scourge_track` has an empty `basedon` and is refused. |
+| Ids past the table | 90 properties use ids 177 to 184. The engine table of [sdk] has 177 entries (ids 0 to 176). What they are is not known. |
+| Model (id 4) | 858 templates, 509 names: 757 exact, 49 only without case, 12 only with `.nod` appended, 40 missing |
+| Motion set (id 13) | 426 templates, all with a model; 167 names: 361 exact, 9 only without case, 34 only with `.nms` appended, 22 missing |
+
+The text search counts names anywhere in the file; the survey counts the
+value each template has after expansion. The two do not count the same
+thing.
 
 ### 4.7 DDS, the textures
 
@@ -328,6 +421,20 @@ The 1116 files of `3D/Materials` [checked]: 745 DXT1, 307 DXT5, 54 DXT3,
   have the same pixel flags as the 4 above; their bit counts and masks
   were not read. `dds-survey` reads them.
 - Over both places: 10 DXT2 files are refused; 79 files have no code.
+
+The survey over every `.dds` of the build [survey], with the parser of
+[sdk]. That parser checks only the header; the survey sizes the payload
+from the format, the mip levels, the cube faces and the depth.
+
+| Fact | Over all 2275 files (the two places above and `UI`) |
+| --- | --- |
+| Read | 2275 of 2275 |
+| Formats | DXT1 1257, DXT2 10, DXT3 329, DXT5 590, 32-bit ARGB 89 (all with masks `FF0000`, `FF00`, `FF`, `FF000000`). No other. |
+| Shape | every side a power of two; 39 cube maps, all with 6 faces; 2 volumes |
+| Size | none shorter than its levels; 1735 exact; 540 with bytes over: 263 by 8, 212 by 16, the rest by other amounts |
+
+What the bytes over hold is not known (O-GHOST-12). A reader takes the
+declared levels and leaves the rest.
 
 ### 4.8 Axes
 
@@ -383,6 +490,11 @@ Item options: none.
 
 `src/formats/nod/`. Our own code, on the renderer library's model and
 instance base classes. It is not a change to the library.
+
+The bytes are read by the parsers of [sdk], not by viewer code: a program
+of our fork exports what the module draws (planned: an export mode next to
+`NODSurvey`; the form of its output is not designed). The refusals below
+are made there.
 
 - The library's base classes give: the place in the scene, culling by a
   sphere, show and hide, the texture loader, and the calls `renderOpaque`
@@ -448,21 +560,37 @@ answered as JSON; `animation` by clip name.
 
 ## 9. Tests
 
-All [plan]. Each needs `GHOST_PATH`. Without it the run fails and names
-the setting; it does not pass.
+All [plan] but the surveys. Each needs `GHOST_PATH`. Without it
+the run fails and names the setting; it does not pass.
 
 Survey tools (R-VIEW-92), one per format, over every file:
 
 | Tool | Reports |
 | --- | --- |
-| `nod-survey` | every file read to its last byte; counts per vertex type; every file refused, with the reason |
-| `nad-survey` | every clip read to its last byte; track kinds; clips refused |
-| `nsa-survey` | every key and `shader` value with its count; blocks not closed; names defined more than once; materials whose texture is missing; for every NOD material name, the step of 4.4 that finds it |
-| `nms-survey` | every flag with its count; clips named and missing |
-| `not-survey` | every id with its count; templates refused; models and motion sets named and missing |
-| `dds-survey` | every compression kind with its count; files refused |
+| `nod-survey` | [today]: `NODSurvey nod`, in our fork (`src/tools/nodsurvey/`). Every file read to its last byte; counts per vertex type; the group fields of 4.1; every file refused, with the reason. |
+| `nad-survey` | [today]: `NODSurvey nad`. Every clip read to its last byte; track kinds; NaN keys; key joins under three readings of `t`; clips refused. |
+| `nsa-survey` | [today]: `NODSurvey nsa`. Every key and `shader` value with its count; comment lines; blocks not closed; nested blocks; properties dropped; names defined more than once; textures missing; for every NOD material name, the step of 4.4 that finds it |
+| `nms-survey` | [today]: `NODSurvey nms`. Every flag with its count; entries without a clip or past 8 flags; the clip match class of every entry |
+| `not-survey` | [today]: `NODSurvey not`. Every id with its count; templates refused; the model and motion set of every template and their match class |
+| `dds-survey` | [today]: `NODSurvey dds`. Every format with its count; mip levels, cube faces, depth; files refused, short, or with bytes over |
 
 The counts of sections 3 and 4 become assertions of these tools.
+`webviewer/scripts/ghost-survey.sh` (`make viewer-ghost-survey`) runs the
+six surveys and asserts the facts of 4.1, 4.2, 4.4, 4.5, 4.6 and 4.7: 45
+assertions. Reports go to `webviewer/build/surveys/`. A survey exits 1
+when it finds a file it cannot read, or a fact it reports as not clean
+(`not`: the refused template and the ids past the table); the assertions
+decide the run.
+
+| Run | Result |
+| --- | --- |
+| `gs-1` (2026-11-24, fork at `6925432` plus the uncommitted survey) | 17 of 17 passed, exit 0 |
+| `gs-neg` | a build folder of 3 models and 2 clips, one of each cut by bytes and one with bytes added: 6 failed, exit 1. Cut files refused, added bytes reported. |
+| `gs-unset` | `GHOST_PATH=`: stops with the setting named, exit 1 |
+| `gs-2` (2026-11-24, fork at `883fc9d`) | 45 of 45 passed, exit 0 |
+| `gs-neg-nms` | a copy of `3D/Motions` with a line of a name only and a line of 9 flags: the 4 NMS checks of entries and flags failed, exit 1 |
+| `gs-neg-not` | `Global.not` cut to half: refused ("invalid NOT template offsets"); all 6 NOT checks failed, exit 1 |
+| `gs-neg-dds` | one texture cut to 40000 bytes: reported short (39872 of 87392 bytes); the DDS checks failed, exit 1 |
 
 In the page:
 
@@ -501,9 +629,9 @@ terrain, the special shader looks of 4.4, sound.
 
 | ID | Point |
 | --- | --- |
-| O-GHOST-1 | The fields inside a mesh group were checked on 5 groups of 2 files (4.1). `nod-survey` over all 1401 files and the rest-pose test decide. Until both pass, G2 is not done. The bytes at 0x1E to 0x20 and 0x37 are not understood. |
+| O-GHOST-1 | `nod-survey` passed over all 1401 files (4.1). The rest-pose test is still to run; until it passes, G2 is not done. The bytes at 0x1E (0 or 2) and 0x20 (0 to 255) are not understood; 0x1F and 0x37 are always 0. |
 | O-GHOST-2 | Closed by the review: id 13 names the motion set (4.6). `not-survey` asserts it. |
-| O-GHOST-3 | The NAD track header was checked on 4 clips of one model (4.2). `nad-survey` checks all 1551. Shape tracks are not read. |
+| O-GHOST-3 | Closed by `nad-survey`: the 12-byte track header reads all 1551 clips to their last byte, and `t` is in frames (4.2). No clip has shape tracks. Open: 1791 key joins of 633369 miss in frames, not explained. |
 | O-GHOST-4 | Motion flags are not acted on. `noloop` could set how a motion starts. Not decided. |
 | O-GHOST-5 | 10 DXT2 textures are refused. DXT2 is the DXT3 layout with colour already multiplied by alpha; a reader for it would be a change to the library. Not planned. The 79 files without a code are expected to load; no test has loaded one. |
 | O-GHOST-6 | More categories were asked for "where feasible". Candidates: backdrops from models with `sky` materials, and the props of a level. Neither is designed. |
@@ -511,4 +639,6 @@ terrain, the special shader looks of 4.4, sound.
 | O-GHOST-8 | Two orders are this document's choice: the 41 archives that `shaderlist.txt` does not list, and the texture folders. A wrong order gives a model the wrong material or texture where a name is defined twice. Not testable without the game's picture. |
 | O-GHOST-9 | The order of the three angles of a turn (4.2) has no programmatic test. |
 | O-GHOST-10 | Template ids 166 and 172 hold model names. What they are for is not known. |
-| O-GHOST-11 | 78 material names (159 slots) are found by no step of 4.4. They are not drawn. |
+| O-GHOST-11 | 79 material names (163 slots) are found by no step of 4.4. They are not drawn. |
+| O-GHOST-12 | 540 textures have bytes past their declared levels, most often one block. What they hold is not known. |
+| O-GHOST-13 | 90 template properties use ids 177 to 184, past the engine table of [sdk]. `scourge_track` has an empty `basedon`. Both are reported; neither is read. |

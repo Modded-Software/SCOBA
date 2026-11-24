@@ -59,7 +59,7 @@ Two control modes have a contract and a state document:
 | `src/SCOBA.SC2Map/scripts/app/` | Galaxy modules. |
 | `scripts/` | Build, validation, launch, and test tooling. |
 | `scripts/testkit/` | In-game test harness and profiles. |
-| `scripts/setup/deps.sh` | Dependency checks and installs behind `make init`, `install-deps`, `install-hdtex`. |
+| `scripts/setup/deps.sh` | Dependency checks and installs behind `make deps-check`, `install-deps`, `install-hdtex`. |
 | `deploy/ansible/` | Ansible playbook for the model viewer dev server (systemd user service). |
 | `scripts/setup/patches/stormex/` | Patches `deps.sh` applies to the stormex source before it builds. |
 | `.venv/src/stormex/` | The stormex source checkout built by setup. Not in git. |
@@ -74,9 +74,10 @@ Two control modes have a contract and a state document:
 
 | Command | Does |
 | --- | --- |
-| `make init` | Report every dependency as `OK`, `MISSING` or `OPTIONAL`. Installs nothing. Exit 1 if a required one is missing. |
+| `sudo make init` | Root steps only, run first. Installs the system packages with apt (`SYSTEM_PACKAGES` in the Makefile: `libglm-dev`). Refuses to run as a user. |
+| `make deps-check` | Report every dependency as `OK`, `MISSING` or `OPTIONAL`. Installs nothing. Exit 1 if a required one is missing. |
 | `make install` | `make install-deps`. Git hooks are separate: `sudo make install-hooks`. |
-| `make install-deps` | `uv sync --frozen`, build `tools/stormex`, `make viewer-install`, then `make init`. |
+| `make install-deps` | `uv sync --frozen`, build `tools/stormex`, `make viewer-install`, build the nodsdk parser library, then `make deps-check`. Needs `sudo make init` first. |
 | `make install-hdtex` | Clone `../upscale-on-arc` if absent, check its pinned commit, run its `make install`. Only the HD texture cache build needs it. |
 
 All steps are in `scripts/setup/deps.sh` and can run again safely.
@@ -198,7 +199,8 @@ lsfg-vk layer. It does not install lsfg-vk.
   GE-Proton is looked up under the Flatpak Steam's `compatibilitytools.d`.
 - `uv` for the Python tooling.
 - `git`, `node` and `npm`, `cmake`, a C++ compiler, and the FUSE 2 headers.
+- The GLM headers, for the nodsdk parser library: `sudo make init`.
 - Optional: lsfg-vk, for the `SCOBA FG` entry. An Intel Arc GPU, for the HD
   texture cache build.
 
-`make init` checks all of these.
+`make deps-check` checks all of these.

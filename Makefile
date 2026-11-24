@@ -41,13 +41,20 @@ help: ## Show this help
 # =============================================================================
 DEPS := $(SCRIPT_BASH) $(REPO_ROOT)/scripts/setup/deps.sh
 
-.PHONY: preflight init install install-ci install-deps install-hdtex install-hooks sync
+.PHONY: preflight init deps-check install install-ci install-deps install-hdtex install-hooks sync
 preflight: ## Verify environment
 	test -d "$(CI_DIR)" || { echo "ERROR: CI directory not found at $(CI_DIR)" >&2; exit 1; }
 	test -f "$(CI_DIR)/scripts/reinstall-hooks" || { echo "ERROR: reinstall-hooks missing" >&2; exit 1; }
 	echo "Preflight OK"
 
-init: ## Report system dependencies (tools, StarCraft II, GE-Proton, lsfg-vk); installs nothing
+# System packages: libglm-dev, the GLM headers the nodsdk parser library needs.
+SYSTEM_PACKAGES := libglm-dev
+
+init: ## Root steps only, run first: sudo make init. Installs the system packages (apt)
+	test "$$(id -u)" -eq 0 || { echo "ERROR: make init holds only root steps; run: sudo make init" >&2; exit 1; }
+	apt-get install -y $(SYSTEM_PACKAGES)
+
+deps-check: ## Report every dependency (tools, StarCraft II, GE-Proton, lsfg-vk, GLM, nodsdk); installs nothing
 	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) check
 
 install: install-deps ## Full install: deps (hooks install separately, root-only: sudo make install-hooks)
@@ -56,10 +63,11 @@ install: install-deps ## Full install: deps (hooks install separately, root-only
 install-ci: install-deps ## CI install: deps only, no hooks
 	:
 
-install-deps: ## Install project dependencies: uv env, stormex (built from source), model viewer, then check
+install-deps: ## Install project dependencies: uv env, stormex (built from source), model viewer, nodsdk parsers, then check
 	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) venv
 	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) stormex
 	$(MAKE) -C "$(REPO_ROOT)" viewer-install
+	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) nodsdk
 	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) check
 
 install-hdtex: ## Clone ../upscale-on-arc (if absent) and install it, for the HD texture cache build
@@ -136,7 +144,7 @@ WEBVIEWER := WEBVIEWER_DIR="$(WEBVIEWER_DIR)" $(SCRIPT_BASH) $(WEBVIEWER_DIR)/sc
 
 VIEWER_ANSIBLE := cd "$(REPO_ROOT)/deploy/ansible" && ansible-playbook viewer-dev.yml
 
-.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-serve viewer-provision viewer-unprovision viewer-start viewer-stop viewer-restart viewer-status viewer-logs viewer-test viewer-test-all
+.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-ghost-survey viewer-serve viewer-provision viewer-unprovision viewer-start viewer-stop viewer-restart viewer-status viewer-logs viewer-test viewer-test-all
 viewer-install: ## Model viewer: install node deps and the test browser, build the renderer
 	$(WEBVIEWER)/setup.sh
 
@@ -151,6 +159,9 @@ viewer-dataset: ## Model viewer: make a new dataset from the full stock data (NA
 
 viewer-survey: ## Model viewer: report which unit models the parser can read
 	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/m3-survey.sh
+
+viewer-ghost-survey: ## Model viewer: read every StarCraft: Ghost model, clip, material, motion set, template and texture (NODSurvey) and assert SPEC-VIEWER-GHOST 4
+	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/ghost-survey.sh
 
 viewer-serve: ## Model viewer: run the server in the foreground (PORT=n beside the service)
 	$(WEBVIEWER)/start.sh
