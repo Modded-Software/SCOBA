@@ -189,4 +189,31 @@ export default class NodInstance extends ModelInstance {
     for (const group of groups) this.draw(shader, group, group.look.kind === 'cutout' ? 'cutout' : 'solid');
     gl.uniform4f(at(shader, 'u_pick'), 0, 0, 0, 0);
   }
+
+  /**
+   * The triangle edges of the drawn groups as lines in one flat colour,
+   * posed like the triangles (the same vertex shader). The depth and blend
+   * state are the caller's. Returns how many lines it drew.
+   */
+  renderEdges(r: number, g: number, b: number): number {
+    const groups = this.model.drawn(this.solidOnly ? OPAQUE : [...OPAQUE, ...TRANSLUCENT]);
+    const edges = groups.length ? this.model.edges() : null;
+    if (!edges) return 0;
+    const gl = this.model.viewer.gl;
+    const shader = nodShader(this);
+    this.use(shader);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, edges.buffer);
+    gl.uniform4f(at(shader, 'u_pick'), r, g, b, 1);
+    // Solid: no cut-out, so every line pixel is drawn.
+    gl.uniform1f(at(shader, 'u_kind'), KIND_CODE.solid);
+    let lines = 0;
+    for (const group of groups) {
+      const range = edges.ranges.get(group.index);
+      if (!range || !range.count) continue;
+      gl.drawElements(gl.LINES, range.count * 2, gl.UNSIGNED_INT, range.first * 8);
+      lines += range.count;
+    }
+    gl.uniform4f(at(shader, 'u_pick'), 0, 0, 0, 0);
+    return lines;
+  }
 }

@@ -7,6 +7,7 @@
 import Model from '@renderer/viewer/model';
 import type { HandlerResourceData } from '@renderer/viewer/handlerresource';
 import Texture from '@renderer/viewer/texture';
+import { edgePairs } from '@renderer/viewer/edges';
 import { readContainer, STRIDE, type NodBone, type NodData } from './container';
 import { lookOf, type DrawKind, type GroupLook } from './materials';
 // The instance class is made here (addInstance); instance.ts names this class as a type only.
@@ -23,6 +24,12 @@ export interface DrawGroup {
   texture: Texture | null;
 }
 
+/** A group's edges in the model's edge buffer: the first edge and how many. */
+export interface EdgeRange {
+  first: number;
+  count: number;
+}
+
 export default class NodModel extends Model {
   readonly data: NodData;
   readonly groups: DrawGroup[];
@@ -36,6 +43,12 @@ export default class NodModel extends Model {
   readonly skinned: boolean;
   readonly undrawn: string[];
   readonly textureFiles: string[];
+  /** The element indices as drawn, kept to make the edge buffer from (edges()). */
+  private readonly indices: Uint32Array;
+  /** Every group's edges, each once, made on the first edges() call; null before. */
+  private edgeBuffer: WebGLBuffer | null = null;
+  /** Each group's place in the edge buffer, in edges, by group index. */
+  private readonly edgeRanges = new Map<number, EdgeRange>();
 
   constructor(bytes: Uint8Array, resourceData: HandlerResourceData) {
     super(resourceData);
@@ -67,6 +80,7 @@ export default class NodModel extends Model {
     if (!this.viewer.webgl.ensureExtension('OES_element_index_uint')) throw new Error(`${name}: no 32-bit index support`);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, turned, gl.STATIC_DRAW);
+    this.indices = turned;
 
     const byName = new Map(data.materials.map((m) => [m.name, m]));
     this.undrawn = [];
@@ -121,6 +135,32 @@ export default class NodModel extends Model {
   /** The groups drawn as one of `kinds`, with geometry. */
   drawn(kinds: readonly DrawKind[]): DrawGroup[] {
     return this.groups.filter((g) => g.look.kind !== null && kinds.includes(g.look.kind) && g.indexCount > 0);
+  }
+
+  /**
+   * The edge buffer: every group's triangle edges, each once, as line
+   * element pairs, and each group's range in it. Made on the first call,
+   * so a model never drawn with edges never pays for them.
+   */
+  edges(): { buffer: WebGLBuffer; ranges: ReadonlyMap<number, EdgeRange> } | null {
+    if (!this.edgeBuffer) {
+      const lists = this.groups.map((g) => edgePairs(this.indices, g.firstIndex, g.indexCount));
+      const array = new Uint32Array(lists.reduce((n, list) => n + list.length, 0));
+      let at = 0;
+      lists.forEach((list, index) => {
+        this.edgeRanges.set(index, { first: at / 2, count: list.length / 2 });
+        array.set(list, at);
+        at += list.length;
+      });
+      if (!array.length) return null;
+      const gl = this.viewer.gl;
+      const buffer = gl.createBuffer();
+      if (!buffer) throw new Error('nod: no WebGL buffer for the edges');
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, array, gl.STATIC_DRAW);
+      this.edgeBuffer = buffer;
+    }
+    return { buffer: this.edgeBuffer, ranges: this.edgeRanges };
   }
 
   addInstance(): NodInstance {

@@ -33,6 +33,11 @@ export interface ViewerEvents {
   /** One frame: after the update, before the draw; dt in ms. */
   frame: { dt: number };
   /**
+   * One frame: the units' scene and its post passes are drawn, the mouse-over
+   * outline not yet. A listener may draw over the canvas with the scene's depth.
+   */
+  'scene-drawn': { width: number; height: number };
+  /**
    * Startup, once the games and the first game's datasets are read. A
    * listener hands its work to `wait`; the page is ready when all of it is done.
    */

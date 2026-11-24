@@ -1,7 +1,7 @@
 From ff5a4944809304f3c0e8d3e714bb0d6cf01f4684 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 19:54:54 +0200
-Subject: [PATCH 24/55] m3: no diffuse layer means a black base colour
+Subject: [PATCH 24/56] m3: no diffuse layer means a black base colour
 
 A material without a diffuse layer shows only its specular and emissive, as WhiteoutFlakes m3_standard.slang (albedo starts at 0). The white base from the lighting patch lit such surfaces white and hid additive glows.
 ---

@@ -1,7 +1,7 @@
 From ab39d0518413e337a97bc772bdac0b506c484279 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sun, 22 Nov 2026 19:52:53 +0200
-Subject: [PATCH 28/55] m3: alpha test (cut-out) from alphaTestThreshold
+Subject: [PATCH 28/56] m3: alpha test (cut-out) from alphaTestThreshold
 
 A standard material with alphaTestThreshold t > 0 draws only where the product of its alpha-mask layers is at least min(t / 255, 1); the rest is discarded, also in the pick draw. Rule: WhiteoutFlakes m3_surface_table.cpp and m3_standard.slang.
 ---

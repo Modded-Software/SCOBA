@@ -1,0 +1,233 @@
+From 68b9595394946f9d9b54d12ff6c9d0d08b022290 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Tue, 24 Nov 2026 12:37:15 +0200
+Subject: [PATCH 56/56] m3: renderEdges draws the triangle edges as lines in
+ one flat colour
+
+Each region's edges, each once (edges.ts edgePairs), go into one edge buffer the model makes on the first draw. renderEdges draws the regions of the drawn batches with the standard vertex shader, so the lines follow the pose; the depth and blend state are the caller's.
+---
+ src/viewer/edges.ts                     | 51 +++++++++++++++++++++++++
+ src/viewer/handlers/m3/model.ts         | 46 ++++++++++++++++++++++
+ src/viewer/handlers/m3/modelinstance.ts | 37 ++++++++++++++++++
+ src/viewer/handlers/m3/region.ts        | 19 +++++++++
+ 4 files changed, 153 insertions(+)
+ create mode 100644 src/viewer/edges.ts
+
+diff --git a/src/viewer/edges.ts b/src/viewer/edges.ts
+new file mode 100644
+index 00000000..98360beb
+--- /dev/null
++++ b/src/viewer/edges.ts
+@@ -0,0 +1,51 @@
++/**
++ * The edges of a triangle list, each once: pairs of element indices, the
++ * lower index first, in the order the triangles first name them.
++ * `elements` holds three indices a triangle; the range read is
++ * [start, start + count). A trailing part of a triangle is left out, and
++ * so is an edge from a vertex to itself.
++ */
++export function edgePairs(elements: ArrayLike<number>, start: number, count: number): number[] {
++  const end = start + count - (count % 3);
++  let top = 0;
++
++  for (let i = start; i < end; i++) {
++    top = Math.max(top, elements[i] ?? 0);
++  }
++
++  // lo * span + hi is one number per edge while span * span stays under 2^53.
++  const span = top + 1;
++
++  if (span > 94_000_000) {
++    throw new Error(`edgePairs: index ${top} is too large`);
++  }
++
++  const seen = new Set<number>();
++  const pairs: number[] = [];
++  const add = (a: number, b: number): void => {
++    if (a === b) {
++      return;
++    }
++
++    const lo = Math.min(a, b);
++    const hi = Math.max(a, b);
++    const key = lo * span + hi;
++
++    if (!seen.has(key)) {
++      seen.add(key);
++      pairs.push(lo, hi);
++    }
++  };
++
++  for (let i = start; i < end; i += 3) {
++    const a = elements[i] ?? 0;
++    const b = elements[i + 1] ?? 0;
++    const c = elements[i + 2] ?? 0;
++
++    add(a, b);
++    add(b, c);
++    add(c, a);
++  }
++
++  return pairs;
++}
+diff --git a/src/viewer/handlers/m3/model.ts b/src/viewer/handlers/m3/model.ts
+index 71481af0..ef70c877 100644
+--- a/src/viewer/handlers/m3/model.ts
++++ b/src/viewer/handlers/m3/model.ts
+@@ -24,6 +24,7 @@ import M3ModelInstance from './modelinstance';
+ import M3Batch from './batch';
+ import { sortBatches } from './draworder';
+ import { HandlerResourceData } from '../../handlerresource';
++import { edgePairs } from '../../edges';
+ import Division from '../../../parsers/m3/division';
+ import Batch from '../../../parsers/m3/batch';
+ import MaterialReference from '../../../parsers/m3/materialreference';
+@@ -69,6 +70,12 @@ export default class M3Model extends Model {
+   elementBytes = 2;
+   /** The largest element index stored (for inspection: vertex count - 1 when nothing wrapped). */
+   elementMax = 0;
++  /** The element indices, kept to make the edge buffer from (edges()). */
++  private elementArray: Uint16Array | Uint32Array = new Uint16Array(0);
++  /** Every region's edges, each once, made on the first edges() call; null before. */
++  private edgeBuffer: WebGLBuffer | null = null;
++  /** How many edges the edge buffer holds. */
++  edgeCount = 0;
+   arrayBuffer: WebGLBuffer | null = null;
+   vertexSize = 0;
+   uvSetCount = 0;
+@@ -374,6 +381,7 @@ export default class M3Model extends Model {
+     }
+ 
+     this.elementMax = elementMax;
++    this.elementArray = elementArray;
+ 
+     const vertices = parser.vertices.list(new Uint8Array(0));
+ 
+@@ -474,6 +482,44 @@ export default class M3Model extends Model {
+     return this.materials[1][materialMap.materialIndex];
+   }
+ 
++  /**
++   * The edge buffer: every region's triangle edges, each once, as line
++   * element pairs (region.edgeOffset, region.edgeCount). Made on the first
++   * call, so a model never drawn with edges never pays for them.
++   */
++  edges(): WebGLBuffer | null {
++    if (this.edgeBuffer || !this.regions.length) {
++      return this.edgeBuffer;
++    }
++
++    const gl = this.viewer.gl;
++    const lists = this.regions.map((region) => edgePairs(this.elementArray, region.offset / this.elementBytes, region.elements));
++    let total = 0;
++
++    for (const list of lists) {
++      total += list.length;
++    }
++
++    const array = this.elementType === gl.UNSIGNED_INT ? new Uint32Array(total) : new Uint16Array(total);
++    let at = 0;
++
++    this.regions.forEach((region, i) => {
++      const list = lists[i] ?? [];
++
++      region.edgeOffset = at * this.elementBytes;
++      region.edgeCount = list.length / 2;
++      array.set(list, at);
++      at += list.length;
++    });
++
++    this.edgeCount = total / 2;
++    this.edgeBuffer = gl.createBuffer();
++    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.edgeBuffer);
++    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, array, gl.STATIC_DRAW);
++
++    return this.edgeBuffer;
++  }
++
+   addGlobalAnims(): void {
+     /*
+     var i, l;
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index c77db500..a92b6fba 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -316,6 +316,43 @@ export default class M3ModelInstance extends ModelInstance {
+     gl.uniform4f(shader.uniforms['u_pick'], 0, 0, 0, 0);
+   }
+ 
++  /**
++   * Draw the triangle edges of the drawn batches as lines in one flat
++   * colour, posed like the triangles (the same vertex shader). The depth
++   * and blend state are the caller's. Returns how many lines it drew.
++   */
++  renderEdges(r: number, g: number, b: number): number {
++    const model = <M3Model>this.model;
++    const regions = new Set(model.batches.filter((batch) => !this.solidOnly || batch.material.blendMode === 0).map((batch) => batch.region));
++    const buffer = regions.size ? model.edges() : null;
++
++    if (!buffer) {
++      return 0;
++    }
++
++    const gl = model.viewer.gl;
++    const m3Cache = <M3HandlerObject>model.viewer.sharedCache.get('m3');
++    const shader = m3Cache.standardShaders[model.uvSetCount - 1];
++
++    this.useShader(shader);
++
++    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
++    gl.uniform4f(shader.uniforms['u_pick'], r, g, b, 1);
++    // No material is bound: no cut-out, so every line pixel is drawn.
++    gl.uniform1f(shader.uniforms['u_alphaTest'], 0);
++
++    let lines = 0;
++
++    for (const region of regions) {
++      region.renderEdges(shader);
++      lines += region.edgeCount;
++    }
++
++    gl.uniform4f(shader.uniforms['u_pick'], 0, 0, 0, 0);
++
++    return lines;
++  }
++
+   override updateAnimations(dt: number): void {
+     const sequenceId = this.sequence;
+ 
+diff --git a/src/viewer/handlers/m3/region.ts b/src/viewer/handlers/m3/region.ts
+index 0cf2cd8e..f6c9e121 100644
+--- a/src/viewer/handlers/m3/region.ts
++++ b/src/viewer/handlers/m3/region.ts
+@@ -22,6 +22,10 @@ export default class M3Region {
+   /** gl.UNSIGNED_SHORT or gl.UNSIGNED_INT: the model's element index type. */
+   elementType: number;
+ 
++  /** Into the model's edge buffer (M3Model.edges), in bytes, and the edges it holds. */
++  edgeOffset = 0;
++  edgeCount = 0;
++
+   constructor(model: M3Model, region: M3ParserRegion, triangles: Uint16Array, elementArray: Uint16Array | Uint32Array, offset: number) {
+     const firstVertexIndex = region.firstVertexIndex;
+     const triangleIndicesCount = region.triangleIndicesCount;
+@@ -56,4 +60,19 @@ export default class M3Region {
+ 
+     gl.drawElements(gl.TRIANGLES, this.elements, this.elementType, this.offset);
+   }
++
++  /** Draw the region's edges as lines. The model's edge buffer must be bound. */
++  renderEdges(shader: Shader): void {
++    if (!this.edgeCount) {
++      return;
++    }
++
++    const gl = this.gl;
++
++    gl.uniform2f(shader.uniforms['u_uvTransform'], this.uvScale, this.uvOffset);
++    gl.uniform1f(shader.uniforms['u_firstBoneLookupIndex'], this.firstBoneLookupIndex);
++    gl.uniform1f(shader.uniforms['u_boneWeightPairsCount'], this.boneWeightPairsCount);
++
++    gl.drawElements(gl.LINES, this.edgeCount * 2, this.elementType, this.edgeOffset);
++  }
+ }

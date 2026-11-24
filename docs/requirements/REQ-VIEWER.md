@@ -146,6 +146,7 @@ Implementation lives in [SPEC-VIEWER](../specifications/SPEC-VIEWER.md).
 | R-VIEW-63 | Camera views MUST be savable as named landmarks, reachable again, and deletable after a question. | today |
 | R-VIEW-64 | Every message and every failure MUST be shown to the user and kept in a message log the user can open. None may be dropped. | today |
 | R-VIEW-65 | The view MUST follow the window size. | today |
+| R-VIEW-66 | Ctrl+/ MUST switch the triangle edges of the selected instances on or off, all the same way. The edges MUST be drawn as thin green lines over the model, follow its pose, and show only where nothing is in front of them. An instance far from the eye MUST show no edges. The choice MUST NOT be kept over a reload or in a copy. | operator 2026-11-24 |
 
 ### 3.8 Saved state
 

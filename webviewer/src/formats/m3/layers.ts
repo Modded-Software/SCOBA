@@ -80,6 +80,8 @@ export function m3Facts(view: ViewerInstance): Record<string, unknown> {
     // Element indices: bytes each, and the largest stored (vertexCount - 1 unless they wrapped).
     elementBytes: model.elementBytes,
     elementMax: model.elementMax,
+    // Edges in the edge buffer (renderEdges): 0 until the first edge draw.
+    edgeCount: model.edgeCount,
     displacementBatches: model.displacementBatches.length,
     // Per region: the UV transform the renderer applies (scale, offset),
     // the stored range of the first UV set, and that range decoded.

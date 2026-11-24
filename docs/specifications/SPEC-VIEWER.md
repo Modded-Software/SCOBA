@@ -273,6 +273,7 @@ interface Capabilities {
     set(slot: TextureSlot, texture: Texture | null): void;
     applied(): number;                          // slots that hold another texture now
   };
+  edges?: { draw(r: number, g: number, b: number): number };  // the triangle edges as lines; lines drawn
 }
 
 interface TextureSlot {
@@ -281,10 +282,17 @@ interface TextureSlot {
 }
 ```
 
-M3 gives all three: 14 team colours, the vertex colour as tint, and one
-slot per active layer that names a texture file. Core reads the team
-count from `teamColor.count`. An item without `teamColor` has no team
-control in its list row.
+M3 gives all four: 14 team colours, the vertex colour as tint, one slot
+per active layer that names a texture file, and the edges. Core reads the
+team count from `teamColor.count`. An item without `teamColor` has no team
+control in its list row. nod gives `edges` only.
+
+`edges.draw` draws the triangle edges of the parts the instance draws, as
+lines in one flat colour. Each edge is drawn once. The format draws them
+with its own vertex shader, so they follow the pose. The caller sets the
+depth and blend state. M3: `M3ModelInstance.renderEdges` (patch 0056).
+nod: `NodInstance.renderEdges`. Both list the edges with the library's
+`edgePairs` (`viewer/edges.ts`), once per model, on the first draw.
 
 A new capability is a new optional member plus the feature that uses it.
 Existing formats are not edited.
@@ -516,7 +524,7 @@ As built in step 6 (`src/page/core/context.ts`, `src/page/main.ts`):
 - Features: `dataset-reload`, `controls` (with turning the selection to
   face the mouse), `landmarks` (the drop-down), `add-all`, `drag`, `sky`
   (the buttons and the picker), `pick`, `select`, `clipboard`, `inspect`,
-  `scenes`. Focus, zoom and framing moved to the camera service, the hit
+  `scenes`, `edges` (16.13). Focus, zoom and framing moved to the camera service, the hit
   tests to the selection service, the sky state to the scene service.
 - `ui.addGalleryTool` gives each matching pane a button with id
   `<tool>-<category>` ("add all": `add-all-units`). `ui.setRowDrag` is
@@ -535,7 +543,9 @@ Events (core/bus.ts, typed by `ViewerEvents`): `item-added`,
 `items-removed`, `item-swapped`, `item-changed` (a field its row shows),
 `scene-edited` (write the scene document), `selection-changed`,
 `game-changed`, `dataset-changed`, `view-changed` (sky, grid),
-`landmarks-changed`, `camera-changed`, `frame`, and two that collect
+`landmarks-changed`, `camera-changed`, `frame`, `scene-drawn` (the units
+and their post passes are drawn; a listener may draw over them with their
+depth), and two that collect
 work: `startup` (the page is ready when all of it is done) and `flush`
 (writes end before a dataset reload). A listener that throws is
 reported; the others still run.
@@ -892,6 +902,7 @@ passed in it. Nothing here is [verified]: see section 2.
 | R-VIEW-63 | [today] | `landmarks.spec`, `landmarks-store.spec` |
 | R-VIEW-64 | [today] | `side.spec` |
 | R-VIEW-65 | [today] | `viewer.spec` |
+| R-VIEW-66 | [plan] | Implemented, not verified. `edges.spec` (section 16.13): 8 of 9 passed in one run; the front-only test passed alone after a test fix. No full run. The look of the lines is an operator check (section 14). |
 | R-VIEW-70 | [today] | `scenes.spec`, `viewer.spec`, `units-ui.spec`, `doodads-ui.spec`, `datasets-ui.spec`, `hd-textures.spec` (step 4c, run `t-4c`) |
 | R-VIEW-71 | [today] | `scenes.spec`: ten faulty files, each refused with its path |
 | R-VIEW-72, 73 | [today] | `camera-persist.spec`, `landmarks-store.spec`, `side.spec`, `scenes.spec` (the open scene), `game-tabs.spec` (the chosen game). |
@@ -1201,6 +1212,8 @@ the step's own test files are run.
 
 - The look and the feel of the game tabs and the handles.
 - Whether the gallery of a game reads well.
+- The edges of Ctrl+/ (16.13): thin, green, no flicker on the surface
+  they lie on, and whether 40 is a good range.
 
 ## 15. Open points
 
@@ -1296,6 +1309,7 @@ constant of the code. Nothing here names a game.
 | Delete | removes the selected instances |
 | Ctrl+C, Ctrl+X, Ctrl+V | copy, cut, paste (16.7) |
 | Ctrl+L | switches the menu's "loop" choice, when an instance is selected |
+| Ctrl+/ | switches the edges of the selected instances (16.13) |
 | Escape | closes the menu, the dialog or the floating window that is open |
 
 - No key acts on the scene while a text field has the keys. The field
@@ -1365,11 +1379,38 @@ constant of the code. Nothing here names a game.
 ### 16.11 Frame
 
 Order of one frame: clear; the backdrop and its post passes; depth clear;
-the grid; the scene; the post passes; the outline of the instance under
-the mouse. One step of animation time is at most 100 ms.
+the grid; the scene; the post passes; the edges (16.13); the outline of
+the instance under the mouse. One step of animation time is at most 100 ms.
 
 ### 16.12 Components
 
 `PagedList`, `Dialog`, the picker dialog, `ConfirmDialog`, `Toast`, the
 drop-down, `FloatingWindow`. They move to `page/ui/components/` as typed
 classes with the same behaviour.
+
+### 16.13 Edges
+
+Not [today]: added 2026-11-24 (R-VIEW-66, operator). `features/edges`.
+
+- Ctrl+/ switches the edges of the selected instances that have the
+  `edges` capability (6.2). All go the same way: off when the one
+  selected last shows them, on otherwise. The key is Ctrl with the "/" key
+  (`code` `Slash`) or any key that types "/". Alt or Meta: not the key.
+- The status line says `edges on: N instances` or `edges off: ...`. With
+  nothing selected: `Ctrl+/: select an instance first`. With no
+  selected instance that can draw edges: `no edges for the selected`.
+- A text field keeps the key. It does nothing to the scene there.
+- The lines are 1 pixel, colour (0.2, 1.0, 0.3), drawn after the post
+  passes. Depth test on (`LEQUAL`), depth write off, no blend. The depth
+  range is pulled to `[0, 1 - 5e-5]`, so a line wins over the surface it
+  lies on. What the instance itself or another one hides is not drawn.
+- An instance whose location is farther than 40 from the eye draws no
+  edges. It keeps the choice, and shows them again when nearer.
+- The choice belongs to the instance shown. It is not in the scene
+  document and not in a copy. A reload, a paste and a new model (variant,
+  dataset) start without edges.
+- Tests read `sc2viewer.state().edges`: `on` (ids), `far` (ids too far in
+  the last frame), `lines` (drawn in the last frame), `range`. And
+  `sc2viewer.edgePixels(rect?)`: the clearly green pixels the edges add,
+  from two frames at one moment, one without them; how many lie more than
+  2 pixels from the drawn body; how many lie in a page rectangle.

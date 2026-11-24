@@ -1,7 +1,7 @@
 From 9a35c308142ae28aef18cc53242f183a428f3115 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 08:20:10 +0200
-Subject: [PATCH 39/55] m3 particles: PARC emitter copies emit from their own
+Subject: [PATCH 39/56] m3 particles: PARC emitter copies emit from their own
  bones
 
 PARC records were skipped (UnsupportedEntry), so an emitter with copies

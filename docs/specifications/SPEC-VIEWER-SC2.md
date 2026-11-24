@@ -168,7 +168,8 @@ Item options (written to the scene address under `o`):
 - Animations are in the model file. The format takes no `clips`.
 - Texture readers: DDS and TGA. The DDS reader takes DXT1, DXT3, DXT5,
   ATI2 and files without a compression code.
-- Capabilities: `teamColor` (14 colours), `tint`, `textureOverride`.
+- Capabilities: `teamColor` (14 colours), `tint`, `textureOverride`,
+  `edges` (`M3ModelInstance.renderEdges`, patch 0056).
 - Post pass: displacement materials, drawn over a copy of the frame.
 - Probes for tests: particle emitters, billboards, ground lights, alpha
   tests, constant colour layers, the fresnel term, vertex and index

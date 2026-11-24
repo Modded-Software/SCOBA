@@ -42,6 +42,7 @@ function capabilities(view: ViewerInstance): Capabilities {
       },
       applied: () => instance.textureOverrides.size,
     },
+    edges: { draw: (r, g, b) => instance.renderEdges(r, g, b) },
   };
 }
 

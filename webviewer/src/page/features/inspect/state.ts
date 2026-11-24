@@ -72,6 +72,8 @@ export function createState({ render, scene, camera: view, games, testApi }: Pic
       vertexBytes: facts['vertexBytes'],
       elementBytes: facts['elementBytes'],
       elementMax: facts['elementMax'],
+      // Edges the format's edge buffer holds (0 before the first edge draw).
+      edgeCount: facts['edgeCount'],
       // Culling: the model's bounding sphere radius, and whether the last
       // frame drew the instance (false when it was culled).
       boundsRadius: item.model.bounds.r,

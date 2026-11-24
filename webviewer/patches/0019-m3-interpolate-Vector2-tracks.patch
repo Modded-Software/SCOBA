@@ -1,7 +1,7 @@
 From b1b66d53234f32ab4de943ae59f95de001c48f1e Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 15:31:22 +0200
-Subject: [PATCH 19/55] m3: interpolate Vector2 tracks
+Subject: [PATCH 19/56] m3: interpolate Vector2 tracks
 
 A two-component value went through the scalar lerp and came out NaN. Vector2 tracks (layer uvOffset, uvTiling) now copy or lerp as vec2.
 ---

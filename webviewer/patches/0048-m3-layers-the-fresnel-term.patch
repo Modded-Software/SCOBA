@@ -1,7 +1,7 @@
 From 4e3b5b846b330e48e54b1c6c0188cd190e406ac8 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 09:28:07 +0200
-Subject: [PATCH 48/55] m3 layers: the fresnel term
+Subject: [PATCH 48/56] m3 layers: the fresnel term
 
 - layers.glsl: fresnelTerm (psmateriallayer.fx CalcFresnelTerm, the
   WhiteoutFlakes abs arm): 1 - |N.V| to the exponent, inverted for mode

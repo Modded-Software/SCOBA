@@ -572,7 +572,9 @@ Refusals (R-VIEW-82), each with the file and the value:
 - a clip track whose bone number is outside the model's bones, or whose
   kind is not 0 or 1.
 
-Capabilities: none. No team colour, no tint, no texture override.
+Capabilities: `edges` only (SPEC-VIEWER 6.2, 16.13): the drawn groups'
+triangle edges as lines, by `NodInstance.renderEdges`. No team colour, no
+tint, no texture override.
 
 A clip that fails is left out; the others play. `attachClips` returns
 the clips left out, each with its reason (HTTP status, or the check that

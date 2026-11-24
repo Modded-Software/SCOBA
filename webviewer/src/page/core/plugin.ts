@@ -96,6 +96,12 @@ export interface Capabilities {
     /** How many slots hold another texture now. */
     applied(): number;
   };
+  /**
+   * The triangle edges of the drawn parts as lines in one flat colour,
+   * posed like the triangles. The caller sets the depth and blend state.
+   * Returns how many lines it drew.
+   */
+  edges?: { draw(r: number, g: number, b: number): number };
 }
 
 /** A draw after the scene. Returns how many parts it drew. */

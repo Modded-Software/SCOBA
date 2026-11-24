@@ -1,7 +1,7 @@
 From b0487ebac4a73f79aa8e18bc363adb233959d75b Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 09:32:47 +0200
-Subject: [PATCH 49/55] m3 ground lights: albedo 0.25
+Subject: [PATCH 49/56] m3 ground lights: albedo 0.25
 
 The six Shadow Battlecruiser spots overlapped into a white blob at
 albedo 0.5 (operator 2026-11-23).

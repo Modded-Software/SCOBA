@@ -1,7 +1,7 @@
 From 38bf820ad2ebb01c299102e23f210abd603e3b46 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 15:17:21 +0200
-Subject: [PATCH 54/55] types: M3ModelInstance.model is an M3Model
+Subject: [PATCH 54/56] types: M3ModelInstance.model is an M3Model
 
 The constructor takes an M3Model and every method casts this.model to
 one. A declared field says so to callers. It emits no code.

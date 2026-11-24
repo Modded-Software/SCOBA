@@ -40,7 +40,7 @@ export function createFrame({ host, camera: view, scene: items, selection, games
     return spots;
   }
 
-  /** One frame: background, sky (and its displacement), ground, units (and theirs), mouse-over outline. */
+  /** One frame: background, sky (and its displacement), ground, units (and theirs), what draws over them, mouse-over outline. */
   function draw(dt: number): void {
     const gl = viewer.gl;
     viewer.update(dt);
@@ -64,6 +64,8 @@ export function createFrame({ host, camera: view, scene: items, selection, games
     ground.draw(scene.camera, camera.target, glowSpots(), camera.distance);
     scene.render();
     displaced += afterScene(scene);
+    // Over the units, with their depth: the edges (features/edges).
+    events.emit('scene-drawn', { width: canvas.width, height: canvas.height });
     // The mouse-over outline, when the hovered unit is drawn this frame.
     const hovered = selection.hovered();
     if (hovered && hovered.instance.drawn) outline.draw(hovered.instance, canvas.width, canvas.height);

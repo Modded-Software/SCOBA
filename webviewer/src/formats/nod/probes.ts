@@ -1,9 +1,10 @@
 // What the nod format tells the tests (SPEC-VIEWER-GHOST 7, 9): the
 // layout, the groups as drawn, the bone matrices now, the skinned
 // positions now (computed here from the same matrices the shader gets),
-// and the axes check. Reached as sc2viewer.probe('nod', name, itemId, ...).
+// the axes check, and the library's edge list. Reached as sc2viewer.probe('nod', name, itemId, ...).
 
 import { mat4, vec3 } from 'gl-matrix';
+import { edgePairs } from '@renderer/viewer/edges';
 import type { FeatureContext } from '../../page/core/context';
 import type { Item } from '../../page/core/types';
 import { nodInstance } from './adapter';
@@ -196,5 +197,8 @@ export function createNodProbes({ scene }: Pick<FeatureContext, 'scene'>): Reado
     return instance.matrices.every(Number.isFinite);
   }
 
-  return { layout, groups, bones, positions, axes, holdAt, joins, poseFinite, boneSpread, triangles };
+  /** The library's edge list of a triangle list (the edge draw of both formats), for a unit test. */
+  const edges = (elements: readonly number[], start = 0, count = elements.length - start): number[] => edgePairs(elements, start, count);
+
+  return { layout, groups, bones, positions, axes, holdAt, joins, poseFinite, boneSpread, triangles, edges };
 }

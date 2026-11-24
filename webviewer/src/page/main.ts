@@ -32,6 +32,7 @@ import { selectFeature } from './features/select';
 import { clipboardFeature } from './features/clipboard';
 import { inspectFeature } from './features/inspect';
 import { scenesFeature } from './features/scenes';
+import { edgesFeature } from './features/edges';
 import { m3Format } from '../formats/m3/format';
 import { DISPLACEMENT } from '../formats/m3/displacement';
 import { nodFormat } from '../formats/nod/format';
@@ -47,7 +48,7 @@ const GAMES = [
   { game: ghostGame, install: installGhostPage },
 ];
 /** In the order the old page scripts loaded, so listeners register in the same order. */
-const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature];
+const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature, edgesFeature];
 
 // ---- the services, each from the ones before it ----
 

@@ -2,7 +2,8 @@
 // through the container the server exports with NODExport. Its handler
 // takes only that container (it starts with "NODX"); its textures are DDS
 // files, read by the m3 format's DDS handler. Clips come through
-// attachClips. No capabilities: no team colour, tint or texture override.
+// attachClips. One capability, the edge draw: no team colour, tint or
+// texture override.
 
 import type ModelViewer from '@renderer/viewer/viewer';
 import type { Clip, FormatModule, RendererHandler, ViewerInstance } from '../../page/core/plugin';
@@ -60,7 +61,10 @@ export const nodFormat: FormatModule = {
   handlers: [handler],
   adopt: adoptNod,
   attachClips,
-  capabilities: () => ({}),
+  capabilities: (view) => {
+    const instance = nodInstance(view);
+    return { edges: { draw: (r, g, b) => instance.renderEdges(r, g, b) } };
+  },
   inspect(view) {
     const instance = nodInstance(view);
     return { bones: instance.model.bones.length, skinned: instance.model.skinned, clips: instance.clips.map((c) => c.name), groupsDrawnLast: instance.lastDrawn.length };
