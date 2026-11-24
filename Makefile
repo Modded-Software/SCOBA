@@ -144,7 +144,7 @@ WEBVIEWER := WEBVIEWER_DIR="$(WEBVIEWER_DIR)" $(SCRIPT_BASH) $(WEBVIEWER_DIR)/sc
 
 VIEWER_ANSIBLE := cd "$(REPO_ROOT)/deploy/ansible" && ansible-playbook viewer-dev.yml
 
-.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-ghost-survey viewer-serve viewer-provision viewer-unprovision viewer-start viewer-stop viewer-restart viewer-status viewer-logs viewer-test viewer-test-all
+.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-ghost-survey viewer-ghost-export-check viewer-serve viewer-provision viewer-unprovision viewer-start viewer-stop viewer-restart viewer-status viewer-logs viewer-test viewer-test-all
 viewer-install: ## Model viewer: install node deps and the test browser, build the renderer
 	$(WEBVIEWER)/setup.sh
 
@@ -162,6 +162,9 @@ viewer-survey: ## Model viewer: report which unit models the parser can read
 
 viewer-ghost-survey: ## Model viewer: read every StarCraft: Ghost model, clip, material, motion set, template and texture (NODSurvey) and assert SPEC-VIEWER-GHOST 4
 	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/ghost-survey.sh
+
+viewer-ghost-export-check: ## Model viewer: export every StarCraft: Ghost model, clip and material (NODExport) and assert SPEC-VIEWER-GHOST 7
+	REPO_ROOT="$(REPO_ROOT)" $(WEBVIEWER)/ghost-export-check.sh
 
 viewer-serve: ## Model viewer: run the server in the foreground (PORT=n beside the service)
 	$(WEBVIEWER)/start.sh

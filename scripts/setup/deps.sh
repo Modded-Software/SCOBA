@@ -55,6 +55,7 @@ NODSDK_SRC="${NODSDK_SRC:-$ROOT_DIR/webviewer/ref/nodsdk-scghost}"
 NODSDK_BUILD="${NODSDK_BUILD:-$ROOT_DIR/webviewer/build/nodsdk}"
 NODSDK_LIB="$NODSDK_BUILD/cmake/libasset_parsers.a"
 NODSDK_SURVEY="$NODSDK_BUILD/cmake/NODSurvey"
+NODSDK_EXPORT="$NODSDK_BUILD/cmake/NODExport"
 GLM_HEADER=/usr/include/glm/glm.hpp
 STEAM_ROOT="${STEAM_ROOT:-$HOME/.var/app/com.valvesoftware.Steam/data/Steam}"
 BNET_PREFIX="${BNET_PREFIX:-$HOME/Games/battlenet-prefix}"
@@ -195,10 +196,11 @@ cmd_nodsdk() {
     [[ -f "$GLM_HEADER" ]] || die "GLM headers missing ($GLM_HEADER); run: sudo make init"
     PATH="$STORMEX_PATH" "$cmake" -S "$NODSDK_SRC" -B "$NODSDK_BUILD" -DCMAKE_BUILD_TYPE=Release \
         -DNODSDK_BUILD_VIEWER=OFF -DNODSDK_BUILD_EDITORS=OFF -DBUILD_TESTING=OFF
-    PATH="$STORMEX_PATH" "$cmake" --build "$NODSDK_BUILD" --target asset_parsers NODSurvey --parallel "$(nproc)"
+    PATH="$STORMEX_PATH" "$cmake" --build "$NODSDK_BUILD" --target asset_parsers NODSurvey NODExport --parallel "$(nproc)"
     [[ -f "$NODSDK_LIB" ]] || die "the build did not write $NODSDK_LIB"
     [[ -x "$NODSDK_SURVEY" ]] || die "the build did not write $NODSDK_SURVEY"
-    say "built the nodsdk parser library and NODSurvey: $NODSDK_BUILD/cmake"
+    [[ -x "$NODSDK_EXPORT" ]] || die "the build did not write $NODSDK_EXPORT"
+    say "built the nodsdk parser library, NODSurvey and NODExport: $NODSDK_BUILD/cmake"
 }
 
 # --- check -------------------------------------------------------------------
@@ -248,7 +250,7 @@ cmd_check() {
     else
         report MISSING glm "GLM headers, needed to build the nodsdk parsers; run: sudo make init"
     fi
-    if [[ -f "$NODSDK_LIB" && -x "$NODSDK_SURVEY" ]]; then
+    if [[ -f "$NODSDK_LIB" && -x "$NODSDK_SURVEY" && -x "$NODSDK_EXPORT" ]]; then
         report OK nodsdk "$NODSDK_BUILD/cmake"
     else
         report MISSING nodsdk "the nodsdk parser library is not built; run: make install-deps"

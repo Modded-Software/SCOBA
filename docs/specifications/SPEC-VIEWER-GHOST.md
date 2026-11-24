@@ -439,8 +439,10 @@ declared levels and leaves the rest.
 ### 4.8 Axes
 
 The game is left-handed with Z up: X right, Y forward [docs]. The viewer
-is right-handed with Z up. The parser mirrors Y and turns each triangle
-round. The normals test of section 9 decides whether this is right.
+is right-handed with Z up. The export keeps the file's axes, so bones and
+clips need no conversion. The format module mirrors Y after skinning and
+turns each triangle round. The normals test of section 9 decides whether
+this is right.
 
 ## 5. Categories
 
@@ -491,10 +493,19 @@ Item options: none.
 `src/formats/nod/`. Our own code, on the renderer library's model and
 instance base classes. It is not a change to the library.
 
-The bytes are read by the parsers of [sdk], not by viewer code: a program
-of our fork exports what the module draws (planned: an export mode next to
-`NODSurvey`; the form of its output is not designed). The refusals below
-are made there.
+The bytes are read by the parsers of [sdk], not by viewer code. `NODExport`
+of our fork exports what the module draws; the server runs it as a child
+process. The refusals below are made there.
+
+| Command | Output |
+| --- | --- |
+| `NODExport nod <in> <out.json> <out.bin>` | `out.bin`: every vertex, 52 bytes (float3 position, float3 normal, float2 uv, uint8[4] bone numbers of the model, float[4] weights), then uint32 triangle indices. Detail level 0; strips turned into triangles, degenerate ones dropped. `out.json`: bounds, material names, bones (parent, position, 3x3 orientation, offset), and per group its material, vertex type, vertex and index range and palette. |
+| `NODExport nad <in> <out.json>` | length in frames, 30 frames a second; tracks (bone, kind, keys of 13 numbers: frame, value, b, c, d); tags. Not-a-number as `null`. |
+| `NODExport materials <build> <names.txt> <out.json>` | per material name: lookup step of 4.4, source file, properties in file order, texture file of each texture property (relative to the build; `null` when missing). |
+| `NODExport catalog <build> <out.json>` | every template, expanded (4.6): name, model, motion set, script, type (id 20), model scale; every motion set with its entries (name, clip, flags); every model with its counts of materials, bones and groups and its vertex types. Names as the files give them; the server matches them to files (section 3). Templates, sets and models that are refused are listed with the reason. |
+
+On a refusal the JSON holds `{"format", "error"}`, the exit code is 1,
+and no binary is written.
 
 - The library's base classes give: the place in the scene, culling by a
   sphere, show and hide, the texture loader, and the calls `renderOpaque`
@@ -590,6 +601,8 @@ decide the run.
 | `gs-2` (2026-11-24, fork code of `f3d434c`) | 45 of 45 passed, exit 0 |
 | `gs-neg-nms` | a copy of `3D/Motions` with a line of a name only and a line of 9 flags: the 4 NMS checks of entries and flags failed, exit 1 |
 | `gs-neg-not` | `Global.not` cut to half: refused ("invalid NOT template offsets"); all 6 NOT checks failed, exit 1 |
+| `ex-1` (2026-11-24, fork `3fce318`, `make viewer-ghost-export-check`) | 18 of 18 passed, exit 0: all 1401 models and 1551 clips export; binary sizes match; materials resolve; changed copies refused (version 9, vertex type 6, cut file, 4 extra bytes; clip version 3, 4 extra bytes), no binary written |
+| `ex-2` (2026-11-24, fork `cdef57b`) | 26 of 26 passed, exit 0: the checks of `ex-1`, plus the catalog: 1223 templates and `scourge_track` refused, 858 with a model, 426 with a motion set, 163 sets with 2027 entries, 1401 models; a folder without `3D/Models` refused |
 | `gs-neg-dds` | one texture cut to 40000 bytes: reported short (39872 of 87392 bytes); the DDS checks failed, exit 1 |
 
 In the page:

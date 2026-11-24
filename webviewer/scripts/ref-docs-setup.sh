@@ -28,7 +28,7 @@ ROOT="${REF_ROOT:-$WEBVIEWER_DIR/ref}"
 REPOS=(
   "scghost-rev https://github.com/aknavj/scghost-rev.git 4f1fd24381edf00e20dff9c0352ead3ef16d1473"
   "nodsdk-docs https://github.com/aknavj/nodsdk-docs.git f2110b37d04135a5b7c1d4605e764de49736d512"
-  "nodsdk-scghost git@github.com:Modded-Software/nodsdk-scghost.git f3d434cdece987ce6b8d1ebb3309c7a8b40c1df0 https://github.com/aknavj/nodsdk-scghost.git"
+  "nodsdk-scghost git@github.com:Modded-Software/nodsdk-scghost.git cdef57b69cee29e613a60489e2d095790ebb4067 https://github.com/aknavj/nodsdk-scghost.git"
   "nodsdk-radiant https://github.com/aknavj/nodsdk-radiant.git a660bef1c7f3f537d01495d207439622d6d257ef"
 )
 
