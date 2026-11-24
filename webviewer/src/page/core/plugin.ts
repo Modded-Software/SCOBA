@@ -137,8 +137,16 @@ export interface PlacementWish {
   otherwise?: 'random' | 'first' | 'refuse';
 }
 
+/** An animation kept outside the model file (SPEC-VIEWER 6.4); fetched as asset kind "animation". */
+export interface Clip {
+  readonly name: string;
+  readonly reference: string;
+}
+
 /** How a record becomes an instance. Core applies it; core does not read the record's data. */
 export interface Placement {
+  /** Animations kept outside the model file; the instance's sequences are the file's, then these. */
+  clips: readonly Clip[];
   /** Servable model file. */
   file: string;
   /** Which of the record's files; null when it has one. */
@@ -202,6 +210,14 @@ export interface FormatModule {
   readonly handlers: readonly RendererHandler[];
   /** The library's loaded resource as this format's model; null when it is not one. */
   adopt(resource: unknown): ViewerModel | null;
+  /**
+   * Give an instance animations kept outside its model file. `url` gives a
+   * clip's route. A clip the format cannot read is left out; the result
+   * names each one with the reason, and core reports them (R-VIEW-82). A
+   * format without it cannot take clips: a placement with clips for it is
+   * a failure (SPEC-VIEWER 6.3).
+   */
+  attachClips?(instance: ViewerInstance, clips: readonly Clip[], url: (reference: string) => string): Promise<readonly string[]>;
   capabilities(instance: ViewerInstance): Capabilities;
   /** Draws after the scene, made once per viewer. */
   postPasses?(viewer: ModelViewer): readonly PostPass[];

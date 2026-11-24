@@ -16,6 +16,17 @@ export class HttpError extends Error {
   }
 }
 
+/** Thrown by a game's start when its data is not on the machine (R-VIEW-8). */
+export class GameUnavailable extends Error {}
+
+/** A game that could not start: listed with `available: false`, its routes answer 503. */
+export interface UnavailableGame {
+  readonly id: GameId;
+  readonly label: string;
+  readonly tab: string;
+  readonly reason: string;
+}
+
 export interface ListQuery {
   q: string;
   offset: number;

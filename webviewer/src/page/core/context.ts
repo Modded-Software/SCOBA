@@ -7,7 +7,7 @@
 
 import type ModelViewer from '@renderer/viewer/viewer';
 import type Scene from '@renderer/viewer/scene';
-import type { CategoryInfo, GameInfo } from '../../shared/protocol';
+import type { AssetKind, CategoryInfo, GameInfo } from '../../shared/protocol';
 import type { DatasetInfo } from '../../shared/records';
 import type {
   AddOptions,
@@ -70,6 +70,8 @@ export interface ApiClient {
   extensionUrl(name: string, game?: string): string;
   modelUrl(path: string, dataset?: string | null, game?: string): string;
   pathSolver(dataset?: string | null, game?: string): (src: unknown) => unknown;
+  /** The route of a reference a model uses, of one kind, resolved for the dataset. */
+  assetUrl(kind: AssetKind, reference: string, dataset?: string | null, game?: string): string;
   iconUrl(name: string, dataset?: string | null, game?: string): string;
   /** The gallery game's current dataset. */
   dataset(): string | null;

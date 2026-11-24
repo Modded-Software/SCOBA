@@ -8,7 +8,7 @@ const TEXT = 'text/plain; charset=utf-8';
 
 const FILES = new Map<string, readonly [string, string]>([
   ['/', ['public/index.html', 'text/html; charset=utf-8']],
-  ...['outline.vert', 'outline-blur.frag', 'outline-compose.frag', 'ground.vert', 'ground.frag'].map((name): [string, readonly [string, string]] => [`/shaders/${name}`, [`public/shaders/${name}`, TEXT]]),
+  ...['outline.vert', 'outline-blur.frag', 'outline-compose.frag', 'ground.vert', 'ground.frag', 'nod.vert', 'nod.frag'].map((name): [string, readonly [string, string]] => [`/shaders/${name}`, [`public/shaders/${name}`, TEXT]]),
   ['/theme.css', ['public/theme.css', 'text/css; charset=utf-8']],
   ['/style.css', ['public/style.css', 'text/css; charset=utf-8']],
   // Built by src/tools/build.ts: the page bundle (src/page) with mdx-m3-viewer.

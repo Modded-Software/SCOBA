@@ -77,7 +77,7 @@ Two control modes have a contract and a state document:
 | `sudo make init` | Root steps only, run first. Installs the system packages with apt (`SYSTEM_PACKAGES` in the Makefile: `libglm-dev`). Refuses to run as a user. |
 | `make deps-check` | Report every dependency as `OK`, `MISSING` or `OPTIONAL`. Installs nothing. Exit 1 if a required one is missing. |
 | `make install` | `make install-deps`. Git hooks are separate: `sudo make install-hooks`. |
-| `make install-deps` | `uv sync --frozen`, build `tools/stormex`, `make viewer-install`, build the nodsdk parser library, then `make deps-check`. Needs `sudo make init` first. |
+| `make install-deps` | `uv sync --frozen`, build `tools/stormex`, `make viewer-install`, build the nodsdk parser library and its `NODExport` tool, then `make deps-check`. Needs `sudo make init` first. |
 | `make install-hdtex` | Clone `../upscale-on-arc` if absent, check its pinned commit, run its `make install`. Only the HD texture cache build needs it. |
 
 All steps are in `scripts/setup/deps.sh` and can run again safely.
@@ -180,6 +180,13 @@ root. Every start, stop and restart goes through the playbook.
   playbook shows each log after its step.
 - Settings: `-e viewer_port=`, `viewer_host`, `viewer_node_bin`, in
   `deploy/ansible/roles/viewer_dev/defaults/main.yml`.
+- The viewer shows two games: StarCraft II and StarCraft: Ghost. Ghost
+  needs `GHOST_PATH` in `webviewer/local.env`, the folder of an unpacked
+  build (with `3D/Models`), and `NODExport` built by `make install-deps`
+  (`NODSDK_EXPORT` names another). Without them the Ghost tab is disabled
+  and names the reason; StarCraft II still works.
+- `make viewer-ghost-export-check` exports every Ghost model and clip
+  through `NODExport` and checks the results and the refusals.
 
 ## Desktop Entries
 

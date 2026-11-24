@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 // The game tabs and the drawer handles (src/page/ui/gametabs.ts, drawers.ts;
-// REQ-VIEWER R-VIEW-20 to 24 and 27). The server lists one game (sc2), so a
-// second game comes from a routed /api/games: one the server cannot open,
-// and one the page has no module for. Both tabs must be disabled.
+// REQ-VIEWER R-VIEW-20 to 24 and 27). The server lists sc2 and ghost. A
+// routed /api/games replaces ghost with one the server cannot open and adds
+// one the page has no module for. Both tabs must be disabled.
 
 async function open(page) {
   const errors = [];
@@ -13,11 +13,12 @@ async function open(page) {
   return errors;
 }
 
-/** Answer /api/games with the server's list plus these games. */
+/** Answer /api/games with the server's list, these games replacing the ones of the same id. */
 async function withGames(page, extra) {
   await page.route('**/api/games', async (route) => {
     const body = await (await route.fetch()).json();
-    await route.fulfill({ json: { ...body, games: [...body.games, ...extra] } });
+    const ids = new Set(extra.map((g) => g.id));
+    await route.fulfill({ json: { ...body, games: [...body.games.filter((g) => !ids.has(g.id)), ...extra] } });
   });
 }
 
@@ -28,10 +29,14 @@ const settled = (page) =>
 test('one tab per game, vertical, at the top of the gallery right edge; sc2 is chosen', async ({ page }) => {
   const errors = await open(page);
   const tabs = page.locator('#game-tabs button[data-game]');
-  await expect(tabs).toHaveCount(1);
+  await expect(tabs).toHaveCount(2);
   const sc2 = page.locator('#game-tabs button[data-game="sc2"]');
   await expect(sc2).toBeEnabled();
   await expect(sc2).toHaveAttribute('aria-pressed', 'true');
+  // Ghost is the second tab, open to choose, not chosen.
+  const ghostTab = page.locator('#game-tabs button[data-game="ghost"]');
+  await expect(ghostTab).toBeEnabled();
+  await expect(ghostTab).toHaveAttribute('aria-pressed', 'false');
   expect(await page.evaluate(() => window.sc2viewer.games.current())).toBe('sc2');
   const [tab, gallery] = [await box(page, '#game-tabs button[data-game="sc2"]'), await box(page, '#gallery')];
   // At the right edge, from the top.

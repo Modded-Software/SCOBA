@@ -96,10 +96,23 @@ export function createScene({ host, games, api, status, events, sky }: SceneDeps
     return model;
   }
 
-  /** A new instance of a model, with what its format lets it do. */
-  function instanceOf(model: ViewerModel): Pick<Item, 'model' | 'instance' | 'capabilities'> {
+  /**
+   * A new instance of a model, with what its format lets it do, and the
+   * placement's clips handed to the format (SPEC-VIEWER 6.4): before the
+   * game picks the rest animation out of the instance's sequences.
+   */
+  async function instanceOf(model: ViewerModel, placement: Placement, from: { game: string; dataset: string }): Promise<Pick<Item, 'model' | 'instance' | 'capabilities'>> {
+    const format = host.formatOf(model);
     const instance = model.addInstance();
-    return { model, instance, capabilities: host.formatOf(model).capabilities(instance) };
+    if (placement.clips.length) {
+      if (!format.attachClips) throw new Error(`${placement.file}: format ${format.id} cannot take ${placement.clips.length} clip(s)`);
+      const refused = await format.attachClips(instance, placement.clips, (reference) => api.assetUrl('animation', reference, from.dataset, from.game));
+      if (refused.length) {
+        console.warn(`sc2viewer: ${placement.file}: clips left out: ${refused.join('; ')}`);
+        status.setStatus(`${placement.file}: ${refused.length} clip(s) left out (${refused[0] ?? ''})`, { failure: true });
+      }
+    }
+    return { model, instance, capabilities: format.capabilities(instance) };
   }
 
   /** The wish of add options: the scale pick (random when not given), the angle, the variant. */
@@ -117,7 +130,7 @@ export function createScene({ host, games, api, status, events, sky }: SceneDeps
     status.setStatus('loading ' + name);
     return status.busy(async () => {
       const model = await loadModel(placement.file, dataset, game);
-      const made = instanceOf(model);
+      const made = await instanceOf(model, placement, from);
       const item: Item = {
         id: nextId++,
         game,
@@ -203,10 +216,10 @@ export function createScene({ host, games, api, status, events, sky }: SceneDeps
     return loading(async () => {
       const { source = item.source, dataset = item.dataset, placement = item.placement } = next;
       const model = await loadModel(placement.file, dataset, item.game);
+      const made = await instanceOf(model, placement, { game: item.game, dataset });
       // Removed while the model loaded: nothing to swap.
       if (!items.includes(item)) return;
       const playing = item.sequence >= 0 ? (item.instance.sequences[item.sequence]?.name ?? null) : null;
-      const made = instanceOf(model);
       const same = playing === null ? -1 : made.instance.sequences.findIndex((s) => s.name === playing);
       item.instance.detach();
       Object.assign(item, { path: placement.file, source, dataset, placement, ...made, sequence: same >= 0 ? same : pluginOf(item.game).restSequence(made.instance.sequences) });

@@ -47,8 +47,10 @@ function placeDoodad(doodad: DoodadRecord, wish: PlacementWish): Placement {
 }
 
 /** What a unit's and a doodad's placement share. */
-function common(record: PlacedRecord, wish: PlacementWish): Pick<Placement, 'scale' | 'height' | 'tint' | 'pick' | 'radius' | 'asBackdrop'> {
+function common(record: PlacedRecord, wish: PlacementWish): Pick<Placement, 'scale' | 'height' | 'tint' | 'pick' | 'radius' | 'asBackdrop' | 'clips'> {
   return {
+    // An M3 file holds its own animations.
+    clips: [],
     scale: dataScale(record, wish.pick),
     // A unit stands at its Height; a doodad stands on the ground.
     height: (!record.doodad && record.height) || 0,
@@ -81,7 +83,7 @@ export const sc2Game: PageGame = {
     return { ...common(placed, wish), file: placed.file, variant: null, variants: 0, rot: wish.rot ?? 0, team: true, icon: { name: placed.icon }, hitRadius: placed.radius };
   },
   placeFile(file, wish) {
-    return { file, variant: null, variants: 0, scale: [1, 1, 1], height: 0, rot: wish.rot ?? 0, tint: null, pick: wish.pick, asBackdrop: false, radius: null, hitRadius: null, team: true, icon: null };
+    return { file, variant: null, variants: 0, scale: [1, 1, 1], height: 0, rot: wish.rot ?? 0, tint: null, pick: wish.pick, asBackdrop: false, radius: null, hitRadius: null, team: true, icon: null, clips: [] };
   },
   /**
    * How fast an animation plays. The model's speed always counts. A walk

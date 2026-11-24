@@ -33,12 +33,18 @@ import { inspectFeature } from './features/inspect';
 import { scenesFeature } from './features/scenes';
 import { m3Format } from '../formats/m3/format';
 import { DISPLACEMENT } from '../formats/m3/displacement';
+import { nodFormat } from '../formats/nod/format';
 import { sc2Game } from '../games/sc2/page/game';
 import { installSc2Page } from '../games/sc2/page/parts';
+import { ghostGame } from '../games/ghost/page/game';
+import { installGhostPage } from '../games/ghost/page/parts';
 
 // The model formats, the games and the features: one line each (SPEC-VIEWER 1, 4, 6.6).
-const FORMATS = [m3Format];
-const GAMES = [{ game: sc2Game, install: installSc2Page }];
+const FORMATS = [m3Format, nodFormat];
+const GAMES = [
+  { game: sc2Game, install: installSc2Page },
+  { game: ghostGame, install: installGhostPage },
+];
 /** In the order the old page scripts loaded, so listeners register in the same order. */
 const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature];
 

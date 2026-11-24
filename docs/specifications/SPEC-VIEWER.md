@@ -300,8 +300,8 @@ interface FormatModule {
   adopt(resource: unknown): ViewerModel | null;
   /** The bytes of a model file, as the object its handler takes. */
   parse?(bytes: Uint8Array, name: string): unknown;
-  /** Give an instance animations kept outside its model file. */
-  attachClips?(instance: ViewerInstance, clips: readonly Clip[], resolver: AssetResolver): Promise<void>;
+  /** Give an instance animations kept outside its model file; the clips left out, each with its reason. */
+  attachClips?(instance: ViewerInstance, clips: readonly Clip[], url: (reference: string) => string): Promise<readonly string[]>;
   capabilities(instance: ViewerInstance): Capabilities;
   postPasses?(viewer: RenderHost): readonly PostPass[];  // draws after the scene, made once per viewer
   inspect?(instance: ViewerInstance): Record<string, unknown>;  // what only the format knows, for state()
@@ -328,6 +328,12 @@ interface PostPass {
   does not hold a model that came through `parse`.
 - A format without `attachClips` cannot take `clips`. A placement with
   clips for such a format is a failure, reported.
+- `url` gives the address of a clip: `api.assetUrl('animation', reference,
+  dataset, game)`. A clip that fails is left out; the others are kept.
+  Core names the ones left out in the console and the status, as a
+  failure. `instanceOf` waits for the clips before the rest animation.
+- A load that a format's handler refused fails with the handler's message
+  (`core/host.ts`). A fetch that fails gives "cannot load <file>".
 - A format refuses what it cannot read (R-VIEW-82): its parser throws with
   the file, the record and the version.
 - Core loads a file with the library, then asks each format to `adopt` the
@@ -417,7 +423,8 @@ It differs from the sketch above:
 - `Placement` also holds `radius` (the grid glow and the room in a row),
   `hitRadius` (the pick ray; null for an SC2 doodad: its model's bounds),
   `team` (shows the team control) and `icon` (the list row's icon box).
-  `clips` is not built: SC2 has none.
+  `clips` is built in step 7: SC2 gives none; Ghost gives the motions of
+  the record's motion set (SPEC-VIEWER-GHOST 6).
 - `backdrop`: the word for a backdrop record, "skybox".
 - `itemOptions` and `install` are built as `GameParts` and the game's
   install function (section 6.6), not as members of `PageGame`.
@@ -843,13 +850,14 @@ passed in it. Nothing here is [verified]: see section 2.
 | R-VIEW-12 | [today] | Step 6: no page object, no `app()`; each module takes typed services (section 6.6). `scripts/typecheck.sh` and the import rule. No test asserts the clause yet. |
 | R-VIEW-13 | [today] | `scripts/typecheck.sh`, first in `scripts/test.sh`; it passed in run `full88` (section 13). `typecheck.spec` asserts that a type error ends the check. |
 | R-VIEW-14 | [plan] | Today: `window.sc2viewer` and `window.SC2App`, put together from what the features hand to `testApi` (`core/testapi.ts`); a format's members only through `probe`. Tests still read item internals (`SC2App.items`, `.instance.m3`); typed in step 8. |
-| R-VIEW-20 | [today] | `game-tabs.spec`: one tab per game the server lists, vertical, at the top of the gallery's right edge. Only SC2 has a page module. |
-| R-VIEW-21 | [today] | `ui/gametabs.ts`, `core/datasets.ts` `setGame`. A switch to a second game is not tested until there is one (step 7). |
+| R-VIEW-8 | [today] | Step 7: `ghost-unavailable.spec` (a server without `GHOST_PATH`: ghost listed with the reason, its routes 503, sc2 answers), `game-tabs.spec`. |
+| R-VIEW-20 | [today] | `game-tabs.spec`: one tab per game the server lists (sc2, ghost), vertical, at the top of the gallery's right edge. |
+| R-VIEW-21 | [today] | `ghost-mix.spec`: the Ghost tab gives its dataset and panes; the scene, the camera and the selection stay. |
 | R-VIEW-22 | [today] | `game-tabs.spec`: a choice is stored, kept over a reload; a refused stored game falls back and stays stored. |
 | R-VIEW-23 | [today] | `game-tabs.spec`: with the gallery closed the tabs are at the window edge; a click opens the gallery. |
 | R-VIEW-24 | [today] | `game-tabs.spec`, `side.spec`: the handles at the bottom of each panel's right edge. |
 | R-VIEW-25 | [today] | `ui/gallery`: the panes from the game's categories. `units-ui.spec`, `doodads-ui.spec`, `datasets-ui.spec`. |
-| R-VIEW-26 | [plan] | Items carry their game; one game only today (step 7). |
+| R-VIEW-26 | [today] | `ghost-mix.spec`: a unit and a Ghost model selected together, moved, copied, pasted, stored with their games, back after a reload. |
 | R-VIEW-27 | [today] | `game-tabs.spec`: a game the server cannot open and one with no page module are disabled, the reason as the title. |
 | R-VIEW-28 | [today] | `side.spec` |
 | R-VIEW-30 to 33 | [today] | `datasets-ui.spec`, `datasets-api.spec` |
@@ -882,10 +890,10 @@ passed in it. Nothing here is [verified]: see section 2.
 | R-VIEW-74 to 77 | [today] | `scenes.spec` |
 | R-VIEW-80 | [today] | `viewer.spec` |
 | R-VIEW-81 | [today] | `displacement.spec`, `particles.spec` |
-| R-VIEW-82 | [plan] | |
+| R-VIEW-82 | [today] | The nod format: `ghost-look.spec` (a refused model fails with its message), `ghost-anim.spec` (clips refused with the reason), `make viewer-ghost-export-check` (changed files refused by NODExport). M3: not asserted. |
 | R-VIEW-90 | [today] | For the [today] rows only. |
-| R-VIEW-91 | [plan] | |
-| R-VIEW-92 | [today] | One format only: see the game specification. |
+| R-VIEW-91 | [plan] | Step 7: two games (sc2, ghost) and two formats (m3, nod) pass their tests. The contract tests are not yet one suite run per game. |
+| R-VIEW-92 | [today] | M3 and the six Ghost formats: see the game specifications. |
 | R-VIEW-93 | [today] | `AGENTS.md` |
 
 ## 13. Migration from the current code
@@ -1061,6 +1069,12 @@ runs while building; one full run, `full93`, with the operator's leave.
 | `sP-1` | The M3 probes behind `sc2viewer.probe` (6.3). `probe.spec` (new, 2 tests: a probe answers, the old names are gone, an unknown format or name is an error) and the 10 files that call a probe: 38 passed. |
 | `full96` | Start 21:40:12 UTC, on HEAD `fe40bfe` with steps 5 and 6 uncommitted. Every test, `@slow` too. 321 tests: 321 passed. Exit 0, 325 s. It closes step 6. |
 | `live5` to `live7` | The real server, as `live1`. `live5`: 1 passed, 4 failed; `live6`: 3 passed, 2 failed. Both used the ids from before step 6 (`#unit-search`, `#races`, `#unit-count`, `#panel-tab`, `#preview-add`, drawer `panel`); the live test now uses the new ids. `live7`: 5 passed. |
+| `gh1` to `gh7` | Step 7, the Ghost game and the nod format (below). `gh1` (7 files): 35 passed, 4 failed: the anim tests read the record without its dataset; a refused model failed as "cannot load" (the host now throws the format's reason). `gh2`: 24 passed, 3 failed: `zergling.nms` holds a clip for Nova's bones, left out by the format (SPEC-VIEWER-GHOST O-GHOST-15); the tests now expect it. `gh3`: 4 passed, 1 failed (motion names repeat; the negative counts them). `gh4` (`ghost-anim`): 5 passed. `gh5` (5 files): 43 passed, 1 failed (`ghost-mix`: the x field kept Ctrl+C; the test leaves it first). `gh6` (`ghost-mix`): 5 passed. `gh7` (the tab switch): 1 passed. |
+| `full97` | Start 08:42:01 UTC. Every test. 334 passed, 2 failed, 6 did not run. `scenes.spec` used `ghost` as the game the server lacks; it uses `nogame` now. `side.spec`: a missing M3 file was reported as "[object Response]"; the host now throws only an Error a format gave. The 6 that did not run wait on `main`. |
+| `full98` | Start 08:50:24 UTC, on HEAD `b2ca220` with step 7 uncommitted; nodsdk fork `cdef57b`. Every test, `@slow` too. 348 tests: 348 passed. Exit 0, 346 s. |
+| `gh8` | The commit hook read the GLSL `void main()` inside `src/formats/nod/shaders.ts` as a discarded JS call. The shaders moved to `public/shaders/nod.vert` and `nod.frag`, as the other page shaders; each model waits for them. New negative: without `nod.frag` a model fails, the file named. 6 files: 43 passed. |
+| `full99` | Start 09:01:02 UTC, as `full98` plus `gh8`. Every test, `@slow` too. 349 tests: 349 passed. Exit 0, 339 s. It closes step 7. |
+| `live8` | The dev server after `make viewer-restart`, as `live1`, with one Ghost case added: the Ghost tab, `zerg_critter` from its gallery, drawn (6571 pixels), `stand` playing, stored as `ghost`/`build`, back after a reload, no failed request. 6 passed. `live9`: the same after the shader move of `gh8` and a second `make viewer-restart`: 6 passed, the same 6571 pixels. |
 
 - Library HEAD `7ac1103a`, 55 patches.
 - `t-scenes`: the test read a doodad's name from `unit`; it is in
@@ -1133,6 +1147,18 @@ runs while building; one full run, `full93`, with the operator's leave.
   `geometry.ts`, `probe.ts`, `testapi.ts`. `features/focus` is gone.
   The bus is `bus.ts`, not `events.ts`: a `.ts` file of that name hides
   `events.d.ts`, the library's `events` module (O-VSPEC-1c).
+- Step 7 built StarCraft: Ghost (SPEC-VIEWER-GHOST). Server:
+  `core/backend.ts` `GameUnavailable`, `UnavailableGame`; the protocol
+  lists a game that is not available with its reason and answers its
+  routes 503; `server/main.ts` starts sc2, then tries ghost;
+  `src/games/ghost/server/`. Page: `Clip`, `Placement.clips`,
+  `FormatModule.attachClips` (6.3), `ApiClient.assetUrl`; `instanceOf` is
+  async and waits for the clips; `src/games/ghost/page/`,
+  `src/formats/nod/`, both registered in `src/page/main.ts`. Shared:
+  `src/games/ghost/shared/records.ts`. New tests: `ghost-api`,
+  `ghost-unavailable`, `ghost-page`, `ghost-anim`, `ghost-look`,
+  `ghost-mix` (helpers `tests/ghost.mjs`). Changed: `server.spec`,
+  `game-tabs.spec` (two games), `scenes.spec` (`nogame`).
 
 Order of work:
 
@@ -1153,7 +1179,7 @@ Order of work:
 6. Game tabs and handles, the generic gallery, and the features on the
    context of 6.6 (no page object), the format probes of 6.3. Done,
    above (`full96`: 321 passed).
-7. The second game and the second format.
+7. The second game and the second format. Done, above (`full99`).
 8. Tests to TypeScript. Documents to the final state.
 
 Each step ends with a full run, once the operator allows it. Until then

@@ -46,9 +46,13 @@ export function createHost(formats: readonly FormatModule[], setStatus: (text: s
   const viewer = new ModelViewer(canvas, { alpha: false, antialias: true });
   for (const format of formats) for (const handler of format.handlers) viewer.addHandler(handler);
   // The library reports failures as events. Show them; never drop them.
+  // A format that refuses a file throws an Error with the reason; loadModel
+  // throws it on. A fetch that fails gives a Response, not a reason.
+  const reasons = new Map<string, string>();
   viewer.on('error', (e: ViewerError) => {
     console.warn('viewer:', e.error, e.fetchUrl || '', e.reason || '');
     const url = text(e.fetchUrl);
+    if (url && e.reason instanceof Error) reasons.set(url, e.reason.message);
     setStatus(`${text(e.error)} ${url ? decodeURIComponent(url) : ''}`, { failure: true });
   });
   // Two scenes: the sky, drawn first around a camera at the origin, and the
@@ -80,9 +84,15 @@ export function createHost(formats: readonly FormatModule[], setStatus: (text: s
     return null;
   }
 
+  /** The model at `url`; null when no format took it; its format's reason as an error when it refused it. */
   async function loadModel(url: string, solver: (src: unknown) => unknown): Promise<ViewerModel | null> {
+    reasons.delete(url);
     const found = adopted(await viewer.load(url, solver));
-    return found ? found.model : null;
+    if (found) return found.model;
+    const reason = reasons.get(url);
+    reasons.delete(url);
+    if (reason) throw new Error(reason);
+    return null;
   }
 
   function formatOf(model: ViewerModel): FormatModule {

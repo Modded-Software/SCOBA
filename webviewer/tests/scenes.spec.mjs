@@ -233,14 +233,14 @@ test('negative: a file that fails the check is refused, names the fault, and cha
 test('an item the server does not have is reported and left out; the other items are added', async ({ page }) => {
   await open(page);
   const missing = sceneItem({ category: 'units', record: 'NoSuchUnitXyzzy', variant: null });
-  const otherGame = sceneItem({ category: 'units', record: 'Marine', variant: null }, { game: 'ghost' });
+  const otherGame = sceneItem({ category: 'units', record: 'Marine', variant: null }, { game: 'nogame' });
   const noCategory = sceneItem({ category: 'nosuch', record: 'Marine', variant: null });
   await call(page, 'importText', sceneText([missing, MARINE, otherGame, noCategory]));
   await settled(page);
   expect(await units(page)).toEqual(['Marine']);
   const messages = await log(page);
   expect(messages).toContain('NoSuchUnitXyzzy');
-  expect(messages).toContain('scene item 3: game "ghost": the server has no game "ghost"');
+  expect(messages).toContain('scene item 3: game "nogame": the server has no game "nogame"');
   expect(messages).toContain('scene item 4: no category "nosuch"');
 });
 

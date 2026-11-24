@@ -231,6 +231,10 @@ export function createDatasets(registered: readonly PageGame[], store: Store, ev
       // What a model names (its textures) is an in-model path; a URL of ours is taken as it is.
       return (src) => (typeof src === 'string' && !src.startsWith('/') ? routes.asset(of, id, 'texture', src, v) : src);
     },
+    assetUrl: (kind, reference, dataset = null, of = game()) => {
+      const id = datasetOf(dataset, of);
+      return routes.asset(of, id, kind, reference, version(id, of));
+    },
     iconUrl: (name, dataset = null, of = game()) => routes.icon(of, datasetOf(dataset, of), name),
     dataset: () => (gameId === null ? null : stateOf().current),
     currentDataset: (of = game()) => stateOf(of).current,

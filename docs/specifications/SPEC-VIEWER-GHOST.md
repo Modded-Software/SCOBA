@@ -1,9 +1,11 @@
 # SPEC-VIEWER-GHOST: StarCraft: Ghost in the Asset Viewer
 
 **Date:** 2026-11-24
-**Status:** Design. Built: the NOD, NAD, NSA, NMS, NOT and DDS surveys
-(section 9), on the parsers of our nodsdk-scghost fork. Nothing in the
-viewer yet.
+**Status:** Built. The NOD, NAD, NSA, NMS, NOT and DDS surveys (section
+9), on the parsers of our nodsdk-scghost fork; NODExport (section 7); the
+`ghost` game on the server (sections 5, 8) and in the page; the `nod`
+format (section 7). Section 9 names the test runs. Section 10 lists what
+only the operator can judge.
 Every file layout below carries its source. Only the rows marked [checked]
 or [survey] were measured on the real files. A row marked [docs] or [scripts] is a
 claim by someone else and may be wrong: section 4.3 lists those found
@@ -219,12 +221,31 @@ Bone pose, per bone, parents first [docs]:
 2. global = parent's global x local; a bone without a parent takes local;
 3. matrix = global x move(-offset).
 
+Bone pose as built (`src/formats/nod/clips.ts`) [checked]:
+
+1. rest place = parent's `offset` - bone's `offset`; a bone without a
+   parent: - its `offset`;
+2. local = move(rest place + track position) x turn(Z x Y x X, degrees);
+3. global = parent's global x local;
+4. matrix = global x move(`offset`).
+
+The bone's `position` and `orientation` are not read. With them, the rest
+pose of 18 models breaks (O-GHOST-14). With the built reading the rest
+pose of `zergling`, `lurker_alt` and `Zangakar` stands at the file
+positions to below 1e-4 (worst 3e-8); with the [docs] sign of `offset`
+each bone moves by twice its rest place (section 9, `ghost-page`).
+
+A motion set may hold a clip for another model's bones. `zergling.nms` lists
+`deathblown`, `nova_death_byZergling.nad`: Nova's side of a paired death.
+Its track 11 names bone 32; the zergling has 32 bones. The viewer leaves
+such a clip out and names it (section 7).
+
 What decides the open parts of this:
 
 | Part | Source | Decided by |
 | --- | --- | --- |
-| The meaning of `offset` | [docs] | the rest-pose test of section 9: a wrong reading moves the vertices |
-| The range of `t` inside a key | [docs] | Decided [survey]: frames since the key (4.2, key joins). |
+| The meaning of `offset` | [docs] | Decided [checked]: the rest-pose test of section 9. The [docs] sign is wrong (4.3). |
+| The range of `t` inside a key | [docs] | Decided [survey]: frames since the key (4.2, key joins). The page probe agrees on the zergling's clips: 18347 of 18352 joins hold in frames, 8315 in 0..1. |
 | The order of the three angles | [docs]. [code] has one builder of a turn from three angles, `mathMatrix_Build34`: the X angle first, then Y, then Z, on row vectors. [code] does not show that a clip uses it. | no test of this document. A pose with no clip has all angles 0, so the rest-pose test cannot see the order. It is an operator check (section 10, O-GHOST-9). |
 
 ### 4.3 Where the sources are wrong
@@ -237,6 +258,7 @@ What decides the open parts of this:
 | [docs] file counts ("about 80 models") | 1401 `.nod`. |
 | [docs] a material is found in the NSA files | Only 908 of the 1340 material names are in an NSA file [survey]. [code] goes on to a `.nas` file, then to the texture of the same name (4.4). |
 | [code] mesh group: bone count at 0x2A, palette at 0x2D, vertex set at 0x42 | A palette at 0x2D and a vertex set at 0x42 lie past the end of a 56-byte group. The files have them at 0x21 and 0x36, and the bone count at 0x35 (4.1). |
+| [docs] bone matrix = global x move(-offset) | With that sign each bone moves by twice its rest place. The files fit move(+offset), with the rest place from the offsets (4.2). |
 
 ### 4.4 NSA, the materials
 
@@ -441,8 +463,10 @@ declared levels and leaves the rest.
 The game is left-handed with Z up: X right, Y forward [docs]. The viewer
 is right-handed with Z up. The export keeps the file's axes, so bones and
 clips need no conversion. The format module mirrors Y after skinning and
-turns each triangle round. The normals test of section 9 decides whether
-this is right.
+turns each triangle round. The axes test of section 9 confirms it: as
+drawn, 76 of 76 (`crate`), 1372 of 1382 (`zergling`), 5959 of 5961
+(`nova`) and 3656 of 3657 (`lurker`) triangles face their vertex normals;
+unmirrored, at most 10.
 
 ## 5. Categories
 
@@ -547,10 +571,37 @@ Refusals (R-VIEW-82), each with the file and the value:
 
 Capabilities: none. No team colour, no tint, no texture override.
 
-Probes for tests: `layout` (counts, strides, group table), `groups` (per
-group: material, kind drawn, triangles), `bones` (matrices now),
-`positions` (skinned positions now, computed in the page from the same
-matrices).
+A clip that fails is left out; the others play. `attachClips` returns
+the clips left out, each with its reason (HTTP status, or the check that
+refused it). Core names them in the status and the console (core
+specification, 6.4). A model the exporter refused (`{error}` in the
+container) fails to load with that message.
+
+The shaders are `public/shaders/nod.vert` and `nod.frag`, served as the
+other page shaders. The handler fetches them once; every model waits for
+them (the library's blockers). Without them a model fails to load and the
+file is named. The model is drawn with Y mirrored after skinning and each
+triangle turned round (4.8). Per material (4.4): the shader table gives a kind
+`solid`, `cutout`, `add` or `blend`. `sky`, `invis`, `video` and
+`constraint_*` are not drawn and not named. An unknown shader, a material
+no step finds, a material missing from the export and a missing texture
+are not drawn and named in the model's `undrawn` list. `cull cull_off`
+draws both sides; else back faces are culled.
+
+Probes for tests (`window.sc2viewer.probe('nod', name, ...)`):
+
+| Probe | Gives |
+| --- | --- |
+| `layout` | vertex and index counts, stride, bones, material names, group table |
+| `groups` | per group: material, kind drawn (null: not drawn), shader, triangles, texture and whether it loaded, why it is not drawn, whether the last frame drew it |
+| `bones` | the clip, the playhead, bone matrices and globals now |
+| `positions` | skinned positions now (Y mirrored), every n-th vertex; the file's positions of the same vertices |
+| `axes` | per triangle: whether its corners face its vertex normals, as drawn and unmirrored |
+| `holdAt` | plays clip n, holds the playhead at a time |
+| `joins` | key joins of every clip, with `t` in frames and in 0..1 |
+| `poseFinite` | whether every bone matrix is finite |
+| `boneSpread` | the mean distance of skinned vertices from their main bone, the palette as read and shifted |
+| `triangles` | the drawn corners of one group |
 
 Known gaps, not drawn as the game does: environment maps, detail and glow
 layers, bump maps, vertex colours, blend shapes, detail levels 1 to 3, key
@@ -562,17 +613,32 @@ tags, motion flags, markers.
 
 | Part | Holds |
 | --- | --- |
-| `server/` | the index of the build, the NSA, NMS and NOT readers, the two categories, file and asset serving |
-| `page/` | `place`, `describe`, the resolver |
+| `server/build.ts` | the settings (`GHOST_PATH`, `NODSDK_EXPORT`), the index of the build, its signature, file lookup without regard to case |
+| `server/exporter.ts` | NODExport runs, the cache `<cache>/ghost/<signature>/`, the model container |
+| `server/catalog.ts` | the two categories from `NODExport catalog`, filters and search |
+| `server/index.ts` | `startGhost`: the game for the protocol |
+| `page/` | `place`, `describe`, the rest animation, the gallery parts |
 | `shared/` | the actor and model record types |
 
-`asset` kinds: `texture` by texture name; `material` by material name,
-answered as JSON; `animation` by clip name.
+`asset` kinds: `texture`, a `.dds` path relative to the build; `material`
+by material name, answered as JSON (a control character in the name gives
+400); `animation` by clip name, answered as the clip's JSON.
+
+The model container that `/api/ghost/file` serves: `NODX`, uint32
+version 1, uint32 JSON length (the JSON padded with spaces to 4 bytes),
+the JSON `{model, materials}` or `{error}`, then the binary of
+`NODExport nod`.
+
+When `GHOST_PATH` is not set, when it has no `3D/Models`, or when
+NODExport is not built, the game is listed as not available with the
+reason. Its routes answer 503 `{error: "game not
+available", game, reason}`; the tab is disabled (core specification, 13).
 
 ## 9. Tests
 
-All [plan] but the surveys. Each needs `GHOST_PATH`. Without it
-the run fails and names the setting; it does not pass.
+Each needs `GHOST_PATH`. Without it the run fails and names the setting;
+it does not pass. `ghost-unavailable` is the one that runs without it, on
+a second server.
 
 Survey tools (R-VIEW-92), one per format, over every file:
 
@@ -604,25 +670,29 @@ decide the run.
 | `ex-1` (2026-11-24, fork `3fce318`, `make viewer-ghost-export-check`) | 18 of 18 passed, exit 0: all 1401 models and 1551 clips export; binary sizes match; materials resolve; changed copies refused (version 9, vertex type 6, cut file, 4 extra bytes; clip version 3, 4 extra bytes), no binary written |
 | `ex-2` (2026-11-24, fork `cdef57b`) | 26 of 26 passed, exit 0: the checks of `ex-1`, plus the catalog: 1223 templates and `scourge_track` refused, 858 with a model, 426 with a motion set, 163 sets with 2027 entries, 1401 models; a folder without `3D/Models` refused |
 | `gs-neg-dds` | one texture cut to 40000 bytes: reported short (39872 of 87392 bytes); the DDS checks failed, exit 1 |
+| `gh1` to `gh8` (2026-11-24) | the Ghost specs while building; their failures and fixes are in the core specification, section 13 |
+| `full99` (2026-11-24, HEAD `b2ca220` with step 7 uncommitted, fork `cdef57b`) | the whole viewer suite, the Ghost specs of the table below among it: 349 of 349 passed, exit 0 |
 
-In the page:
+On the server and in the page (Playwright, `webviewer/tests/`):
 
-| Claim | Test | Negative |
-| --- | --- | --- |
-| Contract | the contract tests of the core specification, for `ghost` | unknown ids give `404` |
-| Not available | started without `GHOST_PATH`: the tab is disabled with the reason | the other game still passes |
-| Static model | `crate.nod`: probes give 1 group and the triangle count of the file; the pick draw finds it at its centre | the pixel beside it finds nothing |
-| Axes | for each triangle, the normal from its corners points the way of its vertex normals, for nearly all triangles of 4 models | the same test on unmirrored data fails |
-| Rest pose | a skinned model with no clip: skinned positions equal the file's positions. This proves the palette, the weights and `offset`. It does not prove the angle order. | a palette read one byte off moves the vertices |
-| Animation | `zergling` with `stand`: bone matrices differ between two times; skinned positions stay inside a few times the rest box | `crate`: no motion menu entries, matrices do not change |
-| Key joins | for every key of the 4 zergling clips but the last of a track: the curve at the key's end equals the next key's value, within a small error | the same test with `t` read the other way (frames, or 0 to 1) fails |
-| Clip end | the pose at the last frame holds no not-a-number | |
-| Shared model | two actors with one model file and different motion sets, if the build has such a pair: each instance lists its own motions | |
-| Materials | a `masked` group is found by the pick draw only where its texture is solid; a `sky` group is in no draw | a group with an unknown `shader` is named and not drawn |
-| Material lookup | `zergling.nod` and `crate.nod` draw with a texture, though their material is in no archive (4.4, step 3) | a group named `collide` is not drawn, and named |
-| Refusal | bytes of a real file, changed in memory: version 9, a cut file, a vertex type 6. Each is refused with its message. | the unchanged bytes are read |
-| Capabilities | | an instance of this game has no team colour control and no "hd" box |
-| Two games | one instance of each game: selected together, moved, copied, pasted, saved in the address, back after a reload | |
+| Claim | Spec | Test | Negative |
+| --- | --- | --- | --- |
+| Contract | `ghost-api` | available; one dataset `build`, two categories with the counts of the catalog; filters and search; the shared model; the container; clips and materials as JSON | unknown ids give 404; unsafe paths and wrong kinds are refused |
+| Not available | `ghost-unavailable`, `game-tabs` | a server without `GHOST_PATH` lists ghost as not available with the setting named; the tab is disabled with the reason | its routes answer 503; `sc2` still answers |
+| Static model | `ghost-page` | `crate.nod`: 1 group, the triangle count of the file, textured; the pick finds it at its pixel | a pixel 300 px beside it, on the canvas, finds nothing |
+| Axes | `ghost-page` | above 95% of the triangles of `crate`, `zergling`, `nova`, `lurker` face their vertex normals as drawn | unmirrored: below 5% |
+| Rest pose | `ghost-page` | `zergling`, `lurker_alt`, `Zangakar` with no clip: skinned positions equal the file's to 1e-4 | the [docs] sign of `offset` moves bones by more than 0.01 |
+| Palette | `ghost-mix` | each skinned vertex is nearer its main bone with the palette as read | read one bone off: the mean distance is above 1.25 times |
+| Animation | `ghost-anim` | `zerg_critter`: its set's clips, rest sequence `stand`; the pose moves between two playheads; finite past the end | the same playhead gives the same pose; `crate` (`ghost-mix`) has no sequences and no bone moves |
+| Key joins | `ghost-anim` | more joins hold with `t` in frames than in 0..1; raw counts logged | the 0..1 reading |
+| Shared model | `ghost-anim` | `zerg_critter` and `zergling_burrowed`, one file: each lists its own set's motions | the two lists differ |
+| Clips left out | `ghost-anim` | a clip answered 404 and the foreign `deathblown` are left out; the status says 2; the console names the 404 one. Alone, the foreign clip is named with the bone it lacks | one sequence of the dropped name fewer |
+| Materials | `ghost-look` | a `cutout` group of `AR_Plant_Vine_01` is picked inside fewer of its triangles than the solid `crate` (5 points lower or more); `sky` is not drawn and not named | an unknown shader (`dynamic`) and a material no step finds (`pCannon_collide`) are named and not drawn |
+| Material lookup | `ghost-mix` | `zergling` and `crate` draw every group with a texture; `undrawn` is empty | |
+| Refusal | `ghost-look`; `ex-1` | a container with `{error}` fails to load with its message; the changed files of `ex-1` are refused by NODExport | another model of the game still loads |
+| Shader files | `ghost-look` | | `nod.frag` answered 404: the model fails with "nod: 404 /shaders/nod.frag" and is not added |
+| Capabilities | `ghost-mix` | the SC2 unit's row has the team control, its state `hd` | the Ghost row has no team control, its state no `hd` |
+| Two games | `ghost-mix` | a unit and a model: selected together, moved, copied, pasted off the view, stored with their games, back after a reload | each comes back as its own game's file |
 
 ## 10. Operator checks
 
@@ -631,6 +701,9 @@ In the page:
 - Whether an animation moves as it does in the game. This is also the
   only check of the angle order (4.2).
 - The size of this game's models next to the other game's.
+- Whether a `cutout`, `add` or `blend` group looks right: the tests prove
+  only which groups are drawn and where the pick finds them.
+- The game tabs, the gallery of this game and its filter buttons.
 
 ## 11. Deferred
 
@@ -642,7 +715,7 @@ terrain, the special shader looks of 4.4, sound.
 
 | ID | Point |
 | --- | --- |
-| O-GHOST-1 | `nod-survey` passed over all 1401 files (4.1). The rest-pose test is still to run; until it passes, G2 is not done. The bytes at 0x1E (0 or 2) and 0x20 (0 to 255) are not understood; 0x1F and 0x37 are always 0. |
+| O-GHOST-1 | `nod-survey` passed over all 1401 files (4.1). The rest-pose test passed (section 9). The bytes at 0x1E (0 or 2) and 0x20 (0 to 255) are not understood; 0x1F and 0x37 are always 0. |
 | O-GHOST-2 | Closed by the review: id 13 names the motion set (4.6). `not-survey` asserts it. |
 | O-GHOST-3 | Closed by `nad-survey`: the 12-byte track header reads all 1551 clips to their last byte, and `t` is in frames (4.2). No clip has shape tracks. Open: 1791 key joins of 633369 miss in frames, not explained. |
 | O-GHOST-4 | Motion flags are not acted on. `noloop` could set how a motion starts. Not decided. |
@@ -655,3 +728,5 @@ terrain, the special shader looks of 4.4, sound.
 | O-GHOST-11 | 79 material names (163 slots) are found by no step of 4.4. They are not drawn. |
 | O-GHOST-12 | 540 textures have bytes past their declared levels, most often one block. What they hold is not known. |
 | O-GHOST-13 | 90 template properties use ids 177 to 184, past the engine table of [sdk]. `scourge_track` has an empty `basedon`. Both are reported; neither is read. |
+| O-GHOST-14 | A bone's `position` is not `parent offset - offset` in 18 models, and its `orientation` is not the identity in some (`lurker_alt`, `Zangakar`, `Goliath_test`, `4_4_Free_Prison`). The rest pose fits the files only with both unread (4.2). What they are for is not known. |
+| O-GHOST-15 | Motion sets list clips for another model's bones: the victim's side of a paired death (`zergling.nms`: `deathblown`). They are left out and named. Playing them on the other actor is not designed. |

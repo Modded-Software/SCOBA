@@ -92,12 +92,20 @@ test('the page bundle is served; nothing else under its folder', async ({ reques
 });
 
 test('health and games name the games; no counts', async ({ request }) => {
-  expect(await (await request.get(api.health)).json()).toEqual({ games: [{ id: 'sc2', available: true }] });
+  // The test server has GHOST_PATH (ghost-unavailable.spec starts one without it).
+  expect(await (await request.get(api.health)).json()).toEqual({
+    games: [
+      { id: 'sc2', available: true },
+      { id: 'ghost', available: true },
+    ],
+  });
   const games = await (await request.get(api.games)).json();
   expect(games.default).toBe('sc2');
-  expect(games.games).toEqual([expect.objectContaining({ id: 'sc2', available: true, reason: null })]);
-  expect(typeof games.games[0].label).toBe('string');
-  expect(typeof games.games[0].tab).toBe('string');
+  expect(games.games).toEqual([expect.objectContaining({ id: 'sc2', available: true, reason: null }), expect.objectContaining({ id: 'ghost', available: true, reason: null })]);
+  for (const game of games.games) {
+    expect(typeof game.label).toBe('string');
+    expect(typeof game.tab).toBe('string');
+  }
 });
 
 test('the categories are the gallery tabs, with their filters', async ({ request }) => {
@@ -117,8 +125,9 @@ test('a route that reads a dataset needs one, and a known one', async ({ request
 });
 
 test('unknown games, categories, kinds and methods are refused', async ({ request }) => {
-  expect((await request.get('/api/ghost/datasets')).status()).toBe(404);
+  expect((await request.get('/api/nogame/datasets')).status()).toBe(404);
   expect((await request.get('/api/SC2/datasets')).status()).toBe(404);
+  expect((await request.get('/api/GHOST/datasets')).status()).toBe(404);
   expect((await request.get(api.records('nosuch'))).status()).toBe(404);
   expect((await request.get(api.record('nosuch', 'Marine'))).status()).toBe(404);
   expect((await request.get(api.asset('Assets/Textures/marine_diffuse.dds', 'scoba', 'sound'))).status()).toBe(400);

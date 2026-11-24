@@ -3,7 +3,7 @@
 // real route.
 
 import { ASSET_KINDS, ID_RULE, LIMIT, type AssetKind, type GamesBody, type HealthBody } from '../../shared/protocol';
-import { HttpError, type GameBackend, type ListQuery } from './backend';
+import { HttpError, type GameBackend, type ListQuery, type UnavailableGame } from './backend';
 import { intParam, json, sendFile, type Request, type Route } from './http';
 
 /** Query parameters that are not filters. */
@@ -105,11 +105,21 @@ async function gameRoute(game: GameBackend, rest: readonly string[], request: Re
   }
 }
 
-/** The protocol's routes over `games`; the first game is the default one. */
-export function protocol(games: readonly GameBackend[]): Route {
+/**
+ * The protocol's routes over `games`; the first game is the default one.
+ * `unavailable` are the games that could not start: listed, with their
+ * reason, and their routes answer 503 (SPEC-VIEWER 7, 8).
+ */
+export function protocol(games: readonly GameBackend[], unavailable: readonly UnavailableGame[] = []): Route {
   const byId = new Map(games.map((game) => [game.id, game]));
+  const down = new Map(unavailable.map((game) => [game.id, game]));
   const first = games[0];
   if (!first) throw new Error('no game registered');
+  const health: HealthBody = { games: [...games.map((g) => ({ id: g.id, available: true })), ...unavailable.map((g) => ({ id: g.id, available: false }))] };
+  const listed: GamesBody = {
+    default: first.id,
+    games: [...games.map((g) => ({ id: g.id, label: g.label, tab: g.tab, available: true, reason: null })), ...unavailable.map((g) => ({ id: g.id, label: g.label, tab: g.tab, available: false, reason: g.reason }))],
+  };
   return async (request) => {
     const { route, res } = request;
     if (route !== '/api' && !route.startsWith('/api/')) return false;
@@ -118,17 +128,18 @@ export function protocol(games: readonly GameBackend[]): Route {
       const [head, ...rest] = parts;
       if (head === 'health' && rest.length === 0) {
         method(request, 'GET');
-        const body: HealthBody = { games: games.map((g) => ({ id: g.id, available: true })) };
-        json(res, 200, body);
+        json(res, 200, health);
         return true;
       }
       if (head === 'games' && rest.length === 0) {
         method(request, 'GET');
-        const body: GamesBody = { default: first.id, games: games.map((g) => ({ id: g.id, label: g.label, tab: g.tab, available: true, reason: null })) };
-        json(res, 200, body);
+        json(res, 200, listed);
         return true;
       }
-      const game = head !== undefined && ID_RULE.test(head) ? byId.get(head) : undefined;
+      const known = head !== undefined && ID_RULE.test(head);
+      const off = known ? down.get(head) : undefined;
+      if (off) throw new HttpError(503, { error: 'game not available', game: off.id, reason: off.reason });
+      const game = known ? byId.get(head) : undefined;
       if (!game) throw new HttpError(404, { error: 'no such game', game: head ?? '' });
       await gameRoute(game, rest, request);
     } catch (error) {
