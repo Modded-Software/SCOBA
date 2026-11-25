@@ -20,7 +20,10 @@ from .results import Made, Original
 from .store import GameStore
 
 # What a state says of an open request. `pid` and `started` name its program, while it has not failed.
-REQUEST_KEYS = ("state", "reason", "step", "steps", "planes", "pid", "started")
+# `log` is the path of its log: the reader serves the file and keeps the path from the page.
+REQUEST_KEYS = (
+    "state", "reason", "step", "steps", "planes", "done", "variant", "since", "log", "pid", "started",
+)  # fmt: skip
 
 
 class VariantState(TypedDict):
@@ -37,6 +40,8 @@ class VariantState(TypedDict):
     numbers: list[limits.Band]
     problems: list[limits.Missed]
     accepted: bool
+    edited: bool  # a person made it: its numbers have no band and make no problem
+    reference: str  # the variant its numbers compare with; empty: the original
     path: str
     sha256: str
 
@@ -57,7 +62,10 @@ def _variants(game: GameStore, texture: Texture, made: dict[str, Made]) -> list[
     found: list[VariantState] = []
     for recipe, one in sorted(made.items()):
         entry = one.entry
+        edited = results.user_made(entry)
         numbers = limits.bands(entry["numbers"], texture.tiles)
+        if edited:
+            numbers = limits.unbound(numbers)
         for size in sorted(one.sizes(), reverse=True):
             variant = variants.variant_id(recipe, size)
             found.append({
@@ -72,6 +80,8 @@ def _variants(game: GameStore, texture: Texture, made: dict[str, Made]) -> list[
                 "numbers": numbers,
                 "problems": list(one.missed),
                 "accepted": one.accepted,
+                "edited": edited,
+                "reference": str(entry.get("reference", "")),
                 "path": str(game.variant_file(texture.origin, recipe, size)),
                 "sha256": entry["files"][str(size)]["sha256"],
             })  # fmt: skip

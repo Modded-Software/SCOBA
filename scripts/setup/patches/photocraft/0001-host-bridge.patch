@@ -1,0 +1,294 @@
+diff --git a/apps/photocraft-web/Cargo.toml b/apps/photocraft-web/Cargo.toml
+index 7054d67..01ee78f 100644
+--- a/apps/photocraft-web/Cargo.toml
++++ b/apps/photocraft-web/Cargo.toml
+@@ -35,7 +35,7 @@ rfd = { workspace = true }
+ wasm-bindgen = "0.2"
+ wasm-bindgen-futures = "0.4"
+ js-sys = "0.3"
+-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement", "DomRect", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Location", "CssStyleDeclaration", "Storage", "Event", "EventTarget", "MouseEvent", "PointerEvent", "BeforeUnloadEvent", "AbortController", "AbortSignal", "DomException", "Response", "IdbFactory", "IdbOpenDbRequest", "IdbDatabase", "IdbRequest", "IdbTransaction", "IdbTransactionMode", "IdbObjectStore", "IdbCursor", "IdbCursorWithValue", "RequestInit", "RequestMode", "Navigator", "ErrorEvent", "PromiseRejectionEvent"] }
++web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement", "DomRect", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Location", "CssStyleDeclaration", "Storage", "Event", "EventTarget", "MouseEvent", "PointerEvent", "BeforeUnloadEvent", "AbortController", "AbortSignal", "DomException", "Response", "IdbFactory", "IdbOpenDbRequest", "IdbDatabase", "IdbRequest", "IdbTransaction", "IdbTransactionMode", "IdbObjectStore", "IdbCursor", "IdbCursorWithValue", "RequestInit", "RequestMode", "Navigator", "ErrorEvent", "PromiseRejectionEvent", "Headers", "XmlHttpRequest"] }
+ 
+ [dev-dependencies]
+ serde_json = { workspace = true }
+diff --git a/apps/photocraft-web/src/host.rs b/apps/photocraft-web/src/host.rs
+new file mode 100644
+index 0000000..2aa155a
+--- /dev/null
++++ b/apps/photocraft-web/src/host.rs
+@@ -0,0 +1,159 @@
++//! The host bridge: PhotoCraft in a frame of a page that owns the document.
++//!
++//! Not upstream code. A patch of the SCOBA project (SPEC-PHOTOCRAFT section 6).
++//!
++//! With `?host=<path>` in the page address, `<path>` names routes on the page's own origin:
++//! - at start the app asks `GET <path>/scratch` and opens the reply as a document; the reply's
++//!   `x-photocraft-name` header is the document's file name;
++//! - a save under a name ending in `.psd` is sent with `PUT <path>/scratch` and waited for, in
++//!   place of the browser download, so the save is confirmed or refused;
++//! - any other write (an export) stays a browser download;
++//! - the app tells the parent page what happens, by `postMessage` to its own origin only:
++//!   `ready`, `opened`, `saved`, `failed` and `unsaved`.
++//!
++//! Without `host` the app is as upstream built it. The bridge takes no message from the page.
++
++use std::sync::OnceLock;
++
++use wasm_bindgen::JsCast as _;
++use wasm_bindgen::JsValue;
++
++/// The host's route prefix, once the page address was read: `None` without `?host=`.
++static HOST: OnceLock<Option<String>> = OnceLock::new();
++
++/// The header of the scratch reply that names the document.
++const NAME_HEADER: &str = "x-photocraft-name";
++
++/// The value every message to the page carries in `source`.
++const SOURCE: &str = "photocraft";
++
++fn js(error: JsValue) -> String {
++    format!("{error:?}")
++}
++
++/// The `host` value of a page query (`?a=b&host=%2Fapi%2Fx`), decoded.
++fn host_value(query: &str) -> Result<Option<String>, String> {
++    for pair in query.trim_start_matches('?').split('&') {
++        if let Some(raw) = pair.strip_prefix("host=") {
++            let decoded = js_sys::decode_uri_component(raw).map_err(|_| "the host value of the page address is not valid percent-encoding".to_string())?;
++            return Ok(Some(String::from(decoded)));
++        }
++    }
++    Ok(None)
++}
++
++/// A host value is a path on this origin: one leading `/`, then letters, digits, `/`, `_`, `-`
++/// and `.`, with no `..`. Anything else could name another origin or leave the host's routes.
++fn valid(host: &str) -> bool {
++    host.starts_with('/')
++        && !host.starts_with("//")
++        && !host.contains("..")
++        && !host.ends_with('/')
++        && host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '.'))
++}
++
++/// Reads the host value from the page query. An invalid one is an error the page must show: the
++/// app does not start as a plain editor in a frame that asked for a host.
++pub(crate) fn init(query: &str) -> Result<(), String> {
++    let host = host_value(query)?;
++    if let Some(value) = &host
++        && !valid(value)
++    {
++        return Err("the host value of the page address must be a path on this site, starting with one /".to_string());
++    }
++    // `init` runs once, at start: a second value is never set.
++    HOST.set(host).map_err(|_| "the host bridge was started twice".to_string())
++}
++
++fn host() -> Option<&'static str> {
++    HOST.get().and_then(|host| host.as_deref())
++}
++
++/// True when the page address named a host.
++pub(crate) fn active() -> bool {
++    host().is_some()
++}
++
++/// True when a write of `name` goes to the host: with a host, a name ending in `.psd`.
++pub(crate) fn takes(name: &str) -> bool {
++    active() && name.to_ascii_lowercase().ends_with(".psd")
++}
++
++/// One message to the parent page, to this origin only. Nothing without a host or a parent.
++fn post(kind: &str, fields: &[(&str, JsValue)]) {
++    if !active() {
++        return;
++    }
++    let Some(window) = web_sys::window() else { return };
++    let Ok(Some(parent)) = window.parent() else { return };
++    if js_sys::Object::is(&parent, &window) {
++        return;
++    }
++    let Ok(origin) = window.location().origin() else { return };
++    let message = js_sys::Object::new();
++    let set = |key: &str, value: &JsValue| js_sys::Reflect::set(&message, &JsValue::from_str(key), value).is_ok();
++    if !set("source", &JsValue::from_str(SOURCE)) || !set("type", &JsValue::from_str(kind)) || !fields.iter().all(|(key, value)| set(key, value)) {
++        log::error!("host bridge: could not build the {kind} message");
++        return;
++    }
++    if let Err(error) = parent.post_message(&message, &origin) {
++        log::error!("host bridge: could not post {kind}: {}", js(error));
++    }
++}
++
++/// The app runs.
++pub(crate) fn ready() {
++    post("ready", &[]);
++}
++
++/// The scratch is open as the document `name`.
++pub(crate) fn opened(name: &str) {
++    post("opened", &[("name", JsValue::from_str(name))]);
++}
++
++/// The editor cannot do its part: it did not start, or the scratch did not load.
++pub(crate) fn failed(reason: &str) {
++    log::error!("host bridge: {reason}");
++    post("failed", &[("reason", JsValue::from_str(reason))]);
++}
++
++/// Whether the editor holds work it has not saved; sent when it changes.
++pub(crate) fn unsaved(unsaved: bool) {
++    post("unsaved", &[("unsaved", JsValue::from_bool(unsaved))]);
++}
++
++/// `GET <host>/scratch`: the document's file name and bytes.
++pub(crate) async fn fetch_scratch() -> Result<(String, Vec<u8>), String> {
++    use wasm_bindgen_futures::JsFuture;
++    let host = host().ok_or("no host")?;
++    let url = format!("{host}/scratch");
++    let window = web_sys::window().ok_or("no window")?;
++    let init = web_sys::RequestInit::new();
++    init.set_mode(web_sys::RequestMode::SameOrigin);
++    let response: web_sys::Response = JsFuture::from(window.fetch_with_str_and_init(&url, &init)).await.map_err(js)?.dyn_into().map_err(|_| "not a Response")?;
++    if !response.ok() {
++        return Err(format!("the host answered HTTP {} for {url}", response.status()));
++    }
++    let name = response.headers().get(NAME_HEADER).map_err(js)?.filter(|name| !name.is_empty()).ok_or_else(|| format!("the host's reply for {url} has no {NAME_HEADER} header"))?;
++    let body = JsFuture::from(response.array_buffer().map_err(js)?).await.map_err(js)?;
++    Ok((name, js_sys::Uint8Array::new(&body).to_vec()))
++}
++
++/// `PUT <host>/scratch` with the saved document, waited for: `Ok` only when the host kept it.
++/// A synchronous request, as `Services::write` must answer before it returns.
++pub(crate) fn put_scratch(name: &str, bytes: &[u8]) -> Result<(), String> {
++    let host = host().ok_or("no host")?;
++    let url = format!("{host}/scratch");
++    let request = web_sys::XmlHttpRequest::new().map_err(js)?;
++    request.open_with_async("PUT", &url, false).map_err(js)?;
++    request.set_request_header("content-type", "application/octet-stream").map_err(js)?;
++    let body = js_sys::Uint8Array::from(bytes);
++    request.send_with_opt_buffer_source(Some(&body)).map_err(|error| format!("the save did not reach the host: {}", js(error)))?;
++    let status = request.status().map_err(js)?;
++    if !(200..300).contains(&status) {
++        let said = request.response_text().ok().flatten().unwrap_or_default();
++        return Err(format!("the host did not keep the save (HTTP {status}): {said}"));
++    }
++    post("saved", &[("name", JsValue::from_str(name))]);
++    Ok(())
++}
+diff --git a/apps/photocraft-web/src/main.rs b/apps/photocraft-web/src/main.rs
+index 6084619..55ccfa1 100644
+--- a/apps/photocraft-web/src/main.rs
++++ b/apps/photocraft-web/src/main.rs
+@@ -27,6 +27,9 @@ mod preset_bridge;
+ #[cfg(target_arch = "wasm32")]
+ mod indexed_presets;
+ 
++#[cfg(target_arch = "wasm32")]
++mod host;
++
+ #[cfg(target_arch = "wasm32")]
+ mod web;
+ 
+diff --git a/apps/photocraft-web/src/web.rs b/apps/photocraft-web/src/web.rs
+index 5f6b71e..2934669 100644
+--- a/apps/photocraft-web/src/web.rs
++++ b/apps/photocraft-web/src/web.rs
+@@ -59,6 +59,14 @@ pub fn start() {
+             return;
+         };
+         let q = query();
++        // The host bridge (crate::host): a bad host value stops the start, and says so in the page.
++        if let Err(reason) = crate::host::init(&q) {
++            log::error!("{reason}");
++            if let Some(el) = document.get_element_by_id("photocraft_loading") {
++                el.set_text_content(Some(&format!("PhotoCraft cannot start: {reason}")));
++            }
++            return;
++        }
+         let force_cpu = q.contains("cpu");
+         // `?free-mb=N`: the memory gates and the low-memory warning see only N MiB (diagnostics).
+         if let Some(mb) = crate::diagnostics::free_mb(&q) {
+@@ -116,10 +124,27 @@ pub fn start() {
+                     }
+                     let unsaved = Arc::new(AtomicBool::new(false));
+                     guard_unload(unsaved.clone());
+-                    Ok(Box::new(WebShell { app, inbox, place_inbox, unsaved, served, database, presets, ui_language: "" }))
++                    // The host's document: asked for once, opened through the inbox as a dropped file is.
++                    if crate::host::active() {
++                        let (inbox, ctx) = (inbox.clone(), cc.egui_ctx.clone());
++                        wasm_bindgen_futures::spawn_local(async move {
++                            match crate::host::fetch_scratch().await {
++                                Ok(file) => {
++                                    inbox.lock().unwrap_or_else(PoisonError::into_inner).push(file);
++                                    ctx.request_repaint();
++                                }
++                                Err(reason) => crate::host::failed(&reason),
++                            }
++                        });
++                    }
++                    Ok(Box::new(WebShell { app, inbox, place_inbox, unsaved, served, database, presets, ui_language: "", host_opened: false, host_unsaved: None }))
+                 }),
+             )
+             .await;
++        match &result {
++            Ok(()) => crate::host::ready(),
++            Err(e) => crate::host::failed(&format!("PhotoCraft failed to start: {e:?}")),
++        }
+         if let Some(el) = document.get_element_by_id("photocraft_loading") {
+             match result {
+                 Ok(()) => el.remove(),
+@@ -353,9 +378,31 @@ struct WebShell {
+     presets: crate::preset_bridge::Bridge,
+     /// The interface language whose served script font was last asked for.
+     ui_language: &'static str,
++    /// The host was told that its document is open (crate::host).
++    host_opened: bool,
++    /// What the host was last told about unsaved work.
++    host_unsaved: Option<bool>,
+ }
+ 
+ impl WebShell {
++    /// Tells the host page that its document opened, and when unsaved work appears or goes.
++    fn report_to_host(&mut self) {
++        if !crate::host::active() {
++            return;
++        }
++        if !self.host_opened
++            && let Some(st) = self.app.session.active()
++        {
++            self.host_opened = true;
++            crate::host::opened(&st.doc.name);
++        }
++        let unsaved = self.app.has_unsaved_work();
++        if self.host_unsaved != Some(unsaved) {
++            self.host_unsaved = Some(unsaved);
++            crate::host::unsaved(unsaved);
++        }
++    }
++
+     fn save_presets(&mut self, ctx: &egui::Context) {
+         if let Some(db) = self.database.clone()
+             && let Some(batch) = self.presets.begin()
+@@ -466,6 +513,7 @@ impl eframe::App for WebShell {
+         self.serve_fonts(ctx);
+         self.app.logic_frame(ctx, frame);
+         self.save_presets(ctx);
++        self.report_to_host();
+         self.app.finish_type_reset_logic(ctx);
+     }
+ 
+@@ -544,9 +592,11 @@ fn services(inbox: Inbox, place_inbox: PlaceInbox, cursor_pos: photocraft_ui_egu
+                 reply.send(Some(FileDialogAnswer::SaveTo(name)));
+             }
+         })),
+-        write: Some(Box::new(|path: &str, bytes: &[u8]| download(path, bytes))),
++        // With a host (crate::host) a PSD save goes to it and is waited for; anything else downloads.
++        write: Some(Box::new(|path: &str, bytes: &[u8]| if crate::host::takes(path) { crate::host::put_scratch(path, bytes) } else { download(path, bytes) })),
+         // A download may be cancelled and never reports back: it doesn't save the document.
+-        write_unconfirmed: true,
++        // A save the host answered did: with a host, writes are confirmed.
++        write_unconfirmed: !crate::host::active(),
+         encode_png: Some(Box::new(|w, h, rgba| {
+             let img = Image::from_u8(w, h, ChannelLayout::Rgba, rgba.to_vec()).map_err(|e| e.to_string())?;
+             photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &EncodeOptions::default()).map_err(|e| e.to_string())

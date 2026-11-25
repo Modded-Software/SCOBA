@@ -34,7 +34,7 @@ async function altDrag(page, from, to) {
   await page.keyboard.down('Alt');
   await page.mouse.move(from[0], from[1]);
   await page.mouse.down();
-  await page.mouse.move(to[0], to[1], { steps: 8 });
+  await page.mouse.move(to[0], to[1], { steps: 4 });
   await page.mouse.up();
   await page.keyboard.up('Alt');
 }
@@ -106,7 +106,7 @@ test('negative: a left drag on a unit without alt scrolls the camera and moves n
   const from = await onItem(page, marine);
   await page.mouse.move(from[0], from[1]);
   await page.mouse.down();
-  await page.mouse.move(from[0] + 80, from[1], { steps: 8 });
+  await page.mouse.move(from[0] + 80, from[1], { steps: 4 });
   await page.mouse.up();
   const after = await state(page);
   const item = await itemOf(page, marine);

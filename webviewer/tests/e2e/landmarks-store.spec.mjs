@@ -164,12 +164,12 @@ test('the exact camera, the grid toggle and the sky are back after a reload', as
     for (const key of keys) await page.keyboard.down(key);
     await page.mouse.move(box.x + 800, box.y + 400);
     await page.mouse.down({ button });
-    await page.mouse.move(box.x + 800 + dx, box.y + 400 + dy, { steps: 5 });
+    await page.mouse.move(box.x + 800 + dx, box.y + 400 + dy, { steps: 3 });
     await page.mouse.up({ button });
     for (const key of keys) await page.keyboard.up(key);
   };
   await drag('middle', [], 70, -30);
-  await drag('middle', ['Control'], -40, 25);
+  await drag('middle', ['Alt'], -40, 25);
   await drag('right', [], 55, 35);
   await drag('left', [], -60, 20);
   await page.mouse.wheel(0, 240);

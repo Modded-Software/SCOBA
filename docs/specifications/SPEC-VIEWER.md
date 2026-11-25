@@ -290,7 +290,11 @@ Replies are JSON unless a file is served.
 | `POST /api/<game>/textures/skin?dataset=` | a skin change of 4.8 of SPEC-HD-TEXTURES; the owner's state |
 | `POST /api/<game>/textures/bake?dataset=` | bakes an owner's skin, or a terrain texture's variant; the state |
 | `POST /api/<game>/textures/unbake?dataset=` | removes a bake; the state |
+| `POST /api/<game>/textures/remove?dataset=` | removes one variant of an asset (R-HD-146); the texture's state |
+| `GET /api/<game>/textures/log?dataset=&asset=&recipe=` | the log of an open or failed request, as text; 404 when the state has no such request |
 | `GET /api/<game>/textures/file?dataset=&asset=&variant=&v=` | a variant's file |
+| `any /api/<game>/textures/edit…` | the edit sessions (SPEC-PHOTOCRAFT 7) |
+| `GET /photocraft/<file>` | a file of the PhotoCraft editor site (SPEC-PHOTOCRAFT 7) |
 | `GET /texture-viewer.html`, `/vendor/texview.js` | the texture window's page and its script |
 
 - `dataset` is required wherever it appears.
@@ -412,6 +416,7 @@ under `viewer.`:
 | `view` | the grid switch, the backdrop and the ground texture (17.7) | grid on, no backdrop, no ground texture |
 | `landmarks` | the landmarks and the chosen one | none but the origin, none chosen |
 | `scene` | the id of the open scene | the newest scene, else a new one |
+| `edits.offered` | by edit session, the rendered planes whose transfer was offered (SPEC-PHOTOCRAFT 9.3) | none offered |
 
 - Each key has one parser. An object must have exactly its keys: a
   missing or an unknown key is refused. A backdrop and a ground texture
@@ -476,7 +481,8 @@ under `viewer.`:
   negative case answers textures with 500 and requires the fixture to
   record it.
 - The texture pipeline flows have one e2e test each (operator
-  2026-11-25): Save to Skin (`skin-editor`), the owner Upscale
+  2026-11-25): Save to Skin (none since `skin-editor` was deleted with
+  the skin editor, 2026-11-25), the owner Upscale
   (`texture-variants`), Bake (`texture-bake`), the texture window
   (`texture-window`), the ground picker (`ground-texture`). Their rules
   are unit tests (`texture-service-api`, `skin-choices`).
@@ -640,14 +646,35 @@ What the page does. A number here is a constant of the code.
 | Alt + left drag on an instance | moves it, and the whole selection when it is selected |
 | Alt + left drag off an instance | draws the select rectangle |
 | Middle drag | orbits around the ground point under the pointer, 0.004 rad per pixel; from the sky, around the camera target |
-| Ctrl + middle drag | turns the view around the eye |
+| Alt + middle drag | turns the view around the eye |
+| Ctrl held during a left, middle or right camera drag | a quarter of the movement (`PRECISE` 0.25 in `features/controls`), read on every move (R-VIEW-143). A left grab with Ctrl moves the ground a quarter of the pointer's way; released, the ground point under the pointer is held again without a jump. Ctrl + left with a selection still turns the units (above) |
 | Right drag | pans, 0.0006 x the camera distance per pixel |
 | Wheel | zooms, gliding over a few frames; less per notch near the ground; a quarter with Ctrl; distance at most 2000 |
-| Left click | selects. A press that moves more than 4 pixels is a drag. |
+| Left click | selects |
 | Right click on an instance | opens its animation menu |
 | Double-click on a record or an instance | the game's own |
 
 The eye never goes under the ground.
+
+A press on the view is a click until it becomes a drag (R-VIEW-142). It
+becomes a drag at the first pointer move that is either:
+
+- at least 2 pixels from the press point (`DRAG_SLOP`) and at least
+  150 ms after the press (`DRAG_HOLD_MS`): a slow drag; or
+- at least 12 pixels from the press point (`FAST_SLOP`), at any time: a
+  fast drag. A fast flick is never missed.
+
+All three are in `core/press.ts`. Until then nothing moves: no camera,
+no instance, no rectangle. A press released before that is a click: left
+selects, right opens the menu, two quick left clicks are a double-click.
+A slow drag holds what is under the pointer when it starts: the ground
+point for a grab, the pointer's offset from the instance for a move. The
+move that starts it moves nothing, so nothing jumps or snaps. A fast drag
+acts from the press point, so it does not lose its quick travel. The select rectangle
+still starts at the press point. One rule for the left, middle and right
+button, in `features/controls`, `features/pick` and `features/select`.
+Ctrl + left with a selection is a hold, not a drag: it turns the units
+from the press on.
 
 ### 16.4 Pick and selection
 
@@ -662,14 +689,19 @@ The eye never goes under the ground.
 - A click on a row name selects the same way. Ctrl + click also points the
   camera at the instance.
 - The rectangle selects every instance whose foot, middle or top is
-  inside. With shift it adds. An empty one clears. Under 4 pixels it is a
-  click.
+  inside. With shift it adds. An empty one clears. It shows only once
+  the press is a drag (16.3); before that it is a click.
 - The selection survives a new instance. A removed instance leaves it.
 
 ### 16.5 Animation menu
 
 - A right click on an instance opens a menu of its animations. It stays
   open until Escape or a click elsewhere.
+- Its title line moves it: a left drag on the title moves the menu with
+  the pointer (R-VIEW-138). The title has the move cursor. At least 80
+  pixels of the title stay on the page, as for a floating window. The
+  drag is `ui/components/drag.ts`, the same as the floating windows'
+  (R-VIEW-141). A press on the title does not count as a click outside.
 - Choosing one plays it once. Then the instance goes back to its looping
   one.
 - With the menu's "loop" box checked, the chosen one becomes the looping
@@ -684,7 +716,9 @@ The eye never goes under the ground.
 | Ctrl+C, Ctrl+X, Ctrl+V | copy, cut, paste |
 | Ctrl+L | switches the menu's "loop" choice, with a selection |
 | Ctrl+/ | switches the edges of the selected instances (16.13) |
+| Ctrl+. held | the selected instances with skins show Original while it is held (R-VIEW-148). The release of "." or Ctrl, or the page losing the focus, ends it. Their skin choice stays; the scene is not edited. The instances held are those selected at the press |
 | Escape | closes the open menu, dialog or floating window |
+| Up, Down | on a focused drop-down or number input: the choice before or after, the number one step down or up (16.14) |
 
 - No key acts on the scene while a text field has the keys (R-VIEW-59).
 - A Ctrl key the viewer owns never reaches the browser, wherever the keys
@@ -723,7 +757,14 @@ The eye never goes under the ground.
 ### 16.9 View tools
 
 - Landmarks: "origin" is always there and cannot be deleted. The pin asks
-  for a name and saves the view. The trash asks, then deletes.
+  for a name and saves the view as it was when the pin was pressed: the
+  target, yaw, pitch and distance, each as the camera holds it, with no
+  rounding. During a zoom glide the distance is the one the glide ends
+  at. Going to it sets exactly those values and stops a glide
+  (R-VIEW-144). The trash asks, then deletes. The wheel
+  over the landmark button, or Up and Down on it, goes to the landmark
+  before or after (16.14). The scene button steps the same way through
+  the scenes.
 - Grid: hexagonal, on at first. Its cell size follows the zoom, so it
   shows at every distance. It glows under the pointer and around every
   instance. A game may give an item another glow class. It needs the GL
@@ -749,7 +790,8 @@ mouse. One step of animation time is at most 100 ms.
 ### 16.12 Components
 
 Paged list, dialog, picker dialog, confirm dialog, toast, drop-down,
-floating window: `page/ui/components/`.
+floating window, title drag (`drag.ts`), stepper (`stepper.ts`, 16.14):
+`page/ui/components/`.
 
 ### 16.13 Edges
 
@@ -767,6 +809,33 @@ floating window: `page/ui/components/`.
   choice.
 - The choice is not in the scene document and not in a copy.
 - Tests read `sc2viewer.state().edges` and `sc2viewer.edgePixels()`.
+
+### 16.14 Stepping drop-downs and number inputs
+
+One component, `ui/components/stepper.ts`, gives every drop-down and
+number input of the page the same steps (R-VIEW-140, R-VIEW-141).
+
+- The wheel over the control steps it, without a focus: away from the
+  user (deltaY < 0) is the choice before, or the number one step up;
+  toward the user the choice after, or one step down. The page does not
+  scroll then. One wheel event is one step.
+- Up and Down step it while it has the focus. Up is the choice before
+  or one step up.
+- A step stops at the first and the last choice. It skips a disabled
+  choice. A number input steps by its `step` and keeps to its `min` and
+  `max`.
+- A step fires the control's `input` and `change` events, so it does
+  what a choice by hand does. A step that does not move fires none.
+- Three kinds use it:
+  - a native `<select>`: the instance rows (animation, team, variation,
+    dataset), the dataset of the view tools, the gallery filters, the
+    upscale dialog (input, model, size), the ground variant, the Save to
+    Skin target;
+  - a number input: the instance rows' position, facing and scale;
+  - a list drop-down (`ui/components/dropdown.ts`): the skin list, the
+    scene list and the landmarks. A step chooses the entry before or
+    after the chosen one: it opens that scene or goes to that landmark.
+- A native select opens and closes as the browser does.
 
 ## 17. Textures
 
@@ -790,11 +859,12 @@ passed yet.
 | Texture window | `page/core/texturewindow.ts`, the page `texture-viewer.html` with `page/texview` | 17.3; compare, pick, Save to Skin… |
 | Skins of an instance | `page/core/skins.ts`, the instance menu in `features/pick/menu.ts` | 17.4 |
 | Upscale dialog | `features/skins/upscale.ts`, its choices in `features/skins/choices.ts` | 17.5 |
-| Skin editor | `features/skins/editor.ts`, its dialogs in `features/skins/actions.ts` | 17.6, 17.6.2 |
+| Skin dialogs | `features/skins/actions.ts`; edit opens the texture window (`features/skins/index.ts`) | 17.6, 17.6.2 |
 | Tiles of a texture | `page/core/tiles.ts`, their look in `public/theme.css` | 17.6.1, both windows |
 | Icons | `page/ui/icons.ts` | the pencil, trash and skin icons |
 | Previews | `page/core/previews.ts` | a small picture decoded in the page from a file |
 | Ground and skybox | `page/core/render/ground.ts`, `page/core/sky.ts`, `features/sky`, its ground row in `features/sky/groundrow.ts` | 17.7 |
+| Texture editing | `server/core/photocraft.ts`, `editroutes.ts`, `textureedits.ts`; `page/core/editorwindow.ts`, `features/edits`, `page/texview/edits.ts` | SPEC-PHOTOCRAFT 7 and 9 |
 
 - A game without a texture service gets no control of this section, and
   its texture routes answer 404 (R-VIEW-100).
@@ -829,6 +899,7 @@ passed yet.
 | `request` | the request route. It outlives the server (R-VIEW-121). |
 | `skin` | the skin route. `skin upscale --defer` writes the skin and starts no request; the service then starts one `request` per texture it names, side by side, each outliving the server, and answers once the index shows each. |
 | `bake`, `unbake` | their routes |
+| `edit` | the edit routes (SPEC-PHOTOCRAFT 10): `open` and `discard` waited for; `check` started and not waited for; `transfer` outlives the server |
 
 - At start, a dataset the index never held is indexed before the server
   listens. A dataset it holds is indexed while the server serves.
@@ -849,10 +920,10 @@ What the server says of one texture:
 | judged | the pipeline has read its role and size. Not judged: `reason` and `models` are empty. |
 | reason | why it cannot be upscaled, or none |
 | colour | whether it has a colour plane |
-| variants | per variant: id, input, models per plane, size, file hash, numbers each with bound, band (`ok`, `near`, `problem`) and info text; stale; accepted |
+| variants | per variant: id, input, models per plane, size, file hash, numbers each with bound, band (`ok`, `near`, `problem`; `none` on a user-made variant) and info text; stale; accepted; whether it is user-made (`edited`); its reference |
 | models | per model: whether a request may ask for it, else why |
 | sizes | per size: whether it can be reached, else why |
-| requests | those not done: variant id, state, step and plane counts, error |
+| requests | those not done, by recipe: `state`, `reason`, `step`, `steps`, `planes`, `done` (planes whose job is done in this step), `variant` (the id it was asked as; empty for the transfer of an edit), `since` (its start, seconds since 1970; null when not known). The log's path stays on the server: the log route serves it |
 | bake | for a terrain texture: the baked variant, and whether the package holds its file |
 
 What the server says of one owner:
@@ -888,6 +959,13 @@ One window for every game, a floating window with the texture page in its
 frame. The page is viewer code. It compares; it changes a skin only by
 **Save to Skin…** (R-VIEW-101, R-VIEW-130, R-VIEW-133).
 
+- Its title is "textures · <name>". Opened on an instance with a texture
+  owner (a double-click, or the skin list's edit icon), it adds the skin
+  the instance shows: "textures · Battlecruiser · Original".
+- It first opens right of the open panels, below the view tools, 1100 x
+  760 px, or smaller where the page is smaller (operator 2026-11-25: "make
+  the default size of the textures / skin viewer a bit larger"; was 900 x
+  620). A move or a resize after that is kept while the page is open.
 - It opens on a record, an instance or a model file, by a double-click.
   Without a rule of the game's own, the textures are those the model
   names.
@@ -895,19 +973,27 @@ frame. The page is viewer code. It compares; it changes a skin only by
   and state badges. Chips filter by kind and plane; a search by name.
 - Below the view: the details of the chosen texture (format, kind,
   "used by", why it cannot be upscaled, its bake, the game's facts), then
-  its tiles, the same tiles as the skin editor (17.6.1, R-VIEW-132).
+  its tiles (17.6.1, R-VIEW-132).
   "used by" lists one user per line in a box 72 px high (about 4.5 lines)
   that scrolls (R-VIEW-134).
-- The view shows the original and, beside it, the tiles shown now, parted
-  by lines that can be dragged. Zoom, pan, 1:1, tile and fit. At first the
-  In game tile is shown.
-- A click on a tile shows it alone beside the original and picks it.
-  Ctrl+click adds it to the view or takes it out; the pick stays. The
-  tiles shown have the blue outline. Picking the In game variant drops
-  the texture's pick (R-VIEW-130).
+- The view shows the original on the left and, beside it, every variant
+  whose **Include in preview** box is checked, in tile order, parted by
+  lines that can be dragged. Zoom, pan, 1:1, tile and fit. At first the
+  In game variant is included.
+- Each tile that shows a variant (In game, Original, each variant) has an
+  **Include in preview** checkbox (R-VIEW-130). Checked, the variant is
+  in the view; any number at once. The original's box is checked and
+  disabled: it is always the left side. A change of a box picks nothing.
+- A click on a tile picks it and checks its box. The picked tile has the
+  blue outline; In game too when it is the same variant. Picking the In
+  game variant drops the texture's pick (R-VIEW-133).
 - **Upscale Texture** is the last tile (R-VIEW-129). It sends the page
   event `texture-upscale` with the game, dataset and asset; the viewer
   opens 17.5 on it.
+- With a PhotoCraft install, each tile that shows a variant has an
+  **Edit Texture** button, a list row of a texture with an edited
+  session has the badge EDIT, and the bar has **Manage Edits…** while
+  the dataset has a session (SPEC-PHOTOCRAFT 9.1, 9.5).
 - When the thing has a texture owner (SC2: a unit, a doodad's actor, a
   bare model file; a ground texture has none), a bar above the tiles says
   "<n> textures picked" with **Save to Skin…** and **Revert Changes**,
@@ -938,9 +1024,9 @@ The skin choice of an instance (R-VIEW-113).
 - Choosing a skin the owner does not have is refused: the instance keeps
   the skin it had. An item read with such a skin is reported as a
   failure and shows its model's own textures.
-- A rename or a delete in this page first sets every instance of the
-  owner on that skin to the new name or to Original, then changes the
-  skin; a refused change sets them back.
+- A delete or a discard in this page first sets every instance of the
+  owner on that skin to Original, then changes the skin; a refused change
+  sets them back.
 - The menu row: the skin list, **Upscale Skin**, **Bake Skin**, and a
   badge (R-VIEW-114, 126). The list is a button: a skin icon, the chosen
   skin's label, and a down arrow (R-VIEW-137). A click opens its rows:
@@ -948,12 +1034,21 @@ The skin choice of an instance (R-VIEW-113).
   - each saved skin, with an edit icon and a red trash icon;
   - **New Skin**, when the owner has one, with the same two icons;
   - **Add New Skin…** last.
+- The list is a list drop-down (`ui/components/dropdown.ts`). A click on
+  its button opens it; a second click closes it. Choosing a skin keeps it
+  open and marks the new choice (R-VIEW-139). The edit and trash icons
+  and Add New Skin… close it: they open a window or a dialog. Escape or a
+  click outside the menu closes the menu and the list. The wheel over
+  the button, or Up and Down on it, chooses the skin before or after
+  (16.14).
 - A click on a row's label chooses the skin for the instance. The edit
-  icon opens 17.6 on that skin. The trash icon of a saved skin asks
-  "Delete Skin", of New Skin "Discard New Skin" (17.6); answered, the
-  instances on it show Original. The trash of the baked skin is disabled;
-  its title says "baked: unbake it or bake another skin first". **Add New
-  Skin…** opens 17.6 on New Skin.
+  icon sets the instance to that skin, then opens the texture window
+  (17.3) on the instance. The trash icon of a saved skin asks "Delete
+  Skin", of New Skin "Discard New Skin"; answered, the instances on it
+  show Original. The trash of the baked skin is disabled; its title says
+  "baked: unbake it or bake another skin first". **Add New Skin…** opens
+  the texture window on the instance; its Save to Skin… makes New Skin
+  (17.6.2).
 - The bake button says **Bake Skin**, or **Unbake Skin** while Original
   is chosen. Unbake Skin is disabled while the owner has no bake. Bake
   Skin is disabled on New Skin, with the reason in its title (R-VIEW-127).
@@ -964,9 +1059,8 @@ The skin choice of an instance (R-VIEW-113).
   "Remove the bake of <title> in <dataset>? It will show its original
   textures." A refusal shows its reason; nothing changes (R-VIEW-123).
 - Dialog titles and buttons start with a capital letter and name what
-  they act on: **Bake Skin**, **Unbake Skin**, **Save Skin**, **Delete
-  Skin**, **Discard New Skin**, **Rename Skin**, **Save to Skin**,
-  **Cancel** (R-VIEW-128). A button that deletes or discards is red
+  they act on: **Bake Skin**, **Unbake Skin**, **Delete Skin**,
+  **Discard New Skin**, **Save to Skin**, **Cancel** (R-VIEW-128). A button that deletes or discards is red
   (R-VIEW-136).
 - An instance shows its own textures at once. Adding it makes no call of
   the texture service and waits for none (R-VIEW-110). Its skin follows
@@ -1005,40 +1099,34 @@ texture) (R-VIEW-115 to 117, 119).
   stored New Skin, the server refuses it: save or discard it first.
 - The dialog closes when the call answers. A refusal keeps it open with
   the reason.
+- It opens at once (R-VIEW-145). While the texture is not judged yet, a
+  line says "Reading what can be made…" and the choices fill in when the
+  judge answers.
+- While the call is out the button says **Requesting…**, is disabled, and
+  has a running stripe. The × and Escape still close the dialog; the
+  request goes on (R-VIEW-121). A refusal that answers after the close
+  goes to the status line.
+- A line under the choices says: "You can close this dialog. The progress
+  shows on the texture's tile in the texture window."
 
-### 17.6 Skin editor
+### 17.6 Skin editing
 
-A floating window on one owner and one skin (R-VIEW-118 to 121).
+There is no skin editor window (operator 2026-11-25: "delete the skin
+viewer, re-use the texture viewer exactly"). A skin is edited in the
+texture window (17.3): picks, then Save to Skin… (17.6.2), Revert
+Changes, Upscale Texture (R-VIEW-118, 119). The skin list's edit icon and
+Add New Skin… open it (17.4). Delete Skin and Discard New Skin are the
+skin list's trash icon.
 
-- Left: one row per texture of the owner, with a preview and its name.
-- Right: the selected texture's tiles (17.6.1). The picked tile has the
-  blue outline: the texture's pick, else the variant the skin names, else
-  the original; In game too when it is the same variant.
-- A click picks the tile. It changes no skin and no instance
-  (R-VIEW-133). A texture row with a pick that differs from the skin has
-  the mark ●. While there is such a pick, a bar says "<n> changes" with
-  **Save to Skin…** and **Revert Changes**.
-- **Save to Skin…** opens 17.6.2 with the skin open as the target; on
-  Original, New Skin (R-VIEW-127). Saved, the editor shows the target
-  skin, and the instance shows it. **Revert Changes** drops the picks.
-- A saved skin the owner no longer has is reported as a failure; the
-  editor does not switch to another skin.
-- A queued or running variant shows as a tile with its state; a failed
-  one with its reason.
-- The header has no name box and no Copy. A saved skin has **Rename
-  Skin** (a dialog asks the name; a bake of it follows the new name) and
-  **Delete Skin** (a dialog asks to confirm). Delete Skin of the baked
-  skin is disabled, its title says "baked: unbake it or bake another skin
-  first", and the service refuses it too (R-HD-136). A name another
-  skin holds, ignoring case, is refused (R-HD-138). New Skin has **Save
-  New Skin As…** (a dialog asks the name) and **Discard New Skin** (a
-  dialog asks to confirm). Original has none. Delete Skin and Discard
-  New Skin are red (R-VIEW-136).
+- Not offered since the window went: **Save New Skin As…** (a name for
+  New Skin) and **Rename Skin**. R-VIEW-127 asks for a name on save; no
+  control does that now. The service still has the `rename` action
+  (R-HD-138).
 
 #### 17.6.1 Tiles of a texture
 
-The skin editor and the texture window show the same tiles, in this
-order (R-VIEW-131, R-VIEW-132):
+The texture window shows these tiles, in this order (R-VIEW-131,
+R-VIEW-132):
 
 - **In game**: the variant the owner shows now (`shows`: its bake, else
   the bake below, else the original). Without an owner (a ground
@@ -1046,16 +1134,50 @@ order (R-VIEW-131, R-VIEW-132):
   the size and "baked" or "not baked". It names no skin. When a bake is
   there and the package does not hold it as it is (owner `held` false, or
   texture `packaged.held` false), an amber line says "not in the package
-  yet: build the map".
+  yet: build the map". Its background is a dark green, set apart from the
+  other tiles.
+- Each tile that shows a variant starts with the **Include in preview**
+  checkbox, above its preview (17.3, R-VIEW-130). A click on the box does not reach the tile.
 - **Original**, then each variant: a preview, the id, the size, and the
-  numbers, each coloured by band (R-VIEW-120). A stale or blocked variant
+  numbers, each coloured by band (R-VIEW-120). The variants are ordered
+  by recipe name, then by size, smallest first (`shownOrder`): `pbrify@1024`
+  before `pbrify@2048` (operator 2026-11-25: "always order the textures /
+  variants in the preview by name and then by their side dimension"). The
+  picture beside the original uses the same order. A stale or blocked variant
   has an amber title.
-- A tile with a number off the ok band has an info mark "i". It keeps the
+- The numbers of a user-made variant have no band and no colour
+  (SPEC-PHOTOCRAFT 10).
+- A tile with a number in the near or the problem band has an info mark
+  "i" on the top right corner of its preview. It keeps the
   arrow cursor. On hover a tooltip says "Amber: near a limit. Red: misses
   a limit." and names each such limit, its number, its bound and what a
   miss looks like (R-VIEW-135).
-- Each open request: its state and step, or its failure reason. It cannot
-  be clicked.
+- Each variant tile has a red trash icon at the bottom right of its
+  preview (R-VIEW-147). A click asks first ("Delete Variant", red), then
+  calls the remove route; a click on it picks nothing. It is disabled,
+  with the reason as its tooltip, when the variant is picked now, a skin
+  of the owner names it, the owner's bake or the texture's bake names it,
+  an edit session is open on it, another variant is made from it, or a
+  request of its recipe is open. The pipeline refuses the rest (a skin or
+  bake of another dataset, R-HD-146); the refusal shows in the window.
+  In game and Original have no trash.
+- Each open request (R-VIEW-145): the recipe, a stage line and a bar.
+  | State | Line | Bar |
+  | --- | --- | --- |
+  | `queued` | "Queued · step i of n" | empty, a moving stripe |
+  | `upscaling` | "Upscaling · step i of n · planes d of p" | filled by steps and planes, a moving stripe |
+  | `encoding` | "Encoding · step i of n" | filled to the step's end, a moving stripe |
+  | `failed` | "Failed: reason" | red, full |
+  The fill is `(i - 1 + d / p) / n` while upscaling and `i / n` while
+  encoding. Under it, the time since the request started (`since`), as
+  "1 min 05 s", counted each second. The window reads the states once a
+  second while any request is not failed (17.3).
+- A failed request has **Ask Again** and **Open Log** (R-VIEW-146). Ask
+  Again calls the request route with the request's own variant (`variant`:
+  input, model, size), with no dialog; the button says "Asking…" while the
+  call is out. A request with no `variant` (the transfer of an edit) has
+  no Ask Again. Open Log opens the log route in a new tab. A request tile
+  cannot be clicked.
 - Last, **Upscale Texture**, as large as a preview tile (R-VIEW-129).
 
 #### 17.6.2 Save to Skin dialog
@@ -1122,12 +1244,20 @@ enlarges on a GPU.
 | Dialog | the disabled models and sizes match the state; submit queues | `pbrify` and `seedvr2` on a data texture cannot be chosen | `skin-choices` (unit); the owner dialog in `texture-variants`. The texture card's dialog in the page: not tested (removed 2026-11-25) |
 | Owner upscale | New Skin names a variant of every texture; each is made; the instance shows each one on a slot of its model without a reload | data textures with `pbrify`: `fast`; no other skin and no bake; refused while New Skin is stored | `texture-variants` |
 | Skin choice | the list has Original, the saved skins and New Skin with edit and trash, Add New Skin… last; the button has its icon and arrow; a choice changes the overrides of that instance; kept in the scene | Original has no icon; Original holds no override; an unknown item option, a bad team, animation or skin type refuses the item | `texture-skins`, `texture-bake`, `scenes`. Not tested (removed 2026-11-25): the trash dialog, a skin showing its variant, a skin of one dataset on another, the 2048 glow |
-| Editor | a click picks and outlines a tile; Save to Skin… sets the picks in the skin open; every instance on the skin changes without a reload; Rename Skin, Delete Skin by dialog; In game tile | a click changes no stored skin and no instance; the baked skin cannot be deleted; a name another skin holds: refused | `skin-editor`. Not tested (removed 2026-11-25): New Skin (Add New Skin…, Save New Skin As…, Discard New Skin), Revert Changes, a cancelled save, no name box and no Copy, the refused names in the editor |
-| Dialogs | each dialog's title and buttons start with a capital letter and name what they act on; delete and discard buttons are red | no dialog button in lower case; a button that keeps is not red | `skin-editor`, `texture-bake`, `scenes` |
-| Window tiles | In game is first; "used by" has a fixed height and scrolls; the info mark's tooltip names amber and red | no Use button and no checkbox; a click on In game changes no skin; a cursor of help | `texture-window`. Not tested (removed 2026-11-25): a click shows the tile beside the original, Ctrl+click |
+| Skin edit | the edit icon and Add New Skin… open the texture window on the instance | no skin editor window | Not tested (the skin editor and `skin-editor` deleted 2026-11-25) |
+| Skin list open | choosing a skin keeps the list open; a second click on its button closes it | a choice does not close it | Not tested (R-VIEW-139, 2026-11-25) |
+| Precise drag, Alt look | Ctrl makes a left, middle or right camera drag a quarter; Alt + middle looks around | Ctrl + middle no longer looks around | `camera.spec` (Alt + middle looks around), `landmarks-store.spec`. The quarter: not tested (R-VIEW-143) |
+| Click or drag | a press becomes a drag after 2 px and 150 ms, or after 12 px at once; nothing jumps when it starts | a quick press with under 2 px of travel moves no camera and is a click; a fast flick is not lost | Not tested (R-VIEW-142). The e2e drags make their first move 12 px or more, so they are fast drags and keep their exact rates |
+| Menu drag, stepping | a drag on the menu title moves the menu; the wheel and Up/Down step every drop-down and number input (16.14) | the menu stays open while dragged; a step past the last choice moves nothing | Not tested (R-VIEW-138, 140, 2026-11-25) |
+| Dialogs | each dialog's title and buttons start with a capital letter and name what they act on; delete and discard buttons are red | no dialog button in lower case; a button that keeps is not red | `texture-bake`, `scenes` |
+| Window tiles | In game is first; "used by" has a fixed height and scrolls; the info mark's tooltip names amber and red | no Use button; a click on In game changes no skin; a cursor of help | `texture-window`. Not tested: Include in preview (several variants in the view, a box picks nothing, the original's box fixed) |
 | Save to Skin | the picks of the window go to the chosen target in one dialog; the instance shows it | Cancel changes nothing; Revert Changes drops the picks; the bake is unchanged; no bar without an owner | `texture-window` (no bar without an owner). The rest: not tested (removed 2026-11-25) |
-| Quality | each number has a band; a problem has its info text | a variant that misses no limit has no number in the problem band | `skin-editor` (the ok band, no info mark). A problem band: not tested (removed 2026-11-25) |
+| Original peek | Ctrl+. held shows Original on the selected instances; the release shows their skins again | the skin choice and the scene are unchanged; an unselected instance keeps its skin | Not tested (R-VIEW-148, 2026-11-25) |
+| Upscale progress | a request tile shows its stage, step, planes, bar and time; the tiles follow the state; the dialog says it may be closed and its button is busy while it sends | a done request leaves no tile; a failed one has Ask Again and Open Log, a running one has neither | Not tested (R-VIEW-145, 146, 2026-11-25) |
+| Variant removal | the trash asks, then the variant is gone from the tiles and the store | the picked, skin-named and baked variants have a disabled trash; In game and Original have none; the pipeline refuses a variant another dataset's skin names | Not tested (R-VIEW-147, R-HD-146, 2026-11-25) |
+| Quality | each number has a band; a problem has its info text | a variant that misses no limit has no number in the problem band | Not tested (`skin-editor` deleted 2026-11-25) |
 | Bake | the bake route writes the bake; the badge shows it; Unbake on Original unbakes | choosing a skin writes no bake; Original shows no bake; a cancelled or refused bake changes nothing; another dataset unchanged | `texture-bake`, `texture-service-api` (unit). Not tested (removed 2026-11-25): an actor's bake offered to its unit as New Skin; New Skin cannot be baked |
 | Ground | a ground record becomes the ground | "none" gives the bare ground; Ghost has no button | `ground-texture`, `ghost-textures`. Not tested (removed 2026-11-25): a blocked variant cannot be baked or chosen |
 | Previews | the ground rows carry a preview image of the entry's file | "none" shows no picture and no broken image | Not tested (removed 2026-11-25) |
-| Doodad owner | a doodad's owner is its actor | | `skin-editor` |
+| Texture editing | SPEC-PHOTOCRAFT 12 | SPEC-PHOTOCRAFT 12 | `texture-edit-button`, `texture-edit-window`, `texture-edit-offer`, `photocraft-site`; `texture-edits-api`, `photocraft-absent` (unit) |
+| Doodad owner | a doodad's owner is its actor | | Not tested (`skin-editor` deleted 2026-11-25) |

@@ -9,6 +9,7 @@ import { GHOST_GAME, startGhost } from '../games/ghost/server';
 import { startSc2 } from '../games/sc2/server';
 import { GameUnavailable, type GameBackend, type UnavailableGame } from './core/backend';
 import { onlyGet, serve } from './core/http';
+import { photocraftSite } from './core/photocraft';
 import { protocol } from './core/protocol';
 import { coreSettings } from './core/settings';
 import { staticFiles } from './core/static';
@@ -29,6 +30,6 @@ try {
   banners.push(`${GHOST_GAME.id}: not available: ${error.message}`);
 }
 
-serve([protocol(games, unavailable), onlyGet, staticFiles(core.viewerDir)], core.port, core.host, () => {
+serve([protocol(games, unavailable, core.photocraftHome), photocraftSite(core.photocraftHome), onlyGet, staticFiles(core.viewerDir)], core.port, core.host, () => {
   console.log(`sc2 webviewer: http://${core.host}:${core.port}/  (${banners.join('; ')})`);
 });

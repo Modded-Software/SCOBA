@@ -9,6 +9,16 @@ from .interfaces import Texture
 from .store import GameStore
 
 ACCEPTED = "accepted"  # key of an entry: why its problems do not refuse a bake
+EDIT = "edit"  # key of an entry a transfer made: its input, its changed planes, their hash
+
+
+def user_made(entry: dict) -> bool:
+    """Whether a person made the variants of this entry: it names a changed plane (R-PC-80).
+
+    The limits bind what a model made. A user-made variant has its
+    numbers and no problem, and its bake is not refused for them.
+    """
+    return bool(entry.get(EDIT, {}).get("changed"))
 
 
 class Original(NamedTuple):
@@ -60,7 +70,11 @@ def of(game: GameStore, texture: Texture, original_sha256: str) -> dict[str, Mad
     for recipe in game.recipes(texture.origin):
         entry = game.entry(texture.origin, recipe)
         if entry is not None:
-            missed = tuple(limits.missed(entry["numbers"], texture.tiles))
+            missed = (
+                ()
+                if user_made(entry)
+                else tuple(limits.missed(entry["numbers"], texture.tiles))
+            )
             found[recipe] = Made(
                 entry, entry["original"]["sha256"] != original_sha256, missed
             )

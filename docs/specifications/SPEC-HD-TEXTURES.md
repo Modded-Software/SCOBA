@@ -69,7 +69,7 @@ StarCraft II.
 | plane | one picture the upscaler takes: 8-bit RGB PNG |
 | role | how a texture splits into planes and joins again |
 | model | `pbrify`, `fast` or `seedvr2`: the model of `arc-upscale` the colour planes get |
-| variant id | `original`, or the input's id and `model@size`, joined by `+`: `pbrify@2048`, `pbrify@4096+seedvr2@4096` |
+| variant id | `original`, or the input's id and `model@size`, joined by `+`: `pbrify@2048`, `pbrify@4096+seedvr2@4096`. An edited variant's last part is `edit` with 12 hex digits, `@` and the size (4.3). |
 | owner | `unit:<CUnit id>`, `actor:<CActor id>` or `model:<model file asset>` |
 | skin | a name and a map from asset to variant id, for one owner of one dataset |
 | bake | one owner's skin as it was when baked, or one terrain texture's variant |
@@ -154,6 +154,14 @@ pixels around each cell before the runner. The rim is cut after it
 The input of a later step is the kept plane of its input recipe, halved
 to the input's size. So a second size costs no GPU time (R-HD-6).
 
+An edited variant is what the transfer of an edit makes
+(SPEC-PHOTOCRAFT 10, `core/edittransfer.py`). The planes the edit
+changed are the scratch's rendered planes; the others are the input's
+own. They are joined with no source, so the result is not matched to the
+original's coarse content. It has one size, its input's. No model and no
+runner takes part, and `request` cannot make one. Its entry holds `edit`:
+the input, the changed planes, the hash and the session.
+
 ### 4.4 Texture store
 
 The folder named by `TEXTURE_STORE`. `scripts/paths.sh` derives it as
@@ -166,6 +174,7 @@ git, not on the repository disk (R-HD-85). The store holds no queue: the queue i
 | `<game>/planes/` | every plane a step takes or keeps, named by the hash of its pixels |
 | `<game>/upscaled/<recipe>/` | the runner's output file for one upscale; `job.json`, the name of the job last asked to make it; an output that was no whole image, renamed with `.broken` |
 | `<game>/variants/<origin>/<recipe>/` | `entry.json` (recipe, models per plane, own size, hashes, numbers) and one file per size; `request.json` while it is made, or after that failed; `request.log` (4.7) |
+| `<game>/edits/<session>/` | one edit session: its record, bases, scratch and rendered planes (SPEC-PHOTOCRAFT 8) |
 | `<game>/datasets/<dataset>/skins/` | one file per owner: its skins (4.6) |
 | `<game>/datasets/<dataset>/` | `bakes.json` (4.6), `package.json` (R-HD-105), and `package/` for a dataset no build packages |
 | `<game>/index/` | the game's own caches |
@@ -207,6 +216,14 @@ Measured on the variant and kept with it (R-HD-13).
   in the state: what it measures and what a miss looks like.
 - An entry may hold `accepted`, the reason the problems do not refuse a
   bake. It is read; no command writes it.
+- The limits bind a variant a model made. A user-made variant, one whose
+  entry holds `edit`, has its numbers measured and kept, each with the
+  band `none`. It has no problem, and its numbers refuse no bake
+  (R-PC-80 to R-PC-82).
+- A model's variant is measured against its reference: the nearest
+  user-made variant among its inputs, else the original. The join
+  matches its coarse content to the same reference. The entry and the
+  request name the reference (R-PC-83).
 
 ### 4.6 Skins and bakes
 
@@ -302,6 +319,9 @@ Each state has one source. The index holds a copy of it for readers
 - A refused request leaves nothing: a texture without a role, a model or
   size of 4.3 that is refused, an original that cannot be read.
 - A request for a variant that exists and is not stale is done at once.
+- The transfer of an edit reports its state as a request does, with no
+  job in the queue: its `request.json` says `encoding` from the start,
+  and holds the reason when it fails (SPEC-PHOTOCRAFT 10).
 - Each plane enters the queue through `arc-upscale submit`, into the
   tool's own queue. The tool answers with the job's name. A plane whose
   job waits or runs, or whose upscale exists, is not submitted again.
@@ -341,10 +361,12 @@ show one.
 | `index` | brings the dataset's part of the index up to date with its files (4.9). `--asset` also finds the role of those textures. |
 | `upscaler` | the runner's worker command and whether it is idle |
 | `request` | makes one variant: `--asset`, `--input` (a variant id or `original`), `--model`, `--size` |
+| `remove` | removes one variant: `--asset A --variant V` (R-HD-146). Its file and its size in the entry go; the last size takes the recipe's folder with it. Refused while a skin or a bake of any dataset of the game names `A` with `V`, a recipe of the origin starts with `V+`, a request of its recipe is open, or an edit session of the origin and `V` is there. `original` is refused. |
 | `skin` | `list`, `copy --from S --name N`, `rename --name N --new M` (from `new`: save), `delete` (of `new`: discard), `set --asset A --variant V` (or `--clear`), `upscale --from S --name N --model M --size Z`; each with `--owner O`. `new` is New Skin (4.6). |
 | `bake` | `--owner O --skin N`, or `--asset A --variant V` for a terrain texture |
 | `unbake` | `--owner O`, or `--asset A` |
 | `package` | packages a dataset no build packages (R-HD-106); `gaps` (below) |
+| `edit` | an edit session (SPEC-PHOTOCRAFT 10): `open --asset A` with `--variant V` for a variant; `check`, `transfer`, `discard`, each with `--session S` |
 
 `--layer <folder>` names the dataset's own layer, for a game that takes
 it from the caller. The viewer's server and the map build pass it. A
@@ -399,6 +421,7 @@ file.
 | Change | Who writes | Rows written again |
 | --- | --- | --- |
 | a request starts, a job of it starts to run, it encodes, it is done, it fails | the program that runs the request | every `texture` row with that origin, in every dataset |
+| a variant is removed | `remove` | every `texture` row with that origin, in every dataset |
 | a skin | `skin` | that `owner` row |
 | a bake | `bake`, `unbake` | that `owner` row, or that `texture` row |
 | a package | the package step | the `owner` and `texture` rows of the dataset |

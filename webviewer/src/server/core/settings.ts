@@ -11,6 +11,8 @@ export interface CoreSettings {
   readonly viewerDir: string;
   /** The repository root, the viewer folder's parent. */
   readonly repoRoot: string;
+  /** Where PhotoCraft is installed, or would be (PHOTOCRAFT_HOME, SPEC-PATHS). It may not exist. */
+  readonly photocraftHome: string;
 }
 
 /**
@@ -35,5 +37,6 @@ export function coreSettings(env: NodeJS.ProcessEnv = process.env): CoreSettings
     host: env['HOST'] || '127.0.0.1',
     viewerDir,
     repoRoot: resolve(env['REPO_ROOT'] || resolve(viewerDir, '..')),
+    photocraftHome: requiredPath(env, 'PHOTOCRAFT_HOME'),
   };
 }

@@ -11,6 +11,7 @@ import type { Page } from '../../../shared/records';
 import type { ApiClient, GalleryTool, GameRegistry, RowDrag, SceneService, StatusService, UiService } from '../../core/context';
 import { make, rows } from '../../core/dom';
 import { PagedList } from '../components/pagedlist';
+import { stepSelect } from '../components/stepper';
 
 const PAGE_SIZE = 60;
 /** The value of a select's "any" option when '' is one of the filter's values (SC2 "no family"). */
@@ -45,7 +46,7 @@ function filterControl(category: CategoryInfo, filter: FilterInfo, choose: (valu
   }
   // '' among the values: the options carry a prefix, so "any" and '' differ.
   const prefixed = filter.values.some((v) => v.value === '');
-  const select = make('select', { id, className: 'filter', title: filter.label });
+  const select = stepSelect(make('select', { id, className: 'filter', title: filter.label }));
   select.append(make('option', { value: prefixed ? ANY : '', textContent: `any ${filter.label}` }), ...filter.values.map((v) => make('option', { value: prefixed ? IS + v.value : v.value, textContent: v.label })));
   select.addEventListener('change', () => {
     const value = select.value;

@@ -3,7 +3,9 @@ import { test, expect } from '../fixtures.mjs';
 // Mouse camera controls:
 // - left drag holds the ground point under the mouse and pulls the map;
 // - middle drag orbits around the ground point under the mouse at press;
-// - ctrl + middle drag turns the view around the eye (mouse-look).
+// - alt + middle drag turns the view around the eye (mouse-look, R-VIEW-143).
+// Each drag's first move is 12 px or more: a fast drag, acting from the press
+// point (core/press.ts, R-VIEW-142), so the rates are exact.
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.6, distance: 12, target: [0, 0, 0] };
 const RATE = 0.004; // radians per pixel
@@ -23,13 +25,13 @@ const groundAt = (page, box, x, y) => page.evaluate(([x, y]) => window.sc2viewer
 const eyeOf = (c) => [0, 1, 2].map((i) => c.target[i] + c.distance * [Math.cos(c.pitch) * Math.cos(c.yaw), Math.cos(c.pitch) * Math.sin(c.yaw), Math.sin(c.pitch)][i]);
 const gap = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
 
-async function drag(page, button, from, to, ctrl = false) {
+async function drag(page, button, from, to, alt = false) {
   await page.mouse.move(from[0], from[1]);
-  if (ctrl) await page.keyboard.down('Control');
+  if (alt) await page.keyboard.down('Alt');
   await page.mouse.down({ button });
-  await page.mouse.move(to[0], to[1], { steps: 8 });
+  await page.mouse.move(to[0], to[1], { steps: 4 });
   await page.mouse.up({ button });
-  if (ctrl) await page.keyboard.up('Control');
+  if (alt) await page.keyboard.up('Alt');
 }
 
 test('left drag holds the ground under the mouse and pulls the map', async ({ page }) => {
@@ -83,7 +85,7 @@ test('negative: a middle drag that starts on the sky orbits around the target', 
   expect(c0.yaw - c1.yaw).toBeCloseTo(80 * RATE, 3);
 });
 
-test('ctrl + middle drag turns the view around the eye', async ({ page }) => {
+test('alt + middle drag turns the view around the eye', async ({ page }) => {
   const box = await open(page);
   const centre = [box.x + box.width / 2, box.y + box.height / 2];
   const c0 = await camera(page);
@@ -103,7 +105,7 @@ test('ctrl + middle drag turns the view around the eye', async ({ page }) => {
   expect(old[0]).toBeLessThan(box.width / 2 - 50);
 });
 
-test('negative: a middle drag without ctrl moves the eye', async ({ page }) => {
+test('negative: a middle drag without alt moves the eye', async ({ page }) => {
   const box = await open(page);
   const centre = [box.x + box.width / 2, box.y + box.height / 2];
   const c0 = await camera(page);

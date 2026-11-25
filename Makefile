@@ -50,7 +50,7 @@ PYMOD := cd "$(REPO_ROOT)/scripts" && PYTHONPATH="$(REPO_ROOT)/scripts" uv --pro
 # =============================================================================
 DEPS := $(PATHS) SC2_PROJECT_ROOT="$(REPO_ROOT)" $(SCRIPT_BASH) $(REPO_ROOT)/scripts/setup/deps.sh
 
-.PHONY: preflight init deps-check install install-ci install-deps install-hdtex install-hooks sync
+.PHONY: preflight init deps-check install install-ci install-deps install-hdtex install-photocraft install-hooks sync
 preflight: ## Verify environment
 	test -d "$(CI_DIR)" || { echo "ERROR: CI directory not found at $(CI_DIR)" >&2; exit 1; }
 	test -f "$(CI_DIR)/scripts/reinstall-hooks" || { echo "ERROR: reinstall-hooks missing" >&2; exit 1; }
@@ -81,6 +81,9 @@ install-deps: ## Install project dependencies: uv env, stormex (built from sourc
 
 install-hdtex: ## Clone ../upscale-on-arc (if absent) and install it, for texture requests
 	$(DEPS) upscale
+
+install-photocraft: ## Build PhotoCraft from source at its pin (editor site and renderer), for texture editing; a long build
+	$(DEPS) photocraft
 
 install-hooks: ## Install native git hooks (root-only: root-owned, immutable)
 	$(SCRIPT_BASH) $(CI_DIR)/scripts/reinstall-hooks
@@ -153,6 +156,11 @@ map-stage: ## Expand the map into OUT=<folder> without checks or publish (for me
 host-tests: ## Rebuild, then run the Python unittest suite for the tooling
 	$(SCRIPT_BASH) $(PLAYTEST) host-tests
 
+.PHONY: host-test
+host-test: ## Run the named host test modules, no map rebuild (ARGS="testkit.tests.textures.test_edits ...")
+	test -n "$(ARGS)" || { echo "ERROR: name the test modules: make host-test ARGS=<module>" >&2; exit 1; }
+	$(PATHS) $(PYMOD) unittest -v $(ARGS)
+
 # The measuring tools read the built map: run make map-build first. ARGS
 # passes options on, such as ARGS="--map <folder>" or ARGS=--print.
 measure-hit-volumes: ## Measure hit volumes, then write their galaxy and camera heights (ARGS for hitvolumes.measure)
@@ -205,8 +213,8 @@ viewer-ghost-export-check: ## Model viewer: export every StarCraft: Ghost model,
 viewer-serve: ## Model viewer: run the server in the foreground (PORT=n beside the service)
 	$(WEBVIEWER)/start.sh
 
-viewer-provision: ## Model viewer: install or update the dev server as a systemd user service (Ansible), start it, check it
-	$(VIEWER_ANSIBLE) $(if $(RESTART),-e viewer_restart=true,)
+viewer-provision: ## Model viewer: install or update the dev server as a systemd user service (Ansible), start it, check it (RESTART=1; PHOTOCRAFT=1 also builds PhotoCraft)
+	$(VIEWER_ANSIBLE) $(if $(RESTART),-e viewer_restart=true,) $(if $(PHOTOCRAFT),-e viewer_photocraft=true,)
 
 viewer-unprovision: ## Model viewer: stop the dev server service and remove its units
 	$(VIEWER_ANSIBLE) -e viewer_state=absent

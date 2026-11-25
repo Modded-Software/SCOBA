@@ -69,13 +69,31 @@ def measure(
     }
 
 
-def encode(original: bytes, role: Role, planes: Planes) -> Encoded:
-    """The result of `planes` for the texture file `original`, at every kept size."""
+def encode(
+    original: bytes,
+    role: Role,
+    planes: Planes,
+    reference: Planes | None = None,
+    matched: bool = True,
+) -> Encoded:
+    """The result of `planes` for the texture file `original`, at every kept size.
+
+    `reference`: the planes the result is matched to and measured against.
+    None: the original's own. A model's variant made from a person's edit
+    is given the edit's planes (SPEC-PHOTOCRAFT 10, R-PC-83).
+    `matched`: False for a person's edit. Its coarse content stays as the
+    planes have it: matching would take a part of the edit back.
+    The file's format, its trailer and what `finish` restores are always
+    the original's.
+    """
     source, source_rgba = read_texture(original)
-    source_planes = role.split(source_rgba)
+    source_planes = role.split(source_rgba) if reference is None else reference
     # Every texture is joined as one that tiles: the upscaler made its edges match.
-    levels = role.finish(role.join(planes, source_planes, True), source_rgba)
-    reference = role.finish(role.join(source_planes, None, True), source_rgba)
+    levels = role.finish(
+        role.join(planes, source_planes if matched else None, True), source_rgba
+    )
+    reference_levels = role.finish(role.join(source_planes, None, True), source_rgba)
+    compared = source_rgba if reference is None else reference_levels[0]
     height, width = levels[0].shape[:2]
     if (
         width % source.width
@@ -106,7 +124,7 @@ def encode(original: bytes, role: Role, planes: Planes) -> Encoded:
             top.shape[1], top.shape[0], blobs[skip:], source.trailer, source.format
         )
     numbers = measure(
-        levels, codec.decode(blobs[0], width, height), source_rgba, reference
+        levels, codec.decode(blobs[0], width, height), compared, reference_levels
     )
     return Encoded(
         source.format,

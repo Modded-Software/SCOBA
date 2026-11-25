@@ -92,6 +92,7 @@ def missed(numbers: dict, tiles: bool) -> list[Missed]:
 
 
 OK, NEAR, PROBLEM = "ok", "near", "problem"
+NONE = "none"  # the band of a number no limit binds: a user-made variant's (R-PC-80)
 # The near bands are the agent's (O-VIEW-7): a number this close to its bound shows amber.
 NEAR_ENCODE_PSNR = 38.0
 NEAR_CORRELATION = 0.8
@@ -111,6 +112,11 @@ def _band(value: float | None, bound: float, near: float, low_is_bad: bool) -> s
     if (value < bound) if low_is_bad else (value > bound):
         return PROBLEM
     return NEAR if ((value < near) if low_is_bad else (value > near)) else OK
+
+
+def unbound(found: list[Band]) -> list[Band]:
+    """The same numbers with no band: those of a user-made variant, which no limit binds."""
+    return [{**item, "band": NONE} for item in found]
 
 
 def bands(numbers: dict, tiles: bool) -> list[Band]:

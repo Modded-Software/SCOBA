@@ -118,7 +118,9 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 
 /* ---- the animation menu of a unit in the view ---- */
 .anim-menu { position: fixed; z-index: 10; min-width: 150px; max-height: 60vh; display: flex; flex-direction: column; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: calc(var(--radius) * 1.5); box-shadow: var(--shadow); }
-.anim-menu .title { padding: 4px 8px; font-weight: 600; white-space: nowrap; }
+.anim-menu .title { padding: 4px 8px; font-weight: 600; white-space: nowrap; user-select: none; }
+/* A title that moves its window or menu (ui/components/drag.ts, R-VIEW-138). */
+.drag-handle { cursor: move; touch-action: none; }
 .anim-menu ul { overflow-y: auto; min-height: 0; }
 .anim-menu button { width: 100%; height: 24px; text-align: left; }
 .anim-menu .empty { padding: 4px 8px; color: var(--dim); }
@@ -130,7 +132,7 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .anim-menu .skin-row button { width: auto; padding: 0 8px; }
 /* The skin list (SPEC-VIEWER 17.4): a button, its rows below it. */
 .anim-menu .skin-choose { position: relative; }
-.anim-menu .skin-list { position: absolute; z-index: 2; top: 100%; left: 0; min-width: 160px; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); }
+.anim-menu .skin-list { position: absolute; z-index: 2; top: 100%; left: 0; right: auto; min-width: 160px; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); }
 .anim-menu .skin-list[hidden] { display: none; }
 .anim-menu .skin-list li { display: flex; gap: 4px; align-items: center; }
 .anim-menu .skin-list .skin-pick, .anim-menu .skin-list .skin-add { flex: 1; text-align: left; }
@@ -145,26 +147,15 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .skin-baked { padding: 0 6px; border-radius: 8px; color: var(--accent); background: var(--accent-bg); white-space: nowrap; }
 .skin-baked[hidden] { display: none; }
 
-/* ---- the upscale dialog and the skin editor (SPEC-VIEWER 17.5, 17.6) ---- */
+/* ---- the upscale dialog (SPEC-VIEWER 17.5) ---- */
 .upscale-row { display: flex; gap: 8px; align-items: center; }
 .upscale-row select, .upscale-row input { flex: 1; min-width: 0; }
 .upscale-lines { color: var(--dim); font-size: 11px; }
-.upscale-error:empty, .skin-error:empty { display: none; }
+.upscale-error:empty { display: none; }
 /* The Save to Skin dialog (17.6.2): one line per pick. */
 .skin-changes { max-height: 160px; overflow-y: auto; margin: 0; padding: 0; font-size: 11px; }
 .skin-changes .same { color: var(--dim); }
-#skin-editor .window-body { flex-direction: column; }
-.skin-head { display: flex; gap: 4px; align-items: center; flex: none; padding: 6px 8px; }
-.skin-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.skin-new-name { width: 120px; }
-.skin-panes { display: flex; flex: 1; min-height: 0; }
-.skin-textures { width: 220px; flex: none; overflow-y: auto; border-right: 1px solid var(--line); }
-.skin-texture { display: flex; gap: 6px; align-items: center; padding: 3px 6px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.skin-texture.current { background: var(--accent-bg); }
-.skin-texture .picked-mark { margin-left: auto; color: var(--accent); }
-.skin-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.skin-right .skin-tiles { flex: 1; overflow-y: auto; }
-/* The tiles themselves are in theme.css: the texture window's page has them too (17.6.1). */
+/* The tiles are in theme.css, with the texture window's page (17.6.1). */
 .picker-list li.with-preview { display: flex; gap: 8px; align-items: center; }
 .ground-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); }
 .ground-row .ground-name { font-weight: 600; }

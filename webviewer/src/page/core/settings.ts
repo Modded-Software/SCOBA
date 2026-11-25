@@ -10,6 +10,7 @@
 // and its module decides by its own rule.
 // Scenes are not settings: they are documents in IndexedDB (store/scenes-db.ts).
 
+import { SESSION_RULE } from '../../shared/edits';
 import { SCENE_ID_RULE } from '../../shared/scene';
 import { ID_RULE } from '../../shared/protocol';
 import type { CameraState, GroundChoice, Landmark, SkyChoice } from './types';
@@ -178,9 +179,26 @@ const landmarks: DefaultedSetting<LandmarksSetting> = {
   },
 };
 
+/** By edit session: the rendered planes the transfer dialog was opened for, as text (SPEC-PHOTOCRAFT 9.3). */
+const editsOffered: DefaultedSetting<Record<string, string>> = {
+  key: 'edits.offered',
+  initial: {},
+  parse(value) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('the offered edits are not an object');
+    const offered: Record<string, string> = {};
+    for (const [session, planes] of Object.entries(value)) {
+      if (!SESSION_RULE.test(session)) throw new Error(`"${session}" is not an edit session`);
+      if (typeof planes !== 'string') throw new Error(`the offered planes of ${session} are not text`);
+      offered[session] = planes;
+    }
+    return offered;
+  },
+};
+
 export const settings = {
   camera,
   drawers,
+  editsOffered,
   /** The gallery's game (R-VIEW-22). Nothing stored: the server's default game. */
   game: { key: 'game', parse: (value: unknown): string => parseId(value, 'game') } as Setting<string>,
   view,

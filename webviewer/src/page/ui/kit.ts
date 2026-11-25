@@ -3,9 +3,10 @@
 // A game's page module may not import ui/: it gets these in its context.
 
 import type { ApiClient, CameraService, GameRegistry, SceneService, SelectionService, StatusService, Store, UiService } from '../core/context';
-import { make } from '../core/dom';
+import { byIdAs, make } from '../core/dom';
 import type { EventBus, ViewerEvents } from '../core/bus';
 import { FloatingWindow } from './components/floatingwindow';
+import { stepSelect } from './components/stepper';
 import { installDrawers } from './drawers';
 import { installGallery } from './gallery';
 import { installGameTabs } from './gametabs';
@@ -31,6 +32,8 @@ export function installUi(deps: UiDeps): UiService {
   installInstances({ ...deps, iconNode });
   installGameTabs({ ...deps, drawers });
   const gallery = installGallery({ ...deps, iconNode });
+  // The view tools' dataset select (core/datasets.ts fills it) steps by the wheel and the keys (16.14).
+  stepSelect(byIdAs('dataset', HTMLSelectElement));
   return {
     ...drawers,
     ...gallery,

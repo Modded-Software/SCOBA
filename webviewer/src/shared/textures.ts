@@ -25,8 +25,8 @@ export interface TextureModel {
   note: string;
 }
 
-/** How a number stands against its bound (R-VIEW-120). */
-export type Band = 'ok' | 'near' | 'problem';
+/** How a number stands against its bound (R-VIEW-120). `none`: no limit binds it: the variant is user-made (R-PC-80). */
+export type Band = 'ok' | 'near' | 'problem' | 'none';
 
 /** One number of a variant against its bound. A value of null has no finite number. */
 export interface TextureNumber {
@@ -55,6 +55,10 @@ export interface TextureVariant {
   problems: { limit: string; value: number | null; bound: number }[];
   /** Why the limits it misses do not block it; empty: they do (O-HD-9). */
   accepted: string;
+  /** A person made it, by the transfer of an edit: its numbers have the band `none` and make no problem (R-PC-80). */
+  edited: boolean;
+  /** The variant its numbers compare with: the nearest user-made one among its inputs; empty: the original (R-PC-83). */
+  reference: string;
   /** The hash of its file: the `v` of its URL. */
   sha256: string;
 }
@@ -73,6 +77,12 @@ export interface TextureRequest {
   step: number;
   steps: number;
   planes: number;
+  /** The planes of this step whose job is done. */
+  done: number;
+  /** The id it was asked as: what Ask Again asks for (R-VIEW-146). Empty: the transfer of an edit, which no request makes again. */
+  variant: string;
+  /** Its start, in seconds since 1970; null: not known. */
+  since: number | null;
 }
 
 /** What the server says of one texture (17.2). */
@@ -162,6 +172,12 @@ export interface TextureRequestAsk {
   size: number;
 }
 
+/** POST /api/<game>/textures/remove: one variant of an asset (R-HD-146). */
+export interface TextureRemoveAsk {
+  asset: string;
+  variant: string;
+}
+
 /** POST /api/<game>/textures/skin: one change of SPEC-HD-TEXTURES 4.8. */
 export type SkinAsk =
   | { owner: string; action: 'copy'; name: string; from: string }
@@ -195,17 +211,32 @@ export type BakeBody = OwnerBody | TexturesBody;
 /** A variant id: the input's steps, then the model at the size. */
 export const variantId = (input: string, model: string, size: number): string => `${input === ORIGINAL ? '' : input + JOIN}${model}${AT}${size}`;
 
+/** The input, model and size a variant id was asked as; null: its last step is no model and size (an edit). */
+export function askOf(asset: string, variant: string): TextureRequestAsk | null {
+  const at = variant.lastIndexOf(AT);
+  const join = variant.lastIndexOf(JOIN);
+  const size = Number(variant.slice(at + 1));
+  if (at < 0 || at < join || !Number.isInteger(size) || size <= 0) return null;
+  return { asset, input: join < 0 ? ORIGINAL : variant.slice(0, join), model: variant.slice(join + 1, at), size };
+}
+
 /** The recipe of a variant: the id without its last size. */
 export function recipeOf(variant: string): string {
   const at = variant.lastIndexOf(AT);
   return at < 0 ? variant : variant.slice(0, at);
 }
 
+/** The order the page shows variants in: by recipe name, then by size, smallest first (SPEC-VIEWER 17.6.1). */
+export function shownOrder<T extends Pick<TextureVariant, 'recipe' | 'size'>>(variants: readonly T[]): T[] {
+  return [...variants].sort((a, b) => a.recipe.localeCompare(b.recipe) || a.size - b.size);
+}
+
 /** A variant that may be shown or baked (R-HD-90, R-HD-102). */
 export const isUsable = (variant: TextureVariant): boolean => !variant.stale && (variant.problems.length === 0 || Boolean(variant.accepted));
 
-/** The worst band of a variant's numbers. */
+/** The worst band of a variant's numbers. A user-made variant has none. */
 export function bandOf(variant: TextureVariant): Band {
+  if (variant.edited) return 'none';
   if (variant.numbers.some((number) => number.band === 'problem')) return 'problem';
   return variant.numbers.some((number) => number.band === 'near') ? 'near' : 'ok';
 }
@@ -223,6 +254,8 @@ export const textureRoutes = {
   owner: (game: GameId, dataset: DatasetId, owner: string): string => `/api/${game}/textures/owner?${new URLSearchParams({ dataset, owner })}`,
   judge: (game: GameId, dataset: DatasetId): string => `/api/${game}/textures/judge?${new URLSearchParams({ dataset })}`,
   request: (game: GameId, dataset: DatasetId): string => `/api/${game}/textures/request?${new URLSearchParams({ dataset })}`,
+  remove: (game: GameId, dataset: DatasetId): string => `/api/${game}/textures/remove?${new URLSearchParams({ dataset })}`,
+  log: (game: GameId, dataset: DatasetId, asset: string, recipe: string): string => `/api/${game}/textures/log?${new URLSearchParams({ dataset, asset, recipe })}`,
   skin: (game: GameId, dataset: DatasetId): string => `/api/${game}/textures/skin?${new URLSearchParams({ dataset })}`,
   bake: (game: GameId, dataset: DatasetId): string => `/api/${game}/textures/bake?${new URLSearchParams({ dataset })}`,
   unbake: (game: GameId, dataset: DatasetId): string => `/api/${game}/textures/unbake?${new URLSearchParams({ dataset })}`,

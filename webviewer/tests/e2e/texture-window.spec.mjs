@@ -34,7 +34,7 @@ async function unitRow(page, name) {
   return row;
 }
 
-test('the window is hidden at first; a double-click on a unit of the gallery opens it with every texture of its model, shown as the skin editor\'s tiles: In game first; "used by" scrolls at a fixed height; no Use, no checkbox; a click on In game picks nothing', async ({ page }) => {
+test('the window is hidden at first; a double-click on a unit of the gallery opens it with every texture of its model, shown as tiles: In game first; "used by" scrolls at a fixed height; no Use; a click on In game picks nothing', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = await open(page);
   await expect(page.locator('#texture-window')).toBeHidden();
@@ -77,7 +77,7 @@ test('the window is hidden at first; a double-click on a unit of the gallery ope
   // The double-click adds nothing to the scene (the "add to scene" button and a drag do).
   expect((await state(page)).items).toEqual([]);
 
-  // The window shows the skin editor's tiles (R-VIEW-131 to 134).
+  // The window shows the texture's tiles (R-VIEW-131 to 134).
   const frame = textureFrame(page);
   // The texture with the most users: its "used by" is the longest.
   const most = [...shown.textures].sort((a, b) => b.users.length - a.users.length)[0];
@@ -97,8 +97,8 @@ test('the window is hidden at first; a double-click on a unit of the gallery ope
   console.log(`used by ${JSON.stringify(box)}`);
   expect(box.lines).toBe(most.users.length);
   if (most.users.length > 4) expect(box.scroll).toBeGreaterThan(box.client);
-  // Negative: no Use button, no show checkbox, no card, no "what it shows now".
-  await expect(frame.locator('button.use-variant, input.show-variant, .card')).toHaveCount(0);
+  // Negative: no Use button, no card, no "what it shows now".
+  await expect(frame.locator('button.use-variant, .card')).toHaveCount(0);
   await expect(frame.locator('#cards')).not.toContainText('what it shows now');
   // Negative: a click on In game (here the original) is no pick: there is nothing to save (R-VIEW-133).
   await frame.locator('#cards .skin-tile[data-tile="in-game"]').click();

@@ -15,15 +15,15 @@
 // - alt + left hold on a unit: drags the unit over the ground (features/controls);
 // - right click on a unit: the animation menu (menu.ts); Ctrl+L switches its "loop" choice;
 // - double-click on a unit: what its game opens for it (openItem).
-// A press that moves more than CLICK_SLOP pixels is a drag (camera), not a click.
+// A press is a click until core/press.ts says it is a drag (2 px and 150 ms, or 12 px at once, R-VIEW-142).
 
 import type { Feature } from '../../core/context';
 import { radius } from '../../core/geometry';
+import { dragsAt, pressAt, type Press } from '../../core/press';
 import type { Ring } from '../../core/render/ground';
 import type { Item, PickState, Vec2 } from '../../core/types';
 import { createMenu } from './menu';
 
-const CLICK_SLOP = 4; // px
 const SELECT_RING: Pick<Ring, 'width' | 'color'> = { width: 0.07, color: [0.2, 1.0, 0.25] };
 const HOVER_RING: Pick<Ring, 'width' | 'color'> = { width: 0.035, color: [0.75, 1.0, 0.75] };
 const BUTTON = { left: 0, right: 2 };
@@ -36,7 +36,7 @@ export const pickFeature: Feature = {
     const { items } = scene;
 
     let mouse: Vec2 | null = null; // last [clientX, clientY] over the canvas
-    let press: { button: number; x: number; y: number; ctrl: boolean; shift: boolean; moved: boolean } | null = null;
+    let press: { button: number; at: Press; ctrl: boolean; shift: boolean } | null = null;
 
     const byId = (id: number | null): Item | null => items.find((item) => item.id === id) ?? null;
     const ring = (item: Item | null, look: Pick<Ring, 'width' | 'color'>): Ring | null => (item ? { x: item.x, y: item.y, radius: radius(item), ...look } : null);
@@ -83,15 +83,15 @@ export const pickFeature: Feature = {
       mouse = null;
     });
     canvas.addEventListener('mousedown', (e) => {
-      press = { button: e.button, x: e.clientX, y: e.clientY, ctrl: e.ctrlKey, shift: e.shiftKey, moved: false };
+      press = { button: e.button, at: pressAt(e), ctrl: e.ctrlKey, shift: e.shiftKey };
     });
     window.addEventListener('mousemove', (e) => {
-      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > CLICK_SLOP) press.moved = true;
+      if (press) dragsAt(press.at, e);
     });
     window.addEventListener('mouseup', (e) => {
       const p = press;
       press = null;
-      if (!p || p.moved || p.button !== e.button) return;
+      if (!p || p.at.dragging || p.button !== e.button) return;
       if (p.button === BUTTON.left) {
         // Ctrl + left with a selection turns the unit; it keeps the selection.
         if (p.ctrl && selection.selectedId() !== null) return;

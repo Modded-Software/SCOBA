@@ -73,6 +73,8 @@
   .tiles-area { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; min-height: 0; }
   .tiles-area .skin-tiles { flex: 1; min-height: 0; padding: 0; overflow-y: auto; }
   .badge.picked { color: var(--bg); background: var(--accent); }
+  /* A texture with an edit session that is edited and not transferred (SPEC-PHOTOCRAFT 9.1). */
+  .badge.edit { color: #000; background: #ffb36b; }
 </style>
 </head>
 <body>
@@ -92,6 +94,7 @@
     <button id="actual" title="One texture pixel per screen pixel (1)">1:1</button>
     <button id="tile" title="Tile the texture (T)">Tile</button>
     <button id="smooth" title="Smooth the original (S)">Smooth</button>
+    <button id="manage-edits" title="The edit sessions of this dataset: resume, transfer or discard one" hidden>Manage Edits&#8230;</button>
     <div id="message"></div>
   </div>
   <div id="view">

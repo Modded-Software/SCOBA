@@ -197,7 +197,7 @@ test('alt + left drag on a selected unit moves every selected unit by the same s
   await page.keyboard.down('Alt');
   await page.mouse.move(from[0], from[1]);
   await page.mouse.down();
-  await page.mouse.move(to[0], to[1], { steps: 8 });
+  await page.mouse.move(to[0], to[1], { steps: 4 });
   await page.mouse.up();
   await page.keyboard.up('Alt');
   const after = await items(page);
@@ -225,7 +225,7 @@ test('negative: alt + left drag on a unit not selected moves that unit alone', a
   await page.keyboard.down('Alt');
   await page.mouse.move(from[0], from[1]);
   await page.mouse.down();
-  await page.mouse.move(from[0] - 50, from[1] + 30, { steps: 8 });
+  await page.mouse.move(from[0] - 50, from[1] + 30, { steps: 4 });
   await page.mouse.up();
   await page.keyboard.up('Alt');
   const after = await items(page);

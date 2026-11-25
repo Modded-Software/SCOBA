@@ -27,8 +27,25 @@ export function installSceneList(status: StatusService, actions: SceneListAction
   const button = byId('scenes-button');
   const listNode = byId('scenes-list');
   const fileInput = byIdAs('scenes-import-file', HTMLInputElement);
-  const dropdown = new Dropdown({ root: byId('scenes'), button, list: listNode });
   const report = (error: unknown): void => status.reportFailure(error);
+  // The wheel and Up/Down on the button open the scene before or after (SPEC-VIEWER 16.14).
+  const dropdown = new Dropdown({
+    root: byId('scenes'),
+    button,
+    list: listNode,
+    steps: {
+      current: () => {
+        const state = actions.state();
+        return state.list.findIndex((scene) => scene.id === state.open?.id);
+      },
+      count: () => actions.state().list.length,
+      usable: () => true,
+      choose: (index) => {
+        const scene = actions.state().list[index];
+        if (scene) actions.openScene(scene.id).catch(report);
+      },
+    },
+  });
   const run = (work: () => Promise<unknown>): void => {
     dropdown.close();
     work().catch(report);

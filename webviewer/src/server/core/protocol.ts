@@ -2,9 +2,11 @@
 // route is read from the raw path, so an encoded ".." never reaches a
 // real route.
 
-import { ASSET_KINDS, ID_RULE, LIMIT, type AssetKind, type GamesBody, type HealthBody } from '../../shared/protocol';
+import { ASSET_KINDS, ID_RULE, LIMIT, type AssetKind, type GamesBody, type HealthBody, type PhotocraftHealth } from '../../shared/protocol';
 import { HttpError, type GameBackend, type ListQuery, type UnavailableGame } from './backend';
+import { editRoute } from './editroutes';
 import { intParam, json, sendFile, type Request, type Route } from './http';
+import { photocraftHealth } from './photocraft';
 import { textureRoute } from './textureroutes';
 
 /** Query parameters that are not filters. */
@@ -47,8 +49,8 @@ function method(request: Request, wanted: string): void {
   if (request.method !== wanted) throw new HttpError(405, { error: 'method not allowed' });
 }
 
-/** One game's routes: `rest` is the path after /api/<game>/, split at "/". */
-async function gameRoute(game: GameBackend, rest: readonly string[], request: Request): Promise<void> {
+/** One game's routes: `rest` is the path after /api/<game>/, split at "/". `install` reads the state of the PhotoCraft install. */
+async function gameRoute(game: GameBackend, rest: readonly string[], install: () => Promise<PhotocraftHealth>, request: Request): Promise<void> {
   const { params, res } = request;
   const [first, second, third, ...more] = rest;
   if (first === 'x' && second !== undefined) {
@@ -57,6 +59,10 @@ async function gameRoute(game: GameBackend, rest: readonly string[], request: Re
     // The extension sees the path after /x/<name>: '' for the name alone, '/...' below it.
     const tail = rest.length > 2 ? `/${rest.slice(2).join('/')}` : '';
     if (!(await extension({ ...request, route: tail }))) throw new HttpError(404, { error: 'not found' });
+    return;
+  }
+  if (first === 'textures' && second === 'edit') {
+    await editRoute(game, rest.slice(2), () => datasetOf(game, params), install, request);
     return;
   }
   if (first === 'textures' && third === undefined) {
@@ -115,12 +121,12 @@ async function gameRoute(game: GameBackend, rest: readonly string[], request: Re
  * `unavailable` are the games that could not start: listed, with their
  * reason, and their routes answer 503 (SPEC-VIEWER 7, 8).
  */
-export function protocol(games: readonly GameBackend[], unavailable: readonly UnavailableGame[] = []): Route {
+export function protocol(games: readonly GameBackend[], unavailable: readonly UnavailableGame[], photocraftHome: string): Route {
   const byId = new Map(games.map((game) => [game.id, game]));
   const down = new Map(unavailable.map((game) => [game.id, game]));
   const first = games[0];
   if (!first) throw new Error('no game registered');
-  const health: HealthBody = { games: [...games.map((g) => ({ id: g.id, available: true })), ...unavailable.map((g) => ({ id: g.id, available: false }))] };
+  const listedGames: HealthBody['games'] = [...games.map((g) => ({ id: g.id, available: true })), ...unavailable.map((g) => ({ id: g.id, available: false }))];
   const listed: GamesBody = {
     default: first.id,
     games: [
@@ -136,6 +142,8 @@ export function protocol(games: readonly GameBackend[], unavailable: readonly Un
       const [head, ...rest] = parts;
       if (head === 'health' && rest.length === 0) {
         method(request, 'GET');
+        // The install is read on each request: a new one needs no restart.
+        const health: HealthBody = { games: listedGames, photocraft: await photocraftHealth(photocraftHome) };
         json(res, 200, health);
         return true;
       }
@@ -149,7 +157,7 @@ export function protocol(games: readonly GameBackend[], unavailable: readonly Un
       if (off) throw new HttpError(503, { error: 'game not available', game: off.id, reason: off.reason });
       const game = known ? byId.get(head) : undefined;
       if (!game) throw new HttpError(404, { error: 'no such game', game: head ?? '' });
-      await gameRoute(game, rest, request);
+      await gameRoute(game, rest, () => photocraftHealth(photocraftHome), request);
     } catch (error) {
       if (!(error instanceof HttpError)) throw error;
       json(res, error.status, error.body);

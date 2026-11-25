@@ -14,11 +14,16 @@
 #            StarCraft: Ghost formats; cloned at its pin by make viewer-install)
 #            into WEBVIEWER_WORK/build/nodsdk. Needs the GLM headers: sudo
 #            make init.
+#   photocraft  build the PhotoCraft editor site and renderer at the pins
+#            below and install them to PHOTOCRAFT_HOME. The steps are in
+#            scripts/setup/photocraft.sh (SPEC-PHOTOCRAFT section 5). Skipped
+#            when the install's pin record matches the current pins.
 #   check    report every dependency as OK, MISSING or OPTIONAL. Exit 1 when a
 #            required one is missing.
 #
 # make runs this with the paths of scripts/paths.sh (SPEC-PATHS): SC2_BUILD,
-# WEBVIEWER_WORK, SC2_INSTALL and UV_PROJECT_ENVIRONMENT come from there.
+# WEBVIEWER_WORK, SC2_INSTALL, PHOTOCRAFT_HOME and UV_PROJECT_ENVIRONMENT
+# come from there.
 # Other settings:
 #   SC2_PROJECT_ROOT  this repo (default: git top level of the working directory)
 #   STORMEX           the stormex binary (default: tools/stormex)
@@ -43,6 +48,18 @@ STORMEX_DEPS=(
     "cxxopts https://github.com/jarro2783/cxxopts.git v3.3.1 44380e5a44706ab7347f400698c703eb2a196202"
     "plog https://github.com/SergiusTheBest/plog.git 1.1.11 e5c033e317a01b2703d13aab42288d09b2efdafc"
 )
+# PhotoCraft (SPEC-PHOTOCRAFT 5.1): the source, the build's own Rust, Trunk
+# by the sha256 of its release archive, and how the renderer is built.
+PHOTOCRAFT_REPO="https://github.com/storytold/photocraft.git"
+PHOTOCRAFT_TAG="v0.23.1"
+PHOTOCRAFT_COMMIT="45066c48292e92229ada3459a83453439514c83d"
+PHOTOCRAFT_RUST="1.96.1"
+PHOTOCRAFT_HOST="x86_64-unknown-linux-gnu"
+PHOTOCRAFT_TRUNK="0.21.14"
+PHOTOCRAFT_TRUNK_URL="https://github.com/trunk-rs/trunk/releases/download/v$PHOTOCRAFT_TRUNK/trunk-$PHOTOCRAFT_HOST.tar.gz"
+PHOTOCRAFT_TRUNK_SHA256="f2b4680cd239693a646a2795e4633c625328d7b2a044fbe749fa3a2fe9e7036b"
+# No default features: the renderer is built without its GPU code (R-PC-59).
+PHOTOCRAFT_CLI_BUILD="--release --locked -p photocraft-cli --no-default-features"
 UPSCALE_REPO="git@github.com:Modded-Software/upscale-on-arc.git"
 # First commit on the remote, 2026-11-22. A checkout must contain it.
 UPSCALE_COMMIT="b35fa0784ab610946a239e7a634f4735eac10998"
@@ -52,6 +69,7 @@ STORMEX="${STORMEX:-$ROOT_DIR/tools/stormex}"
 : "${SC2_BUILD:?SC2_BUILD is not set: run this through make (SPEC-PATHS)}"
 : "${WEBVIEWER_WORK:?WEBVIEWER_WORK is not set: run this through make (SPEC-PATHS)}"
 : "${SC2_INSTALL:?SC2_INSTALL is not set: run this through make (SPEC-PATHS)}"
+: "${PHOTOCRAFT_HOME:?PHOTOCRAFT_HOME is not set: run this through make (SPEC-PATHS)}"
 STORMEX_SRC="${STORMEX_SRC:-$SC2_BUILD/deps/stormex}"
 STORMEX_PATH="${STORMEX_PATH:-/usr/local/bin:/usr/bin:/bin}"
 STORMEX_PATCHES="$ROOT_DIR/scripts/setup/patches/stormex"
@@ -207,6 +225,12 @@ cmd_nodsdk() {
     say "built the nodsdk parser library, NODSurvey and NODExport: $NODSDK_BUILD/cmake"
 }
 
+# cmd_photocraft and photocraft_report: the PhotoCraft steps. Found from the
+# repo root: make starts this script through a guarded shell that hides the
+# script's own path.
+# shellcheck source=scripts/setup/photocraft.sh
+source "$ROOT_DIR/scripts/setup/photocraft.sh" || exit 1
+
 # --- check -------------------------------------------------------------------
 
 MISSING=0
@@ -284,6 +308,7 @@ cmd_check() {
     else
         report OPTIONAL upscale-on-arc "not at $UPSCALE_DIR; only a texture request needs it (make install-hdtex)"
     fi
+    photocraft_report
     if [[ "$MISSING" -gt 0 ]]; then
         say "$MISSING required dependencies missing"
         return 1
@@ -296,6 +321,7 @@ case "${1:-}" in
     stormex) cmd_stormex ;;
     upscale) cmd_upscale ;;
     nodsdk) cmd_nodsdk ;;
+    photocraft) cmd_photocraft ;;
     check) cmd_check ;;
-    *) die "usage: deps.sh venv|stormex|upscale|nodsdk|check" ;;
+    *) die "usage: deps.sh venv|stormex|upscale|nodsdk|photocraft|check" ;;
 esac

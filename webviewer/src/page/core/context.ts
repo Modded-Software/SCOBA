@@ -268,7 +268,8 @@ export interface UiService {
   setRowDrag(drag: RowDrag): void;
   /** A record icon from a dataset of a game, or an empty box. */
   iconNode(name: string | null, dataset?: string, game?: string): HTMLElement;
-  floatingWindow(spec: { id: string; title: string }): FloatingWindowHandle;
+  /** `escape` false: Escape does not close it. `closing`: called for its close button in place of the close. */
+  floatingWindow(spec: { id: string; title: string; escape?: boolean; closing?: () => void }): FloatingWindowHandle;
 }
 
 /** What a feature adds to the test API: `app` members go on window.SC2App, `viewer` on window.sc2viewer. */

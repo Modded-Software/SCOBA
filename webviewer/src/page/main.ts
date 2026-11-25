@@ -40,6 +40,7 @@ import { inspectFeature } from './features/inspect';
 import { scenesFeature } from './features/scenes';
 import { edgesFeature } from './features/edges';
 import { skinsFeature } from './features/skins';
+import { editsFeature } from './features/edits';
 import { m3Format } from '../formats/m3/format';
 import { DISPLACEMENT } from '../formats/m3/displacement';
 import { nodFormat } from '../formats/nod/format';
@@ -55,7 +56,7 @@ const GAMES = [
   { game: ghostGame, install: installGhostPage },
 ];
 /** In install order: a feature listens before the ones after it. */
-const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature, edgesFeature, skinsFeature];
+const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature, edgesFeature, skinsFeature, editsFeature];
 
 declare global {
   interface Window {

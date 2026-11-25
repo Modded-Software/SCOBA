@@ -74,11 +74,16 @@ select:hover { color: var(--text); }
 .dropdown-list li.selected button { color: var(--accent); }
 .dropdown-list li.selected button.trash, .dropdown-list li.selected button.danger { color: var(--danger); }
 
-/* ---- Tiles of a texture: the skin editor and the texture window alike (SPEC-VIEWER 17.6.1) ---- */
+/* ---- Tiles of a texture in the texture window (SPEC-VIEWER 17.6.1) ---- */
 .skin-tiles { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; padding: 8px; }
 .skin-tile { position: relative; width: 132px; padding: 4px; font-size: 11px; line-height: 1.35; text-align: left; background: var(--raised); border: 2px solid transparent; border-radius: var(--radius); cursor: pointer; }
 .skin-tile:hover { border-color: var(--line); }
 .skin-tile.highlighted, .skin-tile.highlighted:hover { border-color: var(--accent); }
+/* In game: what the game ships, set apart from the tiles to choose from. */
+.skin-tile.in-game { background: #1a2b22; }
+/* The "Include in preview" box (R-VIEW-130): a click on it does not pick the tile. */
+.skin-tile .tile-include-row { display: flex; gap: 4px; align-items: center; margin-bottom: 3px; color: var(--dim); cursor: pointer; }
+.skin-tile .tile-include-row:has(input:disabled) { cursor: default; }
 .skin-tile.request { cursor: default; color: var(--dim); }
 .skin-tile.request.failure .tile-size { color: var(--danger); }
 .skin-tile .tile-id { margin-top: 2px; font-weight: 600; overflow-wrap: anywhere; }
@@ -88,12 +93,59 @@ select:hover { color: var(--text); }
 .skin-tile .number.band-ok { color: #7fd17f; }
 .skin-tile .number.band-near { color: #ffb36b; }
 .skin-tile .number.band-problem { color: #ff6b6b; }
+/* The thumbnail: the preview, with the info mark on its top right corner. */
+.skin-tile .tile-thumb { position: relative; width: 120px; }
 /* The info mark keeps the arrow cursor; its tooltip shows on hover (R-VIEW-135). */
 .skin-tile .tile-info { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; line-height: 16px; text-align: center; font-weight: 700; color: #000; background: #ffb36b; border-radius: 50%; cursor: default; }
 .skin-tile.band-problem .tile-info { background: #ff6b6b; }
 .skin-tile .tile-tip { display: none; position: absolute; z-index: 5; top: 20px; right: 0; width: 240px; padding: 6px 8px; font-weight: 400; text-align: left; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); white-space: normal; pointer-events: none; }
 .skin-tile .tile-info:hover .tile-tip { display: block; }
 .skin-tile .tile-tip .tile-legend { margin-bottom: 4px; color: var(--dim); }
+/* Edit Texture: a pencil at the bottom left of the preview; its dot is the session's state (SPEC-PHOTOCRAFT 9.1). */
+.skin-tile .tile-edit { position: absolute; left: 4px; bottom: 4px; width: 22px; height: 22px; padding: 0; line-height: 20px; text-align: center; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.skin-tile .tile-edit:hover { border-color: var(--accent); color: var(--accent); }
+.skin-tile .tile-edit.off, .skin-tile .tile-edit.off:hover { color: var(--dim); border-color: var(--line); cursor: default; opacity: 0.6; }
+.skin-tile .tile-edit-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+.skin-tile .tile-edit-dot.edited { background: #ffb36b; }
+/* Delete Variant: a red trash at the bottom right of the preview (R-VIEW-147). */
+.skin-tile .tile-trash { position: absolute; right: 4px; bottom: 4px; width: 22px; height: 22px; padding: 0; line-height: 20px; text-align: center; color: var(--danger); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.skin-tile .tile-trash:hover { border-color: var(--danger); background: rgba(255, 122, 122, 0.12); }
+.skin-tile .tile-trash.off, .skin-tile .tile-trash.off:hover { color: var(--dim); border-color: var(--line); background: var(--panel); cursor: default; opacity: 0.6; }
+/* A request: its stage, a bar with a moving stripe while it runs, its time (R-VIEW-145). */
+.skin-tile.request .tile-stage { color: var(--text); overflow-wrap: anywhere; }
+.skin-tile.request.failure .tile-stage { color: var(--danger); }
+.skin-tile .tile-progress { position: relative; height: 6px; margin: 4px 0 2px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: 3px; }
+.skin-tile .tile-progress-fill { display: block; height: 100%; background: var(--accent); transition: width 0.4s ease; }
+.skin-tile .tile-progress.failed .tile-progress-fill { background: var(--danger); }
+.skin-tile .tile-progress.running::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, 0.28) 50%, transparent 100%); background-size: 40% 100%; background-repeat: no-repeat; animation: tile-progress-run 1.4s linear infinite; }
+@keyframes tile-progress-run { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+.skin-tile .tile-elapsed { color: var(--dim); font-variant-numeric: tabular-nums; }
+/* Ask Again and Open Log of a failed request (R-VIEW-146). */
+.skin-tile .tile-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.skin-tile .tile-actions a { color: var(--accent); }
+/* The upscale dialog while it reads or sends (17.5). */
+.upscale-wait { color: var(--dim); }
+.upscale-note { color: var(--dim); margin-top: 6px; }
+button.busy { position: relative; overflow: hidden; }
+button.busy::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, 0.22) 50%, transparent 100%); background-size: 40% 100%; background-repeat: no-repeat; animation: tile-progress-run 1.4s linear infinite; }
+/* The edit dialogs: the transfer of an edit, and the session list (SPEC-PHOTOCRAFT 9.4, 9.5). */
+.edit-planes { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+.edit-plane figure { margin: 0; display: inline-block; text-align: center; color: var(--dim); }
+.edit-plane img { display: block; width: 160px; height: 160px; object-fit: contain; background: var(--bg); border-radius: 4px; }
+.edit-plane .edit-plane-name { font-weight: 600; margin-bottom: 2px; }
+.edit-plane .edit-pair { display: flex; gap: 6px; }
+.edit-note { color: var(--dim); margin: 4px 0; overflow-wrap: anywhere; }
+.edit-error { margin: 4px 0; }
+.edit-sessions { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow: auto; min-width: 460px; }
+.edit-session { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); }
+.edit-session .edit-session-name { font-weight: 600; overflow-wrap: anywhere; }
+.edit-session .edit-session-state.edited { color: #ffb36b; }
+.edit-session .edit-session-state.stale { color: var(--danger); }
+.edit-session .answers { margin-top: 6px; }
+/* The editor window: the frame, and a note over it until the editor opened the scratch (SPEC-PHOTOCRAFT 9.2). */
+#editor-window .window-body { position: relative; }
+#editor-note { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; padding: 20px; text-align: center; background: var(--bg); overflow-wrap: anywhere; }
+#editor-note[hidden] { display: none; }
 .tex-preview { display: inline-flex; flex: none; width: 32px; height: 32px; align-items: center; justify-content: center; background: var(--bg); border-radius: 4px; overflow: hidden; }
 .skin-tile .tex-preview { width: 120px; height: 120px; }
 .tex-preview img { width: 100%; height: 100%; object-fit: contain; }

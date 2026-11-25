@@ -2,8 +2,8 @@
 // replies, query numbers, and the listening server. A route never writes
 // headers itself.
 
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { rename, rm, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 /** One request, as the routes see it. */
@@ -15,6 +15,8 @@ export interface Request {
   readonly res: ServerResponse;
   /** The body as JSON. A body that is not JSON, or larger than BODY_LIMIT, is an error. */
   json(): Promise<unknown>;
+  /** The body into a file, never held whole in memory (`receive`). */
+  save(target: string, limit: number): Promise<number>;
 }
 
 /** The largest body a request may send. A texture call sends a few names. */
@@ -39,8 +41,9 @@ export function json(res: ServerResponse, code: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-export function sendFile(res: ServerResponse, full: string, type: string, cache: string): void {
-  res.writeHead(200, { 'content-type': type, 'cache-control': cache });
+/** `more`: headers beside the type and the cache rule. */
+export function sendFile(res: ServerResponse, full: string, type: string, cache: string, more: Readonly<Record<string, string>> = {}): void {
+  res.writeHead(200, { ...more, 'content-type': type, 'cache-control': cache });
   createReadStream(full)
     .on('error', (error) => res.destroy(error))
     .pipe(res);
@@ -97,6 +100,54 @@ function readJson(req: IncomingMessage): Promise<unknown> {
   });
 }
 
+/** Thrown for a body past the bound of `receive`: the routes answer 413 with the message. */
+export class TooLarge extends Error {}
+
+let parts = 0;
+
+/**
+ * Write a body to `target`: streamed to a file of another name beside it,
+ * then renamed, so a reader never sees half a file. Returns its size. A body
+ * past `limit` bytes, or one that stops before its end, leaves `target` as
+ * it was. The request is not destroyed: the reply can still be sent.
+ */
+async function receive(req: IncomingMessage, target: string, limit: number): Promise<number> {
+  const large = (): TooLarge => new TooLarge(`the body is larger than ${limit} bytes`);
+  const declared = Number(req.headers['content-length'] ?? Number.NaN);
+  if (declared > limit) throw large();
+  const part = `${target}.${process.pid}.${++parts}.part`;
+  const out = createWriteStream(part);
+  let size = 0;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const data = (chunk: Buffer): void => {
+        size += chunk.length;
+        if (size > limit) {
+          req.off('data', data);
+          reject(large());
+        } else if (!out.write(chunk)) {
+          req.pause();
+          out.once('drain', () => req.resume());
+        }
+      };
+      req.on('data', data);
+      req.once('end', () => out.end());
+      req.once('error', reject);
+      req.once('close', () => {
+        if (!req.complete) reject(new Error('the body stopped before its end'));
+      });
+      out.once('error', reject);
+      out.once('finish', resolve);
+    });
+    await rename(part, target);
+  } catch (error) {
+    out.destroy();
+    await rm(part, { force: true });
+    throw error;
+  }
+  return size;
+}
+
 function requestOf(req: IncomingMessage, res: ServerResponse): Request {
   const raw = req.url ?? '/';
   const cut = raw.indexOf('?');
@@ -106,6 +157,7 @@ function requestOf(req: IncomingMessage, res: ServerResponse): Request {
     params: new URLSearchParams(cut < 0 ? '' : raw.slice(cut + 1)),
     res,
     json: () => readJson(req),
+    save: (target, limit) => receive(req, target, limit),
   };
 }
 

@@ -3,11 +3,13 @@
     status   the textures of a dataset: descriptions, variants, requests; the owners with skins and bakes
     index    bring the dataset's part of the state index up to date with its files
     request  make one variant: an input variant, a model and a size
+    remove   remove one variant of a texture, unless something still needs it
     skin     list, copy, rename, delete or change the skins of one owner; upscale a whole skin
     bake     bake a skin of an owner, or a variant of a texture baked on its own
     unbake   remove a bake
     package  package a dataset no build packages, into the store
     upscaler the upscaler's tool and whether a worker runs, for whoever starts one
+    edit     open, check, transfer or discard the edit session of a texture's variant (SPEC-PHOTOCRAFT 10)
 
 A command that fails prints {"error": ...} and ends with exit status 1.
 No command takes a tile size, a GPU or a force flag. A command that
@@ -27,7 +29,7 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from . import bakes, package, progress, requests, skinbakes, skins, variants, view
+from . import bakes, edits, edittransfer, package, photocraft, progress, removal, requests, skinbakes, skins, variants, view  # fmt: skip
 from .dataset import Dataset, DatasetError
 from .interfaces import GameError, Runner, Texture
 from .registry import RUNNERS, RegistryError
@@ -39,6 +41,7 @@ from .store import Store, StoreError
 REFUSED = (
     DatasetError, requests.RequestError, variants.VariantError, skins.SkinError, bakes.BakeError,
     StoreError, RegistryError, RunnerError, package.PackageError, GameError,
+    edits.EditError, photocraft.RendererError, removal.RemovalError,
 )  # fmt: skip
 RUNNER_ENV = "HDTEX_RUNNER"
 RUNNER_IDS = (RUNNER, REPEAT)
@@ -162,6 +165,15 @@ def request(
     }
 
 
+def remove(
+    dataset: Dataset, _runner: Callable[[], Runner], args: argparse.Namespace
+) -> dict:
+    """Remove one variant of a texture (R-HD-146)."""
+    texture = dataset.texture(args.asset)
+    removal.remove(dataset, texture, args.variant)
+    return {"asset": texture.asset, "removed": args.variant}
+
+
 def skin(
     dataset: Dataset, runner: Callable[[], Runner], args: argparse.Namespace
 ) -> dict:
@@ -255,6 +267,20 @@ def upscaler(
     }
 
 
+def edit(
+    dataset: Dataset, _runner: Callable[[], Runner], args: argparse.Namespace
+) -> dict:
+    """One action on an edit session. No action hands anything to the upscaler."""
+    if args.action == "open":
+        texture = dataset.texture(args.asset)
+        return {"session": edits.open_session(dataset, texture, args.variant or variants.ORIGINAL)}
+    if args.action == "check":
+        return {"session": edits.check(dataset, args.session)}
+    if args.action == "transfer":
+        return edittransfer.transfer(dataset, args.session)
+    return edits.discard(dataset.game, args.session)
+
+
 def parser() -> argparse.ArgumentParser:
     made = argparse.ArgumentParser(
         prog="hd_textures.py", description=(__doc__ or "").split("\n\n")[0]
@@ -296,6 +322,9 @@ def parser() -> argparse.ArgumentParser:
         type=int,
         help=f"{', '.join(map(str, variants.SIZES))}, or the variant's own size where it is smaller",
     )
+    removing = command("remove", remove)
+    removing.add_argument("--asset", required=True)
+    removing.add_argument("--variant", required=True, help="the variant id, such as pbrify@2048")
     skinned = command("skin", skin)
     skinned.add_argument(
         "action", choices=("list", "copy", "rename", "delete", "set", "upscale")
@@ -343,6 +372,13 @@ def parser() -> argparse.ArgumentParser:
     command("upscaler", upscaler).add_argument(
         "--log", type=Path, required=True, help="the file the worker logs to"
     )
+    edited = command("edit", edit)
+    edited.add_argument("action", choices=("open", "check", "transfer", "discard"))
+    edited.add_argument("--asset", help="the texture, for open")
+    edited.add_argument(
+        "--variant", help=f"the variant to edit, for open; {variants.ORIGINAL} when not given"
+    )
+    edited.add_argument("--session", help="the session, for check, transfer and discard")
     return made
 
 
@@ -356,6 +392,12 @@ def _check(args: argparse.Namespace) -> None:
             raise UsageError("skin set takes --asset")
         if args.action == "upscale" and (args.model is None or args.size is None):
             raise UsageError("skin upscale takes --model and --size")
+    if args.command == "edit":
+        opening = args.action == "open"
+        if opening and (args.asset is None or args.session is not None):
+            raise UsageError("edit open takes --asset, and --variant for a variant; no --session")
+        if not opening and (args.session is None or args.asset is not None or args.variant is not None):
+            raise UsageError(f"edit {args.action} takes --session, and no --asset or --variant")
 
 
 def main(

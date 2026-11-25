@@ -8,6 +8,7 @@ import type { FeatureContext } from '../../core/context';
 import { make, messageOf } from '../../core/dom';
 import type { GroundChoice } from '../../core/types';
 import { ConfirmDialog } from '../../ui/components/dialog';
+import { stepSelect } from '../../ui/components/stepper';
 
 /** The select's value for "what the bake shows, else the original". */
 const BAKED = '';
@@ -22,7 +23,7 @@ export interface GroundRow {
 
 export function createGroundRow({ scene, skins, events, status }: Pick<FeatureContext, 'scene' | 'skins' | 'events' | 'status'>): GroundRow {
   const name = make('span', { className: 'ground-name' });
-  const select = make('select', { className: 'ground-variant', title: 'the variant the view shows; it writes no bake' });
+  const select = stepSelect(make('select', { className: 'ground-variant', title: 'the variant the view shows; it writes no bake' }));
   const upscale = make('button', { className: 'ground-upscale', textContent: 'Upscale' });
   const bake = make('button', { className: 'ground-bake' });
   const badge = make('span', { className: 'skin-baked', hidden: true });

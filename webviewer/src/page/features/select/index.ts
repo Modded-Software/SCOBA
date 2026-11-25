@@ -3,16 +3,17 @@
 //   the instances inside it become the selection, or are added to it with
 //   shift. An instance is inside when the foot, the middle or the top of
 //   its column (core/geometry.ts cylinder) is inside on screen. A press
-//   released without a drag is a click (features/pick), not a rectangle.
+//   is a rectangle only once it is a drag (core/press.ts: 2 px and
+//   150 ms, R-VIEW-142); before that it is a click (features/pick).
 //   (Alt + left on a unit drags the unit: features/controls.)
 // - Delete removes the selected instances, unless a text field has the keys.
 // Copy, cut and paste of the selection: features/clipboard.
 
 import type { Feature } from '../../core/context';
 import { make } from '../../core/dom';
+import { dragsAt, pressAt, type Press } from '../../core/press';
 import type { SelectBox, Vec2 } from '../../core/types';
 
-const MIN_SIZE = 4; // px: the same slop as a click (features/pick CLICK_SLOP)
 const SHARES = [0, 0.5, 1]; // heights of the column tested
 const LEFT = 0;
 
@@ -21,6 +22,8 @@ interface Drag {
   y0: number;
   x1: number;
   y1: number;
+  /** A click until core/press.ts says it is a drag (R-VIEW-142). */
+  press: Press;
 }
 
 export const selectFeature: Feature = {
@@ -33,7 +36,7 @@ export const selectFeature: Feature = {
     let rect: Drag | null = null;
 
     const box = (r: Drag): SelectBox => ({ left: Math.min(r.x0, r.x1), top: Math.min(r.y0, r.y1), width: Math.abs(r.x1 - r.x0), height: Math.abs(r.y1 - r.y0) });
-    const dragged = (r: Drag): boolean => Math.hypot(r.x1 - r.x0, r.y1 - r.y0) > MIN_SIZE;
+    const dragged = (r: Drag): boolean => r.press.dragging;
 
     function show(r: Drag): void {
       node.hidden = !dragged(r);
@@ -47,6 +50,7 @@ export const selectFeature: Feature = {
       if (!rect) return;
       rect.x1 = e.clientX;
       rect.y1 = e.clientY;
+      dragsAt(rect.press, e);
       show(rect);
     }
 
@@ -60,7 +64,7 @@ export const selectFeature: Feature = {
     // Alt + left on the ground or the sky: the rectangle starts.
     render.canvas.addEventListener('mousedown', (e) => {
       if (e.button !== LEFT || !e.altKey || selection.hitAt(e.clientX, e.clientY)) return;
-      rect = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY };
+      rect = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, press: pressAt(e) };
       show(rect);
     });
     window.addEventListener('mousemove', move);

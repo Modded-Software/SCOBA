@@ -69,6 +69,11 @@ def read(
         "step": note["step"],
         "steps": note["steps"],
         "planes": len(note["jobs"]),
+        "done": 0,
+        # The id it was asked as, for asking again; empty for the transfer of an edit.
+        "variant": str(note.get("variant", "")),
+        # Its start in seconds since 1970; None: a note written before it was kept.
+        "since": note.get("since"),
         "log": str(folder / LOG_FILE),
     }
     if note["failed"]:
@@ -79,11 +84,13 @@ def read(
     if note["phase"] == ENCODING:
         return {"state": ENCODING, "reason": "", **where}
     jobs = [job for job in map(job_of, map(Path, note["jobs"])) if job is not None]
-    states = {runner().state(job).state for job in jobs}
+    found = [runner().state(job).state for job in jobs]
+    states = set(found)
     return {
         "state": UPSCALING if states & {RUNNING, DONE} else QUEUED,
         "reason": "",
         **where,
+        "done": found.count(DONE),
     }
 
 

@@ -208,8 +208,9 @@ SPEC-VIEWER section 17.
 - Owners (SPEC-HD-TEXTURES 5.1) [plan]: a `units` record is
   `unit:<id>`, a `doodads` record `actor:<id>`, a `models` record
   `model:<path>`. A `terrain` record has no owner; it bakes per texture.
-  The skin editor of a unit lists the textures of every model its actor
-  shows (death, portrait), not only the file in the view.
+  An owner's skins name the textures of every model its actor shows
+  (death, portrait). The texture window, where skins are edited, lists
+  only the textures of the model file in the view (17.3 of SPEC-VIEWER).
 - The grid glows blue around an instance whose largest shown texture is
   2048 or more on a side, green around the rest.
 
@@ -237,7 +238,7 @@ In `webviewer/tests/`.
 | Gallery | `units-ui`, `doodads-ui`, `paged-list`, `add-all`, `add-all-view` |
 | Record to instance | `units-ui`, `doodads-ui`, `anim-speed` |
 | Backdrops | `skyboxes`, `skybox-units`, `ground-sky` |
-| Textures | `texture-window`, `texture-service`, `ground-texture`; [plan] `texture-variants`, `texture-skins`, `skin-editor`, `texture-bake` in place of `texture-sets` |
+| Textures | `texture-window`, `texture-service`, `ground-texture`; [plan] `texture-variants`, `texture-skins`, `texture-bake` in place of `texture-sets` |
 | Format `m3` | `geometry`, `shader`, `uv`, `uv-anim`, `bounds`, `draw-order`, `constant-color`, `wide-index`, `cutout`, `displacement`, `fresnel`, `ground-lights`, `billboards`, `particles`, `particle-materials`, `particle-motion`, `particle-ground`, `doodads-survey` |
 
 Negative cases:

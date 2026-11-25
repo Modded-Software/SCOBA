@@ -108,7 +108,7 @@ test('left click selects; another unit takes the selection; the ground clears it
   const target = s.camera.target;
   await page.mouse.move(m[0], m[1]);
   await page.mouse.down();
-  await page.mouse.move(m[0] + 60, m[1] + 10, { steps: 6 });
+  await page.mouse.move(m[0] + 60, m[1] + 10, { steps: 3 });
   await page.mouse.up();
   s = await state(page);
   expect(s.pick.selected).toBe(null);
@@ -252,7 +252,7 @@ test('negative: no menu from a right drag over a unit, a right click on the grou
   // Right drag: pans, no menu.
   await page.mouse.move(at[0], at[1]);
   await page.mouse.down({ button: 'right' });
-  await page.mouse.move(at[0] + 50, at[1], { steps: 5 });
+  await page.mouse.move(at[0] + 50, at[1], { steps: 3 });
   await page.mouse.up({ button: 'right' });
   let s = await state(page);
   expect(s.pick.menu).toBe(null);

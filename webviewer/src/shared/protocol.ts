@@ -30,9 +30,19 @@ export interface GamesBody {
   games: GameInfo[];
 }
 
-/** GET /api/health: the games and whether each is available. No counts. */
+/** The PhotoCraft install (SPEC-PHOTOCRAFT section 7): its recorded pins, or why there is none. */
+export interface PhotocraftHealth {
+  installed: boolean;
+  /** The lines of the install's pin record; empty when not installed. */
+  pins: string[];
+  /** Why texture editing is not there; null when installed. */
+  reason: string | null;
+}
+
+/** GET /api/health: the games and whether each is available, and the PhotoCraft install. No counts. */
 export interface HealthBody {
   games: { id: GameId; available: boolean }[];
+  photocraft: PhotocraftHealth;
 }
 
 export interface FilterInfo {

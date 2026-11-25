@@ -162,3 +162,53 @@ class RefusalTest(unittest.TestCase):
         for longest in (0, -1):
             with self.assertRaises(variants.VariantError, msg=str(longest)):
                 variants.refusal("pbrify", longest, True)
+
+
+EDIT = "edit3fa9c1d2aa10"
+DIGEST = "3fa9c1d2aa10" + "0" * 52
+
+
+class EditStepTest(unittest.TestCase):
+    """A person's edit as a step of a variant id (SPEC-PHOTOCRAFT 10, R-PC-54)."""
+
+    def test_an_edit_joins_its_input_with_twelve_digits_of_its_hash_at_the_inputs_size(self) -> None:
+        self.assertEqual(variants.edited(variants.ORIGINAL, DIGEST, 512), f"{EDIT}@512")
+        self.assertEqual(variants.edited("pbrify@2048", DIGEST, 2048), f"pbrify@2048+{EDIT}@2048")
+        self.assertEqual(variants.split(f"pbrify@2048+{EDIT}@2048"), (f"pbrify@2048+{EDIT}", 2048))
+        self.assertEqual(variants.input_of(f"pbrify@2048+{EDIT}@2048"), "pbrify@2048")
+        self.assertEqual(variants.input_of(f"{EDIT}@512"), variants.ORIGINAL)
+        self.assertEqual(variants.title(f"pbrify@2048+{EDIT}@2048"), "PBRify, then Edit at 2048")
+        self.assertEqual(variants.prefixes(f"{EDIT}@512+fast"), (EDIT, f"{EDIT}@512+fast"))
+        [step] = variants.parse_recipe(EDIT)
+        self.assertEqual((step.edit, step.model.id), (True, EDIT))
+        self.assertEqual([step.edit for step in variants.parse_recipe(f"pbrify@2048+{EDIT}@2048+fast")], [False, True, False])
+
+    def test_what_is_no_edit_step_is_no_model_either(self) -> None:
+        for name in ("edit", "edit3fa9c1d2aa1", "edit3fa9c1d2aa100", "edit3FA9C1D2AA10", "edit3fa9c1d2aa1g", "xedit3fa9c1d2aa10"):
+            self.assertFalse(variants.is_edit(name), name)
+            with self.assertRaises(VariantError, msg=name):
+                variants.parse_recipe(name)
+        self.assertNotIn(variants.EDIT, MODELS, "no request can name the edit as its model")
+
+    def test_an_edit_keeps_the_size_of_its_input_and_has_that_one_size(self) -> None:
+        self.assertEqual(variants.own_size(variants.parse_recipe(EDIT), 512), 512)
+        self.assertEqual(variants.own_size(variants.parse_recipe(f"pbrify@2048+{EDIT}"), 1024), 2048)
+        self.assertEqual(variants.own_size(variants.parse_recipe(f"{EDIT}@512+pbrify"), 512), 2048)
+        self.assertEqual(variants.size_refusal(f"pbrify@2048+{EDIT}", 2048, 1024), "")
+        # Negative: not at a level below, though its input's recipe is kept there.
+        self.assertIn("not at 1024", variants.size_refusal(f"pbrify@2048+{EDIT}", 1024, 1024))
+        self.assertIn("not at 2048", variants.size_refusal(f"pbrify@4096+{EDIT}", 2048, 1024))
+
+    def test_a_request_may_build_on_an_edit_at_its_size_and_cannot_make_one(self) -> None:
+        self.assertEqual(variants.refusal(f"{EDIT}@512+pbrify", 512, True), "")
+        self.assertEqual(variants.refusal(f"pbrify@2048+{EDIT}@2048+seedvr2", 1024, True), "")
+        self.assertIn("is kept at 512, not at 256", variants.refusal(f"{EDIT}@256+pbrify", 512, True))
+        self.assertIn("is kept at 2048, not at 1024", variants.refusal(f"pbrify@2048+{EDIT}@1024+fast", 1024, True))
+        self.assertIn("a request cannot", variants.refusal(EDIT, 512, True))
+        self.assertIn("a request cannot", variants.refusal(f"pbrify@2048+{EDIT}", 1024, True))
+        self.assertIn("can add nothing", variants.refusal(f"{EDIT}@4096+fast", 4096, True))
+
+    def test_an_edit_step_is_no_model_a_texture_without_colour_must_avoid(self) -> None:
+        self.assertEqual(variants.model_refusal(EDIT, False), "")
+        self.assertEqual(variants.model_refusal(f"{EDIT}@512+fast", False), "")
+        self.assertIn("use fast", variants.model_refusal(f"{EDIT}@512+pbrify", False))

@@ -59,8 +59,10 @@ Implementation lives in
 - **Data texture**: a texture that holds amounts, not light: a normal map,
   a mask, a specular map. A colour texture may hold a data plane too (a
   mask in alpha).
-- **Variant**: one version of one texture: the original, or what a model
-  made of an input variant, at an output size. A texture can have many.
+- **Variant**: one version of one texture: the original, what a model
+  made of an input variant, at an output size, or what a person's edit
+  made of an input variant (an edited variant, REQ-PHOTOCRAFT). A
+  texture can have many.
 - **Owner**: what a skin belongs to: a unit, an actor or a model. SC2's
   viewer shows units and doodads; it has no actor list.
 - **Skin**: a named preset of one owner in one dataset. It names one
@@ -101,12 +103,13 @@ Implementation lives in
 | ID | Requirement |
 | --- | --- |
 | R-HD-120 | Each texture MUST be able to have any number of variants. The original MUST be one of them. |
-| R-HD-121 | A variant MUST be made on request from three choices: an input variant of the same texture, a model of the `upscale-on-arc` tool, and an output size from a list: 1024, 2048, 4096. |
+| R-HD-121 | A variant MUST be made on request from three choices: an input variant of the same texture, a model of the `upscale-on-arc` tool, and an output size from a list: 1024, 2048, 4096. An edited variant is made another way: by the transfer of an edit of an input variant, at the input's size (R-PC-51). [agent, O-PC-14] |
 | R-HD-122 | `seedvr2` MUST NOT be chosen for a data texture. On a colour texture with a data plane, `seedvr2` MUST make the colour and `fast` MUST make the data plane. Where `seedvr2` is chosen for many textures at once, every data texture among them MUST get `fast`. [agent, O-HD-10: with `pbrify` too, data planes get `fast`, as today] |
 | R-HD-123 | A size above four times the input's longest side MUST be refused with the reason. The model's output MUST be shrunk to the chosen size. An input with a side above 2048 MUST be shrunk until no side is above 2048, before the model. |
-| R-HD-124 | Two requests with the same input, model and size MUST give one variant. A variant MUST record its input, its model per plane, its size and its quality numbers. |
+| R-HD-124 | Two requests with the same input, model and size MUST give one variant. A variant MUST record its input, its model per plane, its size and its quality numbers. An edited variant MUST also record the planes that changed and the hash of the rendered planes; two transfers with the same input and the same rendered planes MUST give one variant (R-PC-54, R-PC-55). [agent, O-PC-14] |
+| R-HD-146 | A variant MUST be removable on request. The removal MUST be refused, with the reason, while a skin or a bake of any dataset names it, while another variant is made from it, while a request of its recipe is open, or while an edit session is open on it. The original MUST NOT be removable. [operator 2026-11-25: "add a trash icon for all textures with confirmation dialog; make currently selected, skin-selected and baked texture non-deletable"; the other refusals are the agent's] |
 | R-HD-10 | A variant MUST keep the layout of its original: the same compression format, a full mip chain, the same channel meaning, and the bytes the game stores after the last mip. |
-| R-HD-11 | A variant MUST show the same picture as its original. Brightness, colour, and surface tilt seen from far away MUST match the original. |
+| R-HD-11 | A variant a model made MUST show the same picture as its original. Brightness, colour, and surface tilt seen from far away MUST match the original. A variant a model made from an edited variant MUST match the nearest edited variant among its inputs instead (R-PC-83). An edited variant is not bound by this (R-PC-80). |
 | R-HD-12 | A variant of a texture that tiles MUST tile as well as its original does. |
 | R-HD-52 | A variant MUST keep the compression format of its original. |
 | R-HD-53 | A texture the tooling cannot upscale soundly MUST be left as it is. A request for it MUST fail with the reason. |
@@ -117,14 +120,14 @@ Implementation lives in
 | ID | Requirement |
 | --- | --- |
 | R-HD-13 | The tooling MUST measure R-HD-10 to R-HD-12 on every variant and keep the numbers with it. |
-| R-HD-90 | A variant that misses a limit MUST be kept, with the limit and the number: a problem. A bake whose skin names a variant with a problem MUST be refused with the problem. A variant marked accepted MUST show its problems, which MUST NOT refuse a bake. No command MUST set the mark. [agent: whether a problem refuses a bake is not stated by the operator; see O-HD-9] |
+| R-HD-90 | A variant that misses a limit MUST be kept, with the limit and the number: a problem. A bake whose skin names a variant with a problem MUST be refused with the problem. A variant marked accepted MUST show its problems, which MUST NOT refuse a bake. No command MUST set the mark. [agent: whether a problem refuses a bake is not stated by the operator; see O-HD-9] The limits bind a variant a model made. An edited variant MUST NOT have a problem, and its numbers MUST NOT refuse a bake (R-PC-80, R-PC-81). |
 | R-HD-91 | The seam limit of R-HD-12 MUST apply only to a texture that tiles. |
 
 ### 3.4 Texture store
 
 | ID | Requirement |
 | --- | --- |
-| R-HD-85 | One texture store MUST hold the variants, the skins and the bakes of every game and every dataset, in one layout. It MUST be outside git. One machine setting MUST name its place. |
+| R-HD-85 | One texture store MUST hold the variants, the skins, the bakes and the edit sessions (REQ-PHOTOCRAFT) of every game and every dataset, in one layout. It MUST be outside git. One machine setting MUST name its place. |
 | R-HD-86 | Variants MUST exist side by side. Making one MUST NOT change another. |
 | R-HD-87 | Datasets that hold the same original MUST share its variants. |
 | R-HD-88 | A variant whose original has changed since MUST NOT be used. It MUST be reported as stale. |

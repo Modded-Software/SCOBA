@@ -18,7 +18,25 @@ export const landmarksFeature: Feature = {
     const pinButton = byId('landmark-pin');
     const listNode = byId('landmarks-list');
 
-    const dropdown = new Dropdown({ root: byId('landmarks'), button, list: listNode });
+    // The wheel and Up/Down on the button go to the landmark before or after (SPEC-VIEWER 16.14).
+    const landmarkAt = (index: number): Landmark | undefined => camera.landmarkState().list[index];
+    const dropdown = new Dropdown({
+      root: byId('landmarks'),
+      button,
+      list: listNode,
+      steps: {
+        current: () => {
+          const { list, selected } = camera.landmarkState();
+          return list.findIndex((l) => l.id === selected);
+        },
+        count: () => camera.landmarkState().list.length,
+        usable: () => true,
+        choose: (index) => {
+          const landmark = landmarkAt(index);
+          if (landmark) camera.goToLandmark(landmark.id);
+        },
+      },
+    });
     const closeList = (): void => dropdown.close();
 
     function render(): void {
@@ -75,8 +93,9 @@ export const landmarksFeature: Feature = {
 
     /** The pin button: ask a name, then keep the view as it was when the button was pressed. */
     async function pin(): Promise<void> {
+      // The exact view, at full precision: during a zoom glide, the distance it ends at (R-VIEW-144).
       const now = camera.camera;
-      const view = { target: [...now.target] satisfies Landmark['target'], yaw: now.yaw, pitch: now.pitch, distance: now.distance };
+      const view = { target: [...now.target] satisfies Landmark['target'], yaw: now.yaw, pitch: now.pitch, distance: camera.zoomGoal() ?? now.distance };
       const list = camera.landmarks();
       let n = 1;
       while (list.some((l) => l.name === `landmark ${n}`)) n++;

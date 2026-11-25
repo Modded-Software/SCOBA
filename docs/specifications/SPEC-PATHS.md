@@ -45,8 +45,9 @@ A value may name `$HOME` and nothing else.
 | `SC2_OUT` | `SC2_WORK/out` | The built map, profile maps, build log and lock. |
 | `SC2_BUILT_MAP` | `SC2_OUT/SC2_MAP_NAME` | The built map. |
 | `SC2_BUILD_STAMP` | `SC2_OUT/.last-build-stamp` | The stamp of the last build. |
-| `SC2_BUILD` | `SC2_WORK/build` | Tool builds and caches: the stormex checkout (`deps/stormex`), the old texture caches (`hdtex`). |
+| `SC2_BUILD` | `SC2_WORK/build` | Tool builds and caches: the stormex checkout (`deps/stormex`), the PhotoCraft clone, its build tree, its build tools, its build folder and its step logs (`deps/photocraft`, `deps/photocraft-tree`, `deps/photocraft-tools`, `deps/photocraft-target`, `deps/photocraft-logs`), the old texture caches (`hdtex`). |
 | `TEXTURE_STORE` | `SC2_BUILD/texture-store` | The texture store (SPEC-HD-TEXTURES). |
+| `PHOTOCRAFT_HOME` | `SC2_BUILD/photocraft` | The installed PhotoCraft: the editor site, the renderer and the pin record (SPEC-PHOTOCRAFT). Absent until `make install-photocraft`. |
 | `SC2_TEST_RUNS` | `SC2_WORK/test-runs` | In-game test runs: `<profile>/<run>/summary.txt`. |
 | `SC2_TESTKIT` | `SC2_WORK/testkit` | Files the test profiles generate, such as the hdbake store and map. |
 | `SC2_TMP` | `SC2_WORK/tmp` | Temporary files; exported as `TMPDIR`. |

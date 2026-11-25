@@ -175,6 +175,48 @@
         label: "{{ item.item }}"
       changed_when: mark != '' and mark not in text
 
+    # PhotoCraft, for texture editing (SPEC-PHOTOCRAFT 5.4): the command of
+    # make install-photocraft. It runs here, not in the service, so the
+    # service's memory limit does not bind the build. The server reads the
+    # install on each request: no restart follows.
+    - name: Build and install PhotoCraft
+      when: viewer_photocraft | bool
+      block:
+        # The build fails the play by its own exit status. The rescue only adds
+        # its log to the failure, then fails.
+        - name: Run make install-photocraft
+          block:
+            - name: Run the PhotoCraft build
+              ansible.builtin.shell: 'make -C "{{ viewer_repo_root }}" install-photocraft >> "{{ viewer_steps_dir }}/photocraft.log" 2>&1'
+              args:
+                executable: /bin/bash
+              environment:
+                PATH: "{{ viewer_path }}"
+              register: viewer_photocraft_run
+              changed_when: false
+          rescue:
+            - name: Read the step log of the failed PhotoCraft build
+              ansible.builtin.slurp:
+                src: "{{ viewer_steps_dir }}/photocraft.log"
+              register: viewer_photocraft_failed
+
+            - name: Fail with the PhotoCraft step log
+              ansible.builtin.fail:
+                msg: "make install-photocraft failed (rc {{ viewer_photocraft_run.rc }}): {{ viewer_photocraft_failed.content | b64decode | trim }}"
+
+        - name: Read the PhotoCraft step log
+          ansible.builtin.slurp:
+            src: "{{ viewer_steps_dir }}/photocraft.log"
+          register: viewer_photocraft_log
+
+        # Changed when it built: a present and pinned install says so and does no work.
+        - name: Show the PhotoCraft step log
+          vars:
+            text: "{{ viewer_photocraft_log.content | b64decode | trim }}"
+          ansible.builtin.debug:
+            msg: "photocraft (rc {{ viewer_photocraft_run.rc }}): {{ text }}"
+          changed_when: "'photocraft present' not in text"
+
     # The port must be free or held by this service: a stray server is named,
     # not killed.
     - name: Read the service state
@@ -270,6 +312,13 @@
         that: viewer_health.json.games | selectattr('id', 'equalto', 'sc2') | selectattr('available') | list | length == 1
         fail_msg: "Health answer without an available sc2 game: {{ viewer_health.content }}"
         success_msg: "health: {{ viewer_health.content }}"
+
+    - name: Require the PhotoCraft install in the health answer
+      when: viewer_photocraft | bool
+      ansible.builtin.assert:
+        that: viewer_health.json.photocraft.installed
+        fail_msg: "The server does not see the PhotoCraft install: {{ viewer_health.json.photocraft.reason }}"
+        success_msg: "photocraft: {{ viewer_health.json.photocraft.pins | join('; ') }}"
 
     - name: Read the service state after the start
       ansible.builtin.systemd_service:

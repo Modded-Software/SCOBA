@@ -3,7 +3,7 @@
 // unit goes back to its own animation; with "loop" checked it becomes the
 // unit's own and loops. An instance whose owner has textures has the skin
 // row (SPEC-VIEWER 17.4, core/skins.ts). The menu stays open until Escape
-// or a click elsewhere.
+// or a click elsewhere. A drag on its title moves it (R-VIEW-138).
 
 import { NEW_SKIN, ORIGINAL_SKIN, skinLabel } from '../../../shared/textures';
 import type { SceneService, StatusService } from '../../core/context';
@@ -11,6 +11,8 @@ import type { Skins } from '../../core/skins';
 import type { Item, MenuState } from '../../core/types';
 import { find, make } from '../../core/dom';
 import { ConfirmDialog } from '../../ui/components/dialog';
+import { draggable } from '../../ui/components/drag';
+import { Dropdown } from '../../ui/components/dropdown';
 import { PENCIL, SKIN, TRASH } from '../../ui/icons';
 
 export interface AnimMenu {
@@ -81,29 +83,52 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
     status.setStatus(unbake ? `${owner.title}: unbaked` : `${owner.title}: skin ${item.skin} baked`);
   }
 
-  /** The skin list (R-VIEW-126, 137): a button with a skin icon, the chosen skin and an arrow; its rows below it. */
+  /**
+   * The skin list (R-VIEW-126, 137, 139): a button with a skin icon, the chosen skin and an arrow; its rows
+   * below it. A list drop-down: choosing a skin keeps it open; only its button closes it (and Escape, or a
+   * press outside the menu). The wheel and Up/Down on the button choose the skin before or after (16.14).
+   */
   function skinList(item: Item, chosen: () => void): HTMLElement {
     const label = make('span', { className: 'skin-label', textContent: skinLabel(item.skin) });
     const button = make('button', { type: 'button', className: 'skin-choice', title: 'Choose the skin this instance shows; it changes no other instance and no bake' }, [make('span', { className: 'skin-icon', innerHTML: SKIN }), label]);
     const list = make('ul', { className: 'skin-list', hidden: true });
+    const root = make('div', { className: 'skin-choose' }, [button, list]);
     const tools = (): ReturnType<MenuDeps['skins']['tools']> => skins.tools();
+    /** Show the instance's skin: the button's label, the marked row, the menu's bake controls. */
     const shown = (): void => {
       label.textContent = skinLabel(item.skin);
+      if (dropdown.isOpen) fill();
       chosen();
     };
+    const choose = (name: string): void => {
+      skins.set(item, name).then(shown).catch(status.reportFailure);
+    };
+    const dropdown = new Dropdown({
+      root,
+      button,
+      list,
+      within: () => root.closest<HTMLElement>('.anim-menu'),
+      steps: {
+        current: () => skins.choices(item).indexOf(item.skin),
+        count: () => skins.choices(item).length,
+        usable: () => true,
+        choose: (index) => {
+          const name = skins.choices(item)[index];
+          if (name !== undefined) choose(name);
+        },
+      },
+    });
     function rows(): HTMLElement[] {
       const baked = bakedSkin(skins, item);
       return skins.choices(item).map((name) => {
         const pick = make('button', { type: 'button', className: `skin-pick${name === item.skin ? ' chosen' : ''}`, textContent: skinLabel(name) });
-        pick.addEventListener('click', () => {
-          list.hidden = true;
-          skins.set(item, name).then(shown).catch(status.reportFailure);
-        });
+        // The list stays open (R-VIEW-139).
+        pick.addEventListener('click', () => choose(name));
         const icons: HTMLElement[] = [];
         if (iconsOf(name).includes('edit')) {
           const edit = make('button', { type: 'button', className: 'skin-edit', innerHTML: PENCIL, title: `Edit Skin "${skinLabel(name)}"` });
           edit.addEventListener('click', () => {
-            list.hidden = true;
+            dropdown.close();
             tools()?.edit(item, name);
           });
           icons.push(edit);
@@ -116,7 +141,7 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
             trash.title = 'baked: unbake it or bake another skin first';
           }
           trash.addEventListener('click', () => {
-            list.hidden = true;
+            dropdown.close();
             tools()
               ?.remove(item, name)
               .then((gone) => gone && shown())
@@ -129,16 +154,19 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
         return row;
       });
     }
-    const add = make('button', { type: 'button', className: 'skin-add', textContent: 'Add New Skin…', title: 'Open the skin editor on New Skin' });
+    const add = make('button', { type: 'button', className: 'skin-add', textContent: 'Add New Skin…', title: 'Open the texture window; Save to Skin… there makes New Skin' });
     add.addEventListener('click', () => {
-      list.hidden = true;
+      dropdown.close();
       tools()?.edit(item, NEW_SKIN);
     });
+    function fill(): void {
+      list.replaceChildren(...rows(), make('li', { className: 'skin-add-row' }, [add]));
+    }
+    // The rows are made as the list opens: the skins may have changed since the menu opened.
     button.addEventListener('click', () => {
-      if (list.hidden) list.replaceChildren(...rows(), make('li', { className: 'skin-add-row' }, [add]));
-      list.hidden = !list.hidden;
+      if (dropdown.isOpen) fill();
     });
-    return make('div', { className: 'skin-choose' }, [button, list]);
+    return root;
   }
 
   function skinRow(item: Item): HTMLElement[] {
@@ -209,6 +237,8 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
     const h = node.offsetHeight;
     node.style.left = `${clientX + w > innerWidth ? Math.max(0, clientX - w) : clientX}px`;
     node.style.top = `${clientY + h > innerHeight ? Math.max(0, innerHeight - h) : clientY}px`;
+    // Its title moves it (R-VIEW-138).
+    draggable({ node, handle: title });
     menu = { node, itemId: item.id };
     markPlaying();
   }

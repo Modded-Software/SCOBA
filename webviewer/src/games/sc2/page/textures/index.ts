@@ -26,8 +26,9 @@ export function installTextures(context: GameContext, ownerOf: (item: Item) => s
    * texture id, or a model file's name), called `name`, in `dataset`.
    */
   /** `owner`: the texture owner whose skins Save to Skin… changes (R-VIEW-133); `item`: the instance, if any. */
-  function openTextures(user: string, name: string, file: string, dataset: string, read: (urls: string[]) => ReturnType<typeof originals>, owner: string | null, item: number | null = null): Promise<void> {
-    return textureWindow.open({ user, name, file, dataset, game: SC2, service: true, read, owner, item });
+  /** `skin`: the skin the instance shows, for the title; null: none. */
+  function openTextures(user: string, name: string, file: string, dataset: string, read: (urls: string[]) => ReturnType<typeof originals>, owner: string | null, item: number | null = null, skin: string | null = null): Promise<void> {
+    return textureWindow.open({ user, name, file, dataset, game: SC2, service: true, read, owner, item, skin });
   }
 
   async function openTexturesFor(category: string, id: string): Promise<void> {
@@ -48,7 +49,8 @@ export function installTextures(context: GameContext, ownerOf: (item: Item) => s
   function openTexturesOf(item: Item): Promise<void> {
     const fileName = item.path.split('\\').pop() ?? item.path;
     const record = item.source ? item.source.record : null;
-    return openTextures(record ? record.id : fileName, record ? record.name : fileName, item.path, item.dataset, (urls) => originals(context, item.path, item.dataset, urls), ownerOf(item), item.id);
+    const owner = ownerOf(item);
+    return openTextures(record ? record.id : fileName, record ? record.name : fileName, item.path, item.dataset, (urls) => originals(context, item.path, item.dataset, urls), owner, item.id, owner === null ? null : item.skin);
   }
 
   return { openTexturesFor, openTexturesOf };

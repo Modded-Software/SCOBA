@@ -1,7 +1,7 @@
 // The texture routes of SPEC-VIEWER section 8, over a game's texture
 // service. A game without one answers 404 on each (R-VIEW-100).
 
-import type { BakeAsk, SkinAsk, TextureRequestAsk, UnbakeAsk } from '../../shared/textures';
+import type { BakeAsk, SkinAsk, TextureRemoveAsk, TextureRequestAsk, UnbakeAsk } from '../../shared/textures';
 import { HttpError, type GameBackend } from './backend';
 import { BodyError, json, sendFile, type Request } from './http';
 
@@ -49,6 +49,16 @@ export async function textureRoute(game: GameBackend, part: string | undefined, 
     json(res, 200, await service.judge(dataset, assets));
   } else if (part === 'request') {
     json(res, 200, await service.request(dataset, (await body(request)) as unknown as TextureRequestAsk));
+  } else if (part === 'remove') {
+    json(res, 200, await service.remove(dataset, (await body(request)) as unknown as TextureRemoveAsk));
+  } else if (part === 'log') {
+    get(request);
+    const asset = params.get('asset');
+    const recipe = params.get('recipe');
+    if (!asset || !recipe) throw new HttpError(400, { error: 'asset and recipe are required' });
+    const full = service.requestLog(dataset, asset, recipe);
+    if (!full) throw new HttpError(404, { error: 'no log of such a request', asset, recipe });
+    sendFile(res, full, 'text/plain; charset=utf-8', 'no-store');
   } else if (part === 'skin') {
     json(res, 200, await service.skin(dataset, (await body(request)) as unknown as SkinAsk));
   } else if (part === 'bake') {

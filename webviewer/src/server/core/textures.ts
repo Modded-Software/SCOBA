@@ -14,13 +14,15 @@
 // none runs, with the command the pipeline names (its GPU is the pipeline's
 // rule).
 
+import { existsSync, realpathSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join, sep } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { asksFrom, ORIGINAL, recipeOf, variantId, type BakeAsk, type BakeBody, type OwnerBody, type OwnerLookup, type SkinAsk, type SkinBody, type SkinUpscaled, type TextureRequestAsk, type TexturesBody, type TexturesHead, type TextureState, type UnbakeAsk } from '../../shared/textures';
+import { asksFrom, ORIGINAL, recipeOf, variantId, type BakeAsk, type BakeBody, type OwnerBody, type OwnerLookup, type SkinAsk, type SkinBody, type SkinUpscaled, type TextureRemoveAsk, type TextureRequestAsk, type TexturesBody, type TexturesHead, type TextureState, type UnbakeAsk } from '../../shared/textures';
 import { HttpError } from './backend';
 import { messageOf } from './http';
 import { requiredPath } from './settings';
+import { editSessions, type EditService } from './textureedits';
 import { asObject, collect, detach, IndexReader, shown, texts, type Indexed } from './textureindex';
 
 /** The most assets one states call asks for: one model's textures, with room. */
@@ -50,10 +52,16 @@ export interface TextureService {
   judge(dataset: string, assets: readonly string[]): Promise<TexturesBody>;
   /** Queue one variant; refused when the state does not offer that input, model and size. */
   request(dataset: string, ask: TextureRequestAsk): Promise<TexturesBody>;
+  /** Remove one variant (R-HD-146); refused while something still needs it. The texture's state. */
+  remove(dataset: string, ask: TextureRemoveAsk): Promise<TexturesBody>;
+  /** The log file of an open or failed request, as the index names it; null: the state has no such request. */
+  requestLog(dataset: string, asset: string, recipe: string): string | null;
   /** A skin change; an upscale also starts a request per texture it names. */
   skin(dataset: string, ask: SkinAsk): Promise<SkinBody>;
   bake(dataset: string, ask: BakeAsk): Promise<BakeBody>;
   unbake(dataset: string, ask: UnbakeAsk): Promise<BakeBody>;
+  /** The edit sessions of the game's textures (SPEC-PHOTOCRAFT 7). */
+  readonly edits: EditService;
 }
 
 /** One texture of a listing. */
@@ -137,10 +145,14 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
 
   const file = (dataset: string, asset: string, variant: string): string | null => index.textures(dataset, [asset]).get(asset)?.variants.find((one) => one.id === variant)?.path ?? null;
 
-  async function command(name: string, dataset: string, words: readonly string[]): Promise<Record<string, unknown>> {
+  /** The words of `uv` that run one command of the pipeline on a dataset. */
+  function argsOf(name: string, dataset: string, words: readonly string[]): string[] {
     const layer = settings.layerOf(dataset);
-    const args = ['run', '--project', settings.repoRoot, 'python', join(settings.repoRoot, 'scripts', 'hd_textures.py'), name, '--game', settings.game, '--dataset', dataset, ...(layer ? ['--layer', layer] : []), ...words];
-    const ran = await collect('uv', args, settings.repoRoot, env);
+    return ['run', '--project', settings.repoRoot, 'python', join(settings.repoRoot, 'scripts', 'hd_textures.py'), name, '--game', settings.game, '--dataset', dataset, ...(layer ? ['--layer', layer] : []), ...words];
+  }
+
+  async function command(name: string, dataset: string, words: readonly string[]): Promise<Record<string, unknown>> {
+    const ran = await collect('uv', argsOf(name, dataset, words), settings.repoRoot, env);
     let answer: Record<string, unknown>;
     try {
       answer = asObject(JSON.parse(ran.out));
@@ -189,13 +201,16 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
     await detach(tool, args, settings.repoRoot, { ...env, ...extra }, join(settings.logDir, 'worker.out'));
   }
 
-  /** Start `request` for one variant as a process that outlives the server. Its state and log are in the store; this log holds what its start printed. */
-  async function startRequest(dataset: string, asset: string, variant: string): Promise<void> {
-    const layer = settings.layerOf(dataset);
+  /** Start a command of the pipeline as a process that outlives the server. Returns the log that holds what its start printed. */
+  async function start(name: string, dataset: string, words: readonly string[], log: string): Promise<string> {
     await mkdir(settings.logDir, { recursive: true });
-    const args = ['run', '--project', settings.repoRoot, 'python', join(settings.repoRoot, 'scripts', 'hd_textures.py'), 'request', '--game', settings.game, '--dataset', dataset, ...(layer ? ['--layer', layer] : []), '--asset', asset, '--variant', variant];
-    await detach('uv', args, settings.repoRoot, env, join(settings.logDir, 'requests.out'));
+    const full = join(settings.logDir, log);
+    await detach('uv', argsOf(name, dataset, words), settings.repoRoot, env, full);
+    return full;
   }
+
+  /** Start `request` for one variant. Its state and log are in the store. */
+  const startRequest = (dataset: string, asset: string, variant: string): Promise<string> => start('request', dataset, ['--asset', asset, '--variant', variant], 'requests.out');
 
   /** Why the state does not offer this request; empty: it does. */
   function refusal(state: TextureState, input: string, model: string, size: number): string {
@@ -245,6 +260,20 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
       if (Date.now() > until) throw new Error(`the request of ${variant} for ${asset} did not show in ${REQUEST_SEEN_MS / 1000} s; its start: ${join(settings.logDir, 'requests.out')}`);
       await delay(REQUEST_POLL_MS);
     }
+  }
+
+  async function remove(dataset: string, ask: TextureRemoveAsk): Promise<TexturesBody> {
+    const asset = text(ask.asset, 'asset');
+    await command('remove', dataset, ['--asset', asset, '--variant', text(ask.variant, 'variant')]);
+    return states(dataset, [asset]);
+  }
+
+  /** Only a request.log in the store: the index names it, and nothing else is served by this route. */
+  function requestLog(dataset: string, asset: string, recipe: string): string | null {
+    const log = index.textures(dataset, [asset]).get(asset)?.requests[recipe]?.log ?? null;
+    if (log === null || basename(log) !== 'request.log' || !existsSync(log)) return null;
+    // Both sides resolved: the store may be named through a link.
+    return realpathSync(log).startsWith(join(realpathSync(settings.storeDir), sep)) ? log : null;
   }
 
   function skinWords(ask: SkinAsk): string[] {
@@ -307,5 +336,13 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
     return states(dataset, [ask.asset]);
   }
 
-  return { states, owner, lookup, listKind, origin: (dataset, asset) => index.origin(dataset, asset), file, indexed: (dataset) => index.head(dataset) !== null, sync, judge, request, skin, bake, unbake };
+  const edits = editSessions({
+    root: join(settings.storeDir, settings.game, 'edits'),
+    index,
+    command,
+    start: (name, dataset, words) => start(name, dataset, words, 'transfers.out'),
+    judge: (dataset, asset) => judge(dataset, [asset]).then(() => undefined),
+  });
+
+  return { states, owner, lookup, listKind, origin: (dataset, asset) => index.origin(dataset, asset), file, indexed: (dataset) => index.head(dataset) !== null, sync, judge, request, remove, requestLog, skin, bake, unbake, edits };
 }

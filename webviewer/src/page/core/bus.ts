@@ -39,6 +39,15 @@ export interface ViewerEvents {
    * `item`: the instance it was opened on, or null. `done` gets the target saved to, or null: cancelled or refused.
    */
   'texture-save': { game: string; dataset: string; owner: string; picks: { asset: string; variant: string }[]; item: number | null; done(target: string | null): void };
+  /**
+   * A variant tile's trash (SPEC-VIEWER 17.6.1, R-VIEW-147): the main page asks first, then removes it.
+   * `done` gets true when it was removed, false when cancelled; an Error when refused.
+   */
+  'texture-remove': { game: string; dataset: string; asset: string; variant: string; done(removed: boolean | Error): void };
+  /** A tile's Edit Texture button: open the edit session of a texture's variant in the editor window (SPEC-PHOTOCRAFT 9.1). */
+  'texture-edit': { game: string; dataset: string; asset: string; variant: string };
+  /** The texture window's Manage Edits… button: list the edit sessions of a dataset (SPEC-PHOTOCRAFT 9.5). */
+  'edits-manage': { game: string; dataset: string };
   /** One frame: after the update, before the draw; dt in ms. */
   frame: { dt: number };
   /**

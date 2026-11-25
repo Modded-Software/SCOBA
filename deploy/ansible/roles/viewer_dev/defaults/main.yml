@@ -17,6 +17,11 @@ viewer_path: "{{ viewer_dir }}/node_modules/.bin:{{ viewer_node_bin }}:{{ viewer
 viewer_unit_dir: "{{ ansible_facts.env.HOME }}/.config/systemd/user"
 # The output of each command of the last run, one log per step.
 viewer_steps_dir: "{{ ansible_facts.env.HOME }}/.local/state/{{ viewer_unit }}/steps"
+# Build and install PhotoCraft for texture editing: the command of
+# make install-photocraft (SPEC-PHOTOCRAFT 5.4). The first build is long. An
+# install that is present and pinned is left as it is. Its rustup comes from
+# viewer_path.
+viewer_photocraft: false
 # Restart the server even when no unit file changed (a restart rebuilds).
 viewer_restart: false
 # Seconds to wait for /api/health after a start (the start builds first).

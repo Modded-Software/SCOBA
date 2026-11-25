@@ -7,6 +7,7 @@ import type { ApiClient, CameraService, GameRegistry, SceneService, SelectionSer
 import type { EventBus, ItemField, ViewerEvents } from '../core/bus';
 import { byId, byIdAs, find, make, rows } from '../core/dom';
 import { ConfirmDialog } from './components/dialog';
+import { stepNumber, stepSelect } from './components/stepper';
 
 type NumberField = 'x' | 'y' | 'rot' | 'scale';
 
@@ -30,7 +31,7 @@ export function installInstances({ scene, selection, games, api, camera, status,
   const sceneList = byId('scene');
 
   function numberInput(item: Item, field: NumberField, step: number): HTMLLabelElement {
-    const input = make('input', { type: 'number', className: field, step: String(step), value: shown(item[field]) });
+    const input = stepNumber(make('input', { type: 'number', className: field, step: String(step), value: shown(item[field]) }));
     input.addEventListener('change', () => {
       const value = Number.parseFloat(input.value);
       if (!Number.isFinite(value) || (field === 'scale' && value <= 0)) {
@@ -52,7 +53,7 @@ export function installInstances({ scene, selection, games, api, camera, status,
     const name = record ? record.name : (item.path.split('\\').pop() ?? item.path);
     const removeButton = make('button', { className: 'remove danger', textContent: '×', title: 'Remove Instance' });
     removeButton.addEventListener('click', () => scene.remove(item.id));
-    const anim = make('select', { className: 'anim' }, [option('-1', '(none)'), ...item.instance.sequences.map((s, i) => option(String(i), s.name))]);
+    const anim = stepSelect(make('select', { className: 'anim' }, [option('-1', '(none)'), ...item.instance.sequences.map((s, i) => option(String(i), s.name))]));
     anim.value = String(item.sequence);
     anim.addEventListener('change', () => {
       item.sequence = Number.parseInt(anim.value, 10);
@@ -61,10 +62,12 @@ export function installInstances({ scene, selection, games, api, camera, status,
     });
     // Team colours the instance's format knows (SPEC-VIEWER 6.2); none: no control.
     const teams = item.capabilities.teamColor ? item.capabilities.teamColor.count : 0;
-    const team = make(
-      'select',
-      { className: 'team', title: 'team colour' },
-      Array.from({ length: teams }, (_, i) => option(String(i), 'team ' + (i + 1))),
+    const team = stepSelect(
+      make(
+        'select',
+        { className: 'team', title: 'team colour' },
+        Array.from({ length: teams }, (_, i) => option(String(i), 'team ' + (i + 1))),
+      ),
     );
     team.value = String(item.team);
     team.addEventListener('change', () => {
@@ -80,10 +83,12 @@ export function installInstances({ scene, selection, games, api, camera, status,
       if (teams > 0) controls.push(team);
     } else if (placement.variants > 1) {
       const count = placement.variants;
-      const variation = make(
-        'select',
-        { className: 'variation', title: 'model variation' },
-        Array.from({ length: count }, (_, i) => option(String(i), `variation ${i + 1} of ${count}`)),
+      const variation = stepSelect(
+        make(
+          'select',
+          { className: 'variation', title: 'model variation' },
+          Array.from({ length: count }, (_, i) => option(String(i), `variation ${i + 1} of ${count}`)),
+        ),
       );
       variation.value = String(placement.variant);
       variation.addEventListener('change', () => scene.setVariation(item, Number.parseInt(variation.value, 10)).catch(status.reportFailure));
@@ -92,7 +97,7 @@ export function installInstances({ scene, selection, games, api, camera, status,
     // Where the item's data and textures come from; another choice swaps them.
     const all = api.datasets(item.game);
     if (all.length > 1) {
-      const source = make('select', { className: 'dataset', title: "dataset: where this instance's data and textures come from" }, all.map((d) => option(d.id, d.label)));
+      const source = stepSelect(make('select', { className: 'dataset', title: "dataset: where this instance's data and textures come from" }, all.map((d) => option(d.id, d.label))));
       source.value = item.dataset;
       source.addEventListener('change', () =>
         scene

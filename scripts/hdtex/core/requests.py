@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import dds, encode, steps, variants
+from . import dds, encode, results, steps, variants
 from .dataset import Dataset
 from .interfaces import DONE, FAILED, RUNNING, WAITING, Runner, Texture
 from .progress import (
@@ -220,6 +220,10 @@ def _make(
     sha256 = hashlib.sha256(original).hexdigest()
     planes = role.split(encode.read_texture(original)[1])
     entry: dict = {}
+    # The nearest person's edit among the steps before: what a model's variant is matched to and
+    # measured against, in place of the original (R-PC-83). None: no step before is an edit.
+    reference: dict | None = None
+    reference_id = ""
     for index, prefix in enumerate(variants.prefixes(recipe)):
         kept = game.entry(texture.origin, prefix)
         there = kept is not None and kept["original"]["sha256"] == sha256
@@ -230,7 +234,15 @@ def _make(
                 kept,
                 {name: game.get_plane(key) for name, key in kept["planes"].items()},
             )
+            if results.user_made(kept):
+                reference = planes
+                reference_id = variants.variant_id(prefix, max(kept["size"]))
             continue
+        if recipe_steps[index].edit:
+            # No model makes an edit again: only its transfer does.
+            raise RequestError(
+                f"step {index + 1}, {prefix}, is a person's edit that is not there for the original as it is now; transfer the edit again"
+            )
         if there:
             LOG.info(
                 "step %d, %s: its variants are there without their planes; the next step needs them, so it is made again",
@@ -256,11 +268,13 @@ def _make(
         )
         planes = step["planes"]
         LOG.info("step %d, %s: encoding", index + 1, prefix)
-        encoded = encode.encode(original, role, planes)
+        encoded = encode.encode(original, role, planes, reference)
         entry = game.write_recipe(
             texture.origin,
             prefix,
             {
+                # The variant its numbers compare with; empty: the original.
+                "reference": reference_id,
                 "role": role.name,
                 "codec": encoded.format,
                 "grid": list(texture.grid),
@@ -322,6 +336,8 @@ def make(
     said = {
         "pid": os.getpid(),
         "started": started(os.getpid()),
+        "since": time.time(),
+        "variant": variant,
         "step": 1,
         "steps": len(variants.parse_recipe(recipe)),
         "phase": UPSCALING,

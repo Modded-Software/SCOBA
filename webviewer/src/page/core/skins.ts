@@ -6,6 +6,7 @@
 // States and owners are asked once per dataset and kept until textures
 // change for that dataset (event "textures-changed", R-VIEW-109): then every
 // item of it is applied again. A change made here emits that event.
+// While Ctrl+. is held, the items held show Original (`peek`, R-VIEW-148).
 
 import { isUsable, NEW_SKIN, ORIGINAL, ORIGINAL_SKIN, recipeOf, textureRoutes, type OwnerLookup, type OwnerState, type TexturesBody, type TextureState } from '../../shared/textures';
 import type { EventBus, ViewerEvents } from './bus';
@@ -17,7 +18,7 @@ import type { Item } from './types';
 
 /** What features/skins adds: the windows that change a skin. */
 export interface SkinTools {
-  /** Open the skin editor on the item's owner and this skin. */
+  /** Show this skin on the item, then open the texture window on it. */
   edit(item: Item, skin: string): void;
   /** Open the upscale dialog on the item's whole owner. */
   upscale(item: Item): void;
@@ -44,6 +45,10 @@ export interface Skins {
   apply(item: Item): Promise<void>;
   /** Set an item's skin, and apply it. Another instance of the owner does not change. */
   set(item: Item, skin: string): Promise<void>;
+  /** Show Original on these items while `on`, their own skin again after; their skin choice stays (R-VIEW-148). */
+  peek(items: readonly Item[], on: boolean): Promise<void>;
+  /** The skin an item shows now: Original while peeked, else its own. */
+  shownSkin(item: Item): string;
   /** Bake the item's skin for its owner; `original` unbakes (R-VIEW-122). A refusal is thrown with its reason. */
   bake(item: Item): Promise<void>;
   /** POST a change to a texture route; the textures of that dataset are read again. A refusal is thrown with its reason. */
@@ -99,6 +104,9 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
   const known = new Map<string, { head: Omit<TexturesBody, 'textures' | 'unknown'>; states: Map<string, TextureState | null>; owners: Map<string, OwnerState | null> }>();
   const ownerOfItem = new WeakMap<Item, OwnerState | null>();
   const polling = new WeakMap<Item, ReturnType<typeof setTimeout>>();
+  /** The items that show Original while Ctrl+. is held (R-VIEW-148). */
+  const peeking = new WeakSet<Item>();
+  const shownSkin = (item: Item): string => (peeking.has(item) ? ORIGINAL_SKIN : item.skin);
   let tools: SkinTools | null = null;
 
   const entryOf = (game: string, dataset: string) => {
@@ -204,7 +212,7 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
         for (const slot of slots) {
           const asset = assetOf(slot.source);
           const state = byAsset.get(asset);
-          const named = shownVariant(owner, item.skin, asset);
+          const named = shownVariant(owner, shownSkin(item), asset);
           if (named === ORIGINAL) continue;
           const own = variantUrl(item.game, item.dataset, state, named);
           if (own !== null) urls.set(slot, own);
@@ -259,6 +267,17 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     events.emit('scene-edited', { what: 'skin' });
   }
 
+  /** No scene-edited event: the hold changes no choice. Items without skins are left alone. */
+  async function peek(chosen: readonly Item[], on: boolean): Promise<void> {
+    // On: those that show another skin. Off: every one held, whatever its skin is now.
+    const changed = chosen.filter((item) => (on ? !peeking.has(item) && item.skin !== ORIGINAL_SKIN && Boolean(ownerOfItem.get(item)) : peeking.has(item)));
+    for (const item of changed) {
+      if (on) peeking.add(item);
+      else peeking.delete(item);
+    }
+    await Promise.all(changed.map((item) => apply(item)));
+  }
+
   async function change<T>(game: string, dataset: string, route: string, body: unknown): Promise<T> {
     const response = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const found = await answer<T>(response, 'the texture service refused');
@@ -278,5 +297,5 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     for (const item of items()) if (item.game === game && item.dataset === dataset) apply(item).catch(status.reportFailure);
   });
 
-  return { offered, states, judge, ownerOf, owner: (item) => ownerOfItem.get(item) ?? null, readOwner, choices, apply, set, bake, change, following: (item) => polling.has(item), variantUrl, tools: () => tools, setTools: (made) => (tools = made) };
+  return { offered, states, judge, ownerOf, owner: (item) => ownerOfItem.get(item) ?? null, readOwner, choices, apply, set, peek, shownSkin, bake, change, following: (item) => polling.has(item), variantUrl, tools: () => tools, setTools: (made) => (tools = made) };
 }

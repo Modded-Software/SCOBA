@@ -35,7 +35,7 @@ export const texts = (value: unknown): string[] => (Array.isArray(value) ? value
 /** A state as the index holds it: each variant with its file, each open request with its program. */
 export type Indexed = Omit<TextureState, 'variants' | 'requests'> & {
   variants: (TextureVariant & { path: string })[];
-  requests: Record<string, TextureRequest & { pid?: number; started?: number }>;
+  requests: Record<string, Partial<Pick<TextureRequest, 'done' | 'variant' | 'since'>> & Omit<TextureRequest, 'done' | 'variant' | 'since'> & { pid?: number; started?: number; log?: string }>;
 };
 
 /** When a process began, in clock ticks since the host started (field 22 of its stat); null: there is no such process. */
@@ -60,7 +60,9 @@ function startedAt(pid: number): number | null {
 export function shown(indexed: Indexed): TextureState {
   const { variants, requests, ...state } = indexed;
   const open: Record<string, TextureRequest> = {};
-  for (const [recipe, { pid, started, ...request }] of Object.entries(requests)) {
+  for (const [recipe, { pid, started, log: _log, ...held }] of Object.entries(requests)) {
+    // A row written before these fields were kept has none of them.
+    const request: TextureRequest = { ...held, done: held.done ?? 0, variant: held.variant ?? '', since: held.since ?? null };
     const gone = request.state !== 'failed' && pid !== undefined && startedAt(pid) !== started;
     open[recipe] = gone ? { ...request, state: 'failed', reason: `the program that made it (process ${pid}) stopped before it was done; ask again` } : request;
   }
@@ -68,7 +70,7 @@ export function shown(indexed: Indexed): TextureState {
 }
 
 /** The statements this reader runs: files of the repository's SQL tree, sql/texture-index/ (scripts/hdtex/core/queries.py). */
-const READS = ['dataset_head', 'reader_texture_state', 'reader_of_kind', 'reader_owner_state', 'origin_of'] as const;
+const READS = ['dataset_head', 'reader_texture_state', 'reader_of_kind', 'reader_owner_state', 'origin_of', 'reader_original_hash'] as const;
 type Read = (typeof READS)[number];
 
 export class IndexReader {
@@ -141,6 +143,14 @@ export class IndexReader {
     return this.reading(null, (db) => {
       const row = db.prepare(this.sql.origin_of).get(this.game, dataset, asset);
       return row === undefined ? null : String(row['origin']);
+    });
+  }
+
+  /** The hash of the original at an origin, as the pipeline last read its file; null: it was never read. */
+  originalHash(origin: string): string | null {
+    return this.reading(null, (db) => {
+      const row = db.prepare(this.sql.reader_original_hash).get(this.game, origin);
+      return row === undefined ? null : String(row['sha256']);
     });
   }
 }

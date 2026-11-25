@@ -47,6 +47,9 @@ class DepsTest(unittest.TestCase):
         self.viewer_work = root / "work" / "webviewer"
         self.src = self.build / "deps/stormex"
         self.patches = self.root / "scripts/setup/patches/stormex"
+        # deps.sh sources its PhotoCraft steps from the repo root it is given.
+        (self.root / "scripts/setup").mkdir(parents=True)
+        (self.root / "scripts/setup/photocraft.sh").symlink_to(SCRIPT.with_name("photocraft.sh"))
         # The build PATH (STORMEX_PATH): the stubs, but not the ones on PATH first.
         self.toolchain = root / "toolchain"
         self.toolchain.mkdir()
@@ -103,6 +106,7 @@ class DepsTest(unittest.TestCase):
             "SC2_BUILD": str(self.build),
             "WEBVIEWER_WORK": str(self.viewer_work),
             "SC2_INSTALL": str(self.sc2),
+            "PHOTOCRAFT_HOME": str(self.build / "photocraft"),
         }
         return subprocess.run(
             [str(self.system / "bash"), str(SCRIPT), command], env=env, text=True, capture_output=True
@@ -316,6 +320,7 @@ class DepsTest(unittest.TestCase):
             "SC2_BUILD": str(self.build),
             "WEBVIEWER_WORK": str(self.viewer_work),
             "SC2_INSTALL": str(self.sc2),
+            "PHOTOCRAFT_HOME": str(self.build / "photocraft"),
         }
         for name in paths:
             given = {key: value for key, value in paths.items() if key != name}

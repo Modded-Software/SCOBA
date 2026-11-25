@@ -25,6 +25,7 @@ NAMES = {
     "SC2RES": True,
     "WEBVIEWER_WORK": True,
     "TEXTURE_STORE": False,
+    "PHOTOCRAFT_HOME": False,
     "UV_PROJECT_ENVIRONMENT": False,
     "BNET_PREFIX": False,
     "SC2_INSTALL": False,

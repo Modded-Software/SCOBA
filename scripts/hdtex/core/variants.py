@@ -7,6 +7,11 @@ input. The size of the last step is the variant's own size.
 
 The id without its last `@size` is the recipe: what the GPU makes. All
 variants of one recipe come from one upscale and differ only in size.
+
+A step may also be a person's edit: `edit` and 12 hex digits of a hash of
+the edited planes, as in `pbrify@2048+edit3fa9c1d2aa10@2048`
+(SPEC-PHOTOCRAFT 10). An edit keeps the size of its input and has that one
+size. A transfer makes it; no request does.
 """
 
 from __future__ import annotations
@@ -25,6 +30,9 @@ SCALE = 4
 MAX_INPUT = 2048  # per side, of what the upscaler takes
 MAX_OUTPUT = 4096  # per side, of what a step keeps
 STEP = re.compile(r"([a-z0-9]+)(?:@([0-9]+))?")
+EDIT = "edit"  # the model of a plane a person changed
+EDIT_DIGITS = 12
+EDIT_STEP = re.compile(rf"{EDIT}[0-9a-f]{{{EDIT_DIGITS}}}")
 
 
 class VariantError(ValueError):
@@ -68,12 +76,24 @@ MODELS = {
 DATA_MODEL = "fast"  # the one model of a texture without a colour plane
 
 
+def is_edit(name: str) -> bool:
+    """Whether a step's name is that of a person's edit."""
+    return EDIT_STEP.fullmatch(name) is not None
+
+
 class Step(NamedTuple):
     model: Model
     size: int | None  # the size the next step takes; None for the last step of a recipe
 
+    @property
+    def edit(self) -> bool:
+        return is_edit(self.model.id)
+
 
 def _model(name: str, text: str) -> Model:
+    if is_edit(name):
+        # No runner knows it: nothing hands a plane to the model of an edit step.
+        return Model(name, "Edit", EDIT, EDIT, True, "a person's edit")
     if name not in MODELS:
         raise VariantError(
             f"unknown model {name!r} in {text!r}; models: {', '.join(MODELS)}"
@@ -139,6 +159,11 @@ def join(input_variant: str, model: str, size: int) -> str:
     return variant_id(recipe, size)
 
 
+def edited(input_variant: str, digest: str, size: int) -> str:
+    """The id of what a person's edit makes of `input_variant`. `digest`: the hash of the edited planes, in hex."""
+    return join(input_variant, f"{EDIT}{digest[:EDIT_DIGITS]}", size)
+
+
 def input_of(variant: str) -> str:
     """The id of the variant a variant was made from: `original` for one step."""
     recipe, _ = split(variant)
@@ -176,10 +201,15 @@ def after(longest: int, colour: bool) -> int:
 
 
 def own_size(steps: tuple[Step, ...], longest: int) -> int:
-    """The own longest side of a recipe made from an original with that longest side."""
+    """The own longest side of a recipe made from an original with that longest side. An edit keeps its input's side."""
     for step in steps[:-1]:
-        longest = min(after(longest, True), step.size or 0)
-    return after(longest, True)
+        longest = longest if step.edit else min(after(longest, True), step.size or 0)
+    return longest if steps[-1].edit else after(longest, True)
+
+
+def sizes_of(step: Step, own: int) -> tuple[int, ...]:
+    """The sizes a step with that own side is kept at: an edit at its one size."""
+    return (own,) if step.edit else kept_sizes(own)
 
 
 def model_refusal(recipe: str, colour: bool) -> str:
@@ -192,8 +222,9 @@ def model_refusal(recipe: str, colour: bool) -> str:
         steps = parse_recipe(recipe)
     except VariantError as error:
         return str(error)
-    if not colour and any(step.model.id != DATA_MODEL for step in steps):
-        bad = next(step.model for step in steps if step.model.id != DATA_MODEL)
+    models = [step.model for step in steps if not step.edit]
+    if not colour and any(model.id != DATA_MODEL for model in models):
+        bad = next(model for model in models if model.id != DATA_MODEL)
         return f"it has no colour plane, so {bad.id} is no model for it: {bad.note}; use {DATA_MODEL}"
     return ""
 
@@ -210,10 +241,12 @@ def refusal(recipe: str, longest: int, colour: bool) -> str:
         return reason
     steps = parse_recipe(recipe)
     for number, step in enumerate(steps[:-1], 1):
-        own = after(longest, True)
-        if step.size not in kept_sizes(own):
-            return f"step {number} ({step.model.id}) is kept at {', '.join(map(str, kept_sizes(own)))}, not at {step.size}"
+        kept = sizes_of(step, longest if step.edit else after(longest, True))
+        if step.size not in kept:
+            return f"step {number} ({step.model.id}) is kept at {', '.join(map(str, kept))}, not at {step.size}"
         longest = step.size or 0
+    if steps[-1].edit:
+        return f"{steps[-1].model.id} is a person's edit; a transfer of the edit makes it, a request cannot"
     last = steps[-1].model
     if not last.invents and longest >= MAX_OUTPUT:
         return f"{last.id} on an input that already has a side of {longest} can add nothing"
@@ -222,9 +255,11 @@ def refusal(recipe: str, longest: int, colour: bool) -> str:
 
 def size_refusal(recipe: str, size: int, longest: int) -> str:
     """Why a variant of the recipe cannot have `size`. Empty: it can (R-HD-123)."""
-    own = own_size(parse_recipe(recipe), longest)
-    if size not in kept_sizes(own):
-        return f"{recipe} gives a side of {own} here, so it can be had at {', '.join(map(str, kept_sizes(own)))}, not at {size}"
+    steps = parse_recipe(recipe)
+    own = own_size(steps, longest)
+    kept = sizes_of(steps[-1], own)
+    if size not in kept:
+        return f"{recipe} gives a side of {own} here, so it can be had at {', '.join(map(str, kept))}, not at {size}"
     return ""
 
 
@@ -234,7 +269,7 @@ def title(variant: str) -> str:
     recipe, size = split(variant)
     return (
         ", then ".join(
-            f"{MODELS[step.split(AT)[0]].title}" for step in recipe.split(JOIN)
+            _model(step.split(AT)[0], variant).title for step in recipe.split(JOIN)
         )
         + f" at {size}"
     )

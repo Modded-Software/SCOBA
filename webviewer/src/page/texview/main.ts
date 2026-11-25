@@ -1,21 +1,34 @@
 // The page of the texture window (SPEC-VIEWER 17.3), in its frame. The
 // window hands it the textures of one thing, decoded (window.hdtex.show).
 // For a game with a texture service it reads their states and shows the
-// tiles of the chosen texture, the same as the skin editor's (core/tiles.ts,
-// R-VIEW-132). A click on a tile shows it beside the original and picks it;
-// Ctrl+click adds a tile to compare (R-VIEW-130). The picks are kept per
+// tiles of the chosen texture (core/tiles.ts, R-VIEW-132). A click on a tile
+// picks it. Each tile's "Include in preview" box puts it in the picture
+// beside the original; any number can be in it (R-VIEW-130). The picks are kept per
 // texture; Save to Skin… hands them to the main page, which asks first
 // (R-VIEW-133). Its Upscale Texture tile asks the window to open the dialog
-// of the main page. src/tools/build.ts bundles it into public/vendor/texview.js.
+// of the main page. A failed request's Ask Again calls the request route
+// here; a variant's trash asks the main page first (R-VIEW-146, 147).
+// This file owns what is shown: the entries, the picks, the picture's
+// choice, and the order of a read and a draw. Its parts: states.ts (the
+// service's calls and answers), pictures.ts (the decoded variant files),
+// tileactions.ts (Ask Again, the trash), rows.ts (a list row), filter.ts,
+// draft.ts, cards.ts, controls.ts, edits.ts, imageview.ts.
+// src/tools/build.ts bundles it into public/vendor/texview.js.
 
-import { decodeDdsBytes, fetchTexture, type DecodedTexture } from '../core/ddsdecode';
-import { inGameOf, textureTiles, type TileState } from '../core/tiles';
+import type { DecodedTexture } from '../core/ddsdecode';
+import { inGameOf, textureTiles, tickElapsed, type TileState } from '../core/tiles';
 import type { PageOwner } from '../core/texturewindow';
-import { ORIGINAL, textureRoutes, type TextureJudgeAsk, type TexturesBody, type TexturesHead, type TextureState, type TextureVariant } from '../../shared/textures';
+import { ORIGINAL, textureRoutes, type TextureJudgeAsk, type TextureState } from '../../shared/textures';
 import { detailsOf } from './cards';
+import { bindControls } from './controls';
 import { createImageView, type Side } from './imageview';
 import { draftBar } from './draft';
+import { editsState, editsTaker, resetEdits, tileEdits, type EditTools } from './edits';
 import { ALL, chips, passes, type Filter, type FilterPage } from './filter';
+import { clearPictures, preview, sides } from './pictures';
+import { listRow } from './rows';
+import { busy, call, headOf, readStates, states, take } from './states';
+import { clearRetries, removalTools, requestTools, type TilePage } from './tileactions';
 
 /** One texture the window hands over. `asset`: the pipeline's name of it; null for a game without a texture service. */
 export type HandedTexture = DecodedTexture & { asset: string | null; facts?: [string, string][] };
@@ -40,8 +53,12 @@ export interface ShowRequest {
   changed(): void;
   /** Open the upscale dialog on one texture (17.5); absent: the window offers none. */
   upscale?(asset: string): void;
+  /** A variant tile's trash: the main page asks, then removes it (R-VIEW-147). False: cancelled; a refusal rejects. Absent: no trash. */
+  remove?(asset: string, variant: string): Promise<boolean>;
   /** Save the picks to a skin of the owner; the main page asks first (R-VIEW-133). The target, or null: not saved. Absent: no owner. */
   save?(picks: TexturePick[]): Promise<string | null>;
+  /** The edit sessions (edits.ts); absent: no edit control. */
+  edit?: EditTools;
 }
 
 interface Entry {
@@ -83,16 +100,10 @@ const filter: Filter = { category: ALL, plane: ALL, text: '' };
 let user = '';
 /** The owner as the window read it last; null: none. */
 let owner: PageOwner | null = null;
-/** The states by asset, and what holds for all of them, from the service. */
-const states = new Map<string, TextureState>();
-let head: TexturesHead = { sizes: [], models: [], limits: [] };
-/** The tiles shown beside the original, by asset; absent: the pick, else In game. */
+/** The variants in the picture beside the original, by asset; absent: the pick, else In game. May be empty. */
 const compared = new Map<string, Set<string>>();
 /** The picks, by asset: only those that differ from In game (R-VIEW-133). */
 const picks = new Map<string, string>();
-/** Decoded variant files: `${asset}|${variant}|${sha256}` -> the decoded texture. */
-const decoded = new Map<string, Promise<DecodedTexture>>();
-const urls: string[] = [];
 let poll: number | null = null;
 /** The judge call of the textures shown is out. */
 let judging = false;
@@ -125,39 +136,13 @@ function say(text: string): void {
   line.classList.toggle('failure', Boolean(text));
 }
 
-async function call(url: string, body: unknown): Promise<TexturesBody> {
-  const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const answer: unknown = await response.json();
-  if (!response.ok) throw new Error(typeof answer === 'object' && answer !== null && typeof Reflect.get(answer, 'error') === 'string' ? String(Reflect.get(answer, 'error')) : `${response.status}`);
-  return answer as TexturesBody;
-}
-
-const variantsKey = (state: TextureState): string => state.variants.map((variant) => `${variant.id}:${variant.sha256}`).join() + `|${state.bake ?? ''}`;
-
-/** Take a reply of the service; true when a texture shown before has other variants or another bake. */
-function take(body: TexturesBody): boolean {
-  let changed = false;
-  head = { sizes: body.sizes, models: body.models, limits: body.limits };
-  for (const state of body.textures) {
-    const before = states.get(state.asset);
-    if (before && variantsKey(before) !== variantsKey(state)) changed = true;
-    states.set(state.asset, state);
-  }
-  return changed;
-}
-
 const assets = (): string[] => [...new Set(entries.map((item) => item.asset).filter((asset): asset is string => asset !== null))];
-const busy = (): boolean => [...states.values()].some((state) => Object.values(state.requests).some((request) => request.state !== 'failed'));
 
 /** Ask the states again; while a request runs, once a second. */
 async function refreshStates(): Promise<void> {
   if (!asked?.service || !assets().length) return;
   const mine = asked;
-  const body = await fetch(textureRoutes.states(mine.game, mine.dataset, assets())).then(async (response) => {
-    const answer: unknown = await response.json();
-    if (!response.ok) throw new Error(String(Reflect.get(Object(answer), 'error') ?? response.status));
-    return answer as TexturesBody;
-  });
+  const body = await readStates(mine.game, mine.dataset, assets());
   if (asked !== mine) return;
   if (take(body)) mine.changed();
   render();
@@ -187,79 +172,36 @@ function schedule(): void {
   poll = busy() ? window.setTimeout(() => refreshStates().then(schedule, (error: unknown) => say(String(error))), POLL_MS) : null;
 }
 
-/** A variant's file, decoded once. */
-function decodedOf(asset: string, variant: TextureVariant): Promise<DecodedTexture> {
-  const key = `${asset}|${variant.id}|${variant.sha256}`;
-  let texture = decoded.get(key);
-  if (!texture && asked) {
-    const url = textureRoutes.file(asked.game, asked.dataset, asset, variant.id, variant.sha256);
-    texture = fetchTexture(url).then(async (response) => decodeDdsBytes(await response.arrayBuffer(), variant.id, urls));
-    decoded.set(key, texture);
-  }
-  return texture ?? Promise.reject(new Error('no texture service'));
-}
+/** The variant picked for an entry: the pick, else what the game shows (R-VIEW-133). */
+const pickedOf = (item: Entry): string => (item.asset === null ? ORIGINAL : (picks.get(item.asset) ?? inGame(item).variant));
 
-/** The tiles of an entry shown beside the original, decoded in the entry's plane. */
-async function sides(item: Entry): Promise<Side[]> {
-  const state = stateOf(item);
-  if (!state || !asked || item.asset === null) return [];
-  const shown = shownOf(item);
-  const found: Side[] = [];
-  for (const variant of state.variants) {
-    if (!shown.has(variant.id)) continue;
-    const made = await decodedOf(state.asset, variant);
-    const plane = made.planes.find((one) => one.plane === item.plane);
-    if (plane) found.push({ label: `${variant.title} · ${variant.size}`, image: plane.image, width: made.size[0] });
-  }
-  return found;
-}
-
-/** The picture of a tile, in the entry's plane. */
-function preview(item: Entry, variant: string): HTMLElement {
-  const box = element('span', 'tex-preview');
-  const img = (src: string): HTMLImageElement => Object.assign(element('img'), { src, alt: '', draggable: false });
-  if (variant === ORIGINAL) {
-    box.append(img(item.image));
-    return box;
-  }
-  const found = stateOf(item)?.variants.find((one) => one.id === variant);
-  if (!found || item.asset === null) {
-    box.classList.add('none');
-    return box;
-  }
-  box.classList.add('loading');
-  decodedOf(item.asset, found).then(
-    (made) => {
-      const plane = made.planes.find((one) => one.plane === item.plane) ?? made.planes[0];
-      box.classList.remove('loading');
-      if (plane) box.append(img(plane.image));
-    },
-    (error: unknown) => {
-      box.className = 'tex-preview failed';
-      box.title = `no picture: ${error instanceof Error ? error.message : String(error)}`;
-      box.textContent = '?';
-    },
-  );
-  return box;
-}
-
-/** A click on a tile: alone beside the original, and picked; Ctrl+click adds or takes out one to compare (R-VIEW-130). */
-function clicked(item: Entry, variant: string, event: MouseEvent): void {
+/**
+ * A click on a tile picks it (R-VIEW-133). It also goes in the picture, beside
+ * the ones there; its box takes it out again (R-VIEW-130).
+ */
+function clicked(item: Entry, variant: string): void {
   const asset = item.asset;
   if (asset === null) return;
-  if (event.ctrlKey || event.metaKey) {
-    const set = new Set(shownOf(item));
-    if (set.has(variant) && set.size > 1) set.delete(variant);
-    else set.add(variant);
-    compared.set(asset, set);
-  } else {
-    compared.set(asset, new Set([variant]));
-    // Only a thing with an owner has picks to save (R-VIEW-133).
-    if (asked?.save) {
-      if (variant === inGame(item).variant) picks.delete(asset);
-      else picks.set(asset, variant);
-    }
+  const set = new Set(shownOf(item));
+  set.add(variant);
+  compared.set(asset, set);
+  // Only a thing with an owner has picks to save.
+  if (asked?.save) {
+    if (variant === inGame(item).variant) picks.delete(asset);
+    else picks.set(asset, variant);
   }
+  render();
+  show(index, true);
+}
+
+/** The "Include in preview" box of a tile: the variant goes in the picture or out of it; nothing is picked (R-VIEW-130). */
+function included(item: Entry, variant: string, on: boolean): void {
+  const asset = item.asset;
+  if (asset === null) return;
+  const set = new Set(shownOf(item));
+  if (on) set.add(variant);
+  else set.delete(variant);
+  compared.set(asset, set);
   render();
   show(index, true);
 }
@@ -283,6 +225,24 @@ const pickBar = (): HTMLElement =>
     element,
   });
 
+/** A removed variant leaves the picture of its texture. */
+function unpicture(asset: string, variant: string): void {
+  compared.get(asset)?.delete(variant);
+}
+
+/** What the tiles' actions read and call of the page, for one show request (tileactions.ts). */
+const tilePage = (mine: ShowRequest): TilePage => ({
+  game: mine.game,
+  dataset: mine.dataset,
+  current: () => asked === mine,
+  render,
+  say,
+  schedule,
+  reread: () => {
+    refreshStates().then(schedule, (error: unknown) => say(String(error)));
+  },
+});
+
 function describe(item: Entry): void {
   const title = $('title');
   title.textContent = item.texture;
@@ -292,18 +252,25 @@ function describe(item: Entry): void {
   const tiles = element('div', 'skin-tiles');
   shownTiles = [];
   if (state && asked) {
+    const mine = asked;
+    const page = tilePage(mine);
     const shown = shownOf(item);
-    const upscale = asked.upscale;
+    const { upscale, remove } = mine;
     const made = textureTiles({
       asset: state.asset,
       state,
-      head,
+      head: headOf(),
       inGame: inGame(item),
       originalSize: item.size.join('x'),
-      preview: (variant) => preview(item, variant),
-      highlighted: (variant) => shown.has(variant),
-      click: (variant, event) => clicked(item, variant, event),
+      preview: (variant) => preview(mine, item, state, variant),
+      highlighted: (variant) => variant === pickedOf(item),
+      click: (variant) => clicked(item, variant),
+      compare: { included: (variant) => shown.has(variant), include: (variant, on) => included(item, variant, on) },
       upscale: upscale && state.judged && !state.reason ? () => upscale(state.asset) : null,
+      edit: tileEdits(state),
+      // Ask Again and Open Log: a game with the service. The trash: a window that offers the removal.
+      requests: mine.service ? requestTools(page, state) : undefined,
+      removal: remove ? removalTools(page, { remove, owner, picked: pickedOf(item), removed: (variant) => unpicture(state.asset, variant) }, state) : undefined,
     });
     shownTiles = made.tiles;
     tiles.append(...made.nodes);
@@ -326,7 +293,7 @@ function show(at: number, keepView: boolean): void {
   const original: Side = { label: 'Original', image: item.image, width: item.size[0] };
   image.show({ original, height: item.size[1], results: [] }, keepView);
   const mine = ++showing;
-  sides(item).then(
+  sides(asked, item, stateOf(item), shownOf(item)).then(
     (results) => {
       if (mine === showing && results.length) image.show({ original, height: item.size[1], results }, true);
     },
@@ -352,33 +319,8 @@ function render(): void {
   entries.forEach((item, at) => {
     if (!passes(listed, item)) return;
     visible.push(at);
-    const row = element('div', `row${at === index ? ' current' : ''}`);
-    row.dataset['index'] = String(at);
-    const thumb = element('img');
-    thumb.decoding = 'async';
-    thumb.alt = '';
-    thumb.src = item.image;
-    const meta = element('div', 'meta');
-    const state = stateOf(item);
-    const made = state ? state.variants.map((variant) => variant.id) : [];
-    if (item.asset !== null && picks.has(item.asset)) {
-      const badge = element('span', 'badge picked', 'PICKED');
-      badge.title = `picked: ${picks.get(item.asset) ?? ''}, not saved`;
-      meta.append(badge);
-    }
-    if (made.length) {
-      const badge = element('span', 'badge hd', 'HD');
-      badge.title = made.join(', ');
-      meta.append(badge);
-    }
-    if (state?.packaged?.held) meta.append(element('span', 'badge packaged', 'PKG'));
-    if (state && Object.values(state.requests).some((request) => request.state === 'failed')) meta.append(element('span', 'badge failed', 'FAILED'));
-    else if (state && Object.keys(state.requests).length) meta.append(element('span', 'badge running', 'QUEUED'));
-    meta.append(`${item.plane} · ${item.size.join('x')} · ${item.format}`);
-    const text = element('div', 'text');
-    text.append(element('div', 'name', item.texture), meta);
-    row.append(thumb, text);
-    row.title = state?.users.join(', ') ?? '';
+    const picked = item.asset === null ? null : (picks.get(item.asset) ?? null);
+    const row = listRow(item, { index: at, current: at === index, state: stateOf(item), picked });
     row.addEventListener('click', () => show(at, true));
     list.append(row);
   });
@@ -405,13 +347,14 @@ function render(): void {
 }
 
 async function showTextures(request: ShowRequest): Promise<void> {
-  for (const url of urls.splice(0)) URL.revokeObjectURL(url);
-  decoded.clear();
+  clearPictures();
   states.clear();
   compared.clear();
   picks.clear();
   judging = false;
   saving = false;
+  clearRetries();
+  resetEdits(request.edit ?? null);
   asked = request;
   owner = request.owner;
   user = request.user;
@@ -438,49 +381,30 @@ async function refresh(next: PageOwner | null = owner): Promise<void> {
   schedule();
 }
 
-search.addEventListener('input', () => {
-  filter.text = search.value.trim().toLowerCase();
-  render();
+bindControls({
+  $,
+  search,
+  image,
+  searched: (text) => {
+    filter.text = text;
+    render();
+  },
+  step: (by) => {
+    if (!visible.length) return;
+    const place = visible.indexOf(index);
+    show(visible[place < 0 ? 0 : (place + by + visible.length) % visible.length] ?? 0, true);
+  },
 });
-const step = (by: number): void => {
-  if (!visible.length) return;
-  const place = visible.indexOf(index);
-  show(visible[place < 0 ? 0 : (place + by + visible.length) % visible.length] ?? 0, true);
-};
-$('previous').addEventListener('click', () => step(-1));
-$('next').addEventListener('click', () => step(1));
-$('fit').addEventListener('click', image.fit);
-$('actual').addEventListener('click', image.actual);
-for (const name of ['tile', 'smooth'] as const) $(name).addEventListener('click', () => $(name).classList.toggle('on', image.toggle(name)));
-window.addEventListener('keydown', (event) => {
-  if (event.target === search) {
-    if (event.key === 'Escape') search.blur();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-  }
-  if (event.target instanceof HTMLSelectElement || event.ctrlKey || event.metaKey || event.altKey) return;
-  if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    step(-1);
-  }
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    event.preventDefault();
-    step(1);
-  }
-  if (event.key === 'f') image.fit();
-  if (event.key === '1') image.actual();
-  if (event.key === 't') $('tile').classList.toggle('on', image.toggle('tile'));
-  if (event.key === 's') $('smooth').classList.toggle('on', image.toggle('smooth'));
-  if (event.key === '/') {
-    event.preventDefault();
-    search.focus();
-    search.select();
-  }
-});
+
+// The time on each request tile counts each second, between the reads of the states (R-VIEW-145).
+window.setInterval(() => tickElapsed([$('cards')], Date.now() / 1000), 1000);
 
 // For the window and its tests.
 Reflect.set(window, 'hdtex', {
   show: showTextures,
   refresh,
+  /** The dataset's edit sessions, as the main page read them now. */
+  edits: editsTaker(render),
   problems: () => [...problems],
   message: () => message,
   textures: () => [...states.values()],
@@ -507,6 +431,7 @@ Reflect.set(window, 'hdtex', {
       picks: Object.fromEntries(picks),
       draft: { shown: draft !== null && !draft.hidden, text: draft?.querySelector('.draft-count')?.textContent ?? '' },
       owner: owner?.owner ?? null,
+      edits: editsState(),
     };
   },
 });
