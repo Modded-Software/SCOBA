@@ -35,46 +35,50 @@ an operator check.
 """
 
 from __future__ import annotations
+
 import math
 import os
 import subprocess
 import time
 from pathlib import Path
+
 import numpy as np
+import workpaths
 from flora.terrain import bilinear
 from mapgen.rimfalls import config as rim_config
 from mapgen.waterfeatures import config
 from mapgen.waterfeatures.sites import Site
+
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .bank_checks import _report
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 from .waterfeat_scene import (
-    ROOT,
-    BUILT,
-    WORK,
-    POINTS_GALAXY,
-    MOVED,
-    VERTEX_TOL,
-    SPOT_TOL,
     AUTHORED_FACING,
+    HOST_DEADLINE_S,
+    MOVED,
+    ORBIT_DIST,
+    ORBIT_HEIGHT,
+    ORBIT_PITCH,
     ORBIT_SECONDS,
     ORBIT_TURN,
-    ORBIT_DIST,
-    ORBIT_PITCH,
-    ORBIT_HEIGHT,
-    SHOTS,
+    ROOT,
     SHOT_GAP_S,
-    HOST_DEADLINE_S,
+    SHOTS,
+    SPOT_TOL,
+    VERTEX_TOL,
     Point,
-    Scene,
+    Rim,
     Samples,
+    Scene,
+    built_path,
+    orbit,
+    points_galaxy_path,
+    rim_groups,
+    samples,
     scene,
     thin,
-    samples,
-    orbit,
-    Rim,
-    rim_groups,
+    work_path,
 )
 
 
@@ -101,23 +105,23 @@ def points_galaxy(sc: Scene) -> str:
 
 
 def map_spec() -> TestMapSpec:
-    WORK.mkdir(parents=True, exist_ok=True)
-    POINTS_GALAXY.write_text(points_galaxy(scene()), encoding="utf-8")
+    work_path().mkdir(parents=True, exist_ok=True)
+    points = points_galaxy_path()
+    points.write_text(points_galaxy(scene()), encoding="utf-8")
     galaxy = ROOT / "scripts" / "testkit" / "galaxy"
     return TestMapSpec(
         profile="waterfeat",
-        source=BUILT,
-        output=PROFILE_OUTPUTS["waterfeat"],
+        source=built_path(),
+        output=profile_output("waterfeat"),
         bank_names=PROFILE_BANKS["waterfeat"],
-        galaxy_files=(galaxy / "common.galaxy", galaxy / "waterfeat.galaxy", POINTS_GALAXY),
+        galaxy_files=(galaxy / "common.galaxy", galaxy / "waterfeat.galaxy", points),
         galaxy_includes=("scripts/test/waterfeat/common", "scripts/test/waterfeat/waterfeat", "scripts/test/waterfeat/waterfeat_points"),
         init_calls=("gt_WaterFeat_Init();",),
     )
 
 
 def _docs() -> Path:
-    prefix = Path(os.environ.get("SC2_GAME_PREFIX", str(Path.home() / "Games" / "battlenet-prefix")))
-    return Path(os.environ.get("SC2_DOCUMENTS", str(prefix / "pfx/drive_c/users/steamuser/Documents/StarCraft II")))
+    return workpaths.path("SC2_DOCUMENTS")
 
 
 def game_window() -> str:
@@ -403,7 +407,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="waterfeat",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["waterfeat"],
+        map_source=profile_output("waterfeat"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["waterfeat"],
         ready_section="meta",

@@ -63,7 +63,8 @@ Rules for the sources:
   only.
 - `webviewer/scripts/ref-docs-setup.sh` clones all four at pinned commits,
   outside git. `scripts/setup/deps.sh nodsdk` builds the fork's parser
-  library and `NODSurvey` into `webviewer/build/nodsdk`. GLM, which the
+  library and `NODSurvey` into `webviewer/build/nodsdk` (`build/` is a link
+  into `WEBVIEWER_WORK`, SPEC-PATHS). GLM, which the
   parsers need, comes from `sudo make init`.
 - No game data is in the repository (R-VIEW-9). Tests that need bytes of a
   game file read them from the build at run time.
@@ -631,9 +632,10 @@ by material name, answered as JSON (a control character in the name gives
 400); `animation` by clip name, answered as the clip's JSON.
 
 The texture window (operator 2026-11-24): the one window of core
-(`page/core/texturewindow.ts`), the same as SC2's, on the bare texture
-viewer page (`/texture-viewer.html`, served from
-`scripts/hdtex/compare.html` with no HD pairs). A double-click on a
+(`page/core/texturewindow.ts`), the same as SC2's, on the texture page
+(`/texture-viewer.html`, `page/texview`). Ghost has no texture service, so
+the page shows the originals alone: no state, no step, no pick, no
+default, and Ghost has no ground button (R-VIEW-100). A double-click on a
 gallery row (actors and models), an instance row or an instance in the
 view opens it on that model. `page/textures.ts` hands the page every
 texture file the model's materials name, decoded with core's DDS decode
@@ -644,7 +646,7 @@ shader" for `sky` and the rest of that list), groups and triangles. The
 format gives that data (`formats/nod/looks.ts`). A material without a
 texture file, and a texture that does not load, are in the page's
 problems. Test members: `sc2viewer.textureWindow()` and the page's
-`hdtex.entries()`, `hdtex.problems()`.
+`hdtex.entries()`, `hdtex.problems()`, `hdtex.textures()`.
 
 The model container that `/api/ghost/file` serves
 (`server/container.ts`; the head constants in `src/shared/nodx.ts`, read
@@ -715,7 +717,7 @@ On the server and in the page (Playwright, `webviewer/tests/`):
 | Materials | `ghost-look` | a `cutout` group of `AR_Plant_Vine_01` is picked inside fewer of its triangles than the solid `crate` (5 points lower or more); `sky` is not drawn and not named (`undrawn` and `why` null) | an unknown shader (`dynamic`) and a material no step finds (`pCannon_collide`) are not drawn; the probe's `why` is the reason and `undrawn` is "material: why" |
 | Material lookup | `ghost-mix` | `zergling` and `crate` draw every group with a texture; `undrawn` is empty | |
 | Refusal | `ghost-look`; `ex-1` | a container with `{error}` fails to load with its message; the changed files of `ex-1` are refused by NODExport | another model of the game still loads |
-| Texture window | `ghost-textures` | the shared window on `/texture-viewer.html`. A double-click on `crate` in the view: one texture, its colour plane first, the fact `material chestCrate2` "drawn solid, groups 0", the picture at the size listed, on the page's card. An actor row (`zerg_critter`) and a models row (`zergling`): `zergling.nod`, the same textures, each with its facts. An instance row of `AR_Plant_Vine_01`: the cutout texture has colour and alpha planes. `dynamic`, `pCannon_collide` and sky give their reasons in words. Layout, measured: the frame fills the window; the list rows have height and do not overlap; the card fits the page | the SC2 page is not opened; nothing is added; a material without a texture file has no entry, only its problem line; a texture answered 404 is named in the problems, and the instance keeps its own |
+| Texture window | `ghost-textures` | the shared window on `/texture-viewer.html`. A double-click on `crate` in the view: one texture, its colour plane first, the fact `material chestCrate2` "drawn solid, groups 0", the picture at the size listed, on the page's card. An actor row (`zerg_critter`) and a models row (`zergling`): `zergling.nod`, the same textures, each with its facts. An instance row of `AR_Plant_Vine_01`: the cutout texture has colour and alpha planes. `dynamic`, `pCannon_collide` and sky give their reasons in words. Layout, measured: the frame fills the window; the list rows have height and do not overlap; the card fits the page | no texture route is asked; no texture names a service asset; no default chooser, step button, pick or badge; no ground button; no texture set choice; nothing is added; a material without a texture file has no entry, only its problem line; a texture answered 404 is named in the problems, and the instance keeps its own |
 | Gallery | `ghost-gallery` | the preview names an actor and its model; its add button and a row dragged into the view add it; the `motion` and `skin` buttons give the server's counts; add all adds the listed actors with the landmark `Animated Ghost actors "zergling"`; the game's list names; a dataset reload with nothing changed keeps the signature and the summary | one click adds nothing; a cancelled add all adds nothing; no skinned model under `rigid`; no toast; the SC2 tab names its list its own way; GET and an unknown dataset are refused |
 | Contract | `contract` (core) | the shared routes and the shared page flow, run for each available game | unknown ids, categories and datasets give 404 |
 | Shader files | `ghost-look` | | `nod.frag` answered 404: the model fails with "nod: 404 /shaders/nod.frag" and is not added |

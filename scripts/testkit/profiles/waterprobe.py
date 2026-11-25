@@ -12,18 +12,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flora import terrain as terrain_mod
+import workpaths
 from flora import config as flora_config
 from flora import crush as crush_mod
+from flora import terrain as terrain_mod
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
-POINTS_GALAXY = ROOT / "out" / "testkit" / "waterprobe" / "waterprobe_points.galaxy"
+
+
+def built():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
+def points_galaxy_path():
+    return workpaths.path("SC2_TESTKIT") / "waterprobe" / "waterprobe_points.galaxy"
+
+
 MARGIN = 12.0  # cells sampled beyond a rect on each side
 STEP = 1.0
 RECT_PICKS = (6, 2)  # two water rects in the middle of the river
@@ -32,7 +41,7 @@ RECT_PICKS = (6, 2)  # two water rects in the middle of the river
 def lines() -> list[tuple[str, list[tuple[float, float]]]]:
     """Horizontal lines through the middle of the picked rects, from dry
     ground across the water to dry ground."""
-    rects = terrain_mod.water_rects(BUILT)
+    rects = terrain_mod.water_rects(built())
     out = []
     for n, i in enumerate(RECT_PICKS):
         _name, (x0, y0, x1, y1) = rects[i]
@@ -55,15 +64,15 @@ def points_galaxy() -> str:
 
 
 def map_spec() -> TestMapSpec:
-    POINTS_GALAXY.parent.mkdir(parents=True, exist_ok=True)
-    POINTS_GALAXY.write_text(points_galaxy(), encoding="utf-8")
+    points_galaxy_path().parent.mkdir(parents=True, exist_ok=True)
+    points_galaxy_path().write_text(points_galaxy(), encoding="utf-8")
     galaxy = ROOT / "scripts" / "testkit" / "galaxy"
     return TestMapSpec(
         profile="waterprobe",
-        source=BUILT,
-        output=PROFILE_OUTPUTS["waterprobe"],
+        source=built(),
+        output=profile_output("waterprobe"),
         bank_names=PROFILE_BANKS["waterprobe"],
-        galaxy_files=(galaxy / "common.galaxy", galaxy / "waterprobe.galaxy", POINTS_GALAXY),
+        galaxy_files=(galaxy / "common.galaxy", galaxy / "waterprobe.galaxy", points_galaxy_path()),
         galaxy_includes=("scripts/test/waterprobe/common", "scripts/test/waterprobe/waterprobe", "scripts/test/waterprobe/waterprobe_points"),
         init_calls=("gt_WaterProbe_Init();",),
     )
@@ -81,7 +90,7 @@ def check(ctx, data: dict, checks) -> None:
     checks.eq("meta", "", "realClicks", 0)
     checks.gt("meta", "", "count", 0)
     print(f"meta raw: {data.get('meta', {})}")
-    t = terrain_mod.load(BUILT)
+    t = terrain_mod.load(built())
     span_depth = {}
     for sy, x0, x1, _z, d in crush_mod.water_spans(t):
         for sx in range(x0, x1):
@@ -122,7 +131,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="waterprobe",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["waterprobe"],
+        map_source=profile_output("waterprobe"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["waterprobe"],
         ready_section="meta",

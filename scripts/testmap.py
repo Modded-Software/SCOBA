@@ -7,9 +7,10 @@ import argparse
 import os
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 from testkit.map_builder import build_instrumented_map
-from testkit.profiles.registry import PROFILE_OUTPUTS, profile_module
+from testkit.profiles.registry import profile_module
 from testkit.runner import run_test
 
 ROOT = project_root()
@@ -65,7 +66,7 @@ def main() -> int:
     delegate("run-profile", args.profile)
     launch_timeout_s = args.launch_timeout if args.launch_timeout is not None else 20.0
     case_timeout_s = args.case_timeout if args.case_timeout is not None else 20.0
-    run_root = args.run_root or ROOT / "out" / "test-runs"
+    run_root = args.run_root or workpaths.path("SC2_TEST_RUNS")
     return run(args.profile, launch_timeout_s, case_timeout_s, run_root)
 
 

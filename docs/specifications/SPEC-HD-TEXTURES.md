@@ -1,577 +1,783 @@
-# SPEC-HD-TEXTURES: Upscaled Terrain Textures
+# SPEC-HD-TEXTURES: Upscaled Textures
 
-**Date:** 2026-11-15
-**Status:** Built. Section 7 gives the state of each requirement and what
-backs it. Section 8 lists what only the operator can judge. Section 9 lists
-what is not tested.
+**Date:** 2026-11-24
+**Status:** Sections 4 to 7 are design. Variants, skins and bakes (4.3,
+4.6, 4.8, 4.9, 5.2, 7) are [plan]. Section 8 gives the state of each
+requirement. Sections 13 and 14 are built.
 **Requirements:** [REQ-HD-TEXTURES](../requirements/REQ-HD-TEXTURES.md)
+**Viewer side:** [SPEC-VIEWER](SPEC-VIEWER.md), section 17.
+
+Names and types of every interface are in the code. This document states
+duties and rules.
 
 ## 1. Principle
 
-The upscaled files are made once, on the GPU, and kept in a cache. The map
-build copies them into the built map and points the game at them. The map
-source is not touched.
-
-There are two variants of the upscaled files, `Upscale 4x` and
-`Generative 4x`. Each has its own cache. A build flag picks the one a map
-build applies (section 5).
-
-The game is not asked to treat a file differently. Each upscaled file has the
-layout of its original and a new name. A catalog entry in the built map names
-it in place of the original.
+- A variant is made once, on request, on the GPU, and kept in the texture
+  store. It is one input variant, one model and one size.
+- Variants of one texture stand side by side. Datasets share them.
+- A skin names a variant per texture of one owner: a unit, an actor or a
+  model file. It lives in its dataset.
+- A bake makes a skin the one the package holds for its owner. It is a
+  copy of the skin at that moment.
+- A package step copies the baked files into the game's data and points
+  the game at them. For `scoba` it is the last step of the map build.
+- A packaged file has the layout of its original and a new name.
+- The core knows no game. A game is an adapter.
 
 ## 2. Labels
 
-State of a design item:
+State: **[host]** a Python `unittest` passed. **[boot]** the map was
+launched and the log check passed. **[built]** in the code, no passing
+check. **[plan]** not in the code.
 
-- **[host]**: a Python `unittest` passed in the named run.
-- **[boot]**: the map was launched and the log check passed in the named run.
-- **[cache]**: `hd_textures.py verify` passed on the real cache.
-- **[built]**: in the code. No passing check for this contract.
-- **[operator]**: only a person can judge it. Listed in section 8.
-
-Source of an engine fact:
-
-- **[stock]**: read in the installed game's data.
-- **[measured]**: computed from the game's files.
-- **[boot]**: seen in the game logs of the named launch.
+Source of an engine fact: **[stock]** read in the game's data.
+**[measured]** computed from the game's files. **[boot]** seen in the game
+logs of a launch of section 10.
 
 ## 3. Engine Facts
 
+StarCraft II.
+
 | ID | Fact | Source |
 | --- | --- | --- |
-| H1 | The map paints with tile set `Zerus`, textures `Zerus1` to `Zerus8`. | `src/SCOBA.SC2Map/t3Terrain.xml` |
-| H2 | A terrain texture is a `CTerrainTex` entry. `Texture` names the colour file, `Normalmap` the normal map. The entries are in `mods\swarm.sc2mod\base.sc2data\gamedata\terraintexdata.xml`. | [stock] |
-| H3 | The 16 files are `mods\liberty.sc2mod\base.sc2assets\assets\textures\zerus_N.dds` and `zerus_Nnormal.dds`: DXT5, 1024x1024, 11 mips. | [stock] |
-| H4 | Colour files hold a specular mask in alpha. Its values run from 0 to about 97. | [measured] |
-| H5 | Normal maps hold X in alpha and Y in green. Red is 255 and blue is 0. The file ends in the 4 bytes `_NXD` after the last mip. | [measured] |
-| H6 | The game's own mips fit averaging in linear light with gamma 2.2. Averaging the bytes misses its small levels by twice the error. | [measured] |
-| H7 | The game keeps a table of texture sizes, `base.sc2data\texturereduction\texturereductionvalues.txt`. Its key is the file name alone. The line for a terrain texture is `zerus_1.dds:8:9:10:10:6:`. The numbers read as size exponents per quality setting. That reading is a guess. | [stock] |
-| H8 | A map catalog `Base.SC2Data/GameData/TerrainTexData.xml` that sets `Texture` and `Normalmap` makes the game open the files it names. | [boot] launch 1: the log names all 16 map paths |
-| H9 | A map file with the name of a table entry and another size is logged: `WARNING: Texture DB does not match file info or file is corrupt`. 16 lines, one per file. It is not known whether the game then loads the file reduced. | [boot] launch 1 |
-| H10 | With names the table does not hold, the game logs no texture warning. | [boot] launches 2, 3, and 4 |
-| H11 | A map with 16 files of 4096x4096 DXT5, about 22 MB each, loads. The built map folder measures 367M with `du -sh`. | [boot] launch 2 |
+| H1 | The map paints with tile set `Zerus`, textures `Zerus1` to `Zerus8`. | `t3Terrain.xml` |
+| H2 | A terrain texture is a `CTerrainTex` entry: `Texture` names the colour file, `Normalmap` the normal map. A terrain set is a `CTerrain` entry; its `BlendTextures` name its terrain textures. | [stock] |
+| H3 | The map's 16 terrain files are DXT5, 1024x1024, 11 mips. | [stock] |
+| H4 | Colour files hold a specular mask in alpha, values 0 to about 97. | [measured] |
+| H5 | Normal maps hold X in alpha and Y in green; red is 255, blue is 0. The file ends in the 4 bytes `_NXD` after the last mip. | [measured] |
+| H6 | The game's mips fit averaging in linear light with gamma 2.2. | [measured] |
+| H7 | The game keeps a table of texture sizes, keyed by file name alone (`texturereductionvalues.txt`). The meaning of its numbers is a guess. | [stock] |
+| H8 | A map catalog that sets `Texture` and `Normalmap` makes the game open the files it names. | [boot] launch 1 |
+| H9 | A map file with the name of a table entry and another size is logged as `Texture DB does not match file info`. | [boot] launch 1 |
+| H10 | With names the table does not hold, no texture warning is logged. | [boot] launches 2 to 4 |
+| H11 | A map with 16 files of 4096x4096 DXT5, about 22 MB each, loads. | [boot] launch 2 |
+| H12 | The game data holds 703 `CTerrainTex` and 149 `CTerrain` entries in `core`, `liberty`, `swarm` and `void`. | [stock], 2026-11-24 |
+| H13 | A `CModel` declares texture slots by file name: `TextureDeclares Prefix="Goliath_"` with `Adaptions TriggerOnSubstring="_Diffuse" Slot="main"`. 505 such declarations are in the game data. A texture whose name does not start with the prefix has no slot; the game logs "Could not find source texture with slot main". | [stock]; [boot] run `tps/20261124-185130` |
 
-The launches are named in section 10.
+| H14 | An archive holds assets in `base.sc2assets` and in variant folders: one per language (`enus.sc2assets`, `dede.sc2assets`, ...), `teen.sc2assets` and `team.sc2assets`. Of the assets one archive holds: 123 are in base and teen, 12 in base and team, 133 in `enus` alone, 6 in teen alone. 10 base files were compared with their teen files: all 10 differ. The installed game is `enUS`. | [measured] 2026-11-24, build 5.0.17.98310 |
 
-## 4. Pipeline
+## 4. Core
 
-`scripts/hd_textures.py` runs it. The code is the package `scripts/hdtex/`.
+`scripts/hdtex/core/`. It imports no game (R-HD-107).
 
-| Stage | Module | Does |
-| --- | --- | --- |
-| Resolve | `sources.py` | Reads the texture ids from `t3Terrain.xml`, the dependencies from `DocumentInfo`, and the `CTerrainTex` entries from the game's catalogs in load order. The map's own catalog is read last. Gives one `TextureRef` per file. |
-| Extract | `casc.py` | Reads the originals from the game storage with `tools/stormex`. |
-| Split | `roles.py` | Splits each file into planes the upscaler can handle. Colour file: `color` and `alpha`. Normal map: `normal`, with Z rebuilt. |
-| Upscale | `upscaler.py` | Runs `arc-upscale` once per model on the planes, with its option that makes opposite edges match. The models come from the variant (4.2). |
-| Join | `roles.py`, `lowfreq.py` | Joins the planes, matches the coarse content to the original, and builds the mip chain. Colour mips average in linear light (H6). Normals are unit length again on every level. |
-| Encode | `bc3.py`, `dds.py` | Writes DXT5 with the original's trailer (H5). |
-| Measure | `metrics.py` | Writes the numbers of section 6 into the manifest. |
+### 4.1 Words
 
-The game ships no load order for its own archives. It is fixed in
-`sources.DEPENDENCY_ARCHIVES`. A map with another dependency fails with a
-message that names the table.
-
-### 4.1 Cache
-
-The cache of a variant is `build/hdtex/<variant>/<source>/`, such as
-`build/hdtex/upscale/terrain/`. `SC2_HDTEX_CACHE` moves `build/hdtex`.
-`build/` is not in git. A build of one variant writes below its own folder
-only.
-
-| Folder | Content |
+| Word | Is |
 | --- | --- |
-| `original/` | Files as extracted. |
-| `planes/<model>/` | PNG planes, the upscaler's input. |
-| `upscaled/<model>/` | PNG planes after upscaling. |
-| `dds/` | Finished files and one JSON entry each. |
-| `preview/` | Comparison sheets. |
-| `manifest.json` | The variant, and every file with its hash, size, source, catalog overrides, and measured numbers. |
+| asset | a texture's name in a dataset's data: lower case, `\` between folders |
+| origin | where the original lies: its place in the game's storage, or dataset and asset for a file of the dataset's own layer |
+| plane | one picture the upscaler takes: 8-bit RGB PNG |
+| role | how a texture splits into planes and joins again |
+| model | `pbrify`, `fast` or `seedvr2`: the model of `arc-upscale` the colour planes get |
+| variant id | `original`, or the input's id and `model@size`, joined by `+`: `pbrify@2048`, `pbrify@4096+seedvr2@4096` |
+| owner | `unit:<CUnit id>`, `actor:<CActor id>` or `model:<model file asset>` |
+| skin | a name and a map from asset to variant id, for one owner of one dataset |
+| bake | one owner's skin as it was when baked, or one terrain texture's variant |
 
-The web page of section 8 is in `build/hdtex/compare/<source>/`.
+### 4.2 Interfaces
 
-Each output has a `.stamp` file: a hash of its inputs and settings. A stage is
-skipped while the stamp matches.
+`core/interfaces.py`. Each is registered by id; the core reaches it by id
+only (R-HD-110).
 
-The stamp of an upscaled plane holds the version of the tool: a hash of its
-`upscale.py`, `uv.lock`, and every module of its `arc_upscale/` package. Since
-2026-11-22 (`upscale-on-arc` commit `b35fa07`) `upscale.py` is only the entry
-point and the code is the package. A change of the tool redoes every plane, so
-that commit redoes the planes made before it. This is
-needed: after the tool's update of 2026-11-15 the model `fast` gave other
-pixels for the same input, up to 6 of 255 levels apart. With one version of
-the tool, three runs of `fast` gave the same file.
+| Interface | One per | Must |
+| --- | --- | --- |
+| Game adapter | game | name its datasets; take the folder of a dataset's own layer from the caller; list and describe a dataset's textures; give the role of one texture whose role needs its file; give an original as a file; name the origin of every texture file a dataset can show, listed or not; have the originals of many textures at hand in one go; list a dataset's owners, each with its layer, the owners below it and its textures; package the bakes into a target; check a package (R-HD-108) |
+| Codec | compression format | decode one mip level to pixels; encode pixels to one level (R-HD-109) |
+| Role | channel layout | name its planes, each colour or data; split a texture into them; join them into a mip chain |
+| Runner | upscaler | give a version that changes when its pixels would; name the file a job leaves in its output folder; take a plane, a model and an output folder, and give the job's name; say of a job by name whether it waits, runs, is done, failed with a reason, or is lost; say why no waiting job can start |
 
-### 4.2 Variants And Models
+A texture description holds: asset, origin, the game's kind word, role,
+whether it tiles, flip book cells, and its users. A texture that cannot be
+upscaled has no role and a reason (R-HD-53). A list may leave a role open
+when it needs the texture's file. The role is found when that one texture
+is asked for, so a list reads no texture file.
 
-`arc-upscale` has three models: `pbrify`, `fast`, and `seedvr2`. Its README
-says of `seedvr2`: one-step diffusion, the most detail, slow, invents detail.
-A variant names the model of each plane. The variants are in
-`scripts/hdtex/variants.py`.
+A job is known by the name the runner gave it. Every job has a state: one
+the runner does not know is lost, with the queue named.
 
-| Variant | Key | `color` | `alpha` | `normal` |
+Second implementations, for tests only (R-HD-111): a made-up game with a
+folder as storage, and a runner that enlarges inside the test, with no GPU
+and no queue.
+
+The runner `repeat` (`core/repeat.py`) is for the viewer's tests: it
+enlarges by pixel repeat the moment a job is given, with no GPU, and its
+worker does nothing. `HDTEX_RUNNER` chooses the runner, `arc` when unset;
+any other value is refused with the ids. A tiling texture's variant of
+`repeat` misses the seam limit: pixel repeat cuts the step between inner
+neighbours to a quarter and keeps the step across the edge.
+
+### 4.3 Variants
+
+A variant is named by its id (4.1). Its input is the id before the last
+`+`, or the original. Its last part names the model and the size
+(R-HD-121, R-HD-124). The id without its last `@size` is the recipe: what
+the GPU makes. The variants of one recipe differ only in size, and are
+kept in one folder (4.4).
+
+| Model | Colour planes | Data planes | Notes |
+| --- | --- | --- | --- |
+| `pbrify` | `pbrify` | `fast` | sharper on colour; draws a crosshatch into masks and normal maps (O-HD-10) |
+| `fast` | `fast` | `fast` | softer; for dark colour of low contrast too |
+| `seedvr2` | `seedvr2` | `fast` | invents detail, so colour only (R-HD-122) |
+
+- A texture without a colour plane takes `fast` only. A request with
+  `pbrify` or `seedvr2` for it is refused with the reason. A skin request
+  for many textures (4.6) gives such a texture `fast` at the same size.
+- Sizes: 1024, 2048, 4096. A recipe's own size is four times its input's
+  longest side, at most 4096. A size above it is refused (R-HD-123). A
+  recipe whose own size is below 1024 has that size only.
+- A `pbrify` or `fast` step whose input already has a side of 4096 is
+  refused: it can add nothing.
+- The size rule needs the original's longest side. A side of 0 or below
+  is an error, not a size. An original whose DDS header cannot be read
+  has no size: it is a state with its reason (4.9), and no request of it
+  is offered or made. The colour-plane rule needs no size
+  (`model_refusal`).
+- A variant whose input is not made yet makes the input first, as a
+  variant of its own.
+
+One step, per plane:
+
+1. The input is the plane of the input variant, or of the original.
+2. An input above 2048 on a side is halved until it is not.
+3. The runner upscales it four times, with edges made to match.
+4. The output is halved until no side is above 4096: the recipe's own
+   size.
+
+Then the planes are joined, matched to the original's coarse content,
+given a mip chain, and encoded. A variant at a smaller size is that mip
+chain without its largest levels. Colour is halved and averaged in linear
+light (H6). In each step a flip book gets a rim of 16 of its own edge
+pixels around each cell before the runner. The rim is cut after it
+(R-HD-56).
+
+The input of a later step is the kept plane of its input recipe, halved
+to the input's size. So a second size costs no GPU time (R-HD-6).
+
+### 4.4 Texture store
+
+The folder named by `TEXTURE_STORE`. `scripts/paths.sh` derives it as
+`SC2_BUILD/texture-store` (SPEC-PATHS); unset, the pipeline stops. Not in
+git, not on the repository disk (R-HD-85). The store holds no queue: the queue is the runner's.
+
+| Path | Holds |
+| --- | --- |
+| `format` | the layout version |
+| `<game>/planes/` | every plane a step takes or keeps, named by the hash of its pixels |
+| `<game>/upscaled/<recipe>/` | the runner's output file for one upscale; `job.json`, the name of the job last asked to make it; an output that was no whole image, renamed with `.broken` |
+| `<game>/variants/<origin>/<recipe>/` | `entry.json` (recipe, models per plane, own size, hashes, numbers) and one file per size; `request.json` while it is made, or after that failed; `request.log` (4.7) |
+| `<game>/datasets/<dataset>/skins/` | one file per owner: its skins (4.6) |
+| `<game>/datasets/<dataset>/` | `bakes.json` (4.6), `package.json` (R-HD-105), and `package/` for a dataset no build packages |
+| `<game>/index/` | the game's own caches |
+| `index.sqlite` | the state index (4.9) |
+
+- An upscale's recipe: the hash of the input plane, the model, and the
+  runner's version. Equal recipes share one folder, so a plane is upscaled
+  once (R-HD-6, R-HD-86).
+- Datasets that resolve an asset to the same origin share its variants
+  (R-HD-87).
+- A variant whose original now has another hash is stale (R-HD-88).
+- A file is written under a temporary name and renamed. A variant's entry
+  is written last and removed first, so half a variant is never read as
+  one. A failed request leaves no variant. Upscaled planes stay
+  (R-HD-100).
+- The runner's version covers the tool's locked dependencies and the
+  modules that decide pixels, not its queue or command line.
+- An entry does not say whether its variant has a problem. That is worked
+  out from the entry's numbers and the texture's description (4.5), and
+  kept in the index (4.9).
+
+### 4.5 Limits
+
+Measured on the variant and kept with it (R-HD-13).
+
+| Limit | Bound | Near (amber) | Measures | Applies to |
 | --- | --- | --- | --- | --- |
-| Upscale 4x | `upscale` | `pbrify`; `fast` for `zerus_4` and `zerus_8` | `fast` | `fast` |
-| Generative 4x | `generative` | `seedvr2` | `fast` | `fast` |
+| Encode PSNR | at least 35 dB | below 38 dB | loss of the encoding on the largest level | all |
+| Correlation | at least 0.7 | below 0.8 | the variant shrunk to the original's size, against the original, per channel | all |
+| Coarse RMSE | at most 1.5 levels | above 1.2 | a small mip of the variant against the same mip of the original | all |
+| Seam growth | at most 1.5 times the original's | above 1.3 | the step across the wrap-around edge | textures that tile (R-HD-91) |
 
-Reasons, judged by eye on comparison crops:
+- A missed bound is a problem. The entry lists each with the number and
+  the bound (R-HD-90). A problem hides nothing: the variant is listed,
+  shown and can be named by a skin.
+- A bake whose skin names a variant with a problem is refused, unless the
+  variant is accepted (O-HD-9).
+- The near bands are the agent's (O-VIEW-7). Each limit has an info text
+  in the state: what it measures and what a miss looks like.
+- An entry may hold `accepted`, the reason the problems do not refuse a
+  bake. It is read; no command writes it.
 
-- `pbrify` is the sharper one on colour.
-- On dark, low-contrast colour `pbrify` invents structure: hatching on
-  `zerus_4`, a repainted look on `zerus_8`. Those two use `fast`.
-- `pbrify` draws a crosshatch pattern into smooth masks and normal maps, so
-  those planes use `fast`.
-- `seedvr2` invents detail. The mask and the normal map are data, so
-  Generative 4x upscales them as Upscale 4x does. The two variants differ in
-  the colour of the colour files alone. The normal map files are the same.
-- From the 1024 original, `seedvr2` looked worse than Upscale 4x to the
-  operator: it had too little to work with. So the input of Generative 4x
-  colour is the Upscale 4x colour result, shrunk from 4096 to 2048 in linear
-  light (`variants.Input`, `roles.shrink_color`). `seedvr2` makes 8192 of
-  it, which is shrunk to 4096 the same way before the join.
+### 4.6 Skins and bakes
 
-Generative 4x needs the Upscale 4x cache. Without it the build fails and
-names the command to run first. A new Upscale 4x colour result redoes the
-Generative 4x texture made from it, and only that one.
+A skin file holds a format number and, per skin name, a map from asset
+to variant id (R-HD-130, 131). A skin names no other skin: a copy or an
+upscale reads its source once, and keeps no link to it.
 
-`hd_textures.py --variant KEY` names the variant for `list`, `build`,
-`verify`, and `preview`. The default is `upscale`.
+- `original` is no entry: it names nothing (R-HD-132). A name is 1 to 40
+  letters, digits, `-` or `_`. `original` is refused as a name, `new` as
+  a name to save under; both in any case. The names of an owner are
+  unique ignoring case (R-HD-138): a copy, an upscale or a rename to a
+  name another skin holds is refused. A case change of one skin is no
+  clash.
+- A store file (skins, bakes) with a key given twice is refused; the
+  reader does not keep the last one.
+- Each skin entry holds `textures` only; the file holds `format`,
+  `owner` and `skins`. A missing or unknown key refuses the file, with
+  its place. A file in the skin folder that names no owner is refused.
+- An asset a skin does not name shows its original (R-HD-131). A bake
+  names `original` for each texture of the owner its skin does not name,
+  so the game shows what the viewer previews.
+- A bake of `original` is refused: `unbake` removes a bake.
+- `new` is New Skin (R-HD-137). It is stored like any skin. `set` or
+  `rename` on an owner without a stored `new` stores it first: as the
+  offered New Skin below, else empty. `rename --name new --new N` saves
+  it. `delete --name new` discards it. A bake of `new` is refused. `copy`
+  and `upscale` to `new` are refused while `new` is stored. `rename` to
+  `new` is refused.
+- The offered New Skin: when the owner holds no `new`, and what it shows
+  (4.9 `shows`) names a variant other than `original`, and no saved skin
+  names exactly those variants (the rest `original`), the owner's state
+  lists `new` with them and `"stored": false`. Nothing is written.
+- A skin may name a variant that is not made yet. Until it is made, the
+  texture shows its original, with the request's state.
+- A skin may name `original` for a texture. Baked, it shows the original
+  over the bakes of the layers below, and packages no file.
+- A skin may only name assets of its owner (R-HD-135) and ids of the asset's
+  own variants.
+- Only `core/skins.py` writes the file. A refused change leaves it as it
+  was.
+- **Skin upscale** (R-HD-134): makes skin N from skin S, with one model
+  and one size. The viewer asks for N = `new`. For each texture of the
+  owner: the input is what S names for it, else `original`; the variant
+  is the input's id joined with `model@size`, or `fast@size` for a
+  texture without a colour plane (R-HD-122). N names it, and it is
+  requested. A texture that cannot reach the size, has no role, or has an
+  original whose header cannot be read, keeps what S names and is listed
+  with the reason.
+- `bakes.json` holds a format number, per owner the skin's name and its
+  map as it was when baked, and per terrain asset a variant id (R-HD-140,
+  R-HD-145). A bake names the skin it was made from (R-HD-136):
+  changing the skin does not change the bake's map; renaming it renames
+  it in the bake; deleting it is refused while it is baked ("skin S is
+  baked; unbake it or bake another skin first"). Only
+  `core/skinbakes.py` renames or deletes a skin.
+- Only `core/bakes.py` writes `bakes.json`. A bake is refused, and the
+  file left, when a named variant is missing, stale, or has a problem and
+  is not accepted (R-HD-102, O-HD-9). The refusal names each texture.
+- No file: no bake (R-HD-22).
+- A file with an unknown key or a wrong type is refused whole, with the
+  fault's path.
 
-`--model PLANE=MODEL` changes a plane for every texture.
-`--model TEXTURE.PLANE=MODEL` changes it for one, such as
-`zerus_4.color=pbrify`. A key that names no plane of the source is an error.
+### 4.7 Requests and the queue
 
-### 4.3 File names
+A request is one texture and one variant id (R-HD-97).
 
-An upscaled file is `Assets\Textures\scoba_hd\scoba_hd_<original name>`. The
-prefix is needed: the game sizes a texture by its file name (H7, H9). A file
-that keeps the original's name gets the original's table entry.
+Each state has one source. The index holds a copy of it for readers
+(4.9).
 
-This also binds a later source. A file that shadows an original by path keeps
-its name. Such a source needs catalog overrides and the prefix too.
-
-## 5. Map Build
-
-`expand_map.py` calls `hdtex.inject.apply_hd_textures`. The build flag is the
-environment variable `SC2_HD_TEXTURES`:
-
-| Value | The step |
+| State | Read from |
 | --- | --- |
-| not set | Applies Upscale 4x. Without its cache it prints a notice and the map keeps the built-in textures. |
-| `upscale` | Applies Upscale 4x. Fails without its cache. |
-| `generative` | Applies Generative 4x. Fails without its cache. |
-| `off` | Does nothing. The map keeps the built-in textures. |
-| anything else | Fails. |
+| `queued` | `request.json` exists and no job of it runs or is done |
+| `upscaling` | a job of it is in the runner's queue as running or done; step and plane counts come from `request.json` |
+| `encoding` | `request.json` says so |
+| `done` | the variant's entry exists and is not stale; there is no `request.json` |
+| `failed` | `request.json` holds the reason, or the process it names is gone |
 
-For the variant it applies, the step:
+- A request runs in the program that was asked. Only that program writes
+  `request.json`. It removes the file when the variant is kept. Any
+  program may read it (R-HD-99).
+- `request.json` names the process by its ID and its start time. Another
+  process that got the same ID later is not taken for it.
+- `request.json` names the upscale folders of the step. The job of a
+  folder is read from the folder's `job.json`. So two requests for one
+  plane wait for one job.
+- `request.log` holds every step of every request for that variant: the
+  time, the process, each call of the tool with its exit status, each
+  job with each change of its state, and the trace of a failure. The
+  state names the file.
+- Whatever stops a request is written to `request.json` with its kind,
+  and to the log with its trace. That holds for an error nobody
+  expected, and for a program that is stopped from its keyboard.
+- A refused request leaves nothing: a texture without a role, a model or
+  size of 4.3 that is refused, an original that cannot be read.
+- A request for a variant that exists and is not stale is done at once.
+- Each plane enters the queue through `arc-upscale submit`, into the
+  tool's own queue. The tool answers with the job's name. A plane whose
+  job waits or runs, or whose upscale exists, is not submitted again.
+- A job's state is the folder of the tool's queue its file is in. The
+  pipeline reads that and writes nothing there.
+- The pipeline starts no worker. The viewer's server starts the one
+  worker, on GPU 1. One worker runs one plane at a time (R-HD-98). GPU 0
+  also holds the desktop: a job that fills it stalls with no error.
+- Whether a worker runs is asked of the tool (`arc-upscale queue`), every
+  10 seconds while all jobs of a request wait. Jobs that wait 30 seconds
+  with no worker fail the request, with the queue named. With a worker,
+  a request waits as long as its jobs are behind others.
+- Retries, the watch for a stalled GPU and the time limit of an image are
+  the tool's: it tries a job again twice, ends a job whose GPU does no
+  work for 60 seconds or that takes more than 5 minutes per 2048 x 2048
+  pixels, and keeps it as failed with its error and the worker's log. A
+  failed job fails its request with that error.
+- A job that is done and wrote no output fails its request. So does a
+  job that is lost.
+- The tool writes an output under another name and renames it. An output
+  that is still no whole image is renamed with `.broken`, and fails the
+  request with each such file's error, size and hash.
+- `arc-upscale` is found next to this project, or at `ARC_UPSCALE`. The
+  runner hands the tool its project folder, and keeps this program's
+  Python settings from it.
 
-1. reads every `manifest.json` in the variant's cache, and fails when one
-   names another variant;
-2. fails when the map paints with a texture the cache does not cover;
-3. checks each cached file against its hash and copies it to its map path;
-4. writes the overrides into `Base.SC2Data/GameData/TerrainTexData.xml`,
-   keeping what the file already holds;
-5. prints the variant's name.
+### 4.8 Command line
 
-Both variants use the same map paths. A built map holds one variant.
-`hdtex.inject.variant_in_map` names the cached variant whose files a built
-map holds, by their hashes.
-
-`validate-map.py` calls `hdtex.check.check_hd_textures`. It reads the built
-map only and fails when:
-
-- a catalog names a file that is not in the map;
-- a file in the folder is named by no catalog;
-- a file lacks the prefix (4.3);
-- a file is not DXT5, has a side that is not a power of two, has a short mip
-  chain, or has more than 16 bytes after the last mip;
-- some terrain textures are upscaled and others are not.
-
-The log checks fail on a texture warning in a new `Graphics.txt` log (H9):
-`sc2-check-logs.py` for `launch-check`, `testkit/logs.py` for every profile
-run.
-
-## 6. Limits
-
-`hd_textures.py verify` fails a file that misses one. The values are in
-`scripts/hd_textures.py`.
-
-The limits are the same for both variants.
-
-| Limit | Value | Measures | Upscale 4x | Generative 4x |
-| --- | --- | --- | --- | --- |
-| Encode PSNR | at least 35 dB | Loss of the DXT5 encoding on the largest level. | 36.7 dB and up | 36.0 dB and up |
-| Correlation | at least 0.7 | The result shrunk to the original's size, against the original, per channel. An inverted or swapped channel fails. | 0.83 and up | 0.80 and up |
-| Coarse RMSE | at most 1.5 levels | A small mip of the result against the same mip made from the original. | 0.82 at most | 1.40 at most |
-| Seam growth | at most 1.5 times the original's | The step across the wrap-around edge, relative to the step between inner neighbours. | Every file passes | Every file passes |
-
-Generative 4x is closer to two limits than Upscale 4x: `Zerus_7` colour has
-coarse RMSE 1.40 and correlation 0.87, `Zerus_1` colour has correlation 0.80.
-In Upscale 4x those files measure 0.82 and 0.97, and 0.95.
-
-`Zerus_2` has a seam in the original: ratio 2.88 for the colour file. The
-Upscale 4x file measures 3.39, the Generative 4x file 3.55.
-
-The eight normal map files are the same in both variants, byte for byte. The
-eight colour files differ.
-
-Without the coarse match of `lowfreq.py` the coarse RMSE of Upscale 4x
-measured 1.9 to 2.35. It was not measured for Generative 4x.
-
-## 7. State Of Each Requirement
-
-Host tests are `test_hdtex_codec.py`, `test_hdtex_sources.py`,
-`test_hdtex_build.py`, `test_hdtex_compare.py`, and `test_logs.py` under
-`scripts/testkit/tests/`. They
-use a storage and an upscaler made for the test. They do not run the game or
-the GPU.
-
-| ID | State | Backing |
-| --- | --- | --- |
-| R-HD-1 | [host] [boot] | `BuiltMapTest`; the builds of launches 3 and 4 printed `hd textures: injected 16 textures` with the variant's name. |
-| R-HD-2 | [host] | `MapSourceTest`. |
-| R-HD-3 | [host] | `TerrainRefsTest`, `MapFilesTest`, `CatalogTest`, `LocateTest`. `hd_textures.py list` gave 16 files for the map. |
-| R-HD-4 | [built] | Ran for the real cache. Host tests replace the storage. |
-| R-HD-5 | [built] | Ran for both real caches: 1024 to 4096 per side. Host tests replace the upscaler. |
-| R-HD-6 | [host] | `PipelineTest`: a second build redoes nothing, a model change redoes one plane, another version of the tool redoes every plane. `UpscalerToolTest`: the version follows the tool's code and locked dependencies. |
-| R-HD-10 | [host] [cache] | `DdsTest`, `NormalRoleTest`, `DiffuseRoleTest`, `PipelineTest`, `CheckTest`. |
-| R-HD-11 | [host] [cache] | `LowFrequencyTest`, `DiffuseRoleTest`; limits of section 6. The look itself is O-HD-1. |
-| R-HD-12 | [cache] | Seam limit of section 6. The look itself is O-HD-2. |
-| R-HD-13 | [host] | `CommandLineTest`: each limit fails a file. |
-| R-HD-15 | [host] | `ComparePageTest` and `ModelComparePageTest`: the page of all sources lists every plane of every source, each with a category, its users, and a thumbnail; its image paths exist. The page loaded in headless Chrome on 2026-11-19 with 253 rows and no console error. The filters and the look have no test; no mouse input was tried on the new page. |
-| R-HD-50 to R-HD-55 | section 12 | Host tests in `test_hdtex_models.py`. Not finished. |
-| R-HD-14 | [host] | `ComparePageTest` in `test_hdtex_compare.py`: the page lists every plane; the layers are ordered Upscale 4x, Generative 4x; each layer shows the file of its own variant; every image it names exists at the stated size. `hd_textures.py compare` wrote 24 entries with 72 images for the real caches. The lines of the page have no test in the repository (section 9). `hd_textures.py preview` wrote 16 sheets per variant; the sheets have no test. |
-| R-HD-20 | [host] | `CheckTest`, `InjectTest`, `BuiltMapTest`. |
-| R-HD-21 | [boot] | Launch 3 for Generative 4x, launch 4 for Upscale 4x. Launch 1 failed this with 16 texture warnings and led to 4.3. |
-| R-HD-22 | [host] | `InjectTest`. Real build: section 10, build C. |
-| R-HD-23 | [host] | `InjectTest`. Real build: section 10, build B. |
-| R-HD-24 | [host] | `InjectTest`: changed file, missing file, missing texture, other manifest format. `VariantTest`: a cache folder that holds another variant. |
-| R-HD-30 | [host] [cache] | `ModelChoiceTest`: the titles, and the models of each variant. `test_every_variant_gives_every_plane_a_model`. Both real caches pass `verify`. |
-| R-HD-31 | [host] | `VariantTest`: a variant builds into its own folder and leaves the other's files and manifest alone. |
-| R-HD-32 | [host] [boot] | `VariantTest`: the flag picks the variant, and the map then holds that variant's files and not the other's; without the flag the map holds Upscale 4x. `BuiltMapTest`: the built map holds the variant the flag names; passed in the builds of launches 3 and 4. |
-| R-HD-33 | [host] | `VariantTest`: a named variant without a cache, and a value that names no variant, fail and leave the map alone. Real builds: section 10, builds A and D. |
-| R-HD-35 | [host] | `VariantTest`: the input is the Upscale 4x colour shrunk to half, the other planes still come from the original, the file is still 4x with a full chain; no Upscale 4x cache is an error; a changed Upscale 4x colour redoes one texture. `shrink_color` averages in linear light. |
-| R-HD-34 | [cache] [boot] | `verify` passed for both caches (section 6). Launches 3 and 4. The look of each variant is O-HD-1 to O-HD-3. |
-| R-HD-40 | [built] | A source is one function in `sources.SOURCES`. A channel layout is one entry in `roles.ROLES`. No second source exists, so this is not tested. |
-
-## 8. Operator Checks
-
-Open, from the requirements: O-HD-1, O-HD-2, O-HD-3, O-HD-4.
-
-The web page is `build/hdtex/compare/index.html`. It opens from disk. It
-shows each plane of each texture of every cached source: 438 entries for
-the caches of 2026-11-20, 27 terrain and 411 model. A page per source is
-written next to it, `compare/<source>/index.html`.
-
-The left side lists the entries with a small picture each, grouped by
-category: `Terrain`, `Doodads`, one per named unit (`models.MODEL_UNITS`),
-and `Shared` for a model texture more than one of those
-use. A unit whose textures are all shared has no category of its own; the
-Viking's main textures are under `Shared`. Above the list: a search field, and chips for category and plane with
-the number of entries each would show. A chip that would show none is left
-out, but the chosen one. The keys: arrows step through the
-listed entries, `/` search, `F` fit, `1` 1:1, `T` tile, `S` smooth original.
-Below the view, one card per side gives the size and the measured numbers.
-
-The address can filter the page. `?user=<id>` lists only the textures that
-catalog entry uses (a unit, a doodad, a terrain); a chip `used by <id>`
-drops the filter. With no texture for the user the list says so and the view
-is empty. `&embed=1` is the narrow layout for a window.
-
-The model viewer (`webviewer/`) serves the page at `/textures/` and shows it
-in a movable window: a double-click on a unit or doodad, in the gallery, in
-the instances list, or in the view, opens it with `?user=<id>&embed=1`. The
-viewer then reads every texture the unit's model file names, from the
-instance's dataset, and hands the decoded pictures to the page
-(`hdtex.addOriginals`). A texture the page has no entry for is listed under
-`Original only`, one entry per plane (`color`, and `alpha` when it is not
-one value all over), with no upscaled side. Only DDS files are decoded; the
-list names the others as not shown. Both
-pages have the same theme: the page carries a copy of the `:root` block of
-`webviewer/public/theme.css`. Tests: `webviewer/tests/texture-window.spec.mjs`,
-with the page template and four made-up entries
-(`webviewer/tools/hdtex-fixture.mjs`).
-
-An entry has one layer per variant that holds its texture. Model textures
-have Upscale 4x only. A texture one variant lacks shows the variants it has.
-
-From left to right: the decoded original, the decoded Upscale 4x file, the
-decoded Generative 4x file. A line parts each two neighbours:
-
-- Both lines can be dragged.
-- The second line stops at the first. It cannot pass it to the left.
-- The first line pushes the second when it is dragged past it.
-- Two lines at one place: a drag to the left takes the first, a drag to the
-  right takes the second.
-
-The wheel zooms, a drag pans, `1:1` shows one texture pixel per screen pixel,
-and `Tile` repeats the texture to show its seams. The specular mask is dark,
-so every side is spread over black to white with the range of the original;
-the page states the range. With one cached variant the page has one line.
-The page code is `scripts/hdtex/compare.py` and `scripts/hdtex/compare.html`.
-
-The comparison sheets are in `build/hdtex/<variant>/terrain/preview/`. Each row is one
-plane. From left to right: original, result, original across the wrap-around
-edge, result across the wrap-around edge.
-
-## 9. Not Tested
-
-- That the game shows the 4096 level on screen, for either variant. Launches
-  2 to 4 show the map loads and the log is clean. Launch 1 shows the game
-  opens the files a catalog names (H8). The later launches use the same
-  mechanism with other names; their logs do not name the files.
-- That the game shows the variant the flag names. The check is on the built
-  map's files (`BuiltMapTest`), not on the screen. The build stamp is the same
-  for every variant, so the stamp in the game log does not tell them apart.
-- Memory use and frame rate with the upscaled files.
-- Texture quality settings other than the one the test machine uses.
-- The meaning of the numbers in the size table (H7).
-- The lines of the web page, in the repository. They were checked with a
-  script outside the repository that drives a headless browser with mouse
-  input (section 10). That script needs Playwright, which is not a
-  dependency of this project. No check used a real mouse or Firefox.
-- Whether Generative 4x keeps the look of the ground. Its numbers pass the
-  limits, and the model invents detail by design. That is O-HD-1 and O-HD-2.
-
-## 10. Runs
-
-| Name | What | Result |
-| --- | --- | --- |
-| Launch 1 | `scripts/playtest.sh launch-check`, files named like the originals. Log `2026-11-15 03.44.06 Graphics.txt`. | Stamp matched, no script error, 16 texture warnings. The log check of that time did not read them. With the check of section 5 it fails. |
-| Launch 2 | `scripts/playtest.sh launch-check`, files with the prefix. Log `2026-11-15 03.54.13 Graphics.txt`. | Stamp `0037eec3083a-497a67faac81c5f4` matched, no script error, no texture warning. |
-| Host tests | `scripts/playtest.sh host-tests`, after launch 2 | 176 tests, all passed, none skipped. Its build has the same `BuildManifest.txt` hash as the build of launch 2: `3588241dd53b...`. |
-
-Launches 1 and 2 predate the variants. Their files were Upscale 4x files made
-by the older version of the tool. The runs below use the caches of section 6,
-both made by one version of the tool. Every build below has the build stamp
-`0037eec3083a-497a67faac81c5f4`.
-
-| Name | What | Result |
-| --- | --- | --- |
-| Build A | `SC2_HD_TEXTURES=sharper scripts/playtest.sh build` | Failed: `SC2_HD_TEXTURES=sharper names no variant; use upscale, generative, or off`. |
-| Build B | `SC2_HD_TEXTURES=off scripts/playtest.sh host-tests` | The build printed `off by SC2_HD_TEXTURES=off`. The map has no upscaled files. `BuildManifest.txt` hash `bf6b9082adf5...`. 215 tests passed, 2 skipped: the two `BuiltMapTest` checks, which need upscaled files. |
-| Build C | `scripts/playtest.sh build` with `SC2_HDTEX_CACHE` set to an empty folder | The build printed `no cache` and passed. `BuildManifest.txt` hash `bf6b9082adf5...`, the same as build B. |
-| Build D | The same with `SC2_HD_TEXTURES=generative` | Failed: `SC2_HD_TEXTURES=generative, but there is no cache at ...`. |
-| Launch 3 | `SC2_HD_TEXTURES=generative scripts/playtest.sh host-tests`, then `launch-check` with the same flag. Log `2026-11-15 13.11.31 Graphics.txt`. | Both builds printed `injected 16 textures, variant Generative 4x` and have the `BuildManifest.txt` hash `1408e361ee07...`. 215 tests passed, none skipped. Stamp matched, no script error, no texture warning. |
-| Launch 4 | `scripts/playtest.sh host-tests`, then `launch-check`, no flag. Log `2026-11-15 13.13.33 Graphics.txt`. | Both builds printed `injected 16 textures, variant Upscale 4x` and have the `BuildManifest.txt` hash `4d1d2b684899...`. 215 tests passed, none skipped. Stamp matched, no script error, no texture warning. |
-| Web page | A script outside the repository drove `build/hdtex/compare/terrain/index.html` with mouse input in headless Chrome 151 and in headless Brave. | 10 of 10 checks passed in each: the order of the three sides and their names; each line moves alone; the second line stops at the first; the first pushes the second; two lines at one place come apart; a pan leaves the lines; drags after a double click and after select-all; the right button moves nothing. |
-
-The 215 tests include tests of other tooling in the work tree.
-
-## 12. Model Textures (proof of concept)
-
-**State: built, not finished.** Host tests pass. The real cache is built and
-fails `verify` for 43 of 226 textures. The map builds with it and passes
-validation: 242 textures, 159 model files. It was launched once with the
-first scope (doodads, Command Center, psi destroyer): stamp matched, no
-texture warning in `Graphics.txt`. It was not launched with the later units.
-
-Source `models` (`hdtex/models.py`). It reads the built map, because the map
-build places most doodads.
-
-Named units, `models.MODEL_UNITS`: `CommandCenter`, `PsiDecimator`,
-`HybridUltraliskShackled`, `VikingAssault`, `VikingFighter`, `Overlord`, `MengskBC`, `SensorTower`,
-`Hellion`, `Goliath`, `Marine`, `SCV`, `Battlecruiser`, `Hydralisk`,
-`Ultralisk`, `Drone`, `Hatchery`. The last seven show classic models
-(section 13).
-`MengskBC` shows the model file `BattlecruiserLoki.m3`.
-The vista overlord (`SCOBAVistaOverlord`) shows the model `Overlord`.
-
-Named model entries, `models.MODEL_ENTRIES`: `BattlecruiserLokiDeathSlow`,
-the death model of `MengskBC`. No other death model is followed.
-`validate_slow_deaths.py` takes the patched copy of a generated slow death
-model for that model, and checks the copy.
-
-Flip books (R-HD-56). A flip book layer does not hold its cells. The
-particle system that draws its material does (`m3tex.flip_grids`). Each
-cell gets a rim of 16 of its own edge pixels per side before the upscale
-(`flipbook.explode`), and the rim is cut after it (`flipbook.implode`). A
-flip book is left when two particle systems or two models name different
-cells, when a layer without a flip book names the same file, when the cells
-do not divide the picture, or when a cell is below 32 pixels.
-
-A model file the map itself ships is read from the map, not from the game
-(`models.map_model`, `models.fetch`). Today that is `VikingAssault.m3`, which
-`scripts/footfall/fx.py` writes. The cache keeps the hash of that file.
-`inject.stale_models` fails the build when the map's file has changed since.
-
-| Step | Module | Does |
-| --- | --- | --- |
-| Catalogs | `catalog.py` | Field values with parents, class defaults, and `##token##` values. |
-| Models | `models.py` | Placed doodad or named unit, to actor, to `CModel`, to model files with variations. Only the model an actor shows while it stands. |
-| Layers | `m3tex.py` | The texture paths in the materials of a model, with the slot of each. |
-| Verdict | `models.judge` | A role per texture from its slots, or a reason to leave it. |
-| Codec | `bc1.py`, `dds.py` | DXT1 next to DXT5. The result keeps the format. |
-| Copies | `pipeline.model_stage` | A copy of each model file that names the upscaled textures. It is read back and compared. |
-| Inject | `inject.py` | Copies go to `Assets\Models\scoba_hd\`, textures to `Assets\Textures\scoba_hd\scoba_hd_m_<name>`. `ModelData.xml` gets a `Model` override per `CModel`. |
-| Check | `check.py` | Every patched model is named by a `CModel`, every texture by a catalog or a patched model. |
-
-Roles added: `data` (amounts in every channel, byte-averaged mips) and
-`normal_red` (a normal map with blue 0 and a red channel of its own; what
-red means there is not known, it is kept as an amount).
-
-Census of 2026-11-20, `hd_textures.py census`: 43 `CModel` entries, 159 model
-files, 250 textures: 179 DXT5, 69 DXT1, 2 DXT3. 226 are upscaled, 19 of
-them flip books; 2 of them are the 2048 colour and normal textures of the
-classic Command Center, kept at 4096 (R-HD-64, `models.ALWAYS_UPSCALE`,
-`models.MAX_SIZES`; both pass `verify`; 22 MB each). The colour plane of
-`commandcenter_remastered_diff` is made by `seedvr2` from the original
-(`variants.VARIANTS["upscale"].textures`); its mask and the normal map by
-`fast`. The upscaler makes 4x only, so 2048 gives 8192, halved once to
-4096. Whether the game loads a 4096 model texture named by a model file
-is not known; the terrain ones load (H11). 24 are left: 17 that are
-2048 on a side already (the
-Hellion, the classic Marine, Hatchery, Lair, and Hive), 3
-normal layers of displacement materials, 2 cube maps, 1 DXT3, 1 of 4x4 pixels. `radius2` was upscaled for the tar pit before; the death model
-of the battlecruiser names it in a displacement material, so it is left.
-
-Open:
-
-- `verify` fails 43 textures with the limits of section 6. 26 miss the seam
-  limit; a model texture is mostly an atlas that does not tile, so that limit
-  and the upscaler's tiling option may not fit it. 15 miss the coarse RMSE
-  limit, most of them glows and particles. 2 miss the encode limit and 2 the
-  correlation limit. Two textures miss two limits. The limits were not changed.
-- Not tested by a program: that the game shows a patched model copy, and that
-  it takes a `Model` override with variations below a new base path. The one
-  launch gave a clean log; the look is O-HD-5.
-- With this cache in place, a map build without `SC2_HD_TEXTURES` injects the
-  model textures too.
-- `scripts/data/hit_volumes.json` names the patched copy as the `m3` of a
-  unit whose model is patched. The measured shapes are the same.
-- R-HD-40 did not hold as written: the encode and inject stages changed.
-
-## 13. Classic Skins
-
-**State: built, not verified in the game.** R-HD-60 to R-HD-63.
-
-The game swaps a skin in by model entry: a `CSkin` lists pairs of `CModel`
-ids, From and To. `scripts/hdtex/classic_skins.py` reads those pairs for the
-skins in `SKINS` from the game data and writes them into the map's own
-`ModelData.xml`: each From entry takes the fields of its To entry that
-differ. That is the model file, for a portrait also the picture and the
-light, and here and there a radius or a low-quality model. The From entry
-keeps its id. So the map's own fields stay (`Battlecruiser` `AnimSpeed`,
-`Hive` `ScaleMax`), and hit volumes, camera heights, and HD textures find
-the classic model by the usual chain.
-
-- 62 entries are written. An entry the map sets itself takes the lines
-  into its own element, each marked `<!-- classic skins -->`. The others
-  stand in one marked block. A second run changes nothing.
-- `Ultralisk` drops `RequiredAnims` (`index="0" removed="1"`): the skin's
-  entry has none. Not tested in the game.
-- A light is named only when the game has a `CLight` of that id.
-- `CommandCenterRemastered` is in (R-HD-62). The Orbital Command
-  and the Planetary Fortress show the `CommandCenter` model, so they change
-  with it. The classic model has the 34 animation names of the stock one.
-  The hall footprint is measured on the classic model: bones `Leg1..3`,
-  `LegPlate`, `LegPlate2` (SPEC-SCALED-FOOTPRINTS). The foot marks of the
-  Alt+0 paint (`systems/hall_paint`) are still those of the stock model.
-  Whether the blocked cells sit on the classic legs is an operator check
-  (O-HD-6).
-- The SCV is drawn at 200%: `CActorUnit` `SCV` `Scale` 2 (operator
-  2026-11-20; 150% first). Its unit data (radius, speed) is as before.
-- Not in the game data, left out: `CommandCenterDeathUnderConstruction`.
-  `Flags` of the skin's portrait entries are not copied.
-- An injected map holds `.hd_models`: the `Model` each entry of the map's
-  own catalog named before a copy took its place. A second read of the map
-  (`census`, a cache build) puts it back. Without it the classic units
-  resolved to their stock models there.
-- The tool reads the game install. Its result is in `src/` and committed;
-  the build does not read the install.
-- Hit volumes were measured again. Camera heights: Ultralisk 5.1374 to
-  4.8761, Command Center 11.1465 to 14.1710, Orbital Command and Planetary
-  Fortress 2.6539 to 14.1710 (their actors now have the Command
-  Center's scale), SCV 1.0172 to 2.0345.
-- Not known: whether the game shows a skin's model files to a player who
-  does not own the skin. The files are in the game's base archives.
-
-| Requirement | Evidence |
-| --- | --- |
-| R-HD-60 | [host] `tests/models/test_classic_skins.py`: `SwapTest`, `MapDataTest`. [built] the map build resolves the classic files: `hd_textures.py census` lists their textures. Not seen in the game. |
-| R-HD-61 | [host] `MergeTest`. |
-| R-HD-62 | [host] `MapDataTest.test_the_command_center_shows_its_classic_model`; [built] the built `UnitData.xml` links the measured hall footprint. Not seen in the game. |
-| R-HD-63 | [built] census and `verify` output of 2026-11-20. |
-| R-HD-64 | [host] `test_hdtex_models.py` `test_other_formats_small_and_large_files_are_left`. [built] `verify` output of 2026-11-20. The look is O-HD-6. |
-
-## 14. Back Faces
-
-**State: built, not verified in the game.** R-HD-70 to R-HD-72.
-
-The game draws a triangle from its front only. The stock psi destroyer
-(`PsiDisintegratorDoodad.m3`) is made for a camera above it: pipes are open
-tubes, plates have no underside. The third-person camera gets under and
-beside them and sees through.
-
-`scripts/hdtex/model_backfaces.py` runs in the map build (`expand_map.py`). It
-reads the stock model from the game install and writes a changed copy into
-the map at the game's own path, so no catalog changes. The HD step copies
-it from there (section 12, `models.MAP_MARK`).
-
-- Found: the hull is one region of 12800 triangles in 57 connected pieces.
-  54 pieces are open; they have 1250 open edges (edges with one triangle).
-  The other 8 regions are glass and energy effects and are left.
-- Every triangle of a solid, one-sided region (standard material, blend
-  mode opaque, not two-sided) gets a back: a new region with the same
-  triangles, two corners swapped. All 12800, not only those of the open
-  pieces: the camera can also be inside a closed piece.
-- The back stands on copies of the region's vertices (17722 for the hull;
-  the model grows from 19417 to 37139 vertices). A copy keeps position,
-  bones, texture coordinates and tangent. Its normal is negated, so the
-  back is lit as a surface that faces the other way. Its `sign` is negated
-  too: the third axis of the normal map is sign x (normal cross tangent),
-  and so stays where it was.
-- The back shows the texture of the front, seen mirrored (operator
-  2026-11-20: "texture from front of face mirrored on back instead of
-  solid color"). Its material is a copy of the front's material, named
-  with the suffix ` ScobaBackFace`, with all layers kept and two flags
-  added: no shadows cast (a back lies in the plane of its front and would
-  shade it) and no hit test. The HD step patches its texture names like
-  those of any material.
-- Earlier tries. (1) A colour-only diffuse layer, unshaded: in the game
-  the backs were flat bright red, the colour of the owner (operator's
-  screenshot). Assumed cause: a standard material shows the owner's colour
-  where the diffuse texture is transparent, and a layer without a texture
-  counts as transparent. (2) An opaque 16x16 dark gray texture, unshaded:
-  built, replaced by the operator's request before a report from the game.
-- A front and its back are never drawn for the same eye, so they do not
-  fight over depth.
-- Not known: how the engine lights the backs (inside a pipe they may be
-  dark or oddly lit), and whether the front now receives a shadow from
-  geometry it did not before. Not seen in the game.
-
-| Requirement | Evidence |
-| --- | --- |
-| R-HD-70 | [host] `tests/models/test_model_backfaces.py` `BackFaceTest`, `TurnTest`. [built] the model in the built map was read back: 10 regions, the last with 12800 turned triangles on 17722 copied vertices with negated normals and equal texture coordinates; its material names the hull's (HD) diffuse and normal textures. Not seen in the game (O-HD-7). |
-| R-HD-71 | [host] `test_the_faces_the_model_had_are_untouched`, `test_the_material_of_the_front_keeps_its_flags`, `test_only_the_solid_one_sided_region_gets_backs`. |
-| R-HD-72 | [host] `SurveyTest`. [built] the build log line of `PsiDisintegratorDoodad.m3`. |
-
-## 11. Commands
+`scripts/hd_textures.py <command> --game G --dataset D`. Every command
+prints JSON. The viewer's server calls the commands that change
+something. It reads states from the index (4.9) and runs no command to
+show one.
 
 | Command | Does |
 | --- | --- |
-| `uv run python scripts/hd_textures.py list` | Show the files the map resolves to. |
-| `uv run python scripts/hd_textures.py build --gpu 1` | Upscale 4x: extract, upscale, encode, and verify. |
-| `uv run python scripts/hd_textures.py --variant generative build --gpu 1` | The same for Generative 4x. |
-| `uv run python scripts/hd_textures.py [--variant KEY] verify` | Check a variant's cache against its manifest and the limits. |
-| `uv run python scripts/hd_textures.py [--variant KEY] preview` | Write a variant's comparison sheets. |
-| `uv run python scripts/hd_textures.py compare` | Write the web page with every cached source and variant. It prints the path. Images of an unchanged texture are kept. |
-| `cd scripts && uv run python -m hdtex.classic_skins [--list]` | Write the classic skin swaps into the map's `ModelData.xml`, or list them. |
-| `uv run python scripts/hd_textures.py census` | List the textures of the map's models with format, size, slots, and verdict. |
-| `uv run python scripts/hd_textures.py --source models build --gpu 1` | Model textures: extract, upscale, encode at 2048 at most, patch the models, and verify. |
-| `scripts/playtest.sh build` | Build the map with Upscale 4x. |
-| `SC2_HD_TEXTURES=generative scripts/playtest.sh build` | Build the map with Generative 4x. |
-| `SC2_HD_TEXTURES=off scripts/playtest.sh build` | Build the map with the built-in textures. |
+| `status` | the textures with descriptions, variants, requests; the owners with skins and bakes; `gaps` (below) |
+| `index` | brings the dataset's part of the index up to date with its files (4.9). `--asset` also finds the role of those textures. |
+| `upscaler` | the runner's worker command and whether it is idle |
+| `request` | makes one variant: `--asset`, `--input` (a variant id or `original`), `--model`, `--size` |
+| `skin` | `list`, `copy --from S --name N`, `rename --name N --new M` (from `new`: save), `delete` (of `new`: discard), `set --asset A --variant V` (or `--clear`), `upscale --from S --name N --model M --size Z`; each with `--owner O`. `new` is New Skin (4.6). |
+| `bake` | `--owner O --skin N`, or `--asset A --variant V` for a terrain texture |
+| `unbake` | `--owner O`, or `--asset A` |
+| `package` | packages a dataset no build packages (R-HD-106); `gaps` (below) |
 
-Upscaling one 1024x1024 plane on one Arc A770 took about 72 s with `seedvr2`,
-27 s with `pbrify`, and 7 s with `fast`.
+`--layer <folder>` names the dataset's own layer, for a game that takes
+it from the caller. The viewer's server and the map build pass it. A
+refusal prints an object with `error` and ends with exit status 1.
 
-`build --max-size 2048` keeps the files at 2048 per side. `arc-upscale` is
-found next to this project, or at `ARC_UPSCALE`. `make install-hdtex` clones
-`upscale-on-arc` there if it is absent, checks that it holds the pinned commit,
-and runs its `make install` (`scripts/setup/deps.sh upscale`).
+No command takes a tile size, a GPU or a force flag.
 
-`tools/stormex`, used by the extract stage, is built from source by
-`make install-deps` (`scripts/setup/deps.sh stormex`). It is built against
-CascLib `3.0`. That tag holds the StarCraft II Nova Covert Ops keys. The
-earlier build left the six encrypted Nova `unitdata.xml` files empty.
+`gaps` is what the game data leaves out, found by the listings the
+command did: kind -> one line per entry with the reason. Nothing is left
+out without a line; nothing fails for it. A game without such gaps gives `{}`.
+For SC2 (5.1) the kinds are:
+
+| Kind | Found by |
+| --- | --- |
+| actors whose model cannot be read | the owner list: the actor's chain breaks (a parent in no catalog, a token without a value). It owns nothing. Stock: 2, `InfestedColonistTransportNova` and `MilitarizedColonistTransportNova` (parent `Unit`). |
+| names the map shows that have no model | `sc2/shown.py` |
+| terrain fields that cannot be read | the terrain listing |
+| model entries that name no file | the model listing, of every entry |
+| model files the data names that are not there | the model listing, of every entry |
+
+### 4.9 State index
+
+`index.sqlite` in the store, one file for every game and dataset
+(R-HD-113). `core/index.py` knows the file; `core/dataset.py` decides
+what is written. It is a copy: the files of 4.4 and the dataset hold the
+truth, and `index` writes a dataset's part again from them, also when the
+file was removed (R-HD-114).
+
+Every statement on the file is a file of `sql/texture-index/` in the
+repository, one statement per file, named by it; the schema is
+`schema.sql`. `core/queries.py` reads them for the pipeline; the viewer's
+reader reads its own from the same folder. A missing file is an error.
+The host tests' statements are in `sql/texture-index/checks/`. Code holds
+no statement text, except the pragmas and the transaction control.
+
+| Table | One row per | Holds |
+| --- | --- | --- |
+| `dataset` | game and dataset | the sizes, the models, the limits with their bands and info texts |
+| `text` | distinct JSON text | the text once, compressed (zlib); its SHA-256 as the key; how many fields name it |
+| `texture` | game, dataset and asset | the origin, the kind, and as `text` ids: the listing, the description of 4.2, and the state |
+| `original` | game and origin | the hash and the longest side of the original, why its header cannot be read (empty when it can; the side is then 0 and is not a size), and the size and time of its file when they were read |
+| `origin` | game, dataset and asset | the origin of every texture file the dataset can show, listed or not (5.1) |
+| `owner` | game, dataset and owner | its title, its layer, the owners below it, its textures, its skins (with the offered New Skin of 4.6), what it shows now (`shows`: its bake, else the nearest bake below, else `original`) and its bake; its description and state as `text` ids |
+
+The state of a texture is what a reader shows of it, in the shape of
+SPEC-VIEWER 17.2: its variants with input, models, size, numbers,
+problems, stale and accepted; its open requests; the models and sizes a
+request may ask for, with the reason of each refusal; the path and hash
+of each variant file; the terrain bake and whether the package holds its
+file.
+
+| Change | Who writes | Rows written again |
+| --- | --- | --- |
+| a request starts, a job of it starts to run, it encodes, it is done, it fails | the program that runs the request | every `texture` row with that origin, in every dataset |
+| a skin | `skin` | that `owner` row |
+| a bake | `bake`, `unbake` | that `owner` row, or that `texture` row |
+| a package | the package step | the `owner` and `texture` rows of the dataset |
+| the dataset's files or the installed game | `index` | every row of the dataset is worked out; those that differ are written; rows of textures and owners that are gone are removed; the `origin` rows when they differ |
+
+- A state is worked out by `core/view.py` from the row's description,
+  the entries, the skins, the bakes, the package record and the
+  `original` row. It reads no file of a dataset. No row is worked out by
+  a reader.
+- A row of another dataset is written without that dataset's files: its
+  description is in the row, and an origin two datasets share is a file
+  of the game's storage, the same for both.
+- Only `index` adds and removes rows of textures and owners nobody asked
+  for. It is run with the layer the reader shows. A request, a skin or a
+  bake adds the row of its own texture or owner. The package step of the
+  map build has the build folder as its layer: it writes states and no
+  new row.
+- What needs a texture's file is read when the texture is asked for by
+  name, by `index --asset` or a request: a role the listing leaves open,
+  and the size of the original. Until then the state says "not judged"
+  and names no model to ask for. A texture with a variant is read always:
+  whether the variant is stale is a fact of the original.
+- What was read is kept while the game lists the texture as before and
+  the size and time of the original's file are as they were. `index`
+  looks at the file of each kept `original` row and reads it again when
+  it differs; a role read from the old file is dropped.
+- An original whose header cannot be read: the state's `reason` is why
+  ("its original's header cannot be read: ..."), and it asks for no
+  model (`asks` is empty).
+- A skin, a bake and a package read no original that is known.
+- A package writes every row of the dataset again (`changed_all`). A row
+  whose original file is gone since the last `index` is refused, not
+  dropped: "its original cannot be read (...); the index is out of
+  date: run index, then this again". The package itself is written
+  then; the index is not.
+- Once `index` wrote a dataset, a skin or a bake reads the owner and
+  its textures from their rows. It does not list the game's owners or
+  textures: on stock that takes seconds per command. The mark is the
+  `origin` rows, which only `index` writes, with every owner in the same
+  transaction. A row of one owner that a skin wrote before any `index`
+  is no such mark. Before that, the game is listed. A change of the
+  game's files shows in these commands after the next `index`.
+- An open request's state holds the process and its start time
+  (4.7). A reader takes a request whose process is gone as failed. That
+  is the one rule a reader applies.
+- The file is in WAL mode: a reader does not wait for a write. A change
+  is one transaction. A process that ends as the file's last user folds
+  the log into the file and holds the file whole meanwhile. A reader
+  without a busy wait fails then ("database is locked"): measured, 163 of
+  6828 reads beside a writer that opens and closes. A reader sets a busy
+  wait.
+- The file holds a schema number (4). The tooling empties a file with
+  another number; each dataset's part comes back with its next `index`.
+  A reader refuses a file with another number and says so.
+- Schema 4 keeps each JSON text of a `texture` or `owner` row once, in
+  `text`: datasets that share a game hold the same descriptions and
+  states. A field holds the id of its text. A text's count is the number
+  of fields that name it; a write that drops the last one removes the
+  text. A row whose text is as before is not written again. Measured on
+  the three test datasets: 79 MB, against 572 MB with the texts in the
+  rows.
+
+## 5. StarCraft II
+
+`scripts/hdtex/sc2/`. Game id `sc2`. Datasets as in
+[SPEC-VIEWER-SC2](SPEC-VIEWER-SC2.md), section 4. `stock` is the game's
+own data and takes no folder. Any other dataset is that data with a map
+folder on top. The caller names the folder; this code finds none itself.
+
+### 5.1 Textures
+
+| Kind | Found from | Users | Tiles |
+| --- | --- | --- | --- |
+| `terrain` | every `CTerrainTex` of the dataset's catalogs in load order, its own layer last | the terrain sets that name the entry | yes |
+| `model` | every texture a material of a model file names; the files are those of every `CModel` entry of the dataset's catalogs (the game's and the map's own), with variations | the model files | no |
+
+- Every dataset lists every `CModel` of its catalogs, shown or not, so an
+  unplaced unit or doodad has textures and a skin (operator 2026-11-25).
+- What the map shows decides only what the package copies into the map
+  (R-HD-54, 5.2). `stock` shows every `CModel`. A dataset with a map folder
+  shows those the map shows. `sc2/shown.py` reads them from the folder: the
+  doodads and units the map places, the units and actors of its own
+  catalogs, and the model entries its own catalog gives a model file. A
+  placed type, a unit and an actor count with the model of the actor of
+  that name, and with each model the actor's entry in the map's catalog
+  links. A line the pack step wrote does not count.
+- Not found: a unit the map only makes by script and that none of its
+  own catalogs names.
+- An original is read from the dataset's own layer first, then from the
+  game's storage with `tools/stormex` (R-HD-4). Only this code resolves an
+  asset. The index holds the answer for every texture file the dataset
+  can show (4.9); the viewer reads it there (SPEC-VIEWER 17.1).
+- Where the storage holds an asset more than once (H14, R-HD-112): a file
+  at an archive's root or in its `base.sc2assets` wins. Without one, the
+  file in `enus.sc2assets` wins. Among files of one standing the archive
+  loaded last wins, then the path that sorts last. `sc2/storage.py` owns
+  the rule.
+- Roles: `diffuse` (colour, mask in alpha, H4), `normal` (H5), `normal_red`
+  (a normal map with a red channel of its own), `data` (amounts in every
+  channel). A model texture's role comes from the material slots that
+  name it and from its file, so it is found when the texture is asked for.
+- No role, with the reason: a cube map, DXT3, under 32 pixels, a normal
+  layer of a displacement material, a flip book without usable cells,
+  slots that disagree.
+- Model files may read one texture with different flip book cells. The
+  cells most model files use hold. A file that reads it another way, or
+  with unknown cells, is not among its users: the pack step leaves that
+  file on the original. A flip book is without usable cells when no file
+  reads it with known cells, or as many files read it one way as another
+  (R-HD-56). For `scoba`, 5 textures have such files.
+- Codecs: DXT5, and DXT1 without transparent pixels.
+- The textures each model file names are cached by the file's hash. The
+  first list of `stock` took 17773 model files out of the storage in
+  132 s. A later list takes 3 to 12 s.
+- A model file the map build makes itself is read from the built map.
+
+
+Owners (R-HD-130):
+
+- `unit:<id>`: a `CUnit` of the dataset's catalogs, the game's and the
+  map's own, placed or not (operator 2026-11-25). Its actor is the actor
+  of that id, as in `sc2/shown.py`. Its models are that actor's model and
+  each model its lines link: death, placement, portrait, parts.
+- `actor:<id>`: a `CActor` of the dataset's catalogs, the same way. The
+  viewer's doodads are this layer.
+- A unit or actor whose model names no model file is no owner.
+- `model:<asset>`: one model file, with its variations. The viewer's
+  model files are this layer.
+- The textures of an owner are those its model files name, with the
+  flip book rule above. The list is in the `owner` row (4.9).
+
+### 5.2 Package
+
+The map build calls it last, for `scoba`, on the build folder (R-HD-101).
+
+What a model file shows, per texture, is decided by layer: the unit's
+bake, then the actor's, then the model's, then the original (R-HD-131).
+The package writes one copy for each distinct result.
+
+| Bake on | Package writes | Others |
+| --- | --- | --- |
+| `model:<file>` | a copy of the file at `Assets\Models\scoba_hd\<path>`, naming the baked files; every `CModel` that shows the file points at the copy (R-HD-143) | every unit and actor that shows the file shows the bake |
+| `actor:<id>` | for the `CModel` of the actor's `Model` field, when its textures differ from what the model layer shows: a copy of each of its files at `Assets\Models\scoba_hd\<actor>\<file>`, and a new `CModel` `<CModel>_hd_<actor>` whose parent is the old entry and whose `Model` is the copy; the actor's `Model` names the new entry (R-HD-142) | other actors keep the old entry |
+| `unit:<id>` | the same for the unit's actor, the actor of the unit's id, with the unit's bake over the actor's: entry `<CModel>_hd_<actor>` (R-HD-141) | other actors and units keep their entries |
+
+- Placed instances name the unit or doodad type, so they show its bake.
+- [plan] An actor that serves more than one unit is not copied apart: a
+  unit bake changes that actor for every unit that has it. Models the
+  actor names in its event lines (death, placement, portrait) keep what
+  the model layer shows (R-HD-144).
+- A copy for an actor lies in a folder of the actor's name, so two copies
+  may share a file name. `sc2/check.py` reads those folders too.
+- A baked variant that no catalog line and no model copy names is not
+  packaged, and the log says so: an actor's bake under its unit's
+  `original` is one.
+- A packaged texture is `Assets\Textures\scoba_hd\<stem>_scoba_hd.<ext>`.
+  The mark is needed: the game sizes a texture by its file name (H7, H9).
+  A texture only model files name is `<stem>_scoba_hd_m.<ext>`. Where the
+  bakes of a dataset name more than one variant of a texture, the one the
+  model layer names keeps that name; each other is
+  `<stem>_scoba_hd_<h>_m.<ext>`, `<h>` the first 6 hex digits of the
+  hash of its variant id.
+- The mark stands at the end. A `CModel` finds its texture slots by the
+  start of a file name and by words inside it (H13). A mark in front made
+  the game lose the slot of the Goliath copy (run `tps/20261124-185130`).
+- A packaged file keeps the file name as the catalog spells it: a terrain
+  texture that of its catalog field, a model copy that of its `CModel`.
+  `validate_slow_deaths.py` names model copies that way.
+- A texture the terrain and a model file both name is a terrain texture.
+  It is packaged once, and the model's copy names that file.
+- Each baked file is copied after a hash check.
+- Terrain: each terrain bake sets the entry's `Texture` or `Normalmap` in
+  the map's `TerrainTexData.xml` (R-HD-145). What the file holds is kept.
+- Each model copy is changed to name the packaged files, read back and
+  compared. All files of a `CModel` are copied: variations share a base
+  path (R-HD-54).
+- The package record lists each packaged asset with its owner, skin,
+  variant, path and hash, and the bakes nothing uses (R-HD-103, R-HD-105).
+- A bake of a missing or stale variant, or of a problem not accepted,
+  fails the build. The message names the texture and the command
+  (R-HD-102).
+- With no bake, it says so and copies nothing (R-HD-22).
+- Unknown engine facts (E-1, E-2, section 8): whether a `CModel` entry the
+  map makes, with the fields of a stock one, shows as the stock one; and
+  whether an actor copy with the unit's events replaces the stock actor
+  for that unit. Both are checked in the game before a unit or actor bake
+  is reported as working.
+
+`sc2/packaged.py` owns what the pack step writes into a map folder, and
+the reading of that folder without it.
+
+- Every catalog line that names a packaged file or a made entry is set
+  through it. It notes in the folder's `.hd_prior` what each line
+  replaced: the value that stood there, or that the field was absent, or
+  that the entry was made, or that the catalog file was made.
+- A catalog of a packaged folder is read as it was before from that note
+  alone. Nothing is guessed from file names. Layout and comments of a
+  catalog the step wrote are not kept.
+- A folder is packaged once. A second package is refused.
+- A catalog line that names a packaged file and is not in the note is
+  refused, with the advice to build the map again.
+- The texture pipeline lists a dataset from the folder as it was before.
+  So does the hit volume data (`hitvolumes/resolve.py`,
+  `hitvolumes/fresh.py`): `scripts/data/hit_volumes.json` names the
+  original models, and a bake does not make it stale.
+
+`validate-map.py` reads the built map only. It fails when a catalog names
+a packaged file that is absent, a packaged file is named by nothing, a
+packaged file lacks the prefix, a packaged texture has a side that is
+not a power of two, a short mip chain, or more than 16 bytes after the
+last mip, or a catalog does not read back through the note.
+
+A partly upscaled terrain mixes sharp and soft ground. So when one
+terrain texture the map paints with is baked, each of them must be,
+colour and normal map (R-HD-104). `sc2/check.py` owns the rule. The pack
+step asks it before a file is written and names what is missing;
+`validate-map.py` asks it of the built map. A terrain texture the map
+does not paint with is outside the rule.
+
+A build check that demands a model the build makes itself (a slow death,
+a slow simulation, fast clips) accepts the packaged copy of that model by
+its file name. For a slow simulation and for fast clips it checks the
+copy as well: the game shows the copy (`validate_slow_deaths.py`).
+
+The log checks fail on a texture warning in a new `Graphics.txt` (H9).
+
+## 6. Second Game
+
+Not built (R-HD-111). It takes an adapter under `scripts/hdtex/<game>/`, a
+codec for each format the core lacks, and one registration line. No core
+file changes.
+
+## 7. Requirement State
+
+The host tests are in `scripts/testkit/tests/textures/`. A row names the
+files that hold the tests of its requirements; it does not say that every
+sentence of a requirement has a test. Rows of 2026-11-24 before variants
+passed on that day.
+
+| ID | State | Backing |
+| --- | --- | --- |
+| R-HD-1, 2 | [host] | `test_sc2_check.py` (`MapSourceTest`, `BuiltMapTest`); the build of 2026-11-24 |
+| R-HD-3, 4, 112 | [host] | `test_sc2_game.py`, `test_sc2_sources.py` (`ArchiveTest`) |
+| R-HD-113, 114 | [host] for textures; [plan] for owners, skins, bakes | `test_index.py` |
+| R-HD-5, 6 | [host] | `test_runner.py`, `test_arc_queue.py`, `test_requests.py`; no request has run on the real GPU queue |
+| R-HD-10 to 13, 52, 91 | [host] | `test_codec.py`, `test_encode.py` |
+| R-HD-90 | [plan] | problems no longer hide; bake refusal |
+| R-HD-53, 56 | [host] | `test_sc2_sources.py` (`RoleTest`), `test_sc2_game.py` (`ModelTest`), `test_steps.py` |
+| R-HD-120 to 124 | [host] for ids, models per plane, sizes, refusals; [plan] for the viewer | `test_variants.py`, run 2026-11-25 |
+| R-HD-85 to 88 | [host] for results; [plan] for variants | `test_store.py`, `test_dataset.py` |
+| R-HD-130 to 133, 135, 136 | [host] for the skin and bake files and skin changes; [plan] for the viewer | `test_skins.py`, run 2026-11-25 |
+| R-HD-134 | [plan] | skin upscale has no host test; the refusal while `new` is stored is in `test_skins.py` |
+| R-HD-137 | [plan] until `test_skins.py` and `test_dataset.py` pass on New Skin | New Skin and its offer, 2026-11-25 |
+| R-HD-97 to 100 | [host] for chains; [plan] for variant ids | `test_requests.py`, `test_arc_queue.py`; R-HD-98 on GPU 1 is not run |
+| R-HD-140 to 143 | [host] for what the package writes; not in game | `test_sc2_owners.py`, run 2026-11-25; E-1, E-2 need a game run |
+| R-HD-144 | [plan] | event-line models are not copied (section 5.2) |
+| R-HD-145 | [host] | `test_sc2_game.py` (`PackageTest`, terrain tests) |
+| R-HD-101 to 106, 54, 22 | [host] for picks; [plan] for bakes | `test_package.py`, `test_sc2_game.py` (`PackageTest`), `test_sc2_packaged.py`, `test_cli.py`, `test_sc2_check.py` (`BuiltMapTest`) |
+| R-HD-24 | [host] | `test_sc2_check.py` (`CheckTest`) |
+| R-HD-21, 55 | [boot] | run `tps/20261124-220055`, picks; not run with bakes |
+| R-HD-107 to 111 | [host] | `test_registry.py`, `doubles.py`: a second game, a second format, a stand-in upscaler |
+| R-HD-60 to 65 | section 12 | |
+| R-HD-70 to 72 | section 13 | |
+
+## 8. Open Points
+
+| ID | Point |
+| --- | --- |
+| E-1 | Not known: whether a `CModel` entry the map makes, holding every field of a stock entry, shows in the game as the stock one does (5.2). A game run decides it. |
+| E-2 | Not known: whether an actor copy with a unit's events, with those events taken from the stock actor, shows that unit and no other (5.2). A game run decides it. |
+| O-HDS-2 | The results taken in from the old caches name the upscaler version of those caches. Whether the tool's current version gives the same pixels is not compared. A result is made again only when its original changes. |
+| O-HDS-4 | 18 model textures of today's map miss a limit and are packaged as accepted. Whether each should be made again or go back to its original is not decided. |
+| O-HDS-5 | The map shows 201 model entries; 159 of them name a picked texture. Their 287 model copies take 76 MB. The map of the variant code held 167 copies of 44 entries, 19 MB; its folder was 1134 MB and is 1186 MB now. The package step takes 18 s of the build. Whether the larger map costs load time or memory in the game is not measured. |
+| O-HDS-6 | Whether the game loads a 4096 texture named by a model file is not known. The terrain ones load (H11). |
+| O-HDS-8 | Why GPU 0 stalls on a SeedVR2 tile that fills it is not known. GPU 1 reports "out of memory" for the same tile, also while another process holds 1.3 GiB there. The tool's watch ends the stall; it does not explain it. |
+| O-HDS-9 | Two requests that ask for one plane in the same instant may both submit it. The plane is then upscaled twice, with the same pixels. No lock prevents it. |
+| O-HDS-12 | Which asset folder the running game reads is not checked: whether `teen.sc2assets` ever wins over `base.sc2assets`, and which language folder an install of another language reads. The rule of 5.1 names `enus` in the code. |
+| O-HDS-13 | `newgoosculpted_diffuseblood.dds` misses the correlation limit with Upscale 4x (0.477) and with Soft 4x (0.447), so the build packages its original. Whether another model reaches the limit is not tried. |
+| O-HDS-14 | Three items of an audit of 2026-11-24 were kept in session notes only and are lost but for their titles: "encode profile", "intermediate sizes", "batch `judge`". What each asked for is not known. |
+| O-HDS-11 | The waterfall model `ZerusWaterfall` names the terrain texture `zerus_4`. It now shows the terrain's pick of it (Soft 4x at 4096). The map of the variant code gave the model a file of its own (Upscale 4x at 2048). Not seen in the game. |
+
+## 9. Not Tested
+
+- That the game shows the largest level of a packaged file on screen.
+- That the game shows a packaged model copy, and takes a model override
+  with variations below a new base path.
+- Memory use and frame rate with packaged files.
+- Texture quality settings other than the test machine's.
+
+## 10. Runs
+
+Launches 1 to 4 and the model launch are with the code of 2026-11-15.
+
+| Name | What | Result |
+| --- | --- | --- |
+| Launch 1 | `launch-check`, files named like the originals | 16 texture warnings (H9) |
+| Launch 2 | `launch-check`, files with the prefix | stamp matched, no script error, no texture warning |
+| Launch 3 | the Generative 4x variant: `host-tests`, `launch-check` | 215 host tests passed; clean log |
+| Launch 4 | the Upscale 4x variant, the same | the same |
+| Model launch | 2026-11-20, doodads, Command Center, psi destroyer | no texture warning; not launched with the later units |
+| `tps/20261124-185130` | the store's package, mark in front of the name | failures 0, but the Goliath copy lost its slot `main` (H13); the log check did not fail on it then |
+
+One 1024x1024 plane on one Arc A770 took about 72 s with `seedvr2`, 27 s
+with `pbrify`, 7 s with `fast`.
+
+## 11. Setup
+
+- `make install-hdtex` clones `upscale-on-arc` next to this project if
+  absent, checks its pinned commit, and installs it. The pin must hold the
+  tool's queue with job names, its worker list, its stall watch and its
+  stand-in worker.
+- The host tests run the tool's submit, queue and worker commands with a
+  stand-in model and no GPU, on a queue of their own. They need the tool
+  installed.
+- `make install-deps` builds `tools/stormex` against CascLib `3.0`, which
+  holds the Nova Covert Ops keys.
+- Paths come from SPEC-PATHS. The store, the old caches (`SC2_BUILD/hdtex`)
+  and the hdbake test copy (`SC2_TESTKIT/hdbake`) are below `SC2_WORK`, on
+  the fast disk. The hdbake copy hard-links the store's planes, upscaled
+  files, variants and index, so it writes no file data; it copies the index
+  database and the datasets, which the bake changes. A file the bake makes
+  lands in the copy only.
+- `make classic-skins` runs section 12's tool.
+
+## 12. Classic Skins
+
+**Built, not seen in the game.** R-HD-60 to 62, R-HD-65.
+
+- The game swaps a skin in by model entry: a `CSkin` lists pairs of
+  `CModel` ids. `classic_skins.py` reads the pairs from the game data and
+  writes them into the map's `ModelData.xml`: each From entry takes the
+  fields of its To entry that differ, and keeps its id.
+- So the map's own fields stay (R-HD-61), and hit volumes, camera heights
+  and packaged textures find the classic model by the usual chain.
+- 62 entries are written. A second run changes nothing.
+- The Orbital Command and the Planetary Fortress show the Command Center's
+  model and change with it. The hall footprint is measured on the classic
+  model (SPEC-SCALED-FOOTPRINTS).
+- The SCV is drawn at 200%: its actor's `Scale` is 2. Its unit data is
+  unchanged.
+- `Ultralisk` drops `RequiredAnims`, as the skin's entry has none.
+- Left out: `CommandCenterDeathUnderConstruction` (not in the game data),
+  and `Flags` of portrait entries. `--list` prints each pair left out.
+- A field with a `##token##` no entry of its chain gives a value is open
+  in the game data. It is kept as written and `--list` prints it: 10
+  ragdoll `LowQualityModel` fields hold `##low##`, on both sides of their
+  pair, so they are no change. Every other catalog error stops the tool.
+  So does a catalog text that is not XML or not UTF-8: none of the 1097
+  texts is either.
+- A packaged map holds `.hd_prior`: what each catalog line named before
+  the pack step set it (section 5.2). A read of the map puts it back.
+- The tool reads the game install. Its result is committed in `src/`; the
+  build does not read the install.
+- Camera heights after the swap: Ultralisk 4.8761, Command Center and its
+  forms 14.1710, SCV 2.0345.
+- Not known: whether a player who does not own a skin sees its models.
+
+Backing: [host] `test_classic_skins.py` (`SwapTest`, `MapDataTest`,
+`MergeTest`). The look is O-HD-6.
+
+## 13. Back Faces
+
+**Built, not seen in the game.** R-HD-70 to 72.
+
+- The game draws a triangle from its front only. The psi destroyer is made
+  for a camera above it: pipes are open tubes, plates have no underside.
+- `model_backfaces.py` runs in the map build. It writes a changed copy of
+  the model at the game's own path, so no catalog changes.
+- The hull is one region of 12800 triangles in 57 pieces. 54 are open,
+  with 1250 open edges. The other 8 regions are glass and energy and are
+  left (R-HD-71).
+- Every triangle of a solid, one-sided region gets a back: the same
+  triangle with two corners swapped, on copied vertices with negated
+  normals. The model grows from 19417 to 37139 vertices.
+- The back shows the front's texture, mirrored. Its material is a copy of
+  the front's with two flags added: no shadows cast, no hit test.
+- A front and its back are never drawn for the same eye.
+- Not known: how the engine lights the backs, and whether fronts now
+  receive new shadows.
+
+Backing: [host] `test_model_backfaces.py`. [built] the model in the built
+map was read back with those counts. The look is O-HD-7.

@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-
+import workpaths
 from flora import terrain as terrain_mod
 from project_root import project_root
 from terrain import sync_height
@@ -25,11 +25,19 @@ from terrain import sync_height
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .bank_checks import _report
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
-POINTS_GALAXY = ROOT / "out" / "testkit" / "ground" / "ground_points.galaxy"
+
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
+def points_galaxy_path():
+    return workpaths.path("SC2_TESTKIT") / "ground" / "ground_points.galaxy"
+
+
 STEP = 16
 EDGE = 16
 SPOTS = 3  # highest and lowest pathable spots each
@@ -46,7 +54,7 @@ def grid_points() -> list[tuple[float, float]]:
 
 def spots() -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
     """Highest and lowest pathable dry cell centres, apart from each other."""
-    t = terrain_mod.load(BUILT)
+    t = terrain_mod.load(built_path())
     n = t.height.shape[0]
     cells = [
         (float(t.height[y, x]), x + 0.5, y + 0.5)
@@ -87,15 +95,15 @@ def points_galaxy() -> str:
 
 
 def map_spec() -> TestMapSpec:
-    POINTS_GALAXY.parent.mkdir(parents=True, exist_ok=True)
-    POINTS_GALAXY.write_text(points_galaxy(), encoding="utf-8")
+    points_galaxy_path().parent.mkdir(parents=True, exist_ok=True)
+    points_galaxy_path().write_text(points_galaxy(), encoding="utf-8")
     galaxy = ROOT / "scripts" / "testkit" / "galaxy"
     return TestMapSpec(
         profile="ground",
-        source=BUILT,
-        output=PROFILE_OUTPUTS["ground"],
+        source=built_path(),
+        output=profile_output("ground"),
         bank_names=PROFILE_BANKS["ground"],
-        galaxy_files=(galaxy / "common.galaxy", galaxy / "ground.galaxy", POINTS_GALAXY),
+        galaxy_files=(galaxy / "common.galaxy", galaxy / "ground.galaxy", points_galaxy_path()),
         galaxy_includes=("scripts/test/ground/common", "scripts/test/ground/ground", "scripts/test/ground/ground_points"),
         init_calls=("gt_GroundTest_Init();",),
     )
@@ -116,8 +124,8 @@ def check(ctx, data: dict, checks) -> None:
         checks.failures += 1
     checks.eq("meta", "", "done", 1)
     checks.eq("meta", "", "realClicks", 0)
-    vz = sync_height.vertex_z(BUILT)
-    sync = (BUILT / "t3SyncHeightMap").exists()
+    vz = sync_height.vertex_z(built_path())
+    sync = (built_path() / "t3SyncHeightMap").exists()
     _report(checks, "built map has t3SyncHeightMap", sync, f"exists={sync}")
 
     host, eng, air = [], [], []
@@ -178,7 +186,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="ground",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["ground"],
+        map_source=profile_output("ground"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["ground"],
         ready_section="meta",

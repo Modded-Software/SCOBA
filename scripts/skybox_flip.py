@@ -18,6 +18,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import workpaths
 from character_anim_assets import extract_model
 from project_root import project_root
 
@@ -28,7 +29,11 @@ import m3
 
 MARKER = ".skybox_flip"
 MARKER_VERSION = "4\n"  # 4: sky grown x8; 2: y axis (1 was z)
-EXTRACT_ROOT = Path("/mnt/ws-fast/sc2res/tmp")  # operator: extract into ws-fast
+
+
+def extract_root():  # operator: extract into ws-fast (SPEC-PATHS)
+    return workpaths.path("SC2_TMP")
+
 
 # (CASC entry, target in the map). The CModel ids live in src ModelData.xml.
 FLIPS = (
@@ -140,8 +145,8 @@ def generate(root: Path, force: bool) -> None:
     marker = root / MARKER
     if marker.exists() and not force and marker.read_text() == MARKER_VERSION:
         return
-    EXTRACT_ROOT.mkdir(parents=True, exist_ok=True)
-    temp_root = Path(tempfile.mkdtemp(prefix="skyflip-", dir=EXTRACT_ROOT))
+    extract_root().mkdir(parents=True, exist_ok=True)
+    temp_root = Path(tempfile.mkdtemp(prefix="skyflip-", dir=extract_root()))
     try:
         for entry, target in FLIPS:
             source = extract_model(entry, temp_root)

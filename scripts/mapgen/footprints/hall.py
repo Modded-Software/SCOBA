@@ -39,7 +39,8 @@ def actor_scale(actor_text: str, actor: str) -> float:
     found = entry.findall(actor_text)
     if len(found) > 1:
         raise ValueError(f"ActorData.xml has {len(found)} CActorUnit {actor} entries")
-    scale = re.search(r'<Scale value="([^"]+)"/>', found[0]) if found else None
+    # `\s*`: the HD pack step writes the catalog again with ElementTree, which spells `" />`.
+    scale = re.search(r'<Scale\s+value="([^"]+)"\s*/>', found[0]) if found else None
     if scale is None:
         return 1.0
     parts = [float(v) for v in scale.group(1).split(",")]

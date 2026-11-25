@@ -27,10 +27,10 @@ APPS_DIR="$HOME/.local/share/applications"
 DESKTOP_FILE="$APPS_DIR/$APP_ID"
 LAUNCHER="$ROOT_DIR/scripts/launch-editor.sh"
 
-BNET_PREFIX="${BNET_PREFIX:-$HOME/Games/battlenet-prefix}"
-SC2_DIR="${SC2_DIR:-$BNET_PREFIX/pfx/drive_c/Program Files (x86)/StarCraft II}"
+# shellcheck source=paths.sh
+source "$ROOT_DIR/scripts/paths.sh" || exit 1
 # The icon comes from the installed editor. It is not stored in the repository.
-ICON_EXE="$SC2_DIR/StarCraft II Editor_x64.exe"
+ICON_EXE="$SC2_INSTALL/StarCraft II Editor_x64.exe"
 ICON_GROUP=101
 
 log() {
@@ -56,7 +56,7 @@ if ! output="$(DRY_RUN=1 SC2_PROJECT_ROOT="$ROOT_DIR" bash "$LAUNCHER" 2>&1)"; t
     fail "launcher dry run failed: $output"
 fi
 
-WORK_DIR="$(mktemp -d)"
+WORK_DIR="$(mktemp -d -p "$SC2_TMP")"
 cleanup() {
     rm -rf "$WORK_DIR"
 }

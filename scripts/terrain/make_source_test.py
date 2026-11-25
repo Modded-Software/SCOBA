@@ -1,14 +1,19 @@
-from pathlib import Path
 import os
-import sys
 import shutil
+import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
 SRC = ROOT / "src" / "SCOBA.SC2Map"
-DST = ROOT / "out" / "SCOBA128TEST.SC2Map"
+
+
+def dst():
+    return workpaths.path("SC2_OUT") / "SCOBA128TEST.SC2Map"
+
 
 HARNESS = '''void gf_DbgLogUnit (bank lp_bank, string lp_section, unit lp_unit) {
     if (UnitIsValid(lp_unit)) {
@@ -56,10 +61,10 @@ void gt_DbgTest_Init () {
 
 
 def main() -> int:
-    if DST.exists():
-        shutil.rmtree(DST)
-    shutil.copytree(SRC, DST)
-    script = DST / "MapScript.galaxy"
+    if dst().exists():
+        shutil.rmtree(dst())
+    shutil.copytree(SRC, dst())
+    script = dst() / "MapScript.galaxy"
     text = script.read_text(encoding="utf-8")
     anchor = 'include "scripts/main"'
     assert anchor in text
@@ -74,9 +79,9 @@ def main() -> int:
     assert line in text
     text = text.replace(line, line + "\n    gt_DbgTest_Init();", 1)
     script.write_text(text, encoding="utf-8")
-    banklist = ROOT / "out" / "SCOBA256.SC2Map" / "BankList.xml"
-    shutil.copyfile(banklist, DST / "BankList.xml")
-    print("built", DST)
+    banklist = workpaths.path("SC2_BUILT_MAP") / "BankList.xml"
+    shutil.copyfile(banklist, dst() / "BankList.xml")
+    print("built", dst())
     return 0
 
 

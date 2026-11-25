@@ -4,10 +4,25 @@ import math
 import unittest
 from types import SimpleNamespace
 
+import workpaths
 from project_root import project_root
-from skybox_flip import AXIS, FLIPS, SD3V_KIND, SD4Q_KIND, flip_model, half_turn_quat, half_turn_vec
+from skybox_flip import (
+    AXIS,
+    FLIPS,
+    SD3V_KIND,
+    SD4Q_KIND,
+    flip_model,
+    half_turn_quat,
+    half_turn_vec,
+)
 
-MAP = project_root() / "out" / "SCOBA256.SC2Map"
+from testkit.tests.built_map import needs_built
+
+
+def map_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 ROOT_ROT_ID = 0x10
 ROOT_LOC_ID = 0x11
 CHILD_ROT_ID = 0x20
@@ -138,7 +153,7 @@ class FlipTest(unittest.TestCase):
 
 
 class BuiltSkyTest(unittest.TestCase):
-    @unittest.skipUnless(MAP.is_dir(), "built map is absent")
+    @needs_built()
     def test_built_sky_root_is_half_turned(self) -> None:
         import sys
 
@@ -146,7 +161,7 @@ class BuiltSkyTest(unittest.TestCase):
         import m3
 
         for _entry, target in FLIPS:
-            model = m3.loadModel(str(MAP / target))
+            model = m3.loadModel(str(map_path() / target))
             roots = [b for b in model.bones if b.parent == -1]
             self.assertEqual(len(roots), 1)
             q = roots[0].rotation.initValue

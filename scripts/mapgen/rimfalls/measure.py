@@ -7,12 +7,14 @@ for, and where its streams land.
 
 The result is committed, so the build never reads the models.
 
-usage: PYTHONPATH=scripts uv run python -m mapgen.rimfalls.measure
+usage: make measure-rim-falls
 """
 
 from __future__ import annotations
 
 import json
+
+import workpaths
 
 from mapgen.waterfeatures import measure as water_measure
 
@@ -20,7 +22,7 @@ from . import config, models
 
 
 def measure() -> dict:
-    files = water_measure.stock_files(config.ROCK_FALL, water_measure.ROOT / "out" / "testkit" / "water_models")
+    files = water_measure.stock_files(config.ROCK_FALL, workpaths.path("SC2_TESTKIT") / "water_models")
     return {"falls": {config.ROCK_FALL: {str(v): water_measure.fall(p) for v, p in sorted(files.items())}}}
 
 

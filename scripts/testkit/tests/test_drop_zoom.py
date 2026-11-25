@@ -11,13 +11,21 @@ import re
 import unittest
 import xml.etree.ElementTree as ET
 
+import workpaths
 from flora import terrain as terrain_mod
 from hitvolumes import intro_shots as S
 from hitvolumes import pod_birth
 from project_root import project_root
 
+from testkit.tests.built_map import needs_built
+
 SCRIPTS = project_root() / "src" / "SCOBA.SC2Map" / "scripts" / "app"
-BUILT = project_root() / "out" / "SCOBA256.SC2Map"
+
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 # The Terran lane spawn regions (app/init: gv_sPAWNLOCATIONS[1..3]).
 LANE_REGIONS = ("1", "3", "4")
 SAMPLES = 41
@@ -109,12 +117,13 @@ class ZoomTest(unittest.TestCase):
         self.assertNotIn("C", S.EASES)
 
 
-@unittest.skipUnless((BUILT / "t3HeightMap").is_file() and (BUILT / "Regions").is_file(), "needs the built map (scripts/playtest.sh build)")
+@needs_built("t3HeightMap")
+@needs_built("Regions")
 class ZoomTerrainTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.t = terrain_mod.load(BUILT)
-        root = ET.parse(BUILT / "Regions").getroot()
+        cls.t = terrain_mod.load(built_path())
+        root = ET.parse(built_path() / "Regions").getroot()
         cls.regions = {}
         for region in root.iter("region"):
             if region.get("id") in LANE_REGIONS:

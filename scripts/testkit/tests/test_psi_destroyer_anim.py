@@ -5,7 +5,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from project_root import project_root
+import workpaths
 from mapgen.spore_scale import (
     DEFAULT_ANIM_SPEED,
     PSI_DESTROYER_ANIM_MARKER,
@@ -14,11 +14,18 @@ from mapgen.spore_scale import (
     slow_model_animations,
     slow_psi_destroyer_animations,
 )
+from project_root import project_root
+
+from testkit.tests.built_map import needs_built
 
 ROOT = project_root()
 MODEL_DATA = Path("Base.SC2Data") / "GameData" / "ModelData.xml"
 SRC_MODELS = ROOT / "src" / "SCOBA.SC2Map" / MODEL_DATA
-BUILT_MODELS = ROOT / "out" / "SCOBA256.SC2Map" / MODEL_DATA
+
+
+def built_models():
+    return workpaths.path("SC2_BUILT_MAP") / MODEL_DATA
+
 
 MODELS = """<?xml version="1.0" encoding="us-ascii"?>
 <Catalog>
@@ -141,20 +148,20 @@ class SlowPsiDestroyerTest(unittest.TestCase):
 
 
 class BuiltMapTest(unittest.TestCase):
-    @unittest.skipUnless(BUILT_MODELS.is_file(), "built map is absent")
+    @needs_built(*MODEL_DATA.parts)
     def test_built_speed_is_source_speed_over_slowdown(self) -> None:
         source = anim_speeds(SRC_MODELS.read_text(encoding="ascii"))
-        built = anim_speeds(BUILT_MODELS.read_text(encoding="ascii"))
+        built = anim_speeds(built_models().read_text(encoding="ascii"))
         for model_id in PSI_DESTROYER_MODELS:
             before = source.get(model_id)
             if before is None:
                 before = DEFAULT_ANIM_SPEED
             self.assertEqual(built[model_id], before / PSI_DESTROYER_ANIM_SLOWDOWN, model_id)
 
-    @unittest.skipUnless(BUILT_MODELS.is_file(), "built map is absent")
+    @needs_built(*MODEL_DATA.parts)
     def test_built_models_outside_the_step_keep_source_speed(self) -> None:
         source = anim_speeds(SRC_MODELS.read_text(encoding="ascii"))
-        built = anim_speeds(BUILT_MODELS.read_text(encoding="ascii"))
+        built = anim_speeds(built_models().read_text(encoding="ascii"))
         checked = 0
         for model_id, speed in source.items():
             if model_id in PSI_DESTROYER_MODELS:

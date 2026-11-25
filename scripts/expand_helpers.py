@@ -7,15 +7,16 @@ import struct
 import subprocess
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 SCALE = 2
 # Map audio (operator 2026-11-18): res/audio/*.wav goes to Assets\Sounds as
 # Ogg Vorbis, the stock music format (and a tenth of the size). The encode is
-# cached under out/audio and redone when the wav is newer.
+# cached under SC2_OUT/audio (SPEC-PATHS) and redone when the wav is newer.
 AUDIO_SRC = Path("res") / "audio"
 AUDIO_DST = Path("Assets") / "Sounds"
-AUDIO_CACHE = Path("out") / "audio"
+AUDIO_CACHE = "audio"
 
 
 def read(path: Path) -> bytes:
@@ -134,8 +135,9 @@ def import_audio(dst: Path, force: bool) -> None:
     if not files:
         raise SystemExit(f"no audio in {root / AUDIO_SRC}")
     (dst / AUDIO_DST).mkdir(parents=True, exist_ok=True)
+    cache = workpaths.path("SC2_OUT") / AUDIO_CACHE
     for wav in files:
-        ogg = root / AUDIO_CACHE / (wav.stem + ".ogg")
+        ogg = cache / (wav.stem + ".ogg")
         if force or not ogg.is_file() or ogg.stat().st_mtime < wav.stat().st_mtime:
             encode_ogg(wav, ogg)
         shutil.copy2(ogg, dst / AUDIO_DST / ogg.name)

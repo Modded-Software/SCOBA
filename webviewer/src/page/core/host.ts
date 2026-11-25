@@ -1,5 +1,5 @@
-// The renderer, the two scenes and the camera rig (the old js/core.js,
-// without the status toast, which is page/ui/status.ts). The frame adds
+// The renderer, the two scenes and the camera rig (the status toast is
+// page/ui/status.ts). The frame adds
 // the draw to this to make the RenderHost (core/context.ts).
 
 import { vec3 } from 'gl-matrix';

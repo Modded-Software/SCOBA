@@ -1,7 +1,7 @@
 From dfa4f65218ab77f9d29cb99366a9279216246012 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 14:20:15 +0200
-Subject: [PATCH 13/56] m3: texture coordinates use the region's uvwMult and
+Subject: [PATCH 13/57] m3: texture coordinates use the region's uvwMult and
  uvwOffset (REGN v5)
 
 ---

@@ -11,11 +11,11 @@ from __future__ import annotations
 
 from functools import cache
 
+import workpaths
 from mapgen import player_slots
 from mapgen.footprints import config as footprint_config
 from mapgen.footprints.hall import Hall, hall_footprint_id, hall_scale, hall_shape
 from mapgen.footprints.slices import load_slices
-from project_root import project_root
 
 GRID = 18                 # c_BH_SUB: 36x36 sub-cells of 0.5 (9 cells each way)
 LEGS = 4                  # leg centres probed with a Barracks
@@ -40,7 +40,7 @@ def _ok(checks, s: str, name: str, ok: bool, detail: str) -> None:
 @cache
 def hall_rows() -> Hall:
     """The CC rows the build generates, at the built map's drawn scale."""
-    actors = project_root() / "out" / "SCOBA256.SC2Map" / "Base.SC2Data" / "GameData" / "ActorData.xml"
+    actors = workpaths.path("SC2_BUILT_MAP") / "Base.SC2Data" / "GameData" / "ActorData.xml"
     data = load_slices()
     return hall_shape(data, HALL_MODEL, hall_scale(data, actors.read_text(encoding="utf-8"), HALL_MODEL, HALL_MODEL))
 

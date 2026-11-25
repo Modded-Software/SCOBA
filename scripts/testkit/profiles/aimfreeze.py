@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import time
+from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..framelog import parse_section
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 PITCH_TIME_MS = 10000.0
@@ -39,8 +40,8 @@ def clip_step(text: str) -> int | None:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="aimfreeze",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["aimfreeze"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("aimfreeze"),
         bank_names=PROFILE_BANKS["aimfreeze"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -128,7 +129,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="aimfreeze",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["aimfreeze"],
+        map_source=profile_output("aimfreeze"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["aimfreeze"],
         ready_section="freeze",

@@ -23,9 +23,28 @@ void gf_DbgCamSnap (string lp_s) {
 }
 
 void gf_DbgCamHeightGroup () {
-    // Unit: an invalid unit falls back to the reference (Tosh) values.
-    BankValueSetFromInt(gv_dbgBank, "cam_null", "offset1000", FixedToInt(gf_CameraTargetOffset(null) * 1000.0));
-    BankValueSetFromInt(gv_dbgBank, "cam_null", "arm1000", FixedToInt(gf_CameraArm(null) * 1000.0));
+    unit lv_spawned;
+    string lv_key;
+    fixed lv_height;
+
+    // Unit: a height is known only of a unit whose type has a row. No unit
+    // and a type without a row are defects; gf_CameraUnitHeight stops on
+    // them, so this asks gf_CameraHeightKnown and never the height itself.
+    gf_DbgReset("cam_known", false, true);
+    lv_spawned = gf_DbgSpawnOne("cam_known", 6.0, 100.0);
+    lv_key = "CAMH_" + UnitGetType(lv_spawned);
+    BankValueSetFromFlag(gv_dbgBank, "cam_known", "nullKnown", gf_CameraHeightKnown(null));
+    BankValueSetFromFlag(gv_dbgBank, "cam_known", "heroKnown", gf_CameraHeightKnown(gv_tPSUNIT[1]));
+    BankValueSetFromFlag(gv_dbgBank, "cam_known", "spawnKnown", gf_CameraHeightKnown(lv_spawned));
+    lv_height = DataTableGetFixed(true, lv_key);
+    BankValueSetFromInt(gv_dbgBank, "cam_known", "spawnHeight1000", FixedToInt(lv_height * 1000.0));
+    // The row taken away: the same unit is no longer known. Put back after.
+    DataTableValueRemove(true, lv_key);
+    BankValueSetFromFlag(gv_dbgBank, "cam_known", "rowlessKnown", gf_CameraHeightKnown(lv_spawned));
+    gf_CamHeightType(UnitGetType(lv_spawned), lv_height);
+    BankValueSetFromFlag(gv_dbgBank, "cam_known", "restoredKnown", gf_CameraHeightKnown(lv_spawned));
+    BankSave(gv_dbgBank);
+    gf_DbgClearEnemies();
 
     // Kerrigan: her height scales the target height and the arm.
     gf_DbgReset("cam_kerrigan", false, true);

@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
@@ -16,12 +17,15 @@ from ..runner import TestRunSpec
 from .bank_checks import _delta, _report
 from .combat import _walk_scale, _yaw_off
 from .pose import check_tps_pose
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 from .tps_pick import check_pick
-from .tps_shot import shot_clocks
 from .tps_sends import check_sends
+from .tps_shot import shot_clocks
 
-ROOT = project_root()
+GALAXY = project_root() / "scripts" / "testkit" / "galaxy"
+# The harness files of the profile, in include order.
+HARNESS = ("common", "tps", "tpspick", "tpshead", "tpshold", "tpsclock", "tpssends", "tpspose")
+
 
 def selected_group() -> str:
     """One scenario group for a fast run, or `all` for the full suite."""
@@ -34,29 +38,11 @@ def selected_group() -> str:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="tps",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["tps"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("tps"),
         bank_names=PROFILE_BANKS["tps"],
-        galaxy_files=(
-            ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "tps.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "tpspick.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "tpshead.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "tpshold.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "tpsclock.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "tpssends.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "tpspose.galaxy",
-        ),
-        galaxy_includes=(
-            "scripts/test/tps/common",
-            "scripts/test/tps/tps",
-            "scripts/test/tps/tpspick",
-            "scripts/test/tps/tpshead",
-            "scripts/test/tps/tpshold",
-            "scripts/test/tps/tpsclock",
-            "scripts/test/tps/tpssends",
-            "scripts/test/tps/tpspose",
-        ),
+        galaxy_files=tuple(GALAXY / f"{name}.galaxy" for name in HARNESS),
+        galaxy_includes=tuple(f"scripts/test/tps/{name}" for name in HARNESS),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_TpsTest_Init();"),
     )
 
@@ -499,7 +485,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="tps",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["tps"],
+        map_source=profile_output("tps"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["tps"],
         ready_section="meta",

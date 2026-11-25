@@ -18,6 +18,8 @@ resolve_root() {
     return 1
 }
 ROOT_DIR="$(resolve_root)" || { printf 'ERROR: cannot locate project root\n' >&2; exit 1; }
+# shellcheck source=paths.sh
+source "$ROOT_DIR/scripts/paths.sh" || exit 1
 
 if [ "${DRY_RUN:-0}" != "1" ]; then
     LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/scoba"
@@ -37,21 +39,21 @@ fail() {
 # The map the editor opens. The default is the built working map: the 256x256
 # component folder with the generated models. src/ is the 128x128 source and
 # looks like the original map in the editor.
-# out/ is replaced by every build: editor saves there do not survive one.
-MAP_SOURCE="${SC2_EDITOR_MAP:-$ROOT_DIR/out/SCOBA256.SC2Map}"
+# SC2_OUT is replaced by every build: editor saves there do not survive one.
+MAP_SOURCE="${SC2_EDITOR_MAP:-$SC2_BUILT_MAP}"
 [ -d "$MAP_SOURCE" ] || fail "unpacked map folder not found, run scripts/playtest.sh build: $MAP_SOURCE"
 MAP_SOURCE="$(cd -- "$MAP_SOURCE" && pwd)"
 COMPONENTS="$MAP_SOURCE/ComponentList.SC2Components"
 [ -f "$COMPONENTS" ] || fail "not an unpacked map, no component list: $COMPONENTS"
 
 STEAM_ROOT="${STEAM_ROOT:-$HOME/.var/app/com.valvesoftware.Steam/data/Steam}"
-BNET_PREFIX="${BNET_PREFIX:-$HOME/Games/battlenet-prefix}"
-SC2_DIR="${SC2_DIR:-$BNET_PREFIX/pfx/drive_c/Program Files (x86)/StarCraft II}"
+SC2_DIR="$SC2_INSTALL"
 EDITOR_EXE="$SC2_DIR/Support64/SC2Editor_x64.exe"
 [ -f "$EDITOR_EXE" ] || fail "StarCraft II editor not found: $EDITOR_EXE"
 
-# The editor sees the Linux filesystem through the Z: drive of the prefix.
-Z_DRIVE="$BNET_PREFIX/pfx/dosdevices/z:"
+# The editor sees the Linux filesystem through the Z: drive of the prefix,
+# beside its drive C.
+Z_DRIVE="$(dirname -- "$BNET_PREFIX/$SC2_WINE_DRIVE")/dosdevices/z:"
 [ -L "$Z_DRIVE" ] || fail "prefix has no Z: drive: $Z_DRIVE"
 [ "$(readlink "$Z_DRIVE")" = "/" ] || fail "prefix Z: drive is not /: $(readlink "$Z_DRIVE")"
 WIN_PATH="Z:${COMPONENTS//\//\\}"

@@ -10,7 +10,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 
 /** Where a file or an import target sits. */
 type Place =
-  | { kind: 'shared' | 'page-core' | 'page-ui' | 'page-features' | 'page-main' | 'server-core' | 'server-main' | 'tools' }
+  | { kind: 'shared' | 'page-core' | 'page-ui' | 'page-features' | 'page-main' | 'page-texview' | 'server-core' | 'server-main' | 'tools' }
   | { kind: 'format'; id: string }
   | { kind: 'game'; id: string; side: 'page' | 'server' | 'shared' }
   | { kind: 'library' | 'package' | 'node' }
@@ -45,6 +45,7 @@ export function placeOf(path: string): Place {
     if (second === 'core') return { kind: 'page-core' };
     if (second === 'ui') return { kind: 'page-ui' };
     if (second === 'features') return { kind: 'page-features' };
+    if (second === 'texview') return { kind: 'page-texview' };
     if (second === 'main' && parts.length === 2) return { kind: 'page-main' };
   }
   if (top === 'server') {
@@ -111,6 +112,10 @@ export function refusal(from: Place, to: Place): string | null {
       break;
     case 'page-features':
       ok = pageCore || to.kind === 'page-ui';
+      break;
+    case 'page-texview':
+      // The texture window's page, a bundle of its own in its frame.
+      ok = pageCore;
       break;
     case 'page-main':
       ok = pageCore || to.kind === 'page-ui' || to.kind === 'page-features' || to.kind === 'format' || (to.kind === 'game' && to.side !== 'server');

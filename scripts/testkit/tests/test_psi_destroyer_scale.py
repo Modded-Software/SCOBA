@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from project_root import project_root
+import workpaths
 from mapgen.spore_scale import (
     PSI_DESTROYER_MARKER,
     PSI_DESTROYER_SCALE,
@@ -13,10 +13,17 @@ from mapgen.spore_scale import (
     scale_psi_destroyer,
     scale_unit_instances,
 )
+from project_root import project_root
+
+from testkit.tests.built_map import needs_built
 
 ROOT = project_root()
 SRC_OBJECTS = ROOT / "src" / "SCOBA.SC2Map" / "Objects"
-BUILT_OBJECTS = ROOT / "out" / "SCOBA256.SC2Map" / "Objects"
+
+
+def built_objects():
+    return workpaths.path("SC2_BUILT_MAP") / "Objects"
+
 
 OBJECTS = """<?xml version="1.0" encoding="utf-8"?>
 <PlacedObjects Version="27">
@@ -116,22 +123,22 @@ class ScalePsiDestroyerTest(unittest.TestCase):
 
 
 class BuiltMapTest(unittest.TestCase):
-    @unittest.skipUnless(BUILT_OBJECTS.is_file(), "built map is absent")
+    @needs_built("Objects")
     def test_built_scale_is_source_scale_times_factor(self) -> None:
         source = unit_scales(SRC_OBJECTS.read_text(encoding="utf-8"))
-        built = unit_scales(BUILT_OBJECTS.read_text(encoding="utf-8"))
+        built = unit_scales(built_objects().read_text(encoding="utf-8"))
         for unit_type in PSI_DESTROYER_UNITS:
             self.assertEqual(len(source[unit_type]), 1, unit_type)
             expected = [[v * PSI_DESTROYER_SCALE for v in scale] for scale in source[unit_type]]
             self.assertEqual(built[unit_type], expected, unit_type)
 
-    @unittest.skipUnless(BUILT_OBJECTS.is_file(), "built map is absent")
+    @needs_built("Objects")
     def test_built_units_outside_the_step_keep_source_scale(self) -> None:
         # Spores have their own scale step, so they are excluded here.
         from mapgen.spore_scale import SPORE_UNITS
 
         source = unit_scales(SRC_OBJECTS.read_text(encoding="utf-8"))
-        built = unit_scales(BUILT_OBJECTS.read_text(encoding="utf-8"))
+        built = unit_scales(built_objects().read_text(encoding="utf-8"))
         skipped = PSI_DESTROYER_UNITS | SPORE_UNITS
         checked = 0
         for unit_type, scales in source.items():

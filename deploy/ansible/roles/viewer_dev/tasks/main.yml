@@ -104,6 +104,24 @@
         fail_msg: "{{ viewer_node_bin }}/node is {{ version }} (rc {{ viewer_node_run.rc }}), not {{ viewer_node_major }}. Set -e viewer_node_bin=<dir>."
         success_msg: "node: {{ version }}"
 
+    - name: Run uv from the service PATH (the texture pipeline needs it; not found, set -e viewer_uv_bin=<dir>)
+      ansible.builtin.shell: 'uv --version >> "{{ viewer_steps_dir }}/uv.log" 2>&1'
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ viewer_path }}"
+      register: viewer_uv_run
+      changed_when: false
+
+    - name: Read the uv step log
+      ansible.builtin.slurp:
+        src: "{{ viewer_steps_dir }}/uv.log"
+      register: viewer_uv_log
+
+    - name: Show uv
+      ansible.builtin.debug:
+        msg: "uv on {{ viewer_path }}: {{ viewer_uv_log.content | b64decode | trim }}"
+
     - name: Find the machine settings (data folder)
       ansible.builtin.stat:
         path: "{{ viewer_dir }}/local.env"
@@ -127,7 +145,8 @@
         WEBVIEWER_DIR: "{{ viewer_dir }}"
         REPO_ROOT: "{{ viewer_repo_root }}"
       loop:
-        - { name: npm, cmd: "npm install --no-audit --no-fund" }
+        # node_modules lives in WEBVIEWER_WORK; plain npm install would replace its link (SPEC-PATHS).
+        - { name: npm, cmd: "source scripts/paths.sh && viewer_npm_install --no-audit --no-fund" }
         - { name: ref, cmd: "bash scripts/ref-setup.sh" }
         - { name: build, cmd: "bash scripts/tool.sh build" }
         - { name: catalog, cmd: "bash scripts/catalog.sh --if-missing" }
@@ -167,16 +186,24 @@
     - name: Read the listening ports
       community.general.listen_ports_facts:
 
+    # The server is a child of the hot reload watcher (scripts/start.sh), so
+    # the listener is judged by its cgroup, not by the unit's MainPID.
+    - name: Read the cgroup of each process on the port
+      ansible.builtin.slurp:
+        src: "/proc/{{ item }}/cgroup"
+      loop: "{{ ansible_facts.tcp_listen | selectattr('port', 'equalto', viewer_port | int) | map(attribute='pid') | unique | list }}"
+      register: viewer_holders_before
+
     - name: Refuse a port held by another process
-      vars:
-        holders: "{{ ansible_facts.tcp_listen | selectattr('port', 'equalto', viewer_port | int) | map(attribute='pid') | map('string') | list }}"
-        main_pid: "{{ viewer_unit_before.status.MainPID | default('0') | string }}"
       ansible.builtin.assert:
-        that: holders | length == 0 or holders | unique == [main_pid]
+        that: ('/' ~ viewer_unit ~ '.service') in (item.content | b64decode)
         fail_msg: >-
-          Port {{ viewer_port }} is held by pid {{ holders | join(', ') }}, not by {{ viewer_unit }}.service.
-          Stop that process (ps -o args -p {{ holders | join(',') }}), then run make viewer-provision again.
-        success_msg: "port {{ viewer_port }}: {{ 'free' if holders | length == 0 else 'held by the service, pid ' ~ main_pid }}"
+          Port {{ viewer_port }} is held by pid {{ item.item }}, not by {{ viewer_unit }}.service.
+          Stop that process (ps -o args -p {{ item.item }}), then run make viewer-provision again.
+        success_msg: "port {{ viewer_port }}: held by the service, pid {{ item.item }}"
+      loop: "{{ viewer_holders_before.results }}"
+      loop_control:
+        label: "{{ item.item }}"
 
     - name: Make the user unit folder
       ansible.builtin.file:
@@ -253,11 +280,23 @@
     - name: Read the listening ports after the start
       community.general.listen_ports_facts:
 
-    - name: Require the listener to be the service
-      vars:
-        holders: "{{ ansible_facts.tcp_listen | selectattr('port', 'equalto', viewer_port | int) | map(attribute='pid') | map('string') | unique | list }}"
-        main_pid: "{{ viewer_unit_after.status.MainPID | string }}"
+    - name: Read the cgroup of each process on the port after the start
+      ansible.builtin.slurp:
+        src: "/proc/{{ item }}/cgroup"
+      loop: "{{ ansible_facts.tcp_listen | selectattr('port', 'equalto', viewer_port | int) | map(attribute='pid') | unique | list }}"
+      register: viewer_holders_after
+
+    - name: Require a listener
       ansible.builtin.assert:
-        that: holders == [main_pid]
-        fail_msg: "Port {{ viewer_port }} answers, but from pid {{ holders }}, not from {{ viewer_unit }}.service (MainPID {{ main_pid }})."
-        success_msg: "{{ viewer_unit }}.service: http://{{ viewer_host }}:{{ viewer_port }}/ (pid {{ main_pid }}); step logs {{ viewer_steps_dir }}"
+        that: viewer_holders_after.results | length > 0
+        fail_msg: "Nothing listens on port {{ viewer_port }} after the start."
+        success_msg: "port {{ viewer_port }}: pid {{ viewer_holders_after.results | map(attribute='item') | join(', ') }}"
+
+    - name: Require the listener to be the service
+      ansible.builtin.assert:
+        that: ('/' ~ viewer_unit ~ '.service') in (item.content | b64decode)
+        fail_msg: "Port {{ viewer_port }} answers, but from pid {{ item.item }}, not from {{ viewer_unit }}.service (MainPID {{ viewer_unit_after.status.MainPID }})."
+        success_msg: "{{ viewer_unit }}.service: http://{{ viewer_host }}:{{ viewer_port }}/ (watcher pid {{ viewer_unit_after.status.MainPID }}, server pid {{ item.item }}); step logs {{ viewer_steps_dir }}"
+      loop: "{{ viewer_holders_after.results }}"
+      loop_control:
+        label: "{{ item.item }}"

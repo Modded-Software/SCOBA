@@ -1,11 +1,11 @@
-"""Host tests for scripts/hdtex/model_backfaces.py: which faces get a back, and what the back looks like."""
+"""Host tests for scripts/hdtex/sc2/model_backfaces.py: which faces get a back, and what the back looks like."""
 
 from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace as Part
 
-from hdtex import model_backfaces as B
+from hdtex.sc2 import model_backfaces as B
 
 # A square of two triangles, and a closed tetrahedron beside it.
 POINTS = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 1.0, 0.0), (0.0, 1.0, 0.0), (5.0, 0.0, 0.0), (6.0, 0.0, 0.0), (5.0, 1.0, 0.0), (5.0, 0.0, 1.0)]

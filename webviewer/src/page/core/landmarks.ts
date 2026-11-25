@@ -5,10 +5,10 @@
 
 import type { Store } from './context';
 import type { EventBus, ViewerEvents } from './bus';
-import { settings, type Restore } from './settings';
+import { ORIGIN_LANDMARK, settings } from './settings';
 import type { CameraState, Landmark } from './types';
 
-const ORIGIN_ID = 0;
+const ORIGIN_ID = ORIGIN_LANDMARK;
 const ORIGIN: Landmark = { id: ORIGIN_ID, name: 'origin (0, 0, 0)', target: [0, 0, 0], yaw: -Math.PI / 2, pitch: 0.5, distance: 9 };
 
 const copy = (l: Landmark): Landmark => ({ ...l, target: [...l.target] });
@@ -20,8 +20,8 @@ export interface Landmarks {
   /** Delete a landmark. The camera stays; a deleted chosen one leaves none chosen. */
   removeLandmark(id: number): void;
   landmarks(): Landmark[];
-  /** The landmarks, the chosen one, and how the stored ones loaded. */
-  landmarkState(): { list: Landmark[]; selected: number | null; restore: string };
+  /** The landmarks, the chosen one, and where the start came from: stored, or the declared default. */
+  landmarkState(): { list: Landmark[]; selected: number | null; start: 'stored' | 'default' };
   /** The one that cannot be deleted. */
   readonly originId: number;
 }
@@ -29,18 +29,14 @@ export interface Landmarks {
 export function createLandmarks(store: Store, events: EventBus<ViewerEvents>, view: (next: Partial<CameraState>) => void): Landmarks {
   const list: Landmark[] = [ORIGIN];
   let nextId = ORIGIN_ID + 1;
+  // The stored landmarks, else the setting's declared default: none but the origin.
+  const found = store.find(settings.landmarks);
+  const start = found === null ? 'default' : 'stored';
+  const stored = found === null ? structuredClone(settings.landmarks.initial) : found;
+  list.push(...stored.list);
+  nextId = Math.max(ORIGIN_ID, ...stored.list.map((l) => l.id)) + 1;
   /** The landmark chosen last, or null. */
-  let selected: number | null = null;
-  /** How the stored landmarks loaded. */
-  let restore: Restore = 'none';
-
-  const stored = store.read(settings.landmarks);
-  restore = stored.restore;
-  if (stored.value) {
-    list.push(...stored.value.list);
-    nextId = Math.max(ORIGIN_ID, ...stored.value.list.map((l) => l.id)) + 1;
-    selected = stored.value.selected;
-  }
+  let selected: number | null = stored.selected;
 
   function changed(): void {
     store.write(settings.landmarks, { list: list.filter((l) => l.id !== ORIGIN_ID).map(copy), selected });
@@ -74,6 +70,6 @@ export function createLandmarks(store: Store, events: EventBus<ViewerEvents>, vi
       changed();
     },
     landmarks: () => list.map(copy),
-    landmarkState: () => ({ list: list.map(copy), selected, restore }),
+    landmarkState: () => ({ list: list.map(copy), selected, start }),
   };
 }

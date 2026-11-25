@@ -61,9 +61,15 @@ def _unit(checks, section: str, unit_type: str, table: dict[str, float], arm_fix
 
 def check_camheight(checks) -> None:
     table = camera_heights.heights(camera_heights.load_json())
-    # Unit: no unit falls back to Tosh's values.
-    checks.between("cam_null", "", "offset1000", 900 - TOL, 900 + TOL)
-    checks.between("cam_null", "", "arm1000", 1500 - TOL, 1500 + TOL)
+    # Unit: a height is known only of a unit whose type has a row; none stands in.
+    checks.true("cam_known", "", "heroKnown")
+    checks.true("cam_known", "", "spawnKnown")
+    checks.false("cam_known", "", "nullKnown")
+    checks.false("cam_known", "", "rowlessKnown")
+    checks.true("cam_known", "", "restoredKnown")
+    # The row read is the generator's height of the spawned type (raw value recorded).
+    spawned = round(table["Zergling"] * 1000)
+    checks.between("cam_known", "", "spawnHeight1000", spawned - TOL, spawned + TOL)
     # Tosh keeps the old fixed values.
     _unit(checks, "cam_tosh", "ToshSCOBA", table)
     checks.between("cam_tosh", "", "applied1000", 900 - TOL, 900 + TOL)

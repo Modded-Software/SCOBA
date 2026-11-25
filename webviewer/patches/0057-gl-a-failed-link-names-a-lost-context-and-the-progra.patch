@@ -1,0 +1,31 @@
+From c0c690bf05e9f05dc8a2c0d18c3c1de745a58e6e Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Wed, 25 Nov 2026 17:58:04 +0200
+Subject: [PATCH 57/57] gl: a failed link names a lost context and the program
+ log
+
+---
+ src/viewer/gl/gl.ts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/viewer/gl/gl.ts b/src/viewer/gl/gl.ts
+index 4eca0f90..f16fdaf4 100644
+--- a/src/viewer/gl/gl.ts
++++ b/src/viewer/gl/gl.ts
+@@ -75,6 +75,16 @@ export default class WebGL {
+     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+       let log = 'Shader failed to link:';
+ 
++      // A lost context links nothing and logs nothing: say so.
++      if (gl.isContextLost()) {
++        log += ' the WebGL context is lost';
++      }
++
++      const programLog = gl.getProgramInfoLog(program);
++      if (programLog && programLog.length) {
++        log += ` Program: ${programLog}`;
++      }
++
+       const vertexLog = gl.getShaderInfoLog(vertex);
+       if (vertexLog && vertexLog.length) {
+         log += ` Vertex shader: ${vertexLog}`;

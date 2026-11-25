@@ -13,7 +13,7 @@
 // the mouse-over outline.
 
 import type { Feature } from '../../core/context';
-import type { Item, Rect } from '../../core/types';
+import type { Item } from '../../core/types';
 import type { ViewerInstance } from '../../core/plugin';
 import type { Rgb } from '../../core/render/gl';
 
@@ -26,8 +26,6 @@ export const EDGE_RANGE = 40;
  * wins over the surface it lies on (lines take no polygon offset).
  */
 const DEPTH_PULL = 5e-5;
-/** edgePixels: an edge pixel farther than this, in pixels, from every drawn pixel is off the body. */
-const OFF_BODY = 2;
 
 /** What the tests read of the edges (sc2viewer.state().edges). */
 export interface EdgesState {
@@ -52,8 +50,6 @@ export const edgesFeature: Feature = {
     const shown = new WeakSet<ViewerInstance>();
     let lines = 0;
     let far: number[] = [];
-    /** For edgePixels: one frame drawn without the edges. */
-    let suppressed = false;
 
     const byId = (id: number): Item | undefined => scene.items.find((item) => item.id === id);
     const isOn = (item: Item): boolean => shown.has(item.instance);
@@ -62,7 +58,7 @@ export const edgesFeature: Feature = {
       lines = 0;
       far = [];
       const chosen = scene.items.filter((item) => isOn(item) && item.capabilities.edges && item.instance.drawn);
-      if (suppressed || !chosen.length) return;
+      if (!chosen.length) return;
       const gl = render.viewer.gl;
       const eye = camera.eye();
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -127,67 +123,7 @@ export const edgesFeature: Feature = {
       range: EDGE_RANGE,
     });
 
-    /** One frame without time passing, read back. */
-    function grab(): Uint8Array {
-      render.resize();
-      render.draw(0);
-      const gl = render.viewer.gl;
-      const data = new Uint8Array(render.canvas.width * render.canvas.height * 4);
-      gl.readPixels(0, 0, render.canvas.width, render.canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      return data;
-    }
-
-    /**
-     * The pixels the edges change, from two frames at the same moment, one
-     * without the edges: `count` of them are clearly green; `outside` of
-     * those are farther than OFF_BODY pixels from every drawn pixel of the
-     * frame without them (a line on the silhouette may cover the pixel
-     * beside it); `inRect`
-     * of those lie in `rect` (page pixels), when given.
-     */
-    function edgePixels(rect?: Rect): { count: number; outside: number; inRect: number } {
-      suppressed = true;
-      let off: Uint8Array;
-      try {
-        off = grab();
-      } finally {
-        suppressed = false;
-      }
-      const on = grab();
-      const { width, height } = render.canvas;
-      const bg = render.BACKGROUND.map((v) => Math.round(v * 255));
-      const box = render.canvas.getBoundingClientRect();
-      const k = width / render.canvas.clientWidth;
-      const px = (i: number, data: Uint8Array): number => data[i] ?? 0;
-      const isBackground = (x: number, y: number): boolean => {
-        if (x < 0 || y < 0 || x >= width || y >= height) return true;
-        const i = (y * width + x) * 4;
-        return [0, 1, 2].every((c) => Math.abs(px(i + c, off) - (bg[c] ?? 0)) <= 1);
-      };
-      const offBody = (x: number, y: number): boolean => {
-        for (let dy = -OFF_BODY; dy <= OFF_BODY; dy++) for (let dx = -OFF_BODY; dx <= OFF_BODY; dx++) if (!isBackground(x + dx, y + dy)) return false;
-        return true;
-      };
-      let count = 0;
-      let outside = 0;
-      let inRect = 0;
-      for (let i = 0, p = 0; i < on.length; i += 4, p++) {
-        const [r, g, b] = [px(i, on), px(i + 1, on), px(i + 2, on)];
-        const step = Math.max(Math.abs(r - px(i, off)), Math.abs(g - px(i + 1, off)), Math.abs(b - px(i + 2, off)));
-        if (step <= 40 || g <= 60 || g <= 1.6 * r || g <= 1.6 * b) continue;
-        count++;
-        if (offBody(p % width, Math.floor(p / width))) outside++;
-        if (rect) {
-          // The framebuffer is read bottom row first.
-          const x = box.left + (p % width) / k;
-          const y = box.top + (height - 1 - Math.floor(p / width)) / k;
-          if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) inRect++;
-        }
-      }
-      return { count, outside, inRect };
-    }
-
     testApi.statePart('edges', edgesState);
-    testApi.viewer({ edgesState, edgePixels });
+    testApi.viewer({ edgesState });
   },
 };

@@ -5,6 +5,7 @@
 import type { AssetKind, CategoryInfo, DatasetId, CategoryId, GameId } from '../../shared/protocol';
 import type { Page } from '../../shared/records';
 import type { Route } from './http';
+import type { TextureService } from './textures';
 
 /** An answer that is not a success: the status code and the ApiError body. */
 export class HttpError extends Error {
@@ -50,7 +51,7 @@ export interface GameBackend {
   /** The game's own counts. */
   summary(dataset: DatasetId): Record<string, unknown>;
   /** One page of a category; HttpError 404 for an unknown category. */
-  list(dataset: DatasetId, category: CategoryId, query: ListQuery): Page<unknown>;
+  list(dataset: DatasetId, category: CategoryId, query: ListQuery): Page<unknown> | Promise<Page<unknown>>;
   /** One record; HttpError 404 for an unknown category or id. */
   record(dataset: DatasetId, category: CategoryId, id: string): unknown;
   /** A servable file on disk, or null. */
@@ -62,4 +63,6 @@ export interface GameBackend {
   backdrops(query: ListQuery): Page<unknown>;
   /** Routes below /api/<game>/x/<name>; the route they get is the part after /x/. */
   readonly extensions: Readonly<Record<string, Route>>;
+  /** The texture service (SPEC-VIEWER 17). Absent: the game has none, and its texture routes answer 404. */
+  readonly textures?: TextureService;
 }

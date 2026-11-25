@@ -42,12 +42,15 @@ class DepsTest(unittest.TestCase):
             self.assertIsNotNone(found, name)
             (self.system / name).symlink_to(found)
         self.stormex = self.root / "tools" / "stormex"
-        self.src = self.root / ".venv/src/stormex"
+        # The work folders make passes from scripts/paths.sh (SPEC-PATHS).
+        self.build = root / "work" / "build"
+        self.viewer_work = root / "work" / "webviewer"
+        self.src = self.build / "deps/stormex"
         self.patches = self.root / "scripts/setup/patches/stormex"
         # The build PATH (STORMEX_PATH): the stubs, but not the ones on PATH first.
         self.toolchain = root / "toolchain"
         self.toolchain.mkdir()
-        self.sc2 = self.home / "Games/battlenet-prefix/pfx/drive_c/Program Files (x86)/StarCraft II"
+        self.sc2 = self.home / "prefix/Program Files (x86)/StarCraft II"
         self.proton = self.home / ".var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d/GE-Proton10-1"
 
     def tearDown(self) -> None:
@@ -83,6 +86,12 @@ class DepsTest(unittest.TestCase):
         self.pinned_stormex()
         self.sc2.mkdir(parents=True)
         (self.sc2 / "StarCraft II.exe").touch()
+        # The nodsdk parser library and its tools, as deps.sh nodsdk builds them.
+        nodsdk = self.viewer_work / "build/nodsdk/cmake"
+        nodsdk.mkdir(parents=True)
+        (nodsdk / "libasset_parsers.a").touch()
+        for tool in ("NODSurvey", "NODExport"):
+            self.executable(nodsdk / tool, "exit 0\n")
         self.executable(self.proton / "proton", "exit 0\n")
 
     def run_deps(self, command: str) -> subprocess.CompletedProcess[str]:
@@ -91,6 +100,9 @@ class DepsTest(unittest.TestCase):
             "PATH": f"{self.stubs}:{self.system}",
             "STORMEX_PATH": f"{self.toolchain}:{self.system}",
             "SC2_PROJECT_ROOT": str(self.root),
+            "SC2_BUILD": str(self.build),
+            "WEBVIEWER_WORK": str(self.viewer_work),
+            "SC2_INSTALL": str(self.sc2),
         }
         return subprocess.run(
             [str(self.system / "bash"), str(SCRIPT), command], env=env, text=True, capture_output=True
@@ -291,6 +303,32 @@ class DepsTest(unittest.TestCase):
         result = self.run_deps("nope")
         self.assertEqual(result.returncode, 1)
         self.assertIn("usage: deps.sh", result.stderr)
+
+    def test_without_the_paths_of_make_it_refuses_and_writes_nothing(self) -> None:
+        # SPEC-PATHS: no guessed folder, so nothing lands on the repo disk.
+        self.full_machine()
+        env = {
+            "HOME": str(self.home),
+            "PATH": f"{self.stubs}:{self.system}",
+            "SC2_PROJECT_ROOT": str(self.root),
+        }
+        paths = {
+            "SC2_BUILD": str(self.build),
+            "WEBVIEWER_WORK": str(self.viewer_work),
+            "SC2_INSTALL": str(self.sc2),
+        }
+        for name in paths:
+            given = {key: value for key, value in paths.items() if key != name}
+            with self.assertRaises(subprocess.CalledProcessError, msg=name) as refused:
+                subprocess.run(
+                    [str(self.system / "bash"), str(SCRIPT), "check"],
+                    env={**env, **given},
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                )
+            self.assertIn(f"{name} is not set", refused.exception.stderr)
+        self.assertEqual(self.calls_made(), [])
 
 
 if __name__ == "__main__":

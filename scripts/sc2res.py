@@ -10,20 +10,19 @@ import sys
 import tempfile
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
 DEFAULT_STORMEX = ROOT / "tools" / "stormex"
-DEFAULT_SC2 = Path(
-    os.environ.get(
-        "SC2_INSTALL",
-        str(
-            Path.home()
-            / "Games/battlenet-prefix/pfx/drive_c/Program Files (x86)/StarCraft II"
-        ),
-    )
-)
-DEFAULT_OUT = Path("/mnt/ws-fast/sc2res")
+
+
+def default_sc2():
+    return workpaths.path("SC2_INSTALL")
+
+
+def default_out():
+    return workpaths.path("SC2RES")
 
 
 def find_stormex():
@@ -42,8 +41,8 @@ def find_sc2():
     value = os.environ.get("SC2_PATH")
     if value:
         return Path(value)
-    if DEFAULT_SC2.exists():
-        return DEFAULT_SC2
+    if default_sc2().exists():
+        return default_sc2()
     sys.exit("SC2 install not found. Set SC2_PATH.")
 
 
@@ -82,7 +81,7 @@ def stormex_failure(proc):
 
 
 def output_dir(args, name):
-    root = Path(args.out).expanduser() if args.out else DEFAULT_OUT / name
+    root = Path(args.out).expanduser() if args.out else default_out() / name
     root = root.resolve()
     root.mkdir(parents=True, exist_ok=True)
     return root
@@ -129,7 +128,7 @@ def convert_file(source, target):
 
 def preview_command(args):
     out = output_dir(args, "preview")
-    tmp_root = DEFAULT_OUT / "tmp"
+    tmp_root = default_out() / "tmp"
     tmp_root.mkdir(parents=True, exist_ok=True)
     converted = []
     with tempfile.TemporaryDirectory(prefix="sc2res-", dir=str(tmp_root)) as tmp:
@@ -166,7 +165,7 @@ def write_gallery(paths, target):
 def paths_command(args):
     print("sc2:", find_sc2())
     print("stormex:", find_stormex())
-    print("output:", DEFAULT_OUT)
+    print("output:", default_out())
 
 
 def build_parser():

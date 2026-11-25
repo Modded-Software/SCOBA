@@ -5,6 +5,7 @@
 import { ASSET_KINDS, ID_RULE, LIMIT, type AssetKind, type GamesBody, type HealthBody } from '../../shared/protocol';
 import { HttpError, type GameBackend, type ListQuery, type UnavailableGame } from './backend';
 import { intParam, json, sendFile, type Request, type Route } from './http';
+import { textureRoute } from './textureroutes';
 
 /** Query parameters that are not filters. */
 const NOT_FILTERS = new Set(['dataset', 'q', 'offset', 'limit', 'v']);
@@ -58,6 +59,10 @@ async function gameRoute(game: GameBackend, rest: readonly string[], request: Re
     if (!(await extension({ ...request, route: tail }))) throw new HttpError(404, { error: 'not found' });
     return;
   }
+  if (first === 'textures' && third === undefined) {
+    await textureRoute(game, second, () => datasetOf(game, params), request);
+    return;
+  }
   if (first === 'datasets' && second !== undefined && third === 'reload' && more.length === 0) {
     method(request, 'POST');
     if (!game.hasDataset(second)) throw new HttpError(404, { error: 'no such dataset', dataset: second });
@@ -74,11 +79,11 @@ async function gameRoute(game: GameBackend, rest: readonly string[], request: Re
     json(res, 200, game.summary(datasetOf(game, params)));
   } else if (first === 'records' && one) {
     const category = categoryOf(second);
-    json(res, 200, game.list(datasetOf(game, params), category, listQuery(params)));
+    json(res, 200, await game.list(datasetOf(game, params), category, listQuery(params)));
   } else if (first === 'record' && one) {
     const category = categoryOf(second);
     const dataset = datasetOf(game, params);
-    json(res, 200, game.record(dataset, category, required(params, 'id')));
+    json(res, 200, await game.record(dataset, category, required(params, 'id')));
   } else if (first === 'file' && second === undefined) {
     const dataset = datasetOf(game, params);
     const path = required(params, 'path');
@@ -118,7 +123,10 @@ export function protocol(games: readonly GameBackend[], unavailable: readonly Un
   const health: HealthBody = { games: [...games.map((g) => ({ id: g.id, available: true })), ...unavailable.map((g) => ({ id: g.id, available: false }))] };
   const listed: GamesBody = {
     default: first.id,
-    games: [...games.map((g) => ({ id: g.id, label: g.label, tab: g.tab, available: true, reason: null })), ...unavailable.map((g) => ({ id: g.id, label: g.label, tab: g.tab, available: false, reason: g.reason }))],
+    games: [
+      ...games.map((g) => ({ id: g.id, label: g.label, tab: g.tab, available: true, reason: null, textures: g.textures !== undefined })),
+      ...unavailable.map((g) => ({ id: g.id, label: g.label, tab: g.tab, available: false, reason: g.reason, textures: false })),
+    ],
   };
   return async (request) => {
     const { route, res } = request;

@@ -24,6 +24,11 @@ const handler: RendererHandler = {
       viewer.sharedCache.set('nod', shader);
     });
     viewer.sharedCache.set(SHADER_LOADING, loading);
+    // Each model that waits reports a failed load as its own. The load itself is reported
+    // here once, so it is seen with no model waiting too.
+    loading.catch((error: unknown) => {
+      console.error(`viewer: the nod shaders did not load: ${error instanceof Error ? error.message : String(error)}`);
+    });
   },
   isValidSource: isContainer,
   resource: NodModel,

@@ -1,12 +1,9 @@
-from pathlib import Path
 import os
-import sys
 import struct
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from project_root import project_root
-
-MAP = project_root() / "out" / "SCOBA256.SC2Map"
+import workpaths
 
 
 def read(p):
@@ -18,7 +15,7 @@ def write(p, b):
 
 
 def flatten_heightmap():
-    p = MAP / "t3HeightMap"
+    p = workpaths.path("SC2_BUILT_MAP") / "t3HeightMap"
     data = bytearray(read(p))
     magic, ver, sx, sy = struct.unpack_from("<4sIII", data, 0)
     center = (sy // 2) * sx + sx // 2
@@ -31,7 +28,7 @@ def flatten_heightmap():
 
 
 def flatten_sync_heightmap():
-    p = MAP / "t3SyncHeightMap"
+    p = workpaths.path("SC2_BUILT_MAP") / "t3SyncHeightMap"
     data = bytearray(read(p))
     magic, ver, sx, sy = struct.unpack_from("<4sIII", data, 0)
     n = sx * sy
@@ -47,17 +44,17 @@ def flatten_sync_heightmap():
 
 
 def write_cell_flags(value=2):
-    p = MAP / "t3CellFlags"
+    p = workpaths.path("SC2_BUILT_MAP") / "t3CellFlags"
     data = bytearray(read(p))
     magic, ver = struct.unpack_from("<4sI", data, 0)
     w, h = struct.unpack_from("<II", data, 24)
-    data[32:32 + w * h] = bytes([value]) * (w * h)
+    data[32 : 32 + w * h] = bytes([value]) * (w * h)
     write(p, bytes(data))
     print("cellflags all", value, w, h)
 
 
 def write_cliff_level(value=64):
-    p = MAP / "t3SyncCliffLevel"
+    p = workpaths.path("SC2_BUILT_MAP") / "t3SyncCliffLevel"
     data = bytearray(read(p))
     w, h = struct.unpack_from("<II", data, 8)
     for i in range(w * h):
@@ -67,19 +64,24 @@ def write_cliff_level(value=64):
 
 
 def clear_cell_attribute(name):
-    p = MAP / name
+    p = workpaths.path("SC2_BUILT_MAP") / name
     data = bytearray(read(p))
     bits = struct.unpack_from("<I", data, 0)[0]
     cells = bits // 8
-    data[4:4 + cells] = bytes(cells)
+    data[4 : 4 + cells] = bytes(cells)
     write(p, bytes(data))
     print(name, "cleared", cells)
 
 
-base, adj = flatten_heightmap()
-flatten_sync_heightmap()
-write_cell_flags(2)
-write_cliff_level(64)
-clear_cell_attribute("CellAttribute_Cpl")
-clear_cell_attribute("CellAttribute_Pnp")
-print("done")
+def main() -> None:
+    flatten_heightmap()
+    flatten_sync_heightmap()
+    write_cell_flags(2)
+    write_cliff_level(64)
+    clear_cell_attribute("CellAttribute_Cpl")
+    clear_cell_attribute("CellAttribute_Pnp")
+    print("done")
+
+
+if __name__ == "__main__":
+    main()

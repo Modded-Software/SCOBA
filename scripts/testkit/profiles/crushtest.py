@@ -12,17 +12,26 @@ import math
 import re
 from pathlib import Path
 
+import workpaths
 from flora import terrain as terrain_mod
 from flora.crush import DATA_FILE
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
-TARGETS_GALAXY = ROOT / "out" / "testkit" / "crushtest" / "crushtest_targets.galaxy"
+
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
+def targets_galaxy_path():
+    return workpaths.path("SC2_TESTKIT") / "crushtest" / "crushtest_targets.galaxy"
+
+
 WALKERS = (("marine", "Marine"), ("goliath", "Goliath"), ("queen", "Queen"))
 PER_WALKER = 3
 CHAIN_MAX = 12.0  # next target within this of the previous one
@@ -32,12 +41,12 @@ EDGE = 16  # keep clear of the unplayable border
 
 
 def crush_table() -> list[tuple[int, float, float]]:
-    text = (BUILT / DATA_FILE).read_text(encoding="utf-8")
+    text = (built_path() / DATA_FILE).read_text(encoding="utf-8")
     return [(int(i), float(x), float(y)) for i, x, y in re.findall(r"gv_crushX\[(\d+)\] = ([\d.]+); gv_crushY\[\d+\] = ([\d.]+); gv_crushZ", text)]
 
 
 def groups() -> list[tuple[tuple[float, float], list[tuple[int, float, float]]]]:
-    t = terrain_mod.load(BUILT)
+    t = terrain_mod.load(built_path())
 
     def open_land(x: float, y: float) -> bool:
         cx, cy = math.floor(x), math.floor(y)
@@ -81,15 +90,15 @@ def targets_galaxy() -> tuple[str, list]:
 def map_spec() -> TestMapSpec:
     text, picked = targets_galaxy()
     print(f"crush targets: {[[r[0] for r in chain] for _s, chain in picked]}")
-    TARGETS_GALAXY.parent.mkdir(parents=True, exist_ok=True)
-    TARGETS_GALAXY.write_text(text, encoding="utf-8")
+    targets_galaxy_path().parent.mkdir(parents=True, exist_ok=True)
+    targets_galaxy_path().write_text(text, encoding="utf-8")
     galaxy = ROOT / "scripts" / "testkit" / "galaxy"
     return TestMapSpec(
         profile="crushtest",
-        source=BUILT,
-        output=PROFILE_OUTPUTS["crushtest"],
+        source=built_path(),
+        output=profile_output("crushtest"),
         bank_names=PROFILE_BANKS["crushtest"],
-        galaxy_files=(galaxy / "common.galaxy", galaxy / "crushtest.galaxy", TARGETS_GALAXY),
+        galaxy_files=(galaxy / "common.galaxy", galaxy / "crushtest.galaxy", targets_galaxy_path()),
         galaxy_includes=("scripts/test/crushtest/common", "scripts/test/crushtest/crushtest", "scripts/test/crushtest/crushtest_targets"),
         init_calls=("gt_CrushTest_Init();",),
     )
@@ -128,7 +137,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="crushtest",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["crushtest"],
+        map_source=profile_output("crushtest"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["crushtest"],
         ready_section="meta",

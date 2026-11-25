@@ -80,6 +80,18 @@ await build({
   sourcemap: true,
 });
 
+// The page of the texture window, in its frame (src/page/texview). It reads DDS files with the library.
+await build({
+  ...common,
+  entryPoints: ['src/page/texview/main.ts'],
+  outfile: 'public/vendor/texview.js',
+  platform: 'browser',
+  format: 'iife',
+  alias: { '@renderer': './ref/mdx-m3-viewer/src' },
+  minify: true,
+  sourcemap: true,
+});
+
 // The server bundle: src/server/main.ts with the games' backends. Node
 // modules and packages stay imports.
 await build({

@@ -264,7 +264,7 @@ drop sequence. Owners per seat (`gv_sceneOwners[p]`, bits
 | `scripts/app/systems/podimpact.galaxy` | `gf_PodImpactNow` |
 | `Base.SC2Data/GameData/UnitData.xml`, `ActorData.xml` | Pod unit and actor, hero `DeathTime` |
 | `scripts/testkit/galaxy/herodrop.galaxy`, `scripts/testkit/profiles/herodrop.py` | Tests |
-| `scripts/testkit/galaxy/herodrop_land.galaxy`, `scripts/testkit/profiles/herodrop_land.py` | Touchdown start state: camera snap, reset, `drop_land` |
+| `scripts/testkit/galaxy/herodrop_land.galaxy`, `scripts/testkit/profiles/herodrop_parts/herodrop_land.py` | Touchdown start state: camera snap, reset, `drop_land` |
 
 ## 5. Tests
 

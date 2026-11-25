@@ -7,8 +7,9 @@ game-neutral words. The rows marked "derived" follow from the operator's goal
 and are the author's wording. Awaiting operator review of this text. Partly
 built: two games (sc2, ghost) and two formats (m3, nod) run through the
 extension points. Open: R-VIEW-2 and 3 (shown only by a game or format
-added without a core edit), R-VIEW-10, 11 and 14 (step 8). SPEC-VIEWER
-section 12 lists the state of each requirement.
+added without a core edit), R-VIEW-10, 11 and 14 (step 8), and section
+3.11 (textures, operator 2026-11-24, not built). SPEC-VIEWER section 12
+lists the state of each requirement.
 
 ## 1. Scope
 
@@ -22,14 +23,19 @@ In scope:
 - the language and structure of the viewer's code;
 - the game tabs and the panel handles;
 - the features every game gets: gallery, scene, selection, camera, view
-  tools, saved state, failure reports.
+  tools, saved state, failure reports;
+- showing a game's textures and their upscaled results, and choosing what
+  is packaged.
 
 Out of scope:
 
 - the rules of any one game. Each game has its own specification;
 - how closely a renderer matches a game's own picture. That is tracked per
   format in the game specifications;
-- tools that build catalogs from game data.
+- tools that build catalogs from game data;
+- how a texture is upscaled, kept and packaged. That is
+  [REQ-HD-TEXTURES](REQ-HD-TEXTURES.md). Its words result, chain, pick,
+  selection, package and blocked are used here as defined there.
 
 No game is named in this document. A game is named only in its own
 specification.
@@ -59,6 +65,10 @@ Implementation lives in [SPEC-VIEWER](../specifications/SPEC-VIEWER.md).
 - **Format module**: the code for one format.
 - **Feature**: one user-facing function of core, such as selection or copy
   and paste.
+- **Texture service**: what a game's server module offers so that the page
+  can show texture states, start upscales and set picks.
+- **Texture window**: the window that shows the textures of one thing.
+- **Ground texture**: a texture that tiles, drawn on the ground of the view.
 
 ## 3. Requirements
 
@@ -154,8 +164,8 @@ Implementation lives in [SPEC-VIEWER](../specifications/SPEC-VIEWER.md).
 | --- | --- | --- |
 | R-VIEW-70 | A scene MUST be kept as a scene document in the browser's database. Each instance MUST name its game, its dataset and its record or file. A reload MUST show the same scene. | operator 2026-11-23 |
 | R-VIEW-71 | A scene document MUST carry a version and be checked against one written type. A document of another version, or one that fails the check, MUST be refused with a message naming the fault. It MUST NOT be read in part. | operator 2026-11-23 |
-| R-VIEW-72 | The camera, the open drawers, the grid, the backdrop, the landmarks, the chosen game, the chosen datasets and the open scene MUST be kept over a reload. | today, operator 2026-11-23 |
-| R-VIEW-73 | A stored value that is not valid MUST be refused, reported and replaced. | today |
+| R-VIEW-72 | The camera, the open drawers, the grid, the ground texture, the backdrop, the landmarks, the chosen game, the chosen datasets and the open scene MUST be kept over a reload. | today, operator 2026-11-23, 2026-11-24 |
+| R-VIEW-73 | A stored value that is not valid MUST be refused and reported. It MUST NOT be replaced by a default or by another value: the page MUST NOT start. It MUST list each refused key with its stored value and the reason, and offer to clear exactly those keys. A stored game, dataset or scene the server or the scene store does not have MUST be refused the same way. A value that is not stored MUST read its declared default. | today; changed 2026-11-25 by the operator (no fallbacks) |
 | R-VIEW-74 | The page address MUST NOT hold the scene or any part of it. An address that holds a scene in an older form MUST be refused with a message and cleared. | operator 2026-11-23 |
 | R-VIEW-75 | There MUST be several named scenes. The user MUST be able to make a new one, rename one, open one and delete one. A delete MUST ask first. The scene open last MUST open after a reload. | operator 2026-11-23 |
 | R-VIEW-76 | A scene MUST be exportable as a file and importable from one. An import MUST pass the check of R-VIEW-71. A refused import MUST change nothing. | operator 2026-11-23 |
@@ -178,10 +188,116 @@ Implementation lives in [SPEC-VIEWER](../specifications/SPEC-VIEWER.md).
 | R-VIEW-92 | Every format MUST have a survey tool that reads every file of that format in a dataset and reports each file it cannot read. | today |
 | R-VIEW-93 | What only a person can judge MUST be listed as an operator check and MUST NOT be reported as verified. | today |
 
+### 3.11 Textures
+
+Every row holds for any game that offers a texture service. Words as in
+[REQ-HD-TEXTURES](REQ-HD-TEXTURES.md) section 2: variant, skin, owner,
+bake, problem, preview.
+
+Operator statement (2026-11-24): "each individual texture can have
+variants"; "a button 'UPSCALE' opens a dialog to select the input texture
+variant, the upscaling algorithm / model and the output dimensions"; "the
+result is added to the variants and a dropdown with available variants
+replaces the simple HD checkbox". On skins: "slick and minimal skin config
+UI where each texture and its variants are previewed and clicking on a
+variant highlights it and selects it in the config". On the button: "in
+both places; upscale on a whole instance creates a new skin with all its
+textures queued for upscale". On models: show the real ones, block
+`seedvr2` on problem texture types. On sizes: "a list". On quality: show
+the numbers, colour-coded, with an info text when a number is a problem.
+On the ground and skybox choosers: keep them, show texture previews. On
+baking: a viewer control next to the skin choice, "Bake Skin"; a preview
+on an instance and a bake into the map are separate.
+
+Operator statement (2026-11-25): "BUTTON NAMES SHOULD BE VERBS"; "add a
+badge with a bread emoji if baked"; "you need a edit icon next to each
+skin and also a Add new... item last instead of Edit"; "all dialogs need
+button capitalisation"; the name box and Copy of the skin editor: "who
+requested them?"; "make the Upscale button inside the Texture and Skin
+viewers a card / tile button - as large as the texture preview tiles";
+"what does default represent? ... replace this with original then any
+additional configuration that uses textures other than original needs to
+be under another skin - if changes made (non-original textures selected)
+then create temp skin named New Skin with a save icon next to it in the
+list instead of the edit icon; ask user explicitly to name the skin on
+save, otherwise keep making all changes under this temp skin". Answers of
+the same day: Original shows the game's textures only; "currently baked
+user texture automatically fall under unsaved New Skins"; the editor's
+first tile is the currently picked variant, still selectable, and a pick
+goes to New Skin; New Skin is kept by the server; Rename and Delete are
+editor buttons with a dialog. Later the same day: "ensure selecting a
+different texture variant from the texture viewer automatically create as
+New Skin if missing, present a notification dialog to the user with a desc
+of what is about to happen".
+
+Operator review (2026-11-25, later): "there is a horrible misalignment
+between the texture and skin viewer windows"; the texture window lacks the
+blue outline of the current texture, and its Use button is replaced by a
+click on the tile; "used by" scrolls at a fixed height; the "what it shows
+now" label goes; no question-mark cursor, the info mark explains orange and
+red on hover; the skin choice gets an icon and an arrow; "delete buttons
+should be red everywhere, buttons should be more descriptive e.g. Rename -
+Rename Skin"; every skin in the list but Original has edit and a trash icon
+that asks first, New Skin too, and no save icon. Answers of the same day: a
+click on a tile "just loads it for preview; we need to design a separate
+explicit save mechanic on a skin-level", in both windows; the outline marks
+the texture presented now; the game knows units, actors, models and
+textures, not skins, so the first tile shows what the game holds and names
+no skin.
+
+Source "operator" is that statement. "agent" marks the agent's own rows.
+
+| ID | Requirement | Source |
+| --- | --- | --- |
+| R-VIEW-100 | A game MAY offer a texture service. For a game without one, every control of this section MUST be absent. They MUST NOT be shown and fail. | agent |
+| R-VIEW-113 | An instance whose owner has textures MUST offer a skin choice: **Original**, each saved skin of its owner in its dataset, and **New Skin** when the owner has one. It replaces the HD checkbox. The choice MUST change that instance only. It MUST be kept with the scene and in a copy. | operator, revised 2026-11-25 |
+| R-VIEW-114 | Next to the skin choice there MUST be an **Upscale Skin** button, a **Bake Skin** button, and a badge with 🍞 and the name of the baked skin while the owner has a bake. Without a bake the badge MUST be absent. | operator, revised 2026-11-25 |
+| R-VIEW-126 | Each saved skin and New Skin in the choice MUST have an edit icon that opens the skin editor on it, and a trash icon that asks first, then deletes it (New Skin: discards it). The trash of the baked skin MUST be disabled and say why. Original MUST have neither. There MUST be no save icon. The last entry MUST be **Add New Skin…**, which opens the editor on New Skin. | operator, revised 2026-11-25 |
+| R-VIEW-131 | The first tile of a texture, in the skin editor and in the texture window, MUST be **In game**: the file the game shows for that texture after a build (the owner's bake, else the bake below, else the original). It MUST name no skin. When the package does not hold that file, the tile MUST say so in amber. | operator 2026-11-25 |
+| R-VIEW-132 | The skin editor and the texture window MUST show a texture's choices as the same tiles: In game, Original, each variant, the open requests, Upscale. The tiles shown now MUST have the blue outline. | operator 2026-11-25 |
+| R-VIEW-133 | A click on a tile MUST only preview it and mark it picked. It MUST change no skin, no bake and no instance. The picks of a window MUST be kept per texture until saved or reverted. **Save to Skin…** MUST ask first in one dialog: the target skin (New Skin or a saved skin), each change from and to, whether New Skin is made, and which instance shows the target. Only then MUST it set each pick in the target. **Revert Changes** MUST drop the picks. Cancel MUST change nothing. | operator 2026-11-25 |
+| R-VIEW-134 | "used by" MUST have a fixed height and scroll inside. | operator 2026-11-25 |
+| R-VIEW-135 | The info mark of a tile MUST NOT change the cursor. On hover it MUST show a tooltip that says amber is near a limit, red misses a limit, and which numbers miss. | operator 2026-11-25 |
+| R-VIEW-136 | A button or icon that deletes or discards MUST be red, in every window and dialog. | operator 2026-11-25 |
+| R-VIEW-137 | The skin choice MUST start with a skin icon and end with a down arrow, so it reads as a drop-down. | operator 2026-11-25 |
+| R-VIEW-127 | Original MUST show the game's textures only. A change to Original MUST go to New Skin, made on the first change. Save MUST ask for a name and keep New Skin under it. Until saved, every change MUST go to New Skin. New Skin MUST NOT be baked. | operator 2026-11-25 |
+| R-VIEW-128 | A button name MUST be a verb and the thing it acts on (**Rename Skin**, **Delete Skin**, **Upscale Texture**). Every dialog title and button MUST start with a capital letter. A question MUST say what will happen in plain words. | operator, revised 2026-11-25 |
+| R-VIEW-129 | **Upscale** in the skin editor and in the texture window MUST be a tile as large as a texture preview tile. | operator 2026-11-25 |
+| R-VIEW-115 | **Upscale** MUST open a dialog with three choices: the input variant, the model (`pbrify`, `fast`, `seedvr2`) and the output size from a list (1024, 2048, 4096). | operator |
+| R-VIEW-116 | The dialog MUST NOT let `seedvr2` be chosen for a data texture, and MUST say why. On an instance, `seedvr2` MUST be choosable; the dialog MUST say that its data textures get `fast`. A size the input cannot reach (R-HD-123) MUST NOT be choosable. | operator, R-HD-122 |
+| R-VIEW-117 | **Upscale** on an instance MUST make New Skin of its owner, from the skin the instance shows, and queue a variant of each of its textures. The input of each is its variant in that skin. The instance MUST show New Skin. While the owner has an unsaved New Skin it MUST be refused with the reason. | operator, revised 2026-11-25 |
+| R-VIEW-118 | The skin editor MUST show each texture of the owner with a preview, and for the selected texture a preview of each of its variants. Its tiles MUST follow R-VIEW-131 to 133; a save from Original MUST go to New Skin. Every instance that shows the target skin MUST show the saved change without a page reload. The editor MUST have no name box and no Copy. A saved skin MUST have **Rename Skin** and **Delete Skin**, each with a dialog; New Skin MUST have **Save New Skin As…** and **Discard New Skin**. | operator, revised 2026-11-25 |
+| R-VIEW-119 | The skin editor MUST have an **Upscale Texture** tile per texture. It MUST open the dialog of R-VIEW-115 for that one texture. The variant it makes MUST appear in the texture's list. | operator |
+| R-VIEW-120 | Each variant MUST show its input, model, size and quality numbers. A number that is a problem MUST show red, a number near its limit amber, others green. A problem MUST carry an info text that names the limit and what it means. | operator |
+| R-VIEW-121 | A variant that is queued or being made MUST show as such, with its state, until it is done or has failed. A failure MUST show its reason. A request MUST go on when the editor or the page is closed. | agent |
+| R-VIEW-122 | **Bake Skin** MUST bake the skin the instance shows for its owner in its dataset, after a confirmation. With Original chosen the button MUST be **Unbake Skin**. The badge of R-VIEW-114 MUST show which skin is baked now. A preview MUST NOT bake. A bake MUST NOT change the skin choice of any instance. | operator, revised 2026-11-25 |
+| R-VIEW-123 | A refused bake MUST change nothing and say why. | agent |
+| R-VIEW-107 | A game MAY mark a category as ground textures. Its records MUST be listed in the ground button's dialog only, with no gallery tab (operator 2026-11-25). Such a record, added, MUST become the ground and MUST NOT be placed. | agent, revised by operator |
+| R-VIEW-108 | The ground MUST show the chosen ground texture tiled. "No ground texture" MUST be choosable. The grid of R-VIEW-61 MUST be drawn over it and stay switchable on its own. | agent |
+| R-VIEW-124 | The ground texture chooser and the skybox model chooser MUST show a preview of each entry. | operator |
+| R-VIEW-125 | A ground texture MUST offer a variant choice, **Upscale** and **Bake** per texture (R-HD-145). | operator |
+| R-VIEW-110 | Adding an instance MUST NOT wait on a texture state. An instance MUST be added, drawn and usable while the texture service is slow, failing or absent. Its skin choice MAY appear later. | operator 2026-11-24, first statement |
+| R-VIEW-111 | The viewer MUST get a texture state by reading what the texture store holds. It MUST NOT run the texture tooling to show a state. A read of the states of one model's textures MUST answer within 250 ms, on a store read for the first time too. | operator 2026-11-24, first statement; 250 ms agent (O-VIEW-6) |
+| R-VIEW-112 | The viewer MUST take the original of a texture from the file the texture tooling names for it. The viewer and the tooling MUST NOT each decide which stored file an asset is. | operator 2026-11-24, first statement |
+| R-VIEW-101 | The texture window MUST open on a record, on an instance, or on a model file. It MUST list every texture that thing names, the original beside each of its variants, for comparison. It MUST NOT set a pick or a default. It MUST change a skin only as R-VIEW-130 says. | agent, revised 2026-11-25 |
+| R-VIEW-130 | In the texture window, a click on a tile MUST show it beside the original; Ctrl+click MUST add or remove a tile to compare. For a thing with a texture owner, the picks MUST be saved only by **Save to Skin…** (R-VIEW-133); the dialog MUST also say that bakes and Original stay as they are. Without an owner there MUST be no Save to Skin. | operator, revised 2026-11-25 |
+
+Withdrawn on 2026-11-24 with picks: R-VIEW-102 to 106 and 109 (by
+R-VIEW-113 to 123). R-VIEW-105, a dataset default in the texture window,
+was the agent's and was wrongly marked "operator". The ids are not reused.
+
 ## 4. Operator checks
 
 Only a person can judge these:
 
+- whether a variant looks better than its original, in the texture window,
+  in the skin editor, on a model and on the ground;
+- whether the skin editor is slick and minimal, and whether the skin
+  choice, its icons, the bake badge, the Upscale dialog and tiles, the
+  Bake Skin control, the dialogs, the tile outline and the info tooltip,
+  the red of delete buttons, the skin choice's icon and arrow, the ground chooser and the skybox
+  chooser read well and are easy to use;
+- whether the previews and the quality colours read well;
 - whether the game tabs and the handles look right and are easy to hit;
 - whether the scene list looks right and is easy to use;
 - whether a model looks as it does in its game;
@@ -195,4 +311,6 @@ Only a person can judge these:
 | O-VIEW-2 | R-VIEW-10 names the tests. They are converted last, so that they keep proving behaviour while the code under them moves. |
 | O-VIEW-3 | Closed (operator 2026-11-23): the renderer library is viewer code. This repository patches it and builds from its own clone. R-VIEW-10 and R-VIEW-13 bind it: it is TypeScript in strict mode, and its type check is part of the test run. |
 | O-VIEW-4 | The review of 2026-11-23 added R-VIEW-28, 45, 58, 59 and 65 and widened R-VIEW-53, 55, 56, 60, 61, 63 and 64. All restate what the current page does. The numbers and the inputs are in section 16 of the specification, not here. |
+| O-VIEW-7 | The amber band of R-VIEW-120 ("near its limit") is the agent's. The operator named no band. The specification gives the number. |
+| O-VIEW-6 | The 250 ms of R-VIEW-111 is the agent's number. The operator asked for a bound and named none. Measured before: 2.0 s for a state not read yet. |
 | O-VIEW-5 | Closed (operator 2026-11-23): the scene leaves the page address. Scenes are documents in IndexedDB, several and named, with export and import. The camera, the grid, the backdrop and the landmarks stay global, not per scene. Scenes of the old address form are not carried over. Scenes are per browser; the export file is the way to move one. |

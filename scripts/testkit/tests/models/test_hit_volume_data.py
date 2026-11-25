@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from hdtex.sc2.packaged import HD_MODEL_DIR, name_files
 from hitvolumes import fresh, galaxy, measure
 from hitvolumes.resolve import STACK, Catalog, GameData
 from hitvolumes.units import concrete
@@ -71,6 +72,27 @@ def map_tree(root: Path, actors: str = MAP_ACTORS, units: str = "<Catalog/>") ->
     return m
 
 
+def packaged_map(map_dir: Path) -> None:
+    """What the HD texture step leaves in a map: copies of the models of Marine and Egg, the lines that name them,
+    and its note of what the lines replaced."""
+    for name in ("Marine.m3", "Egg.m3", "Egg_00.m3"):
+        write(map_dir.joinpath(*HD_MODEL_DIR.split("\\")) / name, "the copy")
+    name_files(map_dir, {("ModelData.xml", "CModel"): {("Marine", "Model"): f"{HD_MODEL_DIR}\\Marine.m3", ("Egg", "Model"): f"{HD_MODEL_DIR}\\Egg.m3"}})
+
+
+def actor_baked_map(map_dir: Path) -> None:
+    """What a unit bake of Marine leaves: a copy for its actor, a made entry, and the actor's Model naming it."""
+    write(map_dir.joinpath(*HD_MODEL_DIR.split("\\")) / "Marine" / "Marine.m3", "the copy")
+    name_files(
+        map_dir,
+        {
+            ("ModelData.xml", "CModel"): {("Marine_hd_Marine", "Model"): f"{HD_MODEL_DIR}\\Marine\\Marine.m3"},
+            ("ActorData.xml", "CActorUnit"): {("Marine", "Model"): "Marine_hd_Marine"},
+        },
+        {("ModelData.xml", "CModel"): {"Marine_hd_Marine": "Marine"}},
+    )
+
+
 class StockUnitTests(unittest.TestCase):
     def test_templates_and_missiles_are_left_out(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -99,6 +121,23 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual(res.actor_scale, (1.25, 1.25, 1.25))
         self.assertEqual(res.actors, ("Marine",))
         self.assertEqual(res.models, ("Marine",))
+
+    def test_a_packaged_copy_resolves_to_the_model_it_was_made_from(self) -> None:
+        root = Path(self.tmp.name) / "packaged"
+        packaged_map(map_tree(root))
+        data = GameData(stock_tree(root), root / "map")
+        self.assertEqual(data.resolve("Marine").m3, "Assets\\Models\\hd\\Marine.m3", "the map's own model, not its copy")
+        self.assertEqual(data.resolve("Egg").files(), ["Assets\\Egg\\Egg.m3", "Assets\\Egg\\Egg_00.m3"], "the stock model")
+        self.assertEqual(data.resolve("Egg").models, ("Egg",))
+
+    def test_a_unit_bake_resolves_to_the_model_the_actor_showed_before(self) -> None:
+        root = Path(self.tmp.name) / "baked"
+        actor_baked_map(map_tree(root))
+        data = GameData(stock_tree(root), root / "map")
+        res = data.resolve("Marine")
+        self.assertEqual(res.m3, "Assets\\Models\\hd\\Marine.m3", "the map's own model, not the actor's copy")
+        self.assertEqual(res.models, ("Marine",), "negative: not the made entry")
+        self.assertEqual(res.actor_scale, (1.25, 1.25, 1.25), "the map's own actor line stays")
 
     def test_birth_create_and_missile_actor(self) -> None:
         self.assertEqual(self.data.actor_for("ArchiveSealed"), "Archive")
@@ -157,6 +196,47 @@ class FreshTests(unittest.TestCase):
         extra = MAP_ACTORS.replace("</Catalog>", '<CActorUnit id="Other" unitName="Marine"/></Catalog>')
         write(self.map / "Base.SC2Data" / "GameData" / "ActorData.xml", extra)
         self.assertIn("Marine changed in the map", "\n".join(self.problems()))
+
+    def test_what_the_texture_step_packages_stays_fresh(self) -> None:
+        packaged_map(self.map)
+        self.assertEqual(self.problems(), [])
+        # The copy is not an input: the game shows it, but its shapes are those of the original.
+        write(self.map / "Assets" / "Models" / "scoba_hd" / "Marine.m3", "another copy")
+        self.assertEqual(self.problems(), [])
+
+    def test_a_copy_for_an_entry_of_the_map_that_named_no_model_stays_fresh(self) -> None:
+        # The map build writes a model of its own at the game's path. The map's entry names no model.
+        entry = '<CModel id="Egg"><Occlusion value="None"/></CModel>'
+        write(self.map / "Base.SC2Data" / "GameData" / "ModelData.xml", MAP_MODELS.replace("</Catalog>", f"{entry}</Catalog>"))
+        write(self.map / "Assets" / "Egg" / "Egg.m3", "the map's egg")
+        rec = {"source": "fuzzy", "m3": "Assets\\Egg\\Egg.m3", "files": ["Assets\\Egg\\Egg.m3"], "actors": ["Egg"], "models": ["Egg"]}
+        rec["inputs"] = fresh.MapInputs(self.map).key("Egg", rec)
+        self.data["units"]["Egg"] = rec
+        packaged_map(self.map)
+        self.assertEqual(self.problems(), [])
+        # Negative: the map's own model is still an input.
+        write(self.map / "Assets" / "Egg" / "Egg.m3", "another egg")
+        self.assertIn("Egg changed in the map", "\n".join(self.problems()))
+
+    def test_a_unit_bake_of_the_texture_step_stays_fresh(self) -> None:
+        # Found by the hdbake run 2026-11-25: the actor's Model line and the
+        # made entry of a unit bake (hdtex.sc2.owned) made Marauder stale.
+        actor_baked_map(self.map)
+        self.assertIn("Marine_hd_Marine", (self.map / "Base.SC2Data" / "GameData" / "ActorData.xml").read_text())
+        self.assertEqual(self.problems(), [])
+        # Negative: an edit of the map's own actor line is still seen.
+        path = self.map / "Base.SC2Data" / "GameData" / "ActorData.xml"
+        path.write_text(path.read_text().replace('"1.25"', '"2.0"'))
+        self.assertIn("Marine changed in the map", "\n".join(self.problems()))
+
+    def test_a_changed_original_is_stale_with_a_copy_in_the_map(self) -> None:
+        packaged_map(self.map)
+        write(self.map / "Assets" / "Models" / "hd" / "Marine.m3", "model bytes v2")
+        self.assertIn("Marine changed in the map", "\n".join(self.problems()))
+
+    def test_another_layout_of_the_catalog_stays_fresh(self) -> None:
+        write(self.map / "Base.SC2Data" / "GameData" / "ModelData.xml", MAP_MODELS.replace("><", ">\n\t\t<"))
+        self.assertEqual(self.problems(), [])
 
     def test_unmeasured_map_type_fails(self) -> None:
         write(self.map / "Base.SC2Data" / "GameData" / "UnitData.xml", '<Catalog><CUnit id="SCOBANew"/></Catalog>')

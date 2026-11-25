@@ -10,23 +10,25 @@
 #            pins file matches the current pins.
 #   upscale  clone upscale-on-arc next to this repo (if absent), check that it
 #            holds the pinned commit, and run its `make install`.
-#   nodsdk   build the parser library of webviewer/ref/nodsdk-scghost (the
+#   nodsdk   build the parser library of the nodsdk-scghost checkout (the
 #            StarCraft: Ghost formats; cloned at its pin by make viewer-install)
-#            into webviewer/build/nodsdk. Needs the GLM headers: sudo make
-#            init.
+#            into WEBVIEWER_WORK/build/nodsdk. Needs the GLM headers: sudo
+#            make init.
 #   check    report every dependency as OK, MISSING or OPTIONAL. Exit 1 when a
 #            required one is missing.
 #
-# Paths come from the same variables the other scripts read:
+# make runs this with the paths of scripts/paths.sh (SPEC-PATHS): SC2_BUILD,
+# WEBVIEWER_WORK, SC2_INSTALL and UV_PROJECT_ENVIRONMENT come from there.
+# Other settings:
 #   SC2_PROJECT_ROOT  this repo (default: git top level of the working directory)
 #   STORMEX           the stormex binary (default: tools/stormex)
-#   STORMEX_SRC       the stormex source checkout (default: .venv/src/stormex)
+#   STORMEX_SRC       the stormex source checkout (default: SC2_BUILD/deps/stormex)
 #   STORMEX_PATH      PATH for the stormex build: the system compiler and linker
 #                     (default: /usr/local/bin:/usr/bin:/bin)
 #   UPSCALE_DIR       the upscale-on-arc checkout (default: ../upscale-on-arc)
 #   NODSDK_SRC        the nodsdk-scghost checkout (default: webviewer/ref/nodsdk-scghost)
-#   NODSDK_BUILD      its build folder (default: webviewer/build/nodsdk)
-#   BNET_PREFIX, SC2_DIR, STEAM_ROOT  as in scripts/launch-scoba.sh
+#   NODSDK_BUILD      its build folder (default: WEBVIEWER_WORK/build/nodsdk)
+#   STEAM_ROOT        as in scripts/launch-scoba.sh
 set -euo pipefail
 
 STORMEX_REPO="https://github.com/Talv/stormex.git"
@@ -47,19 +49,21 @@ UPSCALE_COMMIT="b35fa0784ab610946a239e7a634f4735eac10998"
 
 ROOT_DIR="${SC2_PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
 STORMEX="${STORMEX:-$ROOT_DIR/tools/stormex}"
-STORMEX_SRC="${STORMEX_SRC:-$ROOT_DIR/.venv/src/stormex}"
+: "${SC2_BUILD:?SC2_BUILD is not set: run this through make (SPEC-PATHS)}"
+: "${WEBVIEWER_WORK:?WEBVIEWER_WORK is not set: run this through make (SPEC-PATHS)}"
+: "${SC2_INSTALL:?SC2_INSTALL is not set: run this through make (SPEC-PATHS)}"
+STORMEX_SRC="${STORMEX_SRC:-$SC2_BUILD/deps/stormex}"
 STORMEX_PATH="${STORMEX_PATH:-/usr/local/bin:/usr/bin:/bin}"
 STORMEX_PATCHES="$ROOT_DIR/scripts/setup/patches/stormex"
 UPSCALE_DIR="${UPSCALE_DIR:-$(dirname "$ROOT_DIR")/upscale-on-arc}"
 NODSDK_SRC="${NODSDK_SRC:-$ROOT_DIR/webviewer/ref/nodsdk-scghost}"
-NODSDK_BUILD="${NODSDK_BUILD:-$ROOT_DIR/webviewer/build/nodsdk}"
+NODSDK_BUILD="${NODSDK_BUILD:-$WEBVIEWER_WORK/build/nodsdk}"
 NODSDK_LIB="$NODSDK_BUILD/cmake/libasset_parsers.a"
 NODSDK_SURVEY="$NODSDK_BUILD/cmake/NODSurvey"
 NODSDK_EXPORT="$NODSDK_BUILD/cmake/NODExport"
 GLM_HEADER=/usr/include/glm/glm.hpp
 STEAM_ROOT="${STEAM_ROOT:-$HOME/.var/app/com.valvesoftware.Steam/data/Steam}"
-BNET_PREFIX="${BNET_PREFIX:-$HOME/Games/battlenet-prefix}"
-SC2_DIR="${SC2_DIR:-$BNET_PREFIX/pfx/drive_c/Program Files (x86)/StarCraft II}"
+SC2_DIR="$SC2_INSTALL"
 LSFG_LAYER="$HOME/.local/share/vulkan/implicit_layer.d/VkLayer_LSFGVK_frame_generation.json"
 
 die() {
@@ -258,7 +262,7 @@ cmd_check() {
     if [[ -f "$SC2_DIR/StarCraft II.exe" ]]; then
         report OK starcraft2 "$SC2_DIR"
     else
-        report MISSING starcraft2 "no StarCraft II.exe in $SC2_DIR; set BNET_PREFIX or SC2_DIR"
+        report MISSING starcraft2 "no StarCraft II.exe in $SC2_DIR; set BNET_PREFIX in env/paths.conf"
     fi
     local proton=""
     local candidate
@@ -278,7 +282,7 @@ cmd_check() {
     if [[ -x "$UPSCALE_DIR/arc-upscale" ]]; then
         report OK upscale-on-arc "$UPSCALE_DIR"
     else
-        report OPTIONAL upscale-on-arc "not at $UPSCALE_DIR; only the HD texture cache build needs it (make install-hdtex)"
+        report OPTIONAL upscale-on-arc "not at $UPSCALE_DIR; only a texture request needs it (make install-hdtex)"
     fi
     if [[ "$MISSING" -gt 0 ]]; then
         say "$MISSING required dependencies missing"

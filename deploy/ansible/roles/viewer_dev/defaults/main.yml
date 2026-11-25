@@ -11,7 +11,9 @@ viewer_dir: "{{ viewer_repo_root }}/webviewer"
 # Node 24 for the service (the same node the other dev services use here).
 viewer_node_bin: "{{ ansible_facts.env.HOME }}/WORKSPACE-VM/.boot-linux/node-env/bin"
 viewer_node_major: 24
-viewer_path: "{{ viewer_dir }}/node_modules/.bin:{{ viewer_node_bin }}:/usr/local/bin:/usr/bin:/bin"
+# uv: the server runs the texture pipeline (scripts/hd_textures.py) with it.
+viewer_uv_bin: "{{ ansible_facts.env.HOME }}/WORKSPACE-VM/.boot-linux/bin"
+viewer_path: "{{ viewer_dir }}/node_modules/.bin:{{ viewer_node_bin }}:{{ viewer_uv_bin }}:/usr/local/bin:/usr/bin:/bin"
 viewer_unit_dir: "{{ ansible_facts.env.HOME }}/.config/systemd/user"
 # The output of each command of the last run, one log per step.
 viewer_steps_dir: "{{ ansible_facts.env.HOME }}/.local/state/{{ viewer_unit }}/steps"

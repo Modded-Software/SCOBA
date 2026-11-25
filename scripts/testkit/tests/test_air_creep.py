@@ -10,7 +10,8 @@ import unittest
 import xml.etree.ElementTree as ET
 
 from project_root import project_root
-from testkit.profiles.registry import PROFILE_BANKS, PROFILE_OUTPUTS, profile_module
+
+from testkit.profiles.registry import PROFILE_BANKS, profile_module, profile_output
 
 ROOT = project_root()
 DATA = ROOT / "src" / "SCOBA.SC2Map" / "Base.SC2Data" / "GameData"
@@ -184,7 +185,7 @@ class AirCreepProfileTest(unittest.TestCase):
     def test_map_spec_matches_registry(self) -> None:
         spec = profile_module("aircreep").map_spec()
         self.assertEqual(spec.profile, "aircreep")
-        self.assertEqual(spec.output, PROFILE_OUTPUTS["aircreep"])
+        self.assertEqual(spec.output, profile_output("aircreep"))
         self.assertEqual(spec.bank_names, PROFILE_BANKS["aircreep"])
 
 

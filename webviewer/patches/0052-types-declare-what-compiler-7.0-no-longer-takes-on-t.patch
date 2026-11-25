@@ -1,7 +1,7 @@
 From c7af28a066d38604422fc479a48b70810676be08 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 14:41:03 +0200
-Subject: [PATCH 52/56] types: declare what compiler 7.0 no longer takes on
+Subject: [PATCH 52/57] types: declare what compiler 7.0 no longer takes on
  trust (no change to the built code)
 
 The library was written for compiler 4.3. Compiler 7.0 tells typed arrays, array buffers and video frames apart, and has no suppressImplicitAnyIndexErrors. These are declarations only: the bundle is byte for byte the same.

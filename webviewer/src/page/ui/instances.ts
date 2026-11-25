@@ -50,7 +50,7 @@ export function installInstances({ scene, selection, games, api, camera, status,
     const record = item.source ? item.source.record : null;
     const { placement } = item;
     const name = record ? record.name : (item.path.split('\\').pop() ?? item.path);
-    const removeButton = make('button', { className: 'remove', textContent: '×', title: 'remove' });
+    const removeButton = make('button', { className: 'remove danger', textContent: '×', title: 'Remove Instance' });
     removeButton.addEventListener('click', () => scene.remove(item.id));
     const anim = make('select', { className: 'anim' }, [option('-1', '(none)'), ...item.instance.sequences.map((s, i) => option(String(i), s.name))]);
     anim.value = String(item.sequence);
@@ -178,7 +178,7 @@ export function installInstances({ scene, selection, games, api, camera, status,
 
   // The clear button asks first (operator 2026-11-22); with no instance it does nothing.
   const clearQuestion = make('div', { className: 'question' });
-  const clearDialog = new ConfirmDialog({ id: 'clear-dialog', title: 'remove all', yesText: 'remove all', content: [clearQuestion] });
+  const clearDialog = new ConfirmDialog({ id: 'clear-dialog', title: 'Remove All Instances', yesText: 'Remove All Instances', content: [clearQuestion], danger: true });
   byId('clear').addEventListener('click', () => {
     void (async () => {
       if (!items.length) return;

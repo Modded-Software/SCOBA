@@ -10,13 +10,14 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / "vendor" / "m3addon"))
 
 import m3
+from hdtex.sc2.packaged import HD_MODEL_DIR
 from slow_death_assets import FAST_CLIPS, SLOW_DEATHS, SLOW_SIMULATIONS, event_names
 from validate_assets import fail
 
 GAMEDATA = Path("Base.SC2Data") / "GameData"
-# The HD texture step copies a model and points the CModel at the copy
-# (scripts/hdtex/models.py, HD_MODEL_DIR). The copy keeps the file name.
-HD_MODEL_DIR = "Assets\\Models\\scoba_hd\\"
+# The HD texture step copies a model and points the CModel at the copy.
+# The copy keeps the file name.
+HD_COPIES = HD_MODEL_DIR + "\\"
 
 # (CModel id, unit actors that must die with it, soundless). A soundless death has
 # no sound anywhere. A death with sound keeps its CModel sound events, with
@@ -36,17 +37,31 @@ GOLIATH_EVENT_TIMES = {
 }
 
 
-def generated_value(model_value: str | None) -> str | None:
-    """The generated slow death model a CModel value stands for: itself, or the one its HD copy was made from."""
-    values = [str(relative).replace("/", "\\") for _, relative, _, _ in SLOW_DEATHS]
+def stands_for(model_value: str | None, values: list[str]) -> str | None:
+    """The generated model among `values` a CModel value stands for: itself, or the one its HD copy was made from."""
     if model_value in values:
         return model_value
-    if model_value and model_value.startswith(HD_MODEL_DIR):
-        name = model_value[len(HD_MODEL_DIR) :]
+    if model_value and model_value.startswith(HD_COPIES):
+        name = model_value[len(HD_COPIES) :]
         matches = [value for value in values if value.rsplit("\\", 1)[-1] == name]
         if len(matches) == 1:
             return matches[0]
     return None
+
+
+def generated_value(model_value: str | None) -> str | None:
+    """The generated slow death model a CModel value stands for."""
+    return stands_for(model_value, [str(relative).replace("/", "\\") for _, relative, _, _ in SLOW_DEATHS])
+
+
+def model_value(models: ET.Element, model_id: str) -> str | None:
+    """The Model value of a CModel of the map's own catalog."""
+    node = models.find(f"./CModel[@id='{model_id}']")
+    return None if node is None or node.find("Model") is None else node.find("Model").get("value")
+
+
+def map_path(map_dir: Path, value: str) -> Path:
+    return map_dir.joinpath(*value.split("\\"))
 
 
 def stretch_of(model_value: str) -> int:
@@ -139,34 +154,48 @@ SLOW_SIMULATION_MODELS = (("LeviathanTentacle", "Assets\\Effects\\Zerg\\Leviatha
 FAST_CLIP_MODELS = (("Leviathan", "Assets\\Units\\Zerg\\Leviathan\\LeviathanSCOBA.m3"),)
 
 
+def check_clips(map_dir: Path, value: str, names: tuple[str, ...]) -> None:
+    path = map_path(map_dir, value)
+    if not path.is_file():
+        fail(f"missing fast clip model: {value}")
+    present = {str(s.name) for s in m3.loadModel(str(path)).sequences}
+    if not set(names) <= present:
+        fail(f"{value} lost sequences {sorted(set(names) - present)}")
+
+
 def check_fast_clips(map_dir: Path) -> None:
-    for _, relative, names, _ in FAST_CLIPS:
-        if not (map_dir / relative).is_file():
-            fail(f"missing fast clip model: {relative}")
-        present = {str(s.name) for s in m3.loadModel(str(map_dir / relative)).sequences}
-        if not set(names) <= present:
-            fail(f"{relative} lost sequences {sorted(set(names) - present)}")
+    clips = {str(relative).replace("/", "\\"): names for _, relative, names, _ in FAST_CLIPS}
+    for value, names in clips.items():
+        check_clips(map_dir, value, names)
     models = ET.parse(map_dir / GAMEDATA / "ModelData.xml").getroot()
     for model_id, value in FAST_CLIP_MODELS:
-        node = models.find(f"./CModel[@id='{model_id}']")
-        if node is None or node.find("Model") is None or node.find("Model").get("value") != value:
+        named = model_value(models, model_id)
+        if value not in clips or stands_for(named, [value]) != value:
             fail(f"CModel {model_id} must use {value}")
+        if named != value:  # the HD copy is what the game shows: it must hold the clips too
+            check_clips(map_dir, named, clips[value])
+
+
+def check_simulation(map_dir: Path, value: str) -> None:
+    path = map_path(map_dir, value)
+    if not path.is_file():
+        fail(f"missing slow simulation model: {value}")
+    model = m3.loadModel(str(path))
+    if not model.particles and not model.ribbons:
+        fail(f"{value} has no particles or ribbons to slow")
 
 
 def check_slow_simulations(map_dir: Path) -> None:
     values = {str(relative).replace("/", "\\") for _, relative, _ in SLOW_SIMULATIONS}
-    for _, relative, _ in SLOW_SIMULATIONS:
-        path = map_dir / relative
-        if not path.is_file():
-            fail(f"missing slow simulation model: {relative}")
-        model = m3.loadModel(str(path))
-        if not model.particles and not model.ribbons:
-            fail(f"{relative} has no particles or ribbons to slow")
+    for value in sorted(values):
+        check_simulation(map_dir, value)
     models = ET.parse(map_dir / GAMEDATA / "ModelData.xml").getroot()
     for model_id, value in SLOW_SIMULATION_MODELS:
-        node = models.find(f"./CModel[@id='{model_id}']")
-        if node is None or node.find("Model") is None or node.find("Model").get("value") != value or value not in values:
+        named = model_value(models, model_id)
+        if value not in values or stands_for(named, [value]) != value:
             fail(f"CModel {model_id} must use {value}")
+        if named != value:  # the HD copy is what the game shows: it must hold the emitters too
+            check_simulation(map_dir, named)
 
 
 def check_slow_deaths(map_dir: Path) -> None:

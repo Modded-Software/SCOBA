@@ -87,13 +87,27 @@ export interface Facets {
   tilesets: string[];
 }
 
-/** /api/sc2/x/textures: whether the texture viewer is built. */
-export interface TexturesBody {
-  built: boolean;
-  build: string;
-}
-
-/** /api/sc2/x/hd-textures: in-model paths of the textures with an upscaled file. */
-export interface HdTexturesBody {
-  assets: string[];
+/**
+ * A ground texture, /api/sc2/record/terrain and a row of
+ * /api/sc2/records/terrain: one terrain texture entry (`CTerrainTex`).
+ * Not placed: added, it becomes the ground (SPEC-VIEWER 17.5).
+ */
+export interface TerrainRecord {
+  /** The entry id. */
+  id: string;
+  name: string;
+  /** The row's grey line: the state, then the terrain sets. */
+  sub: string;
+  icon: null;
+  placeable: false;
+  notPlaceableAs: string;
+  /** The colour file, as the texture service names it: the texture the ground shows. */
+  file: string;
+  /** The normal map, or null. */
+  normal: string | null;
+  /** The terrain sets that blend it. */
+  users: string[];
+  /** Its colour file's pick, results and package, in words. */
+  state: string;
+  dataset: string;
 }

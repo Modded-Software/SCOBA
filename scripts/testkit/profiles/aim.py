@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import os
 import time
 from math import atan2, degrees
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..framelog import parse_section
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 AIM_LEG_CROP = (0.30, 0.45, 0.70, 0.90)
@@ -24,8 +24,8 @@ AIM_IDLE_MIN_CHANGED = 100
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="aim",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["aim"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("aim"),
         bank_names=PROFILE_BANKS["aim"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -80,13 +80,7 @@ def on_ready(ctx, data: dict) -> None:
     time.sleep(4.0)
     ctx.frames.capture("aim_stop")
 
-    game_prefix = Path(os.environ.get("SC2_GAME_PREFIX", str(Path.home() / "Games" / "battlenet-prefix")))
-    docs = Path(
-        os.environ.get(
-            "SC2_DOCUMENTS",
-            str(game_prefix / "pfx/drive_c/users/steamuser/Documents/StarCraft II"),
-        )
-    )
+    docs = workpaths.path("SC2_DOCUMENTS")
     if not _wait_realkeys_ready(docs, 90.0):
         ctx.errors.append("real key phase did not start")
         return
@@ -320,7 +314,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="aim",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["aim"],
+        map_source=profile_output("aim"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["aim"],
         ready_section="aim_walk",

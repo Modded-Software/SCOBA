@@ -11,6 +11,8 @@ import type { EventBus, ViewerEvents } from './bus';
 import type { Host } from './host';
 import type { SkyPart } from './sky';
 import type { Placement, PlacementWish, ViewerModel } from './plugin';
+import { ORIGINAL_SKIN } from '../../shared/textures';
+import type { Skins } from './skins';
 
 const REACH = 1.25; // half the room a model with no footprint takes in a row
 
@@ -28,9 +30,10 @@ export interface SceneDeps {
   readonly status: StatusService;
   readonly events: EventBus<ViewerEvents>;
   readonly sky: SkyPart;
+  readonly skins: Pick<Skins, 'apply'>;
 }
 
-export function createScene({ host, games, api, status, events, sky }: SceneDeps): SceneService {
+export function createScene({ host, games, api, status, events, sky, skins }: SceneDeps): SceneService {
   const { scene } = host;
   const { pluginOf, partsOf } = games;
   const items: Item[] = [];
@@ -145,22 +148,26 @@ export function createScene({ host, games, api, status, events, sky }: SceneDeps
         scale: options.scale ?? 1,
         sequence: options.sequence ?? pluginOf(game).restSequence(made.instance.sequences),
         team: options.team ?? 0,
+        skin: options.skin ?? ORIGINAL_SKIN,
+        largestTexture: 0,
         oneShot: null,
         options: partsOf(game).itemOptions(options.options ?? {}),
       };
-      if (item.sequence < -1 || item.sequence >= item.instance.sequences.length) item.sequence = -1;
+      // An animation or a team the model does not have is refused, not replaced.
+      if (!Number.isInteger(item.sequence) || item.sequence < -1 || item.sequence >= item.instance.sequences.length) throw new Error(`${name}: no animation ${item.sequence}; it has ${item.instance.sequences.length}`);
       const teams = item.capabilities.teamColor ? item.capabilities.teamColor.count : 1;
-      if (!(item.team >= 0 && item.team < teams)) item.team = 0;
+      if (!(Number.isInteger(item.team) && item.team >= 0 && item.team < teams)) throw new Error(`${name}: no team ${item.team}; it has ${teams}`);
       applyTransform(item);
       applySequence(item);
       applyLook(item);
-      await partsOf(game).itemReady(item);
       item.instance.attach(scene);
       items.push(item);
       events.emit('item-added', { item });
       events.emit('scene-edited', { what: 'add' });
       status.setStatus('');
       host.reportUndrawn(name, model);
+      // Its skin after it shows, and not waited for: the add does not depend on the texture service (R-VIEW-110); idle() waits for it.
+      skins.apply(item).catch(status.reportFailure);
       return item.id;
     });
   }
@@ -189,14 +196,20 @@ export function createScene({ host, games, api, status, events, sky }: SceneDeps
 
   /**
    * Add a record by category and id, placed as its game says. A record the
-   * game makes a backdrop (an SC2 skybox unit) becomes the sky instead; it
-   * is not placed, and the result is null.
+   * game makes a backdrop (an SC2 skybox unit) becomes the sky instead, and
+   * a record of a ground category becomes the ground; neither is placed,
+   * and the result is null.
    */
   function addRecord(category: string, id: string, options: AddOptions = {}): Promise<number | null> {
     return loading(async () => {
       const from = await fromOf(options);
       const game = pluginOf(from.game);
       const record = await api.record(category, id, from.dataset, from.game);
+      if (game.categories.some((one) => one.id === category && one.ground)) {
+        await sky.setGround({ ...from, category, id: record.id, name: record.name, texture: record.file });
+        status.setStatus(`${record.name} is a ground texture: set as the ground`);
+        return null;
+      }
       const placement = game.place(category, record, wishOf(options));
       if (placement.asBackdrop) {
         await sky.setSky({ id: record.id, name: record.name, file: placement.file, ...from });
@@ -222,33 +235,33 @@ export function createScene({ host, games, api, status, events, sky }: SceneDeps
       const playing = item.sequence >= 0 ? (item.instance.sequences[item.sequence]?.name ?? null) : null;
       const same = playing === null ? -1 : made.instance.sequences.findIndex((s) => s.name === playing);
       item.instance.detach();
-      Object.assign(item, { path: placement.file, source, dataset, placement, ...made, sequence: same >= 0 ? same : pluginOf(item.game).restSequence(made.instance.sequences) });
+      Object.assign(item, { path: placement.file, source, dataset, placement, ...made, largestTexture: 0, sequence: same >= 0 ? same : pluginOf(item.game).restSequence(made.instance.sequences) });
       applyTransform(item);
       applySequence(item);
       applyLook(item);
-      await partsOf(item.game).itemReady(item);
       item.instance.attach(scene);
       events.emit('item-swapped', { item });
       events.emit('scene-edited', { what: 'swap' });
       host.reportUndrawn(source ? source.record.name : placement.file, model);
+      skins.apply(item).catch(status.reportFailure);
     });
   }
 
   /** The wish that keeps an item as it is: its scale pick and angle. */
-  const keep = (item: Item, variant: number | null, otherwise: PlacementWish['otherwise']): PlacementWish => ({ pick: item.placement.pick, rot: item.rot, variant, otherwise });
+  const keep = (item: Item, variant: number | null): PlacementWish => ({ pick: item.placement.pick, rot: item.rot, variant });
 
   /** Swap a placed item to another of its record's variants; place, angle and scale stay. */
   async function setVariation(item: Item, variant: number): Promise<void> {
     const source = item.source;
     if (!source || item.placement.variants < 1) throw new Error(`item ${item.id} has no variants`);
-    const placement = pluginOf(item.game).place(source.category, source.record, keep(item, variant, 'refuse'));
+    const placement = pluginOf(item.game).place(source.category, source.record, keep(item, variant));
     return swapModel(item, { placement });
   }
 
   /**
    * Take a placed item's record, model and textures from another dataset.
-   * It keeps its variant when the other dataset's record has it, else the
-   * first. A record the other dataset does not have stays as it is (an error).
+   * It keeps its variant; a record there without that variant is refused,
+   * and so is a record the other dataset does not have. The item stays as it is.
    */
   function setItemDataset(item: Item, dataset: string): Promise<void> {
     return loading(async () => {
@@ -257,7 +270,7 @@ export function createScene({ host, games, api, status, events, sky }: SceneDeps
       const own = item.source;
       if (!own) return await swapModel(item, { dataset });
       const record = await api.record(own.category, own.record.id, dataset, item.game);
-      const placement = pluginOf(item.game).place(own.category, record, keep(item, item.placement.variant, 'first'));
+      const placement = pluginOf(item.game).place(own.category, record, keep(item, item.placement.variant));
       return await swapModel(item, { source: { category: own.category, record }, dataset, placement });
     });
   }

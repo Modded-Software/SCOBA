@@ -17,7 +17,8 @@ import type { ApiClient, GameParts, GameRegistry, Store } from './context';
 import type { EventBus, ViewerEvents } from './bus';
 import type { GameCategory, GameRecord, PageGame } from './plugin';
 import { byIdAs, make } from './dom';
-import { datasetSetting, settings } from './settings';
+import { SettingsRefused } from './refusals';
+import { datasetSetting, keyOf, settings } from './settings';
 
 /** One game's datasets as the server lists them, and its current one. */
 interface GameDatasets {
@@ -83,18 +84,28 @@ export function createDatasets(registered: readonly PageGame[], store: Store, ev
     return id;
   }
 
-  /** A dataset argument: null or absent is the game's current one. */
-  const datasetOf = (dataset: string | null | undefined, of: string): string => requireDataset(dataset ?? stateOf(of).current, of);
-  const version = (dataset: string, of: string): string => stateOf(of).known.get(dataset)?.signature ?? '';
+  /** A dataset argument: null or absent means the game's current one (the API's declared default). */
+  const datasetOf = (dataset: string | null | undefined, of: string): string => requireDataset(dataset === null || dataset === undefined ? stateOf(of).current : dataset, of);
+  /** A known dataset of a game, checked. */
+  function infoOf(dataset: string, of: string): DatasetInfo {
+    const found = stateOf(of).known.get(requireDataset(dataset, of));
+    if (!found) throw new Error(`no dataset "${dataset}" in ${of}`);
+    return found;
+  }
+  const version = (dataset: string, of: string): string | null => infoOf(dataset, of).signature;
 
+  /**
+   * Read a game's datasets. Its current one: the stored choice; nothing stored, the server's default.
+   * A stored choice the server does not list is refused (core/refusals.ts), not replaced.
+   */
   async function readGame(id: string): Promise<void> {
     const body = await getJson<DatasetsBody>(routes.datasets(id));
     const known = new Map(body.datasets.map((d) => [d.id, d]));
     for (const problem of body.problems) console.warn(`viewer: ${id}: not a dataset: ${problem.dir}: ${problem.reason}`);
-    const stored = store.read(datasetSetting(id)).value;
-    // What the game's new items need (SC2: the HD texture list), before the first one is made.
-    await partsOf(id).prepareGame();
-    loaded.set(id, { known, defaultId: body.default, current: stored !== null && known.has(stored) ? stored : body.default });
+    const setting = datasetSetting(id);
+    const stored = store.find(setting);
+    if (stored !== null && !known.has(stored)) throw new SettingsRefused([{ key: keyOf(setting), stored: JSON.stringify(stored), reason: `${id} has no dataset "${stored}" (have: ${[...known.keys()].join(', ')})` }]);
+    loaded.set(id, { known, defaultId: body.default, current: stored === null ? body.default : stored });
   }
 
   function loadGame(id: string): Promise<void> {
@@ -136,24 +147,34 @@ export function createDatasets(registered: readonly PageGame[], store: Store, ev
     const why = gameRefusal(id);
     if (why !== null) throw new Error(why);
     await loadGame(id);
-    // Only a choice is stored. The game shown at startup in place of a refused one is not, so the stored one opens again later.
     store.write(settings.game, id);
     if (id === gameId) return;
     show(id);
     notify();
   }
 
-  /** The first game that can open: the stored one, the server's default, then any. */
+  /**
+   * The gallery's game: the stored choice; nothing stored, the server's default.
+   * A stored game that cannot open is refused (core/refusals.ts). The server's default that cannot open is an error.
+   * Every game that can open has its datasets read, so a stored dataset choice is checked now.
+   */
   async function setupDatasets(): Promise<void> {
     const body = await getJson<GamesBody>(routes.games());
     info = body.games;
-    const stored = store.read(settings.game).value;
-    const storedWhy = stored === null ? null : gameRefusal(stored);
-    if (storedWhy !== null) console.warn(`viewer: stored game refused: ${storedWhy}`);
-    const order = [stored, body.default, ...info.map((g) => g.id)].filter((id): id is string => id !== null);
-    const chosen = order.find((id) => gameRefusal(id) === null);
-    if (chosen === undefined) throw new Error(`no game can open: ${info.map((g) => `${g.id}: ${gameRefusal(g.id) ?? ''}`).join('; ')}`);
-    await loadGame(chosen);
+    const stored = store.find(settings.game);
+    if (stored !== null) {
+      const why = gameRefusal(stored);
+      if (why !== null) throw new SettingsRefused([{ key: keyOf(settings.game), stored: JSON.stringify(stored), reason: why }]);
+    }
+    const chosen = stored === null ? body.default : stored;
+    const why = gameRefusal(chosen);
+    if (why !== null) throw new Error(`the server's default game "${chosen}" cannot open: ${why}`);
+    const open = info.filter((g) => gameRefusal(g.id) === null).map((g) => g.id);
+    const read = await Promise.allSettled(open.map(loadGame));
+    const refused = read.flatMap((one) => (one.status === 'rejected' && one.reason instanceof SettingsRefused ? one.reason.refused : []));
+    if (refused.length) throw new SettingsRefused(refused);
+    const failed = read.find((one): one is PromiseRejectedResult => one.status === 'rejected');
+    if (failed) throw failed.reason;
     show(chosen);
   }
 
@@ -210,7 +231,13 @@ export function createDatasets(registered: readonly PageGame[], store: Store, ev
     setGame,
     loadGame,
     categoryOf,
-    nounOf: (item) => (item.source ? (pluginOf(item.game).categories.find((c) => c.id === item.source?.category)?.noun ?? null) : null),
+    nounOf(item) {
+      const { source } = item;
+      if (!source) return null;
+      const category = pluginOf(item.game).categories.find((c) => c.id === source.category);
+      if (!category) throw new Error(`${item.game} has no category "${source.category}"`);
+      return category.noun;
+    },
   };
 
   const api: ApiClient = {
@@ -242,8 +269,8 @@ export function createDatasets(registered: readonly PageGame[], store: Store, ev
     datasets: (of = game()) => [...stateOf(of).known.values()].map((d) => ({ ...d })),
     setDataset,
     requireDataset,
-    hasDataset: (id, of = game()) => loaded.get(of)?.known.has(id) ?? false,
-    datasetLabel: (id, of = game()) => loaded.get(of)?.known.get(id)?.label ?? id,
+    hasDataset: (id, of = game()) => stateOf(of).known.has(id),
+    datasetLabel: (id, of = game()) => infoOf(id, of).label,
     updateDatasets,
   };
 

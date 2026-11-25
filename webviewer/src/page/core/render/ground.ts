@@ -5,10 +5,14 @@
 // the level follows the zoom so cells never get arbitrarily small.
 // The grid is faint, except around units (and the mouse): there it glows,
 // fading out with the distance.
+// Under the grid, a ground texture when one is chosen (SPEC-VIEWER 17.5):
+// its colour, repeated by world position, not lit (shaders/groundtex.frag).
+// It is drawn with the grid switched off too.
 
 import type ModelViewer from '@renderer/viewer/viewer';
 import type Camera from '@renderer/viewer/camera';
 import type Shader from '@renderer/viewer/gl/shader';
+import type Texture from '@renderer/viewer/texture';
 import { attrib, loadShader, quadBuffer, uniform, type Rgb } from './gl';
 
 /** Glow spots the shader takes at most; fewer when the GPU has fewer uniform vectors. */
@@ -34,7 +38,12 @@ export interface Ring {
 export type Rings = [Ring | null, Ring | null, ...Ring[]];
 
 export interface Ground {
+  /** The grid is drawn. */
   enabled: boolean;
+  /** The ground texture, or null: none. */
+  texture: Texture | null;
+  /** World units one repeat of the texture covers. */
+  tile: number;
   cell: number;
   /** The quad's half size: at least `radius`, and `reach` times the camera distance. */
   radius: number;
@@ -75,6 +84,7 @@ export function createGround(viewer: ModelViewer): Ground {
   const gl = viewer.gl;
   if (!viewer.webgl.ensureExtension('OES_standard_derivatives')) throw new Error('ground: OES_standard_derivatives is not available');
   let shader: Shader | null = null;
+  let textured: Shader | null = null;
   // One vec4 uniform per spot: as many as the fragment stage can hold.
   const vectors = Number(gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS));
   const maxSpots = Math.max(1, Math.min(SPOT_CAP, vectors - OTHER_UNIFORMS - MAX_RINGS));
@@ -84,8 +94,41 @@ export function createGround(viewer: ModelViewer): Ground {
   const buffer = quadBuffer(gl);
   const defines = `#define MAX_SPOTS ${maxSpots}\n#define MAX_RINGS ${MAX_RINGS}\n`;
 
+  /** Draw the quad of half size `radius` around the rounded centre with one shader; blended, under everything. */
+  function quad(use: Shader, camera: Camera, cx: number, cy: number, radius: number): void {
+    gl.uniformMatrix4fv(uniform(use, 'u_VP'), false, camera.viewProjectionMatrix);
+    gl.uniform2f(uniform(use, 'u_center'), Math.round(cx), Math.round(cy));
+    gl.uniform1f(uniform(use, 'u_radius'), radius);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.vertexAttribPointer(attrib(use, 'a_corner'), 2, gl.FLOAT, false, 0, 0);
+    gl.disable(gl.DEPTH_TEST);
+    gl.depthMask(false);
+    gl.disable(gl.CULL_FACE);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.disable(gl.BLEND);
+    gl.enable(gl.CULL_FACE);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(true);
+  }
+
+  /** The ground texture, repeated by world position. */
+  function drawTexture(use: Shader, texture: Texture, camera: Camera, cx: number, cy: number, radius: number): void {
+    use.use();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture.webglResource);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.uniform1i(uniform(use, 'u_texture'), 0);
+    gl.uniform1f(uniform(use, 'u_tile'), ground.tile);
+    quad(use, camera, cx, cy, radius);
+  }
+
   const ground: Ground = {
     enabled: true,
+    texture: null,
+    tile: 8,
     cell: 1,
     radius: 60,
     reach: 8,
@@ -101,15 +144,18 @@ export function createGround(viewer: ModelViewer): Ground {
     maxRings: MAX_RINGS,
     ringsDrawn: 0,
     ringColor: [0.2, 1.0, 0.25],
-    ready: loadShader(viewer, 'ground', '/shaders/ground.vert', '/shaders/ground.frag', defines).then((loaded) => {
-      shader = loaded;
+    ready: Promise.all([loadShader(viewer, 'ground', '/shaders/ground.vert', '/shaders/ground.frag', defines), loadShader(viewer, 'ground texture', '/shaders/ground.vert', '/shaders/groundtex.frag')]).then(([grid, texture]) => {
+      shader = grid;
+      textured = texture;
     }),
 
     draw(camera, center, spots = [], distance = 0) {
-      if (!ground.enabled || shader === null) return;
-      shader.use();
       const cx = center[0] ?? 0;
       const cy = center[1] ?? 0;
+      ground.drawnRadius = Math.max(ground.radius, ground.reach * distance);
+      if (ground.texture && ground.texture.webglResource && textured) drawTexture(textured, ground.texture, camera, cx, cy, ground.drawnRadius);
+      if (!ground.enabled || shader === null) return;
+      shader.use();
       const near = (x: number, y: number): number => (x - cx) ** 2 + (y - cy) ** 2;
       // More rings than the shader holds: the first two, then the ones nearest the view centre.
       let rings: readonly (Ring | null)[] = ground.rings;
@@ -136,26 +182,11 @@ export function createGround(viewer: ModelViewer): Ground {
       gl.uniform3fv(uniform(shader, 'u_lineHd'), ground.lineHd);
       gl.uniform3fv(uniform(shader, 'u_fillHd'), ground.fillHd);
       gl.uniform1f(uniform(shader, 'u_spotCount'), count);
-      gl.uniformMatrix4fv(uniform(shader, 'u_VP'), false, camera.viewProjectionMatrix);
-      gl.uniform2f(uniform(shader, 'u_center'), Math.round(cx), Math.round(cy));
-      ground.drawnRadius = Math.max(ground.radius, ground.reach * distance);
-      gl.uniform1f(uniform(shader, 'u_radius'), ground.drawnRadius);
       gl.uniform1f(uniform(shader, 'u_cell'), ground.cell);
       gl.uniform1f(uniform(shader, 'u_minPx'), ground.minPx);
       gl.uniform3fv(uniform(shader, 'u_line'), ground.line);
       gl.uniform3fv(uniform(shader, 'u_fill'), ground.fill);
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.vertexAttribPointer(attrib(shader, 'a_corner'), 2, gl.FLOAT, false, 0, 0);
-      gl.disable(gl.DEPTH_TEST);
-      gl.depthMask(false);
-      gl.disable(gl.CULL_FACE);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      gl.disable(gl.BLEND);
-      gl.enable(gl.CULL_FACE);
-      gl.enable(gl.DEPTH_TEST);
-      gl.depthMask(true);
+      quad(shader, camera, cx, cy, ground.drawnRadius);
     },
   };
   return ground;

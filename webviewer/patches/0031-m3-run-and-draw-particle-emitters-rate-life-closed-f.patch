@@ -1,7 +1,7 @@
 From 244d4d03f29457b4ed2a78a64d1d4fdb13eabe0e Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sun, 22 Nov 2026 21:34:34 +0200
-Subject: [PATCH 31/56] m3: run and draw particle emitters (rate, life,
+Subject: [PATCH 31/57] m3: run and draw particle emitters (rate, life,
  closed-form motion, life curves, billboards)
 
 ---

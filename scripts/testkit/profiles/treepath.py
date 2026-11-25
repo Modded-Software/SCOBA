@@ -22,15 +22,24 @@ import re
 from pathlib import Path
 from typing import NamedTuple
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
-TARGETS_GALAXY = ROOT / "out" / "testkit" / "treepath" / "treepath_targets.galaxy"
+
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
+def targets_galaxy_path():
+    return workpaths.path("SC2_TESTKIT") / "treepath" / "treepath_targets.galaxy"
+
+
 MAP_CELLS = 256
 # Targets keep this far from the map edge, which is unpathable terrain
 # (run 20261115-133213: a tree at x = 9 had no open ground around it).
@@ -230,7 +239,8 @@ def walk(target: Obstacle, every: list[Obstacle]) -> tuple[tuple[float, float], 
     return None
 
 
-def pick_targets(every: list[Obstacle], map_dir: Path = BUILT) -> dict[str, Obstacle]:
+def pick_targets(every: list[Obstacle], map_dir: Path | None = None) -> dict[str, Obstacle]:
+    map_dir = map_dir or built_path()
     text = (map_dir / "Objects").read_text(encoding="utf-8")
     rotations = {
         _attr(m.group(0), "Id"): float(_attr(m.group(0), "Rotation") or 0.0)
@@ -284,7 +294,7 @@ def targets_galaxy(picks: dict[str, Obstacle], every: list[Obstacle]) -> str:
 
 
 def map_spec() -> TestMapSpec:
-    every = obstacles(BUILT)
+    every = obstacles(built_path())
     picks = pick_targets(every)
     for section, target in picks.items():
         print(
@@ -292,17 +302,17 @@ def map_spec() -> TestMapSpec:
             f" centre=({target.centre[0]:.2f},{target.centre[1]:.2f})"
             f" in={len(inner_probes(target))} out={len(outer_probes(target, every))}"
         )
-    TARGETS_GALAXY.parent.mkdir(parents=True, exist_ok=True)
-    TARGETS_GALAXY.write_text(targets_galaxy(picks, every), encoding="utf-8")
+    targets_galaxy_path().parent.mkdir(parents=True, exist_ok=True)
+    targets_galaxy_path().write_text(targets_galaxy(picks, every), encoding="utf-8")
     return TestMapSpec(
         profile="treepath",
-        source=BUILT,
-        output=PROFILE_OUTPUTS["treepath"],
+        source=built_path(),
+        output=profile_output("treepath"),
         bank_names=PROFILE_BANKS["treepath"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "treepath.galaxy",
-            TARGETS_GALAXY,
+            targets_galaxy_path(),
         ),
         galaxy_includes=(
             "scripts/test/treepath/common",
@@ -333,7 +343,7 @@ def check(ctx, data: dict, checks) -> None:
         checks.failures += 1
     checks.eq("meta", "", "done", 1)
     checks.eq("meta", "", "realClicks", 0)
-    every = obstacles(BUILT)
+    every = obstacles(built_path())
     by_id = {o.ident: o for o in every}
     for section in SECTIONS:
         raw = data.setdefault(section, {})
@@ -370,7 +380,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="treepath",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["treepath"],
+        map_source=profile_output("treepath"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["treepath"],
         ready_section="meta",

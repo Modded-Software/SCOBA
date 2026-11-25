@@ -52,7 +52,7 @@ if [[ -n "$only" ]] && ! grep -q "^${only}	" <<< "$listing"; then
   exit 1
 fi
 
-export PYTHONPATH="$REPO_ROOT/scripts:$REPO_ROOT/scripts/hdtex"
+export PYTHONPATH="$REPO_ROOT/scripts"
 while IFS=$'\t' read -r id stock map out; do
   [[ -z "$only" || "$only" == "$id" ]] || continue
   present=0

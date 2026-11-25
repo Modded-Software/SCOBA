@@ -8,10 +8,16 @@ import re
 import sys
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
-DEFAULT_MAP = ROOT / "out" / "SCOBA256.SC2Map"
+
+
+def default_map():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 GAMEDATA = Path("Base.SC2Data") / "GameData"
 
 COOLDOWN_LINK = "SCOBA/Attack"
@@ -63,7 +69,7 @@ def apply(map_dir: Path) -> int:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--map", type=Path, default=DEFAULT_MAP)
+    parser.add_argument("--map", type=Path, default=default_map())
     args = parser.parse_args(argv[1:])
     changed = apply(args.map)
     print(f"patched {changed} data files for the hero attack cooldown link")

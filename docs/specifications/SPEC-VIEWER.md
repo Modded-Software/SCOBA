@@ -1,1305 +1,679 @@
 # SPEC-VIEWER: Asset Viewer, Core and Interfaces
 
-**Date:** 2026-11-23
-**Status:** Design. Not built. The viewer that exists today is one game's
-viewer in plain JavaScript; section 13 maps it to this design. Section 12
-gives the state of each requirement. Section 16 records what the features
-do today. One run backs the [today] rows: the baseline of section 13.
+**Date:** 2026-11-24
+**Status:** Built through step 7: two games (sc2, ghost) and two formats
+(m3, nod) run through the extension points. Not built: step 8 (tests in
+TypeScript, the typed test object) and section 17 (textures). Section 12
+gives the state of each requirement.
 **Requirements:** [REQ-VIEWER](../requirements/REQ-VIEWER.md)
 
-Game specifications:
+Game specifications: [SPEC-VIEWER-SC2](SPEC-VIEWER-SC2.md),
+[SPEC-VIEWER-GHOST](SPEC-VIEWER-GHOST.md).
 
-- [SPEC-VIEWER-SC2](SPEC-VIEWER-SC2.md)
-- [SPEC-VIEWER-GHOST](SPEC-VIEWER-GHOST.md)
-
-This document names no game rule. It names games only as links and in the
-state and migration tables.
+This document names no game rule. Names and types of every interface are
+in the code files each section names. This document states duties and
+rules.
 
 ## 1. Principle
 
 - Core knows games and formats only as interfaces (R-VIEW-1, R-VIEW-4).
-- A game is two modules: one for the page, one for the server. Each is
-  registered in one line (R-VIEW-2).
+- A game is two modules, page and server, each registered in one line
+  (R-VIEW-2).
 - A format is one module. A game lists the formats it uses (R-VIEW-3).
-- The server describes a game's gallery as data. The page builds the gallery
-  from that data. A game needs no gallery code of its own (R-VIEW-25).
+- The server describes a game's gallery as data. The page builds the
+  gallery from it (R-VIEW-25).
 - The game's page module holds only what data cannot say: how a record
   becomes an instance (R-VIEW-44).
-- Features see instances through one interface, and ask for capabilities
+- Features see instances through one interface and ask for capabilities
   (R-VIEW-5, R-VIEW-6).
 
 ## 2. Labels
 
-State of a requirement:
-
 - **[verified]**: a Playwright test passed in a run named in section 12.
-- **[today]**: the current code does it, in its one-game form. The test
-  files named cover it and passed in the baseline run (section 13). It is
-  not [verified]: no one has checked that the tests assert every clause of
-  the requirement.
+- **[today]**: the code does it and the named test files passed in a full
+  run of section 13. No one has checked that they assert every clause.
 - **[plan]**: not in the code.
 - **[operator]**: only a person can judge it.
 
 ## 3. Layers
 
-```
-page                                    server
-----                                    ------
-ui         components, drawers,         core      http, router, static files,
-           game tabs, gallery,                    game registry
-           instances panel                 |
-features   pick, select, move,             v
-           clipboard, drag, add all,    GameBackend  (one per game)
-           landmarks, backdrop, grid
-core       render host, scene, camera,
-           events, store, status,
-           registries
-   |                |
-   v                v
-GamePlugin      FormatModule
-(one per game)  (one per format)
+All under `webviewer/src/`.
 
-shared     ids and messages, used by both sides
-```
+| Layer | Side | Holds |
+| --- | --- | --- |
+| `shared` | both | ids and messages |
+| `page/core` | page | render host, scene, camera, events, store, status, registries |
+| `page/features` | page | one folder per feature |
+| `page/ui` | page | components, drawers, game tabs, gallery, instances panel |
+| `formats/<id>` | page | one format |
+| `games/<id>` | both | one game: `page`, `server`, `shared` |
+| `server/core` | server | HTTP, routes, static files, game registry |
+| `tools` | Node | surveys, fixtures, the build |
 
-Dependency rule, checked by the build (section 9):
+Import rule, checked in every test run (section 9):
 
-- `shared` imports nothing of the viewer.
-- `core` imports `shared`.
-- `features` and `ui` import `core` and `shared`.
+- `shared` imports nothing of the viewer. `core` imports `shared`.
+- `features` and `ui` import `core` and `shared`. `features` may import
+  `ui`, never the reverse.
 - `formats/<id>` imports `core` and `shared`.
-- `games/<id>` imports `core`, `shared` and the formats it lists.
-- `games/<a>` never imports `games/<b>` (R-VIEW-7).
-- `core`, `features` and `ui` never import `games/` or `formats/`.
-- Only the two composition roots import games: `src/page/main.ts` and
-  `src/server/main.ts`.
-- `features` may import `ui`. `ui` never imports `features`.
-- Page code (`src/page/`) and server code (`src/server/`) never import
-  each other. `shared` is all they have in common.
-- `games/<id>/page` never imports `games/<id>/server`, and the reverse.
-  Both may import `games/<id>/shared`.
-- `src/tools/` runs in Node. It may import `shared`, `formats/`,
-  `games/<id>/shared`, `games/<id>/server`, `server/core` and the
-  renderer library. It never imports `src/page/`.
-- The renderer library is imported only by `page/core`, `formats/<id>`
-  and `src/tools/`.
-- An import that leaves `src/` is refused, except the renderer library
-  and the packages in `package.json`.
-
-The last six rules were proposed by the author and accepted by the
-operator (2026-11-23, O-VSPEC-7).
+- `games/<id>` imports `core`, `shared` and the formats it lists, never
+  another game (R-VIEW-7).
+- `core`, `features` and `ui` never import a game or a format.
+- Only `page/main.ts` and `server/main.ts` import games.
+- Page code and server code never import each other. Neither do a game's
+  `page` and `server`; both may import its `shared`.
+- `tools` may import `shared`, formats, a game's `shared` and `server`,
+  `server/core` and the renderer library, never page code.
+- The renderer library is imported only by `page/core`, formats and
+  `tools`.
+- An import that leaves `src/` is refused, except the renderer library and
+  the packages of `package.json`.
 
 ## 4. Source layout
 
-```
-webviewer/
-  src/
-    shared/            ids, protocol messages, scene address format
-    page/
-      core/            render host, scene, camera, events, store, status
-      ui/              components, drawers, game tabs, gallery, instances
-      features/        one folder per feature
-      main.ts          registers the games, installs the features
-    formats/<id>/      one folder per format
-    games/<id>/
-      page/            GamePlugin
-      server/          GameBackend
-      shared/          the game's record types
-    server/
-      core/            http, router, static files, registry
-      main.ts          registers the game backends
-    tools/             Node tools (surveys, fixtures)
-  tests/               Playwright tests
-  scripts/             shell entry points
-```
+Besides `src/`, under `webviewer/`:
 
-Adding a game adds `src/games/<id>/` and two lines, one in each `main.ts`.
+| Path | Holds |
+| --- | --- |
+| `public/` | the HTML, style sheets, shaders, and the page bundle |
+| `tests/` | Playwright tests |
+| `scripts/` | shell entry points |
+| `ref/`, `patches/` | the renderer library's repo and its commits as files (section 9) |
+| `build/` | bundles; not in git |
+
+Adding a game adds `src/games/<id>/` and one line in each `main.ts`.
 
 ## 5. Shared types
 
-`src/shared/`. Both sides compile against these (R-VIEW-11).
+`src/shared/`. Both sides compile against them (R-VIEW-11).
 
-```ts
-type GameId = string;      // all four: the id rule of section 8
-type DatasetId = string;
-type CategoryId = string;
-type FormatId = string;
-
-interface GameInfo {
-  id: GameId;
-  label: string;           // full name
-  tab: string;             // short text of the game tab
-  available: boolean;
-  reason: string | null;   // why not, when not available
-}
-
-interface DatasetInfo {
-  id: DatasetId;
-  label: string;
-  builtin: boolean;
-  signature: string | null;  // what is loaded
-  current: string;           // its sources now
-  changed: boolean;          // they differ
-}
-
-interface FilterInfo {
-  id: string;                // the query parameter
-  label: string;
-  kind: 'buttons' | 'select';
-  values: { value: string; label: string }[];
-}
-
-interface CategoryInfo {
-  id: CategoryId;
-  label: string;             // tab text
-  noun: string;              // "unit": for counts and questions
-  filters: FilterInfo[];
-  addAll: boolean;
-}
-
-interface Page<T> { total: number; items: T[] }
-
-interface RecordSummary {
-  id: string;
-  name: string;
-  sub: string;                 // the grey line under the name
-  icon: string | null;
-  placeable: boolean;
-  notPlaceableAs: string | null;  // the word for it, when not placeable
-}
-
-interface RecordDetail<D> extends RecordSummary {
-  game: GameId;
-  dataset: DatasetId;
-  category: CategoryId;
-  files: string[];             // servable model files, one per variant
-  picture: string | null;
-  data: D;                     // the game's own record type
-}
-
-interface Backdrop { id: string; name: string; game: GameId; dataset: DatasetId; file: string }
-
-type AssetKind = 'model' | 'texture' | 'animation' | 'material';
-
-interface ApiError { error: string }  // plus context fields
-```
+| Type | Holds |
+| --- | --- |
+| ids | game, dataset, category, format: the id rule of section 8 |
+| game info | id, label, tab text, available, the reason when not, whether it has a texture service. |
+| dataset info | id, label, built-in, the signature loaded, the signature of its sources now, whether they differ |
+| category info | id, tab label, noun, filters, whether "add all" is offered. The page's game plugin says whether its records are ground textures. |
+| filter info | query parameter, label, buttons or select, values with labels |
+| page | total and items |
+| record summary | id, name, the grey line under it, icon, placeable, the word for it when not |
+| record detail | the summary, game, dataset, category, servable model files (one per variant), picture, the game's own data. A ground record: its colour file and its normal map, as the texture service names them. |
+| backdrop | id, name, game, dataset, file |
+| asset kind | model, texture, animation, material |
+| error | the error text and context fields |
 
 ## 6. Page interfaces
 
+`src/page/core/plugin.ts` and `context.ts`.
+
 ### 6.1 Model and instance
 
-Every format's model and instance satisfy these. Features use nothing else.
+Every format's model and instance offer these. Features use nothing else.
 
-```ts
-interface ViewerModel {
-  readonly format: FormatId;
-  readonly bounds: { readonly r: number };      // culling sphere
-  readonly vertexMin: ArrayLike<number>;        // rest pose box
-  readonly vertexMax: ArrayLike<number>;
-  readonly loaded: boolean;                     // has geometry to draw
-  readonly undrawn: readonly string[];          // parts not drawn (R-VIEW-81)
-  readonly textures: readonly string[];         // references it names
-  addInstance(): ViewerInstance;
-}
-
-interface ViewerInstance {
-  readonly model: ViewerModel;
-  readonly sequences: readonly { readonly name: string; readonly length: number }[];  // length in ms
-  setLocation(at: Vec3): void;
-  setRotation(turn: Quat): void;
-  setScale(by: Vec3): void;
-  setSequence(index: number): void;             // -1: none
-  setLoop(loop: boolean): void;                 // true: repeat. false: play to the end and hold
-  timeScale: number;
-  readonly sequenceEnded: boolean;              // the playhead passed the end in the last step
-  readonly sequence: number;                    // the one set, -1 for none
-  readonly frame: number;                       // playhead, ms
-  readonly location: ArrayLike<number>;         // what the renderer holds
-  readonly rotation: ArrayLike<number>;
-  readonly scaling: ArrayLike<number>;
-  show(): void;
-  hide(): void;
-  readonly shown: boolean;                      // not hidden
-  attach(scene: RenderScene): void;
-  detach(): void;
-  readonly attached: boolean;                   // in a scene
-  readonly drawn: boolean;                      // drawn in the last frame: shown and not culled
-  highlight: number;                            // mouse-over brightness
-  solidOnly: boolean;                           // draw solid parts only
-  renderOpaque(): void;                         // alone, for the outline mask
-  renderPick(r: number, g: number, b: number): void;  // flat colour, solid parts
-}
-```
-
-The types are in `src/page/core/plugin.ts`.
-
-`sequences` is on the instance, not on the model. The renderer library
-keeps one model per file. Two items may share a model file and have
-different animations, when a game keeps animations outside the model file
-(6.4, `clips`).
-
-Where the library's M3 classes stand against these, read from their code
-and from the page's use of them:
-
-| Member | M3 classes today |
+| Of | Offers |
 | --- | --- |
-| `bounds`, `vertexMin`, `vertexMax`, `addInstance` | the same |
-| `setLocation`, `setRotation`, `setScale`, `setSequence`, `timeScale`, `sequenceEnded`, `sequence`, `frame`, `show`, `hide`, `detach`, `highlight`, `solidOnly`, `renderOpaque`, `renderPick` | the same |
-| `format` | absent |
-| `loaded` | `batches.length > 0` |
-| `sequences` | on the model; `length` is `interval[1] - interval[0]` |
-| `undrawn` | `undrawnBatches` |
-| `textures` | read out of `materials` |
-| `setLoop(loop)` | `setSequenceLoopMode(2)` and `(1)`. Mode 0, "as the file says", is not used by the page. |
-| `location`, `rotation`, `scaling` | `localLocation`, `localRotation`, `localScale` |
-| `shown`, `attached`, `drawn` | `rendered`, `scene`, `scene.instances` (the list drawn in the last frame) |
-| `attach(scene)` | `scene.addInstance(instance)` |
+| model | its format; culling sphere; rest-pose box; whether it has geometry; the parts not drawn (R-VIEW-81); the texture references it names; a new instance |
+| instance | its model; its sequences with lengths; place, turn, scale; a sequence to play, looped or held at its end, and a time scale; the playhead and whether it passed the end; show and hide; attach to and detach from a scene; whether the last frame drew it; mouse-over brightness; solid parts only; a draw alone for the outline; a draw in one flat colour for the pick |
 
-The format module `m3` closes these gaps with an adapter
-(`src/formats/m3/adapter.ts`). The library is not changed for them. The
-adapter keeps the library object as `m3`. Format code and the tests reach
-the M3 members through it (`item.model.m3`, `item.instance.m3`).
+- Sequences are on the instance. Two items may share a model file and
+  differ in animations, when a game keeps animations outside it (6.4).
+- m3: an adapter closes the gaps to the library's classes. The library is
+  not changed for them. The adapter keeps the library object as `m3`.
 
 ### 6.2 Capabilities
 
-Optional. A missing member means the instance cannot do it (R-VIEW-6).
+Optional. A missing one means the instance cannot do it (R-VIEW-6).
 
-```ts
-interface Capabilities {
-  teamColor?: { readonly count: number; set(index: number): void };
-  tint?: { set(color: Rgb | null): void };
-  textureOverride?: {
-    slots(): readonly TextureSlot[];
-    set(slot: TextureSlot, texture: Texture | null): void;
-    applied(): number;                          // slots that hold another texture now
-  };
-  edges?: { draw(r: number, g: number, b: number): number };  // the triangle edges as lines; lines drawn
-}
+| Capability | Does | m3 | nod |
+| --- | --- | --- | --- |
+| `teamColor` | a count; set by index | 14 colours | no |
+| `tint` | set a colour or none | the vertex colour | no |
+| `textureOverride` | lists slots, each with its in-model path and its own texture's longest side; puts another texture into a slot or takes it out; counts the slots that hold another | one slot per active layer that names a texture file | no |
+| `edges` | draws the triangle edges as lines in one flat colour; returns the lines drawn | yes (patch 0056) | yes |
 
-interface TextureSlot {
-  readonly source: string;                      // in-model path of the texture
-  ownSize(): number;                            // longest side of its own texture once loaded; 0 before
-}
-```
-
-M3 gives all four: 14 team colours, the vertex colour as tint, one slot
-per active layer that names a texture file, and the edges. Core reads the
-team count from `teamColor.count`. An item without `teamColor` has no team
-control in its list row. nod gives `edges` only.
-
-`edges.draw` draws the triangle edges of the parts the instance draws, as
-lines in one flat colour. Each edge is drawn once. The format draws them
-with its own vertex shader, so they follow the pose. The caller sets the
-depth and blend state. M3: `M3ModelInstance.renderEdges` (patch 0056).
-nod: `NodInstance.renderEdges`. Both list the edges with the library's
-`edgePairs` (`viewer/edges.ts`), once per model, on the first draw.
-
-A new capability is a new optional member plus the feature that uses it.
-Existing formats are not edited.
+- An item without `teamColor` has no team control.
+- `edges` draws each edge once, with the format's own vertex shader, so
+  the lines follow the pose. The caller sets depth and blend state.
+- A new capability is a new optional member and the feature that uses it.
+  Existing formats are not edited.
 
 ### 6.3 Format module
 
-```ts
-interface FormatModule {
-  readonly id: FormatId;
-  readonly extensions: readonly string[];        // ".ext", lower case
-  readonly handlers: readonly RendererHandler[]; // model and texture readers
-  /** The library's loaded resource as this format's model; null when it is not one. */
-  adopt(resource: unknown): ViewerModel | null;
-  /** The bytes of a model file, as the object its handler takes. */
-  parse?(bytes: Uint8Array, name: string): unknown;
-  /** Give an instance animations kept outside its model file; the clips left out, each with its reason. */
-  attachClips?(instance: ViewerInstance, clips: readonly Clip[], url: (reference: string) => string): Promise<readonly string[]>;
-  capabilities(instance: ViewerInstance): Capabilities;
-  postPasses?(viewer: RenderHost): readonly PostPass[];  // draws after the scene, made once per viewer
-  inspect?(instance: ViewerInstance): Record<string, unknown>;  // what only the format knows, for state()
-  readonly probes?: Readonly<Record<string, Probe>>;  // inspection for tests
-}
+| Member | Duty |
+| --- | --- |
+| id, extensions | |
+| handlers | the renderer library's model and texture readers |
+| `adopt` | the library's loaded resource as this format's model, or nothing |
+| `parse`, optional | the bytes of a model file as the object its handler takes |
+| `attachClips`, optional | give an instance animations kept outside its model file; returns the clips left out, each with its reason |
+| `capabilities` | those of an instance |
+| `postPasses`, optional | draws after the scene, each with an id and a switch |
+| `inspect`, optional | what only the format knows, for `state()` |
+| `probes`, optional | inspection for tests |
 
-interface PostPass {
-  readonly id: string;
-  enabled: boolean;
-  draw(scene: RenderScene, width: number, height: number): number;
-}
-```
-
-- The render host is the renderer library's viewer. A format's handlers are
-  that library's handler objects: `load`, `isValidSource`, `resource`.
-- The library picks a handler by the bytes of a file (`isValidSource`),
-  never by its name. That works for a file with a magic number. A format
-  without one gives `parse`: core fetches the file, picks the format by
-  the extension of the file's path, calls `parse`, and hands the result to
-  the library. The format's `isValidSource` then accepts only that parsed
-  object.
+- The library picks a handler by a file's bytes, never by its name. A
+  format without a magic number gives `parse`: core picks the format by
+  the file's extension, parses, and hands the result to the library.
 - Core loads every model through one call and keeps one model per game,
-  dataset signature and file. The library's own store is keyed by URL and
-  does not hold a model that came through `parse`.
-- A format without `attachClips` cannot take `clips`. A placement with
-  clips for such a format is a failure, reported.
-- `url` gives the address of a clip: `api.assetUrl('animation', reference,
-  dataset, game)`. A clip that fails is left out; the others are kept.
-  Core names the ones left out in the console and the status, as a
-  failure. `instanceOf` waits for the clips before the rest animation.
-- A load that a format's handler refused fails with the handler's message
-  (`core/host.ts`). A fetch that fails gives "cannot load <file>".
-- A format refuses what it cannot read (R-VIEW-82): its parser throws with
-  the file, the record and the version.
-- Core loads a file with the library, then asks each format to `adopt` the
-  result. The first that returns a model owns it. No format: the load fails.
-- Core sums what every post pass drew after each scene, sky and units
-  (`state().displacedBatches`). A test turns one pass off by its id.
-- `inspect` gives the format's part of `sc2viewer.state()`: for M3 the
-  geometry layout, layers, draw order, regions and engine look.
-- `probes` replace format-only members of the test object. They are reached
-  as `sc2viewer.probe(format, name, ...)` (step 6). `probes(context)`
-  takes the render and scene services and is made once (`core/testapi.ts`
-  `createProbe`). The M3 probes are in `src/formats/m3/` (`particles.ts`,
-  `billboards.ts`, `layers.ts`). An unknown format or name throws an error
-  that names it: `probe.spec`.
+  dataset signature and file.
+- Core asks each format to adopt a loaded file. The first that does owns
+  it. None: the load fails.
+- A format refuses what it cannot read, naming the file, the record and
+  the version (R-VIEW-82). The load fails with that message. A failed
+  fetch gives "cannot load <file>".
+- Clips for a format without `attachClips` are a failure, reported. A
+  clip that fails is left out and named; the others are kept. The rest
+  animation waits for the clips.
+- Core sums what the post passes drew per frame. A test turns a pass off
+  by its id.
+- Probes are reached as `sc2viewer.probe(format, name, ...)`. An unknown
+  format or name is an error that names it.
 
 ### 6.4 Game plugin
 
-```ts
-interface GamePlugin<D> {
-  readonly id: GameId;
-  readonly formats: readonly FormatModule[];
-  /** URLs for what a model of this game names, per dataset. */
-  resolver(dataset: DatasetId, version: string): AssetResolver;
-  /** The lines of the preview card. */
-  describe(record: RecordDetail<D>): PreviewCard;
-  /** How a record becomes an instance. */
-  place(record: RecordDetail<D>, wish: PlacementWish): Placement;
-  /** How a bare file becomes an instance. */
-  placeFile(file: string, wish: PlacementWish): Placement;
-  /** Speed of one animation of an item. */
-  playRate(item: SceneItem<D>, sequence: number): number;
-  /** The animation an instance starts with, out of its names; -1 for none. */
-  restSequence(names: readonly string[]): number;
-  /** Game-owned settings of an item: checked, and written to the address. */
-  readonly itemOptions: OptionsCodec;
-  /** Game-only features, such as a second texture set. */
-  install?(context: FeatureContext): void;
-}
+| Member | Duty |
+| --- | --- |
+| id, formats | |
+| categories | each category's route name and noun. The noun names the row's data attribute, the drag type and the item's key in `state()`. |
+| `checkRecord` | checks what the server sent, field by field |
+| `describe` | the lines of the preview card |
+| `place` | how a record becomes an instance |
+| `placeFile` | how a bare file becomes one |
+| `playRate` | the speed of one animation of an item |
+| `restSequence` | the animation an instance starts with, or none |
+| backdrop word | what a backdrop record is called |
 
-interface AssetResolver {
-  url(reference: string, kind: AssetKind): string;
-}
+A placement holds: the model file; the variant and how many there are;
+scale; height; angle; tint; pick, which chooses inside data ranges;
+whether it becomes the backdrop; clips; radius, for the grid glow and the
+room in a row; hit radius; whether the team control shows; icon.
 
-interface PlacementWish {
-  x?: number; y?: number; rot?: number; scale?: number;
-  sequence?: number; pick?: number; variant?: number;
-  options?: JsonObject;
-}
-
-interface Placement {
-  file: string;              // servable model file
-  variant: number | null;    // which of record.files
-  variants: number;          // how many the user may choose from
-  scale: Vec3;               // from the record's data
-  height: number;            // over the ground
-  rot: number;               // degrees
-  tint: Rgb | null;
-  pick: number;              // 0..1, chooses inside data ranges
-  asBackdrop: boolean;       // becomes the backdrop, is not placed
-  clips: readonly Clip[];    // animations kept outside the model file
-}
-
-interface Clip { name: string; reference: string }  // read as kind "animation"
-```
-
-Core applies a `Placement`. It does not read `record.data`.
-
-An instance's `sequences` are those of its model file, then the
-placement's `clips`, in that order. A format whose files hold their own
-animations gets an empty `clips`. Core hands the clips to the format
-(`attachClips`) before it asks the game for the rest animation.
-
-As built in step 5b, the page side is `PageGame` in
-`src/page/core/plugin.ts`; SC2 gives it in `src/games/sc2/page/game.ts`.
-It differs from the sketch above:
-
-- `categories`: each category's route name and noun (`units`, `unit`).
-  The noun names the list row's data attribute (`data-unit`), the drag
-  type (`application/x-sc2-unit`) and the item's key in `state()`.
-- `checkRecord(category, body)`: the game checks what the server sent,
-  field by field (`src/games/sc2/page/records.ts`). Core holds the result
-  as a `GameRecord`: id, name, file, dataset.
-- `place` and `describe` take the category too. `place` gets a wish with
-  `otherwise`: a variant the record lacks is replaced by a random one
-  (an add), by the first (a dataset swap) or refused (the variant select:
-  "ZerusTree has no variation 12").
-- `Placement` also holds `radius` (the grid glow and the room in a row),
-  `hitRadius` (the pick ray; null for an SC2 doodad: its model's bounds),
-  `team` (shows the team control) and `icon` (the list row's icon box).
-  `clips` is built in step 7: SC2 gives none; Ghost gives the motions of
-  the record's motion set (SPEC-VIEWER-GHOST 6).
-- `backdrop`: the word for a backdrop record, "skybox".
-- `itemOptions` and `install` are built as `GameParts` and the game's
-  install function (section 6.6), not as members of `PageGame`.
-  `resolver` is not built: the server resolves the paths.
-- The gallery's plugin is `games.plugin()`; `games.game()` is its id.
-  An item's plugin is `games.pluginOf(item.game)`.
+- Core applies a placement. It does not read a record's data.
+- No variant wished: a random one, the map editor's rule. A wished variant
+  the record lacks is refused, on an add, a dataset swap and the variant
+  select: "<id> has no variation N (it has M)".
+- An instance's sequences are those of its model file, then the clips.
+- The server resolves asset paths. The page has no resolver.
 
 ### 6.5 Scene item
 
-```ts
-interface SceneItem<D> {
-  readonly id: number;
-  game: GameId;
-  dataset: DatasetId;
-  source: { category: CategoryId; record: string } | { file: string };
-  record: RecordDetail<D> | null;
-  placement: Placement;
-  model: ViewerModel;
-  instance: ViewerInstance;
-  capabilities: Capabilities;
-  x: number; y: number; rot: number; scale: number;
-  sequence: number;
-  oneShot: number | null;
-  options: JsonObject;       // read and written through the game's itemOptions
-}
-```
+`core/types.ts`. An item holds: id; game; dataset; its source, a category
+and record or a bare file; placement; model; instance; capabilities;
+place, angle, scale; sequence; one-shot; team; skin; the largest
+texture side it shows; options.
 
-As built in step 5b (`Item` in `src/page/core/app.ts`): `source` is
-`{ category, record: GameRecord }` or null for a bare file; `placement`,
-`model`, `instance`, `capabilities`, place, angle, scale, sequence,
-one-shot and team as above. `game` is the game that placed it (step 6).
-Step 5c adds `options`, checked by the game's `itemOptions` (SC2: `hd`, on
-unless false; unknown keys are dropped). `team` stays a field of the
-item: the team colour is a format capability (`teamColor`) that the
-placement shows or hides, so it is not one game's. A scene document
-keeps both in its item's `options`.
+- Options are checked by the game. An unknown key refuses the item, with
+  its name; the item is not added. Neither game has options of its own.
+- `team` and the skin are item fields, not game options: the team
+  colour is a format capability, the skin core's (17.4). The scene
+  document keeps the skin as the option `skin`. A `team` that is not a
+  whole number, or a skin that is not a name, refuses the item.
+- A team or an animation the model does not have refuses the item, with
+  the number; neither is replaced.
+- A scene document keeps them all in the item's options.
 
 ### 6.6 Features
 
-```ts
-interface Feature {
-  readonly id: string;
-  install(context: FeatureContext): void;
-}
+A feature has an id and an install that takes the context. The context
+gives: games, render host, scene, selection, camera, status, store,
+events, the API client, UI, the texture window, the skins, and the
+test API builder.
 
-interface FeatureContext {
-  readonly games: GameRegistry;
-  readonly render: RenderHost;
-  readonly scene: SceneService;       // add, remove, swap, items
-  readonly selection: SelectionService;
-  readonly camera: CameraService;
-  readonly status: StatusService;
-  readonly store: Store;              // typed local storage
-  readonly events: EventBus<ViewerEvents>;
-  readonly api: ApiClient;            // typed calls of section 8
-  readonly ui: UiService;             // rows, menus, dialogs, tools
-  readonly testApi: TestApiBuilder;
-}
-```
+- A feature takes what it needs from the context. There is no page object
+  and no shared untyped state (R-VIEW-12).
+- Features talk through events and services. A feature never imports
+  another feature.
+- Row controls and menu entries are added through the UI service, each
+  with a test of the item. A capability control tests for the capability.
+- `main.ts` builds the services in order. Then each game installs and
+  gives its parts. Then each feature installs.
+- Features: `dataset-reload`, `controls`, `landmarks`, `add-all`, `drag`,
+  `sky`, `pick`, `select`, `clipboard`, `inspect`, `scenes`, `edges`.
+- A game's parts: its glow class, its facts, its options check, the
+  texture service's name of a texture an instance names (absent: no
+  service), and what a double-click on an item or a record opens.
+- A game or feature adds test members through the test API builder. They
+  make `window.sc2viewer` and `window.SC2App`. A member given twice
+  throws.
 
-- A feature states what it needs by taking it from the context. Nothing is
-  published on a shared object (R-VIEW-12).
-- Features talk to each other through `events` and the services. A feature
-  never imports another feature.
-- Row controls and menu entries are added through `ui`, each with a test:
-  `when(item) => boolean`. A capability control uses
-  `when: (item) => item.capabilities.x !== undefined`.
-- The grid glows around each instance. A game may register a rule that
-  gives an item one of the grid's glow classes. Without a rule the item
-  gets the standard one.
-- A game's `install` uses the same `ui` calls for what only it has: a key,
-  a menu entry, what a double-click on a record or an instance opens.
-- What each feature does, with its numbers, is in section 16.
-
-As built in step 6 (`src/page/core/context.ts`, `src/page/main.ts`):
-
-- There is no page object and no `app()`. `main.ts` builds the
-  services in order, each from the ones before it: `status` (ui/status),
-  `events` (core/bus), `store`, the render host (core/host), `games`
-  and `api` (core/datasets), `camera` (core/view, with zoom, framing,
-  focus and the landmarks of core/landmarks), the sky (core/sky), `scene`
-  (core/scene, with the sky), `selection` (core/selection: the
-  selection, the hover, the select rectangle, the hit tests), `render`
-  (core/frame on the host), `ui` (ui/kit: drawers, scene list, game
-  tabs, gallery, icons, floating windows), `testApi` (core/testapi).
-- Then each game installs with the context (`GameContext` is the
-  `FeatureContext`) and gives its `GameParts`, then each feature in
-  `FEATURES` installs.
-- Features: `dataset-reload`, `controls` (with turning the selection to
-  face the mouse), `landmarks` (the drop-down), `add-all`, `drag`, `sky`
-  (the buttons and the picker), `pick`, `select`, `clipboard`, `inspect`,
-  `scenes`, `edges` (16.13). Focus, zoom and framing moved to the camera service, the hit
-  tests to the selection service, the sky state to the scene service.
-- `ui.addGalleryTool` gives each matching pane a button with id
-  `<tool>-<category>` ("add all": `add-all-units`). `ui.setRowDrag` is
-  what a drag of a gallery row does (features/drag).
-- `GameParts`: `itemReady`, `glowOf`, `itemFacts`, `itemOptions`,
-  `menuToggles`, `openItem`, `openRecord`, `prepareGame`. A game adds
-  its test API through `testApi` like a feature. SC2 gives them in
-  `src/games/sc2/page/parts.ts`.
-- `testApi.app` and `testApi.viewer` make `window.SC2App` and
-  `window.sc2viewer`; a member given twice throws. `testApi.statePart`
-  adds a key to `sc2viewer.state()` (pick, ghost).
-- The m3 test probes (particles, billboards, layers) are factories that
-  take the context; `main.ts` adds them to `sc2viewer`.
-
-Events (core/bus.ts, typed by `ViewerEvents`): `item-added`,
-`items-removed`, `item-swapped`, `item-changed` (a field its row shows),
-`scene-edited` (write the scene document), `selection-changed`,
-`game-changed`, `dataset-changed`, `view-changed` (sky, grid),
-`landmarks-changed`, `camera-changed`, `frame`, `scene-drawn` (the units
-and their post passes are drawn; a listener may draw over them with their
-depth), and two that collect
-work: `startup` (the page is ready when all of it is done) and `flush`
-(writes end before a dataset reload). A listener that throws is
-reported; the others still run.
+Events (`core/bus.ts`): item added, removed, swapped, changed; scene
+edited; selection, game, dataset, view, landmarks, camera changed; frame;
+scene drawn, after which a listener may draw over the scene with its
+depth; startup and flush, which collect work. A listener that throws is
+reported. The others still run.
 
 ## 7. Server interface
 
-```ts
-interface GameBackend {
-  readonly id: GameId;
-  readonly label: string;
-  readonly tab: string;
-  /** Index the data. Throws GameUnavailable with the reason (R-VIEW-8). */
-  start(settings: Settings): Promise<void>;
-  datasets(): Promise<{ default: DatasetId; datasets: DatasetInfo[]; problems: DatasetProblem[] }>;
-  reload(dataset: DatasetId): Promise<DatasetInfo>;
-  categories(dataset: DatasetId): Promise<CategoryInfo[]>;
-  /** The game's own counts: what is indexed, and what was left out and why. */
-  summary(dataset: DatasetId): Promise<JsonObject>;
-  list(dataset: DatasetId, category: CategoryId, query: ListQuery): Promise<Page<RecordSummary>>;
-  record(dataset: DatasetId, category: CategoryId, id: string): Promise<RecordDetail<unknown> | null>;
-  /** A raw file by its servable path. */
-  file(dataset: DatasetId, path: string): Promise<FileRef | null>;
-  /** A reference a model uses, resolved for the dataset. */
-  asset(dataset: DatasetId, kind: AssetKind, reference: string): Promise<AssetReply | null>;
-  icon(dataset: DatasetId, name: string): Promise<FileRef | null>;
-  backdrops(query: ListQuery): Promise<Page<Backdrop>>;
-  /** Routes below /api/<game>/x/, for game-only features. */
-  readonly extensions?: Readonly<Record<string, RouteHandler>>;
-}
+`src/server/core/backend.ts`. A backend answers in values and throws for a
+reply that is not a success. It never sees a request, except in its
+extensions.
 
-interface ListQuery { q: string; offset: number; limit: number; filters: Record<string, string> }
-type AssetReply = FileRef | { json: JsonObject };
-```
+| Member | Duty |
+| --- | --- |
+| id, label, tab text, default dataset | |
+| datasets | list them with their problems; say whether one exists; reload one |
+| categories, summary | of a dataset. The summary is the game's own counts. |
+| list, record | one page of a category; one record. Either may answer later (a promise). |
+| file, asset, icon | a file on disk or nothing: a raw file by its servable path, a reference a model uses, an icon |
+| backdrops | one page |
+| extensions | routes below `/api/<game>/x/` |
+| textures | the texture service (section 17). Absent: the game has none. |
 
-- Server core owns the HTTP side: parsing, paging limits, error replies,
-  file streaming, cache headers. A backend never sees a request object,
-  except in `extensions`.
-- A backend that throws `GameUnavailable` in `start` is listed with
-  `available: false`. The server starts without it.
-- `icon` serves only the names the dataset's index lists. No name can
-  reach a file outside the icon folder [today].
-- Server core has two settings of its own: `PORT` (4517; the tests use
-  4518) and `HOST` (`127.0.0.1`) [today]. Every other setting belongs to
-  a game and is named in its specification.
+- A game whose data is not on the machine is listed as not available,
+  with the reason. The server starts without it (R-VIEW-8).
+- Only the icon names a dataset's index lists are served.
+- Core's own settings: `PORT` (4517; tests use 4518) and `HOST`
+  (`127.0.0.1`). Every other setting is a game's.
 
 ## 8. Protocol
 
-All replies are JSON unless a file is served. Lists are `Page`.
+Replies are JSON unless a file is served.
 
 | Method and route | Reply |
 | --- | --- |
-| `GET /api/health` | `{ games: { id, available }[] }` |
-| `GET /api/games` | `{ default, games: GameInfo[] }` |
-| `GET /api/<game>/datasets` | `{ default, datasets: DatasetInfo[], problems }` |
-| `POST /api/<game>/datasets/<id>/reload` | `DatasetInfo` |
-| `GET /api/<game>/categories?dataset=` | `CategoryInfo[]` |
-| `GET /api/<game>/summary?dataset=` | the game's counts, a JSON object |
-| `GET /api/<game>/records/<category>?dataset=&q=&offset=&limit=&<filter>=` | `Page<RecordSummary>` |
-| `GET /api/<game>/record/<category>?dataset=&id=` | `RecordDetail` |
+| `GET /api/health` | each game's id and whether it is available |
+| `GET /api/games` | the default game and every game's info |
+| `GET /api/<game>/datasets` | default, datasets, problems |
+| `POST /api/<game>/datasets/<id>/reload` | the dataset's info |
+| `GET /api/<game>/categories?dataset=` | category infos |
+| `GET /api/<game>/summary?dataset=` | the game's counts |
+| `GET /api/<game>/records/<category>?dataset=&q=&offset=&limit=&<filter>=` | a page of record summaries |
+| `GET /api/<game>/record/<category>?dataset=&id=` | a record detail |
 | `GET /api/<game>/file?dataset=&path=&v=` | the file |
-| `GET /api/<game>/asset?dataset=&kind=&ref=&v=` | the file, or JSON for `kind=material` |
+| `GET /api/<game>/asset?dataset=&kind=&ref=&v=` | the file, or JSON for a material |
 | `GET /api/<game>/icon/<name>?dataset=` | the image |
-| `GET /api/<game>/backdrops?q=&offset=&limit=` | `Page<Backdrop>` |
+| `GET /api/<game>/backdrops?q=&offset=&limit=` | a page of backdrops |
 | `any /api/<game>/x/<name>` | the game's own |
+| `GET /api/<game>/textures?dataset=&asset=` | texture states (17.2) |
+| `POST /api/<game>/textures/judge?dataset=` | has the named assets judged; their states (17.2) |
+| `POST /api/<game>/textures/request?dataset=` | queues an asset, an input, a model and a size; the request's state |
+| `GET /api/<game>/textures/owner?dataset=&owner=` | an owner's state (17.2); null when the index holds no such owner with textures |
+| `POST /api/<game>/textures/skin?dataset=` | a skin change of 4.8 of SPEC-HD-TEXTURES; the owner's state |
+| `POST /api/<game>/textures/bake?dataset=` | bakes an owner's skin, or a terrain texture's variant; the state |
+| `POST /api/<game>/textures/unbake?dataset=` | removes a bake; the state |
+| `GET /api/<game>/textures/file?dataset=&asset=&variant=&v=` | a variant's file |
+| `GET /texture-viewer.html`, `/vendor/texview.js` | the texture window's page and its script |
 
-Rules:
-
-- `dataset` is required on every route that has it. There is no implied
-  dataset.
-- `limit` is 1 to 500; 60 when absent. `offset` is 0 or more; 0 when
-  absent. This holds for every list route, `backdrops` too (before step
-  4b it gave every skybox when `limit` was absent).
-- `/api/health` holds no counts. The counts are in the game's `summary`.
-  The start scripts and the test runner wait on `/api/health`.
-- An extension (`x/<name>`) gets the rest of the path: empty for the name
-  alone, `/...` below it. It answers 404 for a path it does not have.
-- A `kind` outside `model`, `texture`, `animation`, `material` is `400`.
-  A kind the game has no assets of is `404`.
-- `v` is the dataset's signature. It only makes the URL change when the
-  dataset is reloaded.
-- Errors: `400` a missing or bad parameter; `404` an unknown game, dataset,
-  category, record or file; `405` a wrong method; `503` a game that is not
-  available; `500` anything else. The body is `ApiError`.
-- The route is matched on the raw URL, so an encoded `..` never reaches a
-  real route.
-- The id rule: a game id, a dataset id, a category id and a format id
-  match `^[a-z0-9][a-z0-9_-]{0,39}$`: 1 to 40 letters. This is today's
-  rule for a dataset id.
+- `dataset` is required wherever it appears.
+- `limit` is 1 to 500, 60 when absent. `offset` is 0 when absent.
+- `v` is the dataset's signature. It only makes the URL change on a
+  reload.
+- An extension gets the rest of the path and answers 404 for what it does
+  not have.
+- Errors: 400 a missing or bad parameter; 404 an unknown game, dataset,
+  category, record, file or asset kind the game lacks; 405 a wrong method;
+  503 a game that is not available; 500 anything else.
+- The route is matched on the raw URL, so an encoded `..` reaches no
+  route.
+- The id rule: `^[a-z0-9][a-z0-9_-]{0,39}$`.
 
 ## 9. Build and code rules
 
 - TypeScript in strict mode, with `noUncheckedIndexedAccess` and
-  `noImplicitOverride` (R-VIEW-10). One `tsconfig.json` for page, server,
-  tools and tests. The renderer library has its own (below).
-- esbuild bundles the page (`src/page/main.ts`), the server
-  (`src/server/main.ts`) and each Node tool into `build/`. `build/` is not
-  in git. The test runner starts `build/server.js`.
-- The page is one bundle (step 3, done). `src/tools/build.ts` bundles
-  `src/page/main.ts` into `public/vendor/renderer.js` and the server
-  (`src/server/main.ts`) into `build/server.js` (step 4a). The page
-  bundle stays under `public/vendor/`, its route since before step 3.
-  `public/js` is gone. The HTML, the
-  style sheets and the shader files stay static files.
-- When the bundle does not load, a few lines of script on its tag in
-  `index.html` show `#load-failure` and log the file name (`side.spec`).
-- The renderer library is bundled from its source in the ref repo, in the
-  page bundle and in the tool bundles that parse models. There is no
-  global renderer object, and no separate parser bundle.
-- The renderer library is viewer code (operator 2026-11-23): we patch it
-  and build from our clone. R-VIEW-10 and R-VIEW-13 bind it.
-  - It is TypeScript in strict mode (`strict`, `noImplicitOverride`). Its
-    own `tsconfig.json` was written for compiler 4.3. Compiler 7.0.2
-    refuses it: `suppressImplicitAnyIndexErrors` and
-    `moduleResolution=node10` no longer exist.
-  - `webviewer/tsconfig.lib.json` restates the library's flags without
-    those two. `scripts/typecheck.sh` checks it in every test run. A type
-    error in it ends the run.
-  - Only the code we bundle is checked (operator 2026-11-23): the viewer,
-    the `m3`, `dds` and `tga` handlers, the `m3` and `dds` parsers, and
-    what they import. The rest of the library is never bundled and is
-    not checked. Measured with `gl-matrix` 3.3.0: 68 errors in the whole
-    library, 27 in the bundled part.
-  - `gl-matrix` is 3.4.4, named in `package.json`. The declaration file
-    of 3.3.0 does not pass compiler 7.0.2.
-  - The 18 errors left in the bundled part are fixed in two library
-    commits (patches 0052 and 0053). 0052 changes declarations only.
-    0053 changes four places of code. Every test passed with both
-    (run `full86`, section 13).
-  - Step 3 added two commits that change types only, for our callers:
-    0054 (`M3ModelInstance.model` is an `M3Model`) and 0055
-    (`setVertexColor` takes any list of numbers). Run `full88` passed
-    with them.
-  - The page settings (`tsconfig.page.json`) have no Node globals. The
-    library's `ModelViewer` extends `EventEmitter` of the npm package
-    `events`, which ships no types. `src/page/core/events.d.ts` declares
-    the part the page uses.
-  - It does not pass `noUncheckedIndexedAccess`. Read from its code:
-    `handlers/m3/handler.ts` reads `teamColors[i]` and then indexes the
-    result. No compiler run backs this.
-  - So there are two settings files: ours with that flag, the library's
-    without. Making the library pass the flag is a series of changes over
-    all its M3 code. That is not in this change (O-VSPEC-1).
-  - A change to it stays a commit in the ref repo and a file in
-    `webviewer/patches/`. The ref repo is outside git, so the commit
-    hooks and the line limit do not see its files.
-- `src/tools/build.ts` (before step 2: `tools/build-renderer.mjs`) keeps
-  two duties: it refuses a ref repo with uncommitted changes, and it
-  writes `webviewer/patches/` from the commits.
-- `scripts/tool.sh <name>` bundles `src/tools/<name>.ts` into
-  `build/tools/<name>.js` and runs it. `scripts/build.sh` starts the build
-  tool this way.
+  `noImplicitOverride` (R-VIEW-10). Node 24.11.1, compiler 7.0.2.
+- No `any`. No cast that hides a type error. No file over the line limit.
+- `src/tools/build.ts` bundles the page into `public/vendor/renderer.js`
+  and the server into `build/server.js`, with esbuild.
+- When the page bundle does not load, a few lines in `index.html` show the
+  failure and name the file.
+- `scripts/tool.sh <name>` bundles and runs `src/tools/<name>.ts`.
+- `scripts/typecheck.sh` runs the compiler on three settings files (Node
+  code, page code, the library) and then the import rule of section 3. It
+  runs first in `scripts/test.sh`. An error ends the run (R-VIEW-13).
 - Python and shell tools stay as they are.
-- `scripts/typecheck.sh` runs the compiler without output, on three
-  settings files: the library's (`tsconfig.lib.json`), Node code
-  (`tsconfig.json`) and page code (`tsconfig.page.json`). `scripts/test.sh`
-  runs it first; a type error ends the run (R-VIEW-13).
-- `scripts/typecheck.sh` also checks the import rule of section 3 with a
-  Node tool that reads the import lines (`src/tools/import-rule.ts`). A
-  forbidden import ends the run. Tests: `import-rule.spec`,
-  `typecheck.spec`. The operator accepted the rule (O-VSPEC-7).
-- No file over the repository's line limit. No `any`. No cast that hides a
-  type error.
+
+The renderer library, `mdx-m3-viewer`, is viewer code (operator
+2026-11-23):
+
+- It is bundled from its source in `ref/`. There is no global renderer
+  object.
+- A change to it is a commit in the ref repo and a file in `patches/`, 56
+  today. The build refuses a ref repo with uncommitted changes and writes
+  the patches from the commits. The commit hooks do not see the ref repo.
+- Only the code we bundle is type-checked, under the library's own flags.
+  It does not pass `noUncheckedIndexedAccess` (O-VSPEC-1).
+- Our code reads the library's declaration files. `core/events.d.ts`
+  declares the part of the `events` package the page uses. A file named
+  `events.ts` would hide it, so the bus is `bus.ts`.
 
 ## 10. Page layout and saved state
 
 ### 10.1 Panels
 
-- `#side`: the column at the left. `#gallery` on top, `#instances` below,
-  each half the window height.
-- `#game-tabs`: one `button[data-game]` per game, stacked, text turned
-  vertical, on the gallery's right edge from its top (R-VIEW-20). The
-  text is the game's `tab` (`SC2`, `SC: G`), 14 px; the chosen tab is
-  bold (operator 2026-11-24).
-- `#gallery-handle`, `#instances-handle`: at the bottom of each panel's
-  right edge (R-VIEW-24).
-- Gallery closed: the game tabs and the gallery handle slide to the window
-  edge with it and stay clickable. A tab click opens the gallery on that
-  game (R-VIEW-23).
-- A tab of a game that is not available is `disabled`. Its `title` is the
+- `#side` is the left column: `#gallery` on top, `#instances` below, each
+  half the window height.
+- `#game-tabs`: one button per game, stacked, vertical text, at the top of
+  the gallery's right edge (R-VIEW-20). The chosen tab is bold.
+- `#gallery-handle` and `#instances-handle` sit at the bottom of each
+  panel's right edge (R-VIEW-24).
+- With the gallery closed, its tabs and handle stay clickable at the
+  window edge. A tab click opens the gallery on that game (R-VIEW-23).
+- The tab of a game that is not available is disabled. Its title is the
   reason (R-VIEW-27).
-- Inside the gallery: the dataset select, then the category tabs built from
-  `CategoryInfo[]`, then one pane per category built from its filters.
+- Inside the gallery: the dataset select, the category tabs, and one pane
+  per category built from its filters.
 
 ### 10.2 Scene documents
 
-A scene is a document (R-VIEW-70). The type and its check are in
-`src/shared/scene.ts`; the page and an exported file use the same ones.
+`src/shared/scene.ts` holds the document type and its check. The page and
+an exported file use the same ones (R-VIEW-70).
 
-```ts
-interface SceneDocument {
-  format: 'viewer-scene';
-  version: 1;
-  id: string;          // "s-" then 1 to 40 of a-z, 0-9; unique in the database
-  name: string;        // 1 to 80 characters, trimmed
-  created: string;     // ISO 8601 UTC
-  modified: string;    // ISO 8601 UTC
-  items: SceneItemDocument[];   // at most 20000
-}
+| Field | Rule |
+| --- | --- |
+| format, version | `viewer-scene`, 1 |
+| id | `s-` then 1 to 40 of a-z and 0-9; unique in the database |
+| name | 1 to 80 characters, trimmed |
+| created, modified | ISO 8601 UTC |
+| items | at most 20000 |
 
-interface SceneItemDocument {
-  game: GameId;
-  dataset: DatasetId;
-  source: { category: CategoryId; record: string; variant: number | null }
-        | { file: string };
-  x: number; y: number;  // finite
-  rot: number;           // degrees, finite
-  scale: number;         // finite, above 0
-  sequence: number;      // integer, -1 or more
-  pick: number;          // 0 to 1
-  options: JsonObject;   // the game's own item values
-}
-```
+| Item field | Rule |
+| --- | --- |
+| game, dataset | ids |
+| source | a category, a record and a variant or none; or a file |
+| x, y, rot | finite; rot in degrees |
+| scale | finite, above 0 |
+| sequence | an integer, -1 or more |
+| pick | 0 to 1 |
+| options | the game's own item values |
 
-- `parseSceneDocument(unknown)` returns the document or throws a
-  `SceneError` that names the first fault by path, such as
-  `items[3].scale: not above 0`. A document that fails is not read in
-  part (R-VIEW-71). Unknown fields are a fault.
-- `version` other than 1 is a fault. A later version adds a migration
-  from the one before; the check runs on the result.
-- SC2 `options`: `team` (integer 0 to 13, the 14 team colours) and `hd`
-  (boolean). Step 5 moves
-  them behind the game's `itemOptions`.
-- An item whose game, category or record the server does not have is
-  reported and not added. The other items are added (R-VIEW-80).
-
-Store (`src/page/core/store/scenes-db.ts`): IndexedDB database `viewer`,
-version 1, object store `scenes`, key path `id`. One record per scene.
-
-- At startup every record is checked. A record that fails is listed as
-  refused, with its reason, and can only be deleted. The others open
-  (R-VIEW-77).
-- The scene to open is the id in the setting `viewer.scene`. When it is
-  missing or refused, the newest good scene opens. With none, an empty
-  scene "scene 1" is made.
-- Every change to the scene writes the document. Writes run one after
-  another. `sc2viewer.scenes.flush()` waits for the last one.
-- While a scene's items are being added, no write is made; one write
-  follows.
-
-Scene list (`features/scenes`, in `#view-tools`, before the landmarks):
-
-- `#scenes-button` shows the open scene's name. `#scenes-list` lists the
-  scenes by name: a click opens one; each has rename and delete; delete
-  asks first (R-VIEW-75).
-- At the end: new, export, import. New asks a name. Export downloads
-  `<name>.scene.json`, the document as it is stored. Import reads a file,
-  checks it, gives it a new id and a free name, stores it and opens it. A
-  refused import changes nothing and says why (R-VIEW-76).
-
-The page address (R-VIEW-74): the page never writes a scene into it. At
-startup an address with a `#` part is refused with a failure message
-("the scene is no longer kept in the address") and cleared. Old scenes
-are not carried over (O-VIEW-5).
+- The check returns the document or names the first fault by its path. A
+  document that fails is not read in part. An unknown field is a fault
+  (R-VIEW-71).
+- A later version adds a migration from the one before.
+- An item whose game, category or record the server lacks is reported and
+  not added. The others are added (R-VIEW-80).
+- Store: IndexedDB database `viewer`, object store `scenes`, one record
+  per scene.
+- At startup every record is checked. One that fails is listed as refused,
+  with its reason, and can only be deleted (R-VIEW-77).
+- The scene to open is the stored id. A stored id that names no scene, or
+  a refused one, stops the start with the refused-settings panel (10.3,
+  R-VIEW-73). Nothing stored: the newest good scene opens. With none, an
+  empty "scene 1" is made.
+- Every change writes the document. Writes run one after another. While a
+  scene's items are being added, one write follows at the end.
+- The scene list is in the view tools: open, rename, delete after a
+  question, new, export, import (R-VIEW-75). Export downloads the document
+  as stored. An import is checked, given a new id and a free name, stored
+  and opened. A refused import changes nothing and says why (R-VIEW-76).
+- The page never writes a scene into its address. An address with a `#`
+  part is refused with a message and cleared (R-VIEW-74).
 
 ### 10.3 Settings
 
-`src/page/core/settings.ts` holds every key, its parser and its default.
-A module reads and writes only through it. Keys, all under `viewer.`:
+`core/settings.ts` holds every key, its parser and its default. Keys, all
+under `viewer.`:
 
-| Key | Holds | Module |
+| Key | Holds | Nothing stored |
 | --- | --- | --- |
-| `camera` | yaw, pitch, distance, target | `core/camera.ts` |
-| `drawers` | which drawers are open: `{ gallery, instances }` | `ui/drawers.ts` |
-| `game` | the chosen game (R-VIEW-22) | `core/datasets.ts` |
-| `dataset.<game>` | the chosen dataset of a game | `core/datasets.ts` |
-| `view` | the grid toggle and the backdrop, with its game and dataset | `core/sky.ts` |
-| `landmarks` | the landmarks and the chosen one | `core/landmarks.ts` |
-| `scene` | the id of the open scene | `features/scenes` |
+| `camera` | yaw, pitch, distance, target | the origin from the south: yaw -pi/2, pitch 0.5, distance 9, target (0, 0, 0.8) |
+| `drawers` | which drawers are open | both open |
+| `game` | the chosen game (R-VIEW-22) | the server's default game |
+| `dataset.<game>` | the chosen dataset of a game | the game's default dataset |
+| `view` | the grid switch, the backdrop and the ground texture (17.7) | grid on, no backdrop, no ground texture |
+| `landmarks` | the landmarks and the chosen one | none but the origin, none chosen |
+| `scene` | the id of the open scene | the newest scene, else a new one |
 
-- `game`: only a choice is stored. The game shown at startup in place of
-  a refused one is not stored, so the stored game opens again later.
-- Each read returns the value and how it went: `none`, `restored`, or
-  `refused: <why>`. A refused value is reported and not used; the next
-  write replaces it (R-VIEW-73).
-- The keys used before this design (`sc2viewer.*`) are not read.
+- Each key has one parser. An object must have exactly its keys: a
+  missing or an unknown key is refused. A backdrop and a ground texture
+  name their game and dataset. The chosen landmark is the origin (0) or
+  one of the list.
+- Before the page starts, `main.ts` checks every stored `viewer.*` key
+  (`refusedSettings`). A key the page does not know, text that is not
+  JSON, and a value its parser refuses are refused.
+- At start the game, dataset and scene choices are checked against what
+  exists: a game the server cannot open, a dataset the game does not
+  list, a scene that is missing or fails its check. These are refused
+  the same way (`SettingsRefused`).
+- A refusal stops the start (R-VIEW-73). Nothing is put in place of the
+  refused value, and `ready` stays unset. The panel `#settings-refused`
+  (`core/refusals.ts`) lists one row per key: the key, the stored text
+  and the reason. "Clear refused settings"
+  (`#settings-refused-clear`) removes exactly those keys and reloads.
+  Every other key is kept.
+- A read gives the stored value, or the declared default when nothing
+  is stored. The camera and the landmarks tell which (`cameraStart`,
+  `landmarkState().start`: `stored` or `default`).
+- A write is checked by the same parser first. A module cannot store
+  what it could not read back.
+- The server's default game that cannot open is an error, not a
+  refusal: it names no stored key.
+- Only a choice is stored as the game. The startup pick is not.
 - The camera, the grid, the backdrop and the landmarks are global, not per
-  scene (O-VIEW-5).
+  scene.
 
 ## 11. Tests
 
 - Runner: Playwright, through `scripts/test.sh`. A program decides pass or
   fail. A picture never does.
-- The page offers `window.viewer`, typed `TestApi`, built from what the
-  features register (R-VIEW-14). Tests use it and the DOM.
-- **Contract tests** run once per available game, from `/api/games`:
-  - protocol: every route of section 8 answers in its shape; paging walks a
-    list without repeats; unknown ids give `404`;
-  - page: the tab shows the game's categories; a record is previewed,
-    added, selected, moved, copied, pasted, saved in the address and back
-    after a reload, removed;
-  - capabilities: a control shows only on an instance that has the
-    capability. Negative: it is absent on one that has not.
-- **Two implementations** (R-VIEW-91): the contract tests must pass for two
-  games, and the instance tests for two formats.
-- **Mixed scene**: instances of two games side by side; selection, group
-  move and copy and paste work across them (R-VIEW-26).
-- **Game not available**: the server is started with one game's data path
-  unset. Its tab is disabled with the reason; the other game passes its
-  contract tests (R-VIEW-8, R-VIEW-27).
-- **Import rule**: a host test feeds the import checker a forbidden import
-  and expects a failure.
+- **A full run needs the operator's permission** (operator 2026-11-23).
+  Since 2026-11-24: targeted spec files only.
+- Two projects (`playwright.config.mjs`):
+  - `unit` (`tests/unit/`, `make viewer-test`): no browser. The tools'
+    own checks; page and game logic bundled for Node by esbuild
+    (`tests/unit/source.mjs`); the server's routes asked directly.
+  - `e2e` (`tests/e2e/`, `make viewer-test-e2e`): the page in a browser.
+  - `ARGS=<filter>` runs only the spec files that match.
+  - `@slow` tests run only with `make viewer-test-all`.
+- Where a test goes: logic that needs no DOM, storage or WebGL when it is
+  called is a unit test. A rule (a setting's check, the scene document
+  check, the zoom, the add-all layout, the list names) is tested there, every
+  case. An e2e test shows only that the page wires the rule in: one case,
+  and the negative.
+- One test per stored thing and reload: the scene store
+  (`scenes.spec`, every field and item kind), the view settings
+  (`landmarks-store.spec`). No other test reloads to check what was
+  kept.
+- Every problem fails the test unless the test names it (`tests/fixtures.mjs`, the `page` fixture).
+  Every e2e test fails on any of these, unless the test names it with
+  `allowErrors(pattern)`:
+  - an uncaught page error;
+  - a console error, or any `viewer:` / `sc2viewer:` report;
+  - a reply of 400 or more, or a request with no reply (not an abort);
+  - an error line in the worker server's log.
+  An allowance that matches nothing fails the test too.
+  `clean-load.spec` loads real units (among them the ones that failed on
+  the dev service on 2026-11-25) and a doodad with no allowance. Its
+  negative case answers textures with 500 and requires the fixture to
+  record it.
+- The texture pipeline flows have one e2e test each (operator
+  2026-11-25): Save to Skin (`skin-editor`), the owner Upscale
+  (`texture-variants`), Bake (`texture-bake`), the texture window
+  (`texture-window`), the ground picker (`ground-texture`). Their rules
+  are unit tests (`texture-service-api`, `skin-choices`).
+- The e2e browser renders WebGL on the GPU (`playwright.config.mjs`;
+  `gpu.spec` fails on a software renderer). The workers' browsers start
+  one at a time, and each must link a WebGL program before its tests run
+  (`tests/fixtures.mjs`, the `browser` fixture). Four starting at once
+  sometimes gave one page a lost context (runs e2e17, e2e18, e2e21,
+  e2e23).
+- Isolation (11.1): each worker has its own server, texture store and
+  datasets folder (`tests/fixtures.mjs`). Global setup
+  (`tests/global-setup.mjs`) makes the base store's state index once;
+  each worker copies it. A server refuses a port that already answers: a
+  killed run can leave one there.
+- No fixed sleep and no wall-clock bound: a test waits for frames, idle or
+  a state. A time a test measures depends on the load of the run, so a
+  time bound (the 250 ms of R-VIEW-111) is not tested.
+- Tests use the page's test object and the DOM (R-VIEW-14).
+- Contract tests run once per available game: every route of section 8
+  answers in its shape, and a record is previewed, added, selected, moved,
+  copied, pasted, stored and removed (`contract.spec`).
+- Two implementations (R-VIEW-91): the contract tests pass for two games,
+  the instance tests for two formats.
+- Mixed scene: instances of two games are selected, moved and copied
+  together (`ghost-mix.spec`).
+- Game not available: its tab is disabled with the reason and the other
+  game still passes (`ghost-unavailable.spec`).
+- Known to fail under machine load: `pick-pixel.spec` `@slow` (timeout),
+  `particle-motion.spec`. `fresnel.spec` compares two frames with a small
+  tolerance (operator 2026-11-23).
 - Each game specification lists its own tests.
 
 ## 12. Requirement state
 
-Run: `full85`, the baseline of section 13. Every test file named below
-passed in it. Nothing here is [verified]: see section 2.
+Nothing is [verified]. [today] rows passed in run `full102` or an earlier
+full run of section 13.
 
-| Requirement | State | Where |
+| R-VIEW | State | Where |
 | --- | --- | --- |
-| R-VIEW-1 | [today] | `core-names.spec`: the code of `page/core`, `page/ui`, `page/features` and `server/core` (comments read out) holds no game id and no game model or clip file extension. Comments still name SC2 examples. The test object names `sc2viewer`, `SC2App` are left as they are (R-VIEW-14, step 8). The DDS decode in core (`page/core/ddsdecode.ts`) serves the textures of both games. |
-| R-VIEW-2 | [plan] | Not shown. Step 7 added Ghost with core edits as well (game tabs, the texture window moved into core, `TEMPLATE_PAGE`). The rule is shown only when a game is added without one. |
-| R-VIEW-3 | [plan] | Not shown, for the same reason: the nod format came with core edits in step 7. |
-| R-VIEW-4 | [today] | The import rule (`scripts/typecheck.sh`, `import-rule.spec`): core imports no game and no format; games and formats reach core through `page/core/plugin.ts`, `page/core/context.ts` and `server/core/backend.ts`. |
-| R-VIEW-5 | [today] | `contract.spec` (page): in each game a record is previewed, added, selected, moved, copied, pasted, kept and removed through the same features. `ghost-mix.spec`: both games and formats in one scene. |
-| R-VIEW-6 | [today] | `ghost-mix.spec`: the team control is on an SC2 unit and absent on a Ghost instance; no `hd` on a Ghost instance. |
-| R-VIEW-7 | [today] | The import rule; `import-rule.spec` "a game imports another game is refused". |
-| R-VIEW-9 | [today] | `local.env`, `.gitignore` |
-| R-VIEW-10, 11 | [plan] | TypeScript today: the page (`src/page`, `src/formats/m3`, `src/formats/nod`, `src/shared`), the server (`src/server`, `src/games/*/server`) and `src/tools`. The survey tools under `tools/` and the tests are still JavaScript: step 8, not started. |
-| R-VIEW-12 | [today] | Step 6: no page object, no `app()`; each module takes typed services (section 6.6). `scripts/typecheck.sh` and the import rule. No test asserts the clause yet. |
-| R-VIEW-13 | [today] | `scripts/typecheck.sh`, first in `scripts/test.sh`; it passed in run `full88` (section 13). `typecheck.spec` asserts that a type error ends the check. |
-| R-VIEW-14 | [plan] | Today: `window.sc2viewer` and `window.SC2App`, put together from what the features hand to `testApi` (`core/testapi.ts`); a format's members only through `probe`. Tests still read item internals (`SC2App.items`, `.instance.m3`); typed in step 8. |
-| R-VIEW-8 | [today] | Step 7: `ghost-unavailable.spec` (a server without `GHOST_PATH`: ghost listed with the reason, its routes 503, sc2 answers), `game-tabs.spec`. |
-| R-VIEW-20 | [today] | `game-tabs.spec`: one tab per game the server lists (sc2, ghost), vertical, at the top of the gallery's right edge. |
-| R-VIEW-21 | [today] | `ghost-mix.spec`: the Ghost tab gives its dataset and panes; the scene, the camera and the selection stay. |
-| R-VIEW-22 | [today] | `game-tabs.spec`: a choice is stored, kept over a reload; a refused stored game falls back and stays stored. |
-| R-VIEW-23 | [today] | `game-tabs.spec`: with the gallery closed the tabs are at the window edge; a click opens the gallery. |
-| R-VIEW-24 | [today] | `game-tabs.spec`, `side.spec`: the handles at the bottom of each panel's right edge. |
-| R-VIEW-25 | [today] | `ui/gallery`: the panes from the game's categories. `units-ui.spec`, `doodads-ui.spec`, `datasets-ui.spec`. |
-| R-VIEW-26 | [today] | `ghost-mix.spec`: a unit and a Ghost model selected together, moved, copied, pasted, stored with their games, back after a reload. |
-| R-VIEW-27 | [today] | `game-tabs.spec`: a game the server cannot open and one with no page module are disabled, the reason as the title. |
-| R-VIEW-28 | [today] | `side.spec` |
-| R-VIEW-30 to 33 | [today] | `datasets-ui.spec`, `datasets-api.spec` |
-| R-VIEW-34 | [today] | `datasets-toast.spec` |
-| R-VIEW-40 | [today] | `units-ui.spec`, `doodads-ui.spec`, `paged-list.spec` |
-| R-VIEW-41 | [today] | `units-ui.spec`, `doodads-ui.spec` |
-| R-VIEW-42 | [today] | `drag-preview.spec`, `units-ui.spec`, `doodads-ui.spec` |
-| R-VIEW-43 | [today] | `add-all.spec`, `add-all-view.spec`, `landmarks.spec`, `skybox-units.spec` |
-| R-VIEW-44 | [today] | `page/core/scene.ts` applies what the game's `place`, `placeFile`, `restSequence` and `playRate` return; core holds no record rule (`page/core/rules.ts` is gone). `units-ui.spec` (SC2 scale, height, rate), `ghost-gallery.spec` (a Ghost actor's file). |
-| R-VIEW-45 | [today] | `skybox-units.spec` |
-| R-VIEW-50 | [today] | `viewer.spec`, `instances.spec` |
-| R-VIEW-51 | [today] | `side.spec` |
-| R-VIEW-52 | [today] | `pick-pixel.spec`, `cutout.spec` |
-| R-VIEW-53 | [today] | `pick.spec`, `multi-select.spec`, `instances.spec` |
-| R-VIEW-54 | [today] | `move.spec`, `clipboard.spec`, `pick.spec`, `multi-select.spec` |
-| R-VIEW-55 | [today] | `clipboard.spec` |
-| R-VIEW-56 | [today] | `pick.spec` |
-| R-VIEW-57 | [today] | `viewer.spec` |
-| R-VIEW-58 | [today] | `scene-focus.spec` |
-| R-VIEW-59 | [today] | `clipboard.spec`, `multi-select.spec`, `hd-textures.spec` |
-| R-VIEW-60 | [today] | `camera.spec`, `zoom.spec`, `viewer.spec` |
-| R-VIEW-61 | [today] | `ground-sky.spec`, `grid-levels.spec` |
-| R-VIEW-62 | [today] | `ground-sky.spec`, `skyboxes.spec` |
-| R-VIEW-63 | [today] | `landmarks.spec`, `landmarks-store.spec` |
-| R-VIEW-64 | [today] | `side.spec` |
-| R-VIEW-65 | [today] | `viewer.spec` |
-| R-VIEW-66 | [plan] | Implemented, not verified. `edges.spec` (section 16.13): 8 of 9 passed in one run; the front-only test passed alone after a test fix. No full run. The look of the lines is an operator check (section 14). |
-| R-VIEW-70 | [today] | `scenes.spec`, `viewer.spec`, `units-ui.spec`, `doodads-ui.spec`, `datasets-ui.spec`, `hd-textures.spec` (step 4c, run `t-4c`) |
-| R-VIEW-71 | [today] | `scenes.spec`: ten faulty files, each refused with its path |
-| R-VIEW-72, 73 | [today] | `camera-persist.spec`, `landmarks-store.spec`, `side.spec`, `scenes.spec` (the open scene), `game-tabs.spec` (the chosen game). |
-| R-VIEW-74 to 77 | [today] | `scenes.spec` |
-| R-VIEW-80 | [today] | `viewer.spec` |
-| R-VIEW-81 | [today] | `displacement.spec`, `particles.spec` |
-| R-VIEW-82 | [today] | The nod format: `ghost-look.spec` (a refused model fails with its message), `ghost-anim.spec` (clips refused with the reason), `make viewer-ghost-export-check` (changed files refused by NODExport). M3: not asserted. |
-| R-VIEW-90 | [today] | For the [today] rows only. |
-| R-VIEW-91 | [today] | `contract.spec`: one suite run for every game `/api/games` lists, protocol and page; it needs two available games. The formats (m3, nod) pass the instance tests of their games. The capability part of section 11 is `ghost-mix.spec`, not yet in the suite. |
-| R-VIEW-92 | [today] | M3 and the six Ghost formats: see the game specifications. |
-| R-VIEW-93 | [today] | `AGENTS.md` |
+| 1 | [today] | `core-names.spec`: core code holds no game id and no game file extension. Comments and the test object's names still do. |
+| 2, 3 | [plan] | Not shown: the second game and format came with core edits. |
+| 4, 7 | [today] | the import rule; `import-rule.spec` |
+| 5, 26 | [today] | `contract.spec`, `ghost-mix.spec` |
+| 6, 21 | [today] | `ghost-mix.spec` |
+| 8, 27 | [today] | `ghost-unavailable.spec`, `game-tabs.spec` |
+| 9 | [today] | `local.env`, `.gitignore` |
+| 10, 11 | [plan] | The page, the server and `src/tools` are TypeScript. The surveys under `tools/` and the tests are not. |
+| 12 | [today] | Typed services, no page object. No test asserts the clause. |
+| 13 | [today] | `typecheck.spec` |
+| 14 | [plan] | Tests still read item internals. |
+| 20, 22 to 24 | [today] | `game-tabs.spec`, `side.spec` |
+| 25 | [today] | `units-ui.spec`, `doodads-ui.spec`, `datasets-ui.spec` |
+| 28, 51, 64 | [today] | `side.spec` |
+| 30 to 33 | [today] | `datasets-ui.spec`, `datasets-api.spec` |
+| 34 | [today] | `datasets-change.spec` (unit: the server sees the change and reloads). The page's question, Yes and No: not tested (removed 2026-11-25) |
+| 40, 41 | [today] | `units-ui.spec`, `doodads-ui.spec`, `paged-list.spec` |
+| 42 | [today] | `drag-preview.spec`, `units-ui.spec`, `doodads-ui.spec` |
+| 43 | [today] | `add-all.spec` (unit and e2e), `add-all-view.spec`, `landmarks.spec`, `skybox-units.spec` |
+| 44 | [today] | `units-ui.spec`, `ghost-gallery.spec` |
+| 45 | [today] | `skybox-units.spec` |
+| 50 | [today] | `viewer.spec`, `instances.spec` |
+| 52 | [today] | `pick-pixel.spec`, `cutout.spec` |
+| 53 | [today] | `pick.spec`, `multi-select.spec`, `instances.spec` |
+| 54 | [today] | `move.spec`, `clipboard.spec`, `pick.spec`, `multi-select.spec` |
+| 55 | [today] | `clipboard.spec` |
+| 56 | [today] | `pick.spec` |
+| 57, 65, 80 | [today] | `viewer.spec` |
+| 58 | [today] | `scene-focus.spec` |
+| 59 | [today] | `clipboard.spec`, `multi-select.spec`, `texture-skins.spec` (Ctrl+L) |
+| 60 | [today] | `camera.spec`, `zoom.spec` (unit and e2e), `viewer.spec` |
+| 61 | [today] | `ground-sky.spec`, `grid-levels.spec` |
+| 62 | [today] | `ground-sky.spec`, `skyboxes.spec` |
+| 63 | [today] | `landmarks.spec`, `landmarks-store.spec` |
+| 66 | [plan] | Implemented, not verified. `edges.spec`: 8 of 9 passed in one run; the ninth passed alone after a test fix. |
+| 70 | [today] | `scenes.spec` |
+| 71, 74 to 77 | [today] | `scenes.spec`, `scene-document.spec` (unit) |
+| 72, 73 | [today] | `settings.spec` (unit), `landmarks-store.spec`, `side.spec`, `scenes.spec`, `game-tabs.spec` |
+| 81 | [today] | `displacement.spec`, `particles.spec` |
+| 82 | [today] | nod: `ghost-look.spec`, `ghost-anim.spec`. m3: not asserted. |
+| 90 | [today] | for the [today] rows only |
+| 91 | [today] | `contract.spec`. The capability part is `ghost-mix.spec`. |
+| 92 | [today] | the game specifications |
+| 93 | [today] | `AGENTS.md` |
+| 100, 107, 108, 110 to 112 | [plan] | 17.1, 17.2, 17.7; built, the specs of 17.8 passed before skins (runs v4 to v10 of 2026-11-24) |
+| 101, 113 to 137 | [plan] | 17.3 to 17.7; implemented, not verified: the specs of 17.8 have not passed; 126 to 137 and the revisions of 2026-11-25 are being built |
 
-## 13. Migration from the current code
+## 13. Migration and runs
 
-| Today | Becomes |
-| --- | --- |
-| `public/js/core.js` | `page/core/` (render host, camera, status); its data rules go to the game |
-| `public/js/scene.js` | `page/core/scene`, `page/ui/instances`, `features/focus` |
-| `public/js/panels.js`, `doodads.js` | `page/ui/gallery`, built from `CategoryInfo` |
-| `public/js/datasets.js` | `page/core/datasets`, `features/dataset-reload` |
-| `public/js/side.js` | `page/ui/drawers`, `page/ui/game-tabs` |
-| `public/js/controls.js`, `pick.js`, `select.js`, `clipboard.js`, `drag.js`, `landmarks.js`, `addall.js`, `sky.js` | one folder each under `page/features/` |
-| `public/js/inspect.js` | `features/inspect` and format `probes` |
-| `public/js/hd.js`, `textures.js`, `particles.js`, `billboards.js` | the game or its format |
-| `public/components.js` | `page/ui/components/` |
-| `public/ground.js`, `outline.js`, `pickbuffer.js`, `displacement.js` | `page/core/render/`; displacement becomes a format `PostPass` |
-| `public/js/main.js` | `page/main.ts`, `page/core/frame`, `shared/address` |
-| `public/index.html`, `style.css`, `theme.css`, `public/shaders/` | stay static files; the HTML loads one bundle and holds no game name |
-| `public/vendor/renderer.js`, `src/renderer-entry.cjs`, `src/parser-entry.cjs` | gone: the library is imported where it is used |
-| `server.mjs` | `server/core/` and the game's backend |
-| `server-*.mjs` | the game's backend |
-| `tools/*.mjs` | `src/tools/` |
-| `tools/*.py`, `scripts/*.sh` | stay; the scripts start the bundles |
-| `playwright.config.mjs` | `playwright.config.ts`; it starts `build/server.js` |
-| `tests/*.spec.mjs` | `tests/*.spec.ts`, last |
+Steps 1 to 7 are done: tooling, typed page modules, the server core and
+one backend, the protocol, scene documents, the interfaces, the generic
+gallery and game tabs, the second game and format. Step 8 is open: tests
+in TypeScript and the typed test object.
 
-Two tests of today prove how the page is served, not what it does. They
-cannot pass unchanged, and are rewritten in step 3:
+Full runs, every test, `@slow` too:
 
-| Test | Today | After |
-| --- | --- | --- |
-| `server.spec`: "every page module in public/js is served, read at request time; nothing else under /js/" | 20 files under `/js/` | the bundle is served; nothing else under its folder |
-| `side.spec`: "a page module that does not load is reported as a failure, naming the file" | one of 20 scripts fails to load | the bundle fails to load: a few lines of script in the HTML itself show the failure and name the file |
+| Run | Day | Closes | Result |
+| --- | --- | --- | --- |
+| `full85` | 2026-11-23 | the baseline | 273 passed |
+| `full86` | 2026-11-23 | step 2 | 273 passed |
+| `full88` | 2026-11-23 | step 3 | 297 passed |
+| `full91` | 2026-11-23 | step 4a | 297 passed |
+| `full93` | 2026-11-23 | steps 4b, 4c | 314 passed |
+| `full94` | 2026-11-23 | step 5 | 314 passed |
+| `full96` | 2026-11-23 | step 6 | 321 passed |
+| `full99` | 2026-11-24 | step 7 | 349 passed |
+| `full102` | 2026-11-24 | selected instances stay lit | 350 passed |
 
-Numbers of today, counted in the files, not from a run: 51 test files with
-254 `test(` calls (some stand in a loop and make several tests), 20 page
-scripts, 51 library patches (53 after step 2, 55 after step 3).
-
-Baseline (step 1, done 2026-11-23). Every test, the `@slow` ones too
-(`WEBVIEWER_TEST_ALL=1 bash webviewer/scripts/test.sh`):
-
-| Run | Start (UTC) | Result |
-| --- | --- | --- |
-| `full84` | 12:11:40 | 273 tests: 266 passed, 1 failed, 6 did not run. Exit 1, 179 s. |
-| `full85` | 12:18:04 | 273 tests: 273 passed. Exit 0, 333 s. |
-
-- Repository HEAD `3a640a05`, library HEAD `bce6a587`. The working tree
-  held uncommitted changes; under `webviewer/` only `scripts/setup.sh` and
-  `scripts/ref-docs-setup.sh`.
-- `full84` failed in `datasets-api.spec`: "the datasets are listed, the
-  built-in ones first; none has changed". Cause: the catalog of one dataset
-  was older than two data files of the map. It was rebuilt
-  (`catalog.sh --if-stale`), nothing else changed, and `full85` passed.
-- The logs are `/tmp/opencode/full84.log` and `full85.log`. They are not
-  kept in the repository.
-
-Step 2 (done 2026-11-23), the same command:
-
-| Run | Start (UTC) | Result |
-| --- | --- | --- |
-| `full86` | 12:44:19 | 273 tests: 273 passed. Exit 0, 335 s. |
-
-- Repository HEAD `3a640a05` with the step 2 changes uncommitted. Library
-  HEAD `1989c174`, 53 patches. Node 24.11.1, compiler 7.0.2.
-- Both type checks passed at the start of the run.
-- Built: the compiler, the two settings files, `scripts/typecheck.sh`,
-  `scripts/tool.sh`, and the build tool in TypeScript.
-- Not built in step 2: the page bundle and `build/server.js` (they come
-  with the code they bundle, steps 3 and 4), and the import-rule check
-  (O-VSPEC-7).
-- With `gl-matrix` 3.3.0 the build tool gave the same two files, byte for
-  byte, as `tools/build-renderer.mjs` did.
-
-Step 3 (done 2026-11-23), the same command:
-
-| Run | Start (UTC) | Result |
-| --- | --- | --- |
-| `full87` | 13:56:27 | 297 tests: 290 passed, 1 failed, 6 did not run. Exit 1, 198 s. |
-| `full88` | 14:00:34 | 297 tests: 297 passed. Exit 0, 365 s. |
-
-- Repository HEAD `3a640a05` with the step 2 and 3 changes uncommitted.
-  Library HEAD `7ac1103a`, 55 patches.
-- `full87` failed in `fresnel.spec`: "negative: a model with no fresnel
-  layer draws the same frame with the term on and off". The two frames
-  differed in the colour sums by one level of one pixel. The test passed
-  20 of 20 times alone (`--repeat-each=10`) and in `full88`, unchanged.
-  It was not seen to fail before step 3. It now has a small tolerance
-  (O-VSPEC-8).
-- Built: every file of `public/js`, `public/components.js` and the four
-  render files is a typed module under `src/page` or `src/formats/m3`.
-  `index.html` loads one script. The server's `/js/` route is gone.
-- Changed tests: the two of the table above, and `skyboxes.spec`, which
-  read the library's global `ModelViewer` (now `sc2viewer.DdsImage`).
-- The page is still one shared object (`page/core/app.ts`), put together
-  in `page/main.ts` in the old script order. Step 5 replaces it.
-
-Step 4a (done 2026-11-23), the same command: the server in TypeScript,
-with today's routes.
-
-| Run | Start (UTC) | Result |
-| --- | --- | --- |
-| `full89` | 14:25:38 | 297 tests: 290 passed, 1 failed, 6 did not run. Exit 1, 183 s. |
-| `full90` | 14:29:23 | 297 tests: 295 passed, 1 failed, 1 did not run. Exit 1, 347 s. |
-| `full91` | 14:39:31 | 297 tests: 297 passed. Exit 0, 345 s. |
-
-- Library HEAD `7ac1103a`, 55 patches, as in step 3.
-- `full89` failed in `datasets-api.spec` ("none has changed"): the map's
-  `UnitData.xml` and `BehaviorData.xml` were written at 14:25:42, four
-  seconds into the run, by work outside the viewer. The scoba catalog
-  was rebuilt at the start of `full90`.
-- `full90` failed in `pick-pixel.spec` "CommandCenter (stock) @slow": the
-  60 s test timeout. The machine's load average was 36 (other jobs). The
-  test took 30 to 33 s in `full85` to `full88`, and 8.8 s when run again
-  at once.
-- Built: `src/server/core` (HTTP, static files, settings),
-  `src/games/sc2/server` (storage, datasets, catalogs, skyboxes, HD
-  textures, today's routes) and `src/server/main.ts`.
-  `src/tools/build.ts` bundles it into `build/server.js`; the scripts and
-  the test runner start that. `tools/datasets.mjs` is
-  `src/tools/datasets.ts`, run with `scripts/tool.sh datasets`.
-  `server.mjs` and `server-*.mjs` are gone.
-- No test changed. The protocol of section 8 is step 4b.
-
-Step 4b (2026-11-23): the protocol of section 8. The old routes are gone
-(operator choice SWITCH).
-
-| Run | Start (UTC) | Result |
-| --- | --- | --- |
-| `full92` | 15:07:18 | 302 tests: 300 passed, 1 failed, 1 did not run. Exit 1, 298 s. |
-| `t-sky` | after 15:12 | 297 tests: 297 passed. Exit 0, 252 s. Not a planned full run (below). |
-
-- Library HEAD `7ac1103a`, 55 patches, as in step 3.
-- `full92` failed in `skyboxes.spec` "every skybox loads ... @slow": it
-  read `backdrops` with no `limit`, so it surveyed 60 of 66 skyboxes. The
-  test now asks `limit=500` and asserts that it got all of them.
-- `t-sky` was meant to run that one test. With `WEBVIEWER_TEST_ALL=1` the
-  `slow` project depends on `main`, so the whole `main` project ran too. A
-  single `@slow` test is run with `--project slow --no-deps`. In it the
-  survey passed with all 66 skyboxes. From here
-  on, a full run needs the operator's permission (operator 2026-11-23).
-- Built: `src/shared/protocol.ts` (ids, types, the route builder),
-  `src/server/core/backend.ts` (`GameBackend`), `src/server/core/protocol.ts`
-  (the routes over the games). `src/games/sc2/server/index.ts` is the SC2
-  `GameBackend`. The page builds every URL with `routes`.
-- Changed tests: every test that named an old route uses `tests/api.mjs`.
-  New in `server.spec`: health and games, the categories, a dataset is
-  required, unknown games, categories, kinds and methods, and the old
-  routes answer 404. `ground-sky.spec` asserts the default page of 60.
-
-Step 4c (2026-11-23): scene documents and settings (section 10). Targeted
-runs while building; one full run, `full93`, with the operator's leave.
-
-| Run | Result |
-| --- | --- |
-| `t-set` | the settings: 5 files, 35 tests, 35 passed |
-| `t-scenes`, `t-scenes2` | `scenes.spec`: 1 failed each, both faults of the test (below) |
-| `t-scenes3` | `scenes.spec`, `--repeat-each=3`: 33 passed |
-| `t-4c` | 16 changed files named. 309 tests ran, 309 passed (below). |
-| `t-scenes4` | `scenes.spec` after a types-only move: 11 passed |
-| `full93` | Start 15:52:52 UTC. Every test, `@slow` too (operator allowed). 314 tests: 314 passed. Exit 0, 327 s. It closes steps 4b and 4c. |
-| `t-swallow` | After full93, four promise errors that were dropped are now reported (dataset reload, scene open queue, paged list, picker search; the commit hook found them). `datasets-toast`, `paged-list`, `scenes`, `ground-sky`, `typecheck`: 30 passed. |
-| `s5a-1`, `s5a-2` | Step 5a, the format interfaces (below). 28 spec files: the typecheck and the import rule, the scene and its list, HD, the texture window, drag, pick, sky, displacement, cutout, fresnel, billboards, ground lights, particles, constant colour, geometry, draw order, UV, animation speed, bounds, the galleries, scenes, clipboard. `s5a-1`: 87 passed, 53 s. `s5a-2`: 96 passed, 62 s. No full run yet. |
-| `s5b-1` | Step 5b, first try: 74 failed, 37 passed. The game plugin was `game` on the page object, and the datasets part's `game()` (the game id) hid it. Renamed `gamePlugin`; `merge` now refuses a member two parts both have. |
-| `s5b-2` to `s5b-5` | Step 5b (below). 45 spec files: the scene and its list, the galleries, datasets, drag, clipboard, scenes, pick, move, sky, textures, HD, add all, selection, focus, landmarks, camera, and the M3 set of 5a. `s5b-2`: 111 passed, 63 s. `s5b-3`: 79 passed, 71 s. `s5b-4`: 67 passed, 55 s. `s5b-5` (`datasets-toast`, `--no-deps`): 1 passed. No full run yet. |
-| `s5c-1`, `s5c-2` | Step 5c (below). 15 spec files: add all and its view, clipboard, datasets UI, doodads UI, drag, HD, instances, landmarks, pick, scenes, skybox units, the texture window, units UI, ground and sky. `s5c-1`: 107 passed, 79 s. `s5c-2` (`datasets-toast`, `--no-deps`): 1 passed. Typecheck and import rule: 92 files, 0 forbidden imports. |
-| `full94` | Start 20:17:10 UTC, on HEAD `fe40bfe` with the step 5 changes uncommitted. Every test, `@slow` too (operator allowed after step 5). 314 tests: 314 passed. Exit 0, 327 s. It closes step 5. |
-| `live1` to `live3` | The real server (`scripts/start.sh`, port 4600, real `scoba` and `stock` data) in a real browser: page on the new routes only, a gallery Marine drawn and back after a reload, two named scenes, export and import, an old address scene refused, a bad import refused, settings back under `viewer.*`. `live1`: 4 passed, 1 failed (the test hid the gallery before using its dataset select; test fixed). `live2` and `live3` (after the error fix): 5 passed. |
-| `s6-1`, `s6-2` | Step 6, the generic gallery (below), with the test ids renamed. `s6-1`: 128 passed, 1 failed (`datasets-ui`: a dataset change emptied the search; the search now stays). `s6-2` (`datasets-ui`): 7 passed. |
-| `s6d-1` to `s6d-5` | Step 6, the game tabs and the handles. `s6d-1`: 23 passed, 3 failed (`game-tabs.spec`: the choice was not stored when the game was already shown; now every choice is stored, and the game shown at startup in place of a refused one is not). `s6d-2` (`game-tabs`): 5 passed. `s6d-3` (20 files): 132 passed, 1 failed (`scenes.spec` expected the old refusal text; the refusal now names its reason). `s6d-4` (`scenes`): 11 passed. `s6d-5` (`datasets-toast`, `--no-deps`): 1 passed. |
-| `sE-1` | Step 6, the features on the context (below): `game-tabs`, `side`, `instances`: 19 passed. |
-| `full95` | Start 21:22 UTC. Every test. 310 passed, 3 failed, 6 did not run. `clipboard.spec` (2): `SC2App.pointer` was a function, not the point; it is a getter now. `particle-motion.spec`: one spore rose 0.2987, the floor is 0.3. |
-| `sE-2`, `sE-3` | `clipboard`, `particle-motion`: 9 passed. `particle-motion`, `--repeat-each=8`: 16 passed. The `full95` miss came under the load of the whole suite. The 6 that did not run are the `slow` and `shared` projects, which wait on `main`. |
-| `sP-1` | The M3 probes behind `sc2viewer.probe` (6.3). `probe.spec` (new, 2 tests: a probe answers, the old names are gone, an unknown format or name is an error) and the 10 files that call a probe: 38 passed. |
-| `full96` | Start 21:40:12 UTC, on HEAD `fe40bfe` with steps 5 and 6 uncommitted. Every test, `@slow` too. 321 tests: 321 passed. Exit 0, 325 s. It closes step 6. |
-| `live5` to `live7` | The real server, as `live1`. `live5`: 1 passed, 4 failed; `live6`: 3 passed, 2 failed. Both used the ids from before step 6 (`#unit-search`, `#races`, `#unit-count`, `#panel-tab`, `#preview-add`, drawer `panel`); the live test now uses the new ids. `live7`: 5 passed. |
-| `gh1` to `gh7` | Step 7, the Ghost game and the nod format (below). `gh1` (7 files): 35 passed, 4 failed: the anim tests read the record without its dataset; a refused model failed as "cannot load" (the host now throws the format's reason). `gh2`: 24 passed, 3 failed: `zergling.nms` holds a clip for Nova's bones, left out by the format (SPEC-VIEWER-GHOST O-GHOST-15); the tests now expect it. `gh3`: 4 passed, 1 failed (motion names repeat; the negative counts them). `gh4` (`ghost-anim`): 5 passed. `gh5` (5 files): 43 passed, 1 failed (`ghost-mix`: the x field kept Ctrl+C; the test leaves it first). `gh6` (`ghost-mix`): 5 passed. `gh7` (the tab switch): 1 passed. |
-| `full97` | Start 08:42:01 UTC. Every test. 334 passed, 2 failed, 6 did not run. `scenes.spec` used `ghost` as the game the server lacks; it uses `nogame` now. `side.spec`: a missing M3 file was reported as "[object Response]"; the host now throws only an Error a format gave. The 6 that did not run wait on `main`. |
-| `full98` | Start 08:50:24 UTC, on HEAD `b2ca220` with step 7 uncommitted; nodsdk fork `cdef57b`. Every test, `@slow` too. 348 tests: 348 passed. Exit 0, 346 s. |
-| `gh8` | The commit hook read the GLSL `void main()` inside `src/formats/nod/shaders.ts` as a discarded JS call. The shaders moved to `public/shaders/nod.vert` and `nod.frag`, as the other page shaders; each model waits for them. New negative: without `nod.frag` a model fails, the file named. 6 files: 43 passed. |
-| `full99` | Start 09:01:02 UTC, as `full98` plus `gh8`. Every test, `@slow` too. 349 tests: 349 passed. Exit 0, 339 s. It closes step 7. |
-| `tab1`, `full100` | The game tabs: Ghost's tab text `SC: G`, 14 px, the chosen tab bold (10.1). `tab1` (6 files): 42 passed. `full100` (start 09:14:40 UTC): 349 passed, exit 0, 351 s. |
-| `lit1` | Selected instances stay lit, without the glow (16.4). New test in `pick.spec`: brightness 80.1 to 118.0 with two of three selected, green 0; the third not lit; cleared, none lit. 7 files: 39 passed. `full101`: 343 passed, 1 failed: `hd-textures.spec` compared the Marine's colour before it was selected with its colour after, and a selected unit is now lit. The test now takes the reference colour once the unit is selected. `lit2` (`hd-textures`): 8 passed. `full102`: 350 passed, exit 0. |
-| `tw1` to `tw3` | The Ghost texture window (SPEC-VIEWER-GHOST 8); the DDS decode moved from SC2's `textures/originals.ts` to `page/core/ddsdecode.ts`, used by both games. `tw1` (`ghost-textures`, `texture-window`, `hd-textures`): 19 passed, 1 failed (the test double-clicked the view under the open window; it closes the window first). `tw2` (`ghost-textures`): 4 passed. `tw3` (the other Ghost specs): 19 passed. No full run (operator 2026-11-24: targeted specs only). |
-| `rw1`, `rw2` | The rework of the texture window: one window in core (`page/core/texturewindow.ts`) for both games, Ghost on the bare texture viewer page; Ghost's own card window and its CSS are gone. With it: `GroupLook.why`; the Ghost container in `games/ghost/server/container.ts` with its head in `shared/nodx.ts`; `GHOST_GAME`; the drag preview's state key `ghost` renamed `dragPreview`; new specs `contract`, `core-names`, `ghost-gallery`. Targeted only, no `@slow`, no full run (operator 2026-11-24). `rw1` (15 files, 84 tests): 83 passed, 1 failed: `contract.spec` expected `loaded` true for Ghost's first actor, `_actorProps`, whose model `dflt.nod` has only a group no step finds, so it draws nothing; the test now holds `loaded` the same over the reload and logs it. `rw2` (`contract`): 2 passed, exit 0. |
-| `live8` | The dev server after `make viewer-restart`, as `live1`, with one Ghost case added: the Ghost tab, `zerg_critter` from its gallery, drawn (6571 pixels), `stand` playing, stored as `ghost`/`build`, back after a reload, no failed request. 6 passed. `live9`: the same after the shader move of `gh8` and a second `make viewer-restart`: 6 passed, the same 6571 pixels. |
-
-- Library HEAD `7ac1103a`, 55 patches.
-- `t-scenes`: the test read a doodad's name from `unit`; it is in
-  `doodad`. `t-scenes2`: the test read the open scene before "new" had
-  opened it; it now polls. Neither was a fault of the page.
-- `t-4c` was meant to run 16 files. `datasets-toast.spec` is in the
-  `shared` project, which depends on `main`, so the whole `main` project
-  ran: a run of the default suite, not asked for. `t-4b` ran the same way.
-  A `shared` spec is run with `--no-deps` from now on.
-- Built: `src/shared/scene.ts` (the document, its check, ids, names),
-  `src/page/core/settings.ts` (every `viewer.*` key), `core/store/scenes-db.ts`
-  (IndexedDB), `features/scenes` (the scenes and their list),
-  `core/scenes-api.ts` (types). The camera, drawers, dataset, view and
-  landmark modules read and write through `settings.ts`. `frame.ts` keeps
-  no scene; `saveHash` is `saveScene`.
-- Changed tests: the 10 files that read `location.hash` read the stored
-  scene (`tests/scene.mjs`). `camera-persist.spec` and
-  `landmarks-store.spec` use the new keys; a new negative proves the old
-  key is not read. New: `scenes.spec`, 11 tests.
-- Operator check: the look of the scene list and its dialogs.
-- Step 5a built: the types of 6.1 to 6.3 (`src/page/core/plugin.ts`), the
-  M3 format module (`src/formats/m3/format.ts`, `adapter.ts`), the M3
-  layer probes moved from `features/inspect` to `src/formats/m3/layers.ts`.
-  Items hold a `ViewerModel`, a `ViewerInstance` and their `Capabilities`.
-  Core loads through the formats (`loadModel`, `formatOf`); no page module
-  outside `src/formats/m3` names an M3 class. HD uses `textureOverride`;
-  team colour and tint go through `teamColor` and `tint`; the displacement
-  pass is a `PostPass`. `SC2App.lib`, `TEAMS` and `SC2App.setDisplacement`
-  are gone; `sc2viewer.setDisplacement` stays. Six specs read the library
-  objects through `.m3` now.
-- Step 5b built: `PageGame` (6.4 as built) and SC2's
-  (`src/games/sc2/page/`: `game.ts` placement and play rate, `rules.ts`
-  data scale, `records.ts` record checks, `describe.ts` preview cards,
-  `api.ts` the test API's `addUnit` and `addDoodad`). Core adds a record
-  by category (`addRecord`) and applies the placement; `core/rules.ts`
-  is gone; no core file reads a unit or doodad field. The gallery cards
-  take their lines from `describe`. `state()` keys `unit`, `doodad`,
-  `variation` and `dataScale` stay, made from the category nouns and the
-  placement. `SC2App.addUnit`, `addDoodad` and `doodadPlacement` are gone
-  (`sc2viewer.addUnit` and `addDoodad` stay); `add-all-view.spec` reads
-  `source.record`.
-- Step 5c moved what was still SC2 in shared page code to the game.
-  The SC2 record types are in `src/games/sc2/shared/records.ts`;
-  `src/shared/records.ts` keeps the shapes of every game (`Page`, the
-  datasets, `Backdrop`). `src/games/sc2/page/` gained `parts.ts` (what
-  SC2 adds, section 6.6), `hd.ts` (the HD sets, Ctrl+H, the "hd" menu
-  check box, the blue glow rule), `textures/` (the texture window) and
-  `gallery/` (the units and doodads tabs, their filters, the facets and
-  the landmark names). `features/hd`, `features/textures` and the two
-  tabs in `ui/gallery` are gone; `ui/gallery` keeps the tab switch and
-  the model file search. `features/addall` takes its list from the
-  game (`addAllSource`). `hd` is an item option (section 6.5). Ctrl+L
-  and the double-click on an instance are in `features/pick`.
-  `SC2App.filterName`, `sc2viewer.textureWindow` and `hdAssets` stay.
-- Still SC2 after 5c (step 6): `index.html` holds the SC2 tabs, their
-  filters and buttons, and the sky picker says "skybox". Done in step 6:
-  `index.html` has no game's tabs; the picker title stays "skybox".
-- Step 6 built: the generic gallery (`ui/gallery/index.ts`, `pane.ts`)
-  from `CategoryInfo` (`rows`, `icons`) and `RecordSummary`; the game
-  tabs (`ui/gametabs.ts`, 10.1); the handles at the bottom of each
-  panel; `#panel` is `#gallery`; the settings `game` and
-  `drawers: { gallery, instances }`; the datasets per game
-  (`core/datasets.ts`); items, the sky, the clipboard and scene items
-  carry their game. `src/games/sc2/page/gallery/` is gone;
-  `names.ts` holds the landmark names.
-- Step 6 also put the features on the context of 6.6 (as built there).
-  `core/app.ts` is gone; the data types are `core/types.ts`. New in core:
-  `bus.ts`, `context.ts` (the services), `selection.ts`, `sky.ts`,
-  `view.ts`, `landmarks.ts`, `focus.ts`, `framebox.ts`, `zoom.ts`,
-  `geometry.ts`, `probe.ts`, `testapi.ts`. `features/focus` is gone.
-  The bus is `bus.ts`, not `events.ts`: a `.ts` file of that name hides
-  `events.d.ts`, the library's `events` module (O-VSPEC-1c).
-- Step 7 built StarCraft: Ghost (SPEC-VIEWER-GHOST). Server:
-  `core/backend.ts` `GameUnavailable`, `UnavailableGame`; the protocol
-  lists a game that is not available with its reason and answers its
-  routes 503; `server/main.ts` starts sc2, then tries ghost;
-  `src/games/ghost/server/`. Page: `Clip`, `Placement.clips`,
-  `FormatModule.attachClips` (6.3), `ApiClient.assetUrl`; `instanceOf` is
-  async and waits for the clips; `src/games/ghost/page/`,
-  `src/formats/nod/`, both registered in `src/page/main.ts`. Shared:
-  `src/games/ghost/shared/records.ts`. New tests: `ghost-api`,
-  `ghost-unavailable`, `ghost-page`, `ghost-anim`, `ghost-look`,
-  `ghost-mix` (helpers `tests/ghost.mjs`). Changed: `server.spec`,
-  `game-tabs.spec` (two games), `scenes.spec` (`nogame`).
-
-Order of work:
-
-1. Baseline: one full run of the current tests, recorded. Done, above.
-2. Tooling: compiler, bundles, type check in the test run. Done, above.
-3. Page to typed modules, behaviour unchanged. Done, above.
-4. Server to core and one backend (4a), new routes (4b), scene documents
-   and stored settings (4c, section 10), in IndexedDB, named, with export
-   and import; the URL holds no scene (operator 2026-11-23). Done, above
-   (`full93`).
-5. Interfaces of sections 5 to 7; the existing game becomes a plugin.
-   5a, the format interfaces and M3 as a format module: done, above
-   (`s5a-1`, `s5a-2`). 5b, the game plugin of 6.4 and generic scene
-   items: done, above (`s5b-2` to `s5b-5`). 5c, the feature context of
-   6.6, `itemOptions`, `hd`, `textures` and the gallery tabs to
-   `games/sc2`, the SC2 record types to `games/sc2/shared`: done, above
-   (`s5c-1`, `s5c-2`). Full run `full94`: 314 passed.
-6. Game tabs and handles, the generic gallery, and the features on the
-   context of 6.6 (no page object), the format probes of 6.3. Done,
-   above (`full96`: 321 passed).
-7. The second game and the second format. Done, above (`full99`).
-8. Tests to TypeScript. Documents to the final state.
-
-Each step ends with a full run, once the operator allows it. Until then
-the step's own test files are run.
+Since `full102` only targeted runs: the shared texture window, the edges,
+section 17. The last targeted runs, 2026-11-24, covered 37 of the 71 spec
+files. Three checks there still named the shapes from before section 17
+(`server`, `ghost-api`, `pick`). The other spec files were not run since.
+Run logs are not kept in the repository. The step-by-step record is in
+this file's git history.
 
 ## 14. Operator checks
 
-- The look and the feel of the game tabs and the handles.
+- The look and the feel of the game tabs, the handles and the scene list.
 - Whether the gallery of a game reads well.
-- The edges of Ctrl+/ (16.13): thin, green, no flicker on the surface
-  they lie on, and whether 40 is a good range.
+- The edges of Ctrl+/: thin, green, no flicker on the surface they lie on,
+  and whether 40 is a good range.
+- Section 17: whether a variant looks better than its original; the look
+  of the texture window, the skin choice, the Upscale dialog, the skin
+  editor, the quality colours, the ground and skybox previews.
 
 ## 15. Open points
 
 | ID | Point |
 | --- | --- |
-| O-VSPEC-1 | The renderer library is viewer code and is type-checked in the test run (section 9). (a) Open: the operator ruled that it is viewer code, not which flags bind it. Checking it without `noUncheckedIndexedAccess` is the author's reading. (b) Closed (operator 2026-11-23): one compiler, and only the bundled code is checked. It passes in run `full86`. (c) Open: how our code imports it under two settings files. Step 3 shows it: our code reads the library's declaration files (`build/lib-types`, path `@renderer/*`) under our flags; the library's source is checked under its own. The page needs `src/page/core/events.d.ts` (section 9). (d) Open: the library code we do not bundle is not checked. |
-| O-VSPEC-2 | The commit hooks have not been seen on `.ts` files in this repository. |
-| O-VSPEC-3 | `Capabilities` lists what today's features need. A capability for a format's own effects (particles, lights) is left to the format's `probes` and `postPasses` until a second format needs the same. |
-| O-VSPEC-4 | Closed (operator 2026-11-23): accepted. `sequences` on the instance, `parse` with the choice of format by extension, and core's own model store. |
-| O-VSPEC-5 | Closed (step 2): Node 24.11.1, compiler `typescript` 7.0.2, `@types/node` 24.19.2. `scripts/typecheck.sh` prints the first two at the start of every run. |
-| O-VSPEC-6 | Section 16 was written from the page code and the test titles. The baseline run `full85` (section 13) passed every test of today. It proves what those tests assert, not every sentence and constant of section 16: what no test asserts there stays read from the code. |
-| O-VSPEC-7 | The import-rule check of section 9 was written first in step 3, with its tests (`src/tools/import-rule.ts`, `import-rule.spec`). Closed (operator 2026-11-23): the last six rules of section 3 are accepted: what `src/tools/` may import, `features` over `ui`, page and server apart, a game's `page` and `server` apart, where the library is imported, and imports from outside `src/`. |
-| O-VSPEC-8 | `fresnel.spec` "negative: ... the same frame with the term on and off" asserts two frames equal to the last colour level. It failed once in `full87` by one level of one pixel and passed alone 20 of 20 times. Two renders of one still scene are known to differ a little (`changedSinceMark` ignores steps up to 40). Closed (operator 2026-11-23): a small tolerance. The test now allows 5 pixels of coverage and 0.05 levels of mean colour per channel; the real term moves the mean brightness by over 20. |
+| O-VSPEC-1 | The library is checked without `noUncheckedIndexedAccess`. That is the author's reading; the operator ruled only that it is viewer code. The library code we do not bundle is not checked. |
+| O-VSPEC-2 | The commit hooks have not been seen on `.ts` files here. |
+| O-VSPEC-3 | A capability for a format's own effects (particles, lights) is left to probes and post passes until a second format needs it. |
+| O-VSPEC-6 | Section 16 was written from the page code and the test titles. What no test asserts there is read from the code. |
 
 ## 16. Feature behaviour
 
-All [today]: what the current page does, read from its code and its test
-titles. Core keeps it unchanged through the migration. A number here is a
-constant of the code. Nothing here names a game.
+What the page does. A number here is a constant of the code.
 
 ### 16.1 Status messages
 
-- A message shows as a toast at the top centre of the free view (16.2),
-  not inside a panel.
-- It stays 5 s. A failure stays 9 s.
-- Messages in a row replace each other. Each shows at least 0.1 s.
-- A click on the toast opens the message log and takes the toast down.
-- The log holds every message in order, with its clock time and a failure
-  mark. It grows while open.
+- A message shows as a toast at the top centre of the free view (16.2).
+- It stays 5 s, a failure 9 s. Messages in a row replace each other; each
+  shows at least 0.1 s.
+- A click on the toast opens the message log. The log holds every message
+  in order, with its time and a failure mark (R-VIEW-64).
 
 ### 16.2 Drawers
 
 - The gallery and the instances panel are drawers. A handle slides its
-  drawer out to the left and back. It shows a single angle mark that
-  points left when open and right when closed, and carries
-  `aria-expanded`. The choice is stored.
-- A closed drawer is `inert`: it takes no mouse and no keys.
+  drawer out and back. The choice is stored.
+- A closed drawer takes no mouse and no keys (R-VIEW-28).
 - The free view is the window without the open drawers. The toast and the
   camera framing centre on it.
-- An instance behind an open drawer is not under the mouse. With the
-  drawer closed it is.
-- Each panel is half the window high, whatever it holds.
+- An instance behind an open drawer is not under the mouse.
 
 ### 16.3 Mouse
 
 | Input | Does |
 | --- | --- |
 | Left drag | holds the ground point under the pointer and pulls the map |
-| Ctrl + left, held, with a selection | turns the selected instances to face the pointer. With no selection it is a left drag. |
-| Alt + left drag on an instance | moves it. If it is selected, the whole selection moves by the same step. The point pressed stays under the pointer. |
+| Ctrl + left, held, with a selection | turns the selected instances to face the pointer |
+| Alt + left drag on an instance | moves it, and the whole selection when it is selected |
 | Alt + left drag off an instance | draws the select rectangle |
-| Middle drag | orbits around the ground point under the pointer, 0.004 rad per pixel. Started on the sky, it orbits around the camera target. |
+| Middle drag | orbits around the ground point under the pointer, 0.004 rad per pixel; from the sky, around the camera target |
 | Ctrl + middle drag | turns the view around the eye |
 | Right drag | pans, 0.0006 x the camera distance per pixel |
-| Wheel | zooms. The step glides over a few frames. A notch moves less the closer the eye is to the ground. Ctrl makes a notch a quarter. The eye never goes under the ground. The distance is at most 2000. Setting the view stops a glide. |
-| Left click | selects (16.4). A press that moves more than 4 pixels is a drag. |
-| Right click on an instance | opens its animation menu (16.5) |
-| Double-click on a record or an instance | the game's own (6.6) |
+| Wheel | zooms, gliding over a few frames; less per notch near the ground; a quarter with Ctrl; distance at most 2000 |
+| Left click | selects. A press that moves more than 4 pixels is a drag. |
+| Right click on an instance | opens its animation menu |
+| Double-click on a record or an instance | the game's own |
+
+The eye never goes under the ground.
 
 ### 16.4 Pick and selection
 
 - The instance under the mouse is the one whose solid surface is drawn at
-  that pixel. An instance in front takes the pixel from one behind.
-- Under the mouse: it is drawn brighter, with a feathered green glow
-  around its outline, only while it is there.
-- A click selects it. Another instance takes the selection. A click on the
-  ground clears it. A drag does not select.
-- Shift + click adds an instance to the selection or takes it out.
-- Every selected instance gets a ring and stays drawn brighter, as under
-  the mouse, without the glow (operator 2026-11-24; `pick.spec`).
-- A click on a row name selects the same way, with shift too. Ctrl + click
-  on a row name also points the camera at the instance.
-- The rectangle selects every instance whose foot, middle or top is inside
-  it. A new rectangle replaces the selection. With shift it adds. An empty
-  one clears. A rectangle under 4 pixels is a click.
+  that pixel (R-VIEW-52).
+- Under the mouse it is drawn brighter, with a feathered green glow around
+  its outline.
+- A click selects it. A click on the ground clears. Shift + click adds or
+  takes out. A drag does not select.
+- Every selected instance gets a ring and stays brighter, without the
+  glow.
+- A click on a row name selects the same way. Ctrl + click also points the
+  camera at the instance.
+- The rectangle selects every instance whose foot, middle or top is
+  inside. With shift it adds. An empty one clears. Under 4 pixels it is a
+  click.
 - The selection survives a new instance. A removed instance leaves it.
 
 ### 16.5 Animation menu
 
-- A right click on an instance opens a menu of all its animations. A right
-  drag does not. A right click on the ground does not.
-- The menu stays open until Escape or a click elsewhere.
-- Choosing one plays it once; then the instance goes back to its looping
+- A right click on an instance opens a menu of its animations. It stays
+  open until Escape or a click elsewhere.
+- Choosing one plays it once. Then the instance goes back to its looping
   one.
-- With the menu's "loop" box checked, the chosen one becomes the
-  instance's looping animation.
+- With the menu's "loop" box checked, the chosen one becomes the looping
+  one.
 - Capability controls and a game's own entries stand in the same menu.
 
 ### 16.6 Keys
@@ -1307,110 +681,453 @@ constant of the code. Nothing here names a game.
 | Key | Does |
 | --- | --- |
 | Delete | removes the selected instances |
-| Ctrl+C, Ctrl+X, Ctrl+V | copy, cut, paste (16.7) |
-| Ctrl+L | switches the menu's "loop" choice, when an instance is selected |
+| Ctrl+C, Ctrl+X, Ctrl+V | copy, cut, paste |
+| Ctrl+L | switches the menu's "loop" choice, with a selection |
 | Ctrl+/ | switches the edges of the selected instances (16.13) |
-| Escape | closes the menu, the dialog or the floating window that is open |
+| Escape | closes the open menu, dialog or floating window |
 
-- No key acts on the scene while a text field has the keys. The field
-  keeps them: copy and paste work on its text.
-- Ctrl+L never reaches the browser, wherever the keys are: not with a
-  selection, not without, not from a text field, not from a floating
-  window. The same holds for a Ctrl key a game adds.
-- A game adds its own keys through `ui`.
+- No key acts on the scene while a text field has the keys (R-VIEW-59).
+- A Ctrl key the viewer owns never reaches the browser, wherever the keys
+  are.
+- A game adds its own keys through the UI service.
 
 ### 16.7 Clipboard
 
 - The clipboard is kept in the page. It is not the system clipboard.
 - A copy keeps what defines the item: game, dataset, record or file,
-  variant, scale, angle, animation, pick, item options
-  (`features/clipboard`; `ghost-mix.spec`, `contract.spec`).
-- A paste keeps the shape of the group. Its centre goes under the pointer.
-  With the pointer off the view, the copies go where they were copied
-  from.
-- The copies become the selection.
-- With no selection nothing is copied. An empty clipboard pastes nothing.
+  variant, scale, angle, animation, pick, options.
+- A paste keeps the shape of the group. Its centre goes under the pointer,
+  or where it was copied from when the pointer is off the view. The copies
+  become the selection.
 
 ### 16.8 Gallery
 
-- A list loads one page, then the next when scrolled to its end. A new
-  search starts at the first page. The total is shown.
-- A click on a row shows the preview: picture, data, "add to scene". A
-  double-click on a row adds nothing.
-- A drag shows the record's model on the ground point under the pointer.
-  Off the view the preview hides. Above the horizon there is no ground:
-  no preview, and a drop places nothing and says why.
+- A list loads a page at a time as it is scrolled. A new search starts at
+  the first page. The total is shown. A hidden list loads its first page
+  only, and the next once it is shown and scrolled.
+- A click on a row shows the preview with "add to scene". A double-click
+  adds nothing.
+- A drag shows the record's model on the ground under the pointer. Above
+  the horizon there is no ground: no preview, and a drop places nothing
+  and says why.
 - A drop places what the preview showed: the same variant and angle.
-- A record that is a backdrop has no preview. Added or dropped, it becomes
-  the backdrop.
-- "Add all" asks first, with the count, and names what it leaves out. A
-  question that is declined adds nothing, no landmark, and leaves the
-  camera.
-- "Add all" reads the list 500 at a time and loads 6 models at once.
-- It lays the new instances out by size: clusters of small, medium and
-  large ones, outliers alone. Nothing overlaps. The block goes next to the
-  instances already there; none of those moves.
-- Then the camera frames the block, and a landmark is saved, named after
-  the filters, with a number when the name is taken.
+- A backdrop record has no preview. Added or dropped, it becomes the
+  backdrop.
+- "Add all" asks first, with the count, and names what it leaves out.
+  Declined, it changes nothing.
+- It reads the list 500 at a time and loads 6 models at once.
+- It lays the new instances out by size, without overlap, next to those
+  already there. Then the camera frames them and a landmark is saved,
+  named after the filters.
 
 ### 16.9 View tools
 
-- Landmarks: "origin" is always there, takes the camera to 0, 0, 0, and
-  cannot be deleted. The pin asks for a name and saves the view. The trash
-  asks, then deletes that one. The list and the chosen one are stored.
-- Grid: hexagonal, on at first. Lines are about one pixel and solid, also
-  at a flat angle. Its cell size follows the zoom, so it shows at every
-  distance. It glows under the pointer and around every instance. The
-  switch is stored. It needs the GL extension `OES_standard_derivatives`.
-- Backdrop: chosen in a dialog, drawn behind everything. Escape closes the
-  dialog without a change. The choice is stored.
-- The camera is stored. A stored camera that is not valid is refused,
-  reported and replaced by the default view.
+- Landmarks: "origin" is always there and cannot be deleted. The pin asks
+  for a name and saves the view. The trash asks, then deletes.
+- Grid: hexagonal, on at first. Its cell size follows the zoom, so it
+  shows at every distance. It glows under the pointer and around every
+  instance. A game may give an item another glow class. It needs the GL
+  extension `OES_standard_derivatives`.
+- Backdrop: chosen in a dialog, drawn behind everything.
+- Ground texture: 17.7.
 - The canvas follows the window size.
 
 ### 16.10 Datasets in the page
 
 - The page asks for the datasets every 3 s.
-- A dataset that changed raises a question at the bottom: yes or no. Yes
-  reloads the data and the page. No hides it until the files change again.
+- A dataset that changed raises a question. Yes reloads the data and the
+  page. No hides it until the files change again (R-VIEW-34).
 - Every asset URL carries the dataset's signature.
 - An instance row has a dataset select (R-VIEW-32).
 
 ### 16.11 Frame
 
-Order of one frame: clear; the backdrop and its post passes; depth clear;
-the grid; the scene; the post passes; the edges (16.13); the outline of
-the instance under the mouse. One step of animation time is at most 100 ms.
+Order: clear; the backdrop and its post passes; depth clear; the grid; the
+scene; the post passes; the edges; the outline of the instance under the
+mouse. One step of animation time is at most 100 ms.
 
 ### 16.12 Components
 
-`PagedList`, `Dialog`, the picker dialog, `ConfirmDialog`, `Toast`, the
-drop-down, `FloatingWindow`. They move to `page/ui/components/` as typed
-classes with the same behaviour.
+Paged list, dialog, picker dialog, confirm dialog, toast, drop-down,
+floating window: `page/ui/components/`.
 
 ### 16.13 Edges
 
-Not [today]: added 2026-11-24 (R-VIEW-66, operator). `features/edges`.
+`features/edges` (R-VIEW-66).
 
 - Ctrl+/ switches the edges of the selected instances that have the
-  `edges` capability (6.2). All go the same way: off when the one
-  selected last shows them, on otherwise. The key is Ctrl with the "/" key
-  (`code` `Slash`) or any key that types "/". Alt or Meta: not the key.
-- The status line says `edges on: N instances` or `edges off: ...`. With
-  nothing selected: `Ctrl+/: select an instance first`. With no
-  selected instance that can draw edges: `no edges for the selected`.
-- A text field keeps the key. It does nothing to the scene there.
+  `edges` capability. All go the same way: off when the one selected last
+  shows them.
+- The status line names the count, or says why nothing happened.
 - The lines are 1 pixel, colour (0.2, 1.0, 0.3), drawn after the post
-  passes. Depth test on (`LEQUAL`), depth write off, no blend. The depth
-  range is pulled to `[0, 1 - 5e-5]`, so a line wins over the surface it
-  lies on. What the instance itself or another one hides is not drawn.
-- An instance whose location is farther than 40 from the eye draws no
-  edges. It keeps the choice, and shows them again when nearer.
-- The choice belongs to the instance shown. It is not in the scene
-  document and not in a copy. A reload, a paste and a new model (variant,
-  dataset) start without edges.
-- Tests read `sc2viewer.state().edges`: `on` (ids), `far` (ids too far in
-  the last frame), `lines` (drawn in the last frame), `range`. And
-  `sc2viewer.edgePixels(rect?)`: the clearly green pixels the edges add,
-  from two frames at one moment, one without them; how many lie more than
-  2 pixels from the drawn body; how many lie in a page rectangle.
+  passes with the depth test on and depth write off. The depth range is
+  pulled to `[0, 1 - 5e-5]`, so a line wins over the surface it lies on.
+  What is hidden is not drawn.
+- An instance farther than 40 from the eye draws no edges. It keeps the
+  choice.
+- The choice is not in the scene document and not in a copy.
+- Tests read `sc2viewer.state().edges` and `sc2viewer.edgePixels()`.
+
+## 17. Textures
+
+R-VIEW-100, 101, 107, 108, 110 to 125; their state is in section 12. How a
+variant is made, kept, put in a skin and baked is
+[SPEC-HD-TEXTURES](SPEC-HD-TEXTURES.md). Its words are used here. Status:
+17.1 and 17.2 reading are built and were tested. Skins, the dialog, the
+editor, bake and previews are built, and their specs (17.8) have not
+passed yet.
+
+### 17.1 Parts
+
+| Part | Where | Holds |
+| --- | --- | --- |
+| Shared types | `src/shared/textures.ts` | 17.2, the routes as the page builds them |
+| Routes | `server/core/textureroutes.ts` | the texture routes of section 8, over a game's texture service |
+| Service over the pipeline | `server/core/textures.ts` | runs `scripts/hd_textures.py` only to change something (below). A game registers it in one line. |
+| Index reader | `server/core/textureindex.ts` | reads the pipeline's state index (below) |
+| Owner of a record | the game's server module | which owner a record or an instance is (SPEC-VIEWER-SC2 8.2) |
+| Owner of an instance | the game's page part `textureOwner` | the owner id of an item, or none |
+| Texture window | `page/core/texturewindow.ts`, the page `texture-viewer.html` with `page/texview` | 17.3; compare, pick, Save to Skin… |
+| Skins of an instance | `page/core/skins.ts`, the instance menu in `features/pick/menu.ts` | 17.4 |
+| Upscale dialog | `features/skins/upscale.ts`, its choices in `features/skins/choices.ts` | 17.5 |
+| Skin editor | `features/skins/editor.ts`, its dialogs in `features/skins/actions.ts` | 17.6, 17.6.2 |
+| Tiles of a texture | `page/core/tiles.ts`, their look in `public/theme.css` | 17.6.1, both windows |
+| Icons | `page/ui/icons.ts` | the pencil, trash and skin icons |
+| Previews | `page/core/previews.ts` | a small picture decoded in the page from a file |
+| Ground and skybox | `page/core/render/ground.ts`, `page/core/sky.ts`, `features/sky`, its ground row in `features/sky/groundrow.ts` | 17.7 |
+
+- A game without a texture service gets no control of this section, and
+  its texture routes answer 404 (R-VIEW-100).
+- A state, a listing, an owner, a variant's file and an original's place
+  are read from the state index in the texture store (SPEC-HD-TEXTURES
+  4.9), with the statements of `sql/texture-index/`, read once when the
+  service starts. The file is opened read-only for each read, with a busy wait of
+  200 ms. A read that cannot be made in that time fails and says so. The
+  service keeps nothing between reads and runs no pipeline code to answer
+  one (R-VIEW-111).
+- Built only when missing (operator 2026-11-25). At start the server
+  indexes a dataset the state index does not hold yet, and nothing else.
+  A dataset it holds is not synced at start; a reload of the dataset
+  syncs it. The game storage's file list is kept in
+  `$WEBVIEWER_CACHE/storage-listing.txt`, made when missing; delete it
+  after a game update. The tests' base store is kept between runs; delete
+  `$TEXTURE_STORE` (the test one) to build it again.
+- The reader is Node's own `node:sqlite`. Node 24.11.1 marks it
+  experimental and says so once in the log at start.
+- A change made past the viewer (the CLI, a map build) shows on the next
+  read.
+- The service applies one rule of its own, the reader's rule of
+  SPEC-HD-TEXTURES 4.9: a request whose process is gone shows as failed,
+  and its variant may be asked for again.
+- The service runs these pipeline commands, each as a process:
+
+| Command | When |
+| --- | --- |
+| `index` | the server starts; a dataset is reloaded. One at a time per dataset. |
+| `index --asset` | the judge route; a request for a texture not judged yet |
+| `upscaler` | before a request. It names the worker's command; the service starts the worker when none runs. |
+| `request` | the request route. It outlives the server (R-VIEW-121). |
+| `skin` | the skin route. `skin upscale --defer` writes the skin and starts no request; the service then starts one `request` per texture it names, side by side, each outliving the server, and answers once the index shows each. |
+| `bake`, `unbake` | their routes |
+
+- At start, a dataset the index never held is indexed before the server
+  listens. A dataset it holds is indexed while the server serves.
+- A failed `index` is logged. The states stay as the index holds them.
+- A request, and each request of a skin upscale, answers once the index shows it or its variant, at most 30 s
+  after its process started. What the index held of that variant before,
+  an attempt that failed or a stale variant, does not count.
+- An index of another schema is an error on every read. The pipeline
+  rebuilds it on its next write.
+
+### 17.2 States
+
+What the server says of one texture:
+
+| Field | Meaning |
+| --- | --- |
+| asset, kind, users | from the pipeline's description |
+| judged | the pipeline has read its role and size. Not judged: `reason` and `models` are empty. |
+| reason | why it cannot be upscaled, or none |
+| colour | whether it has a colour plane |
+| variants | per variant: id, input, models per plane, size, file hash, numbers each with bound, band (`ok`, `near`, `problem`) and info text; stale; accepted |
+| models | per model: whether a request may ask for it, else why |
+| sizes | per size: whether it can be reached, else why |
+| requests | those not done: variant id, state, step and plane counts, error |
+| bake | for a terrain texture: the baked variant, and whether the package holds its file |
+
+What the server says of one owner:
+
+| Field | Meaning |
+| --- | --- |
+| owner, title, layer | from the index |
+| below | the owners below it, each with its bake |
+| textures | its textures' assets; their states come by the textures route |
+| skins | per skin: name, the variant per asset, and whether it is stored. `new` is New Skin; an offered one is not stored (SPEC-HD-TEXTURES 4.6) |
+| shows | per asset, what the owner shows now: its bake, else the nearest bake below, else the original. The In game tile of both windows reads it (17.6.1) |
+| bake | the baked skin's name and map, or none; whether the package holds it |
+
+- With the states come the sizes, the models and the limits with their
+  bands and info texts.
+- "Held by the package" is decided by the file: the package record names
+  it, and the file at the recorded place has the recorded hash.
+- A refused request, skin change or bake is a 400 with the pipeline's
+  reason. Nothing changes (R-VIEW-123).
+- The pipeline judges a texture when it has a variant or is asked for by
+  name. The judge route asks for a list of textures by name and answers
+  with their states. A name that is no texture of the dataset is refused.
+- A read of the states of one model's textures answers within 250 ms, on
+  a store read for the first time too (R-VIEW-111).
+- An original is served by the asset route. For a texture it is the file
+  the index's origin table names for the asset in that dataset
+  (R-VIEW-112, R-VIEW-33). An asset the table does not hold is found by
+  the game's own listing.
+
+### 17.3 Texture window
+
+One window for every game, a floating window with the texture page in its
+frame. The page is viewer code. It compares; it changes a skin only by
+**Save to Skin…** (R-VIEW-101, R-VIEW-130, R-VIEW-133).
+
+- It opens on a record, an instance or a model file, by a double-click.
+  Without a rule of the game's own, the textures are those the model
+  names.
+- The list has one entry per texture and plane: a small picture, the size,
+  and state badges. Chips filter by kind and plane; a search by name.
+- Below the view: the details of the chosen texture (format, kind,
+  "used by", why it cannot be upscaled, its bake, the game's facts), then
+  its tiles, the same tiles as the skin editor (17.6.1, R-VIEW-132).
+  "used by" lists one user per line in a box 72 px high (about 4.5 lines)
+  that scrolls (R-VIEW-134).
+- The view shows the original and, beside it, the tiles shown now, parted
+  by lines that can be dragged. Zoom, pan, 1:1, tile and fit. At first the
+  In game tile is shown.
+- A click on a tile shows it alone beside the original and picks it.
+  Ctrl+click adds it to the view or takes it out; the pick stays. The
+  tiles shown have the blue outline. Picking the In game variant drops
+  the texture's pick (R-VIEW-130).
+- **Upscale Texture** is the last tile (R-VIEW-129). It sends the page
+  event `texture-upscale` with the game, dataset and asset; the viewer
+  opens 17.5 on it.
+- When the thing has a texture owner (SC2: a unit, a doodad's actor, a
+  bare model file; a ground texture has none), a bar above the tiles says
+  "<n> textures picked" with **Save to Skin…** and **Revert Changes**,
+  while there is a pick. A list row with a pick has the badge PICKED.
+  **Save to Skin…** sends the page event `texture-save` with the game,
+  dataset, owner, the picks and the instance the window was opened on, if
+  any; the viewer asks in the dialog of 17.6.2. Saved, the picks are
+  dropped. **Revert Changes** drops them; nothing else changes. Without an
+  owner there is no bar.
+- When a texture changes for its game and dataset (`textures-changed`),
+  the window reads the states again.
+- Every picture is decoded in the page from the file itself.
+- It has no key of its own. Ctrl+L stays the viewer's inside it.
+- On opening, it shows the states at once, then calls the judge route
+  for the textures not judged and does not wait.
+- While a shown texture has an open request, the states are asked for
+  once a second.
+
+### 17.4 Skins of an instance
+
+The skin choice of an instance (R-VIEW-113).
+
+- The instance's owner comes from the game. An instance without an owner
+  with textures has no skin controls.
+- The item's choice is a skin name. Absent means `original`. It is kept
+  in the scene document as the option `skin`, and in a copy. It changes
+  no other instance.
+- Choosing a skin the owner does not have is refused: the instance keeps
+  the skin it had. An item read with such a skin is reported as a
+  failure and shows its model's own textures.
+- A rename or a delete in this page first sets every instance of the
+  owner on that skin to the new name or to Original, then changes the
+  skin; a refused change sets them back.
+- The menu row: the skin list, **Upscale Skin**, **Bake Skin**, and a
+  badge (R-VIEW-114, 126). The list is a button: a skin icon, the chosen
+  skin's label, and a down arrow (R-VIEW-137). A click opens its rows:
+  - **Original** first, with no icon;
+  - each saved skin, with an edit icon and a red trash icon;
+  - **New Skin**, when the owner has one, with the same two icons;
+  - **Add New Skin…** last.
+- A click on a row's label chooses the skin for the instance. The edit
+  icon opens 17.6 on that skin. The trash icon of a saved skin asks
+  "Delete Skin", of New Skin "Discard New Skin" (17.6); answered, the
+  instances on it show Original. The trash of the baked skin is disabled;
+  its title says "baked: unbake it or bake another skin first". **Add New
+  Skin…** opens 17.6 on New Skin.
+- The bake button says **Bake Skin**, or **Unbake Skin** while Original
+  is chosen. Unbake Skin is disabled while the owner has no bake. Bake
+  Skin is disabled on New Skin, with the reason in its title (R-VIEW-127).
+- The badge shows 🍞 and the baked skin's name. It is absent while the
+  owner has no bake.
+- **Bake Skin** asks to confirm, naming the owner, the skin and the
+  dataset, then calls the bake route (R-VIEW-122). **Unbake Skin** asks
+  "Remove the bake of <title> in <dataset>? It will show its original
+  textures." A refusal shows its reason; nothing changes (R-VIEW-123).
+- Dialog titles and buttons start with a capital letter and name what
+  they act on: **Bake Skin**, **Unbake Skin**, **Save Skin**, **Delete
+  Skin**, **Discard New Skin**, **Rename Skin**, **Save to Skin**,
+  **Cancel** (R-VIEW-128). A button that deletes or discards is red
+  (R-VIEW-136).
+- An instance shows its own textures at once. Adding it makes no call of
+  the texture service and waits for none (R-VIEW-110). Its skin follows
+  when the owner is in; `idle()` waits for it.
+- A slot shows the variant the skin names, at its size. A texture the
+  skin does not name shows its original. Original names nothing: every
+  slot shows the original, whatever is baked (R-VIEW-127).
+- A named variant with an open request: the slot shows the model's own
+  texture until it is made (below). A named variant that is stale, has a
+  problem not accepted, is not made with no request, or cannot be
+  loaded: the skin is reported as a failure, naming the texture and why.
+- When a skin or a variant changes for its game and dataset, the skin is
+  applied again to every instance that shows it.
+- While an instance's skin names a variant with an open request, the
+  states of those textures are read again once a second, and the skin
+  applied again, until the variant is made or its request failed.
+- What is baked shows on an instance only through a skin: the baked
+  skin, or the offered New Skin that names what the owner shows now
+  (R-HD-137).
+
+### 17.5 Upscale dialog
+
+One dialog, opened from an instance (whole owner) or a texture (one
+texture) (R-VIEW-115 to 117, 119).
+
+| Choice | One texture | Whole owner |
+| --- | --- | --- |
+| Input | a select of its variants, `original` first | the skin shown now; each texture's input is its variant there |
+| Model | `pbrify`, `fast`, `seedvr2`; those the state refuses are disabled, with the reason | all three; with `seedvr2` or `pbrify`, a line says how many data textures get `fast` |
+| Size | 1024, 2048, 4096; those the input cannot reach are disabled | all three; a line says how many textures cannot reach it and keep their variant |
+
+- The button is **Upscale Texture** on one texture, **Upscale Skin** on
+  an owner. Submit on one texture calls the request
+  route. Submit on an owner calls the skin route with `upscale` and the
+  name `new`; the instance then shows New Skin. While the owner has a
+  stored New Skin, the server refuses it: save or discard it first.
+- The dialog closes when the call answers. A refusal keeps it open with
+  the reason.
+
+### 17.6 Skin editor
+
+A floating window on one owner and one skin (R-VIEW-118 to 121).
+
+- Left: one row per texture of the owner, with a preview and its name.
+- Right: the selected texture's tiles (17.6.1). The picked tile has the
+  blue outline: the texture's pick, else the variant the skin names, else
+  the original; In game too when it is the same variant.
+- A click picks the tile. It changes no skin and no instance
+  (R-VIEW-133). A texture row with a pick that differs from the skin has
+  the mark ●. While there is such a pick, a bar says "<n> changes" with
+  **Save to Skin…** and **Revert Changes**.
+- **Save to Skin…** opens 17.6.2 with the skin open as the target; on
+  Original, New Skin (R-VIEW-127). Saved, the editor shows the target
+  skin, and the instance shows it. **Revert Changes** drops the picks.
+- A saved skin the owner no longer has is reported as a failure; the
+  editor does not switch to another skin.
+- A queued or running variant shows as a tile with its state; a failed
+  one with its reason.
+- The header has no name box and no Copy. A saved skin has **Rename
+  Skin** (a dialog asks the name; a bake of it follows the new name) and
+  **Delete Skin** (a dialog asks to confirm). Delete Skin of the baked
+  skin is disabled, its title says "baked: unbake it or bake another skin
+  first", and the service refuses it too (R-HD-136). A name another
+  skin holds, ignoring case, is refused (R-HD-138). New Skin has **Save
+  New Skin As…** (a dialog asks the name) and **Discard New Skin** (a
+  dialog asks to confirm). Original has none. Delete Skin and Discard
+  New Skin are red (R-VIEW-136).
+
+#### 17.6.1 Tiles of a texture
+
+The skin editor and the texture window show the same tiles, in this
+order (R-VIEW-131, R-VIEW-132):
+
+- **In game**: the variant the owner shows now (`shows`: its bake, else
+  the bake below, else the original). Without an owner (a ground
+  texture), the texture's own bake, else the original. The second line is
+  the size and "baked" or "not baked". It names no skin. When a bake is
+  there and the package does not hold it as it is (owner `held` false, or
+  texture `packaged.held` false), an amber line says "not in the package
+  yet: build the map".
+- **Original**, then each variant: a preview, the id, the size, and the
+  numbers, each coloured by band (R-VIEW-120). A stale or blocked variant
+  has an amber title.
+- A tile with a number off the ok band has an info mark "i". It keeps the
+  arrow cursor. On hover a tooltip says "Amber: near a limit. Red: misses
+  a limit." and names each such limit, its number, its bound and what a
+  miss looks like (R-VIEW-135).
+- Each open request: its state and step, or its failure reason. It cannot
+  be clicked.
+- Last, **Upscale Texture**, as large as a preview tile (R-VIEW-129).
+
+#### 17.6.2 Save to Skin dialog
+
+One dialog for both windows (R-VIEW-133).
+
+- A select of the target: New Skin (with "made now" when it is not
+  stored) and each saved skin.
+- One line per pick: the texture, the variant the target names now, and
+  the pick. A pick the target names already says "no change".
+- "<title> (<owner>) in <dataset>. Bakes, Original and the other skins do
+  not change." "New Skin will be made from what <title> shows now." when
+  the target is New Skin and it is not stored. "This instance will show
+  <target>." for an instance; else "No instance changes its skin."
+- **Save to Skin** is disabled while no line is a change. It calls the
+  skin route `set` once per change, in order, then sets the instance's
+  skin to the target. A refusal stops there and shows its reason in the
+  window. **Cancel** changes nothing.
+
+### 17.7 Ground texture and skybox
+
+- A ground category lists ground textures, each row with a preview and a
+  state badge (R-VIEW-107, R-VIEW-124). Its records are not placeable.
+- It has no gallery tab: the ground button below is the one place to
+  choose a ground texture (operator 2026-11-25).
+- Such a record, added, becomes the ground.
+- The ground is held with the grid and the backdrop: stored and global.
+- The view tools get a ground button beside the grid button. Its dialog
+  lists the ground records of the gallery's game and dataset, "none"
+  first, each with a preview. The chosen one has a variant select,
+  **Upscale**, **Bake** and a badge (R-VIEW-125). The button says
+  **Unbake** while the select shows the bake. The badge shows 🍞 and the
+  baked variant. It is hidden when the texture has no bake.
+- The texture is drawn on the ground, repeated by world position, under
+  the grid. One repeat is 8 world units, for every game (SPEC-VIEWER-SC2
+  O-SC2-4). It fades out to the ground's rim and is drawn with the grid
+  off too. The grid switch is unchanged (R-VIEW-108).
+- It is the chosen variant of the record's colour file; none chosen, its
+  terrain bake; no bake, its original. A chosen or baked variant that
+  cannot be shown is reported as a failure and no ground is drawn.
+- Only the colour is drawn. The ground is not lit.
+- The skybox chooser shows a preview of each model: its colour texture,
+  else a rendered picture of the model.
+- The buttons are there only for a gallery game with a texture service
+  and a ground category.
+
+### 17.8 Tests
+
+Each with a negative case. The base test store is built only when
+missing and kept between runs: its state index and the game's index of
+its model files (17.1). No test writes to it; each worker copies it.
+The runner enlarges by pixel repeat (`HDTEX_RUNNER=repeat`): no test
+enlarges on a GPU.
+
+| Area | Proves | Negative | Spec |
+| --- | --- | --- | --- |
+| Routes | the page and its script are served | the pick, default and chain routes: 404 | `texture-service-api` (unit) |
+| Start | the server lists every dataset in a state index that was not there | a name that is no texture is unknown | `texture-service-api` (unit) |
+| State read | the states of one model's textures are read from the index, the same each time (the 250 ms bound is not tested, section 11) | no read fails beside eight writers | `texture-service`, `texture-service-api` (unit) |
+| Judge | the route has a texture judged | an unknown name: 400 | `texture-service-api` (unit) |
+| Instance add | the instance is added and usable while states stall or fail | no skin controls until the owner is in | `texture-service` |
+| Gone request | a killed request shows as failed and may be asked again | while it runs it is not failed | `texture-service-api` (unit) |
+| Request | input, model and size give the variant; it is listed | `seedvr2` on a data texture: 400, nothing queued; a size the input cannot reach: 400 | `texture-service-api` (unit) |
+| Dialog | the disabled models and sizes match the state; submit queues | `pbrify` and `seedvr2` on a data texture cannot be chosen | `skin-choices` (unit); the owner dialog in `texture-variants`. The texture card's dialog in the page: not tested (removed 2026-11-25) |
+| Owner upscale | New Skin names a variant of every texture; each is made; the instance shows each one on a slot of its model without a reload | data textures with `pbrify`: `fast`; no other skin and no bake; refused while New Skin is stored | `texture-variants` |
+| Skin choice | the list has Original, the saved skins and New Skin with edit and trash, Add New Skin… last; the button has its icon and arrow; a choice changes the overrides of that instance; kept in the scene | Original has no icon; Original holds no override; an unknown item option, a bad team, animation or skin type refuses the item | `texture-skins`, `texture-bake`, `scenes`. Not tested (removed 2026-11-25): the trash dialog, a skin showing its variant, a skin of one dataset on another, the 2048 glow |
+| Editor | a click picks and outlines a tile; Save to Skin… sets the picks in the skin open; every instance on the skin changes without a reload; Rename Skin, Delete Skin by dialog; In game tile | a click changes no stored skin and no instance; the baked skin cannot be deleted; a name another skin holds: refused | `skin-editor`. Not tested (removed 2026-11-25): New Skin (Add New Skin…, Save New Skin As…, Discard New Skin), Revert Changes, a cancelled save, no name box and no Copy, the refused names in the editor |
+| Dialogs | each dialog's title and buttons start with a capital letter and name what they act on; delete and discard buttons are red | no dialog button in lower case; a button that keeps is not red | `skin-editor`, `texture-bake`, `scenes` |
+| Window tiles | In game is first; "used by" has a fixed height and scrolls; the info mark's tooltip names amber and red | no Use button and no checkbox; a click on In game changes no skin; a cursor of help | `texture-window`. Not tested (removed 2026-11-25): a click shows the tile beside the original, Ctrl+click |
+| Save to Skin | the picks of the window go to the chosen target in one dialog; the instance shows it | Cancel changes nothing; Revert Changes drops the picks; the bake is unchanged; no bar without an owner | `texture-window` (no bar without an owner). The rest: not tested (removed 2026-11-25) |
+| Quality | each number has a band; a problem has its info text | a variant that misses no limit has no number in the problem band | `skin-editor` (the ok band, no info mark). A problem band: not tested (removed 2026-11-25) |
+| Bake | the bake route writes the bake; the badge shows it; Unbake on Original unbakes | choosing a skin writes no bake; Original shows no bake; a cancelled or refused bake changes nothing; another dataset unchanged | `texture-bake`, `texture-service-api` (unit). Not tested (removed 2026-11-25): an actor's bake offered to its unit as New Skin; New Skin cannot be baked |
+| Ground | a ground record becomes the ground | "none" gives the bare ground; Ghost has no button | `ground-texture`, `ghost-textures`. Not tested (removed 2026-11-25): a blocked variant cannot be baked or chosen |
+| Previews | the ground rows carry a preview image of the entry's file | "none" shows no picture and no broken image | Not tested (removed 2026-11-25) |
+| Doodad owner | a doodad's owner is its actor | | `skin-editor` |

@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { errorCode, messageOf } from '../../../server/core/http';
+import { requiredPath } from '../../../server/core/settings';
 
 export const DEFAULT_DATASET = 'scoba';
 export const BUILTIN: readonly string[] = ['scoba', 'stock'];
@@ -55,10 +56,11 @@ export interface DatasetProblem {
 
 /**
  * The folders, from the environment. The scripts set WEBVIEWER_DATA from
- * webviewer/local.env. `viewerDir`: the webviewer folder.
+ * webviewer/local.env, or below WEBVIEWER_WORK (SPEC-PATHS). `viewerDir`:
+ * the webviewer folder.
  */
 export function folders(viewerDir: string, env: NodeJS.ProcessEnv = process.env): Folders {
-  const data = env['WEBVIEWER_DATA'] || join(viewerDir, 'data');
+  const data = requiredPath(env, 'WEBVIEWER_DATA');
   return {
     data,
     stock: env['WEBVIEWER_STOCK'] || join(data, 'stock'),

@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 import time
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 from testkit.bank import find_latest_bank, read_bank
 from testkit.framelog import analyze, frame_order, parse_section
@@ -17,13 +17,7 @@ BANK = "SCOBAFRAMELOG"
 
 
 def docs_path() -> Path:
-    prefix = Path(os.environ.get("SC2_GAME_PREFIX", str(Path.home() / "Games" / "battlenet-prefix")))
-    return Path(
-        os.environ.get(
-            "SC2_DOCUMENTS",
-            str(prefix / "pfx/drive_c/users/steamuser/Documents/StarCraft II"),
-        )
-    )
+    return workpaths.path("SC2_DOCUMENTS")
 
 
 def latest_bank(explicit: Path | None) -> Path | None:

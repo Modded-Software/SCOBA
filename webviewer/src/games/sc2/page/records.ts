@@ -1,8 +1,8 @@
-// The SC2 unit and doodad records as the server sends them, checked field
-// by field. A body that is not one is refused with the field that is wrong.
+// The SC2 unit, doodad and terrain records as the server sends them, checked
+// field by field. A body that is not one is refused with the field that is wrong.
 
 import type { Vec3 } from '../../../shared/records';
-import type { DoodadRecord, PlacedRecord, UnitRecord } from '../shared/records';
+import type { DoodadRecord, PlacedRecord, TerrainRecord, UnitRecord } from '../shared/records';
 
 type Body = Readonly<Record<string, unknown>>;
 
@@ -118,9 +118,29 @@ export function doodadRecord(body: unknown): DoodadRecord {
   };
 }
 
+/** A ground texture record, checked. */
+export function terrainRecord(body: unknown): TerrainRecord {
+  if (!isBody(body)) throw new Error('terrain record: not an object');
+  const f = new Fields(body, `terrain record ${String(body['id'])}`);
+  return {
+    id: f.text('id'),
+    name: f.text('name'),
+    sub: f.text('sub'),
+    icon: null,
+    placeable: false,
+    notPlaceableAs: f.text('notPlaceableAs'),
+    file: f.text('file'),
+    normal: f.textOrNull('normal'),
+    users: f.texts('users'),
+    state: f.text('state'),
+    dataset: f.text('dataset'),
+  };
+}
+
 /** The record categories of SC2: the route name and the noun. */
 export const UNITS = 'units';
 export const DOODADS = 'doodads';
+export const TERRAIN = 'terrain';
 
 /** A record of a category, checked. */
 export function placedRecord(category: string, body: unknown): PlacedRecord {

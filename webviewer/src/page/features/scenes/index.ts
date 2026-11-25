@@ -7,7 +7,8 @@ import { emptyScene, freeName, newSceneId, parseSceneDocument, type SceneDocumen
 import type { Feature, FeatureContext } from '../../core/context';
 import type { AddOptions, Item, RefusedScene, ScenesState } from '../../core/types';
 import { messageOf } from '../../core/dom';
-import { settings } from '../../core/settings';
+import { SettingsRefused } from '../../core/refusals';
+import { keyOf, settings } from '../../core/settings';
 import { openSceneStore, type SceneStore } from '../../core/store/scenes-db';
 import { installSceneList } from './list';
 
@@ -17,13 +18,18 @@ const FIRST_NAME = 'scene 1';
 function itemDocument(item: Item): SceneItemDocument {
   const own = item.source;
   const source: SceneItemDocument['source'] = own ? { category: own.category, record: own.record.id, variant: item.placement.variant } : { file: item.path };
-  return { game: item.game, dataset: item.dataset, source, x: item.x, y: item.y, rot: item.rot, scale: item.scale, sequence: item.sequence, pick: item.placement.pick, options: { team: item.team, ...item.options } };
+  return { game: item.game, dataset: item.dataset, source, x: item.x, y: item.y, rot: item.rot, scale: item.scale, sequence: item.sequence, pick: item.placement.pick, options: { team: item.team, skin: item.skin, ...item.options } };
 }
 
-/** The item options (section 10.2): `team` is core's; the rest go to the game's itemOptions. */
-function itemOptions(options: SceneItemDocument['options']): Pick<AddOptions, 'team' | 'options'> {
-  const { team, ...rest } = options;
-  return { ...(typeof team === 'number' && Number.isInteger(team) ? { team } : {}), options: rest };
+/**
+ * The item options (section 10.2): `team` and `skin` are core's; the rest go to the game's itemOptions,
+ * which refuses a key it does not know. A `team` or `skin` of the wrong type is refused.
+ */
+function itemOptions(options: SceneItemDocument['options']): Pick<AddOptions, 'team' | 'skin' | 'options'> {
+  const { team, skin, ...rest } = options;
+  if (team !== undefined && !(typeof team === 'number' && Number.isInteger(team))) throw new Error(`option team: not a whole number: ${JSON.stringify(team)}`);
+  if (skin !== undefined && !(typeof skin === 'string' && skin)) throw new Error(`option skin: not a name: ${JSON.stringify(skin)}`);
+  return { ...(team === undefined ? {} : { team }), ...(skin === undefined ? {} : { skin }), options: rest };
 }
 
 /** Add one scene item to the view. A fault names the item. */
@@ -209,9 +215,19 @@ export const scenesFeature: Feature = {
         }
       }
       if (refused.length) status.setStatus(`${refused.length} stored scene(s) refused; see the scene list`, { failure: true });
-      const stored = settingsStore.read(settings.scene).value;
-      const chosen = stored !== null ? scenes.get(stored) : undefined;
-      const first = chosen ?? newest();
+      // The open scene: the stored one; nothing stored, the newest; no scene, a new one.
+      // A stored id that names no readable scene is refused (core/refusals.ts), not replaced.
+      const stored = settingsStore.find(settings.scene);
+      if (stored !== null) {
+        const chosen = scenes.get(stored);
+        if (!chosen) {
+          const bad = refused.find((one) => one.id === stored);
+          throw new SettingsRefused([{ key: keyOf(settings.scene), stored: JSON.stringify(stored), reason: bad ? `the scene is refused: ${bad.reason}` : 'there is no such scene' }]);
+        }
+        await openScene(chosen.id);
+        return;
+      }
+      const first = newest();
       if (first) await openScene(first.id);
       else await newScene(FIRST_NAME);
     }

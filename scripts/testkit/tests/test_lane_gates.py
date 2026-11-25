@@ -1,12 +1,16 @@
 import math
 import unittest
 
+import workpaths
 from flora import config, dirt, gates
 from flora import scene as scene_mod
 from flora import terrain as terrain_mod
-from project_root import project_root
 
-BUILT = project_root() / "out" / "SCOBA256.SC2Map"
+from testkit.tests.built_map import needs_built
+
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
 
 
 class GateTableTest(unittest.TestCase):
@@ -20,19 +24,19 @@ class GateTableTest(unittest.TestCase):
         self.assertNotIn("gv_gateRadius[", gates.galaxy([]).split("void gf_GateLoad")[1])
 
 
-@unittest.skipUnless((BUILT / "t3TextureMasks").is_file(), "needs the built map (scripts/playtest.sh build)")
+@needs_built("t3TextureMasks")
 class BuiltGatesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.terrain = terrain_mod.load(BUILT)
-        cls.scene = scene_mod.load(BUILT)
-        cls.gates = gates.find(BUILT, cls.terrain, cls.scene)
+        cls.terrain = terrain_mod.load(built_path())
+        cls.scene = scene_mod.load(built_path())
+        cls.gates = gates.find(built_path(), cls.terrain, cls.scene)
 
     def test_one_gate_per_half_lane(self) -> None:
         self.assertEqual(sorted((g.lane, g.side) for g in self.gates), sorted((r.name, s) for r in config.LANE_ROUTES for s in gates.SIDES))
 
     def test_every_pick_is_on_dirt(self) -> None:
-        self.assertEqual(gates.problems(BUILT, self.gates, self.terrain.height.shape[0]), [])
+        self.assertEqual(gates.problems(built_path(), self.gates, self.terrain.height.shape[0]), [])
 
     def test_gate_lies_between_spawn_and_x(self) -> None:
         for route in config.LANE_ROUTES:
@@ -47,7 +51,7 @@ class BuiltGatesTest(unittest.TestCase):
                 self.assertLess(math.hypot(g.x - spawn.x, g.y - spawn.y) + math.hypot(g.x - cross.x, g.y - cross.y), 1.6 * leg)
 
     def test_dirt_is_the_lane_texture(self) -> None:
-        on = dirt.dirt_cells(BUILT, self.terrain.height.shape[0])
+        on = dirt.dirt_cells(built_path(), self.terrain.height.shape[0])
         self.assertLess(on.mean(), 0.3)  # lanes only, not the whole map
         self.assertGreater(on.mean(), 0.05)
 

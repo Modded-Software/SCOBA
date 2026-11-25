@@ -104,11 +104,10 @@ bring their own splashes.
   and `Waterfall` actors have no footprint.
 - `.rim_falls`: the report, one block per group.
 
-HD textures: the inject step fails on a doodad type it has not seen.
-`RockWaterfall` was added to the models cache on 2026-11-20 (a map built
-with `SC2_HD_TEXTURES=off`, then `hd_textures.py --source models --map
-<folder> build --gpu 1`). `verify` listed 43 failures, the same count as
-before this change.
+Upscaled textures: the package step finds the models the map shows by
+itself (SPEC-HD-TEXTURES, section 5.1). The package of 2026-11-24 holds
+the waterfall textures. A doodad type with no picked texture keeps its
+originals and does not fail the build.
 
 ## 7. Checks (R-RF-10)
 

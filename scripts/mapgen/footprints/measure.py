@@ -9,20 +9,20 @@ height of a walking unit's feet, divided by each placed object's scale.
 The result is written to scripts/data/footprint_slices.json and committed, so
 the build never reads the game install. Re-run only when the models change.
 
-usage (from scripts/): uv run python -m footprints.measure [--print]
+usage: make measure-footprints [ARGS=--print]
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
@@ -32,12 +32,12 @@ sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
 import m3
 
 STORMEX = ROOT / "tools" / "stormex"
-SC2 = Path(
-    os.environ.get(
-        "SC2_INSTALL",
-        str(Path.home() / "Games/battlenet-prefix/pfx/drive_c/Program Files (x86)/StarCraft II"),
-    )
-)
+
+
+def sc2_path():
+    return workpaths.path("SC2_INSTALL")
+
+
 OUT = ROOT / "scripts" / "data" / "footprint_slices.json"
 # Model group -> CASC path regex. The number in the file name is the variation.
 MODELS = {
@@ -45,7 +45,7 @@ MODELS = {
     "SporeCannon": r"assets.buildings.zerg.sporecannon.sporecannon\.m3$",
     "SporeCrawler": r"assets.buildings.zerg.sporecrawler.sporecrawler\.m3$",
     # Model "CommandCenter": the hall legs (R-BASE-30). The map shows the
-    # classic model (scripts/hdtex/classic_skins.py; operator 2026-11-20: "the
+    # classic model (scripts/hdtex/sc2/classic_skins.py; operator 2026-11-20: "the
     # legs are a tiny bit off need to recalculate footprint"). Before:
     # commandcenterex1, bones *_Foot_*.
     "CommandCenter": r"assets.buildings.terran.commandcenter_remastered.commandcenter_remastered\.m3$",
@@ -133,7 +133,7 @@ def slices(tris: list[Triangle]) -> list[list[list[float]]]:
 
 def extract(pattern: str, out: Path) -> list[Path]:
     out.mkdir(parents=True, exist_ok=True)
-    cmd = [str(STORMEX), "-S", str(SC2), "-I", pattern, "-x", "-o", str(out)]
+    cmd = [str(STORMEX), "-S", str(sc2_path()), "-I", pattern, "-x", "-o", str(out)]
     try:
         subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as error:
@@ -153,24 +153,22 @@ def model_scales(scratch: Path) -> dict[str, list[float]]:
     (liberty CommandCenterBase), so cells at actor scale alone sat 25% too far
     out (operator 2026-11-19). The resolved m3 must be the sliced one.
     """
+    from hdtex.sc2.casc import Casc
     from hitvolumes.resolve import GameData, stock_entries
 
     from .config import HALL_UNITS
-
-    sys.path.insert(0, str(ROOT / "scripts" / "hdtex"))
-    from casc import Casc
 
     casc = Casc()
     stock = scratch / "stock"
     wanted = set(stock_entries())
     casc.extract([p for p in casc.find(sorted(wanted)) if p in wanted], stock)
-    game = GameData(stock, ROOT / "out" / "SCOBA256.SC2Map")
+    game = GameData(stock, workpaths.path("SC2_BUILT_MAP"))
     out: dict[str, list[float]] = {}
     for unit, group in sorted(HALL_UNITS.items()):
         res = game.resolve(unit)
         if res is None:
             raise SystemExit(f"{unit}: no actor or model in the data stack")
-        # The HD step shows a copy with the same file name (hdtex.models).
+        # The data stack is read without the copies of the HD step (hdtex.sc2.packaged).
         name = res.m3.replace("\\", "/").lower().rsplit("/", 1)[-1]
         if name != HALL_FILES[group]:
             raise SystemExit(f"{unit}: data stack model {res.m3} is not the sliced {MODELS[group]}")
@@ -183,7 +181,7 @@ def main() -> int:
     parser.add_argument("--print", action="store_true", help="print segment counts per model")
     args = parser.parse_args()
     data: dict = {"slice_step": SLICE_STEP, "slice_count": SLICE_COUNT, "models": {}}
-    with tempfile.TemporaryDirectory(prefix="fpmeasure-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="fpmeasure-", dir=workpaths.path("SC2_TMP")) as scratch:
         data["model_scale"] = model_scales(Path(scratch))
         if args.print:
             print(f"model_scale {data['model_scale']}")

@@ -15,9 +15,13 @@ Environment="REPO_ROOT={{ viewer_repo_root }}"
 Environment="PORT={{ viewer_port }}"
 Environment="HOST={{ viewer_host }}"
 # start.sh checks the patched renderer clone, rebuilds the page and the
-# server from the checkout, makes a missing catalog, then execs node: a
-# restart always serves the current code.
+# server from the checkout, makes a missing catalog, then execs the hot
+# reload watcher (src/tools/dev.ts). It runs the server as its child,
+# rebuilds on a change under src/ or patches/, and restarts the server on
+# every new build/server.js (a test run's build too). The whole cgroup is
+# stopped together (KillMode=control-group).
 ExecStart=/bin/bash {{ viewer_dir }}/scripts/start.sh
+KillMode=control-group
 Restart=always
 # 5 s after the first exit, growing to 60 s over 5 restarts in a row.
 RestartSec=5

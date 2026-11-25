@@ -1,7 +1,7 @@
 // Copy, cut and paste of the selected instances:
 // - Ctrl+C copies the selected instances: its game, what each is (a record of a
 //   category and its variant, or model file), its dataset, place, angle, scale,
-//   animation, team, scale pick and the game's options (SC2: the HD choice);
+//   animation, team, texture set, scale pick and the game's options;
 // - Ctrl+X copies them and removes them;
 // - Ctrl+V adds the copies. The group keeps its shape; its centre goes to
 //   the ground point under the mouse, or, with the mouse off the view, to
@@ -26,8 +26,9 @@ interface Entry {
   scale: number;
   sequence: number;
   team: number;
+  skin: string;
   pick: number;
-  /** The game's settings of the item (SC2: hd). */
+  /** The game's settings of the item. */
   options: Record<string, unknown>;
 }
 
@@ -45,6 +46,7 @@ function entryOf(item: Item): Entry {
     scale: item.scale,
     sequence: item.sequence,
     team: item.team,
+    skin: item.skin,
     pick: item.placement.pick,
     options: { ...item.options },
   };
@@ -91,7 +93,7 @@ export const clipboardFeature: Feature = {
       const ids: number[] = [];
       // One after another, so the order is kept.
       for (const e of copied) {
-        const options = { x: e.x + dx, y: e.y + dy, rot: e.rot, scale: e.scale, sequence: e.sequence, team: e.team, pick: e.pick, options: e.options, game: e.game, dataset: e.dataset };
+        const options = { x: e.x + dx, y: e.y + dy, rot: e.rot, scale: e.scale, sequence: e.sequence, team: e.team, skin: e.skin, pick: e.pick, options: e.options, game: e.game, dataset: e.dataset };
         let id: number | null | void = null;
         if (e.category !== null) id = await scene.addRecord(e.category, e.id, { ...options, variant: e.variant }).catch(status.reportFailure);
         else id = await scene.add(e.id, options).catch(status.reportFailure);

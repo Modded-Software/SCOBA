@@ -4,7 +4,9 @@
 // data/camera_heights by scripts/hitvolumes/camera_heights.py. Tosh
 // (ToshSCOBA) is the reference: his height gives the old fixed target
 // offset (c_SCOBA_CAMERA_HEIGHT_OFFSET) and arm (c_SCOBA_CAMERA_ARM).
-// A type without a measured height uses the reference height.
+// A height asked of no unit, or of a type without a measured height, is a
+// defect: it stops the calling thread with a script error. The build check
+// (camera_heights.py, missing_bodies) makes sure every bound body has one.
 
 // A unit's absolute z: the engine ground under it plus its height above
 // that ground. A unit position carries no height (PointGetHeight reads 0),
@@ -17,21 +19,34 @@ void gf_CamHeightType (string lp_name, fixed lp_height) {
     DataTableSetFixed(true, "CAMH_" + lp_name, lp_height);
 }
 
-// The unit's measured height, or the reference height when unmeasured.
-fixed gf_CameraUnitHeight (unit lp_unit) {
-    string lv_key;
+// Stops the calling thread with a script error that names the defect.
+// The engine writes it to ScriptError.txt, which fails a test run.
+void gf_CamHeightFail (string lp_why) {
+    int lv_zero = 0;
 
-    if (!UnitIsValid(lp_unit)) {
-        return c_CAM_HEIGHT_REFERENCE;
-    }
-    lv_key = "CAMH_" + UnitGetType(lp_unit);
-    if (!DataTableValueExists(true, lv_key)) {
-        return c_CAM_HEIGHT_REFERENCE;
-    }
-    return DataTableGetFixed(true, lv_key);
+    TriggerDebugOutput(1, StringToText("camera height: " + lp_why), true);
+    lv_zero = 1 / lv_zero;
 }
 
-// Height scale of the unit against Tosh: 1 for Tosh and unmeasured types.
+// Whether the unit is a unit whose type has a measured height.
+bool gf_CameraHeightKnown (unit lp_unit) {
+    return UnitIsValid(lp_unit) && DataTableValueExists(true, "CAMH_" + UnitGetType(lp_unit));
+}
+
+// The unit's measured height. No unit, or a type without a row, is a defect.
+fixed gf_CameraUnitHeight (unit lp_unit) {
+    if (!UnitIsValid(lp_unit)) {
+        gf_CamHeightFail("asked of no unit");
+        return 0.0;  // not reached: the fail stops the thread
+    }
+    if (!gf_CameraHeightKnown(lp_unit)) {
+        gf_CamHeightFail(UnitGetType(lp_unit) + " has no measured height; run hitvolumes.measure");
+        return 0.0;  // not reached: the fail stops the thread
+    }
+    return DataTableGetFixed(true, "CAMH_" + UnitGetType(lp_unit));
+}
+
+// Height scale of the unit against Tosh: 1 for Tosh.
 fixed gf_CameraHeightScale (unit lp_unit) {
     return gf_CameraUnitHeight(lp_unit) / c_CAM_HEIGHT_REFERENCE;
 }

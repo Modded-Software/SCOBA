@@ -42,7 +42,11 @@ export interface Item {
   team: number;
   /** The animation played once from the menu, or null. */
   oneShot: number | null;
-  /** The game's settings of the item (SPEC-VIEWER 6.5), as its itemOptions checked them: SC2 `hd`. */
+  /** The skin of its owner it shows (SPEC-VIEWER 17.4): "original", "new" or a saved skin's name. */
+  skin: string;
+  /** The longest side of any texture it shows, once they are in; 0 before. */
+  largestTexture: number;
+  /** The game's settings of the item (SPEC-VIEWER 6.5), as its itemOptions checked them. */
   options: Record<string, unknown>;
 }
 
@@ -59,6 +63,8 @@ export interface AddOptions {
   scale?: number;
   sequence?: number;
   team?: number;
+  /** The skin; absent: "original". */
+  skin?: string;
   /** Which of the record's model files; null or absent: the game chooses. */
   variant?: number | null;
   /** The game's settings, checked by its itemOptions. */
@@ -136,9 +142,9 @@ export interface SkyChoice {
   id: string;
   name: string;
   file: string;
-  /** Whose backdrop, from which dataset; absent: the gallery's game and its default dataset. */
-  game?: string;
-  dataset?: string;
+  /** Whose backdrop, from which dataset. */
+  game: string;
+  dataset: string;
 }
 
 export interface Sky extends SkyChoice {
@@ -146,18 +152,36 @@ export interface Sky extends SkyChoice {
   instance: ViewerInstance | null;
 }
 
+/** A record of a ground category (SPEC-VIEWER 17.5), and the texture it shows: its `file`, as the texture service names it. */
+export interface GroundChoice {
+  game: string;
+  dataset: string;
+  category: string;
+  id: string;
+  name: string;
+  texture: string;
+  /** The variant the ground shows; absent: the terrain bake, else the original. */
+  variant?: string;
+}
+
 export interface Hit {
   item: Item;
   point: Vec3;
 }
 
-/** The open instance menu; each game check box it shows is a key too (SC2 `hd`). */
+/** The open instance menu. */
 export interface MenuState {
   item: number;
   entries: (string | null)[];
   playing: (string | null)[];
   loop: boolean;
-  [toggle: string]: number | boolean | (string | null)[];
+  /**
+   * The skin row (SPEC-VIEWER 17.4): the chosen skin and its label, whether the choice has its icon
+   * and arrow (R-VIEW-137), the choices, the rows of the list with their icons ("Add New Skin…"
+   * last, name ""), the bake button's verb and whether it is disabled, the shown bake badge (null:
+   * hidden); null: the menu has none.
+   */
+  skins: { value: string; label: string; dropdown: boolean; choices: string[]; rows: { name: string; label: string; icons: ('edit' | 'trash')[] }[]; bake: string; bakeDisabled: boolean; badge: string | null } | null;
 }
 
 export interface PickState {

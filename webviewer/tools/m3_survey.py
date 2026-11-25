@@ -5,7 +5,7 @@ them again), reads each file's index table, and prints the tag/version pairs
 the renderer's parser does not know, with how many units need each.
 
 Run it through webviewer/scripts/m3-survey.sh. That script sets REPO_ROOT
-and puts scripts/ and scripts/hdtex/ on PYTHONPATH.
+and puts scripts/ on PYTHONPATH.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import re
 import struct
 from pathlib import Path
 
-from casc import Casc
+from hdtex.sc2.casc import Casc
 
 if "REPO_ROOT" not in os.environ:
     raise SystemExit("m3_survey: REPO_ROOT is not set; run webviewer/scripts/m3-survey.sh")

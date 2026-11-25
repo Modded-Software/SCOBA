@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 
@@ -16,8 +17,8 @@ ROOT = project_root()
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="rungun",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["rungun"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("rungun"),
         bank_names=PROFILE_BANKS["rungun"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -64,7 +65,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="rungun",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["rungun"],
+        map_source=profile_output("rungun"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["rungun"],
         ready_section="rungun_start",

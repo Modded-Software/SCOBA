@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>textures</title>
+<!-- The page of the texture window (SPEC-VIEWER 17.3). Its script is src/page/texview, bundled into /vendor/texview.js. -->
+<link rel="stylesheet" href="/theme.css">
+<style>
+  * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; background: var(--bg); color: var(--text); font: 12px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+  button { cursor: pointer; height: 26px; padding: 0 9px; color: var(--dim); background: transparent; border: 1px solid transparent; border-radius: var(--radius); white-space: nowrap; }
+  button:hover { color: var(--text); background: var(--raised); }
+  button.on { color: var(--accent); background: var(--accent-bg); }
+  .failure { color: #ff7a7a; }
+
+  #side { display: flex; flex-direction: column; gap: 8px; width: 300px; min-width: 300px; padding-top: 10px; background: var(--panel); border-right: 1px solid var(--line); }
+  #side h1 { margin: 0; padding: 0 12px; font-size: 13px; font-weight: 600; }
+  #side h1 small { color: var(--dim); font-size: 11px; font-weight: 400; margin-left: 8px; }
+  #search { width: 100%; }
+  .filter { padding: 0 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 2px; }
+  body.embed .chips { max-height: 74px; overflow-y: auto; }
+  .chip { height: 22px; padding: 0 7px; font-size: 11px; }
+  .chip span { opacity: 0.6; margin-left: 4px; }
+  #list { flex: 1; overflow-y: auto; padding: 0 6px 6px; border-top: 1px solid var(--line); }
+  .row { display: flex; gap: 8px; align-items: center; padding: 3px 6px; cursor: pointer; border-radius: var(--radius); }
+  .row:hover { background: var(--raised); }
+  .row.current { background: var(--accent-bg); box-shadow: inset 2px 0 0 var(--accent); }
+  .row img { width: 32px; height: 32px; object-fit: contain; background: var(--bg); border-radius: 4px; flex: none; }
+  .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .meta { color: var(--dim); font-size: 11px; }
+  .row .text { min-width: 0; }
+  .badge { display: inline-block; margin-right: 5px; padding: 0 4px; border-radius: 3px; background: var(--accent-bg); color: var(--accent); font-size: 9px; font-weight: 700; line-height: 13px; letter-spacing: 0.04em; vertical-align: 1px; }
+  .badge.failed { color: #ff7a7a; }
+  #empty { padding: 20px 6px; color: var(--dim); }
+  #problems { padding: 8px 6px; color: var(--dim); font-size: 11px; overflow-wrap: anywhere; }
+
+  #main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  #bar { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; padding: 6px 8px 6px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #title small { color: var(--dim); font-weight: 400; margin-left: 8px; }
+  #message { flex-basis: 100%; font-size: 11px; overflow-wrap: anywhere; }
+  #message:empty { display: none; }
+  body.embed #side { width: 232px; min-width: 232px; }
+  body.embed #side h1 { font-size: 11px; font-weight: 400; }
+  body.embed #side h1 span { display: none; }
+  body.embed #side h1 small { margin-left: 0; }
+  #view { position: relative; flex: 1; overflow: hidden; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+    background: #0c0d0f; background-image: linear-gradient(45deg, #15171b 25%, transparent 25%, transparent 75%, #15171b 75%), linear-gradient(45deg, #15171b 25%, transparent 25%, transparent 75%, #15171b 75%); background-size: 24px 24px; background-position: 0 0, 12px 12px; }
+  #view.panning { cursor: grabbing; }
+  .layer { position: absolute; inset: 0; }
+  .divider { position: absolute; top: 0; bottom: 0; width: 21px; margin-left: -10px; cursor: ew-resize; }
+  .divider::before { content: ""; position: absolute; left: 10px; top: 0; bottom: 0; width: 1px; background: #fff; box-shadow: 0 0 0 1px #000; }
+  .divider::after { content: "\2194"; position: absolute; left: 0; top: 50%; width: 21px; height: 21px; margin-top: calc(-10px + var(--knob, 0px)); border-radius: 50%; background: #fff; color: #000; text-align: center; line-height: 21px; }
+  .tag { position: absolute; top: 10px; padding: 2px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; white-space: nowrap; pointer-events: none; }
+  #tag-before { left: 10px; }
+  #status { position: absolute; left: 10px; bottom: 10px; padding: 2px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; pointer-events: none; }
+  /* Below the view: the details of the chosen texture, then its tiles, the skin editor's (theme.css, SPEC-VIEWER 17.6.1). */
+  #cards { display: flex; gap: 6px; flex: none; max-height: 45%; min-height: 0; padding: 8px; background: var(--panel); border-top: 1px solid var(--line); }
+  #cards:empty { display: none; }
+  .details { flex: none; width: 220px; padding: 6px 10px; overflow-y: auto; background: var(--raised); border-radius: var(--radius); font-size: 11px; }
+  .details h3 { margin: 0 0 2px; font-size: 12px; font-weight: 600; }
+  .details h3 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  .details dl { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; margin: 0; }
+  .details dt { color: var(--dim); }
+  .details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  /* "used by": one user per line, 4.5 lines high, scrolls inside (R-VIEW-134). */
+  .details dd.used-by { height: 72px; overflow-y: auto; padding-right: 4px; }
+  .details .unread { margin-top: 4px; color: var(--dim); }
+  .tiles-area { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; min-height: 0; }
+  .tiles-area .skin-tiles { flex: 1; min-height: 0; padding: 0; overflow-y: auto; }
+  .badge.picked { color: var(--bg); background: var(--accent); }
+</style>
+</head>
+<body>
+<aside id="side">
+  <h1><span>Textures</span><small id="count"></small></h1>
+  <div class="filter"><input id="search" type="search" placeholder="Search  ( / )" title="Search name, plane, kind, or user" aria-label="Search name, plane, kind, or user" autocomplete="off"></div>
+  <div class="filter"><div class="chips" id="categories" aria-label="Kind"></div></div>
+  <div class="filter"><div class="chips" id="planes" aria-label="Plane"></div></div>
+  <div id="list"></div>
+</aside>
+<div id="main">
+  <div id="bar">
+    <div id="title"></div>
+    <button id="previous" title="Previous (up or left arrow)">&#8592;</button>
+    <button id="next" title="Next (down or right arrow)">&#8594;</button>
+    <button id="fit" title="Fit the view (F)">Fit</button>
+    <button id="actual" title="One texture pixel per screen pixel (1)">1:1</button>
+    <button id="tile" title="Tile the texture (T)">Tile</button>
+    <button id="smooth" title="Smooth the original (S)">Smooth</button>
+    <div id="message"></div>
+  </div>
+  <div id="view">
+    <div class="layer" id="before"></div>
+    <div class="tag" id="tag-before">Original</div>
+    <div id="status"></div>
+  </div>
+  <div id="cards"></div>
+</div>
+<script src="/vendor/texview.js"></script>
+</body>
+</html>

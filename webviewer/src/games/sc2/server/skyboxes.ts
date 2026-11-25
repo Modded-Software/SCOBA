@@ -86,7 +86,10 @@ export function listSkyboxes(keys: Iterable<string>, servable: (key: string) => 
     if (file === undefined) continue;
     // A model with variations is stored as name_00.m3, name_01.m3, ...
     const variation = /_(\d\d)\.m3$/.exec(key);
-    const model = named.get(key) ?? (variation ? named.get(key.slice(0, variation.index) + '.m3') : undefined) ?? null;
+    // The model entry that names the file itself; a variation file is named by its model's base file.
+    const ownName = named.get(key);
+    const baseName = variation ? named.get(key.slice(0, variation.index) + '.m3') : undefined;
+    const model = ownName !== undefined ? ownName : baseName !== undefined ? baseName : null;
     const base = key.slice(key.lastIndexOf('\\') + 1, -'.m3'.length);
     const id = model ? (variation && !named.has(key) ? `${model}_${variation[1] ?? ''}` : model) : base;
     if (seen.has(id)) continue;

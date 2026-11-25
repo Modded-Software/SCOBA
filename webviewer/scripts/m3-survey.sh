@@ -7,7 +7,7 @@ WEBVIEWER_DIR="${WEBVIEWER_DIR:-$(git rev-parse --show-toplevel)/webviewer}"
 source "$WEBVIEWER_DIR/scripts/paths.sh" || exit 1
 bash scripts/ref-setup.sh
 cd "$REPO_ROOT/scripts"
-PYTHONPATH="$REPO_ROOT/scripts:$REPO_ROOT/scripts/hdtex" uv run python ../webviewer/tools/m3_survey.py --data "$WEBVIEWER_DATA" \
+PYTHONPATH="$REPO_ROOT/scripts" uv run python ../webviewer/tools/m3_survey.py --data "$WEBVIEWER_DATA" \
   --parser "$WEBVIEWER_DIR/ref/mdx-m3-viewer/src/parsers/m3/indexentry.ts"
 cd "$WEBVIEWER_DIR"
 bash scripts/tool.sh build

@@ -1,41 +1,47 @@
 from pathlib import Path
 
-from project_root import project_root
+import workpaths
 
-ROOT = project_root()
-
-PROFILE_OUTPUTS = {
-    "combat": ROOT / "out" / "SCOBA256_test.SC2Map",
-    "aim": ROOT / "out" / "SCOBA256_aimtest.SC2Map",
-    "controls": ROOT / "out" / "SCOBA256_controlstest.SC2Map",
-    "motion": ROOT / "out" / "SCOBA256_motiontest.SC2Map",
-    "pitch": ROOT / "out" / "SCOBA256_pitchtest.SC2Map",
-    "aimfreeze": ROOT / "out" / "SCOBA256_aimfreezetest.SC2Map",
-    "rungun": ROOT / "out" / "SCOBA256_runguntest.SC2Map",
-    "pncprobe": ROOT / "out" / "SCOBA256_pncprobe.SC2Map",
-    "tps": ROOT / "out" / "SCOBA256_tpstest.SC2Map",
-    "treepath": ROOT / "out" / "SCOBA256_treepath.SC2Map",
-    "fprot": ROOT / "out" / "SCOBA256_fprot.SC2Map",
-    "flora": ROOT / "out" / "SCOBA256_flora.SC2Map",
-    "crushtest": ROOT / "out" / "SCOBA256_crushtest.SC2Map",
-    "fxgallery": ROOT / "out" / "SCOBA256_fxgallery.SC2Map",
-    "waterprobe": ROOT / "out" / "SCOBA256_waterprobe.SC2Map",
-    "dissolveview": ROOT / "out" / "SCOBA256_dissolveview.SC2Map",
-    "dropview": ROOT / "out" / "SCOBA256_dropview.SC2Map",
-    "jump": ROOT / "out" / "SCOBA256_jumptest.SC2Map",
-    "slowwalk": ROOT / "out" / "SCOBA256_slowwalk.SC2Map",
-    "herodrop": ROOT / "out" / "SCOBA256_herodroptest.SC2Map",
-    "intro": ROOT / "out" / "SCOBA256_introtest.SC2Map",
-    "podbirth": ROOT / "out" / "SCOBA256_podbirth.SC2Map",
-    "aimdof": ROOT / "out" / "SCOBA256_aimdof.SC2Map",
-    "skyduel": ROOT / "out" / "SCOBA256_skyduel.SC2Map",
-    "aircreep": ROOT / "out" / "SCOBA256_aircreep.SC2Map",
-    "ui": ROOT / "out" / "SCOBA256_uitest.SC2Map",
-    "baseai": ROOT / "out" / "SCOBA256_baseai.SC2Map",
-    "roster": ROOT / "out" / "SCOBA256_roster.SC2Map",
-    "ground": ROOT / "out" / "SCOBA256_ground.SC2Map",
-    "waterfeat": ROOT / "out" / "SCOBA256_waterfeat.SC2Map",
+# Profile -> the test map it builds, below SC2_OUT (SPEC-PATHS).
+PROFILE_MAPS = {
+        "combat": "SCOBA256_test.SC2Map",
+        "aim": "SCOBA256_aimtest.SC2Map",
+        "controls": "SCOBA256_controlstest.SC2Map",
+        "motion": "SCOBA256_motiontest.SC2Map",
+        "pitch": "SCOBA256_pitchtest.SC2Map",
+        "aimfreeze": "SCOBA256_aimfreezetest.SC2Map",
+        "rungun": "SCOBA256_runguntest.SC2Map",
+        "pncprobe": "SCOBA256_pncprobe.SC2Map",
+        "tps": "SCOBA256_tpstest.SC2Map",
+        "treepath": "SCOBA256_treepath.SC2Map",
+        "fprot": "SCOBA256_fprot.SC2Map",
+        "flora": "SCOBA256_flora.SC2Map",
+        "crushtest": "SCOBA256_crushtest.SC2Map",
+        "fxgallery": "SCOBA256_fxgallery.SC2Map",
+        "waterprobe": "SCOBA256_waterprobe.SC2Map",
+        "dissolveview": "SCOBA256_dissolveview.SC2Map",
+        "dropview": "SCOBA256_dropview.SC2Map",
+        "jump": "SCOBA256_jumptest.SC2Map",
+        "slowwalk": "SCOBA256_slowwalk.SC2Map",
+        "herodrop": "SCOBA256_herodroptest.SC2Map",
+        "intro": "SCOBA256_introtest.SC2Map",
+        "podbirth": "SCOBA256_podbirth.SC2Map",
+        "aimdof": "SCOBA256_aimdof.SC2Map",
+        "skyduel": "SCOBA256_skyduel.SC2Map",
+        "aircreep": "SCOBA256_aircreep.SC2Map",
+        "ui": "SCOBA256_uitest.SC2Map",
+        "baseai": "SCOBA256_baseai.SC2Map",
+        "roster": "SCOBA256_roster.SC2Map",
+        "ground": "SCOBA256_ground.SC2Map",
+        "waterfeat": "SCOBA256_waterfeat.SC2Map",
+        "hdbake": "SCOBA256_hdbake.SC2Map",
 }
+
+
+def profile_output(name: str) -> Path:
+    """The test map of profile `name`."""
+    return workpaths.path("SC2_OUT") / PROFILE_MAPS[name]
+
 
 PROFILE_BANKS = {
     "combat": ("SCOBATEST", "SCOBADBG"),
@@ -68,6 +74,7 @@ PROFILE_BANKS = {
     "roster": ("SCOBAROSTER",),
     "ground": ("SCOBAGROUND",),
     "waterfeat": ("SCOBAWATERFEAT",),
+    "hdbake": ("SCOBAHDBAKE",),
 }
 
 
@@ -153,4 +160,7 @@ def profile_module(name):
     if name == "waterfeat":
         from . import waterfeat
         return waterfeat
+    if name == "hdbake":
+        from . import hdbake
+        return hdbake
     raise SystemExit(f"unknown test profile: {name}")

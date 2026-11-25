@@ -22,6 +22,10 @@ export interface PickerOptions<T> {
   none?: string | null;
   /** Grey hint text in the search box. */
   hint?: string;
+  /** A small picture for a row; null or absent: none (no broken image). */
+  preview?: (item: T) => HTMLElement | null;
+  /** Nodes between the search box and the list (the ground's controls). */
+  extra?: readonly Node[];
 }
 
 export class Picker<T> {
@@ -34,16 +38,18 @@ export class Picker<T> {
   private readonly describe: (item: T) => Described;
   private readonly onPick: (item: T | null) => void;
   private readonly none: string | null;
+  private readonly preview: ((item: T) => HTMLElement | null) | undefined;
 
-  constructor({ id, title, fetchPage, describe, onPick, none = null, hint = 'search' }: PickerOptions<T>) {
+  constructor({ id, title, fetchPage, describe, onPick, none = null, hint = 'search', preview, extra = [] }: PickerOptions<T>) {
     this.dialog = new Dialog({ id, title });
     this.describe = describe;
     this.onPick = onPick;
     this.none = none;
+    this.preview = preview;
     this.search = make('input', { type: 'search', placeholder: hint, autocomplete: 'off', spellcheck: false });
     this.count = make('div', { className: 'sub' });
     const list = make('ul', { className: 'picker-list rows' });
-    this.dialog.body.append(this.search, this.count, list);
+    this.dialog.body.append(...extra, this.search, this.count, list);
     this.list = new PagedList<T>({
       list,
       fetchPage: (offset, limit) => fetchPage(this.search.value.trim(), offset, limit),
@@ -62,9 +68,12 @@ export class Picker<T> {
 
   private row(item: T | null): HTMLLIElement {
     const { id, name, sub } = item === null ? { id: '', name: this.none ?? '', sub: '' } : this.describe(item);
-    const li = make('li', {}, [make('div', { textContent: name })]);
+    const picture = item === null || !this.preview ? null : this.preview(item);
+    const lines: HTMLElement[] = [make('div', { textContent: name })];
+    if (sub) lines.push(make('div', { className: 'sub', textContent: sub }));
+    // A row with a picture holds it beside its lines; one without keeps its lines alone.
+    const li = picture ? make('li', { className: 'with-preview' }, [picture, make('div', { className: 'picker-text' }, lines)]) : make('li', {}, lines);
     li.dataset.id = id;
-    if (sub) li.append(make('div', { className: 'sub', textContent: sub }));
     li.classList.toggle('selected', id === (this.selected ?? ''));
     li.addEventListener('click', () => this.pick(item, id));
     return li;

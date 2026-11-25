@@ -12,14 +12,15 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import workpaths
 from hitvolumes import pod_birth
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .herodrop_zoom import ARM_MAX_MS, ZOOM_LENGTH
-from .herodrop_zoom import CAM_DISTANCE as CAM_ARM
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .herodrop_parts.herodrop_zoom import ARM_MAX_MS, ZOOM_LENGTH
+from .herodrop_parts.herodrop_zoom import CAM_DISTANCE as CAM_ARM
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 LOOP_MS = 62
@@ -271,8 +272,8 @@ def check_dof(checks) -> None:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="podbirth",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["podbirth"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("podbirth"),
         bank_names=PROFILE_BANKS["podbirth"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -309,7 +310,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="podbirth",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["podbirth"],
+        map_source=profile_output("podbirth"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["podbirth"],
         ready_section="pb_start",

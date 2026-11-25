@@ -8,20 +8,27 @@ Run: scripts/playtest.sh dropview  (launches the map for manual viewing)
 
 from __future__ import annotations
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec, build_instrumented_map
 
 ROOT = project_root()
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
-OUTPUT = ROOT / "out" / "SCOBA256_dropview.SC2Map"
+
+
+def built():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
+def output_path():
+    return workpaths.path("SC2_OUT") / "SCOBA256_dropview.SC2Map"
 
 
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="dropview",
-        source=BUILT,
-        output=OUTPUT,
+        source=built(),
+        output=output_path(),
         bank_names=("SCOBADROPVIEW",),
         galaxy_files=(ROOT / "scripts" / "testkit" / "galaxy" / "dropview.galaxy",),
         galaxy_includes=("scripts/test/dropview/dropview",),

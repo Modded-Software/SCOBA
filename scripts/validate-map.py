@@ -15,25 +15,32 @@ sys.path.insert(0, str(SCRIPT_DIR / "vendor" / "m3addon"))
 
 import m3
 from animation_tokens import normalized_animation_name, validate_animation_name
-from hdtex.check import check_hd_textures
 from flora.build import check_flora
 from flora.config import MARKER as FLORA_MARKER
-from mapgen.footprints.build import check_scaled_footprints
-from mapgen.melee_map import check as check_melee_map
-from mapgen.resources.build import check as check_resources
-from mapgen.player_slots import check as check_player_slots, check_script as check_roster_script
-from input_gate_check import gated as check_input_gate
-from hitvolumes.drop_path_check import check as check_drop_path
-from validate_aim_shot import TOSH_CLOCK, check_aim_shot_data, check_aim_shot_script
-from validate_assets import check_actor_events, check_control_icons, check_footfall_fx, check_skybox_flip, check_stamp
-from jumpanim.validate import check_jump
+from hdtex.sc2.check import check_hd_textures
 from heroanim.rig import HEROES
 from heroanim.validate import check_heroes
-from validate_slow_deaths import check_slow_deaths
-from hitvolumes.validate_pod_actor import check_pod_actor
-from validate_tps_overlay import check_tps_overlay
+from hitvolumes.drop_path_check import check as check_drop_path
 from hitvolumes.validate_intro import animation_actor_problems, intro_problems
+from hitvolumes.validate_pod_actor import check_pod_actor
+from input_gate_check import gated as check_input_gate
+from jumpanim.validate import check_jump
+from mapgen.footprints.build import check_scaled_footprints
+from mapgen.melee_map import check as check_melee_map
+from mapgen.player_slots import check as check_player_slots
+from mapgen.player_slots import check_script as check_roster_script
+from mapgen.resources.build import check as check_resources
 from terrain import sync_height
+from validate_aim_shot import TOSH_CLOCK, check_aim_shot_data, check_aim_shot_script
+from validate_assets import (
+    check_actor_events,
+    check_control_icons,
+    check_footfall_fx,
+    check_skybox_flip,
+    check_stamp,
+)
+from validate_slow_deaths import check_slow_deaths
+from validate_tps_overlay import check_tps_overlay
 
 GENERATED_MODELS = [rig.target for rig in HEROES.values()]
 
@@ -98,19 +105,9 @@ XML_FILES = [
     "BankList.xml",
 ]
 
-CUSTOM_ABILITIES = [
-    "SCOBAAutoAttackToggle",
-    "SCOBARightClickToggle",
-    "SCOBATPSToggle",
-    "SCOBAAutoAttackStatus",
-]
+CUSTOM_ABILITIES = ["SCOBAAutoAttackToggle", "SCOBARightClickToggle", "SCOBATPSToggle", "SCOBAAutoAttackStatus"]
 
-CUSTOM_BEHAVIORS = [
-    "SCOBAAttackSingle",
-    "SCOBARightClickStandBehavior",
-    "SCOBATPSBehavior",
-    "SCOBAStandRoot",
-]
+CUSTOM_BEHAVIORS = ["SCOBAAttackSingle", "SCOBARightClickStandBehavior", "SCOBATPSBehavior", "SCOBAStandRoot"]
 
 CUSTOM_BUTTONS = [
     "SCOBAAutoAttackOn",

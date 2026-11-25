@@ -11,11 +11,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ...map_builder import TestMapSpec
 from ...runner import TestRunSpec
-from ..registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from ..registry import PROFILE_BANKS, profile_output
 from . import check as check_mod
 
 ROOT = project_root()
@@ -46,8 +47,8 @@ def selected_group() -> str:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="pncprobe",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["pncprobe"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("pncprobe"),
         bank_names=PROFILE_BANKS["pncprobe"],
         galaxy_files=tuple(GALAXY / f"{name}.galaxy" for name in GALAXY_FILES),
         galaxy_includes=tuple(f"scripts/test/pncprobe/{name}" for name in GALAXY_FILES),
@@ -67,7 +68,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="pncprobe",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["pncprobe"],
+        map_source=profile_output("pncprobe"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["pncprobe"],
         ready_section="meta",

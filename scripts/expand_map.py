@@ -4,34 +4,47 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import re
 import shutil
 import struct
 from pathlib import Path
 
+import workpaths
 from attack_cooldown_link import apply as apply_attack_cooldown_link
 from bootstrap_galaxy import write_bootstrap
 from character_anim_assets import generate as generate_character_anim
 from doodad_occlusion import disable_doodad_occlusion, disable_unit_silhouettes
-from expand_helpers import clone_cells, expand_texture_masks, import_audio, read, upsample_grid, write
-from hdtex.inject import apply_hd_textures
-from mapgen.melee_map import apply as apply_melee_map
-from mapgen.player_slots import apply as apply_player_slots
-from project_root import project_root
-from props_expand import expand_props
-from mapgen.resources.build import apply as apply_resources
+from expand_helpers import (
+    clone_cells,
+    expand_texture_masks,
+    import_audio,
+    read,
+    upsample_grid,
+    write,
+)
 from flora.build import apply_flora
 from flora.lift import lift_doodads, sink_trees
-from mapgen.footprints.build import apply_scaled_footprints
-from hdtex.model_backfaces import generate as generate_back_faces
-from hitvolumes.intro_trees import apply_intro_tree_clearing
-from skybox_flip import generate as generate_skybox_flip
 from footfall.fx import generate as generate_footfall_fx
-from slow_death_assets import generate as generate_slow_deaths
-from mapgen.spore_scale import scale_psi_destroyer, scale_spores, slow_psi_destroyer_animations
+from hdtex.sc2.game import package_map as package_hd_textures
+from hdtex.sc2.model_backfaces import generate as generate_back_faces
+from hitvolumes.intro_trees import apply_intro_tree_clearing
+from mapgen.footprints.build import apply_scaled_footprints
+from mapgen.melee_map import apply as apply_melee_map
+from mapgen.player_slots import apply as apply_player_slots
+from mapgen.resources.build import apply as apply_resources
 from mapgen.rimfalls.build import apply_rim_falls
+from mapgen.spore_scale import (
+    scale_psi_destroyer,
+    scale_spores,
+    slow_psi_destroyer_animations,
+)
 from mapgen.waterfeatures.build import apply_water_features
+from project_root import project_root
+from props_expand import expand_props
+from skybox_flip import generate as generate_skybox_flip
+from slow_death_assets import generate as generate_slow_deaths
 from strip_gui_triggers import strip_triggers
 from terrain import sync_height
 from water_splashes import apply as apply_water_splashes
@@ -397,10 +410,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, help="Build into this folder without swapping")
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
     root = project_root()
     src = root / "src" / "SCOBA.SC2Map"
-    final = root / "out" / "SCOBA256.SC2Map"
-    dst = args.out if args.out is not None else root / "out" / ".build-tmp"
+    final = workpaths.path("SC2_BUILT_MAP")
+    dst = args.out if args.out is not None else workpaths.path("SC2_OUT") / ".build-tmp"
     if not src.is_dir():
         raise SystemExit(f"source not found: {src}")
     if dst.exists():
@@ -457,14 +471,15 @@ def main() -> int:
     if os.environ.get("SC2_NO_FLORA") != "1":
         apply_flora(dst)
     # Occlusion is disabled after every step that places doodads: a doodad model added later would fade when it hides a unit.
-    for step in (lift_doodads, sink_trees, disable_doodad_occlusion, disable_unit_silhouettes, scale_psi_destroyer, slow_psi_destroyer_animations, apply_hd_textures):
+    # The texture store's bakes go in after every step that makes or changes a model or a catalog (R-HD-101).
+    for step in (lift_doodads, sink_trees, disable_doodad_occlusion, disable_unit_silhouettes, scale_psi_destroyer, slow_psi_destroyer_animations, package_hd_textures):
         step(dst)
     # Engine ground from the render mesh (terrain/sync_height.py), last:
     # the ground calibration reads the final trees and lift markers.
     if sync_height.enabled():
         sync_height.bake(src, dst)
     if args.out is None:
-        old = root / "out" / ".build-old"
+        old = workpaths.path("SC2_OUT") / ".build-old"
         if old.exists():
             shutil.rmtree(old)
         if final.exists():

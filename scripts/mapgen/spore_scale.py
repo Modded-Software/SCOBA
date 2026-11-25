@@ -1,15 +1,21 @@
 from __future__ import annotations
 
-from pathlib import Path
 import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
-DEFAULT_MAP = ROOT / "out" / "SCOBA256.SC2Map"
+
+
+def default_map():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 SPORE_SCALE = 3.0
 SPORE_UNITS = {"SporeCannon", "SporeCrawler"}
 PROJECTILE_FACTOR = 1.5
@@ -179,7 +185,7 @@ def revert() -> int:
 def main(argv: list[str]) -> int:
     if "--revert" in argv[1:]:
         return revert()
-    map_dir = DEFAULT_MAP
+    map_dir = default_map()
     positional = [a for a in argv[1:] if not a.startswith("--")]
     if positional:
         map_dir = Path(positional[0])

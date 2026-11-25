@@ -7,13 +7,15 @@ import argparse
 import sys
 from pathlib import Path
 
-from water_splashes import DEFAULT_MAP, NON_SPLASH_ACTORS, audit_actors
+from water_splashes import NON_SPLASH_ACTORS, audit_actors, default_map
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--map", type=Path, default=DEFAULT_MAP)
+    parser.add_argument("--map", type=Path, default=None)
     args = parser.parse_args(argv[1:])
+    if args.map is None:
+        args.map = default_map()
     ok, missing, skipped = audit_actors(args.map)
     print(f"map: {args.map}")
     print(f"ok: {len(ok)} missing: {len(missing)} skipped: {len(skipped)}")

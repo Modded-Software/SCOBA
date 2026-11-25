@@ -2,7 +2,7 @@
 // extracted on demand into the cache) and each dataset's map layer on disk.
 
 import { execFile } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { Page } from '../../../shared/records';
@@ -59,8 +59,23 @@ export function createStorage(stormex: string, gameDir: string, cache: string): 
   let models: string[] = [];
   const extracting = new Map<string, Promise<string>>();
 
-  async function index(): Promise<void> {
+  /** The storage's file list, kept in the cache: built only when missing (operator 2026-11-25). Delete the file after a game update. */
+  const LISTING = join(cache, 'storage-listing.txt');
+  async function listing(): Promise<string> {
+    try {
+      return await readFile(LISTING, 'utf8');
+    } catch (error) {
+      if (errorCode(error) !== 'ENOENT') throw error;
+    }
     const { stdout } = await run(stormex, ['-S', gameDir, '-I', '\\.(m3|dds|tga)$', '-l'], { maxBuffer: 256 * 1024 * 1024 });
+    // Whole or not at all: a reader never sees half a list.
+    await writeFile(`${LISTING}.${process.pid}`, stdout);
+    await rename(`${LISTING}.${process.pid}`, LISTING);
+    return stdout;
+  }
+
+  async function index(): Promise<void> {
+    const stdout = await listing();
     for (const line of stdout.split('\n')) {
       const path = line.trim();
       if (!path) continue;

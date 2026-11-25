@@ -16,7 +16,7 @@ class SummaryTests(unittest.TestCase):
             write_summary(
                 run_dir,
                 "aim",
-                Path("out/map"),
+                Path(tmp) / "map",
                 Path("bank"),
                 0,
                 [{"section": "case", "tag": "t0", "key": "value", "got": 1, "want": 1, "status": "PASS"}],

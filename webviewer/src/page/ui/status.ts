@@ -30,7 +30,7 @@ export function installStatus(visibleRect: () => Rect): StatusService {
 
   // The message log: every message given to setStatus since the page
   // loaded, with its clock time, in a dialog a click on the toast opens.
-  const logDialog = new Dialog({ id: 'status-log-dialog', title: 'messages' });
+  const logDialog = new Dialog({ id: 'status-log-dialog', title: 'Messages' });
   const logList = make('ul', { id: 'status-log', className: 'rows' });
   logDialog.body.append(logList);
   const two = (n: number): string => String(n).padStart(2, '0');

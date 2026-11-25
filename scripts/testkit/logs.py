@@ -18,6 +18,10 @@ FAIL_WORDS = (
     # footfall dust never played, 2026-11-18): data that does nothing
     # and reports nothing.
     "without a triggering message",
+    # A model whose textures are not named as its `CModel` declares them
+    # (TextureDeclares): the slot is not there, and a texture swap by slot
+    # does nothing (tps/20261124-185130, a packaged copy of the Goliath).
+    "could not find source texture", "no mapping for slot", "non-existent slot",
 )
 SKIP_PREFIXES = (
     "StarCraft II",

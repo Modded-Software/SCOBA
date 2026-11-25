@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
-from typing import NamedTuple
 from pathlib import Path
+from typing import NamedTuple
+
+from hdtex.sc2.packaged import own_catalog
 
 # Void Story data stack, lowest first. The map comes last.
 STACK = (
@@ -73,15 +75,20 @@ def stock_entries() -> list[str]:
 class Catalog:
     """Every entry of one catalog along the stack, by id."""
 
-    def __init__(self, paths: list[Path], tags: tuple[str, ...]) -> None:
+    def __init__(self, paths: list[Path], tags: tuple[str, ...], own: str | None = None) -> None:
+        """`own`: the text of the map's own catalog, read after the files."""
         self.entries: dict[str, list[ET.Element]] = {}
-        for path in paths:
-            if not path.is_file():
-                continue
-            parser = ET.XMLParser(target=ET.TreeBuilder(insert_pis=True))
-            for el in ET.parse(path, parser).getroot():
+        roots = [ET.parse(path, self._parser()).getroot() for path in paths if path.is_file()]
+        if own is not None:
+            roots.append(ET.fromstring(own, self._parser()))
+        for root in roots:
+            for el in root:
                 if el.tag in tags and el.get("id"):
                     self.entries.setdefault(el.get("id"), []).append(el)
+
+    @staticmethod
+    def _parser() -> ET.XMLParser:
+        return ET.XMLParser(target=ET.TreeBuilder(insert_pis=True))
 
     def parent(self, ident: str) -> str | None:
         for el in reversed(self.entries.get(ident, [])):
@@ -157,9 +164,11 @@ def vec3(text: str | None) -> Vec3:
 
 class GameData:
     def __init__(self, stock_dir: Path, map_dir: Path) -> None:
-        data = map_dir / "Base.SC2Data" / "GameData"
-        self.actors = Catalog(stock_paths(stock_dir, "actor") + [data / MAP_CATALOGS["actor"]], ACTOR_TAGS)
-        self.models = Catalog(stock_paths(stock_dir, "model") + [data / MAP_CATALOGS["model"]], ("CModel",))
+        # The actors and the model the map shows without the texture step's
+        # lines and copies: a copy has the same shapes, and which textures are
+        # picked must not move a volume. A unit or actor bake sets an actor's Model.
+        self.actors = Catalog(stock_paths(stock_dir, "actor"), ACTOR_TAGS, own_catalog(map_dir, MAP_CATALOGS["actor"]))
+        self.models = Catalog(stock_paths(stock_dir, "model"), ("CModel",), own_catalog(map_dir, MAP_CATALOGS["model"]))
         # unitName -> the first actor that lists it, in catalog order; and
         # unit -> the first actor its birth creates (a morph state such as
         # ArchiveSealed has no actor of its own).

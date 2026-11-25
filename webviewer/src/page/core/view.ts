@@ -43,7 +43,7 @@ export function createView(host: Host, store: Store, events: EventBus<ViewerEven
   return {
     ...createLandmarks(store, events, view),
     camera,
-    cameraRestore: rig.cameraRestore,
+    cameraStart: rig.cameraStart,
     pointer: () => pointer,
     setPointer(point) {
       pointer = point;

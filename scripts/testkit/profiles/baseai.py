@@ -13,18 +13,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from . import baseai_patch
-from .baseai_env import ALL_GROUPS, GROUPS, gas_extra, gas_help, gas_ring, gas_town, selected_group
+from .baseai_env import (
+    ALL_GROUPS,
+    GROUPS,
+    gas_extra,
+    gas_help,
+    gas_ring,
+    gas_town,
+    selected_group,
+)
 from .baseai_flight import check_flight_group
 from .baseai_gas import check_gas
 from .baseai_hall import check_hall
 from .baseai_macro import check_macro
 from .baseai_probe import check_probe
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 GALAXY = ROOT / "scripts" / "testkit" / "galaxy"
@@ -46,8 +55,8 @@ def map_spec() -> TestMapSpec:
     return TestMapSpec(
         patch=baseai_patch.patch_ab if baseai_patch.wanted() else None,
         profile="baseai",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["baseai"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("baseai"),
         bank_names=PROFILE_BANKS["baseai"],
         galaxy_files=(GALAXY / "common.galaxy",) + tuple(GALAXY / "baseai" / f"{name}.galaxy" for name in HARNESS),
         galaxy_includes=("scripts/test/baseai/common",) + tuple(f"scripts/test/baseai/{name}" for name in HARNESS),
@@ -87,7 +96,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="baseai",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["baseai"],
+        map_source=profile_output("baseai"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["baseai"],
         ready_section="ba_start",

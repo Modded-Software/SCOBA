@@ -18,7 +18,7 @@ scripts/data/water_models.json, in model space:
 The result is committed, so the build never reads the models. Re-run after
 a change to these models or to their ModelData scale.
 
-usage: PYTHONPATH=scripts uv run python -m mapgen.waterfeatures.measure [--print]
+usage: make measure-water-features [ARGS=--print]
 """
 
 from __future__ import annotations
@@ -31,20 +31,24 @@ from pathlib import Path
 from typing import TypedDict
 
 import numpy as np
-
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
 sys.path.insert(0, str(ROOT / "scripts" / "vendor" / "m3addon"))
 
 import m3
-
 from hitvolumes.dump_m3_bounds import bone_rest
+
 from mapgen.footprints.measure import triangles
 
 from . import config
 
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 OUT = ROOT / "scripts" / "data" / "water_models.json"
 DECIMALS = 4
 # A tube: a welded mesh part that is long, thin and close to level.
@@ -167,7 +171,7 @@ def stock_files(kind: str, work: Path) -> dict[int, Path]:
     A doodad the map does not place yet has no CModel in the built map. Its
     model is the game's: Assets\\Doodads\\<id>\\<id>_NN.m3.
     """
-    from hdtex.casc import Casc
+    from hdtex.sc2.casc import Casc
 
     casc = Casc()
     stem = kind.lower()
@@ -189,7 +193,7 @@ def rock(path: Path) -> dict:
 
 def measure(map_dir: Path, work: Path | None = None) -> dict:
     data: dict = {"falls": {}, "pipes": {}, "rocks": {}}
-    files = stock_files(config.ROCK_TYPE, work or ROOT / "out" / "testkit" / "water_models")
+    files = stock_files(config.ROCK_TYPE, work or workpaths.path("SC2_TESTKIT") / "water_models")
     data["rocks"][config.ROCK_TYPE] = {str(v): rock(p) for v, p in sorted(files.items())}
     for kind in (config.FALL_TYPE,):
         path, scale = model_entry(map_dir, kind)
@@ -207,7 +211,7 @@ def measure(map_dir: Path, work: Path | None = None) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--map", type=Path, default=BUILT, help="built map folder")
+    parser.add_argument("--map", type=Path, default=built_path(), help="built map folder")
     parser.add_argument("--print", action="store_true", help="print what was measured")
     args = parser.parse_args()
     data = measure(args.map)

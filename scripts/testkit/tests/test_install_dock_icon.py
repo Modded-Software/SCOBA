@@ -92,9 +92,9 @@ class InstallDockIconTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         plain = (self.apps / "scoba.desktop").read_text(encoding="utf-8")
         fg = (self.apps / "scoba-fg.desktop").read_text(encoding="utf-8")
-        self.assertEqual(plain.count('SCOBA_GAME_GPU="0000:03:00.0"'), 5)
-        self.assertEqual(fg.count('SCOBA_GAME_GPU="0000:03:00.0"'), 5)
-        self.assertEqual(fg.count('SCOBA_FG_GPU="0000:09:00.0"'), 5)
+        self.assertEqual(plain.count('SCOBA_GAME_GPU="0000:03:00.0"'), 2)  # the entry and its one action
+        self.assertEqual(fg.count('SCOBA_GAME_GPU="0000:03:00.0"'), 2)
+        self.assertEqual(fg.count('SCOBA_FG_GPU="0000:09:00.0"'), 2)
         self.assertNotIn("pci-0000_03_00_0", plain)  # negative: provisioner does not pin DRI
         self.assertIn("game on GPU 0000:03:00.0", fg)
         self.assertIn("frame generation on GPU 0000:09:00.0", fg)
@@ -106,16 +106,18 @@ class InstallDockIconTest(unittest.TestCase):
         self.assertNotIn("DRI_PRIME", plain)
         self.assertNotIn("LSFGVK", plain)
 
-    def test_fg_actions_keep_texture_choices_and_instant_launch(self) -> None:
+    def test_the_one_action_is_the_instant_launch_and_no_entry_picks_textures(self) -> None:
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        fg = (self.apps / "scoba-fg.desktop").read_text(encoding="utf-8")
-        self.assertIn("Actions=built;original;upscaled;hd;", fg)
-        self.assertEqual(fg.count("[Desktop Action "), 4)
-        self.assertIn('playtest.sh" launch-built', fg)
-        self.assertIn('SC2_HD_TEXTURES="off"', fg)
-        self.assertIn('SC2_HD_TEXTURES="upscale"', fg)
-        self.assertIn('SC2_HD_TEXTURES="generative"', fg)
+        for name in ("scoba.desktop", "scoba-fg.desktop"):
+            entry = (self.apps / name).read_text(encoding="utf-8")
+            self.assertIn("Actions=built;\n", entry)
+            self.assertEqual(entry.count("[Desktop Action "), 1, name)
+            self.assertIn('playtest.sh" launch-built', entry)
+            self.assertIn('playtest.sh" launch\n', entry)
+            self.assertIn("Right-click: Instant Launch (no build)", entry)
+            self.assertNotIn("HD_TEXTURES", entry)  # negative: the build takes its textures from the store
+            self.assertNotIn("Textures", entry)
 
     def test_both_entries_are_added_to_favorites(self) -> None:
         result = self.run_installer()

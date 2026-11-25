@@ -8,8 +8,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Callable, Mapping, NamedTuple, Optional
 
-from .profiles.registry import PROFILE_OUTPUTS
-from .profiles.registry import PROFILE_BANKS
+from .profiles.registry import PROFILE_BANKS, PROFILE_MAPS, profile_output
 
 
 class TestMapSpec(NamedTuple):
@@ -188,9 +187,9 @@ def patch_base_ai(root: Path) -> None:
 
 
 def build_instrumented_map(spec: TestMapSpec) -> Path:
-    expected = PROFILE_OUTPUTS.get(spec.profile)
-    if expected is None:
+    if spec.profile not in PROFILE_MAPS:
         raise SystemExit(f"unknown test profile: {spec.profile}")
+    expected = profile_output(spec.profile)
     if spec.output != expected:
         raise SystemExit(f"profile {spec.profile} must write {expected}")
     if tuple(PROFILE_BANKS.get(spec.profile, ())) != tuple(spec.bank_names):

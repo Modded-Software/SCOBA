@@ -1,5 +1,5 @@
-// Ghost in the texture window (core/texturewindow.ts), on the bare texture
-// viewer page: every texture file a model's materials name, decoded, each
+// Ghost in the texture window (core/texturewindow.ts), without a texture
+// service: every texture file a model's materials name, decoded, each
 // with what draws with it (material, shader, drawn or why not, groups). A
 // material without a texture file, and a texture that does not load, are
 // listed as not shown, with why.
@@ -7,7 +7,7 @@
 import type { GameContext } from '../../../page/core/context';
 import { decodeDds } from '../../../page/core/ddsdecode';
 import { messageOf } from '../../../page/core/dom';
-import { TEMPLATE_PAGE, type ShownTexture } from '../../../page/core/texturewindow';
+import type { ShownTexture } from '../../../page/core/texturewindow';
 import type { Item } from '../../../page/core/types';
 import { nodLooks, type NodLook } from '../../../formats/nod/looks';
 import { GHOST } from './game';
@@ -56,7 +56,7 @@ export function installGhostTextures(context: GameContext): GhostTextures {
     const textures: ShownTexture[] = [];
     for (const [texture, used] of [...byTexture].sort(([a], [b]) => a.localeCompare(b))) {
       await decodeDds(String(api.pathSolver(dataset, GHOST)(texture)), texture, urls).then(
-        (decoded) => textures.push({ ...decoded, facts: materialFacts(used) }),
+        (decoded) => textures.push({ ...decoded, asset: null, facts: materialFacts(used) }),
         (error: unknown) => failed.push(`${texture} (${messageOf(error)})`),
       );
     }
@@ -64,7 +64,8 @@ export function installGhostTextures(context: GameContext): GhostTextures {
   }
 
   function openTextures(user: string, name: string, file: string, dataset: string): Promise<void> {
-    return textureWindow.open({ user, name, file, dataset, page: TEMPLATE_PAGE, read: (urls) => read(file, dataset, urls) });
+    // Ghost has no texture service (R-VIEW-100): the window shows the originals only.
+    return textureWindow.open({ user, name, file, dataset, game: GHOST, service: false, read: (urls) => read(file, dataset, urls) });
   }
 
   async function openTexturesFor(category: string, id: string): Promise<void> {

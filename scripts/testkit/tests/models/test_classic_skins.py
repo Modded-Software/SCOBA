@@ -1,11 +1,11 @@
-"""Host tests for scripts/hdtex/classic_skins.py: which model entries a skin swaps, and how the map takes them."""
+"""Host tests for scripts/hdtex/sc2/classic_skins.py: which model entries a skin swaps, and how the map takes them."""
 
 from __future__ import annotations
 
 import re
 import unittest
 
-from hdtex import classic_skins as C
+from hdtex.sc2 import classic_skins as C
 
 SKINS = """<Catalog>
 <CSkin default="1" id="Base">
@@ -50,7 +50,7 @@ MAP = """<?xml version="1.0" encoding="us-ascii"?>
 
 
 def found() -> list[C.Swap]:
-    swaps, _left = C.swaps([SKINS], [MODELS], ("BugOld",), frozenset({"SplatLight"}))
+    swaps, _left, _open = C.swaps([SKINS], [MODELS], ("BugOld",), frozenset({"SplatLight"}))
     return swaps
 
 
@@ -79,9 +79,31 @@ class SwapTest(unittest.TestCase):
         self.assertNotIn("Bug_Yes", [swap.entry for swap in found()])
 
     def test_a_pair_the_game_data_lacks_is_left_out_and_reported(self) -> None:
-        swaps, left = C.swaps([SKINS], [MODELS], ("TankOld",))
+        swaps, left, _open = C.swaps([SKINS], [MODELS], ("TankOld",))
         self.assertEqual(swaps, [])
         self.assertEqual(left, ["TankOld: Tank -> Tank_Old", "TankOld: TankDeath -> Tank_Old_Death"])
+
+    def test_a_token_without_a_value_is_kept_as_written_and_named(self) -> None:
+        # The game data has ten ragdoll models whose LowQualityModel holds ##low##, on both sides of a pair.
+        models = MODELS.replace(
+            '<CModel id="BugDeath" parent="Unit"/>',
+            '<CModel id="BugDeath" parent="Unit"><LowQualityModel value="##low##"/></CModel>',
+        ).replace('<Radius value="2"/>', '<Radius value="2"/><LowQualityModel value="##low##"/>')
+        swaps, _left, kept_open = C.swaps([SKINS], [models], ("BugOld",), frozenset({"SplatLight"}))
+        self.assertEqual(kept_open, ["BugDeath.LowQualityModel: ##low##", "Bug_Old_Splat.LowQualityModel: ##low##"])
+        death = next(swap for swap in swaps if swap.entry == "BugDeath")
+        self.assertNotIn("LowQualityModel", dict(death.fields), "the same open field is no change")
+        _swaps, _left, none_open = C.swaps([SKINS], [MODELS], ("BugOld",), frozenset({"SplatLight"}))
+        self.assertEqual(none_open, [], "negative: no open token, none named")
+
+    def test_a_missing_parent_is_an_error_not_kept(self) -> None:
+        models = MODELS.replace('id="BugDeath" parent="Unit"', 'id="BugDeath" parent="NoSuchParent"')
+        with self.assertRaises(C.SkinError):
+            C.swaps([SKINS], [models], ("BugOld",))
+
+    def test_a_catalog_text_that_is_not_xml_is_an_error(self) -> None:
+        with self.assertRaises(C.SkinError):
+            C.class_text(["<Catalog><CModel id='Bug'>"], "CModel")
 
     def test_an_unknown_skin_is_an_error(self) -> None:
         with self.assertRaises(C.SkinError):

@@ -11,15 +11,22 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-
-from project_root import project_root
+import workpaths
 from mapgen.resources import config, fit, sites
 from mapgen.resources.build import PILE
+from project_root import project_root
+
 from testkit.profiles import baseai_scan
+from testkit.tests.built_map import needs_built
 
 ROOT = project_root()
 APP = ROOT / "src" / "SCOBA.SC2Map" / "scripts" / "app"
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
+
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 # The files sites.plan reads (terrain.load, Regions, Objects).
 INPUTS = ("Objects", "Regions", "t3HeightMap", "t3Terrain.xml", "t3CellFlags", "t3Water",
           "Base.SC2Data/GameData/WaterData.xml", ".doodads_lifted", ".trees_sunk")
@@ -113,11 +120,11 @@ class FitTest(unittest.TestCase):
         self.assertEqual(len(fit.inside(self._objects(), keep)), 2)
 
 
-@unittest.skipUnless((BUILT / "Objects").exists(), "needs a built map")
+@needs_built("Objects")
 class PlanTest(unittest.TestCase):
     def setUp(self) -> None:
         self.work = Path(tempfile.mkdtemp())
-        _stage(BUILT, self.work)
+        _stage(built_path(), self.work)
 
     def tearDown(self) -> None:
         shutil.rmtree(self.work)

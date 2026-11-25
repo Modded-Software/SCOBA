@@ -13,7 +13,12 @@ export interface Request {
   readonly route: string;
   readonly params: URLSearchParams;
   readonly res: ServerResponse;
+  /** The body as JSON. A body that is not JSON, or larger than BODY_LIMIT, is an error. */
+  json(): Promise<unknown>;
 }
+
+/** The largest body a request may send. A texture call sends a few names. */
+export const BODY_LIMIT = 64 * 1024;
 
 /** A route answers a request it knows and returns true; false: not mine. */
 export type Route = (request: Request) => Promise<boolean>;
@@ -65,6 +70,33 @@ export const onlyGet: Route = async ({ method, res }) => {
   return true;
 };
 
+/** Thrown for a body that cannot be read: the routes answer 400 with the message. */
+export class BodyError extends Error {}
+
+function readJson(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const parts: Buffer[] = [];
+    let size = 0;
+    req.on('data', (part: Buffer) => {
+      size += part.length;
+      if (size > BODY_LIMIT) {
+        reject(new BodyError(`the body is larger than ${BODY_LIMIT} bytes`));
+        req.destroy();
+        return;
+      }
+      parts.push(part);
+    });
+    req.on('error', reject);
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(parts).toString('utf8')));
+      } catch (error) {
+        reject(new BodyError(`the body is not JSON: ${messageOf(error)}`));
+      }
+    });
+  });
+}
+
 function requestOf(req: IncomingMessage, res: ServerResponse): Request {
   const raw = req.url ?? '/';
   const cut = raw.indexOf('?');
@@ -73,6 +105,7 @@ function requestOf(req: IncomingMessage, res: ServerResponse): Request {
     route: cut < 0 ? raw : raw.slice(0, cut),
     params: new URLSearchParams(cut < 0 ? '' : raw.slice(cut + 1)),
     res,
+    json: () => readJson(req),
   };
 }
 

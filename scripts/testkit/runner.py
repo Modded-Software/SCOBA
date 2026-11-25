@@ -11,11 +11,13 @@ import time
 from pathlib import Path
 from typing import Callable, NamedTuple
 
+import workpaths
+from m3dump.dump_m3_clip_metrics import map_models, write_docs_bank
+
 from .animlog import write_animlog
 from .bank import delete_banks, find_latest_bank, read_bank
-from .framelog import write_framelog
-from dump_m3_clip_metrics import map_models, write_docs_bank
 from .checks import Checks
+from .framelog import write_framelog
 from .frames import FrameCollector
 from .logs import latest_script_error, report_logs
 from .summary import write_summary
@@ -94,18 +96,8 @@ def _run_id() -> str:
 
 def run_test(spec: TestRunSpec) -> int:
     disable_bell()
-    game_prefix = Path(os.environ.get("SC2_GAME_PREFIX", str(Path.home() / "Games" / "battlenet-prefix")))
-    docs = Path(
-        os.environ.get(
-            "SC2_DOCUMENTS",
-            str(game_prefix / "pfx/drive_c/users/steamuser/Documents/StarCraft II"),
-        )
-    )
-    cache = (
-        game_prefix
-        / "pfx/drive_c/ProgramData/Blizzard Entertainment/StarCraft II/Maps/Cache"
-        / spec.map_cache_name
-    )
+    docs = workpaths.path("SC2_DOCUMENTS")
+    cache = workpaths.path("SC2_MAP_CACHE") / spec.map_cache_name
     logs = docs / "GameLogs"
     run_dir = spec.run_root / spec.profile / _run_id()
     run_dir.mkdir(parents=True, exist_ok=False)

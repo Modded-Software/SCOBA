@@ -9,8 +9,12 @@ else
     ROOT_DIR="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 fi
 export SC2_PROJECT_ROOT="$ROOT_DIR"
-OUT_DIR="$ROOT_DIR/out"
-FRESH_MAP="$OUT_DIR/SCOBA256.SC2Map"
+# Every path below comes from here (SPEC-PATHS).
+# shellcheck source=paths.sh
+source "$ROOT_DIR/scripts/paths.sh" || exit 1
+paths_check_device
+OUT_DIR="$SC2_OUT"
+FRESH_MAP="$SC2_BUILT_MAP"
 PLAYTEST="$ROOT_DIR/scripts/playtest.sh"
 UV_BIN="${UV_BIN:-uv}"
 if [ "${UV_BIN#/}" = "$UV_BIN" ]; then
@@ -39,10 +43,10 @@ usage() {
 usage: scripts/playtest.sh <action> [group]
 
 actions:
-  build                  rebuild out/SCOBA256.SC2Map and stop
+  build                  rebuild the map (SC2_BUILT_MAP) and stop
   host-tests             rebuild, then run the Python unittest suite for the tooling
   launch                 rebuild, then launch the fresh map
-  launch-built           no build: launch out/SCOBA256.SC2Map as it was last built
+  launch-built           no build: launch the map as it was last built
   launch-check           rebuild, launch, and check runtime logs
   combat [group]         rebuild, build combat test map, run one scenario group
                          (idle, single, auto, cancel, wasd, hold, button, switch,
@@ -78,6 +82,8 @@ actions:
   waterprobe             rebuild, build the water test probe map, run it
   ground                 rebuild, engine ground vs render ground, flyer over a
                          hill
+  hdbake                 rebuild, then a map with a unit and an actor HD bake:
+                         the made model entries in the game (SPEC-HD-TEXTURES E-1)
   waterfeat              rebuild, water features: carved ground, pool pathing,
                          a walk into each pool, the pipe unit
   dissolveview           rebuild, build the doodad physics view map, launch it
@@ -92,6 +98,8 @@ actions:
 environment:
   SC2_KEEP_OPEN=1        operator mode: check and write the summary as usual,
                          then leave StarCraft II running to play on
+  paths                  env/paths.conf, read by scripts/paths.sh (SPEC-PATHS);
+                         a variable set in the environment wins
 EOF
 }
 
@@ -119,6 +127,7 @@ profile_timeout() {
         herodrop) printf '%s\n' "${SC2_CASE_TIMEOUT:-170}" ;;
         roster) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
         waterfeat) printf '%s\n' "${SC2_CASE_TIMEOUT:-150}" ;;
+        hdbake) printf '%s\n' "${SC2_CASE_TIMEOUT:-60}" ;;
         podbirth) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
         aimdof) printf '%s\n' "${SC2_CASE_TIMEOUT:-60}" ;;
         ui) printf '%s\n' "${SC2_CASE_TIMEOUT:-90}" ;;
@@ -135,8 +144,8 @@ fresh_build() {
     log "fresh build: $ROOT_DIR/src/SCOBA.SC2Map"
     SC2_PLAYTEST_ACTIVE=1 bash "$ROOT_DIR/scripts/build.sh"
     [ -f "$FRESH_MAP/BuildStamp.txt" ] || fail "fresh build missing BuildStamp.txt"
-    [ -f "$OUT_DIR/.last-build-stamp" ] || fail "fresh build missing build stamp"
-    log "fresh build stamp: $(cat "$OUT_DIR/.last-build-stamp")"
+    [ -f "$SC2_BUILD_STAMP" ] || fail "fresh build missing build stamp"
+    log "fresh build stamp: $(cat "$SC2_BUILD_STAMP")"
     if [ -f "$FRESH_MAP/BuildManifest.txt" ]; then
         log "fresh map manifest sha256: $(sha256sum "$FRESH_MAP/BuildManifest.txt" | cut -d' ' -f1)"
     fi
@@ -145,7 +154,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|slowwalk|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat) ;;
+        combat|tps|jump|slowwalk|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -201,7 +210,7 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat)
+    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake)
         run_profile "$ACTION"
         ;;
     picklog)

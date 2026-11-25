@@ -130,7 +130,7 @@ not repeated here.
 | R-TPS-81 | [tested] attack command in the free-cursor state. A cursor left click in the free-cursor state is [built]. | `controls_attack` |
 | R-TPS-82 | [tested] | `tps` group `target` |
 | R-TPS-83 | [tested] flags after leaving TPS | `tend` of every `tps` scenario |
-| R-TPS-90 | [tested] Tosh, Kerrigan, SCV: applied target height, desired arm, engine camera distance, aim pick eye height; the heights equal the generator's; an invalid unit falls back to Tosh. The framing itself is [operator] (AC-TPS-25). Viking flying and after the landing morph: applied height = its form's offset (+ flight), arm 6. | `combat` group `camheight`, `combat/20261119-131142` (with the Viking), `combat/20261119-120931`; full `combat` on HEAD 0868359 + this change: `combat/20261119-124334` (1 failure, `hold_right_back`, the same on clean HEAD `combat/20261119-123815`) |
+| R-TPS-90 | [untested] Tosh, Kerrigan, SCV: applied target height, desired arm, engine camera distance, aim pick eye height; the heights equal the generator's. No unit and a type without a height row are not known (`gf_CameraHeightKnown`, section `cam_known`); asking their height stops with a script error. The framing itself is [operator] (AC-TPS-25). Viking flying and after the landing morph: applied height = its form's offset (+ flight), arm 6. | `combat` group `camheight`; no run of the current code |
 
 ## 5. Design
 
@@ -589,8 +589,8 @@ not repeated here.
   was 0.75, measured 0.8374; every camera unchanged). Host test
   `test_tosh_camera_kept_after_the_shrink`. `--check` and validate-map fail
   when it is stale. `main` loads it into a data table (`gf_CamHeightLoad`).
-- `systems/camera/camera_height.galaxy`: `gf_CameraUnitHeight` (reference
-  for an invalid or unmeasured unit), `gf_CameraHeightScale` = height /
+- `systems/camera/camera_height.galaxy`: `gf_CameraHeightKnown` (a valid unit whose type has a row), `gf_CameraUnitHeight` (stops with a script error
+  for no unit or a type without a row, through `gf_CamHeightFail`), `gf_CameraHeightScale` = height /
   reference, `gf_CameraTargetOffset` = 0.9 x scale, `gf_CameraArm` = 1.5 x
   scale.
 - Users: `gf_CameraHeightApply` (base of the applied height, then quake,
@@ -616,7 +616,7 @@ not repeated here.
 - 2026-11-20: the SCV is the classic model at actor scale 2; its height
   is 2.0345 (not run in the game). The classic Command Center is 14.1710,
   its Orbital Command and Planetary Fortress forms the same (their actors
-  have its scale), the classic Ultralisk 4.8761 (SPEC-HD-TEXTURES 13).
+  have its scale), the classic Ultralisk 4.8761 (SPEC-HD-TEXTURES 12).
   6x6 gas (R-BASE-35): VespeneGeyser 1.2747 to 2.5493; new entries
   Refinery and AutomatedRefinery 4.9421, Extractor and AutomatedExtractor
   5.6112.

@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- No icon file: an empty one, so the browser asks for no /favicon.ico (a 404). -->
+  <link rel="icon" href="data:,">
   <title>model viewer</title>
   <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/style.css">
@@ -17,7 +19,7 @@
     </div>
   </aside>
   <aside id="instances">
-    <div id="scene-head"><span>instances <span id="instance-count"></span></span><button id="clear" title="remove all">clear</button></div>
+    <div id="scene-head"><span>instances <span id="instance-count"></span></span><button id="clear" class="danger" title="Remove All Instances">clear</button></div>
     <input id="instance-search" type="search" placeholder="search instances by name, id or file" autocomplete="off" spellcheck="false">
     <ul id="scene" class="rows"></ul>
   </aside>
@@ -38,6 +40,7 @@
     </div>
     <button id="landmark-pin" title="pin: save this view as a landmark"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M8 1a5 5 0 0 0-5 5c0 3.5 5 9 5 9s5-5.500 5-9a5 5 0 0 0-5-5zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg></button>
     <button id="grid-toggle" class="on" title="hex grid ground">grid</button>
+    <button id="ground-button" title="choose a ground texture" hidden>ground</button>
     <button id="sky-button" title="choose a skybox">sky</button>
   </nav>
   <!-- The page is one bundle (src/page/main.ts). When it does not load, nothing of the page runs: these lines say so, naming the file. -->

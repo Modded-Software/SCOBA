@@ -34,7 +34,10 @@ export function installGallery(deps: GalleryDeps): GalleryApi {
 
   async function setupGallery(): Promise<void> {
     const mine = ++build;
-    const categories = await deps.api.categories();
+    // A ground category has no tab: its records are chosen with the ground
+    // button only (R-VIEW-107, operator 2026-11-25).
+    const ground = new Set(deps.games.plugin().categories.filter((category) => category.ground).map((category) => category.id));
+    const categories = (await deps.api.categories()).filter((category) => !ground.has(category.id));
     if (mine !== build) return;
     // The search text stays over a rebuild; the filters start at "any" (their values are the new dataset's).
     const searches = new Map([...panes].map(([id, pane]) => [id, pane.query()['q'] ?? '']));

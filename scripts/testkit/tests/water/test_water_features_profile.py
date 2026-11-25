@@ -20,7 +20,7 @@ class ProfileTest(unittest.TestCase):
         from testkit.profiles import waterfeat
 
         cls.wf = waterfeat
-        if not (waterfeat.BUILT / build.MARKER).exists():
+        if not (waterfeat.built_path() / build.MARKER).exists():
             raise unittest.SkipTest("the built map has no water features (SC2_NO_WATER_FEATURES)")
         cls.scene = waterfeat.scene()
         cls.samples = [waterfeat.samples(cls.scene, i) for i in range(len(cls.scene.sites))]

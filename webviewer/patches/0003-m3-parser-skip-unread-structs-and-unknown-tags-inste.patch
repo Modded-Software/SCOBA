@@ -1,7 +1,7 @@
 From e21656fa929542cd04e8dc41bce072ca05cf77f8 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 09:53:35 +0200
-Subject: [PATCH 03/56] m3 parser: skip unread structs and unknown tags instead
+Subject: [PATCH 03/57] m3 parser: skip unread structs and unknown tags instead
  of rejecting the model
 
 ---

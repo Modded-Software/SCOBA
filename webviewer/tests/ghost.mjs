@@ -1,7 +1,7 @@
 // What the Ghost page specs share (ghost-page, ghost-anim, ghost-look):
 // open the page, add Ghost files and records, reach the nod probes and
 // the pick. Engine state only.
-import { expect } from '@playwright/test';
+import { expect } from './fixtures.mjs';
 
 export async function open(page) {
   const errors = [];
@@ -10,6 +10,14 @@ export async function open(page) {
   await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
   return errors;
 }
+
+/**
+ * The viewer's report on the zergling models (a data fact, not a fault): their
+ * motion set holds Nova's side of a paired death, a clip for her bones, which
+ * names bone 32 of a model with 32 (0 to 31). It is left out and named
+ * (ghost-anim.spec.mjs). A spec that loads a zergling allows it (allowErrors).
+ */
+export const FOREIGN_CLIP = /clips left out: .*deathblown \(nova_death_byZergling\.nad\): clip deathblown: track \d+ names bone 32; the model has 32/;
 
 export const add = (page, path, x = 0) => page.evaluate(([p, at]) => window.sc2viewer.add(p, { game: 'ghost', x: at, y: 0, rot: 0 }), [path, x]);
 export const addRecord = (page, category, id, x = 0) => page.evaluate(([c, i, at]) => window.sc2viewer.addRecord(c, i, { game: 'ghost', x: at, y: 0, rot: 0 }), [category, id, x]);

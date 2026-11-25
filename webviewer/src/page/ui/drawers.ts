@@ -20,8 +20,8 @@ const isDrawer = (id: string): id is DrawerId => id === 'gallery' || id === 'ins
 export type DrawersApi = Pick<UiService, 'setDrawer' | 'drawerState'>;
 
 export function installDrawers(store: Store, placeStatus: () => void): DrawersApi {
-  // Both open when none are stored, or the stored value is refused.
-  const open: DrawersSetting = store.read(settings.drawers).value ?? { gallery: true, instances: true };
+  // The stored drawers, else the setting's declared default: both open.
+  const open: DrawersSetting = store.read(settings.drawers);
 
   function apply(): void {
     for (const { id, tab, name } of DRAWERS) {

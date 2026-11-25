@@ -83,7 +83,7 @@ Implements `docs/requirements/REQ-SCENERY.md`. Code:
 
 `scripts/playtest.sh herodrop scenery`. Harness
 `scripts/testkit/galaxy/herodrop_scenery.galaxy`, checks
-`scripts/testkit/profiles/herodrop_scenery.py`.
+`scripts/testkit/profiles/herodrop_parts/herodrop_scenery.py`.
 
 ## 5. Known limits
 

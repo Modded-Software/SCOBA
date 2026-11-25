@@ -1,7 +1,7 @@
 From 296347e04d4ecf57de664de190d66be1b484a7f4 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 09:24:31 +0200
-Subject: [PATCH 47/56] m3 ground lights: draw one light only (test hook)
+Subject: [PATCH 47/57] m3 ground lights: draw one light only (test hook)
 
 groundLightOnly: an index into model.lights, -1 for all.
 

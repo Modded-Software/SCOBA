@@ -14,6 +14,17 @@ export interface CoreSettings {
 }
 
 /**
+ * A path the scripts set (webviewer/scripts/paths.sh sources scripts/paths.sh,
+ * SPEC-PATHS). Unset or blank is an error: the viewer guesses no place.
+ */
+export function requiredPath(env: NodeJS.ProcessEnv, name: string): string {
+  const value = (env[name] ?? '').trim();
+  if (!value) throw new Error(`${name} is not set: start the viewer through make or its scripts, which source scripts/paths.sh (SPEC-PATHS)`);
+  if (!value.startsWith('/')) throw new Error(`${name} is not absolute: ${value} (SPEC-PATHS)`);
+  return value;
+}
+
+/**
  * Read from the environment. The viewer folder is WEBVIEWER_DIR, or the
  * parent of the folder of the running bundle (build/server.js).
  */

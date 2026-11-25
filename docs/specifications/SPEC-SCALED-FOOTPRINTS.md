@@ -96,7 +96,7 @@ Fit checks (R-FP-07), against the eroded mesh: covered ≥ `MIN_MESH_COVERED`
 - `check_squares` fails the build check when the footprint link, its shape, or
   a flatten event is missing.
 - **2026-11-20: the hall is measured on the classic model**
-  (`CommandCenter_Remastered.m3`, SPEC-HD-TEXTURES 13; operator: "the legs
+  (`CommandCenter_Remastered.m3`, SPEC-HD-TEXTURES 12; operator: "the legs
   are a tiny bit off need to recalculate footprint"). It has no `Foot_*`
   bones. The triangles of the bones named `*Leg*` are sliced
   (`measure.MODEL_BONES`): three round legs `Leg1..3` and two side plates
@@ -105,7 +105,7 @@ Fit checks (R-FP-07), against the eroded mesh: covered ≥ `MIN_MESH_COVERED`
   35 cells, 7 loops. Three loops of 3 by 3 are the legs, at about
   (-0.5, -5), (-5.5, 0), (4, 4.5). Four smaller loops are what the plates
   put at feet height after `ERODE`. `measure` checks the unit shows
-  `measure.HALL_FILES` by file name, so the HD copy passes. The text below
+  `measure.HALL_FILES` by file name, so a packaged copy passes. The text below
   on feet, bones and footprint ids describes the stock model, measured
   before. Not seen in the game. The F and A marks of the Alt+0 paint are
   still the stock foot points; the red marks are the engine's cells.
@@ -212,7 +212,7 @@ Built map: 334 trees, 249 footprints. Largest trees block about area 75
 
 ## 6. State
 
-Run `out/test-runs/treepath/20261115-133439` (`SC2_HD_TEXTURES=off`),
+Run `out/test-runs/treepath/20261115-133439` (built-in textures),
 `failures: 0`. Targets: largest tree (area 77.75), most off-centre tree, a
 1-cell tree, a tree far from a quarter turn, one cannon, one crawler.
 

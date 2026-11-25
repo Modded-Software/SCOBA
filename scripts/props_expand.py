@@ -1,18 +1,24 @@
 from __future__ import annotations
 
-from pathlib import Path
 import os
 import random
 import re
 import struct
 import subprocess
 import sys
+from pathlib import Path
 
+import workpaths
 from flora.treevary import vary_objects
 from project_root import project_root
 
 ROOT = project_root()
-DEFAULT_MAP = ROOT / "out" / "SCOBA256.SC2Map"
+
+
+def default_map():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 TREE_TYPE = "ZerusTree"
 TREE_COUNT_FACTOR = 1.5
 FLUFF_COUNT_FACTOR = 2
@@ -137,7 +143,7 @@ def revert(map_dir: Path) -> int:
 
 
 def main(argv: list[str]) -> int:
-    map_dir = DEFAULT_MAP
+    map_dir = default_map()
     args = argv[1:]
     if "--revert" in args:
         return revert(map_dir)

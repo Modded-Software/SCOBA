@@ -11,8 +11,8 @@ the dataset's map layer when it has one: a folder shaped like an SC2Map
 builds from the stock data alone. Datasets: webviewer/src/games/sc2/server/datasets.ts.
 Stock catalogs must be extracted first; see webviewer/scripts/catalog.sh.
 
-Run it through webviewer/scripts/catalog.sh. That script puts scripts/ and
-scripts/hdtex/ on PYTHONPATH.
+Run it through webviewer/scripts/catalog.sh. That script puts scripts/ on
+PYTHONPATH.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from casc import Casc
+from hdtex.sc2.casc import Casc
 from hitvolumes.resolve import STACK, Catalog, expand, vec3
 from PIL import Image
 

@@ -17,8 +17,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
-
+import workpaths
 from project_root import project_root
+
 from mapgen.footprints.blocker import build_blocker
 from mapgen.footprints.config import SAMPLES_PER_SUB, SUB
 from mapgen.footprints.placement import tree_outlines
@@ -26,7 +27,12 @@ from mapgen.footprints.raster import mesh_samples
 from mapgen.footprints.slices import feet_slices, load_slices, segments_world
 
 ROOT = project_root()
-DEFAULT_OBJECTS = ROOT / "out" / "SCOBA256.SC2Map" / "Objects"
+
+
+def default_objects():
+    return workpaths.path("SC2_BUILT_MAP") / "Objects"
+
+
 TREE_BLOCK = re.compile(r'<ObjectDoodad\b[^>]*\bType="ZerusTree[^"]*"[^>]*>')
 
 
@@ -106,7 +112,7 @@ def _inside(px: float, py: float, poly: np.ndarray) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--objects", type=Path, default=DEFAULT_OBJECTS)
+    parser.add_argument("--objects", type=Path, default=default_objects())
     parser.add_argument("--worst", type=int, default=0, help="show the N trees with the lowest coverage")
     parser.add_argument("--unit", action="append", default=[], help="show a spore unit type's union blocker")
     parser.add_argument("ids", nargs="*")

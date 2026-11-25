@@ -1,0 +1,161 @@
+// HD bake probe (SPEC-HD-TEXTURES 5.2, E-1). The map holds a unit bake
+// (Marine) and an actor bake (Marauder); the package made a CModel entry
+// `<entry>_hd_<actor>` for each, whose parent is the stock entry. Goliath
+// has a model bake only and keeps its entry.
+// Per actor: the catalog as the running game reads it, the made entry's
+// fields against the stock entry's, and a spawned unit's actor.
+// The calls come from the generated hdbake_cases.galaxy.
+
+trigger gt_HdBakeTest;
+
+void gf_HdBakeCases ();
+void gf_HbScope (string lp_s, string lp_scope, string lp_prefix, string lp_entry, string lp_made, int lp_depth);
+
+void gf_HbActor (string lp_s, string lp_actor, string lp_entry, string lp_made) {
+    BankValueSetFromString(gv_dbgBank, lp_s, "actorModel", CatalogFieldValueGet(c_gameCatalogActor, lp_actor, "Model", 1));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "entryValid", CatalogEntryIsValid(c_gameCatalogModel, lp_entry));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "madeValid", CatalogEntryIsValid(c_gameCatalogModel, lp_made));
+    BankValueSetFromString(gv_dbgBank, lp_s, "entryPath", CatalogFieldValueGet(c_gameCatalogModel, lp_entry, "Model", 1));
+    if (CatalogEntryIsValid(c_gameCatalogModel, lp_made)) {
+        BankValueSetFromString(gv_dbgBank, lp_s, "madeParent", CatalogEntryParent(c_gameCatalogModel, lp_made));
+        BankValueSetFromString(gv_dbgBank, lp_s, "madePath", CatalogFieldValueGet(c_gameCatalogModel, lp_made, "Model", 1));
+    }
+    BankSave(gv_dbgBank);
+}
+
+// Every field of the entries' scope, the made entry against the stock one,
+// as the running game reads them: arrays by element, structs by member.
+// `Model` is left out: it names the copy. Counts go to gv_hbCompared; each
+// difference to the bank as d<n>Path, d<n>Stock, d<n>Made (the first 20).
+int gv_hbCompared;
+int gv_hbDiffer;
+
+void gf_HbValue (string lp_s, string lp_path, string lp_entry, string lp_made) {
+    string lv_stock = CatalogFieldValueGet(c_gameCatalogModel, lp_entry, lp_path, 1);
+    string lv_made = CatalogFieldValueGet(c_gameCatalogModel, lp_made, lp_path, 1);
+    string lv_key;
+
+    gv_hbCompared += 1;
+    if (lv_stock == lv_made) {
+        return;
+    }
+    gv_hbDiffer += 1;
+    if (gv_hbDiffer <= 20) {
+        lv_key = "d" + IntToString(gv_hbDiffer);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_key + "Path", lp_path);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_key + "Stock", lv_stock);
+        BankValueSetFromString(gv_dbgBank, lp_s, lv_key + "Made", lv_made);
+    }
+}
+
+void gf_HbScope (string lp_s, string lp_scope, string lp_prefix, string lp_entry, string lp_made, int lp_depth) {
+    int lv_n = CatalogFieldCount(lp_scope);
+    int lv_i;
+    int lv_j;
+    int lv_count;
+    int lv_countMade;
+    string lv_field;
+    string lv_path;
+    string lv_item;
+    bool lv_scope;
+
+    for (lv_i = 0; lv_i < lv_n; lv_i += 1) {
+        lv_field = CatalogFieldGet(lp_scope, lv_i);
+        lv_path = lp_prefix + lv_field;
+        if (lv_path == "Model") {
+            continue;
+        }
+        lv_scope = CatalogFieldIsScope(lp_scope, lv_field);
+        if (lv_scope && lp_depth >= 4) {
+            continue;
+        }
+        if (CatalogFieldIsArray(lp_scope, lv_field)) {
+            lv_count = CatalogFieldValueCount(c_gameCatalogModel, lp_entry, lv_path, 1);
+            lv_countMade = CatalogFieldValueCount(c_gameCatalogModel, lp_made, lv_path, 1);
+            gv_hbCompared += 1;
+            if (lv_count != lv_countMade) {
+                gv_hbDiffer += 1;
+                if (gv_hbDiffer <= 20) {
+                    BankValueSetFromString(gv_dbgBank, lp_s, "d" + IntToString(gv_hbDiffer) + "Path", lv_path + "[#]");
+                    BankValueSetFromString(gv_dbgBank, lp_s, "d" + IntToString(gv_hbDiffer) + "Stock", IntToString(lv_count));
+                    BankValueSetFromString(gv_dbgBank, lp_s, "d" + IntToString(gv_hbDiffer) + "Made", IntToString(lv_countMade));
+                }
+                continue;
+            }
+            for (lv_j = 0; lv_j < lv_count; lv_j += 1) {
+                lv_item = lv_path + "[" + IntToString(lv_j) + "]";
+                if (lv_scope) {
+                    gf_HbScope(lp_s, CatalogFieldType(lp_scope, lv_field), lv_item + ".", lp_entry, lp_made, lp_depth + 1);
+                }
+                else {
+                    gf_HbValue(lp_s, lv_item, lp_entry, lp_made);
+                }
+            }
+        }
+        else if (lv_scope) {
+            gf_HbScope(lp_s, CatalogFieldType(lp_scope, lv_field), lv_path + ".", lp_entry, lp_made, lp_depth + 1);
+        }
+        else {
+            gf_HbValue(lp_s, lv_path, lp_entry, lp_made);
+        }
+    }
+}
+
+void gf_HbFields (string lp_s, string lp_entry, string lp_made) {
+    string lv_scope = CatalogEntryScope(c_gameCatalogModel, lp_entry);
+
+    gv_hbCompared = 0;
+    gv_hbDiffer = 0;
+    BankValueSetFromString(gv_dbgBank, lp_s, "scope", lv_scope);
+    BankValueSetFromString(gv_dbgBank, lp_s, "madeScope", CatalogEntryScope(c_gameCatalogModel, lp_made));
+    gf_HbScope(lp_s, lv_scope, "", lp_entry, lp_made, 0);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "compared", gv_hbCompared);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "differ", gv_hbDiffer);
+    BankSave(gv_dbgBank);
+}
+
+// A unit of the actor's id: alive, and its actor by name in its scope.
+// `lp_other`: an actor the unit does not have. Its text must stay empty;
+// that shows the probe can say no (SPEC-FLORA-CRUSH: ActorFromScope alone
+// returns non-null for any name).
+void gf_HbUnit (string lp_s, string lp_unit, string lp_other) {
+    point lv_p = RegionGetCenter(RegionPlayableMap());
+    unit lv_u;
+    actorscope lv_sc;
+
+    UnitCreate(1, lp_unit, c_unitCreateIgnorePlacement, 1, lv_p, 270.0);
+    lv_u = UnitLastCreated();
+    Wait(1.0, c_timeGame);
+    lv_sc = ActorScopeFromUnit(lv_u);
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "unitValid", UnitIsValid(lv_u));
+    BankValueSetFromString(gv_dbgBank, lp_s, "unitType", UnitGetType(lv_u));
+    BankValueSetFromFlag(gv_dbgBank, lp_s, "unitAlive", UnitIsAlive(lv_u));
+    BankValueSetFromText(gv_dbgBank, lp_s, "actorText", ActorGetText(ActorFromScope(lv_sc, lp_unit)));
+    BankValueSetFromText(gv_dbgBank, lp_s, "otherText", ActorGetText(ActorFromScope(lv_sc, lp_other)));
+    UnitRemove(lv_u);
+    Wait(0.5, c_timeGame);
+    BankSave(gv_dbgBank);
+}
+
+bool gt_HdBakeTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBAHDBAKE", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    gf_DbgProbeInit();
+    BankValueSetFromString(gv_dbgBank, "meta", "stamp", c_SCOBA_BUILD_STAMP);
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankSave(gv_dbgBank);
+    gf_HdBakeCases();
+    BankValueSetFromInt(gv_dbgBank, "meta", "realClicks", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_HdBakeTest_Init () {
+    gt_HdBakeTest = TriggerCreate("gt_HdBakeTest_Func");
+    TriggerAddEventMapInit(gt_HdBakeTest);
+}

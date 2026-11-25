@@ -1,7 +1,7 @@
 From 7ac1103a8d918a0c34ba2bcf0ef6d20a079a98fe Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 15:46:32 +0200
-Subject: [PATCH 55/56] types: setVertexColor takes any rgba list (it is stored
+Subject: [PATCH 55/57] types: setVertexColor takes any rgba list (it is stored
  as floats)
 
 ---

@@ -7,6 +7,7 @@ import { access, constants, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { GameUnavailable } from '../../../server/core/backend';
 import { errorCode } from '../../../server/core/http';
+import { requiredPath } from '../../../server/core/settings';
 
 /** The folders the viewer reads, relative to the build (SPEC-VIEWER-GHOST 3). */
 export const READ_FOLDERS = ['3D/Models', '3D/Anims', '3D/Motions', '3D/Materials', 'Materials', 'Misc/Templates'] as const;
@@ -31,7 +32,7 @@ export async function ghostSettings(viewerDir: string, env: NodeJS.ProcessEnv): 
     if (errorCode(error) !== 'ENOENT' && errorCode(error) !== 'EACCES') throw error;
     throw new GameUnavailable(`NODExport is not built (${exporter}): run make install-deps`);
   }
-  const data = env['WEBVIEWER_DATA'] || join(viewerDir, 'data');
+  const data = requiredPath(env, 'WEBVIEWER_DATA');
   return { root, exporter, cache: join(env['WEBVIEWER_CACHE'] || join(data, 'cache'), 'ghost') };
 }
 

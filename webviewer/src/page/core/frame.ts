@@ -1,5 +1,5 @@
-// Drawing, the grid glow and the frame loop (the old js/main.js, without
-// the startup, which is page/main.ts). With the host it makes the render
+// Drawing, the grid glow and the frame loop (the startup is
+// page/main.ts). With the host it makes the render
 // service (core/context.ts RenderHost).
 
 import type { GameRegistry, RenderHost, SceneService, SelectionService, CameraService } from './context';

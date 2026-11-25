@@ -13,6 +13,7 @@ import type {
   AddOptions,
   CameraState,
   GroundBox,
+  GroundChoice,
   Hit,
   Item,
   Ray,
@@ -30,7 +31,8 @@ import type { Landmarks } from './landmarks';
 import type { Ground } from './render/ground';
 import type { Outline } from './render/outline';
 import type { PickBuffer } from './render/pickbuffer';
-import type { Read, Setting } from './settings';
+import type { DefaultedSetting, Setting } from './settings';
+import type { Skins } from './skins';
 import type { TextureWindow } from './texturewindow';
 
 /** The games: what main.ts registered, the server lists, and the gallery shows (core/games.ts, core/datasets.ts). */
@@ -140,6 +142,9 @@ export interface SceneService {
   setSky(choice: SkyChoice | null): Promise<void>;
   setGrid(on: boolean): void;
   grid(): boolean;
+  /** The ground texture's record, or null: none (SPEC-VIEWER 17.5). */
+  ground(): GroundChoice | null;
+  setGround(choice: GroundChoice | null): Promise<void>;
 }
 
 /** The selection, what is under the mouse, and the hit tests (core/selection.ts). */
@@ -170,8 +175,8 @@ export interface SelectionService {
 /** The camera (core/camera.ts, core/view.ts) and its landmarks (core/landmarks.ts). */
 export interface CameraService extends Landmarks {
   readonly camera: CameraState;
-  /** 'none', 'restored', or 'refused: <why>'. */
-  readonly cameraRestore: string;
+  /** Where the camera's start came from: the stored setting, or its declared default. */
+  readonly cameraStart: 'stored' | 'default';
   /** The ground point under the mouse, or null off the ground. */
   pointer(): Vec2 | null;
   /** Set it where no mouse move says (a drag over the view: features/drag). */
@@ -211,7 +216,10 @@ export interface StatusService {
 
 /** The typed local storage (core/settings.ts). */
 export interface Store {
-  read<T>(setting: Setting<T>): Read<T>;
+  /** The stored value, or the setting's declared default when nothing is stored. */
+  read<T>(setting: DefaultedSetting<T>): T;
+  /** The stored value; null: nothing is stored, and the caller's own rule decides. */
+  find<T>(setting: Setting<T>): T | null;
   write<T>(setting: Setting<T>, value: T): void;
   clear<T>(setting: Setting<T>): void;
 }
@@ -286,6 +294,8 @@ export interface FeatureContext {
   readonly ui: UiService;
   /** The one texture window; a game opens it on its textures (core/texturewindow.ts). */
   readonly textureWindow: TextureWindow;
+  /** The skins of the instances (core/skins.ts). */
+  readonly skins: Skins;
   readonly testApi: TestApiBuilder;
 }
 
@@ -297,33 +307,27 @@ export interface Feature {
 /** What a game gets at install: the same context as a feature. */
 export type GameContext = FeatureContext;
 
-/** A check box of the instance menu (features/pick), shown when `when` holds. */
-export interface MenuToggle {
-  /** The input's class, and its key in the menu state. */
-  readonly className: string;
-  readonly label: string;
-  readonly title: string;
-  when(item: Item): boolean;
-  checked(item: Item): boolean;
-  set(item: Item, on: boolean): Promise<unknown>;
+/** What a game adds to the page: hooks core and the features call. */
+/** The itemOptions of a game without item options: any key is refused. */
+export function noItemOptions(raw: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const [key] = Object.keys(raw);
+  if (key !== undefined) throw new Error(`unknown item option "${key}"`);
+  return {};
 }
 
-/** What a game adds to the page: hooks core and the features call. */
 export interface GameParts {
-  /** After an instance is made (add, swap), before it joins the scene. */
-  itemReady(item: Item): Promise<void>;
   /** The grid glow class of an item: 0 the standard one, 1 the game's second. */
   glowOf(item: Item): number;
   /** The game's facts of an item, for sc2viewer.state(). */
   itemFacts(item: Item): Record<string, unknown>;
-  /** The game's settings of an item, checked; unknown keys are dropped. */
+  /** The game's settings of an item, checked; an unknown key is refused (thrown). */
   itemOptions(raw: Readonly<Record<string, unknown>>): Record<string, unknown>;
-  /** Check boxes the game adds to the instance menu. */
-  readonly menuToggles: readonly MenuToggle[];
+  /** The texture service's name of a texture an instance names (SPEC-VIEWER 17); absent: the game has none. */
+  readonly textureAsset?: (source: string) => string;
+  /** The texture owner of an item (SPEC-HD-TEXTURES 5.1); null or absent: it has none, and no skin controls. */
+  readonly textureOwner?: (item: Item) => string | null;
   /** What a double-click on an instance or its list row opens. */
   openItem(item: Item): Promise<void>;
   /** What a double-click on a gallery row opens. */
   openRecord(category: string, id: string): Promise<void>;
-  /** Before the game's first item: what new items need. */
-  prepareGame(): Promise<void>;
 }

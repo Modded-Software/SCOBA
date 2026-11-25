@@ -5,7 +5,7 @@ set -euo pipefail
 WEBVIEWER_DIR="${WEBVIEWER_DIR:-$(git rev-parse --show-toplevel)/webviewer}"
 source "$WEBVIEWER_DIR/scripts/paths.sh" || exit 1
 pwd
-npm install
+viewer_npm_install
 npx playwright install chromium
 bash scripts/ref-setup.sh
 bash scripts/ref-docs-setup.sh

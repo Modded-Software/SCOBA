@@ -301,15 +301,10 @@ walk and the pipe unit. It has no check for the fall facing, the wall
 dirt, the rocks or the plants: those are placed doodads and paint, which
 the profile does not read. They are built and host-tested only.
 
-HD textures of the rock: `ZerusRockLarge` was not in the models cache, and
-the inject step fails on a doodad it has not seen. A map was built with
-`SC2_HD_TEXTURES=off` into a temporary folder and
-`hd_textures.py --source models --map <folder> build --gpu 1` was run on
-it. It upscaled `zerusrocks_diffuse` and `zerusrocks_normal` to 2048 (both
-`ok` in `verify`) and patched the 8 rock models. Nothing else was
-rebuilt. `verify` lists 43 failures on other model textures of that
-cache; this run did not make them (SPEC-HD-TEXTURES section 12: not
-finished).
+Upscaled textures of the rock: the package step finds the models the map
+shows by itself (SPEC-HD-TEXTURES, section 5.1). The package of 2026-11-24
+holds `zerusrocks_diffuse` and `zerusrocks_normal`. A doodad type with no
+picked texture keeps its originals and does not fail the build.
 
 In-game profile `waterfeat` (`scripts/playtest.sh waterfeat`): per site,
 engine ground against the built ground (pool, shore, far), pool cells not

@@ -1,34 +1,48 @@
-// The texture window: the texture viewer page (scripts/hdtex/compare.html)
-// in a movable window over the view, one for every game. A game opens it
-// on a page (SC2: its built page with the HD pairs; else the bare template,
-// /texture-viewer.html) and hands it the textures it shows, decoded
-// (ddsdecode.ts), through the page's hdtex.addOriginals.
+// The texture window (SPEC-VIEWER 17.3): the texture viewer page
+// (public/texture-viewer.html, src/page/texview) in a movable window over
+// the view, one for every game. A game hands it the textures of one thing,
+// decoded (ddsdecode.ts). For a game with a texture service the page reads
+// their states and compares the variants (R-VIEW-101). Its Upscale Texture
+// tile is the event "texture-upscale", its Save to Skin… the event
+// "texture-save" (R-VIEW-133); a change made in the main page
+// ("textures-changed") makes it read the states and the owner again. The
+// owner tells the page what the game shows (In game, R-VIEW-131).
 
+import { textureRoutes, type OwnerLookup, type OwnerState } from '../../shared/textures';
+import type { EventBus, ViewerEvents } from './bus';
 import type { RenderHost, UiService, WindowPlace } from './context';
 import type { DecodedTexture } from './ddsdecode';
 import { make, messageOf } from './dom';
+
+/** What the page needs of the owner: what it shows, its bakes, whether the package holds them. */
+export type PageOwner = Pick<OwnerState, 'owner' | 'shows' | 'held' | 'bake' | 'below'>;
 
 const MARGIN = 16;
 const TOP = 48; // below the view tools
 const SIZE = [900, 620] as const;
 
-/** The texture viewer page as a template, served by the server's core. */
-export const TEMPLATE_PAGE = '/texture-viewer.html';
+/** The page of the window, served by the server's core. */
+export const TEXTURE_PAGE = '/texture-viewer.html';
 
-/** One texture for the page: decoded, with facts for its card ([name, value]). */
-export type ShownTexture = DecodedTexture & { facts?: [string, string][] };
+/** One texture for the page: decoded, with the pipeline's name of it (null: none) and facts for its card ([name, value]). */
+export type ShownTexture = DecodedTexture & { asset: string | null; facts?: [string, string][] };
 
 /** What a game hands the window to show. */
 export interface TextureRequest {
-  /** Whose textures: the page lists them under this name (its `user`). */
+  /** Whose textures: the page lists them under this name. */
   user: string;
   /** The window's title. */
   name: string;
-  /** The page: SC2's built one, or TEMPLATE_PAGE. */
-  page: string;
-  /** The model file and its dataset: with `user`, what makes two requests the same. */
+  /** The model file, its dataset and its game: with `user`, what makes two requests the same. */
   file: string;
   dataset: string;
+  game: string;
+  /** The game offers a texture service (R-VIEW-100). */
+  service: boolean;
+  /** The texture owner of the thing (R-VIEW-130); null: none, so the window offers no Save to Skin. */
+  owner?: string | null;
+  /** The instance the window is opened on; null or absent: a record or a file. */
+  item?: number | null;
   /** Read the textures; object URLs go in `urls` (the window revokes them). */
   read(urls: string[]): Promise<{ textures: ShownTexture[]; failed: string[] }>;
 }
@@ -40,35 +54,48 @@ export interface TextureWindow {
 }
 
 /** What the texture viewer page offers the window. */
-interface HdTexPage {
-  addOriginals(user: string, textures: ShownTexture[], failed: string[]): void;
+interface TexturePage {
+  show(request: { user: string; game: string; dataset: string; service: boolean; owner: PageOwner | null; textures: ShownTexture[]; failed: string[]; changed(): void; upscale?(asset: string): void; save?(picks: { asset: string; variant: string }[]): Promise<string | null> }): Promise<void>;
+  /** Read the states again: the main page changed textures; `owner` as it is now. */
+  refresh(owner: PageOwner | null): Promise<void>;
 }
 
-function hdtexOf(frame: HTMLIFrameElement): HdTexPage {
+/** The owner as the server has it now; null: none, or no service. */
+async function readOwner(game: string, dataset: string, owner: string | null): Promise<PageOwner | null> {
+  if (owner === null) return null;
+  const response = await fetch(textureRoutes.owner(game, dataset, owner));
+  const body: unknown = await response.json();
+  if (!response.ok) throw new Error(`the owner ${owner} in ${dataset}: ${String(Reflect.get(Object(body), 'error') ?? response.status)}`);
+  return (body as OwnerLookup).owner;
+}
+
+function pageOf(frame: HTMLIFrameElement): TexturePage {
   const hdtex: unknown = frame.contentWindow ? Reflect.get(frame.contentWindow, 'hdtex') : undefined;
-  const add: unknown = typeof hdtex === 'object' && hdtex !== null ? Reflect.get(hdtex, 'addOriginals') : undefined;
-  if (typeof add !== 'function') throw new Error('the texture viewer page has no hdtex.addOriginals');
-  return { addOriginals: (user, textures, failed) => Reflect.apply(add, hdtex, [user, textures, failed]) };
+  const member = (name: string): unknown => (typeof hdtex === 'object' && hdtex !== null ? Reflect.get(hdtex, name) : undefined);
+  const show = member('show');
+  const refresh = member('refresh');
+  if (typeof show !== 'function' || typeof refresh !== 'function') throw new Error('the texture viewer page has no hdtex.show or hdtex.refresh');
+  return { show: (request) => Promise.resolve(Reflect.apply(show, hdtex, [request])), refresh: (owner) => Promise.resolve(Reflect.apply(refresh, hdtex, [owner])) };
 }
 
 /**
  * The one texture window of the page. `viewerKeys`: Ctrl+<key> that belong
  * to the viewer, kept from the browser inside the frame too.
  */
-export function createTextureWindow(ui: Pick<UiService, 'floatingWindow'>, render: Pick<RenderHost, 'visibleRect'>, viewerKeys: readonly string[]): TextureWindow {
+export function createTextureWindow(ui: Pick<UiService, 'floatingWindow'>, render: Pick<RenderHost, 'visibleRect'>, events: EventBus<ViewerEvents>, viewerKeys: readonly string[]): TextureWindow {
   const frame = make('iframe', { id: 'texture-frame', title: 'textures' });
   const win = ui.floatingWindow({ id: 'texture-window', title: 'textures' });
   win.body.append(frame);
   // Keys go to the frame once it was clicked: Escape there closes the window
-  // too. In the page's search box Escape only leaves the box.
+  // too. In the page's search box and its selects Escape only leaves them.
   frame.addEventListener('load', () => {
     frame.contentWindow?.addEventListener('keydown', (e) => {
       const target = e.target;
-      if (e.key === 'Escape' && !(target instanceof Element && target.matches('input'))) win.close();
+      if (e.key === 'Escape' && !(target instanceof Element && target.matches('input, select'))) win.close();
       if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && viewerKeys.includes(e.key.toLowerCase())) e.preventDefault();
     });
   });
-  let shown: { user: string; file: string; dataset: string } | null = null;
+  let shown: { user: string; file: string; dataset: string; game: string; item: number | null; owner: string | null } | null = null;
   /** Counts the opens, so a slow read for an earlier one is dropped. */
   let turn = 0;
   let urls: string[] = [];
@@ -90,24 +117,43 @@ export function createTextureWindow(ui: Pick<UiService, 'floatingWindow'>, rende
     win.title.textContent = `textures · ${request.name}`;
     win.open(firstPlace());
     // The same textures again: the window shows them already, or is reading them.
-    if (shown && shown.user === request.user && shown.file === request.file && shown.dataset === request.dataset && !originals.startsWith('failed')) return;
-    shown = { user: request.user, file: request.file, dataset: request.dataset };
+    if (shown && shown.user === request.user && shown.file === request.file && shown.dataset === request.dataset && shown.item === (request.item ?? null) && !originals.startsWith('failed')) return;
+    const owner = request.service ? (request.owner ?? null) : null;
+    shown = { user: request.user, file: request.file, dataset: request.dataset, game: request.game, item: request.item ?? null, owner };
     const mine = ++turn;
     for (const url of urls) URL.revokeObjectURL(url);
     urls = [];
     originals = 'loading';
+    // A fresh page for every thing: nothing of the one before stays in it.
     const loaded = frameLoaded();
-    frame.src = `${request.page}?${new URLSearchParams({ user: request.user, embed: '1' })}`;
+    frame.src = `${TEXTURE_PAGE}?embed=1`;
     try {
-      const [found] = await Promise.all([request.read(urls), loaded]);
+      const [found, ownerState] = await Promise.all([request.read(urls), readOwner(request.game, request.dataset, owner), loaded]);
       if (mine !== turn) return;
-      hdtexOf(frame).addOriginals(request.user, found.textures, found.failed);
+      const changed = (): void => events.emit('textures-changed', { game: request.game, dataset: request.dataset });
+      const upscale = (asset: string): void => events.emit('texture-upscale', { game: request.game, dataset: request.dataset, asset });
+      // Save to Skin…: the main page asks the target and shows each change first (R-VIEW-133).
+      const save = (picks: { asset: string; variant: string }[]): Promise<string | null> =>
+        new Promise((done) => {
+          if (owner) events.emit('texture-save', { game: request.game, dataset: request.dataset, owner, picks, item: request.item ?? null, done });
+          else done(null);
+        });
+      await pageOf(frame).show({ user: request.user, game: request.game, dataset: request.dataset, service: request.service, owner: ownerState, textures: found.textures, failed: found.failed, changed, ...(request.service ? { upscale } : {}), ...(ownerState ? { save } : {}) });
       originals = 'done';
     } catch (error) {
       if (mine === turn) originals = `failed: ${messageOf(error)}`;
       throw error;
     }
   }
+
+  // A change made in the main page (the upscale dialog, a bake) shows in the open window.
+  events.on('textures-changed', ({ game, dataset }) => {
+    if (!win.isOpen || originals !== 'done' || !shown || shown.dataset !== dataset || shown.game !== game) return;
+    const mine = shown;
+    readOwner(game, dataset, mine.owner)
+      .then((owner) => (shown === mine ? pageOf(frame).refresh(owner) : undefined))
+      .catch((error: unknown) => console.error(`the texture window was not read again: ${messageOf(error)}`));
+  });
 
   return { open, state: () => ({ open: win.isOpen, user: shown ? shown.user : null, file: shown ? shown.file : null, dataset: shown ? shown.dataset : null, originals }) };
 }

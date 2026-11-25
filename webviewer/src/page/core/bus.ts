@@ -2,7 +2,7 @@
 // tell each other what changed. A listener that throws is reported and the
 // others still run: one broken feature must not stop the rest.
 
-import type { CameraState, Item, Landmark, Sky } from './types';
+import type { CameraState, GroundChoice, Item, Landmark, Sky } from './types';
 
 /** A field of an item that its list row shows. */
 export type ItemField = 'sequence' | 'rot' | 'x' | 'y';
@@ -24,12 +24,21 @@ export interface ViewerEvents {
   'game-changed': { game: string };
   /** The gallery's dataset changed (also after a game change). */
   'dataset-changed': { game: string; dataset: string };
-  /** The sky or the grid toggle changed (core/sky.ts). */
-  'view-changed': { sky: Readonly<Sky> | null; grid: boolean };
+  /** The sky, the grid toggle or the ground texture changed (core/sky.ts). */
+  'view-changed': { sky: Readonly<Sky> | null; grid: boolean; ground: Readonly<GroundChoice> | null };
   /** The landmarks or the chosen one changed (core/landmarks.ts). */
   'landmarks-changed': { list: readonly Landmark[]; selected: number | null };
   /** The camera moved. */
   'camera-changed': { camera: Readonly<CameraState> };
+  /** A variant, a skin or a bake of a game's dataset changed (SPEC-VIEWER 17, R-VIEW-109). */
+  'textures-changed': { game: string; dataset: string };
+  /** The texture window asks for the upscale dialog on one texture (SPEC-VIEWER 17.5). */
+  'texture-upscale': { game: string; dataset: string; asset: string };
+  /**
+   * The texture window asks to save its picks to a skin of the owner (SPEC-VIEWER 17.3, 17.6.2, R-VIEW-133).
+   * `item`: the instance it was opened on, or null. `done` gets the target saved to, or null: cancelled or refused.
+   */
+  'texture-save': { game: string; dataset: string; owner: string; picks: { asset: string; variant: string }[]; item: number | null; done(target: string | null): void };
   /** One frame: after the update, before the draw; dt in ms. */
   frame: { dt: number };
   /**

@@ -1,10 +1,14 @@
 // The page. src/tools/build.ts bundles this file for the browser.
 //
-// main.ts is the composition root (SPEC-VIEWER 6.6): it builds the
-// services of core and ui, each from the ones before it, then installs
-// the games and the features with one FeatureContext. Nothing reads a
-// shared page object: the services and the events are all there is. The
-// test API is what the features hand to testApi.
+// First every stored setting is checked (core/settings.ts). One that is
+// refused stops the start: the page shows the refused keys and a way to
+// clear them (core/refusals.ts, R-VIEW-73). Else the page starts.
+//
+// main.ts is the composition root (SPEC-VIEWER 6.6): startViewer builds the
+// services of core and ui, each from the ones before it, then installs the
+// games and the features with one FeatureContext. Nothing reads a shared
+// page object: the services and the events are all there is. The test API
+// is what the features hand to testApi.
 
 import type { Feature, FeatureContext, Store } from './core/context';
 import { createDatasets } from './core/datasets';
@@ -14,9 +18,11 @@ import { createHost, visibleRect } from './core/host';
 import { DdsImage } from './core/library';
 import { createScene } from './core/scene';
 import { createSelection } from './core/selection';
-import { clearSetting, readSetting, writeSetting } from './core/settings';
+import { SettingsRefused, showRefusedSettings } from './core/refusals';
+import { clearSetting, findSetting, readSetting, refusedSettings, writeSetting } from './core/settings';
 import { createSky } from './core/sky';
 import { createProbe, createTestApi } from './core/testapi';
+import { createSkins } from './core/skins';
 import { createTextureWindow } from './core/texturewindow';
 import { createView } from './core/view';
 import { installStatus } from './ui/status';
@@ -33,6 +39,7 @@ import { clipboardFeature } from './features/clipboard';
 import { inspectFeature } from './features/inspect';
 import { scenesFeature } from './features/scenes';
 import { edgesFeature } from './features/edges';
+import { skinsFeature } from './features/skins';
 import { m3Format } from '../formats/m3/format';
 import { DISPLACEMENT } from '../formats/m3/displacement';
 import { nodFormat } from '../formats/nod/format';
@@ -47,14 +54,23 @@ const GAMES = [
   { game: sc2Game, install: installSc2Page },
   { game: ghostGame, install: installGhostPage },
 ];
-/** In the order the old page scripts loaded, so listeners register in the same order. */
-const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature, edgesFeature];
+/** In install order: a feature listens before the ones after it. */
+const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature, edgesFeature, skinsFeature];
 
+declare global {
+  interface Window {
+    SC2App: Readonly<Record<string, unknown>>;
+    sc2viewer: Record<string, unknown>;
+  }
+}
+
+/** Build the page and start it. The stored settings were checked before. */
+function startViewer(): void {
 // ---- the services, each from the ones before it ----
 
 const status = installStatus(visibleRect);
 const events = createEventBus<ViewerEvents>(status.reportFailure);
-const store: Store = { read: readSetting, write: writeSetting, clear: clearSetting };
+const store: Store = { read: readSetting, find: findSetting, write: writeSetting, clear: clearSetting };
 const host = createHost(FORMATS, status.setStatus);
 const { games, api, setupDatasets } = createDatasets(
   GAMES.map((g) => g.game),
@@ -62,16 +78,18 @@ const { games, api, setupDatasets } = createDatasets(
   events,
 );
 const camera = createView(host, store, events);
-const sky = createSky({ host, games, api, status, store, events });
-const scene = createScene({ host, games, api, status, events, sky });
+// The scene is made after; the skins read its items only on a later event.
+const skins = createSkins({ host, games, status, events, items: () => scene.items });
+const sky = createSky({ host, games, api, status, store, events, skins });
+const scene = createScene({ host, games, api, status, events, sky, skins });
 const selection = createSelection({ host, camera, items: scene.items, events });
 const render = createFrame({ host, camera, scene, selection, games, events });
 const ui = installUi({ games, api, scene, selection, camera, status, store, events });
 const tests = createTestApi();
-// Ctrl+H (SC2's HD switch) and Ctrl+L (the loop choice) stay the viewer's inside the texture window's frame.
-const textureWindow = createTextureWindow(ui, render, ['h', 'l']);
+// Ctrl+L (the loop choice) stays the viewer's inside the texture window's frame.
+const textureWindow = createTextureWindow(ui, render, events, ['l']);
 
-const context: FeatureContext = { games, render, scene, selection, camera, status, store, events, api, ui, textureWindow, testApi: tests.builder };
+const context: FeatureContext = { games, render, scene, selection, camera, status, store, events, api, ui, textureWindow, skins, testApi: tests.builder };
 
 // ---- the games, then the features ----
 
@@ -87,7 +105,7 @@ tests.builder.app({
   eye: camera.eye,
   view: camera.view,
   zoomGoal: camera.zoomGoal,
-  cameraRestore: camera.cameraRestore,
+  cameraStart: camera.cameraStart,
   /** The ground point under the mouse, as a value (the tests read SC2App.pointer). */
   get pointer() {
     return camera.pointer();
@@ -117,37 +135,64 @@ tests.builder.viewer({
   screenOf: camera.screenOf,
   itemScreen: selection.itemScreen,
   setDisplacement: (on: boolean) => render.setPostPass(DISPLACEMENT, on),
-  /** The games: the tabs' list, the gallery's game, and choosing one. */
-  games: { list: games.gamesInfo, current: games.game, choose: games.setGame, refusal: games.gameRefusal },
+  /** The games: the tabs' list, the gallery's game, choosing one, and the chosen game's categories (ground: listed by the ground button, no pane). */
+  games: {
+    list: games.gamesInfo,
+    current: games.game,
+    choose: games.setGame,
+    refusal: games.gameRefusal,
+    categories: () => games.plugin().categories.map((category) => ({ id: category.id, ground: Boolean(category.ground) })),
+  },
   /** A format's own test members: probe('m3', 'particles', id) (SPEC-VIEWER 6.3). */
   probe: createProbe(FORMATS, context),
   /** The renderer's DDS reader, for the tests that decode a texture in the page. */
   DdsImage,
   /** The texture window of every game: open, whose textures, how reading them went. */
   textureWindow: textureWindow.state,
+  /** An instance's skin: its owner, its menu's choices, and setting one (SPEC-VIEWER 17.4). */
+  skinChoices: (id: number) => {
+    const item = scene.items.find((one) => one.id === id);
+    return item ? { owner: skins.ownerOf(item), choices: skins.choices(item), state: skins.owner(item), following: skins.following(item) } : null;
+  },
+  setSkin: async (id: number, skin: string) => {
+    const item = scene.items.find((one) => one.id === id);
+    if (!item) throw new Error(`no instance ${id}`);
+    await skins.set(item, skin);
+  },
 });
 
 const sc2viewer = tests.viewer();
 const sc2App = tests.app();
 
-declare global {
-  interface Window {
-    SC2App: Readonly<Record<string, unknown>>;
-    sc2viewer: Record<string, unknown>;
-  }
-}
-
 window.SC2App = sc2App;
 window.sc2viewer = sc2viewer;
 
 // ---- startup: the datasets first; every list and every item reads one ----
+// A stored game or dataset the server refuses stops the start with the panel (core/refusals.ts).
 
 host.resize();
 camera.applyCamera();
 render.start();
 setupDatasets()
   .then(() => Promise.all([collect(events, 'startup'), render.ground.ready, render.outline.ready]))
-  .catch(status.reportFailure)
-  .finally(() => {
-    sc2viewer['ready'] = true;
-  });
+  .then(
+    () => {
+      sc2viewer['ready'] = true;
+    },
+    (failure: unknown) => {
+      // A refused stored choice stops the start: the panel, not the page (ready stays unset).
+      if (failure instanceof SettingsRefused) {
+        showRefusedSettings(failure.refused);
+        return;
+      }
+      status.reportFailure(failure);
+      sc2viewer['ready'] = true;
+    },
+  );
+}
+
+// ---- the start: the stored settings first ----
+
+const refused = refusedSettings();
+if (refused.length) showRefusedSettings(refused);
+else startViewer();

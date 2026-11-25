@@ -37,8 +37,9 @@ and its tooling. Work in progress:
   `WASD / TPS`.
 - Two heroes, hero switch, order mode, HUD, and the character animation layer.
 - A deterministic map build and an in-game test kit.
-- Terrain textures upscaled four times per side, in two variants, `Upscale 4x`
-  and `Generative 4x`. The map build applies one of them:
+- Terrain and model textures upscaled four times per side, kept in a texture
+  store. A selection picks a result and a size per texture. The map build
+  packages the selection of the dataset `scoba`:
   [REQ-HD-TEXTURES](docs/requirements/REQ-HD-TEXTURES.md),
   [SPEC-HD-TEXTURES](docs/specifications/SPEC-HD-TEXTURES.md)
 
@@ -62,13 +63,34 @@ Two control modes have a contract and a state document:
 | `scripts/setup/deps.sh` | Dependency checks and installs behind `make deps-check`, `install-deps`, `install-hdtex`. |
 | `deploy/ansible/` | Ansible playbook for the model viewer dev server (systemd user service). |
 | `scripts/setup/patches/stormex/` | Patches `deps.sh` applies to the stormex source before it builds. |
-| `.venv/src/stormex/` | The stormex source checkout built by setup. Not in git. |
 | `tools/stormex`, `tools/stormex.pins` | The CASC extractor and the pins it was built from, written by `make install-deps`. Not in git. |
-| `scripts/hdtex/`, `scripts/hd_textures.py` | Texture upscaling: extract, upscale, encode, inject. |
-| `build/hdtex/` | Cache of upscaled textures, one folder per variant. Not in git. |
+| `scripts/hdtex/core/`, `scripts/hd_textures.py` | Texture upscaling for any game: store, steps, selection, requests, package. |
+| `scripts/hdtex/sc2/` | The StarCraft II adapter: textures of a dataset, model copies, map packaging. |
+| `env/paths.conf`, `scripts/paths.sh` | Where the project writes, and the one resolver of those paths. See below. |
 | `original/` | The untouched source map. |
-| `out/` | Build output and test runs. Never edited by hand. |
 | `docs/` | Requirements and specifications. |
+
+### Work folders
+
+The repository holds source only. Its disk is encrypted, and heavy writes
+there freeze the desktop. Built maps, test runs, the texture store, extracted
+game files, temp files and the Python and Node environments go below
+`SC2_WORK` (`env/paths.conf`, today `/mnt/ws-fast/sc2work`).
+[SPEC-PATHS](docs/specifications/SPEC-PATHS.md) lists every folder.
+
+| Variable | Default | Holds |
+| --- | --- | --- |
+| `SC2_OUT` | `SC2_WORK/out` | The built map (`SC2_BUILT_MAP`) and the profile maps. Never edited by hand. |
+| `SC2_TEST_RUNS` | `SC2_WORK/test-runs` | In-game test runs. |
+| `TEXTURE_STORE` | `SC2_WORK/build/texture-store` | The texture store: results, selections, package records. |
+| `SC2_BUILD` | `SC2_WORK/build` | The stormex source (`deps/stormex`), the caches of the earlier texture pipeline (`hdtex`). |
+| `SC2_TMP` | `SC2_WORK/tmp` | Temp files (`TMPDIR`). |
+| `UV_PROJECT_ENVIRONMENT` | `SC2_WORK/venv` | The Python environment. |
+| `WEBVIEWER_WORK` | `SC2_WORK/webviewer` | The viewer's `build`, `node_modules`, `test-results`; `webviewer/` links to them. `webviewer/ref` stays in the repo. |
+
+`make` and `scripts/playtest.sh` source `scripts/paths.sh`. It refuses a
+work folder on the repository's disk. A variable set in the environment
+wins over the file.
 
 ## Setup
 
@@ -78,7 +100,7 @@ Two control modes have a contract and a state document:
 | `make deps-check` | Report every dependency as `OK`, `MISSING` or `OPTIONAL`. Installs nothing. Exit 1 if a required one is missing. |
 | `make install` | `make install-deps`. Git hooks are separate: `sudo make install-hooks`. |
 | `make install-deps` | `uv sync --frozen`, build `tools/stormex`, `make viewer-install`, build the nodsdk parser library and its `NODExport` tool, then `make deps-check`. Needs `sudo make init` first. |
-| `make install-hdtex` | Clone `../upscale-on-arc` if absent, check its pinned commit, run its `make install`. Only the HD texture cache build needs it. |
+| `make install-hdtex` | Clone `../upscale-on-arc` if absent, check its pinned commit, run its `make install`. Only a texture request needs it. |
 
 All steps are in `scripts/setup/deps.sh` and can run again safely.
 
@@ -95,7 +117,7 @@ All steps are in `scripts/setup/deps.sh` and can run again safely.
   | [plog](https://github.com/SergiusTheBest/plog) | `1.1.11` | `e5c033e` |
 
   `scripts/setup/patches/stormex/` makes the 2019 source build against them.
-  The source goes to `.venv/src/stormex`. The build uses the system compiler
+  The source goes to `SC2_BUILD/deps/stormex`. The build uses the system compiler
   and linker (`STORMEX_PATH`, default `/usr/local/bin:/usr/bin:/bin`). The
   pins go to `tools/stormex.pins`. The build is skipped while
   `tools/stormex --version` reports `v2.2.0` and that file matches the current
@@ -104,49 +126,49 @@ All steps are in `scripts/setup/deps.sh` and can run again safely.
 - **upscale-on-arc** is
   [Modded-Software/upscale-on-arc](https://github.com/Modded-Software/upscale-on-arc).
   A checkout must contain commit `b35fa07`.
-- **Model viewer**: `make viewer-install` runs `npm install`, installs the
-  Playwright browser, clones the pinned
+- **Model viewer**: `make viewer-install` runs `npm install` (into
+  `WEBVIEWER_WORK`), installs the Playwright browser, clones the pinned
   [mdx-m3-viewer](https://github.com/flowtsohg/mdx-m3-viewer) into
-  `webviewer/ref/` with `webviewer/patches/` applied, and builds the renderer.
+  `webviewer/ref/` (a real folder in the repo) with `webviewer/patches/`
+  applied, and builds the renderer.
 - Not installed by any step: StarCraft II, GE-Proton, lsfg-vk. See
   [Requirements](#requirements).
 
-`deps.sh` reads `STORMEX`, `STORMEX_SRC`, `STORMEX_PATH`, `UPSCALE_DIR`, `BNET_PREFIX`,
-`SC2_DIR` and `STEAM_ROOT` to override its paths.
+`deps.sh` takes the work folders and the game install from `scripts/paths.sh`
+and refuses to run without them. It reads `STORMEX`, `STORMEX_SRC`,
+`STORMEX_PATH`, `UPSCALE_DIR`, `NODSDK_SRC`, `NODSDK_BUILD` and `STEAM_ROOT`
+to override its own paths.
 
 ## Build And Test
 
-`scripts/playtest.sh` is the only entry point. Every action rebuilds the map
-first.
+`scripts/playtest.sh` and `make` are the only entry points. Every playtest
+action rebuilds the map first.
 
 | Command | Does |
 | --- | --- |
-| `scripts/playtest.sh build` | Rebuild and validate `out/SCOBA256.SC2Map`. |
+| `scripts/playtest.sh build` | Rebuild and validate the map (`SC2_BUILT_MAP`). |
 | `scripts/playtest.sh host-tests` | Rebuild, then run the Python `unittest` suite for the tooling. |
 | `scripts/playtest.sh launch` | Rebuild, then launch the map. |
 | `scripts/playtest.sh combat` | Run the full Point & Click suite, about three minutes. |
 | `scripts/playtest.sh combat <group>` | Run one group, about one minute. Groups: `idle`, `single`, `auto`, `cancel`, `wasd`, `hold`, `button`, `switch`, `kerrigan`. |
 | `scripts/playtest.sh pncprobe` | Run the engine probes. |
 | `scripts/playtest.sh launch-check` | Rebuild, launch the map, and check the game logs. |
-| `uv run python scripts/hd_textures.py build --gpu 1` | Fill the cache of the `Upscale 4x` textures. Needs `../upscale-on-arc` and a GPU. Run once; the map build applies the cache. |
-| `uv run python scripts/hd_textures.py --variant generative build --gpu 1` | Fill the cache of the `Generative 4x` textures. Its input is the `Upscale 4x` colour at 2048, so build `Upscale 4x` first. |
-| `uv run python scripts/hd_textures.py compare` | Write a web page that shows every texture as original, upscaled, and generative: `build/hdtex/compare/index.html`. |
+| `make host-tests` | The same as `scripts/playtest.sh host-tests`. |
+| `make measure-hit-volumes`, `measure-footprints`, `measure-rim-falls`, `measure-water-features`, `classic-skins` | The measuring tools; they write the committed data under `scripts/data/` or `src/`. `ARGS=` passes options. |
+| `make map-stage OUT=<folder>` | Expand the map into a folder without checks, to measure a changed map. |
 
-`SC2_HD_TEXTURES` picks the terrain textures of a build:
+The texture pipeline (`scripts/hd_textures.py`) runs from the viewer, which
+gives it the paths. See [SPEC-HD-TEXTURES](docs/specifications/SPEC-HD-TEXTURES.md),
+section 4.8.
 
-| Value | The map gets |
-| --- | --- |
-| not set | `Upscale 4x`. Without its cache, the built-in textures. |
-| `upscale` | `Upscale 4x`. The build fails without its cache. |
-| `generative` | `Generative 4x`. The build fails without its cache. |
-| `off` | The built-in textures. |
-
-For example: `SC2_HD_TEXTURES=generative scripts/playtest.sh build`.
+The map build packages the picks of the dataset `scoba` as its last step. It
+upscales nothing. It fails when a pick names a result that is missing, stale
+or blocked. With no selection, the map keeps the built-in textures.
 
 A test run stops any running StarCraft II process. Do not click in the game
 window during a run: real mouse input makes the run invalid.
 
-Results are written to `out/test-runs/<profile>/<run>/summary.txt`.
+Results are written to `SC2_TEST_RUNS/<profile>/<run>/summary.txt`.
 
 The testing rules for contributors and agents are in [AGENTS.md](AGENTS.md).
 
@@ -161,7 +183,7 @@ root. Every start, stop and restart goes through the playbook.
 | --- | --- |
 | `make viewer-provision` | Check linger, node 24 and `webviewer/local.env`; install the node packages; set up the renderer clone; build; make a missing catalog; write and enable the units; start; wait for `/api/health`; check that the port is held by the service. A second run changes nothing. `RESTART=1` restarts too. |
 | `make viewer-start` | The same as `viewer-provision`. |
-| `make viewer-restart` | Restart. A start rebuilds from the checkout, so this serves the current code. |
+| `make viewer-restart` | Restart. A start rebuilds from the checkout. Not needed for code changes: the service hot reloads (a change under `webviewer/src/` rebuilds; a new `build/server.js` restarts the server). |
 | `make viewer-stop` | Stop the server and its health check. Check that the port is free. The units stay. |
 | `make viewer-unprovision` | Stop, disable and remove the units. |
 | `make viewer-status`, `make viewer-logs` | Show the unit and the health answer; the last log lines (`LINES=n`). Read only. |
@@ -201,13 +223,14 @@ lsfg-vk layer. It does not install lsfg-vk.
 
 ## Requirements
 
-- StarCraft II installed under a Proton prefix, launched with GE-Proton. The
-  test runner reads `SC2_GAME_PREFIX`, default `~/Games/battlenet-prefix`.
-  GE-Proton is looked up under the Flatpak Steam's `compatibilitytools.d`.
+- StarCraft II installed under a Wine or Proton prefix, launched with
+  GE-Proton. `env/paths.conf` names the prefix (`BNET_PREFIX`), its drive C
+  (`SC2_WINE_DRIVE`) and its Windows user (`SC2_WINE_USER`). GE-Proton is
+  looked up under the Flatpak Steam's `compatibilitytools.d`.
 - `uv` for the Python tooling.
 - `git`, `node` and `npm`, `cmake`, a C++ compiler, and the FUSE 2 headers.
 - The GLM headers, for the nodsdk parser library: `sudo make init`.
-- Optional: lsfg-vk, for the `SCOBA FG` entry. An Intel Arc GPU, for the HD
-  texture cache build.
+- Optional: lsfg-vk, for the `SCOBA FG` entry. An Intel Arc GPU, for
+  texture requests.
 
 `make deps-check` checks all of these.

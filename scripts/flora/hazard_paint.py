@@ -5,7 +5,7 @@ texture and painted under the hazards, blended out over a few cells.
 There is no Zerus lava terrain texture; the stock CharLavaCracks
 (liberty.sc2mod, glowing cracks) is used. RedstoneLavaCracks showed no lava
 (operator 2026-11-16). Its normal map fills red and blue with copies of Y;
-hdtex.roles.normal_layout handles that layout.
+hdtex.core.roles.normal_layout handles that layout.
 Slot 7 (was the unpainted Zerus5) holds it. Under the paint the other
 layers, except the lane dirt (see scaled_slots), are scaled by
 (1 - lava weight): the first try left them at full weight and the lava

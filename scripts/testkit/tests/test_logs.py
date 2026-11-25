@@ -6,7 +6,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from testkit.logs import collect_new_logs, latest_script_error, report_logs, texture_warning_lines
+from testkit.logs import (
+    collect_new_logs,
+    latest_script_error,
+    report_logs,
+    texture_warning_lines,
+)
 
 # Lines as the game wrote them in "2026-11-15 03.44.06 Graphics.txt".
 GRAPHICS_CLEAN = (
@@ -73,6 +78,19 @@ class ActorAlertTests(unittest.TestCase):
 
     def test_dropped_actor_event_fails_the_run(self):
         self.assertEqual(self._failures(self.DROPPED), 1)
+
+    # As the game wrote them in tps/20261124-185130: a packaged model copy
+    # whose textures did not start as the `CModel` declares its slots.
+    SLOTS = (
+        "USER 0 0.000 0.063 Model Goliath; Texture expression for editor has non-existent slot.main\n",
+        "USER 0 0.000 0.063 [143f    c] CActorUnit[Goliath] Model[Goliath]  m3[Goliath.m3]; No mapping for slot main.diffuse.\n",
+        "USER 0 0.000 0.063 [143f    c] CActorUnit[Goliath] Goliath assets\\models\\scoba_hd\\goliath.m3; Could not find source texture with slot main.\n",
+    )
+
+    def test_each_line_of_a_texture_slot_that_is_not_there_fails_the_run(self):
+        for line in self.SLOTS:
+            self.assertEqual(self._failures(line), 1, line)
+        self.assertEqual(self._failures(self.BENIGN + "".join(self.SLOTS)), 1)
 
 
 class LogTests(unittest.TestCase):

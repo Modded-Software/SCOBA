@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
 import sys
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 # Models whose Occlusion resolves to Show, or to nothing (the engine
@@ -101,8 +102,8 @@ def catalog_entries(paths: list[Path]) -> list[tuple[str, str | None, str | None
 
 def refresh(work: Path) -> list[str]:
     """Read every dependency ModelData.xml from the game storage; write the JSON."""
-    from hdtex.casc import Casc
-    from hdtex.sources import DEPENDENCY_ARCHIVES
+    from hdtex.sc2.casc import Casc
+    from hdtex.sc2.sources import DEPENDENCY_ARCHIVES
 
     casc = Casc()
     names = [a + "\\base.sc2data\\gamedata\\modeldata.xml" for a in DEPENDENCY_ARCHIVES[DEPENDENCY]]
@@ -129,12 +130,11 @@ def disable_unit_silhouettes(map_dir: Path) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    root = project_root()
     if len(argv) > 1 and argv[1] == "--refresh":
-        ids = refresh(Path(argv[2]) if len(argv) > 2 else Path("/tmp/opencode/modeldata"))
+        ids = refresh(Path(argv[2]) if len(argv) > 2 else workpaths.path("SC2_TMP") / "modeldata")
         print(f"{len(ids)} silhouette models written to {SILHOUETTE_JSON}")
         return 0
-    map_dir = Path(argv[1]) if len(argv) > 1 else root / "out" / "SCOBA256.SC2Map"
+    map_dir = Path(argv[1]) if len(argv) > 1 else workpaths.path("SC2_BUILT_MAP")
     ids = disable_doodad_occlusion(map_dir)
     print(f"occlusion disabled for {len(ids)} doodad types: {', '.join(ids)}")
     return 0

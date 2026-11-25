@@ -13,15 +13,21 @@ import json
 import math
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 from .treepath import obstacles
 
 ROOT = project_root()
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
+
+
+def built():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 # Written by a scan run (no file yet): spots whose probe grid is fully open in game.
 OPEN_SPOTS = ROOT / "scripts" / "data" / "fprot_open_spots.json"
 # Run 20261115-132159 found: Place cells without a Shape block nothing; the
@@ -92,8 +98,9 @@ def actor_xml(name: str) -> str:
     )
 
 
-def candidate_spots(map_dir: Path = BUILT) -> list[tuple[float, float]]:
+def candidate_spots(map_dir: Path | None = None) -> list[tuple[float, float]]:
     """Spots far from every placed object. Terrain may still block them."""
+    map_dir = map_dir or built()
     every = obstacles(map_dir)
     spots: list[tuple[float, float]] = []
     for y in range(24, 233, 4):
@@ -154,8 +161,8 @@ def patch(map_dir: Path) -> None:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="fprot",
-        source=BUILT,
-        output=PROFILE_OUTPUTS["fprot"],
+        source=built(),
+        output=profile_output("fprot"),
         bank_names=PROFILE_BANKS["fprot"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -218,7 +225,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="fprot",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["fprot"],
+        map_source=profile_output("fprot"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["fprot"],
         ready_section="meta",

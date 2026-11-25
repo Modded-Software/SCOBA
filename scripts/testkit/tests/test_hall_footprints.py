@@ -39,6 +39,12 @@ class ActorScaleTests(unittest.TestCase):
         text = '<CActorUnit id="CommandCenter">\n<Scale value="3.600000,3.600000,4.200000"/>\n</CActorUnit>'
         self.assertEqual(actor_scale(text, "CommandCenter"), 3.6)
 
+    def test_reads_a_catalog_the_hd_pack_step_wrote(self) -> None:
+        # The pack step writes ActorData.xml with ElementTree: `<Scale value=".." />`.
+        # Found by the hdbake run 2026-11-25: the scale read 1 and the check failed.
+        text = '<CActorUnit id="CommandCenter">\n    <Scale value="3.6,3.6,4.2" />\n</CActorUnit>'
+        self.assertEqual(actor_scale(text, "CommandCenter"), 3.6)
+
     def test_no_entry_or_no_scale_is_one(self) -> None:
         self.assertEqual(actor_scale("<Catalog/>", "CommandCenter"), 1.0)
         self.assertEqual(actor_scale('<CActorUnit id="CommandCenter"><On/></CActorUnit>', "CommandCenter"), 1.0)

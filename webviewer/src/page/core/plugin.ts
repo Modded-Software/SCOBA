@@ -129,6 +129,8 @@ export interface GameCategory {
   readonly id: string;
   /** One of them, in lower case: "unit". The list row's data attribute, the drag type, the state key. */
   readonly noun: string;
+  /** Its records are ground textures: added, one becomes the ground and is not placed. No gallery tab: the ground button lists them (R-VIEW-107). */
+  readonly ground?: boolean;
 }
 
 /** What the user or a document asks of a new instance (SPEC-VIEWER 6.4). */
@@ -137,10 +139,8 @@ export interface PlacementWish {
   pick: number;
   /** Degrees. */
   rot?: number;
-  /** Which of the record's model files; null or absent: the game chooses. */
+  /** Which of the record's model files; null or absent: the game chooses by its own rule. One the record does not have is refused. */
   variant?: number | null;
-  /** A variant the record does not have: the game chooses one (default), takes the first, or refuses. */
-  otherwise?: 'random' | 'first' | 'refuse';
 }
 
 /** An animation kept outside the model file (SPEC-VIEWER 6.4); fetched as asset kind "animation". */

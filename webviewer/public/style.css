@@ -67,6 +67,13 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 
 /* The page bundle did not load (index.html): the message, top centre. */
 #load-failure { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); margin: 0; padding: 6px 12px; color: var(--warn); background: #000c; }
+/* Refused stored settings (page/core/refusals.ts): in place of the page, the keys and one way out. */
+#settings-refused { position: fixed; inset: 10% 20% auto; z-index: 100; padding: 16px 20px; color: var(--text); background: var(--panel); border: 1px solid var(--warn); }
+#settings-refused h2 { margin: 0 0 8px; color: var(--warn); font-size: 15px; }
+#settings-refused ul { margin: 8px 0 12px; padding: 0; list-style: none; }
+#settings-refused li { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; padding: 4px 0; }
+#settings-refused .refused-stored { grid-column: 2; word-break: break-all; color: var(--dim); }
+#settings-refused .refused-reason { grid-column: 2; }
 /* The status toast (page/ui/status.ts): top centre of the view. */
 #status { max-width: min(640px, 60vw); word-break: break-word; cursor: pointer; }
 /* Its message log (a click on the toast): oldest first, the newest at the bottom. */
@@ -83,7 +90,6 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 #scene .head .icon { width: 22px; height: 22px; }
 #scene .head .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #scene .remove { width: 20px; height: 20px; padding: 0; }
-#scene .remove:hover { color: var(--danger); }
 #scene .row { display: flex; gap: 4px; margin-top: 4px; align-items: center; }
 #scene .row label { display: flex; align-items: center; gap: 3px; color: var(--dim); font-size: 11px; }
 #scene .row input, #scene .row select { height: 22px; font-size: 11px; background: var(--bg); }
@@ -99,13 +105,11 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 #landmarks-button { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 #landmarks-button::after { content: ' \25BE'; }
 #landmarks-list .go { flex: 1; text-align: left; }
-#landmarks-list .trash:hover { color: var(--danger); }
 #landmark-pin, #landmarks-list .trash { display: flex; align-items: center; }
 #scenes-button { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 #scenes-button::after { content: ' \25BE'; }
 #scenes-list .go { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
 #scenes-list .rename, #scenes-list .trash { display: flex; align-items: center; }
-#scenes-list .trash:hover { color: var(--danger); }
 #scenes-list li.refused .go { color: var(--danger); }
 #scenes-list li.actions { gap: 4px; justify-content: flex-end; }
 #landmark-name { width: 100%; }
@@ -121,4 +125,49 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .anim-menu button.playing { color: var(--accent); background: var(--accent-bg); }
 .anim-menu .loop-choice { display: flex; gap: 6px; align-items: center; padding: 2px 8px; color: var(--dim); cursor: pointer; }
 .anim-menu ul { margin-top: 4px; }
+/* The skin row (SPEC-VIEWER 17.4). */
+.anim-menu .skin-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 2px 8px 2px 0; }
+.anim-menu .skin-row button { width: auto; padding: 0 8px; }
+/* The skin list (SPEC-VIEWER 17.4): a button, its rows below it. */
+.anim-menu .skin-choose { position: relative; }
+.anim-menu .skin-list { position: absolute; z-index: 2; top: 100%; left: 0; min-width: 160px; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); }
+.anim-menu .skin-list[hidden] { display: none; }
+.anim-menu .skin-list li { display: flex; gap: 4px; align-items: center; }
+.anim-menu .skin-list .skin-pick, .anim-menu .skin-list .skin-add { flex: 1; text-align: left; }
+.anim-menu .skin-list .skin-pick.chosen { color: var(--accent); background: var(--accent-bg); }
+.anim-menu .skin-list .skin-edit, .anim-menu .skin-list .skin-trash { flex: none; display: flex; align-items: center; justify-content: center; width: 26px; padding: 0; }
+/* The skin choice reads as a drop-down: a skin icon first, an arrow last (R-VIEW-137). */
+.anim-menu .skin-row button.skin-choice { display: flex; gap: 6px; align-items: center; padding: 0 6px 0 8px; border: 1px solid var(--line); }
+.anim-menu .skin-choice .skin-icon { display: flex; color: var(--accent); }
+.anim-menu .skin-choice::after { content: '\25BE'; margin-left: 2px; color: var(--dim); font-size: 10px; }
+.anim-menu .skin-list .skin-add-row { border-top: 1px solid var(--line); margin-top: 2px; padding-top: 2px; }
+/* The bake badge of the skin row and the ground row. */
+.skin-baked { padding: 0 6px; border-radius: 8px; color: var(--accent); background: var(--accent-bg); white-space: nowrap; }
+.skin-baked[hidden] { display: none; }
+
+/* ---- the upscale dialog and the skin editor (SPEC-VIEWER 17.5, 17.6) ---- */
+.upscale-row { display: flex; gap: 8px; align-items: center; }
+.upscale-row select, .upscale-row input { flex: 1; min-width: 0; }
+.upscale-lines { color: var(--dim); font-size: 11px; }
+.upscale-error:empty, .skin-error:empty { display: none; }
+/* The Save to Skin dialog (17.6.2): one line per pick. */
+.skin-changes { max-height: 160px; overflow-y: auto; margin: 0; padding: 0; font-size: 11px; }
+.skin-changes .same { color: var(--dim); }
+#skin-editor .window-body { flex-direction: column; }
+.skin-head { display: flex; gap: 4px; align-items: center; flex: none; padding: 6px 8px; }
+.skin-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skin-new-name { width: 120px; }
+.skin-panes { display: flex; flex: 1; min-height: 0; }
+.skin-textures { width: 220px; flex: none; overflow-y: auto; border-right: 1px solid var(--line); }
+.skin-texture { display: flex; gap: 6px; align-items: center; padding: 3px 6px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.skin-texture.current { background: var(--accent-bg); }
+.skin-texture .picked-mark { margin-left: auto; color: var(--accent); }
+.skin-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.skin-right .skin-tiles { flex: 1; overflow-y: auto; }
+/* The tiles themselves are in theme.css: the texture window's page has them too (17.6.1). */
+.picker-list li.with-preview { display: flex; gap: 8px; align-items: center; }
+.ground-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.ground-row .ground-name { font-weight: 600; }
+.ground-row select { flex: 1; min-width: 0; }
+.ground-error:empty { display: none; }
 

@@ -59,12 +59,6 @@ exceptions:
     owner: sc2
     review_date: '2026-11-22'
     removal: Remove when no search box shows hint text.
-  - rule: bplaceholders-b
-    path: ^scripts/hdtex/compare\.html$
-    rationale: The HTML input attribute placeholder and the CSS pseudo-element ::placeholder set and colour the grey hint text of the texture search box. They are the standard names, not placeholder code.
-    owner: sc2
-    review_date: '2026-11-22'
-    removal: Remove when the texture search box no longer shows hint text.
   - rule: bskeleton-b
     path: ^webviewer/patches/0031-m3-run-and-draw-particle-emitters-rate-life-closed-f\.patch$
     rationale: The exported renderer patch reads animated emitter values through instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
@@ -101,12 +95,6 @@ exceptions:
     owner: sc2
     review_date: '2026-11-23'
     removal: Remove when ground lights no longer read through the bone hierarchy.
-  - rule: bskeleton-b
-    path: ^webviewer/tests/billboards\.spec\.mjs$
-    rationale: The test reads billboard bone matrices from instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
-    owner: sc2
-    review_date: '2026-11-23'
-    removal: Remove when the test no longer reads the bone hierarchy.
   - rule: bfallback-b
     path: ^webviewer/patches/0037-M3-BBSC-billboards-turn-their-bones-to-the-camera\.patch$
     rationale: A comment in the exported renderer patch (forward-only ref history) names the default billboard axis rule. Not fallback code.
@@ -161,3 +149,21 @@ exceptions:
     owner: sc2
     review_date: '2026-11-23'
     removal: Remove when the gallery search boxes no longer show hint text.
+  - rule: bskeleton-b
+    path: ^webviewer/tests/e2e/billboards\.spec\.mjs$
+    rationale: The test reads billboard bone matrices from instance.skeleton. instance.skeleton is the upstream mdx-m3-viewer bone hierarchy field. Not skeleton code.
+    owner: sc2
+    review_date: '2026-11-25'
+    removal: Remove when the test no longer reads the bone hierarchy.
+  - rule: bplaceholders-b
+    path: ^webviewer/public/texture-viewer\.html$
+    rationale: The search input sets the HTML input attribute placeholder, the hint text shown while it is empty. Not placeholder code.
+    owner: sc2
+    review_date: '2026-11-25'
+    removal: Remove when the search input has no hint text.
+  - rule: bplaceholders-b
+    path: ^webviewer/src/page/features/skins/actions\.ts$
+    rationale: The skin name box sets the HTML input property placeholder, the hint text shown while it is empty. Not placeholder code.
+    owner: sc2
+    review_date: '2026-11-25'
+    removal: Remove when the skin name box has no hint text.

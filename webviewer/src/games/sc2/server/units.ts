@@ -47,10 +47,18 @@ export interface Units {
  * and counted in `withoutFile`.
  */
 export async function loadUnits(catalogDir: string, assets: AssetLookup): Promise<Units> {
-  /** The servable path of a unit's model: the file itself, or its first variation. */
+  /**
+   * The servable path of a unit's model. The game's naming rule: the file the
+   * unit names; a model with variations is stored as name_00.m3, name_01.m3,
+   * ..., so a unit naming name.m3 with no such file shows name_00.m3.
+   * Neither: null (the unit is left out and counted).
+   */
   const modelFile = (m3: string): string | null => {
     const key = assetKey(m3);
-    return assets.get(key) ?? assets.get(key.replace(/\.m3$/, '_00.m3')) ?? null;
+    const named = assets.get(key);
+    if (named !== undefined) return named;
+    const firstVariation = assets.get(key.replace(/\.m3$/, '_00.m3'));
+    return firstVariation === undefined ? null : firstVariation;
   };
   const byId = new Map<string, Unit>();
   const icons = new Set<string>();

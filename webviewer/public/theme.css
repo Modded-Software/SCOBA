@@ -1,7 +1,6 @@
 /* The theme: colour and shape tokens, the base look of controls, and the
-   look of the reusable components (src/page/ui/components). The HD texture viewer
-   (scripts/hdtex/compare.html) opens from disk, so it carries its own copy
-   of the :root block; tests/texture-window.spec.mjs holds the two equal. */
+   look of the reusable components (src/page/ui/components). The texture
+   window's page (public/texture-viewer.html) links it too. */
 :root {
   --bg: #0d0e11; --panel: #15171c; --raised: #1f2229; --line: #2a2e37;
   --text: #e4e6eb; --dim: #8b919d; --accent: #7aa2ff; --accent-bg: #1c2740;
@@ -29,6 +28,11 @@ button:disabled { opacity: 0.4; cursor: default; }
 button.on { color: var(--accent); background: var(--accent-bg); }
 button.primary { color: var(--bg); background: var(--accent); font-weight: 600; }
 button.primary:hover { color: var(--bg); background: var(--text); }
+/* A button that deletes or discards is red, everywhere (R-VIEW-136). */
+button.danger, button.trash { color: var(--danger); }
+button.danger:hover, button.trash:hover { color: var(--danger); background: rgba(255, 122, 122, 0.12); }
+button.primary.danger { color: var(--bg); background: var(--danger); }
+button.primary.danger:hover { color: var(--bg); background: #ff9a9a; }
 select { cursor: pointer; color: var(--dim); padding: 0 4px; }
 select:hover { color: var(--text); }
 
@@ -68,6 +72,40 @@ select:hover { color: var(--text); }
 .dropdown-list li { display: flex; align-items: center; border-radius: var(--radius); }
 .dropdown-list li.selected { background: var(--accent-bg); }
 .dropdown-list li.selected button { color: var(--accent); }
+.dropdown-list li.selected button.trash, .dropdown-list li.selected button.danger { color: var(--danger); }
+
+/* ---- Tiles of a texture: the skin editor and the texture window alike (SPEC-VIEWER 17.6.1) ---- */
+.skin-tiles { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; padding: 8px; }
+.skin-tile { position: relative; width: 132px; padding: 4px; font-size: 11px; line-height: 1.35; text-align: left; background: var(--raised); border: 2px solid transparent; border-radius: var(--radius); cursor: pointer; }
+.skin-tile:hover { border-color: var(--line); }
+.skin-tile.highlighted, .skin-tile.highlighted:hover { border-color: var(--accent); }
+.skin-tile.request { cursor: default; color: var(--dim); }
+.skin-tile.request.failure .tile-size { color: var(--danger); }
+.skin-tile .tile-id { margin-top: 2px; font-weight: 600; overflow-wrap: anywhere; }
+.skin-tile.stale .tile-id, .skin-tile.blocked .tile-id { color: #ffb36b; }
+.skin-tile .tile-size, .skin-tile .tile-numbers { color: var(--dim); overflow-wrap: anywhere; }
+.skin-tile .tile-note { color: #ffb36b; }
+.skin-tile .number.band-ok { color: #7fd17f; }
+.skin-tile .number.band-near { color: #ffb36b; }
+.skin-tile .number.band-problem { color: #ff6b6b; }
+/* The info mark keeps the arrow cursor; its tooltip shows on hover (R-VIEW-135). */
+.skin-tile .tile-info { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; line-height: 16px; text-align: center; font-weight: 700; color: #000; background: #ffb36b; border-radius: 50%; cursor: default; }
+.skin-tile.band-problem .tile-info { background: #ff6b6b; }
+.skin-tile .tile-tip { display: none; position: absolute; z-index: 5; top: 20px; right: 0; width: 240px; padding: 6px 8px; font-weight: 400; text-align: left; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); white-space: normal; pointer-events: none; }
+.skin-tile .tile-info:hover .tile-tip { display: block; }
+.skin-tile .tile-tip .tile-legend { margin-bottom: 4px; color: var(--dim); }
+.tex-preview { display: inline-flex; flex: none; width: 32px; height: 32px; align-items: center; justify-content: center; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.skin-tile .tex-preview { width: 120px; height: 120px; }
+.tex-preview img { width: 100%; height: 100%; object-fit: contain; }
+.tex-preview.failed { color: var(--warn); }
+/* The Upscale tile: as large as a preview tile (R-VIEW-129). */
+.skin-tile.upscale { display: block; height: auto; text-align: center; color: var(--accent); border: 2px dashed var(--line); }
+.skin-tile.upscale:hover { border-color: var(--accent); }
+.skin-tile .tile-plus { display: flex; width: 120px; height: 120px; margin: 0 auto; align-items: center; justify-content: center; font-size: 48px; background: var(--bg); border-radius: 4px; }
+/* The picks of a window: a count, Save to Skin…, Revert Changes (R-VIEW-133). */
+.skin-draft { display: flex; gap: 6px; align-items: center; flex: none; padding: 4px 8px; background: var(--accent-bg); border-radius: var(--radius); }
+.skin-draft[hidden] { display: none; }
+.skin-draft .draft-count { flex: 1; min-width: 0; color: var(--accent); }
 
 /* ---- FloatingWindow ---- */
 .window { position: fixed; z-index: 7; display: flex; flex-direction: column; min-width: 320px; min-height: 200px; overflow: hidden; resize: both; background: var(--panel); border: 1px solid var(--line); border-radius: calc(var(--radius) * 2); box-shadow: var(--shadow); }

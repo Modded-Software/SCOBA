@@ -57,7 +57,7 @@ FLATTEN_UNITS = ("VespeneGeyser",)
 # (operator 2026-11-20; check_halls). Before, the Orbital Command and the
 # Planetary Fortress kept FootprintSCOBAHall1x1 and blocked nothing.
 HALL_UNITS = {"CommandCenter": "CommandCenter", "OrbitalCommand": "CommandCenter", "PlanetaryFortress": "CommandCenter"}
-# The map shows the classic Command Center model (scripts/hdtex/classic_skins.py).
+# The map shows the classic Command Center model (scripts/hdtex/sc2/classic_skins.py).
 # The legs are still those measured on the stock model: operator 2026-11-20,
 # "it's got pretty much the same 4 legs, enable pathblocking". Off: the hall
 # keeps FootprintSCOBAHall1x1 and blocks no pathing.

@@ -72,7 +72,6 @@ export function m3Facts(view: ViewerInstance): Record<string, unknown> {
     batches: model.batches.length,
     engineTeam: instance.teamColor,
     tint: Array.from(instance.vertexColor),
-    hdApplied: instance.textureOverrides.size,
     // Geometry layout as the renderer reads it.
     vertexStride: model.vertexSize,
     vertexCount: model.vertexCount,

@@ -12,18 +12,17 @@ record keeps a key of the map's inputs (fresh.py); validate-map fails when
 the map no longer gives that key. Re-run after a change to units, actors,
 models, or scales:
 
-    scripts/playtest.sh build
-    cd scripts && uv run python -m hitvolumes.measure
-    cd scripts && uv run python -m hitvolumes.galaxy
-    cd scripts && uv run python -m hitvolumes.camera_heights
+    make map-build
+    make measure-hit-volumes
 
+That target runs this, then hitvolumes.galaxy and hitvolumes.camera_heights.
 The build does not publish a map whose inputs differ from the measured
-ones. After such a change, measure a staged map instead:
+ones. After such a change, stage the map and measure that instead:
 
-    uv run python scripts/expand_map.py --out <folder>
-    cd scripts && uv run python -m hitvolumes.measure --map <folder>
+    make map-stage OUT=<folder>
+    make measure-hit-volumes ARGS="--map <folder>"
 
-usage (from scripts/): uv run python -m hitvolumes.measure [--print] [--map FOLDER] [--jobs N]
+usage: make measure-hit-volumes [ARGS="--print --map FOLDER --jobs N"]
 """
 
 from __future__ import annotations
@@ -39,11 +38,9 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import NamedTuple
 
+import workpaths
+from hdtex.sc2.casc import Casc
 from project_root import project_root
-
-sys.path.insert(0, str(project_root() / "scripts" / "hdtex"))
-
-from casc import Casc
 
 from .fresh import MapInputs
 from .resolve import GameData, Resolution, stock_entries
@@ -51,7 +48,6 @@ from .shapes import model_shapes, reach
 from .units import stock_unit_types, unit_types
 
 ROOT = project_root()
-MAP = ROOT / "out" / "SCOBA256.SC2Map"
 HARNESS = ROOT / "scripts" / "testkit" / "galaxy"
 OUT = ROOT / "scripts" / "data" / "hit_volumes.json"
 VERSION = 2
@@ -153,10 +149,10 @@ def record(res: Resolution, entry: str, source: str, shapes: list) -> dict:
     }
 
 
-def measure(casc: Casc, scratch: Path, stock: Path, jobs: int, clock: Clock) -> dict:
-    data = GameData(stock, MAP)
-    inputs = MapInputs(MAP)
-    names = sorted(set(unit_types(MAP, HARNESS)) | set(stock_unit_types(stock)))
+def measure(casc: Casc, built: Path, scratch: Path, stock: Path, jobs: int, clock: Clock) -> dict:
+    data = GameData(stock, built)
+    inputs = MapInputs(built)
+    names = sorted(set(unit_types(built, HARNESS)) | set(stock_unit_types(stock)))
     units: dict[str, dict] = {}
     resolved: dict[str, Resolution] = {}
     for unit in names:
@@ -222,25 +218,23 @@ def measure(casc: Casc, scratch: Path, stock: Path, jobs: int, clock: Clock) -> 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--print", action="store_true", help="print one line per unit type")
-    parser.add_argument("--map", type=Path, help="measure this expanded map, not out/SCOBA256.SC2Map")
+    parser.add_argument("--map", type=Path, help="measure this expanded map, not the built map (SC2_BUILT_MAP)")
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1, help="worker processes for the m3 files (1: none)")
     args = parser.parse_args()
-    global MAP
-    if args.map is not None:
-        MAP = args.map.resolve()
-    if not (MAP / "Base.SC2Data").is_dir():
-        print(f"built map missing: {MAP}; run scripts/playtest.sh build", file=sys.stderr)
+    built = args.map.resolve() if args.map is not None else workpaths.path("SC2_BUILT_MAP")
+    if not (built / "Base.SC2Data").is_dir():
+        print(f"built map missing: {built}; run scripts/playtest.sh build", file=sys.stderr)
         return 1
     clock = Clock()
     casc = Casc()
-    with tempfile.TemporaryDirectory(prefix="hvmeasure-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="hvmeasure-", dir=workpaths.path("SC2_TMP")) as tmp:
         scratch = Path(tmp)
         stock = scratch / "stock"
         # Not every stack member has every catalog.
         wanted = set(stock_entries())
         casc.extract([p for p in casc.find(sorted(wanted)) if p in wanted], stock)
         clock.lap("catalogs")
-        result = measure(casc, scratch, stock, args.jobs, clock)
+        result = measure(casc, built, scratch, stock, args.jobs, clock)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     clock.lap("write")

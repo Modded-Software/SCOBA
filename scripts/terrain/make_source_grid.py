@@ -1,14 +1,19 @@
-from pathlib import Path
 import os
-import sys
 import shutil
+import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
 SRC = ROOT / "src" / "SCOBA.SC2Map"
-DST = ROOT / "out" / "SCOBA128GRID.SC2Map"
+
+
+def dst():
+    return workpaths.path("SC2_OUT") / "SCOBA128GRID.SC2Map"
+
 
 HARNESS = '''bool gt_DbgTest_Func (bool testConds, bool runActions) {
     int lv_i;
@@ -43,10 +48,10 @@ void gt_DbgTest_Init () {
 
 
 def main() -> int:
-    if DST.exists():
-        shutil.rmtree(DST)
-    shutil.copytree(SRC, DST)
-    script = DST / "MapScript.galaxy"
+    if dst().exists():
+        shutil.rmtree(dst())
+    shutil.copytree(SRC, dst())
+    script = dst() / "MapScript.galaxy"
     text = script.read_text(encoding="utf-8")
     anchor = 'include "scripts/main"'
     assert anchor in text
@@ -59,7 +64,7 @@ def main() -> int:
     line = "void InitTriggers () {"
     text = text.replace(line, line + "\n    gt_DbgTest_Init();", 1)
     script.write_text(text, encoding="utf-8")
-    print("built", DST)
+    print("built", dst())
     return 0
 
 

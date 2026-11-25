@@ -22,6 +22,14 @@ export function createState({ render, scene, camera: view, games, testApi }: Pic
     return out;
   }
 
+  /** The asset of each texture slot of the item, as the game names it for the texture service; one asset may fill several slots. Empty without slots. */
+  function textureSlots(item: Item): string[] {
+    const override = item.capabilities.textureOverride;
+    const assetOf = games.partsOf(item.game).textureAsset;
+    if (!override || !assetOf) return [];
+    return override.slots().map((slot) => assetOf(slot.source)).sort();
+  }
+
   function itemState(item: Item): Record<string, unknown> {
     const record = item.source ? item.source.record : null;
     const playing = item.instance.sequence >= 0 ? item.instance.sequences[item.instance.sequence] : undefined;
@@ -62,9 +70,13 @@ export function createState({ render, scene, camera: view, games, testApi }: Pic
       engineTeam: facts['engineTeam'],
       tint: facts['tint'],
       texturesLoaded: facts['texturesLoaded'],
-      // The texture overrides the renderer's instance holds (SC2: its HD set).
-      hdApplied: item.capabilities.textureOverride ? item.capabilities.textureOverride.applied() : 0,
-      // The game's facts (SC2: hd, hdLayers, largestTexture, blueGlow).
+      // Its skin (SPEC-VIEWER 17.4), the textures the renderer's instance holds in place of its own, and the largest side it shows.
+      skin: item.skin,
+      overrides: item.capabilities.textureOverride ? item.capabilities.textureOverride.applied() : 0,
+      // The textures a skin can replace: the asset of each override slot (`overrides` counts slots).
+      textureSlots: textureSlots(item),
+      largestTexture: item.largestTexture,
+      // The game's facts (SC2: blueGlow).
       ...games.partsOf(item.game).itemFacts(item),
       // Geometry layout as the renderer reads it (the format's facts).
       vertexStride: facts['vertexStride'],
@@ -99,6 +111,9 @@ export function createState({ render, scene, camera: view, games, testApi }: Pic
       items: scene.items.map(itemState),
       sceneInstances: render.scene.grid.cells.reduce((n, cell) => n + cell.instances.length, 0),
       grid: render.ground.enabled,
+      // The ground texture's record, and the texture the ground draws: its size, null while none (SPEC-VIEWER 17.5).
+      ground: scene.ground(),
+      groundTexture: render.ground.texture ? [render.ground.texture.width, render.ground.texture.height] : null,
       pointer: view.pointer()?.slice() ?? null,
       // What the features add (pick, dragPreview).
       ...testApi.stateParts(),

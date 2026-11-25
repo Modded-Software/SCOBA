@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 import mpyq
-
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
@@ -99,7 +99,7 @@ def main() -> int:
         args.base_rev = str(args.base)
     else:
         raw = subprocess.run(["git", "show", f"{args.base_rev}:original/SCOBA.SC2Map"], cwd=ROOT, check=True, capture_output=True).stdout
-        base_path = Path("/tmp") / f"port_terrain_base_{args.base_rev}.SC2Map"
+        base_path = workpaths.path("SC2_TMP") / f"port_terrain_base_{args.base_rev}.SC2Map"
         base_path.write_bytes(raw)
         base = mpyq.MPQArchive(str(base_path))
     edited = open_map(args.edited)

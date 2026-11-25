@@ -11,12 +11,15 @@ import math
 import os
 from pathlib import Path
 
+import workpaths
 from hitvolumes import pod_birth
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .herodrop_zoom import (
+from .herodrop_parts.herodrop_land import check_land, check_spot, check_start_state
+from .herodrop_parts.herodrop_scenery import check_escort, check_scenery
+from .herodrop_parts.herodrop_zoom import (
     ARM_MAX_MS,
     ARM_TOL_100,
     CAM_DISTANCE,
@@ -38,9 +41,7 @@ from .herodrop_zoom import (
     zoom_armed,
     zoom_follow,
 )
-from .herodrop_land import check_land, check_spot, check_start_state
-from .herodrop_scenery import check_escort, check_scenery
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 # One group per scenario (herodrop.galaxy). Only "wave" fires the real wave.
@@ -454,8 +455,8 @@ def check_leave(checks) -> None:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="herodrop",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["herodrop"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("herodrop"),
         bank_names=PROFILE_BANKS["herodrop"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -493,7 +494,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="herodrop",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["herodrop"],
+        map_source=profile_output("herodrop"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["herodrop"],
         ready_section="drop_start",

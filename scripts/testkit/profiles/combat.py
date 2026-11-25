@@ -9,15 +9,22 @@ import math
 import os
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .bank_checks import _delta, _no_damage, _report, _shots, _still
 from .camheight import check_camclamp, check_camheight
-from .combat_kerrigan import check_breath, check_psi_probe, check_psi_watch, check_talons, check_weapons
+from .combat_kerrigan import (
+    check_breath,
+    check_psi_probe,
+    check_psi_watch,
+    check_talons,
+    check_weapons,
+)
 from .pose import check_combat_pose
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 from .tps_shot import shot_clocks
 
 ROOT = project_root()
@@ -36,8 +43,8 @@ def selected_group() -> str:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="combat",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["combat"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("combat"),
         bank_names=PROFILE_BANKS["combat"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -405,7 +412,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="combat",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["combat"],
+        map_source=profile_output("combat"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["combat"],
         ready_section="meta",

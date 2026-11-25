@@ -8,10 +8,9 @@ import unittest
 from pathlib import Path
 
 import numpy as np
-
+import workpaths
 from flora import terrain
 from flora.lift import SINK_MARKER, sink_text, sink_trees, tree_sink
-from project_root import project_root
 
 ABS = '        <Flag Index="HeightAbsolute" Value="1"/>\n'
 
@@ -71,9 +70,8 @@ class TreeSinkTest(unittest.TestCase):
 
 
 class BuiltMapTest(unittest.TestCase):
-    BUILT = project_root() / "out" / "SCOBA256.SC2Map"
-
     def setUp(self) -> None:
+        self.BUILT = workpaths.path("SC2_BUILT_MAP")
         if not (self.BUILT / SINK_MARKER).exists():
             self.skipTest("built map has no sunk trees; run scripts/playtest.sh build")
 

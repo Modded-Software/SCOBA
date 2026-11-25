@@ -1,7 +1,7 @@
 From 1c087f5d1e4253f4bc53e35c205b66c20f178c5f Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 09:21:33 +0200
-Subject: [PATCH 45/56] m3 parser: lights (LITE v7)
+Subject: [PATCH 45/57] m3 parser: lights (LITE v7)
 
 Type, bone, flags, colour, intensity, attenuation far and near, hot spot
 and falloff, at the m3addon offsets. model.lights lists them.

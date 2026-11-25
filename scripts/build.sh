@@ -11,8 +11,11 @@ fi
 if [ "${SC2_PLAYTEST_ACTIVE:-}" != "1" ]; then
     exec bash "$ROOT_DIR/scripts/playtest.sh" build
 fi
-OUT_DIR="$ROOT_DIR/out"
-FINAL="$OUT_DIR/SCOBA256.SC2Map"
+# shellcheck source=paths.sh
+source "$ROOT_DIR/scripts/paths.sh" || exit 1
+paths_check_device
+OUT_DIR="$SC2_OUT"
+FINAL="$SC2_BUILT_MAP"
 TMP="$OUT_DIR/.build-tmp"
 OLD="$OUT_DIR/.build-old"
 cd "$ROOT_DIR"
@@ -75,7 +78,9 @@ log "writing manifest"
 while IFS= read -r -d '' file; do
     rel="${file#"$TMP"/}"
     (cd "$TMP" && sha256sum "$rel") >>"$TMP/BuildManifest.txt"
-done < <(find "$TMP" -type f ! -name 'BuildManifest.txt' -print0)
+# Byte order, so the manifest and its hash do not depend on the disk's
+# directory order (the same map gave two hashes on two disks).
+done < <(find "$TMP" -type f ! -name 'BuildManifest.txt' -print0 | LC_ALL=C sort -z)
 
 log "validating map"
 py "$ROOT_DIR/scripts/validate-map.py" "$TMP"
@@ -88,4 +93,4 @@ rm -rf "$OLD"
 trap - EXIT
 
 log "OK: $FINAL"
-printf '%s\n' "$STAMP" >"$OUT_DIR/.last-build-stamp"
+printf '%s\n' "$STAMP" >"$SC2_BUILD_STAMP"

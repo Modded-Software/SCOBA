@@ -31,14 +31,15 @@ gf_StompConfig (systems/stomp.galaxy). Shake and doodad crushing too.
 from __future__ import annotations
 
 import argparse
+import copy
 import re
 import shutil
 import sys
 import tempfile
-import copy
-from typing import NamedTuple
 from pathlib import Path
+from typing import NamedTuple
 
+import workpaths
 from character_anim_assets import extract_model
 from project_root import project_root
 
@@ -51,7 +52,12 @@ from footfall import m3_footfalls
 
 MARKER = ".footfall_fx"
 MARKER_VERSION = "7\n"  # 7: one IsStatus per event (ScobaFootGround); 6: thumps; 5: ScobaFootFx gate, model/actor ids; 4: engine squibs off
-EXTRACT_ROOT = Path("/mnt/ws-fast/sc2res/tmp")  # operator: extract into ws-fast
+
+
+def extract_root():  # operator: extract into ws-fast (SPEC-PATHS)
+    return workpaths.path("SC2_TMP")
+
+
 NO_ADDON = 0xFFFF
 STATUS = "ScobaFootGround"  # dust / splash gate (script, systems/quake.galaxy)
 GROUND_OFF = 0  # effects off
@@ -439,8 +445,8 @@ def generate(root: Path, force: bool) -> None:
         return
     if marker.exists():
         raise ValueError(f"{root} already has footfall data ({MARKER}); rebuild the map from src")
-    EXTRACT_ROOT.mkdir(parents=True, exist_ok=True)
-    temp_root = Path(tempfile.mkdtemp(prefix="footfall-", dir=EXTRACT_ROOT))
+    extract_root().mkdir(parents=True, exist_ok=True)
+    temp_root = Path(tempfile.mkdtemp(prefix="footfall-", dir=extract_root()))
     try:
         for spec in FOOTFALL_UNITS:
             generate_unit(root, spec, temp_root)

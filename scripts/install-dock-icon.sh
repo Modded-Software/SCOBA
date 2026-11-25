@@ -62,35 +62,29 @@ fi
 mkdir -p "$ICON_DIR" "$APPS_DIR"
 cp -f "$ICON_SOURCE" "$ICON_DIR/$ICON_NAME.png"
 
-# The launch command. $1 is the SC2_HD_TEXTURES value of the build; empty
-# leaves it unset, so the build picks its default (Upscale 4x, or the
-# built-in textures without a cache). $2 is the playtest.sh action; empty
-# is `launch`. $3 is extra environment for this desktop entry.
+# The launch command. $1 is the playtest.sh action. $2 is extra environment
+# for this desktop entry. The textures of a build are the picks of the
+# dataset `scoba` in the texture store, not a choice of the entry.
 launch_exec() {
-    local textures="${1:-}"
-    local entry="${2:-launch}"
-    local extra="${3:-}"
-    [ -z "$textures" ] || textures="SC2_HD_TEXTURES=\"$textures\" "
+    local entry="$1"
+    local extra="${2:-}"
     [ -z "$extra" ] || extra="$extra "
-    printf 'env %sUV_BIN="%s" SC2_PROJECT_ROOT="%s" %sSC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s/scripts/playtest.sh" %s' \
-        "$extra" "$UV_BIN" "$ROOT_DIR" "$textures" "$ROOT_DIR" "$entry"
+    printf 'env %sUV_BIN="%s" SC2_PROJECT_ROOT="%s" SC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s/scripts/playtest.sh" %s' \
+        "$extra" "$UV_BIN" "$ROOT_DIR" "$ROOT_DIR" "$entry"
 }
 
-# Right-click entries of the dock icon: action id, name, SC2_HD_TEXTURES
-# value, playtest.sh action (empty: launch). `built` launches the map as it
-# was last built, with no build step (operator 2026-11-20).
+# Right-click entries of the dock icon: action id, name, playtest.sh action.
+# `built` launches the map as it was last built, with no build step
+# (operator 2026-11-20).
 ACTIONS=(
-    "built|Instant Launch (no build)||launch-built"
-    "original|Original Textures|off|"
-    "upscaled|Upscaled Textures|upscale|"
-    "hd|HD Textures|generative|"
+    "built|Instant Launch (no build)|launch-built"
 )
 
 action_ids=""
 action_names=""
 for action in "${ACTIONS[@]}"; do
     action_ids="$action_ids${action%%|*};"
-    IFS='|' read -r _id action_name _textures _entry <<<"$action"
+    IFS='|' read -r _id action_name _entry <<<"$action"
     action_names="${action_names:+$action_names, }$action_name"
 done
 
@@ -117,16 +111,16 @@ write_desktop() {
         printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=%s\nPath=%s\nIcon=%s\nTerminal=false\nType=Application\nCategories=Game;StrategyGame;\nStartupNotify=true\nStartupWMClass=StarCraft II.exe\nActions=%s\n' \
             "$app_name" \
             "$comment" \
-            "$(launch_exec "" "launch" "$extra_env")" \
+            "$(launch_exec "launch" "$extra_env")" \
             "$ROOT_DIR" \
             "$ICON_NAME" \
             "$action_ids"
         for action in "${ACTIONS[@]}"; do
-            IFS='|' read -r action_id action_name textures entry <<<"$action"
+            IFS='|' read -r action_id action_name entry <<<"$action"
             printf '\n[Desktop Action %s]\nName=%s\nExec=%s\n' \
                 "$action_id" \
                 "$action_name" \
-                "$(launch_exec "$textures" "$entry" "$extra_env")"
+                "$(launch_exec "$entry" "$extra_env")"
         done
     } > "$file"
 

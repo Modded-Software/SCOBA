@@ -4,28 +4,47 @@ Used by profiles/waterfeat.py, which holds the map spec, the host hook and the c
 """
 
 from __future__ import annotations
+
 import math
 import re
 import struct
 import time
 from pathlib import Path
 from typing import NamedTuple
+
 import numpy as np
+import workpaths
 from flora import config as flora_config
 from flora import terrain as terrain_mod
 from flora.terrain import bilinear
 from mapgen.rimfalls import config as rim_config
 from mapgen.waterfeatures import build as feature_build
-from mapgen.waterfeatures import carve, config, ground as ground_mod, models as models_mod, sites as site_finder
+from mapgen.waterfeatures import carve, config
+from mapgen.waterfeatures import ground as ground_mod
+from mapgen.waterfeatures import models as models_mod
+from mapgen.waterfeatures import sites as site_finder
 from mapgen.waterfeatures.sites import Site
 from project_root import project_root
 from terrain import sync_height
 
 ROOT = project_root()
-BUILT = ROOT / "out" / "SCOBA256.SC2Map"
+
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 SRC = ROOT / "src" / "SCOBA.SC2Map"
-WORK = ROOT / "out" / "testkit" / "waterfeat"
-POINTS_GALAXY = WORK / "waterfeat_points.galaxy"
+
+
+def work_path():
+    return workpaths.path("SC2_TESTKIT") / "waterfeat"
+
+
+def points_galaxy_path():
+    return work_path() / "waterfeat_points.galaxy"
+
+
 SAMPLES = 24  # per class and site
 CELLS = 80
 FAR = 8
@@ -102,9 +121,11 @@ def _things(objects: str) -> list[tuple[float, float, float]]:
     return out
 
 
-def scene(built: Path = BUILT, src: Path = SRC, work: Path = WORK) -> Scene:
+def scene(built: Path | None = None, src: Path = SRC, work: Path | None = None) -> Scene:
     import expand_map
 
+    built = built or built_path()
+    work = work or work_path()
     work.mkdir(parents=True, exist_ok=True)
     # The ground and the pathing paint as the expand step made them, before the water features.
     expand_map.expand_heightmap(src / "t3HeightMap", work / "before_t3HeightMap")
@@ -220,8 +241,9 @@ class Rim(NamedTuple):
     rocks: list[Point]
 
 
-def rim_groups(built: Path = BUILT) -> list[Rim]:
+def rim_groups(built: Path | None = None) -> list[Rim]:
     """The groups the build reports in its marker: what it wrote."""
+    built = built or built_path()
     marker = built / rim_config.MARKER
     if not marker.is_file():
         return []

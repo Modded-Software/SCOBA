@@ -1,5 +1,5 @@
 // A list that loads one page at a time and the next when its end scrolls
-// into reach.
+// into reach. A hidden list waits with the next page until it is shown.
 
 /** One page of a list the server serves. */
 export interface Page<T> {
@@ -40,6 +40,8 @@ export class PagedList<T> {
     this.onTotal = onTotal;
     this.onError = onError;
     list.addEventListener('scroll', () => this.fill());
+    // Shown (its tab chosen) or resized: the box may need more rows now.
+    new ResizeObserver(() => this.fill()).observe(list);
   }
 
   /** Drop every row and load the first page again. */
@@ -81,10 +83,10 @@ export class PagedList<T> {
     return this.loading;
   }
 
-  /** Load more when the end of the list is within one box height. */
+  /** Load more when the end of the list is within one box height. A hidden list (no box) loads no more than its first page. */
   fill(): void {
     const list = this.list;
-    if (this.done || this.loading) return;
+    if (this.done || this.loading || list.clientHeight === 0) return;
     if (list.scrollTop + list.clientHeight >= list.scrollHeight - list.clientHeight) this.more().catch((error: unknown) => this.onError(error));
   }
 }

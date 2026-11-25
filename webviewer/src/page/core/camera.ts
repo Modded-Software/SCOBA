@@ -3,7 +3,7 @@
 
 import type Scene from '@renderer/viewer/scene';
 import type { CameraState, Ray, Vec2, Vec3 } from './types';
-import { readSetting, settings, writeSetting, type Restore } from './settings';
+import { findSetting, settings, writeSetting } from './settings';
 
 export const UP: Vec3 = [0, 0, 1];
 export const FOV = Math.PI / 4;
@@ -22,7 +22,7 @@ const unit3 = (v: Vec3): Vec3 => {
 
 export interface CameraRig {
   camera: CameraState;
-  cameraRestore: string;
+  cameraStart: 'stored' | 'default';
   eye(): Vec3;
   applyCamera(): void;
   resize(): void;
@@ -34,12 +34,10 @@ export interface CameraRig {
 
 /** The camera of the unit scene and the sky scene, drawn on `canvas`. */
 export function createCamera(canvas: HTMLCanvasElement, scene: Scene, skyScene: Scene): CameraRig {
-  const camera: CameraState = { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0.8] };
-
-  /** How the stored camera loaded (core/settings.ts). */
-  const stored = readSetting(settings.camera);
-  const cameraRestore: Restore = stored.restore;
-  if (stored.value) Object.assign(camera, stored.value);
+  // The stored camera, else the setting's declared default (core/settings.ts).
+  const stored = findSetting(settings.camera);
+  const cameraStart = stored === null ? 'default' : 'stored';
+  const camera: CameraState = stored === null ? structuredClone(settings.camera.initial) : stored;
 
   function saveCamera(): void {
     writeSetting(settings.camera, { yaw: camera.yaw, pitch: camera.pitch, distance: camera.distance, target: [...camera.target] });
@@ -134,5 +132,5 @@ export function createCamera(canvas: HTMLCanvasElement, scene: Scene, skyScene: 
     return groundAt(e.clientX - box.left, e.clientY - box.top);
   }
 
-  return { camera, cameraRestore, eye, applyCamera, resize, rayAt, screenOf, groundAt, eventGround };
+  return { camera, cameraStart, eye, applyCamera, resize, rayAt, screenOf, groundAt, eventGround };
 }

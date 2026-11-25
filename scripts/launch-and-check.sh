@@ -8,6 +8,8 @@ fi
 if [ "${SC2_PLAYTEST_ACTIVE:-}" != "1" ]; then
     exec bash "$ROOT_DIR/scripts/playtest.sh" launch-check
 fi
+# shellcheck source=paths.sh
+source "$ROOT_DIR/scripts/paths.sh" || exit 1
 UV_BIN="${UV_BIN:-uv}"
 if [ "${UV_BIN#/}" = "$UV_BIN" ]; then
     UV_BIN="$(command -v "$UV_BIN")" || {
@@ -24,8 +26,8 @@ mkdir -p "$LOG_DIR"
 
 export SC2_BANK_SINCE="$(date +%s)"
 export SC2_LOG_SINCE="$SC2_BANK_SINCE"
-if [ -z "${SC2_MAP_SOURCE:-}" ] && [ -d "$ROOT_DIR/out/SCOBA256.SC2Map" ]; then
-    export SC2_MAP_SOURCE="$ROOT_DIR/out/SCOBA256.SC2Map"
+if [ -z "${SC2_MAP_SOURCE:-}" ] && [ -d "$SC2_BUILT_MAP" ]; then
+    export SC2_MAP_SOURCE="$SC2_BUILT_MAP"
 fi
 nohup "$ROOT_DIR/scripts/launch-scoba.sh" >>"$LOG_DIR/launcher.log" 2>&1 &
 sleep "${SC2_LOAD_DELAY:-18}"

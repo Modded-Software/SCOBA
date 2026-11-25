@@ -9,8 +9,7 @@ import { byId, make } from '../../core/dom';
 import type { Landmark } from '../../core/types';
 import { ConfirmDialog } from '../../ui/components/dialog';
 import { Dropdown } from '../../ui/components/dropdown';
-
-const TRASH = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M6 1h4l1 1h3v2H2V2h3zM3 5h10l-1 10H4zm3 2v6h1V7zm3 0v6h1V7z"/></svg>';
+import { TRASH } from '../../ui/icons';
 
 export const landmarksFeature: Feature = {
   id: 'landmarks',
@@ -37,7 +36,7 @@ export const landmarksFeature: Feature = {
           row.dataset.id = String(l.id);
           row.classList.toggle('selected', l.id === selected);
           if (l.id !== camera.originId) {
-            const trash = make('button', { className: 'trash', title: `delete "${l.name}"`, innerHTML: TRASH });
+            const trash = make('button', { className: 'trash', title: `Delete Landmark "${l.name}"`, innerHTML: TRASH });
             trash.addEventListener('click', () => {
               closeList();
               askDelete(l).catch(status.reportFailure);
@@ -53,7 +52,7 @@ export const landmarksFeature: Feature = {
     // ---- dialogs: name a new landmark, confirm a delete ----
 
     const question = make('div', { className: 'question' });
-    const deleteDialog = new ConfirmDialog({ id: 'landmark-delete-dialog', title: 'delete landmark', yesText: 'delete', content: [question] });
+    const deleteDialog = new ConfirmDialog({ id: 'landmark-delete-dialog', title: 'Delete Landmark', yesText: 'Delete Landmark', content: [question], danger: true });
 
     async function askDelete(landmark: Landmark): Promise<void> {
       question.textContent = `Delete the landmark "${landmark.name}"?`;
@@ -63,7 +62,7 @@ export const landmarksFeature: Feature = {
     }
 
     const nameBox = make('input', { id: 'landmark-name', type: 'text', autocomplete: 'off', spellcheck: false, maxLength: 60 });
-    const nameDialog = new ConfirmDialog({ id: 'landmark-name-dialog', title: 'new landmark: this view', yesText: 'save', content: [nameBox] });
+    const nameDialog = new ConfirmDialog({ id: 'landmark-name-dialog', title: 'New landmark: this view', yesText: 'Save', content: [nameBox] });
     nameDialog.yes.id = 'landmark-save';
     nameDialog.no.id = 'landmark-cancel';
     const nameOk = (): boolean => nameBox.value.trim().length > 0;

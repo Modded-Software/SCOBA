@@ -10,12 +10,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import workpaths
 from mapgen import player_slots
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 PLAYER_TYPE_USER = 1      # c_playerTypeUser
@@ -107,8 +108,8 @@ def check_gate(checks) -> None:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="roster",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["roster"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("roster"),
         bank_names=PROFILE_BANKS["roster"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -141,7 +142,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="roster",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["roster"],
+        map_source=profile_output("roster"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["roster"],
         ready_section="rs_start",

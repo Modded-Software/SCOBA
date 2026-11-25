@@ -81,7 +81,7 @@ Read these from Galaxy and write them to the bank:
   stop a session the operator is using without asking.
 - A run passes only with `failures: 0`, no `ScriptError.txt`, and a build
   stamp that matches the fresh build.
-- Read `out/test-runs/<profile>/<run>/summary.txt` before reporting. Quote
+- Read `$SC2_TEST_RUNS/<profile>/<run>/summary.txt` before reporting. Quote
   the failing checks. Do not summarize a run that was not read.
 
 ### Reporting
@@ -95,8 +95,44 @@ Read these from Galaxy and write them to the bank:
 ## Build
 
 - Every map modification lives in a deterministic script under `scripts/` or
-  in `src/SCOBA.SC2Map`. Never hand-edit `out/`.
-- `out/SCOBA256.SC2Map` is rebuilt from `src/SCOBA.SC2Map` on every run.
+  in `src/SCOBA.SC2Map`. Never hand-edit `$SC2_OUT`.
+- The built map (`$SC2_BUILT_MAP`) is rebuilt from `src/SCOBA.SC2Map` on
+  every run.
+
+## Paths
+
+- The repository holds source only. Its disk is encrypted; heavy writes
+  there freeze the desktop. Spec: `docs/specifications/SPEC-PATHS.md`.
+- `env/paths.conf` names the places. `scripts/paths.sh` derives and exports
+  every path and refuses a work folder on the repository's disk.
+- Run project code only through `make` or `scripts/playtest.sh`. They
+  source `scripts/paths.sh`. A tool started any other way stops with an
+  error. Measuring tools have make targets (`make help`).
+- Python reads a path with `workpaths.path("NAME")`, when it runs. Never at
+  import. Never a stand-in path, a `"/tmp"`, a repo `out`/`build`, or the prefix
+  layout. `scripts/testkit/tests/test_workpaths.py` fails on each of them.
+- Agent scratch files go to `$SC2_WORK/scratch`, not `/tmp`.
+
+## Model viewer service
+
+- The operator's viewer is a systemd user service, set up by Ansible. It
+  serves port 4517. Manage it only through the `Makefile` targets in the
+  repo root. Never start, stop or kill its `node` process by hand.
+- `make viewer-restart`: rebuild from the checkout and restart.
+- `make viewer-status`: the service and its health answer.
+- `make viewer-logs` (`LINES=n`): its last log lines.
+- `make viewer-provision` (`RESTART=1`): install or update the service.
+- `make viewer-start` / `make viewer-stop` / `make viewer-unprovision`.
+- `make viewer-serve` (`PORT=n`): a foreground server beside the service.
+- The service hot reloads (`webviewer/src/tools/dev.ts`). A change under
+  `webviewer/src/` or `webviewer/ref/mdx-m3-viewer/src/` rebuilds. A
+  `build/server.js` with new content restarts the server. That covers a
+  test run's build too. The page files are read from disk on each browser
+  load. A failed build keeps the old server; see `make viewer-logs`.
+- A change to `dev.ts` itself, `scripts/start.sh` or the unit needs
+  `make viewer-provision RESTART=1`, then `make viewer-status`.
+- Test runs use port 4518. A killed run can leave its server there; clean
+  it up. Never touch the service on 4517 except through the targets.
 
 ## Commit hook exemptions
 
@@ -107,7 +143,7 @@ Read these from Galaxy and write them to the bank:
   `quality_exceptions.yaml`, and the rest listed in
   `/opt/workspace-ci/config/exemption_files.yaml`.
 - These files are root-owned. The hook rejects them otherwise. The agent
-  never edits them. The agent writes a script under `/tmp/opencode/` that
+  never edits them. The agent writes a script under `$SC2_WORK/scratch/` that
   calls `workspace-yaml-edit add <file> exceptions ...`, checks it with
   `--dry-run`, and the operator runs it as root.
 - One entry = one rule id + one anchored exact path:

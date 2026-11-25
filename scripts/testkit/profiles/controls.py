@@ -6,12 +6,13 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .bank_checks import _report
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 
@@ -19,8 +20,8 @@ ROOT = project_root()
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="controls",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["controls"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("controls"),
         bank_names=PROFILE_BANKS["controls"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -49,7 +50,7 @@ def _check_icons(checks) -> None:
         checks.failures += 1
     else:
         print("controls_icons: icons differ PASS")
-    button_path = PROFILE_OUTPUTS["controls"] / "Base.SC2Data" / "GameData" / "ButtonData.xml"
+    button_path = profile_output("controls") / "Base.SC2Data" / "GameData" / "ButtonData.xml"
     buttons = {element.get("id"): element for element in ET.parse(button_path).getroot().iter("CButton")}
     for button_id, icon_path in ICONS.items():
         icon = buttons[button_id].find("Icon")
@@ -190,7 +191,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="controls",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["controls"],
+        map_source=profile_output("controls"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["controls"],
         ready_section="controls_default",

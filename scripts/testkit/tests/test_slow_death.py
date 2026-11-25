@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
-from project_root import project_root
+import workpaths
 from slow_death_assets import (
     BLOCK_KINDS,
     FAST_CLIPS,
@@ -21,7 +23,13 @@ from slow_death_assets import (
     speed_up_clips,
 )
 
-MAP = project_root() / "out" / "SCOBA256.SC2Map"
+from testkit.tests.built_map import needs_built
+
+
+def map_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 GOLIATH_SLOW = Path("Assets") / "Units" / "Terran" / "GoliathDeath" / "GoliathDeathSlow.m3"
 RATE_ID = 0x1111
 
@@ -242,12 +250,12 @@ class RetimeTest(unittest.TestCase):
     def test_leviathan_stand_is_three_times_faster(self) -> None:
         self.assertEqual([(t.name, n, f) for _, t, n, f in FAST_CLIPS], [("LeviathanSCOBA.m3", ("Stand",), 3)])
 
-    @unittest.skipUnless(MAP.is_dir(), "built map is absent")
+    @needs_built()
     def test_built_leviathan_stand_length(self) -> None:
         # Stock leviathan.m3: Stand 3000 ms, Walk 3000 ms, Spell 1833 ms.
-        from dump_m3_clip_metrics import frame_rows
+        from m3dump.dump_m3_clip_metrics import frame_rows
 
-        rows = frame_rows(MAP / FAST_CLIPS[0][1])
+        rows = frame_rows(map_path() / FAST_CLIPS[0][1])
         self.assertEqual(rows["Stand"]["dur"], 1000)
         self.assertEqual(rows["Walk"]["dur"], 3000)
         self.assertEqual(rows["Spell"]["dur"], 1833)
@@ -273,24 +281,24 @@ class RetimeTest(unittest.TestCase):
 
 
 class BuiltModelTest(unittest.TestCase):
-    @unittest.skipUnless(MAP.is_dir(), "built map is absent")
+    @needs_built()
     def test_built_death_is_stretched(self) -> None:
-        from dump_m3_clip_metrics import frame_rows
+        from m3dump.dump_m3_clip_metrics import frame_rows
 
         for _, relative, stretch, _ in SLOW_DEATHS:
-            rows = frame_rows(MAP / relative)
+            rows = frame_rows(map_path() / relative)
             self.assertTrue(rows)
             for name, row in rows.items():
                 self.assertTrue(name.startswith("Death"), name)
                 self.assertEqual(row["dur"] % stretch, 0, name)
                 self.assertGreaterEqual(row["dur"], 1000 * stretch, name)
 
-    @unittest.skipUnless(MAP.is_dir(), "built map is absent")
+    @needs_built()
     def test_built_goliath_death_is_two_times_stock(self) -> None:
         # Stock GoliathDeath.m3: Death 6667 ms, Death 01 5000 ms, Death 02 5000 ms.
-        from dump_m3_clip_metrics import frame_rows
+        from m3dump.dump_m3_clip_metrics import frame_rows
 
-        rows = frame_rows(MAP / GOLIATH_SLOW)
+        rows = frame_rows(map_path() / GOLIATH_SLOW)
         self.assertEqual({name: row["dur"] for name, row in rows.items()},
                          {"Death": 13334, "Death 01": 10000, "Death 02": 10000})
 
@@ -308,12 +316,57 @@ class HdCopyTest(unittest.TestCase):
         value = str(SLOW_DEATHS[0][1]).replace("/", "\\")
         name = value.rsplit("\\", 1)[-1]
         self.assertEqual(V.generated_value(value), value)
-        self.assertEqual(V.generated_value(V.HD_MODEL_DIR + name), value)
-        self.assertEqual(V.stretch_of(V.HD_MODEL_DIR + name), SLOW_DEATHS[0][2])
+        self.assertEqual(V.generated_value(V.HD_COPIES + name), value)
+        self.assertEqual(V.stretch_of(V.HD_COPIES + name), SLOW_DEATHS[0][2])
 
     def test_another_model_is_not_accepted(self) -> None:
         import validate_slow_deaths as V
 
         self.assertIsNone(V.generated_value("Assets\\Units\\Terran\\Stock\\StockDeath.m3"))
-        self.assertIsNone(V.generated_value(V.HD_MODEL_DIR + "StockDeath.m3"))
+        self.assertIsNone(V.generated_value(V.HD_COPIES + "StockDeath.m3"))
         self.assertIsNone(V.generated_value(None))
+
+
+class HdCopyOfARequiredModelTest(unittest.TestCase):
+    """A CModel that must use a generated model may name the HD copy of it. The copy is then checked itself."""
+
+    def setUp(self) -> None:
+        import validate_slow_deaths as V
+
+        self.V = V
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.map_dir = Path(self.temp.name)
+        self.checked: list[str] = []
+        for name in ("check_simulation", "check_clips"):
+            patch = mock.patch.object(V, name, lambda _map_dir, value, *_names: self.checked.append(value))
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def catalog(self, model_id: str, value: str) -> None:
+        folder = self.map_dir / self.V.GAMEDATA
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "ModelData.xml").write_text(f'<Catalog><CModel id="{model_id}"><Model value="{value}"/></CModel></Catalog>')
+
+    def cases(self):
+        return ((self.V.check_slow_simulations, *self.V.SLOW_SIMULATION_MODELS[0]), (self.V.check_fast_clips, *self.V.FAST_CLIP_MODELS[0]))
+
+    def test_the_generated_model_is_accepted(self) -> None:
+        for check, model_id, value in self.cases():
+            self.catalog(model_id, value)
+            check(self.map_dir)
+            self.assertIn(value, self.checked)
+
+    def test_its_hd_copy_is_accepted_and_checked_itself(self) -> None:
+        for check, model_id, value in self.cases():
+            copy = self.V.HD_COPIES + value.rsplit("\\", 1)[-1]
+            self.catalog(model_id, copy)
+            check(self.map_dir)
+            self.assertIn(copy, self.checked, "the game shows the copy")
+
+    def test_another_model_and_the_copy_of_another_model_are_refused(self) -> None:
+        for check, model_id, _value in self.cases():
+            for other in ("Assets\\Units\\Terran\\Stock\\Stock.m3", self.V.HD_COPIES + "Stock.m3", ""):
+                self.catalog(model_id, other)
+                with self.assertRaises(SystemExit, msg=f"{model_id}: {other}"):
+                    check(self.map_dir)

@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import mpyq
-
+import workpaths
 from project_root import project_root
 
 ROOT = project_root()
@@ -57,7 +57,7 @@ def kids(el: ET.Element) -> list[tuple[str, dict[str, str]]]:
 
 def base_from_git(rev: str) -> Path:
     out = subprocess.run(["git", "show", f"{rev}:original/SCOBA.SC2Map"], cwd=ROOT, check=True, capture_output=True).stdout
-    tmp = Path(tempfile.mkdtemp(prefix="port_objects_")) / "base.SC2Map"
+    tmp = Path(tempfile.mkdtemp(prefix="port_objects_", dir=workpaths.path("SC2_TMP"))) / "base.SC2Map"
     tmp.write_bytes(out)
     return tmp
 

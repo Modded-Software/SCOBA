@@ -1,51 +1,54 @@
-// SC2 in the texture window (core/texturewindow.ts): the HD texture viewer
-// page (scripts/hdtex/compare.html as built, with its HD pairs, served
-// below /api/sc2/x/textures/). A double-click on a unit or doodad (a
-// gallery row, an instance row, or an instance in the view) opens it on
-// that unit's or doodad's textures:
-// - the ones with an HD version, original beside upscaled (the page's own
-//   entries, filtered by ?user=);
-// - every other texture its model file names, the original alone (originals.ts).
-// The viewer's "used by" chip drops the filter.
+// SC2 in the texture window (core/texturewindow.ts), with the texture
+// service (SPEC-VIEWER 17). A double-click on a unit or doodad (a gallery
+// row, an instance row, or an instance in the view) opens it on every
+// texture its model file names (originals.ts); on a ground texture, on its
+// colour file and its normal map. The page reads their results and picks
+// from the service.
 
 import type { Item } from '../../../../page/core/types';
 import type { GameContext } from '../../../../page/core/context';
-import type { TexturesBody } from '../../shared/records';
 import { SC2 } from '../game';
-import { originals } from './originals';
+import { TERRAIN, terrainRecord } from '../records';
+import { decodeAll, originals } from './originals';
 
 export interface Sc2Textures {
-  /** The window on a record of the gallery: its record's model file (an SC2 doodad's first variation). */
+  /** The window on a record of the gallery: its record's model file (an SC2 doodad's first variation), or a ground texture's files. */
   openTexturesFor(category: string, id: string): Promise<void>;
   /** The window on an instance of the scene: the model file it shows. */
   openTexturesOf(item: Item): Promise<void>;
 }
 
-export function installTextures(context: GameContext): Sc2Textures {
+export function installTextures(context: GameContext, ownerOf: (item: Item) => string | null): Sc2Textures {
   const { api, textureWindow } = context;
 
   /**
-   * Open the window on the textures of `user` (a unit or doodad id, or a
-   * model file's name), called `name`, whose model file is `file` in `dataset`.
+   * Open the window on the textures of `user` (a unit, doodad or ground
+   * texture id, or a model file's name), called `name`, in `dataset`.
    */
-  async function openTextures({ user, name, file, dataset }: { user: string; name: string; file: string; dataset: string }): Promise<void> {
-    const built = await api.getJson<TexturesBody>(api.extensionUrl('textures', SC2));
-    if (!built.built) throw new Error(`the texture viewer is not built; run: ${built.build}`);
-    return textureWindow.open({ user, name, file, dataset, page: `${api.extensionUrl('textures', SC2)}/`, read: (urls) => originals(context, file, dataset, urls) });
+  /** `owner`: the texture owner whose skins Save to Skin… changes (R-VIEW-133); `item`: the instance, if any. */
+  function openTextures(user: string, name: string, file: string, dataset: string, read: (urls: string[]) => ReturnType<typeof originals>, owner: string | null, item: number | null = null): Promise<void> {
+    return textureWindow.open({ user, name, file, dataset, game: SC2, service: true, read, owner, item });
   }
 
   async function openTexturesFor(category: string, id: string): Promise<void> {
     const dataset = api.requireDataset(api.currentDataset(SC2), SC2);
     const record = await api.record(category, id, dataset, SC2);
+    if (category === TERRAIN) {
+      const ground = terrainRecord(record);
+      const files = ground.normal === null ? [ground.file] : [ground.file, ground.normal];
+      // A ground texture has no owner: it is baked on its own (R-HD-145).
+      return openTextures(id, record.name, ground.file, dataset, (urls) => decodeAll(context, files, dataset, urls), null);
+    }
     if (!record.file) throw new Error(`${record.name} has no model file`);
-    return openTextures({ user: id, name: record.name, file: record.file, dataset });
+    const owner = category === 'units' ? `unit:${id}` : category === 'doodads' ? `actor:${id}` : null;
+    return openTextures(id, record.name, record.file, dataset, (urls) => originals(context, record.file, dataset, urls), owner);
   }
 
   /** A bare model file goes by its file name. */
   function openTexturesOf(item: Item): Promise<void> {
     const fileName = item.path.split('\\').pop() ?? item.path;
     const record = item.source ? item.source.record : null;
-    return openTextures({ user: record ? record.id : fileName, name: record ? record.name : fileName, file: item.path, dataset: item.dataset });
+    return openTextures(record ? record.id : fileName, record ? record.name : fileName, item.path, item.dataset, (urls) => originals(context, item.path, item.dataset, urls), ownerOf(item), item.id);
   }
 
   return { openTexturesFor, openTexturesOf };

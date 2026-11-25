@@ -9,12 +9,19 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import workpaths
+from flora import terrain as terrain_mod
 from hitvolumes import intro_shots as S
 from hitvolumes import intro_trees as T
-from flora import terrain as terrain_mod
 from project_root import project_root
 
-BUILT = project_root() / "out" / "SCOBA256.SC2Map"
+from testkit.tests.built_map import needs_built
+
+
+def built_path():
+    return workpaths.path("SC2_BUILT_MAP")
+
+
 SAMPLES = 41
 CLEARANCE = 0.5
 # Largest slope of each easing, d(eased)/du.
@@ -281,11 +288,11 @@ class IntroPatchTest(unittest.TestCase):
         self.assertEqual(text.count(INTRO_ON), 1)
 
 
-@unittest.skipUnless((BUILT / "t3HeightMap").is_file(), "needs the built map (scripts/playtest.sh build)")
+@needs_built("t3HeightMap")
 class TerrainTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.t = terrain_mod.load(BUILT)
+        cls.t = terrain_mod.load(built_path())
 
     def ground(self, x: float, y: float) -> float:
         return terrain_mod.ground_z(self.t, x, y)

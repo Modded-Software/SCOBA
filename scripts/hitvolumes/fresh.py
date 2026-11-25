@@ -12,8 +12,12 @@ alone:
   in the map's own Assets.
 
 An edit to any of them changes the key: "run hitvolumes.measure". So does a
-map unit type the JSON lacks. XML comments do not count. Stock data is not
-re-read: a game patch needs a manual measure.
+map unit type the JSON lacks. XML comments and the layout of a file do not
+count. Stock data is not re-read: a game patch needs a manual measure.
+
+What the HD texture step packages does not count either: its model copies
+and the lines that name them (hdtex.sc2.packaged). A copy has the shapes of
+its original, so a volume does not depend on which textures are picked.
 """
 
 from __future__ import annotations
@@ -21,6 +25,8 @@ from __future__ import annotations
 import hashlib
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+from hdtex.sc2.packaged import is_packaged, own_catalog
 
 from .resolve import ACTOR_TAGS, MAP_CATALOGS, birth_units
 from .units import unit_types
@@ -33,8 +39,9 @@ class MapInputs:
 
     def __init__(self, map_dir: Path) -> None:
         self.map_dir = map_dir
-        self.actors = self._entries(map_dir / GAMEDATA / MAP_CATALOGS["actor"], ACTOR_TAGS)
-        self.models = self._entries(map_dir / GAMEDATA / MAP_CATALOGS["model"], ("CModel",))
+        # A unit or actor bake sets an actor's Model line (hdtex.sc2.owned): read the actors as before it too.
+        self.actors = self._entries(own_catalog(map_dir, MAP_CATALOGS["actor"]), ACTOR_TAGS)
+        self.models = self._entries(own_catalog(map_dir, MAP_CATALOGS["model"]), ("CModel",))
         self.claims: dict[str, list[str]] = {}
         for ident, texts in self.actors.items():
             for text in texts:
@@ -43,18 +50,27 @@ class MapInputs:
                 for name in names:
                     self.claims.setdefault(name, []).append(ident)
         self._digests: dict[Path, bytes] = {}
-        self.m3: dict[str, Path] = {
-            p.relative_to(map_dir).as_posix().lower(): p for p in map_dir.rglob("*.m3")
-        }
+        self.m3: dict[str, Path] = {}
+        for p in map_dir.rglob("*.m3"):
+            entry = p.relative_to(map_dir).as_posix().lower()
+            if not is_packaged(entry):
+                self.m3[entry] = p
 
     @staticmethod
-    def _entries(path: Path, tags: tuple[str, ...]) -> dict[str, list[str]]:
+    def _entries(text: str | None, tags: tuple[str, ...]) -> dict[str, list[str]]:
+        """Id -> the text of each of its entries in one catalog, without comments and layout."""
         out: dict[str, list[str]] = {}
-        if not path.is_file():
+        if text is None:
             return out
-        for el in ET.parse(path).getroot():
+        for el in ET.fromstring(text):
             if el.tag in tags and el.get("id"):
                 el.tail = None
+                for node in el.iter():
+                    # Blank text between lines is layout: a step that writes the file again changes it.
+                    if node.text is not None and not node.text.strip():
+                        node.text = None
+                    if node is not el and node.tail is not None and not node.tail.strip():
+                        node.tail = None
                 out.setdefault(el.get("id"), []).append(ET.tostring(el, encoding="unicode"))
         return out
 

@@ -16,15 +16,23 @@ import os
 import time
 from pathlib import Path
 
+import workpaths
 from hitvolumes import intro_shots as S
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .herodrop import birth_follow, scene_on
-from .herodrop_land import check_start_state
-from .herodrop_zoom import ARM_MAX_MS, PHASE_ARM, PHASE_ZOOM, PHASES, zoom_armed, zoom_follow
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .herodrop_parts.herodrop_land import check_start_state
+from .herodrop_parts.herodrop_zoom import (
+    ARM_MAX_MS,
+    PHASE_ARM,
+    PHASE_ZOOM,
+    PHASES,
+    zoom_armed,
+    zoom_follow,
+)
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 GROUPS = ("boot", "shots", "wrap", "gate", "seats", "deploy")
@@ -52,8 +60,8 @@ def selected_group() -> str:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="intro",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["intro"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("intro"),
         bank_names=PROFILE_BANKS["intro"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -70,8 +78,7 @@ def map_spec() -> TestMapSpec:
 
 
 def _docs() -> Path:
-    prefix = Path(os.environ.get("SC2_GAME_PREFIX", str(Path.home() / "Games" / "battlenet-prefix")))
-    return Path(os.environ.get("SC2_DOCUMENTS", str(prefix / "pfx/drive_c/users/steamuser/Documents/StarCraft II")))
+    return workpaths.path("SC2_DOCUMENTS")
 
 
 def on_ready(ctx, data: dict) -> None:
@@ -472,7 +479,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="intro",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["intro"],
+        map_source=profile_output("intro"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["intro"],
         ready_section="intro_start",

@@ -11,11 +11,12 @@ import os
 import re
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 SLOW_CORE = ROOT / "src" / "SCOBA.SC2Map" / "scripts" / "app" / "core" / "slow_walk.galaxy"
@@ -71,8 +72,8 @@ def selected_group() -> str:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="slowwalk",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["slowwalk"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("slowwalk"),
         bank_names=PROFILE_BANKS["slowwalk"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -387,7 +388,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="slowwalk",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["slowwalk"],
+        map_source=profile_output("slowwalk"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["slowwalk"],
         ready_section="slow_start",

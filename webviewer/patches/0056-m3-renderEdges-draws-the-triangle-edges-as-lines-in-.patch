@@ -1,7 +1,7 @@
 From 68b9595394946f9d9b54d12ff6c9d0d08b022290 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Tue, 24 Nov 2026 12:37:15 +0200
-Subject: [PATCH 56/56] m3: renderEdges draws the triangle edges as lines in
+Subject: [PATCH 56/57] m3: renderEdges draws the triangle edges as lines in
  one flat colour
 
 Each region's edges, each once (edges.ts edgePairs), go into one edge buffer the model makes on the first draw. renderEdges draws the regions of the drawn batches with the standard vertex shader, so the lines follow the pose; the depth and blend state are the caller's.

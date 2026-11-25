@@ -1,17 +1,28 @@
 // SC2 on the page (SPEC-VIEWER 6.4): what the unit and doodad data does
 // to an instance. Core applies the placement; only this file reads the data.
+// A terrain record is a ground texture (SPEC-VIEWER 17.5): core makes it
+// the ground.
 
-import type { DoodadRecord, PlacedRecord } from '../shared/records';
-import type { GameRecord, PageGame, Placement, PlacementWish, SequenceInfo } from '../../../page/core/plugin';
+import type { DoodadRecord, PlacedRecord, TerrainRecord } from '../shared/records';
+import type { GameRecord, PageGame, Placement, PlacementWish, PreviewCard, SequenceInfo } from '../../../page/core/plugin';
 import { describeRecord } from './describe';
 import { listName } from './names';
-import { DOODADS, UNITS, asPlaced, placedRecord } from './records';
+import { DOODADS, TERRAIN, UNITS, asPlaced, placedRecord, terrainRecord } from './records';
 import { dataScale } from './rules';
 
 export const SC2 = 'sc2';
 
 /** Checked records, by the object core holds. */
 const checked = new WeakMap<GameRecord, PlacedRecord>();
+/** Checked ground texture records. */
+const grounds = new WeakMap<GameRecord, TerrainRecord>();
+
+/** The preview card of a ground texture. */
+function terrainCard(record: TerrainRecord): PreviewCard {
+  const facts = [`ground texture · ${record.state}`, `colour ${record.file}`, `normal map ${record.normal ?? 'none'}`];
+  if (record.users.length) facts.push(`terrain sets: ${record.users.join(', ')}`);
+  return { name: record.name, picture: null, facts };
+}
 
 /** The SC2 record behind one core holds. */
 export function sc2Record(record: GameRecord): PlacedRecord {
@@ -35,10 +46,9 @@ function validVariation(doodad: DoodadRecord, value: unknown): number | null {
  */
 function placeDoodad(doodad: DoodadRecord, wish: PlacementWish): Placement {
   const asked = wish.variant;
-  const given = asked !== undefined && asked !== null;
-  if (given && wish.otherwise === 'refuse' && validVariation(doodad, asked) === null) throw new Error(`${doodad.id} has no variation ${asked}`);
-  const otherwise = given && wish.otherwise === 'first' ? 0 : Math.floor(Math.random() * doodad.variations);
-  const variant = validVariation(doodad, asked) ?? otherwise;
+  // None asked: the map editor's rule, a random variation. One asked must be the doodad's.
+  const variant = asked === undefined || asked === null ? Math.floor(Math.random() * doodad.variations) : validVariation(doodad, asked);
+  if (variant === null) throw new Error(`${doodad.id} has no variation ${String(asked)} (it has ${doodad.variations})`);
   const file = doodad.files[variant];
   if (file === undefined) throw new Error(`${doodad.id} has no variation ${variant}`);
   const rot = wish.rot ?? (doodad.autoRotate ? Math.floor(Math.random() * 360) : 0);
@@ -66,14 +76,22 @@ export const sc2Game: PageGame = {
   categories: [
     { id: UNITS, noun: 'unit' },
     { id: DOODADS, noun: 'doodad' },
+    { id: TERRAIN, noun: 'ground texture', ground: true },
   ],
   backdrop: 'skybox',
   checkRecord(category, body) {
+    if (category === TERRAIN) {
+      const ground = terrainRecord(body);
+      grounds.set(ground, ground);
+      return ground;
+    }
     const record = placedRecord(category, body);
     checked.set(record, record);
     return record;
   },
   place(category, record, wish) {
+    // Core makes a ground texture the ground; it is never placed.
+    if (category === TERRAIN) throw new Error(`${record.id} is a ground texture: it becomes the ground, it is not placed`);
     const placed = sc2Record(record);
     if (placed.doodad) {
       if (category !== DOODADS) throw new Error(`${placed.id} is a doodad, not one of ${category}`);
@@ -99,7 +117,10 @@ export const sc2Game: PageGame = {
     }
     return rate;
   },
-  describe: (_category, record) => describeRecord(sc2Record(record)),
+  describe(category, record) {
+    const ground = category === TERRAIN ? grounds.get(record) : undefined;
+    return ground ? terrainCard(ground) : describeRecord(sc2Record(record));
+  },
   /** The stand animation, or the first one, or none. */
   restSequence(sequences) {
     if (!sequences.length) return -1;

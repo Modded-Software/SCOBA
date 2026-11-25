@@ -10,6 +10,7 @@ import os
 import re
 from pathlib import Path
 
+import workpaths
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
@@ -18,7 +19,7 @@ from .jump_gait import CYCLE_MS, KERRIGAN_CYCLE_MS, strides_for
 from .jump_gait import check_gait as _gait
 from .jump_gait import check_no_gait as _no_gait
 from .jump_rates import check_rates
-from .registry import PROFILE_BANKS, PROFILE_OUTPUTS
+from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 GROUPS = ("arc", "body", "hero")
@@ -81,8 +82,8 @@ def selected_group() -> str:
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="jump",
-        source=ROOT / "out" / "SCOBA256.SC2Map",
-        output=PROFILE_OUTPUTS["jump"],
+        source=workpaths.path("SC2_BUILT_MAP"),
+        output=profile_output("jump"),
         bank_names=PROFILE_BANKS["jump"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
@@ -432,7 +433,7 @@ def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> 
     return TestRunSpec(
         profile="jump",
         map_name="SCOBA.SC2Map",
-        map_source=PROFILE_OUTPUTS["jump"],
+        map_source=profile_output("jump"),
         map_cache_name="SCOBA.SC2Map",
         bank_names=PROFILE_BANKS["jump"],
         ready_section="jump_start",

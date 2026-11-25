@@ -37,9 +37,18 @@ help: ## Show this help
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # =============================================================================
+# Paths (SPEC-PATHS): a recipe that starts project code begins with $(PATHS).
+# scripts/paths.sh reads env/paths.conf, exports every path, and refuses a
+# work folder on the repository's disk. scripts/playtest.sh sources it too.
+# =============================================================================
+PATHS := ROOT_DIR="$(REPO_ROOT)" && source "$(REPO_ROOT)/scripts/paths.sh" && paths_check_device &&
+# A Python module of scripts/, as the project's tools run it.
+PYMOD := cd "$(REPO_ROOT)/scripts" && PYTHONPATH="$(REPO_ROOT)/scripts" uv --project "$(REPO_ROOT)" run python -m
+
+# =============================================================================
 # Setup
 # =============================================================================
-DEPS := $(SCRIPT_BASH) $(REPO_ROOT)/scripts/setup/deps.sh
+DEPS := $(PATHS) SC2_PROJECT_ROOT="$(REPO_ROOT)" $(SCRIPT_BASH) $(REPO_ROOT)/scripts/setup/deps.sh
 
 .PHONY: preflight init deps-check install install-ci install-deps install-hdtex install-hooks sync
 preflight: ## Verify environment
@@ -55,7 +64,7 @@ init: ## Root steps only, run first: sudo make init. Installs the system package
 	apt-get install -y $(SYSTEM_PACKAGES)
 
 deps-check: ## Report every dependency (tools, StarCraft II, GE-Proton, lsfg-vk, GLM, nodsdk); installs nothing
-	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) check
+	$(DEPS) check
 
 install: install-deps ## Full install: deps (hooks install separately, root-only: sudo make install-hooks)
 	:
@@ -64,14 +73,14 @@ install-ci: install-deps ## CI install: deps only, no hooks
 	:
 
 install-deps: ## Install project dependencies: uv env, stormex (built from source), model viewer, nodsdk parsers, then check
-	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) venv
-	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) stormex
+	$(DEPS) venv
+	$(DEPS) stormex
 	$(MAKE) -C "$(REPO_ROOT)" viewer-install
-	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) nodsdk
-	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) check
+	$(DEPS) nodsdk
+	$(DEPS) check
 
-install-hdtex: ## Clone ../upscale-on-arc (if absent) and install it, for the HD texture cache build
-	SC2_PROJECT_ROOT="$(REPO_ROOT)" $(DEPS) upscale
+install-hdtex: ## Clone ../upscale-on-arc (if absent) and install it, for texture requests
+	$(DEPS) upscale
 
 install-hooks: ## Install native git hooks (root-only: root-owned, immutable)
 	$(SCRIPT_BASH) $(CI_DIR)/scripts/reinstall-hooks
@@ -136,6 +145,33 @@ controls: ## Rebuild and run the controls profile
 pitch: ## Rebuild and run the 10-second pitch profile
 	$(SCRIPT_BASH) $(PLAYTEST) pitch
 
+.PHONY: map-stage host-tests measure-hit-volumes measure-footprints measure-rim-falls measure-water-features classic-skins
+map-stage: ## Expand the map into OUT=<folder> without checks or publish (for measuring a changed map)
+	test -n "$(OUT)" || { echo "ERROR: name the folder: make map-stage OUT=<folder>" >&2; exit 1; }
+	$(PATHS) uv --project "$(REPO_ROOT)" run python "$(REPO_ROOT)/scripts/expand_map.py" --out "$(OUT)"
+
+host-tests: ## Rebuild, then run the Python unittest suite for the tooling
+	$(SCRIPT_BASH) $(PLAYTEST) host-tests
+
+# The measuring tools read the built map: run make map-build first. ARGS
+# passes options on, such as ARGS="--map <folder>" or ARGS=--print.
+measure-hit-volumes: ## Measure hit volumes, then write their galaxy and camera heights (ARGS for hitvolumes.measure)
+	$(PATHS) $(PYMOD) hitvolumes.measure $(ARGS)
+	$(PATHS) $(PYMOD) hitvolumes.galaxy
+	$(PATHS) $(PYMOD) hitvolumes.camera_heights
+
+measure-footprints: ## Measure the footprint slices of the sliced models (ARGS=--print)
+	$(PATHS) $(PYMOD) mapgen.footprints.measure $(ARGS)
+
+measure-rim-falls: ## Measure the rim fall models
+	$(PATHS) $(PYMOD) mapgen.rimfalls.measure $(ARGS)
+
+measure-water-features: ## Measure the water feature models (ARGS=--print)
+	$(PATHS) $(PYMOD) mapgen.waterfeatures.measure $(ARGS)
+
+classic-skins: ## Rewrite the classic skin data from the game storage (ARGS=--list)
+	$(PATHS) $(PYMOD) hdtex.sc2.classic_skins $(ARGS)
+
 # =============================================================================
 # SC2 model web viewer (webviewer/). Machine paths go in webviewer/local.env.
 # =============================================================================
@@ -144,7 +180,7 @@ WEBVIEWER := WEBVIEWER_DIR="$(WEBVIEWER_DIR)" $(SCRIPT_BASH) $(WEBVIEWER_DIR)/sc
 
 VIEWER_ANSIBLE := cd "$(REPO_ROOT)/deploy/ansible" && ansible-playbook viewer-dev.yml
 
-.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-ghost-survey viewer-ghost-export-check viewer-serve viewer-provision viewer-unprovision viewer-start viewer-stop viewer-restart viewer-status viewer-logs viewer-test viewer-test-all
+.PHONY: viewer-install viewer-build viewer-catalog viewer-dataset viewer-survey viewer-ghost-survey viewer-ghost-export-check viewer-serve viewer-provision viewer-unprovision viewer-start viewer-stop viewer-restart viewer-status viewer-logs viewer-test viewer-test-e2e viewer-gpu-check viewer-test-all
 viewer-install: ## Model viewer: install node deps and the test browser, build the renderer
 	$(WEBVIEWER)/setup.sh
 
@@ -190,8 +226,14 @@ viewer-status: ## Model viewer: show the dev server service and its health answe
 viewer-logs: ## Model viewer: show the last log lines of the dev server service (LINES=n)
 	$(WEBVIEWER)/service.sh logs
 
-viewer-test: ## Model viewer: run the Playwright integration tests (not the @slow surveys)
-	$(WEBVIEWER)/test.sh
+viewer-test: ## Model viewer: run the unit tests (no browser: the tools, the server's routes; ARGS=spec filter)
+	$(WEBVIEWER)/test.sh --project=unit $(ARGS)
 
-viewer-test-all: ## Model viewer: run every Playwright test, the @slow surveys too
+viewer-test-e2e: ## Model viewer: run the end-to-end tests (the page in a browser; not the @slow surveys; ARGS=spec filter)
+	$(WEBVIEWER)/test.sh --project=e2e $(ARGS)
+
+viewer-gpu-check: ## Model viewer: check that the test browser renders WebGL on the GPU (tests/e2e/gpu.spec.mjs only)
+	$(WEBVIEWER)/test.sh --project=e2e gpu.spec
+
+viewer-test-all: ## Model viewer: run every test, unit and end-to-end, the @slow surveys too
 	WEBVIEWER_TEST_ALL=1 $(WEBVIEWER)/test.sh

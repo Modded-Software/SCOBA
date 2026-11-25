@@ -42,7 +42,7 @@ export const addAllFeature: Feature = {
     // ---- confirm dialog ----
 
     const question = make('div', { className: 'question' });
-    const confirm = new ConfirmDialog({ id: 'add-all-dialog', title: 'add all', yesText: 'add', content: [question] });
+    const confirm = new ConfirmDialog({ id: 'add-all-dialog', title: 'Add all', yesText: 'Add', content: [question] });
 
     function ask(text: string): Promise<boolean> {
       question.textContent = text;

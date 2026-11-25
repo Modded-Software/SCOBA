@@ -11,9 +11,9 @@ import re
 import shutil
 from pathlib import Path
 
+import workpaths
 
 from flora import terrain as terrain_mod
-from project_root import project_root
 
 KINDS = ("ZerusBrambles", "ZerusPlant", "ZerusPlantClusterMedium", "ZerusTallGrassCluster", "ZerusPlantlife")
 ORIGIN = (197.0, 178.0)  # east of the hero spawn (188, 186)
@@ -74,9 +74,8 @@ def add_labels(map_dir: Path) -> None:
 
 
 def main() -> int:
-    root = project_root()
-    src = root / "out" / "SCOBA256.SC2Map"
-    dst = root / "out" / "SCOBA256_heightprobe.SC2Map"
+    src = workpaths.path("SC2_BUILT_MAP")
+    dst = workpaths.path("SC2_OUT") / "SCOBA256_heightprobe.SC2Map"
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)

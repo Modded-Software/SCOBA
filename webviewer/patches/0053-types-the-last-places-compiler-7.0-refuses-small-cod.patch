@@ -1,7 +1,7 @@
 From 1989c174abba0bc2c1b9b91e34d99e68010fe095 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 14:43:36 +0200
-Subject: [PATCH 53/56] types: the last places compiler 7.0 refuses (small code
+Subject: [PATCH 53/57] types: the last places compiler 7.0 refuses (small code
  changes)
 
 billboard: the 3x3 scratch matrix is a Float32Array(9). It was mat3.create(), whose type has no set(); every use fills all nine values first.

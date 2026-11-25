@@ -22,6 +22,8 @@ sc2_apply_gpu_env
 if [ "${SC2_PLAYTEST_ACTIVE:-}" != "1" ]; then
     exec bash "$ROOT_DIR/scripts/playtest.sh" launch
 fi
+# shellcheck source=paths.sh
+source "$ROOT_DIR/scripts/paths.sh" || exit 1
 
 UV_BIN="${UV_BIN:-uv}"
 if [ "${UV_BIN#/}" = "$UV_BIN" ]; then
@@ -37,7 +39,7 @@ mkdir -p "$LOG_DIR"
 exec >>"$LOG_DIR/launcher.log" 2>&1
 
 MAP_NAME="SCOBA.SC2Map"
-MAP_SOURCE="${SC2_MAP_SOURCE:-$ROOT_DIR/out/SCOBA256.SC2Map}"
+MAP_SOURCE="${SC2_MAP_SOURCE:-$SC2_BUILT_MAP}"
 if [ ! -e "$MAP_SOURCE" ]; then
     MAP_SOURCE="$ROOT_DIR/src/$MAP_NAME"
 fi
@@ -46,13 +48,12 @@ if [ ! -e "$MAP_SOURCE" ]; then
 fi
 
 STEAM_ROOT="${STEAM_ROOT:-$HOME/.var/app/com.valvesoftware.Steam/data/Steam}"
-BNET_PREFIX="${BNET_PREFIX:-$HOME/Games/battlenet-prefix}"
-SC2_DIR="${SC2_DIR:-$BNET_PREFIX/pfx/drive_c/Program Files (x86)/StarCraft II}"
+SC2_DIR="$SC2_INSTALL"
 SC2_EXE="$SC2_DIR/StarCraft II.exe"
 SC2_SWITCHER="$SC2_DIR/Support64/SC2Switcher_x64.exe"
 MAP_DIR="$SC2_DIR/Maps"
 MAP_TARGET="$MAP_DIR/$MAP_NAME"
-CACHE_DIR="${SC2_CACHE_DIR:-$BNET_PREFIX/pfx/drive_c/ProgramData/Blizzard Entertainment/StarCraft II/Maps/Cache/$MAP_NAME}"
+CACHE_DIR="$SC2_MAP_CACHE/$MAP_NAME"
 SC2_LAUNCH_ARGS=(-run "$MAP_NAME" -displaymode "${SC2_DISPLAYMODE:-0}" -preload 1 -NoUserCheats -reloadcheck)
 
 log() {
@@ -101,8 +102,8 @@ if [ -f "$MAP_TARGET/BuildStamp.txt" ]; then
     log "stamp: $(cat "$MAP_TARGET/BuildStamp.txt")"
 fi
 if [ -d "$MAP_SOURCE" ]; then
-    DOCS_DIR="${SC2_DOCUMENTS:-$BNET_PREFIX/pfx/drive_c/users/steamuser/Documents/StarCraft II}"
-    "$UV_BIN" run python "$ROOT_DIR/scripts/dump_m3_clip_metrics.py" --map "$MAP_SOURCE" --docs "$DOCS_DIR" >>"$LOG_DIR/clip-metrics.log" 2>&1
+    DOCS_DIR="$SC2_DOCUMENTS"
+    (cd "$ROOT_DIR/scripts" && PYTHONPATH="$ROOT_DIR/scripts" "$UV_BIN" run python -m m3dump.dump_m3_clip_metrics --map "$MAP_SOURCE" --docs "$DOCS_DIR") >>"$LOG_DIR/clip-metrics.log" 2>&1
     log "clip metrics: $DOCS_DIR/Banks/SCOBACLIPMETRICS.SC2Bank"
 fi
 

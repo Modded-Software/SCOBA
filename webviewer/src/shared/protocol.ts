@@ -20,6 +20,8 @@ export interface GameInfo {
   available: boolean;
   /** Why not, when not available. */
   reason: string | null;
+  /** The game offers a texture service (SPEC-VIEWER 17, R-VIEW-100). */
+  textures: boolean;
 }
 
 /** GET /api/games. */
@@ -81,8 +83,9 @@ export const routes = {
   summary: (game: GameId, dataset: DatasetId): string => `/api/${game}/summary?${new URLSearchParams({ dataset })}`,
   records: (game: GameId, category: CategoryId, dataset: DatasetId, query: Record<string, string>): string => `/api/${game}/records/${category}?${new URLSearchParams({ dataset, ...query })}`,
   record: (game: GameId, category: CategoryId, dataset: DatasetId, id: string): string => `/api/${game}/record/${category}?${new URLSearchParams({ dataset, id })}`,
-  file: (game: GameId, dataset: DatasetId, path: string, version: string): string => `/api/${game}/file?${new URLSearchParams({ dataset, path, v: version })}`,
-  asset: (game: GameId, dataset: DatasetId, kind: AssetKind, ref: string, version: string): string => `/api/${game}/asset?${new URLSearchParams({ dataset, kind, ref, v: version })}`,
+  // `v` is the dataset's signature, so a reloaded dataset is fetched anew; a dataset with no signature has no `v`.
+  file: (game: GameId, dataset: DatasetId, path: string, version: string | null): string => `/api/${game}/file?${new URLSearchParams({ dataset, path, ...(version === null ? {} : { v: version }) })}`,
+  asset: (game: GameId, dataset: DatasetId, kind: AssetKind, ref: string, version: string | null): string => `/api/${game}/asset?${new URLSearchParams({ dataset, kind, ref, ...(version === null ? {} : { v: version }) })}`,
   icon: (game: GameId, dataset: DatasetId, name: string): string => `/api/${game}/icon/${name}?${new URLSearchParams({ dataset })}`,
   backdrops: (game: GameId, query: Record<string, string>): string => `/api/${game}/backdrops?${new URLSearchParams(query)}`,
   extension: (game: GameId, name: string): string => `/api/${game}/x/${name}`,

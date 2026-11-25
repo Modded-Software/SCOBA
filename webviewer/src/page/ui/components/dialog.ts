@@ -43,6 +43,8 @@ export interface ConfirmOptions {
   noText?: string;
   /** Nodes above the buttons. */
   content?: readonly Node[];
+  /** The yes button deletes or discards: it is red (R-VIEW-136). */
+  danger?: boolean;
 }
 
 /**
@@ -55,11 +57,11 @@ export class ConfirmDialog {
   readonly no: HTMLButtonElement;
   private answer: ((value: boolean) => void) | null = null;
 
-  constructor({ id, title, yesText, noText = 'cancel', content = [] }: ConfirmOptions) {
+  constructor({ id, title, yesText, noText = 'Cancel', content = [], danger = false }: ConfirmOptions) {
     const name = id.replace(/-dialog$/, '');
     this.dialog = new Dialog({ id, title });
     this.dialog.node.classList.add('confirm-dialog');
-    this.yes = make('button', { id: `${name}-yes`, className: 'primary', textContent: yesText });
+    this.yes = make('button', { id: `${name}-yes`, className: danger ? 'primary danger' : 'primary', textContent: yesText });
     this.no = make('button', { id: `${name}-no`, textContent: noText });
     this.dialog.body.append(...content, make('div', { className: 'answers' }, [this.no, this.yes]));
     this.yes.addEventListener('click', () => this.settle(true));

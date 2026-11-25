@@ -8,6 +8,7 @@ import type { StatusService } from '../../core/context';
 import { byId, byIdAs, make } from '../../core/dom';
 import { ConfirmDialog } from '../../ui/components/dialog';
 import { Dropdown } from '../../ui/components/dropdown';
+import { PENCIL, TRASH } from '../../ui/icons';
 
 export interface SceneListActions {
   state(): ScenesState;
@@ -18,9 +19,6 @@ export interface SceneListActions {
   exportScene(): string;
   importScene(text: string): Promise<string>;
 }
-
-const PENCIL = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M11 1l4 4-9 9H2v-4zM10 4l2 2"/></svg>';
-const TRASH = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M6 1h4l1 1h3v2H2V2h3zM3 5h10l-1 10H4zm3 2v6h1V7zm3 0v6h1V7z"/></svg>';
 
 /** A file name for a scene: its name with only letters, digits, "-" and "_". */
 export const fileName = (name: string): string => `${name.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'scene'}.scene.json`;
@@ -39,7 +37,7 @@ export function installSceneList(status: StatusService, actions: SceneListAction
   // ---- dialogs: a name (new, rename), a delete ----
 
   const nameBox = make('input', { id: 'scene-name', type: 'text', autocomplete: 'off', spellcheck: false, maxLength: 80 });
-  const nameDialog = new ConfirmDialog({ id: 'scene-name-dialog', title: 'scene name', yesText: 'save', content: [nameBox] });
+  const nameDialog = new ConfirmDialog({ id: 'scene-name-dialog', title: 'Scene name', yesText: 'Save', content: [nameBox] });
   const nameOk = (): boolean => nameBox.value.trim().length > 0;
   nameBox.addEventListener('input', () => {
     nameDialog.yes.disabled = !nameOk();
@@ -60,7 +58,7 @@ export function installSceneList(status: StatusService, actions: SceneListAction
   }
 
   const question = make('div', { className: 'question' });
-  const deleteDialog = new ConfirmDialog({ id: 'scene-delete-dialog', title: 'delete scene', yesText: 'delete', content: [question] });
+  const deleteDialog = new ConfirmDialog({ id: 'scene-delete-dialog', title: 'Delete Scene', yesText: 'Delete Scene', content: [question], danger: true });
 
   async function askDelete(id: string, label: string): Promise<void> {
     question.textContent = `Delete the scene "${label}"? This cannot be undone.`;
@@ -107,13 +105,13 @@ export function installSceneList(status: StatusService, actions: SceneListAction
     const rows = state.list.map((scene) => {
       const go = make('button', { className: 'go', textContent: scene.name, title: `open "${scene.name}" (${scene.items} instances)` });
       go.addEventListener('click', () => run(() => actions.openScene(scene.id)));
-      const rename = iconButton('rename', `rename "${scene.name}"`, PENCIL, () =>
+      const rename = iconButton('rename', `Rename Scene "${scene.name}"`, PENCIL, () =>
         run(async () => {
           const name = await askName('rename scene', scene.name);
           if (name !== null) await actions.renameScene(scene.id, name);
         }),
       );
-      const trash = iconButton('trash', `delete "${scene.name}"`, TRASH, () => run(() => askDelete(scene.id, scene.name)));
+      const trash = iconButton('trash', `Delete Scene "${scene.name}"`, TRASH, () => run(() => askDelete(scene.id, scene.name)));
       const row = make('li', {}, [go, rename, trash]);
       row.dataset.id = scene.id;
       row.classList.toggle('selected', scene.id === state.open?.id);
@@ -122,7 +120,7 @@ export function installSceneList(status: StatusService, actions: SceneListAction
     const broken = state.refused.map((scene) => {
       const label = scene.name ?? scene.id;
       const text = make('span', { className: 'go', textContent: `${label}: refused`, title: scene.reason });
-      const trash = iconButton('trash', `delete "${label}"`, TRASH, () => run(() => askDelete(scene.id, label)));
+      const trash = iconButton('trash', `Delete Scene "${label}"`, TRASH, () => run(() => askDelete(scene.id, label)));
       const row = make('li', { className: 'refused' }, [text, trash]);
       row.dataset.id = scene.id;
       return row;
