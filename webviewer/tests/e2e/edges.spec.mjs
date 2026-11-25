@@ -19,12 +19,12 @@ const edges = async (page) => {
   await frames(page);
   return (await viewState(page)).edges;
 };
-const select = (page, ids) => page.evaluate((list) => window.SC2App.setSelection(list), ids);
+const select = (page, ids) => page.evaluate((list) => window.SCOBAEdit.setSelection(list), ids);
 const statusText = (page) => page.locator('#status');
 
 /** A unit standing still, the camera on it. */
 async function place(page, unit, options = {}) {
-  const id = await page.evaluate(([u, o]) => window.sc2viewer.addUnit(u, { x: 0, y: 0, pick: 0.5, sequence: -1, ...o }), [unit, options]);
+  const id = await page.evaluate(([u, o]) => window.scobaeditor.addUnit(u, { x: 0, y: 0, pick: 0.5, sequence: -1, ...o }), [unit, options]);
   await idle(page);
   await view(page, VIEW);
   await page.mouse.move(1000, 80);
@@ -33,7 +33,7 @@ async function place(page, unit, options = {}) {
 
 test('unit: the edge list holds each triangle edge once, the lower index first', async ({ page }) => {
   const errors = await open(page);
-  const list = (...args) => page.evaluate((a) => window.sc2viewer.probe('nod', 'edges', ...a), args);
+  const list = (...args) => page.evaluate((a) => window.scobaeditor.probe('nod', 'edges', ...a), args);
   // A quad of two triangles: five edges, the shared one once.
   expect(await list([0, 1, 2, 2, 1, 3])).toEqual([0, 1, 1, 2, 0, 2, 1, 3, 2, 3]);
   // A range of the list: the second triangle only.
@@ -131,7 +131,7 @@ test('a walking unit draws its edges at every moment of its walk', async ({ page
   const still = await place(page, 'Marine');
   const walk = (await viewState(page)).items[0].sequences.findIndex((s) => /^Walk/.test(s));
   expect(walk).toBeGreaterThanOrEqual(0);
-  await page.evaluate((id) => window.sc2viewer.remove(id), still);
+  await page.evaluate((id) => window.scobaeditor.remove(id), still);
   const marine = await place(page, 'Marine', { sequence: walk });
   expect((await viewState(page)).items[0].sequence).toBe(walk);
   await select(page, [marine]);
@@ -140,7 +140,7 @@ test('a walking unit draws its edges at every moment of its walk', async ({ page
   for (let k = 0; k < 3; k++) {
     // On in game time: the playhead has moved since the last moment.
     const last = (await viewState(page)).items[0].frame;
-    await page.waitForFunction((f) => window.sc2viewer.state().items[0].frame !== f, last);
+    await page.waitForFunction((f) => window.scobaeditor.state().items[0].frame !== f, last);
     const now = await edges(page);
     moments.push({ frame: (await viewState(page)).items[0].frame, lines: now.lines });
   }
@@ -159,12 +159,12 @@ test('farther than the range from the eye, a unit shows no edges; nearer, it doe
   expect(near.lines).toBeGreaterThan(0);
   expect(near.far).toEqual([]);
 
-  await page.evaluate((d) => window.sc2viewer.view({ distance: d }), near.range * 1.5);
+  await page.evaluate((d) => window.scobaeditor.view({ distance: d }), near.range * 1.5);
   const far = await edges(page);
   expect(far).toMatchObject({ on: [marine], far: [marine], lines: 0 });
 
   // Just inside the range: drawn.
-  await page.evaluate((d) => window.sc2viewer.view({ distance: d }), near.range * 0.9);
+  await page.evaluate((d) => window.scobaeditor.view({ distance: d }), near.range * 0.9);
   const inside = await edges(page);
   expect(inside.far).toEqual([]);
   expect(inside.lines).toBe(near.lines);
@@ -178,7 +178,7 @@ test('not kept: a paste and a reload start without edges', async ({ page }) => {
   await page.keyboard.press('Control+/');
   expect((await edges(page)).on).toEqual([marine]);
 
-  const at = (await page.evaluate(() => window.sc2viewer.screenOf([2, -2, 0]))).map(Math.round);
+  const at = (await page.evaluate(() => window.scobaeditor.screenOf([2, -2, 0]))).map(Math.round);
   await page.mouse.move(at[0], at[1]);
   await page.keyboard.press('Control+c');
   await page.keyboard.press('Control+v');
@@ -197,7 +197,7 @@ test('Ghost: Ctrl+/ draws the edges of a nod model', async ({ page }) => {
   const errors = await open(page);
   const crate = await addGhost(page, '3D/Models/crate.nod');
   await idle(page);
-  await page.evaluate(() => window.sc2viewer.view('front'));
+  await page.evaluate(() => window.scobaeditor.view('front'));
   await page.mouse.move(1000, 80);
   await select(page, [crate]);
   await page.keyboard.press('Control+/');

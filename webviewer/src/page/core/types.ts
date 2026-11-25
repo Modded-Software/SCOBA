@@ -127,7 +127,7 @@ export interface AddAllRun {
   skipped: string[];
 }
 
-/** The record being dragged into the view (features/drag): sc2viewer.state().dragPreview. */
+/** The record being dragged into the view (features/drag): scobaeditor.state().dragPreview. */
 export interface DragPreviewState {
   kind: string;
   unit: string;

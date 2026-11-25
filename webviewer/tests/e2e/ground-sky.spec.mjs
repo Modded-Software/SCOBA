@@ -12,7 +12,7 @@ const topDown = (page) => view(page, { yaw: -Math.PI / 2, pitch: Math.PI / 2 - 0
 /** The ground spots the last frame drew. */
 const spots = async (page) => {
   await frames(page);
-  return page.evaluate(() => window.SC2App.ground.spotsDrawn);
+  return page.evaluate(() => window.SCOBAEdit.ground.spotsDrawn);
 };
 
 test('the ground grid is on by default; its button turns it off and on', async ({ page }) => {
@@ -32,10 +32,10 @@ test('a unit gives the grid a spot where it stands; removed, the spot goes', asy
   const errors = await open(page);
   await topDown(page);
   expect(await spots(page)).toBe(0);
-  const id = await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: 0, y: 0, team: 1, pick: 0.5 }));
+  const id = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: 0, y: 0, team: 1, pick: 0.5 }));
   await idle(page);
   expect(await spots(page)).toBe(1);
-  await page.evaluate((i) => window.sc2viewer.remove(i), id);
+  await page.evaluate((i) => window.scobaeditor.remove(i), id);
   expect(await spots(page)).toBe(0);
   expect(errors).toEqual([]);
 });
@@ -43,7 +43,7 @@ test('a unit gives the grid a spot where it stands; removed, the spot goes', asy
 test('the ground point under the mouse is the pointer; over a panel there is none', async ({ page }) => {
   const errors = await open(page);
   await topDown(page);
-  const at = await page.evaluate(() => window.sc2viewer.screenOf([1.3, 0, 0]));
+  const at = await page.evaluate(() => window.scobaeditor.screenOf([1.3, 0, 0]));
   await page.mouse.move(at[0], at[1]);
   const pointer = (await state(page)).pointer;
   expect(pointer[0]).toBeCloseTo(1.3, 1);
@@ -73,7 +73,7 @@ test('the sky button opens a dialog; Escape closes it and changes nothing; a pic
   expect((await state(page)).sky).toMatchObject({ id: 'AiurSkybox' });
   await expect(page.locator('#sky-button')).toHaveClass(/\bon\b/);
   await idle(page);
-  await page.waitForFunction(() => window.sc2viewer.state().skyLoaded);
+  await page.waitForFunction(() => window.scobaeditor.state().skyLoaded);
   await frames(page);
   const s = await state(page);
   expect(s.skyDrawn).toBe(true);

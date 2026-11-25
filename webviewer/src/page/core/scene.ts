@@ -111,7 +111,7 @@ export function createScene({ host, games, api, status, events, sky, skins }: Sc
       if (!format.attachClips) throw new Error(`${placement.file}: format ${format.id} cannot take ${placement.clips.length} clip(s)`);
       const refused = await format.attachClips(instance, placement.clips, (reference) => api.assetUrl('animation', reference, from.dataset, from.game));
       if (refused.length) {
-        console.warn(`sc2viewer: ${placement.file}: clips left out: ${refused.join('; ')}`);
+        console.warn(`scobaeditor: ${placement.file}: clips left out: ${refused.join('; ')}`);
         status.setStatus(`${placement.file}: ${refused.length} clip(s) left out (${refused[0] ?? ''})`, { failure: true });
       }
     }

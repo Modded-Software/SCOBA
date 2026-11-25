@@ -8,14 +8,14 @@ async function open(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 20_000 }).toBe(true);
   return errors;
 }
 
-const state = (page) => page.evaluate(() => window.sc2viewer.state());
-const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 30_000 });
+const state = (page) => page.evaluate(() => window.scobaeditor.state());
+const idle = (page) => page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 30_000 });
 const row = (page, id) => page.locator(`#doodads li[data-id="${id}"]`);
-const add = (page, id, options = {}) => page.evaluate(([id, options]) => window.sc2viewer.addDoodad(id, options), [id, options]);
+const add = (page, id, options = {}) => page.evaluate(([id, options]) => window.scobaeditor.addDoodad(id, options), [id, options]);
 
 async function showDoodads(page) {
   await page.click('#tab-doodads');
@@ -142,10 +142,10 @@ test('the variation select swaps the model file and keeps place, angle and scale
   const select = page.locator('#scene li[data-doodad="ZerusTree"] select.variation');
   await expect(select.locator('option')).toHaveCount(12);
   await select.selectOption('7');
-  await page.waitForFunction(() => window.sc2viewer.state().items[0].variation === 7);
+  await page.waitForFunction(() => window.scobaeditor.state().items[0].variation === 7);
   await idle(page);
   // "drawn" is what the last frame drew: let one draw the new instance.
-  await page.waitForFunction(() => window.sc2viewer.state().items[0].drawn);
+  await page.waitForFunction(() => window.scobaeditor.state().items[0].drawn);
   const s = await state(page);
   const after = s.items[0];
   console.log('variation swap', JSON.stringify({ before: before.path, after: after.path, vertices: [before.vertexCount, after.vertexCount] }));
@@ -157,7 +157,7 @@ test('the variation select swaps the model file and keeps place, angle and scale
   expect(s.sceneInstances).toBe(1);
   await expect(page.locator('#scene li[data-doodad="ZerusTree"] select.variation')).toHaveValue('7');
   // Negative: a variation the doodad does not have is refused.
-  const bad = await page.evaluate(() => window.SC2App.setVariation(window.SC2App.items[0], 12).then(() => 'swapped', (error) => error.message));
+  const bad = await page.evaluate(() => window.SCOBAEdit.setVariation(window.SCOBAEdit.items[0], 12).then(() => 'swapped', (error) => error.message));
   expect(bad).toBe('ZerusTree has no variation 12 (it has 12)');
   expect((await state(page)).items[0].variation).toBe(7);
   expect(errors).toEqual([]);
@@ -177,7 +177,7 @@ test('a doodad with one variation has no variation select', async ({ page }) => 
 
 test('dragging a doodad shows its preview; the drop keeps the previewed variation and angle', async ({ page }) => {
   await open(page);
-  await page.evaluate(() => window.sc2viewer.setGrid(false));
+  await page.evaluate(() => window.scobaeditor.setGrid(false));
   await showDoodads(page);
   await page.fill('#search-doodads', 'zerus tree');
   await expect(row(page, 'ZerusTree')).toBeVisible();
@@ -193,7 +193,7 @@ test('dragging a doodad shows its preview; the drop keeps the previewed variatio
   expect(preview.variation).toBeGreaterThanOrEqual(0);
   // Negative: the preview is not a scene item.
   expect((await state(page)).items).toEqual([]);
-  const at = await page.evaluate(([x, y]) => window.sc2viewer.groundUnder(x, y), [701, 450]);
+  const at = await page.evaluate(([x, y]) => window.scobaeditor.groundUnder(x, y), [701, 450]);
   await page.mouse.up();
   await idle(page);
   const s = await state(page);
@@ -220,9 +220,9 @@ test('"add all" on the doodads tab adds every doodad of the list after a confirm
 
   await page.click('#add-all-doodads');
   await page.click('#add-all-yes');
-  await page.waitForFunction(() => !window.SC2App.addAllState().running && window.SC2App.addAllState().asked > 0, null, { timeout: 60_000 });
+  await page.waitForFunction(() => !window.SCOBAEdit.addAllState().running && window.SCOBAEdit.addAllState().asked > 0, null, { timeout: 60_000 });
   await idle(page);
-  const run = await page.evaluate(() => window.SC2App.addAllState());
+  const run = await page.evaluate(() => window.SCOBAEdit.addAllState());
   console.log('run', JSON.stringify({ asked: run.asked, added: run.added, failed: run.failed, landmark: run.landmark }));
   expect(run).toMatchObject({ asked: listed.total, added: listed.total, failed: [] });
   const items = (await state(page)).items;
@@ -230,7 +230,7 @@ test('"add all" on the doodads tab adds every doodad of the list after a confirm
   // Negative: no units came along.
   expect(items.every((i) => i.unit === null)).toBe(true);
   // The landmark is named after the doodad list.
-  const names = await page.evaluate(() => window.SC2App.landmarks().map((l) => l.name));
+  const names = await page.evaluate(() => window.SCOBAEdit.landmarks().map((l) => l.name));
   expect(names).toContain('Doodads "aiur tree"');
   expect(errors).toEqual([]);
 });

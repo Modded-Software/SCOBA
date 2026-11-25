@@ -9,7 +9,7 @@ import { chooseRow, open, state, textureFrame } from '../page.mjs';
 // The window compares; it changes nothing (R-VIEW-101). The tests' store is
 // fresh: no texture has a variant here. Variants: texture-variants.spec.mjs.
 
-const win = (page) => page.evaluate(() => window.sc2viewer.textureWindow());
+const win = (page) => page.evaluate(() => window.scobaeditor.textureWindow());
 
 /** The texture page's own state, once the window handed it the textures of `user` and the page read their states. */
 async function inside(page, user) {

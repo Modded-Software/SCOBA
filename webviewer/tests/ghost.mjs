@@ -7,7 +7,7 @@ export async function open(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 20_000 }).toBe(true);
   return errors;
 }
 
@@ -19,12 +19,12 @@ export async function open(page) {
  */
 export const FOREIGN_CLIP = /clips left out: .*deathblown \(nova_death_byZergling\.nad\): clip deathblown: track \d+ names bone 32; the model has 32/;
 
-export const add = (page, path, x = 0) => page.evaluate(([p, at]) => window.sc2viewer.add(p, { game: 'ghost', x: at, y: 0, rot: 0 }), [path, x]);
-export const addRecord = (page, category, id, x = 0) => page.evaluate(([c, i, at]) => window.sc2viewer.addRecord(c, i, { game: 'ghost', x: at, y: 0, rot: 0 }), [category, id, x]);
-export const probe = (page, name, ...args) => page.evaluate(([n, a]) => window.sc2viewer.probe('nod', n, ...a), [name, args]);
-export const itemOf = async (page, id) => (await page.evaluate(() => window.sc2viewer.state())).items.find((i) => i.id === id);
+export const add = (page, path, x = 0) => page.evaluate(([p, at]) => window.scobaeditor.add(p, { game: 'ghost', x: at, y: 0, rot: 0 }), [path, x]);
+export const addRecord = (page, category, id, x = 0) => page.evaluate(([c, i, at]) => window.scobaeditor.addRecord(c, i, { game: 'ghost', x: at, y: 0, rot: 0 }), [category, id, x]);
+export const probe = (page, name, ...args) => page.evaluate(([n, a]) => window.scobaeditor.probe('nod', n, ...a), [name, args]);
+export const itemOf = async (page, id) => (await page.evaluate(() => window.scobaeditor.state())).items.find((i) => i.id === id);
 /** The id of the item the pick finds at a page pixel, or null. */
-export const hitId = (page, [x, y]) => page.evaluate(([px, py]) => window.SC2App.itemAt(px, py)?.id ?? null, [x, y]);
+export const hitId = (page, [x, y]) => page.evaluate(([px, py]) => window.SCOBAEdit.itemAt(px, py)?.id ?? null, [x, y]);
 /** Two frames drawn, so the pick buffer and lastDrawn hold this state. */
 export const frames = (page) => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
@@ -34,7 +34,7 @@ export async function frameItem(page, id) {
   const [min, max] = item.vertexBox;
   const target = [item.x + (min[0] + max[0]) / 2, item.y + (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
   const size = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
-  await page.evaluate((v) => window.sc2viewer.view(v), { yaw: -Math.PI / 2, pitch: 0.35, distance: size * 1.6 + 0.5, target });
+  await page.evaluate((v) => window.scobaeditor.view(v), { yaw: -Math.PI / 2, pitch: 0.35, distance: size * 1.6 + 0.5, target });
   await frames(page);
 }
 
@@ -58,9 +58,9 @@ export async function triangleHits(page, id, group) {
       let hit = 0;
       let miss = 0;
       for (const p of pts) {
-        const s = window.sc2viewer.screenOf(p);
+        const s = window.scobaeditor.screenOf(p);
         if (!s) continue;
-        if (window.SC2App.itemAt(Math.round(s[0]), Math.round(s[1]))?.id === own) hit++;
+        if (window.SCOBAEdit.itemAt(Math.round(s[0]), Math.round(s[1]))?.id === own) hit++;
         else miss++;
       }
       return { hit, miss };

@@ -7,20 +7,20 @@ import { frames, idle, open } from '../page.mjs';
 // Survey: scripts/uv-anim-survey.sh. How the moving texture looks is an
 // operator check (SPEC-VIEWER 14); these tests read the uploaded transforms.
 
-const lastItem = async (page) => (await page.evaluate(() => window.sc2viewer.state())).items.at(-1);
+const lastItem = async (page) => (await page.evaluate(() => window.scobaeditor.state())).items.at(-1);
 
 /**
  * Two snapshots of the unit: after its first draws, and once its engine
  * frame has moved `ms` on (game time, a loop counts as moved).
  */
 async function sample(page, id, ms) {
-  await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0 }), id);
+  await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0 }), id);
   await idle(page);
   await frames(page);
-  await page.waitForFunction(() => window.sc2viewer.state().items.at(-1).uvLayers.some((l) => l.binds > 0));
+  await page.waitForFunction(() => window.scobaeditor.state().items.at(-1).uvLayers.some((l) => l.binds > 0));
   const a = await lastItem(page);
   await page.waitForFunction(([f, step]) => {
-    const now = window.sc2viewer.state().items.at(-1).frame;
+    const now = window.scobaeditor.state().items.at(-1).frame;
     return now < f || now - f >= step;
   }, [a.frame, ms]);
   await frames(page);

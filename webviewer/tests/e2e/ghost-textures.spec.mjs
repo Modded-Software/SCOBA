@@ -7,7 +7,7 @@
 import { allowErrors, test, expect } from '../fixtures.mjs';
 import { open, add, frameItem } from '../ghost.mjs';
 
-const win = (page) => page.evaluate(() => window.sc2viewer.textureWindow());
+const win = (page) => page.evaluate(() => window.scobaeditor.textureWindow());
 const textureFrame = (page) => page.frames().find((frame) => frame.url().includes('/texture-viewer.html'));
 
 /** The page's own state once it shows `user` and the textures were handed to it. */
@@ -59,7 +59,7 @@ test('a double-click on a Ghost instance opens the shared texture window on its 
   const errors = await open(page);
   const id = await add(page, '3D/Models/crate.nod');
   await frameItem(page, id);
-  const at = await page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
+  const at = await page.evaluate((i) => window.scobaeditor.itemPixel(i), id);
   await page.mouse.dblclick(at[0], at[1]);
   await expect(page.locator('#texture-window')).toBeVisible();
   await expect(page.locator('#texture-window .window-title')).toContainText('crate.nod');
@@ -95,7 +95,7 @@ test('negative: Ghost has no texture service: no state, no request, no skin, no 
   });
   const errors = await open(page);
   const id = await add(page, '3D/Models/crate.nod');
-  expect(await page.evaluate((i) => window.sc2viewer.skinChoices(i), id)).toEqual({ owner: null, choices: [], state: null, following: false });
+  expect(await page.evaluate((i) => window.scobaeditor.skinChoices(i), id)).toEqual({ owner: null, choices: [], state: null, following: false });
   await page.locator(`#scene li[data-id="${id}"] .head .name`).dblclick();
   const shown = await inside(page, 'crate.nod');
   expect(shown.entries.length).toBeGreaterThan(0);
@@ -133,7 +133,7 @@ test('gallery rows open it: an actor of the actors pane and a file of the models
   expect((await win(page)).file).toBe('3D/Models/zergling.nod');
   expect(model.entries.map((e) => e.texture)).toEqual(actor.entries.map((e) => e.texture));
   // Negative: a double-click adds nothing to the scene.
-  expect((await page.evaluate(() => window.sc2viewer.state())).items).toEqual([]);
+  expect((await page.evaluate(() => window.scobaeditor.state())).items).toEqual([]);
   expect(errors).toEqual([]);
 });
 
@@ -170,7 +170,7 @@ test('materials not drawn: the reason, on the texture card or in the problems wh
       expect(shown.entries.some((e) => e.facts.some(([n]) => n === `material ${material}`))).toBe(false);
     }
     await closeWindow(page);
-    await page.evaluate((i) => window.sc2viewer.remove(i), id);
+    await page.evaluate((i) => window.scobaeditor.remove(i), id);
   }
   expect(errors).toEqual([]);
 });
@@ -192,7 +192,7 @@ test('negative: a texture that does not load is named in the problems; the insta
   expect(shown.entries).toEqual([]);
   expect(shown.problems).toEqual([expect.stringMatching(/\.dds \(404\)$/i)]);
   expect(gone).toBe(1);
-  const groups = await page.evaluate((i) => window.sc2viewer.probe('nod', 'groups', i), id);
+  const groups = await page.evaluate((i) => window.scobaeditor.probe('nod', 'groups', i), id);
   expect(groups[0].textureLoaded).toBe(true);
   expect(errors).toEqual([]);
 });

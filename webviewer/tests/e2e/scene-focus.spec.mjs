@@ -14,19 +14,19 @@ async function open(page) {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
 async function place(page, units) {
   const ids = [];
-  for (const [id, x, y] of units) ids.push(await page.evaluate(([u, ux, uy]) => window.sc2viewer.addUnit(u, { x: ux, y: uy }), [id, x, y]));
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  await page.evaluate((v) => window.sc2viewer.view(v), VIEW);
+  for (const [id, x, y] of units) ids.push(await page.evaluate(([u, ux, uy]) => window.scobaeditor.addUnit(u, { x: ux, y: uy }), [id, x, y]));
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  await page.evaluate((v) => window.scobaeditor.view(v), VIEW);
   return ids;
 }
 
-const state = (page) => page.evaluate(() => window.sc2viewer.state());
+const state = (page) => page.evaluate(() => window.scobaeditor.state());
 const head = (page, id) => page.locator(`#scene li[data-id="${id}"] .head .name`);
 const marked = (page) => page.locator('#scene li.selected').evaluateAll((rows) => rows.map((r) => Number(r.dataset.id)));
 
@@ -50,7 +50,7 @@ test('ctrl + click on a row name points the camera at the instance and selects i
 
   // The instance is on screen, near the middle of the view.
   const box = await page.locator('canvas#view').boundingBox();
-  const at = await page.evaluate((i) => window.sc2viewer.itemPixel(i), ultra);
+  const at = await page.evaluate((i) => window.scobaeditor.itemPixel(i), ultra);
   expect(at).not.toBeNull();
   expect(Math.abs(at[0] - (box.x + box.width / 2))).toBeLessThan(box.width * 0.25);
   expect(Math.abs(at[1] - (box.y + box.height / 2))).toBeLessThan(box.height * 0.25);

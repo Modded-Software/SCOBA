@@ -68,7 +68,7 @@ export const datasetReloadFeature: Feature = {
         await collect(events, 'flush');
         location.reload();
       } catch (error) {
-        console.warn('sc2viewer: dataset reload failed:', error);
+        console.warn('scobaeditor: dataset reload failed:', error);
         text.textContent = `Reload failed: ${messageOf(error)}`;
         yes.hidden = true;
         no.disabled = false;
@@ -98,7 +98,7 @@ export const datasetReloadFeature: Feature = {
 
     function poll(): void {
       check()
-        .catch((error: unknown) => console.warn('sc2viewer: dataset check failed:', error))
+        .catch((error: unknown) => console.warn('scobaeditor: dataset check failed:', error))
         .finally(() => setTimeout(poll, POLL));
     }
 

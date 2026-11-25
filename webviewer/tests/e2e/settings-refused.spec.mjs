@@ -10,7 +10,7 @@ import { refusedRows, storeAndReload, storedKeys } from '../refused.mjs';
 
 const GOOD_DRAWERS = JSON.stringify({ gallery: true, instances: false });
 const DEFAULT_VIEW = { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0.8] };
-const ready = (page) => expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
+const ready = (page) => expect.poll(() => page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 20_000 }).toBe(true);
 
 test('every refused key is listed, sorted, with its stored text and reason; Clear removes those only', async ({ page }) => {
   allowErrors(/^console\.error: viewer: stored settings refused: viewer\.camera: .*viewer\.nosuch: the page has no such setting; viewer\.view: the view: no "ground"$/);
@@ -44,10 +44,10 @@ test('every refused key is listed, sorted, with its stored text and reason; Clea
   expect(JSON.parse(kept['viewer.view'])).toEqual({ grid: true, sky: null, ground: null });
   expect(kept['viewer.drawers'], 'negative: a good key is kept').toBe(GOOD_DRAWERS);
   expect(await page.evaluate(() => localStorage.getItem('other.thing')), 'negative: a key of another page is kept').toBe('x');
-  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ gallery: true, instances: false });
+  expect(await page.evaluate(() => window.SCOBAEdit.drawerState())).toEqual({ gallery: true, instances: false });
   // Nothing stored for the camera now: the declared default view.
-  expect(await page.evaluate(() => window.SC2App.cameraStart)).toBe('default');
-  const camera = (await page.evaluate(() => window.sc2viewer.state())).camera;
+  expect(await page.evaluate(() => window.SCOBAEdit.cameraStart)).toBe('default');
+  const camera = (await page.evaluate(() => window.scobaeditor.state())).camera;
   expect(camera.distance).toBeCloseTo(DEFAULT_VIEW.distance, 6);
   expect(camera.yaw).toBeCloseTo(DEFAULT_VIEW.yaw, 6);
 });
@@ -62,7 +62,7 @@ test('negative: stored landmarks whose chosen one is not listed stop the start; 
   await storeAndReload(page, { 'viewer.landmarks': JSON.stringify({ list: [mark], selected: 1 }) });
   await ready(page);
   await expect(page.locator('#settings-refused')).toHaveCount(0);
-  expect(await page.evaluate(() => window.SC2App.landmarkState())).toMatchObject({ selected: 1, start: 'stored' });
+  expect(await page.evaluate(() => window.SCOBAEdit.landmarkState())).toMatchObject({ selected: 1, start: 'stored' });
 });
 
 test('negative: with every stored key good there is no panel, and a stored camera reads as stored', async ({ page }) => {
@@ -71,6 +71,6 @@ test('negative: with every stored key good there is no panel, and a stored camer
   await storeAndReload(page, { 'viewer.drawers': GOOD_DRAWERS, 'viewer.camera': JSON.stringify(view) });
   await ready(page);
   await expect(page.locator('#settings-refused')).toHaveCount(0);
-  expect(await page.evaluate(() => window.SC2App.cameraStart)).toBe('stored');
-  expect((await page.evaluate(() => window.sc2viewer.state())).camera.distance).toBeCloseTo(31, 6);
+  expect(await page.evaluate(() => window.SCOBAEdit.cameraStart)).toBe('stored');
+  expect((await page.evaluate(() => window.scobaeditor.state())).camera.distance).toBeCloseTo(31, 6);
 });

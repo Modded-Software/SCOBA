@@ -27,7 +27,7 @@ export const EDGE_RANGE = 40;
  */
 const DEPTH_PULL = 5e-5;
 
-/** What the tests read of the edges (sc2viewer.state().edges). */
+/** What the tests read of the edges (scobaeditor.state().edges). */
 export interface EdgesState {
   /** The items with edges on, by id. */
   on: number[];

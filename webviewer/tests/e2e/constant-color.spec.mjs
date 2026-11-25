@@ -10,7 +10,7 @@ import { frames, idle, open, state } from '../page.mjs';
 // operator check (SPEC-VIEWER 14); these tests read the layer the shader gets.
 
 async function drawn(page, id) {
-  await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0 }), id);
+  await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0 }), id);
   await idle(page);
   await frames(page);
   const item = (await state(page)).items.at(-1);
@@ -32,9 +32,9 @@ test('Ghost: the Standard_7 constant emissive is read as red and bound', async (
   layer.color.forEach((c, i) => expect(c).toBeCloseTo(want[i], 4));
   expect(layer.binds).toBeGreaterThan(0);
   // The switch reaches that one layer.
-  const off = await page.evaluate((id) => window.sc2viewer.probe('m3', 'setConstantLayers', id, false), item.id);
+  const off = await page.evaluate((id) => window.scobaeditor.probe('m3', 'setConstantLayers', id, false), item.id);
   expect(off).toBe(1);
-  await page.evaluate((id) => window.sc2viewer.probe('m3', 'setConstantLayers', id, true), item.id);
+  await page.evaluate((id) => window.scobaeditor.probe('m3', 'setConstantLayers', id, true), item.id);
   expect(errors).toEqual([]);
 });
 
@@ -57,6 +57,6 @@ test('negative: Marine has no constant colour layer', async ({ page }) => {
   const errors = await open(page);
   const item = await drawn(page, 'Marine');
   expect(item.constantLayers).toEqual([]);
-  expect(await page.evaluate((id) => window.sc2viewer.probe('m3', 'setConstantLayers', id, false), item.id)).toBe(0);
+  expect(await page.evaluate((id) => window.scobaeditor.probe('m3', 'setConstantLayers', id, false), item.id)).toBe(0);
   expect(errors).toEqual([]);
 });

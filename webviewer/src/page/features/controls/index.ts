@@ -9,6 +9,9 @@
 //   a left or right click without a drag is handled by features/pick;
 // - a press is a drag only after 2 px and 150 ms, or 12 px at once (core/press.ts, R-VIEW-142);
 // - middle drag: orbit around the ground point under the mouse;
+// - with a unit under the mouse (hover outline) at the press, its centre
+//   takes the ground point's place: the orbit turns around it and a left
+//   drag holds the level plane through it (R-VIEW-149);
 // - alt + middle drag: mouse-look, turning around the camera itself;
 // - right drag: pan in the view plane;
 // - ctrl held during a left, middle or right camera drag: a quarter of the
@@ -19,6 +22,7 @@
 import type { Feature } from '../../core/context';
 import type { Item, Vec2, Vec3 } from '../../core/types';
 import { add, cross, dot, scale, sub } from '../../core/camera';
+import { cylinder } from '../../core/geometry';
 import { direction } from '../../core/zoom';
 import { dragsAt, pressAt, type Press } from '../../core/press';
 
@@ -55,7 +59,7 @@ interface At {
 type Drag = { press: Press } & (
   | (At & { mode: 'move'; item: Item; others: { item: Item; dx: number; dy: number }[]; z: number; offset: Vec2 })
   | (At & { mode: 'rect' | 'face' | 'look' | 'pan' })
-  | (At & { mode: 'grab'; anchor: Vec2 | null })
+  | (At & { mode: 'grab'; anchor: Vec2 | null; z: number })
   | (At & { mode: 'orbit'; pivot: Vec3 })
 );
 
@@ -106,19 +110,36 @@ export const controlsFeature: Feature = {
       camera.target = sub(eye, scale(direction(camera.yaw, camera.pitch), camera.distance));
     }
 
-    /** Grab: move the camera along the ground so `anchor` is under the mouse. */
-    function grab(anchor: Vec2, e: MouseEvent): void {
-      const now = view.eventGround(e);
-      // Above the horizon there is no ground to hold: wait for it.
+    /** The point of the level plane at height z under a page pixel: the ground at z = 0, else the plane through a unit's centre (R-VIEW-149). */
+    function heldAt(clientX: number, clientY: number, z: number): Vec2 | null {
+      if (z !== 0) return selection.planeAt(clientX, clientY, z);
+      const box = canvas.getBoundingClientRect();
+      return view.groundAt(clientX - box.left, clientY - box.top);
+    }
+
+    /**
+     * The centre of a press (R-VIEW-149): the centre of the instance with the hover
+     * outline, else null (the ground point is used).
+     */
+    function unitCentre(): Vec3 | null {
+      const item = selection.hovered();
+      if (!item) return null;
+      const c = cylinder(item);
+      return [c.x, c.y, (c.z0 + c.z1) / 2];
+    }
+
+    /** Grab: move the camera along the plane at `z` so `anchor` is under the mouse. */
+    function grab(anchor: Vec2, z: number, e: MouseEvent): void {
+      const now = heldAt(e.clientX, e.clientY, z);
+      // Above the horizon there is no plane to hold: wait for it.
       if (!now) return;
       camera.target = [camera.target[0] + anchor[0] - now[0], camera.target[1] + anchor[1] - now[1], camera.target[2]];
     }
 
-    /** Grab by a share `k` of the ground the pointer crossed from (x0, y0) to (x1, y1) (page pixels). */
-    function preciseGrab(x0: number, y0: number, x1: number, y1: number, k: number): void {
-      const box = canvas.getBoundingClientRect();
-      const before = view.groundAt(x0 - box.left, y0 - box.top);
-      const now = view.groundAt(x1 - box.left, y1 - box.top);
+    /** Grab by a share `k` of the plane at `z` the pointer crossed from (x0, y0) to (x1, y1) (page pixels). */
+    function preciseGrab(x0: number, y0: number, x1: number, y1: number, z: number, k: number): void {
+      const before = heldAt(x0, y0, z);
+      const now = heldAt(x1, y1, z);
       if (!before || !now) return;
       const t = camera.target;
       camera.target = [t[0] - (now[0] - before[0]) * k, t[1] - (now[1] - before[1]) * k, t[2]];
@@ -181,10 +202,13 @@ export const controlsFeature: Feature = {
         // Ctrl + left with units selected turns them.
         drag = { mode: 'face', ...at };
         faceSelected(e);
-      } else if (e.button === BUTTON.left) drag = { mode: 'grab', ...at, anchor: ground };
-      else if (e.button === BUTTON.middle && e.altKey) drag = { mode: 'look', ...at };
-      // Off the ground (sky under the mouse) the orbit turns around the target.
-      else if (e.button === BUTTON.middle) drag = { mode: 'orbit', ...at, pivot: ground ? [ground[0], ground[1], 0] : [...camera.target] };
+      } else if (e.button === BUTTON.left) {
+        // A unit under the mouse: its centre's plane is held; else the ground (R-VIEW-149).
+        const centre = unitCentre();
+        drag = centre ? { mode: 'grab', ...at, anchor: heldAt(e.clientX, e.clientY, centre[2]), z: centre[2] } : { mode: 'grab', ...at, anchor: ground, z: 0 };
+      } else if (e.button === BUTTON.middle && e.altKey) drag = { mode: 'look', ...at };
+      // Around the unit under the mouse; else the ground point; off the ground (sky) around the target.
+      else if (e.button === BUTTON.middle) drag = { mode: 'orbit', ...at, pivot: unitCentre() ?? (ground ? [ground[0], ground[1], 0] : [...camera.target]) };
       else if (e.button === BUTTON.right) drag = { mode: 'pan', ...at };
       if (drag) view.stopGlide();
     });
@@ -192,7 +216,7 @@ export const controlsFeature: Feature = {
     function begin(d: Drag, e: MouseEvent): void {
       d.x = e.clientX;
       d.y = e.clientY;
-      if (d.mode === 'grab') d.anchor = view.eventGround(e);
+      if (d.mode === 'grab') d.anchor = heldAt(e.clientX, e.clientY, d.z);
       else if (d.mode === 'move') {
         // The unit keeps its place; the pointer holds it at the offset it has now.
         const now = selection.planeAt(e.clientX, e.clientY, d.z);
@@ -245,11 +269,11 @@ export const controlsFeature: Feature = {
         if (k !== 1) {
           // The ground under the pointer moves a quarter of the way: the anchor is
           // let go, and taken again (without a jump) when Ctrl is released.
-          preciseGrab(e.clientX - dx, e.clientY - dy, e.clientX, e.clientY, k);
+          preciseGrab(e.clientX - dx, e.clientY - dy, e.clientX, e.clientY, drag.z, k);
           drag.anchor = null;
-        } else if (!drag.anchor) drag.anchor = view.eventGround(e);
+        } else if (!drag.anchor) drag.anchor = heldAt(e.clientX, e.clientY, drag.z);
         // Pressed on the sky: the first ground point reached becomes the anchor.
-        else grab(drag.anchor, e);
+        else grab(drag.anchor, drag.z, e);
       } else if (drag.mode === 'orbit') orbit(drag.pivot, -dx * ROTATE_RATE * k, dy * ROTATE_RATE * k);
       else if (drag.mode === 'look') look(-dx * ROTATE_RATE * k, dy * ROTATE_RATE * k);
       else pan(dx * k, dy * k);

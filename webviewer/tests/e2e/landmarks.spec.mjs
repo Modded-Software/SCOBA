@@ -12,13 +12,13 @@ async function open(page) {
     if (m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
+  await page.waitForFunction(() => window.scobaeditor && window.scobaeditor.ready);
   return errors;
 }
 
-const landmarks = (page) => page.evaluate(() => window.SC2App.landmarks());
-const camera = async (page) => (await page.evaluate(() => window.sc2viewer.state())).camera;
-const run = (page) => page.evaluate(() => window.SC2App.addAllState());
+const landmarks = (page) => page.evaluate(() => window.SCOBAEdit.landmarks());
+const camera = async (page) => (await page.evaluate(() => window.scobaeditor.state())).camera;
+const run = (page) => page.evaluate(() => window.SCOBAEdit.addAllState());
 // The drop-down list's rows (landmarks-store.spec.mjs covers the pin and trash buttons).
 const options = (page) => page.locator('#landmarks-list li .go').allTextContents();
 /** Open the list and click the row of landmark `id`. */
@@ -42,7 +42,7 @@ async function addAllRun(page, total) {
     const r = await run(page);
     return r.running === false && r.asked === total && r.added + r.failed.length === total;
   }, { timeout: 30_000 }).toBe(true);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 30_000 });
   return run(page);
 }
 
@@ -59,8 +59,8 @@ test('the origin landmark is there from the start and takes the camera to 0, 0, 
   const [origin] = await landmarks(page);
   expect(origin.target).toEqual([0, 0, 0]);
   // Elsewhere, then back.
-  await page.evaluate(() => window.sc2viewer.view({ target: [40, -25, 0], distance: 60, yaw: 1 }));
-  await page.evaluate((id) => window.SC2App.goToLandmark(id), origin.id);
+  await page.evaluate(() => window.scobaeditor.view({ target: [40, -25, 0], distance: 60, yaw: 1 }));
+  await page.evaluate((id) => window.SCOBAEdit.goToLandmark(id), origin.id);
   expectView(await camera(page), origin);
   expect(errors).toEqual([]);
 });
@@ -75,14 +75,14 @@ test('add all frames the new block, adds a landmark named after the filters, and
   expect(await options(page)).toEqual(['origin (0, 0, 0)', 'Melee Units "zergling"']);
   const block = marks[1];
   expect(r.landmark).toBe(block.id);
-  expect((await page.evaluate(() => window.SC2App.landmarkState())).selected).toBe(block.id);
+  expect((await page.evaluate(() => window.SCOBAEdit.landmarkState())).selected).toBe(block.id);
   await expect(page.locator('#landmarks-button')).toHaveText('Melee Units "zergling"');
   // The camera is the landmark's view, and every new unit stands in the uncovered part of the canvas.
   expectView(await camera(page), block);
   const inside = await page.evaluate((ids) => {
-    const rect = window.SC2App.visibleRect();
+    const rect = window.SCOBAEdit.visibleRect();
     return ids.map((id) => {
-      const p = window.sc2viewer.itemScreen(id, 0);
+      const p = window.scobaeditor.itemScreen(id, 0);
       return Boolean(p) && p[0] >= rect.left && p[0] <= rect.right && p[1] >= rect.top && p[1] <= rect.bottom;
     });
   }, r.layout.map((l) => l.id));

@@ -24,7 +24,7 @@ function share(distance, pitch, ctrl = false) {
 test('the canvas wheel zooms by the rule, with ctrl a quarter; ctrl + wheel does not zoom the page', async ({ page }) => {
   await open(page);
   for (const ctrl of [false, true]) {
-    await page.evaluate(() => window.sc2viewer.view({ distance: 20, pitch: 1.2, target: [0, 0, 0] }));
+    await page.evaluate(() => window.scobaeditor.view({ distance: 20, pitch: 1.2, target: [0, 0, 0] }));
     if (ctrl) await page.keyboard.down('Control');
     await page.mouse.wheel(0, 100);
     if (ctrl) await page.keyboard.up('Control');
@@ -37,9 +37,9 @@ test('the canvas wheel zooms by the rule, with ctrl a quarter; ctrl + wheel does
 
 test('negative: setting the view stops a zoom glide', async ({ page }) => {
   await open(page);
-  await page.evaluate(() => window.sc2viewer.view({ distance: 10 }));
+  await page.evaluate(() => window.scobaeditor.view({ distance: 10 }));
   await page.mouse.wheel(0, 400);
-  await page.evaluate(() => window.sc2viewer.view({ distance: 7 }));
+  await page.evaluate(() => window.scobaeditor.view({ distance: 7 }));
   expect((await camera(page)).zoomGoal).toBe(null);
   // A few frames later the camera is still where it was set.
   await frames(page);

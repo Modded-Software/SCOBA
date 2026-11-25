@@ -7,9 +7,9 @@ import { idle, open as openPage, view } from '../page.mjs';
 // renderer/particle/sc2 (sc2_kernels_spawn, sc2_kernels_build) and
 // renderer/sc2/sc2_element_math.h. Field layout: m3addon structures.xml,
 // checked field by field against its m3.py on one file per version.
-// Truth: the emitter state the renderer keeps (sc2viewer.probe('m3', 'particles', ...)),
+// Truth: the emitter state the renderer keeps (scobaeditor.probe('m3', 'particles', ...)),
 // and the quads a drawn frame drew with particles on and off
-// (sc2viewer.probe('m3', 'setParticles', ...)). How they look is an operator check.
+// (scobaeditor.probe('m3', 'setParticles', ...)). How they look is an operator check.
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.3, distance: 6, target: [0, 0, 1] };
 
@@ -21,13 +21,13 @@ async function open(page) {
 
 /** Add a unit; `sequence` -1 plays no animation (every track at its rest value). */
 const unit = async (page, id, sequence) => {
-  const item = await page.evaluate(([u, q]) => window.sc2viewer.addUnit(u, { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock', ...(q === null ? {} : { sequence: q }) }), [id, sequence ?? null]);
+  const item = await page.evaluate(([u, q]) => window.scobaeditor.addUnit(u, { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock', ...(q === null ? {} : { sequence: q }) }), [id, sequence ?? null]);
   await idle(page);
   return item;
 };
-const state = (page, id, positions = false) => page.evaluate(([i, p]) => window.sc2viewer.probe('m3', 'particles', i, p), [id, positions]);
+const state = (page, id, positions = false) => page.evaluate(([i, p]) => window.scobaeditor.probe('m3', 'particles', i, p), [id, positions]);
 /** Run an item's emitters for `seconds` of game time in 1/60 s steps (the frame loop keeps running too). */
-const advance = (page, id, seconds) => page.evaluate(([i, s]) => window.sc2viewer.probe('m3', 'advanceParticles', i, s, 1 / 60), [id, seconds]);
+const advance = (page, id, seconds) => page.evaluate(([i, s]) => window.scobaeditor.probe('m3', 'advanceParticles', i, s, 1 / 60), [id, seconds]);
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /** Everything a live particle must satisfy, as a list of what failed (empty when all is well). */
@@ -90,11 +90,11 @@ test('Probe at rest: the particles draw; switched off, nothing is drawn and noth
   const errors = await open(page);
   const id = await unit(page, 'Probe', -1);
   // From behind: from the front the body hides the thruster glow.
-  await page.evaluate(() => window.sc2viewer.view({ yaw: Math.PI / 2, pitch: 0.3, distance: 3, target: [0, 0, 0.4] }));
+  await page.evaluate(() => window.scobaeditor.view({ yaw: Math.PI / 2, pitch: 0.3, distance: 3, target: [0, 0, 0.4] }));
   await advance(page, id, 1);
   // `quads` is what the last drawn frame drew: draw one, with the particles on and then off.
   const quads = await page.evaluate((i) => {
-    const v = window.sc2viewer;
+    const v = window.scobaeditor;
     v.drawOnce();
     const on = v.probe('m3', 'particles', i).quads;
     v.probe('m3', 'setParticles', false);
@@ -108,14 +108,14 @@ test('Probe at rest: the particles draw; switched off, nothing is drawn and noth
   expect(quads.on).toBeGreaterThan(0);
   expect(quads.off).toBe(0);
   // Negative: while off, no quads, and the emitters do not run.
-  await page.evaluate(() => window.sc2viewer.probe('m3', 'setParticles', false));
+  await page.evaluate(() => window.scobaeditor.probe('m3', 'setParticles', false));
   const before = await state(page, id);
   await advance(page, id, 0.5);
   const after = await page.evaluate((i) => {
-    window.sc2viewer.drawOnce();
-    return window.sc2viewer.probe('m3', 'particles', i);
+    window.scobaeditor.drawOnce();
+    return window.scobaeditor.probe('m3', 'particles', i);
   }, id);
-  await page.evaluate(() => window.sc2viewer.probe('m3', 'setParticles', true));
+  await page.evaluate(() => window.scobaeditor.probe('m3', 'setParticles', true));
   expect(after.quads).toBe(0);
   expect(after.emitters[0].spawned).toBe(before.emitters[0].spawned);
   expect(after.emitters[0].live).toBe(0);
@@ -125,7 +125,7 @@ test('Probe at rest: the particles draw; switched off, nothing is drawn and noth
 test('negative: Probe standing: its Stand animation keys the emission rate to 0, so it emits nothing', async ({ page }) => {
   const errors = await open(page);
   const id = await unit(page, 'Probe');
-  const item = (await page.evaluate(() => window.sc2viewer.state())).items[0];
+  const item = (await page.evaluate(() => window.scobaeditor.state())).items[0];
   console.log('Probe sequence', item.sequenceName);
   expect(item.sequenceName).toMatch(/^Stand/);
   await advance(page, id, 1);
@@ -142,9 +142,9 @@ test('negative: Probe standing: its Stand animation keys the emission rate to 0,
 test('Zerus Tree: world-space spores stay where they were born when the tree moves, and new ones are born at its new place', async ({ page }) => {
   test.setTimeout(60_000);
   const errors = await open(page);
-  const id = await page.evaluate(() => window.sc2viewer.addDoodad('ZerusTree', { x: 0, y: 0, rot: 0, variation: 9, pick: 0.5, dataset: 'stock' }));
+  const id = await page.evaluate(() => window.scobaeditor.addDoodad('ZerusTree', { x: 0, y: 0, rot: 0, variation: 9, pick: 0.5, dataset: 'stock' }));
   await idle(page);
-  const path = (await page.evaluate(() => window.sc2viewer.state())).items[0].path;
+  const path = (await page.evaluate(() => window.scobaeditor.state())).items[0].path;
   expect(path.toLowerCase()).toMatch(/zerustree_09\.m3$/);
   await advance(page, id, 6);
   const s = await state(page, id, true);
@@ -159,7 +159,7 @@ test('Zerus Tree: world-space spores stay where they were born when the tree mov
   // Move the tree 5 to the side, without advancing time: both snapshots in
   // one call, so no frame of the page runs between them.
   const { first, moved } = await page.evaluate((i) => {
-    const v = window.sc2viewer;
+    const v = window.scobaeditor;
     const first = v.probe('m3', 'particles', i, true);
     v.probe('m3', 'setItemPosition', i, 5, 0);
     v.drawOnce();
@@ -205,7 +205,7 @@ test('Battlecruiser at rest: tail particles are stretched along their travel; bi
   await advance(page, id, 1);
   // Two snapshots 0.05 s apart in one call: the travel of each particle between them.
   const { first, second } = await page.evaluate((i) => {
-    const v = window.sc2viewer;
+    const v = window.scobaeditor;
     const first = v.probe('m3', 'particles', i, true);
     v.probe('m3', 'advanceParticles', i, 0.05, 1 / 60);
     return { first, second: v.probe('m3', 'particles', i, true) };
@@ -285,15 +285,15 @@ test('Stalker Attack (partEmit): each key the playhead steps over bursts its val
   expect(e0.partEmit.animFlags & 2).toBe(2);
   // The oracle: the positive keys of Attack, read from the model data.
   const { keys, end } = await page.evaluate(([i, ref]) => {
-    const item = window.SC2App.items.find((x) => x.id === i);
+    const item = window.SCOBAEdit.items.find((x) => x.id === i);
     const seq = item.model.m3.sequences.find((s) => s.name === 'Attack');
-    return { keys: window.sc2viewer.probe('m3', 'animKeys', i, 'Attack', ref), end: seq.interval[1] };
+    return { keys: window.scobaeditor.probe('m3', 'animKeys', i, 'Attack', ref), end: seq.interval[1] };
   }, [id, e0.partEmit]);
   const want = keys.filter(([t, v]) => t >= 0 && t <= end && v > 0).reduce((n, [, v]) => n + v, 0);
   console.log('Stalker Attack partEmit keys', JSON.stringify(keys), 'end', end, 'want', want);
   expect(want).toBeGreaterThan(0);
   // Once through Attack, held at its last frame.
-  const reached = await page.evaluate((i) => window.sc2viewer.probe('m3', 'playParticles', i, 'Attack', 3), id);
+  const reached = await page.evaluate((i) => window.scobaeditor.probe('m3', 'playParticles', i, 'Attack', 3), id);
   const after = await state(page, id);
   console.log('Stalker Attack bursts', JSON.stringify(after.emitters.map((e) => [e.bursts, e.spawned])), 'frame', reached);
   expect(reached).toBe(end);
@@ -301,7 +301,7 @@ test('Stalker Attack (partEmit): each key the playhead steps over bursts its val
   expect(after.emitters[0].spawned).toBeGreaterThanOrEqual(want);
   // Held at the end: more time owes nothing more.
   await page.evaluate((i) => {
-    const item = window.SC2App.items.find((x) => x.id === i);
+    const item = window.SCOBAEdit.items.find((x) => x.id === i);
     for (let k = 0; k < 60; k++) item.instance.m3.updateAnimations(1 / 60);
   }, id);
   expect((await state(page, id)).emitters[0].bursts[0]).toBe(want);
@@ -342,13 +342,13 @@ test('Searchlight beam (clampTailParts): no tail reaches farther than its partic
 test('particle materials draw with their alpha-mask layers bound, and only layers the particle shader reads', async ({ page }) => {
   const errors = await open(page);
   // Zerus Tree spores: smokelit.dds with an alpha mask on its alpha channel.
-  const id = await page.evaluate(() => window.sc2viewer.addDoodad('ZerusTree', { x: 0, y: 0, rot: 0, variation: 9, pick: 0.5, dataset: 'stock' }));
+  const id = await page.evaluate(() => window.scobaeditor.addDoodad('ZerusTree', { x: 0, y: 0, rot: 0, variation: 9, pick: 0.5, dataset: 'stock' }));
   await idle(page);
   await advance(page, id, 3);
   // Draw one frame, then read the layer bind counters.
   const binds = (x) => x.emitters.map((e) => e.layers.map((l) => l.binds));
   const before = binds(await state(page, id));
-  await page.evaluate(() => window.sc2viewer.drawOnce());
+  await page.evaluate(() => window.scobaeditor.drawOnce());
   const s = await state(page, id);
   const drawn = s.emitters.filter((e) => e.quads > 0);
   expect(binds(s)).not.toEqual(before);
@@ -373,7 +373,7 @@ test('Xel Naga Shrine: emitters with a displacement material run and draw over t
   page.on('console', (m) => warnings.push(m.text()));
   const id = await unit(page, 'XelNagaShrine', -1);
   await advance(page, id, 2);
-  await page.evaluate(() => window.sc2viewer.drawOnce());
+  await page.evaluate(() => window.scobaeditor.drawOnce());
   const s = await state(page, id);
   const shimmer = s.emitters.filter((e) => e.materialType === 2);
   console.log('XelNagaShrine displacement emitters', JSON.stringify(shimmer.map((e) => [e.index, e.live, e.quads, e.layers])));
@@ -381,11 +381,11 @@ test('Xel Naga Shrine: emitters with a displacement material run and draw over t
   expect(shimmer.filter((e) => e.live > 0 && e.quads === e.live).length).toBeGreaterThan(0);
   // No longer listed as not drawn.
   expect(warnings.filter((w) => w.includes('material type 2 (displacement)'))).toEqual([]);
-  const undrawn = (await page.evaluate(() => window.sc2viewer.state())).items[0].undrawn || [];
+  const undrawn = (await page.evaluate(() => window.scobaeditor.state())).items[0].undrawn || [];
   expect(undrawn.filter((u) => /particle emitter \d+: displacement/.test(u))).toEqual([]);
   // Negative: with displacement off, the emitters draw nothing.
   const off = await page.evaluate((i) => {
-    const v = window.sc2viewer;
+    const v = window.scobaeditor;
     v.setDisplacement(false);
     v.drawOnce();
     const r = v.probe('m3', 'particles', i).emitters.filter((e) => e.materialType === 2).map((e) => e.quads);
@@ -397,14 +397,14 @@ test('Xel Naga Shrine: emitters with a displacement material run and draw over t
 });
 
 test('negative: a video texture (.ogv) is not fetched; the model lists it as not drawn', async ({ page }) => {
-  allowErrors(/sc2viewer: Blimp: not drawn: .*video texture assets\/textures\/ipistolad\.ogv/);
+  allowErrors(/scobaeditor: Blimp: not drawn: .*video texture assets\/textures\/ipistolad\.ogv/);
   const errors = await open(page);
   const asked = [];
   page.on('request', (r) => {
     if (r.url().toLowerCase().includes('.ogv')) asked.push(r.url());
   });
   await unit(page, 'BlimpAds');
-  const item = (await page.evaluate(() => window.sc2viewer.state())).items[0];
+  const item = (await page.evaluate(() => window.scobaeditor.state())).items[0];
   console.log('BlimpAds undrawn', JSON.stringify(item.undrawn));
   expect(asked).toEqual([]);
   expect((item.undrawn || []).filter((u) => u.includes('video texture') && u.endsWith('.ogv')).length).toBeGreaterThan(0);
@@ -415,8 +415,8 @@ test('negative: a model without emitters has none and draws no particle quad', a
   const errors = await open(page);
   const id = await unit(page, 'Marine');
   const s = await page.evaluate((i) => {
-    window.sc2viewer.drawOnce();
-    return window.sc2viewer.probe('m3', 'particles', i);
+    window.scobaeditor.drawOnce();
+    return window.scobaeditor.probe('m3', 'particles', i);
   }, id);
   expect(s.emitters).toEqual([]);
   expect(s.quads).toBe(0);

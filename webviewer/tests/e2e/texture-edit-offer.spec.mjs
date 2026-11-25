@@ -64,7 +64,7 @@ test('an edited session opens the transfer dialog once; Keep Editing changes not
   expect(Object.keys((await editsState(page)).offered)).toContain(session.session);
   // Negative: a reload does not offer them again: what was offered is in the page's stored state.
   await page.reload();
-  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 20_000 }).toBe(true);
   frame = await openTextures(page, 'Sentry', ASSET);
   await expect.poll(() => frame.locator('#list .badge.edit').count(), { timeout: 15_000 }).toBeGreaterThan(0);
   await page.waitForTimeout(5000);

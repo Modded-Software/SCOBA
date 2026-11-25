@@ -11,7 +11,7 @@ const VIEW = { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0.8] }
 /** Add units at [x, y] and return their ids, with the test camera. */
 async function place(page, units) {
   const ids = [];
-  for (const [id, x, y] of units) ids.push(await page.evaluate(([u, ux, uy]) => window.sc2viewer.addUnit(u, { x: ux, y: uy, pick: 0.5 }), [id, x, y]));
+  for (const [id, x, y] of units) ids.push(await page.evaluate(([u, ux, uy]) => window.scobaeditor.addUnit(u, { x: ux, y: uy, pick: 0.5 }), [id, x, y]));
   await settle(page);
   await view(page, VIEW);
   return ids;
@@ -31,7 +31,7 @@ const watchFrames = (page, id, name, wraps = 0) =>
         let last = -1;
         let seen = 0;
         const step = () => {
-          const item = window.sc2viewer.state().items.find((x) => x.id === i);
+          const item = window.scobaeditor.state().items.find((x) => x.id === i);
           if (item.sequenceName !== n) return resolve({ largest, wraps: seen, now: item.sequenceName, oneShot: item.oneShot });
           if (item.frame < last) seen++;
           last = item.frame;
@@ -50,12 +50,12 @@ const facing = (item) => (2 * Math.atan2(item.rotation[2], item.rotation[3]) * 1
 
 test('screenOf is the inverse of the picking ray: ground points round-trip', async ({ page }) => {
   const errors = await open(page);
-  await page.evaluate((v) => window.sc2viewer.view(v), VIEW);
+  await page.evaluate((v) => window.scobaeditor.view(v), VIEW);
   for (const p of [[0, 0], [3, 2], [2.5, -1.5]]) {
     const s = await onWorld(page, [p[0], p[1], 0]);
     const back = await page.evaluate(([x, y]) => {
       const box = document.getElementById('view').getBoundingClientRect();
-      return window.sc2viewer.groundUnder(x - box.left, y - box.top);
+      return window.scobaeditor.groundUnder(x - box.left, y - box.top);
     }, s);
     expect(back[0]).toBeCloseTo(p[0], 3);
     expect(back[1]).toBeCloseTo(p[1], 3);
@@ -71,13 +71,13 @@ test('selected units stay highlighted; a unit not selected is not', async ({ pag
   await page.mouse.move(ground[0], ground[1]);
   await expect.poll(async () => (await pick(page)).hovered).toBe(null);
   expect((await state(page)).items.map((i) => i.highlight)).toEqual([0, 0, 0]);
-  await page.evaluate((ids) => window.SC2App.setSelection(ids), [marine, zealot]);
+  await page.evaluate((ids) => window.SCOBAEdit.setSelection(ids), [marine, zealot]);
   await expect.poll(async () => (await itemOf(page, marine)).highlight).toBe(1);
   expect((await itemOf(page, zealot)).highlight).toBe(1);
   // Negative: the unit not selected is not highlighted.
   expect((await itemOf(page, zergling)).highlight).toBe(0);
   // Cleared: none is lit.
-  await page.evaluate(() => window.SC2App.setSelection([]));
+  await page.evaluate(() => window.SCOBAEdit.setSelection([]));
   await expect.poll(async () => (await state(page)).items.map((i) => i.highlight)).toEqual([0, 0, 0]);
   expect(errors).toEqual([]);
 });
@@ -258,7 +258,7 @@ test('negative: no menu from a right drag over a unit, a right click on the grou
   expect(s.pick.menu).toBe(null);
   expect(s.camera.target).not.toEqual(camera.target);
   // Right click on the ground: no menu.
-  await page.evaluate((v) => window.sc2viewer.view(v), VIEW);
+  await page.evaluate((v) => window.scobaeditor.view(v), VIEW);
   const ground = await onWorld(page, [3, 2, 0]);
   await page.mouse.click(ground[0], ground[1], { button: 'right' });
   expect((await pick(page)).menu).toBe(null);

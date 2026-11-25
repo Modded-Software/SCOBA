@@ -1,7 +1,7 @@
 // What the nod format tells the tests (SPEC-VIEWER-GHOST 7, 9): the
 // layout, the groups as drawn, the bone matrices now, the skinned
 // positions now (computed here from the same matrices the shader gets),
-// the axes check, and the library's edge list. Reached as sc2viewer.probe('nod', name, itemId, ...).
+// the axes check, and the library's edge list. Reached as scobaeditor.probe('nod', name, itemId, ...).
 
 import { mat4, vec3 } from 'gl-matrix';
 import { edgePairs } from '@renderer/viewer/edges';

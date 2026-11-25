@@ -125,7 +125,7 @@ export const scenesFeature: Feature = {
       });
       // The caller gets the failure through run; the queue logs it and goes on.
       opens = run.catch((error: unknown) => {
-        console.warn('sc2viewer: scene open failed:', error);
+        console.warn('scobaeditor: scene open failed:', error);
       });
       return run;
     }

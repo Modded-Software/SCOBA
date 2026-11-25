@@ -1,7 +1,7 @@
 // Drag a record from its gallery list into the view. While dragged, a
 // preview stands on the ground under the pointer; a drop adds the record
 // there, looking as the preview did. The gallery rows call it through
-// ui.setRowDrag. The tests read the preview as sc2viewer.state().dragPreview.
+// ui.setRowDrag. The tests read the preview as scobaeditor.state().dragPreview.
 
 import type { AddOptions, DragPreviewState, Vec2 } from '../../core/types';
 import type { Feature } from '../../core/context';

@@ -60,8 +60,8 @@ const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, lan
 
 declare global {
   interface Window {
-    SC2App: Readonly<Record<string, unknown>>;
-    sc2viewer: Record<string, unknown>;
+    SCOBAEdit: Readonly<Record<string, unknown>>;
+    scobaeditor: Record<string, unknown>;
   }
 }
 
@@ -97,7 +97,7 @@ const context: FeatureContext = { games, render, scene, selection, camera, statu
 for (const { game, install } of GAMES) games.addParts(game.id, install(context));
 for (const feature of FEATURES) feature.install(context);
 
-// ---- the test API (window.SC2App, window.sc2viewer) ----
+// ---- the test API (window.SCOBAEdit, window.scobaeditor) ----
 
 tests.builder.app({
   canvas: render.canvas,
@@ -107,7 +107,7 @@ tests.builder.app({
   view: camera.view,
   zoomGoal: camera.zoomGoal,
   cameraStart: camera.cameraStart,
-  /** The ground point under the mouse, as a value (the tests read SC2App.pointer). */
+  /** The ground point under the mouse, as a value (the tests read SCOBAEdit.pointer). */
   get pointer() {
     return camera.pointer();
   },
@@ -162,11 +162,11 @@ tests.builder.viewer({
   },
 });
 
-const sc2viewer = tests.viewer();
-const sc2App = tests.app();
+const scobaeditor = tests.viewer();
+const scobaEdit = tests.app();
 
-window.SC2App = sc2App;
-window.sc2viewer = sc2viewer;
+window.SCOBAEdit = scobaEdit;
+window.scobaeditor = scobaeditor;
 
 // ---- startup: the datasets first; every list and every item reads one ----
 // A stored game or dataset the server refuses stops the start with the panel (core/refusals.ts).
@@ -178,7 +178,7 @@ setupDatasets()
   .then(() => Promise.all([collect(events, 'startup'), render.ground.ready, render.outline.ready]))
   .then(
     () => {
-      sc2viewer['ready'] = true;
+      scobaeditor['ready'] = true;
     },
     (failure: unknown) => {
       // A refused stored choice stops the start: the panel, not the page (ready stays unset).
@@ -187,7 +187,7 @@ setupDatasets()
         return;
       }
       status.reportFailure(failure);
-      sc2viewer['ready'] = true;
+      scobaeditor['ready'] = true;
     },
   );
 }

@@ -1,8 +1,8 @@
 // R-VIEW-1 on the source: core code (page/core, page/ui, page/features,
 // page/texview, server/core) holds no game id and no game model or clip file extension
 // in its code. Comments are read out first: an example in a comment is not
-// a rule. The legacy test object names (window.sc2viewer, window.SC2App,
-// the "sc2viewer:" log prefix; R-VIEW-14, step 8) are listed and allowed.
+// a rule. The test objects (window.scobaeditor, window.SCOBAEdit) and the
+// "scobaeditor:" log prefix name no game: nothing is allowed by name.
 import { test, expect } from '../fixtures.mjs';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -10,7 +10,6 @@ import { join, relative } from 'node:path';
 const CORE = ['src/page/core', 'src/page/ui', 'src/page/features', 'src/page/texview', 'src/server/core'];
 const GAME_IDS = ['sc2', 'ghost'];
 const EXTENSIONS = ['m3', 'm3a', 'nod', 'nad', 'nms', 'sc2map', 'sc2mod'];
-const LEGACY = /\bsc2viewer\b|\bSC2App\b/g;
 
 const files = (dir) => readdirSync(dir).flatMap((name) => (statSync(join(dir, name)).isDirectory() ? files(join(dir, name)) : name.endsWith('.ts') ? [join(dir, name)] : []));
 
@@ -22,7 +21,7 @@ function code(text) {
 /** Every game id as a string literal and every game file extension in a literal, with its line. */
 function findings(path, text) {
   const out = [];
-  const lines = code(text).replace(LEGACY, '').split('\n');
+  const lines = code(text).split('\n');
   const ids = new RegExp(`(['"\`])(${GAME_IDS.join('|')})\\1`, 'i');
   const ext = new RegExp(`['"\`/][^'"\`\\n]*\\.(${EXTENSIONS.join('|')})\\b`, 'i');
   lines.forEach((line, i) => {
@@ -43,5 +42,6 @@ test('negative: the check finds a game id, an extension and a regex of one; a co
   expect(findings('a.ts', 'const nod = /\\.nod$/i;')).toHaveLength(1);
   expect(findings('a.ts', '// an SC2 unit: .m3 files, the ghost game\nconst x = 1;')).toEqual([]);
   expect(findings('a.ts', '/* sc2 \'sc2\' */ const x = 1;')).toEqual([]);
-  expect(findings('a.ts', "console.warn('sc2viewer: failed');")).toEqual([]);
+  // The test objects' names and the log prefix are no game id.
+  expect(findings('a.ts', "console.warn('scobaeditor: failed'); add(app, members, 'SCOBAEdit');")).toEqual([]);
 });

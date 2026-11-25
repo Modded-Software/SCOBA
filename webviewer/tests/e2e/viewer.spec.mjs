@@ -166,7 +166,7 @@ test('an animation can be chosen per instance and it plays', async ({ page }) =>
 
   // It plays: the engine frame advances.
   const f0 = s.items[0].frame;
-  await page.waitForFunction((f) => Math.abs(window.sc2viewer.state().items[0].frame - f) > 150, f0);
+  await page.waitForFunction((f) => Math.abs(window.scobaeditor.state().items[0].frame - f) > 150, f0);
 
   // Negative: with no animation on either instance, the frame stands still
   // while the page draws on (several frames, measured in drawn frames).
@@ -264,7 +264,7 @@ test('a model that fails to load is reported and not added', async ({ page }) =>
   allowErrors(/^http 404 GET .*\/api\/sc2\/file\?.*path=mods%5Cnope%5Cnope\.m3/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, /^console\.warning: viewer: Failed to fetch a resource: .*nope/);
   await open(page);
   await addByUi(page, 'terran\\marine\\marine.m3', MARINE);
-  const result = await page.evaluate(() => window.sc2viewer.add('mods\\nope\\nope.m3').then(() => 'added', (e) => 'failed: ' + e.message));
+  const result = await page.evaluate(() => window.scobaeditor.add('mods\\nope\\nope.m3').then(() => 'added', (e) => 'failed: ' + e.message));
   expect(result).toContain('failed');
   await expect(page.locator('#status')).toContainText('nope.m3');
   const s = await state(page);

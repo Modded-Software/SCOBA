@@ -32,7 +32,7 @@ export class PagedList<T> {
   private readonly onTotal: (total: number) => void;
   private readonly onError: (error: unknown) => void;
 
-  constructor({ list, fetchPage, renderItem, pageSize = 60, onTotal = () => {}, onError = (error: unknown) => console.warn('sc2viewer: list page failed:', error) }: PagedListOptions<T>) {
+  constructor({ list, fetchPage, renderItem, pageSize = 60, onTotal = () => {}, onError = (error: unknown) => console.warn('scobaeditor: list page failed:', error) }: PagedListOptions<T>) {
     this.list = list;
     this.fetchPage = fetchPage;
     this.renderItem = renderItem;

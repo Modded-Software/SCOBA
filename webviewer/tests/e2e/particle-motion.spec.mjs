@@ -17,22 +17,22 @@ async function open(page) {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
-const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 20_000 });
+const idle = (page) => page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 20_000 });
 
 /** Rise of each particle since its birth, over its age: its mean upward speed. */
 const climb = (p) => (p.position[2] - p.born[2]) / p.age;
 
 test('Zerus Tree spores rise at their emission speed: sorted, they take the per-step motion', async ({ page }) => {
   const errors = await open(page);
-  const id = await page.evaluate(() => window.sc2viewer.addDoodad('ZerusTree', { x: 0, y: 0, rot: 0, variation: 9, sequence: 0, dataset: 'stock' }));
+  const id = await page.evaluate(() => window.scobaeditor.addDoodad('ZerusTree', { x: 0, y: 0, rot: 0, variation: 9, sequence: 0, dataset: 'stock' }));
   await idle(page);
-  const stand = await page.evaluate((i) => window.sc2viewer.state().items.find((t) => t.id === i).sequences[0], id);
-  await page.evaluate(([i, s]) => window.sc2viewer.probe('m3', 'playParticles', i, s, 6), [id, stand]);
-  const st = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
+  const stand = await page.evaluate((i) => window.scobaeditor.state().items.find((t) => t.id === i).sequences[0], id);
+  await page.evaluate(([i, s]) => window.scobaeditor.probe('m3', 'playParticles', i, s, 6), [id, stand]);
+  const st = await page.evaluate((i) => window.scobaeditor.probe('m3', 'particles', i, true), id);
   expect(st.emitters.length).toBe(2);
   for (const e of st.emitters) {
     const old = e.particles.filter((p) => p.age > 1);
@@ -51,10 +51,10 @@ test('Zerus Tree spores rise at their emission speed: sorted, they take the per-
 
 test('negative: an emitter without those flags keeps the closed form and its drag floor', async ({ page }) => {
   const errors = await open(page);
-  const id = await page.evaluate(() => window.sc2viewer.addUnit('Probe', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
+  const id = await page.evaluate(() => window.scobaeditor.addUnit('Probe', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
   await idle(page);
-  await page.evaluate((i) => window.sc2viewer.probe('m3', 'playParticles', i, 'Stand', 2), id);
-  const st = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
+  await page.evaluate((i) => window.scobaeditor.probe('m3', 'playParticles', i, 'Stand', 2), id);
+  const st = await page.evaluate((i) => window.scobaeditor.probe('m3', 'particles', i, true), id);
   const closed = st.emitters.filter((e) => !e.euler);
   console.log('probe', JSON.stringify(st.emitters.map((e) => ({ bone: e.bone, flags: e.flags, euler: e.euler, drag: e.drag, forcePair2: e.forcesFallback, wind: e.windMultiplier, kill: e.killSphere, noise: e.noiseAmplitude }))));
   expect(closed.length).toBeGreaterThan(0);

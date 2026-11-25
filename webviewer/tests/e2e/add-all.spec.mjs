@@ -19,7 +19,7 @@ function watch(page) {
 }
 
 const units = async (page, query) => (await page.request.get(api.records('units', { limit: '500', ...query }))).json();
-const run = (page) => page.evaluate(() => window.SC2App.addAllState());
+const run = (page) => page.evaluate(() => window.SCOBAEdit.addAllState());
 const count = (page) => page.locator('#count-units').textContent();
 
 test('ui: the family select filters the list, and "any family" takes the filter off', async ({ page }) => {
@@ -60,7 +60,7 @@ test('add all: the dialog asks with the count; "add" adds every listed unit, lai
   await expect(page.locator('#add-all-dialog .question')).toHaveText(`Are you sure you want to add ${listed.total} units to the map?`);
   await page.locator('#add-all-yes').click();
   await expect.poll(async () => (await run(page)).running === false && (await run(page)).asked === listed.total, { timeout: 30_000 }).toBe(true);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 30_000 });
   const r = await run(page);
   const s = await state(page);
   console.log('run', JSON.stringify({ asked: r.asked, added: r.added, failed: r.failed }), 'layout', JSON.stringify(r.layout.map((l) => [l.id, +l.size.toFixed(2), +l.x.toFixed(2), +l.y.toFixed(2)])));
@@ -88,7 +88,7 @@ async function addAllRun(page, total) {
     const r = await run(page);
     return r.running === false && r.asked === total && r.added + r.failed.length === total;
   }, { timeout: 30_000 }).toBe(true);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 30_000 });
   return run(page);
 }
 

@@ -66,7 +66,7 @@ test('the ground button picks a ground texture and (none); a reload keeps it; no
   expect(Math.min(...chosen.size)).toBeGreaterThan(0);
 
   await page.reload();
-  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready))).toBe(true);
+  await expect.poll(() => page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready))).toBe(true);
   await expect.poll(async () => (await ground(page)).size).toEqual(chosen.size);
   expect((await ground(page)).ground).toEqual(chosen.ground);
 

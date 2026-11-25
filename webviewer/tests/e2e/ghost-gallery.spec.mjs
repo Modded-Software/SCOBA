@@ -9,13 +9,13 @@ import { FOREIGN_CLIP, open } from '../ghost.mjs';
 
 const D = 'build';
 const records = async (request, category, query) => (await request.get(`/api/ghost/records/${category}?${new URLSearchParams({ dataset: D, limit: '500', ...query })}`)).json();
-const state = (page) => page.evaluate(() => window.sc2viewer.state());
-const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 30_000 });
-const run = (page) => page.evaluate(() => window.SC2App.addAllState());
+const state = (page) => page.evaluate(() => window.scobaeditor.state());
+const idle = (page) => page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 30_000 });
+const run = (page) => page.evaluate(() => window.SCOBAEdit.addAllState());
 
 async function ghostTab(page) {
   await page.locator('#game-tabs button[data-game="ghost"]').click();
-  await expect.poll(() => page.evaluate(() => window.sc2viewer.games.current())).toBe('ghost');
+  await expect.poll(() => page.evaluate(() => window.scobaeditor.games.current())).toBe('ghost');
   await expect(page.locator('#actors li[data-id]').first()).toBeAttached({ timeout: 15_000 });
 }
 
@@ -102,7 +102,7 @@ test('add all adds the listed actors and keeps a landmark named by the Ghost lis
   // The files of the listed records, one instance each.
   const files = await Promise.all(listed.items.map(async (row) => (await (await request.get(`/api/ghost/record/actors?dataset=${D}&id=${encodeURIComponent(row.id)}`)).json()).file));
   expect(items.map((i) => i.path).sort()).toEqual(files.sort());
-  const names = (await page.evaluate(() => window.SC2App.landmarks())).map((l) => l.name);
+  const names = (await page.evaluate(() => window.SCOBAEdit.landmarks())).map((l) => l.name);
   expect(names).toEqual(['origin (0, 0, 0)', 'Animated Ghost actors "zergling"']);
   expect(errors).toEqual([]);
 });
@@ -117,12 +117,12 @@ test('landmark names from the Ghost filters', async ({ page }) => {
     ['models', { q: '', skin: 'skinned' }],
     ['models', { q: 'crate', skin: 'rigid' }],
     ['models', { q: 'crate' }],
-  ].map(([category, query]) => window.SC2App.listName(category, query)));
+  ].map(([category, query]) => window.SCOBAEdit.listName(category, query)));
   expect(names).toEqual(['All Ghost actors', 'Still Ghost actors', 'Animated Ghost actors "zerg"', 'Skinned Ghost models', 'Rigid Ghost models "crate"', 'Ghost models "crate"']);
   // Negative: the SC2 tab names its lists its own way.
   await page.locator('#game-tabs button[data-game="sc2"]').click();
-  await expect.poll(() => page.evaluate(() => window.sc2viewer.games.current())).toBe('sc2');
-  expect(await page.evaluate(() => window.SC2App.listName('units', {}))).toBe('All Units');
+  await expect.poll(() => page.evaluate(() => window.scobaeditor.games.current())).toBe('sc2');
+  expect(await page.evaluate(() => window.SCOBAEdit.listName('units', {}))).toBe('All Units');
   expect(errors).toEqual([]);
 });
 
@@ -136,8 +136,8 @@ test('the dataset reload: nothing changed, the same signature and lists; no toas
   expect([after.id, after.signature, after.changed]).toEqual([D, before.signature, false]);
   expect(await (await request.get(`/api/ghost/summary?dataset=${D}`)).json()).toEqual(summary);
   // Negative: nothing changed on disk, so the page raises no toast.
-  await page.evaluate(() => window.SC2App.checkDatasets());
-  expect((await page.evaluate(() => window.SC2App.datasetToast())).up).toBe(false);
+  await page.evaluate(() => window.SCOBAEdit.checkDatasets());
+  expect((await page.evaluate(() => window.SCOBAEdit.datasetToast())).up).toBe(false);
   expect((await request.get(`/api/ghost/datasets/${D}/reload`)).status()).toBe(405);
   expect((await request.post('/api/ghost/datasets/nosuch/reload')).status()).toBe(404);
   expect(errors).toEqual([]);

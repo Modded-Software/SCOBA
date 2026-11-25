@@ -10,7 +10,7 @@ import { frames, idle, open, state, view } from '../page.mjs';
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.35, distance: 7, target: [0, 0, 1.2] };
 
 async function place(page, id) {
-  await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0, pick: 0.5 }), id);
+  await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0, pick: 0.5 }), id);
   await idle(page);
   await view(page, VIEW);
   return state(page);
@@ -20,11 +20,11 @@ async function place(page, id) {
 async function drawnBatches(page) {
   const counts = {};
   for (const on of [true, false]) {
-    await page.evaluate((o) => window.sc2viewer.setDisplacement(o), on);
+    await page.evaluate((o) => window.scobaeditor.setDisplacement(o), on);
     await frames(page);
     counts[on ? 'on' : 'off'] = (await state(page)).displacedBatches;
   }
-  await page.evaluate(() => window.sc2viewer.setDisplacement(true));
+  await page.evaluate(() => window.scobaeditor.setDisplacement(true));
   return counts;
 }
 

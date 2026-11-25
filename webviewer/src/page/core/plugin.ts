@@ -231,7 +231,7 @@ export interface FormatModule {
   inspect?(instance: ViewerInstance): Record<string, unknown>;
   /**
    * The format's own test members, made once with the page's services.
-   * The tests reach them as `sc2viewer.probe(format, name, ...args)`.
+   * The tests reach them as `scobaeditor.probe(format, name, ...args)`.
    */
   probes?(context: ProbeContext): Readonly<Record<string, unknown>>;
 }

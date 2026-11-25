@@ -22,7 +22,7 @@ export async function refusedRows(page) {
       reason: li.querySelector('.refused-reason').textContent,
     })),
   );
-  expect(await page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), 'negative: the page did not start').toBe(false);
+  expect(await page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), 'negative: the page did not start').toBe(false);
   return rows;
 }
 

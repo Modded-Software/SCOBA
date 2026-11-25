@@ -12,14 +12,14 @@ async function open(page) {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
 async function unitRegions(page, id) {
-  await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0, pick: 0.5 }), id);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  const item = (await page.evaluate(() => window.sc2viewer.state())).items.at(-1);
+  await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0, pick: 0.5 }), id);
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  const item = (await page.evaluate(() => window.scobaeditor.state())).items.at(-1);
   expect(item.loaded).toBe(true);
   return item.regionUv;
 }

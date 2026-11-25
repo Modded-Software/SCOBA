@@ -11,7 +11,7 @@ import { baseOf, changeScratch, checkedSession, cmd, editorFrame, editsState, ed
 /** What a key of the viewer page would change: the camera, the grid, the items. */
 const viewer = (page) =>
   page.evaluate(() => {
-    const { camera, grid, items } = window.sc2viewer.state();
+    const { camera, grid, items } = window.scobaeditor.state();
     return JSON.stringify({ camera, grid, items: items.length });
   });
 
@@ -156,7 +156,7 @@ test('a scratch with a mask, a blend mode, an adjustment layer, a layer style an
   expect(was.carried[plane].some((layer) => layer.visible === false)).toBe(true);
 
   const errors = await open(page);
-  await page.evaluate((target) => window.sc2viewer.edits.resume(target), { game: 'sc2', dataset: 'scoba', session: edited });
+  await page.evaluate((target) => window.scobaeditor.edits.resume(target), { game: 'sc2', dataset: 'scoba', session: edited });
   await opened(page);
   // The editor window alone has the sessions read: the edit is offered. Keep Editing gives the keys back to the editor.
   await expect(page.locator('#edit-transfer-dialog')).toBeVisible({ timeout: 30_000 });
@@ -193,7 +193,7 @@ test('negative: resumed on a session that is gone, the window shows the reason a
   const session = await openSession(request, 'scoba', ASSET);
   expect((await request.post(editUrl('scoba', `/${session.session}/discard`))).status()).toBe(200);
 
-  await page.evaluate((target) => window.sc2viewer.edits.resume(target), { game: 'sc2', dataset: 'scoba', session });
+  await page.evaluate((target) => window.scobaeditor.edits.resume(target), { game: 'sc2', dataset: 'scoba', session });
   await expect(page.locator('#editor-window')).toBeVisible();
   await expect.poll(async () => (await editor(page)).phase, { timeout: 150_000 }).toBe('failed');
   const failed = await editor(page);

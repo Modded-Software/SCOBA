@@ -4,7 +4,7 @@ import { frames, idle, open, state } from '../page.mjs';
 // While a unit is dragged over the view, its model stands on the ground
 // under the mouse. It goes when the drag leaves, ends or drops.
 
-const ground = (page, x, y) => page.evaluate(([x, y]) => window.sc2viewer.groundUnder(x, y), [x, y]);
+const ground = (page, x, y) => page.evaluate(([x, y]) => window.scobaeditor.groundUnder(x, y), [x, y]);
 const row = (page, id) => page.locator(`#units li[data-id="${id}"]`);
 
 /** Press on a unit row and drag the pointer to canvas point (x, y). */
@@ -69,7 +69,7 @@ test('dragging off the view hides the preview; releasing outside adds nothing', 
 test('above the horizon there is no ground, so no preview', async ({ page }) => {
   await open(page);
   // Look nearly level: the top rows show sky.
-  await page.evaluate(() => window.sc2viewer.view({ pitch: 0.1 }));
+  await page.evaluate(() => window.scobaeditor.view({ pitch: 0.1 }));
   await dragOver(page, 'Marine', 700, 5);
   expect(await ground(page, 701, 5)).toBe(null);
   expect((await state(page)).dragPreview).toMatchObject({ shown: false });

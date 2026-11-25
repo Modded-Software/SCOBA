@@ -12,9 +12,9 @@ import { expect } from './fixtures.mjs';
 export async function open(page, { path = '/', grid = true, particles = true, tab = null } = {}) {
   const errors = watch(page);
   await page.goto(path);
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
-  if (!grid) await page.evaluate(() => window.sc2viewer.setGrid(false));
-  if (!particles) await page.evaluate(() => window.sc2viewer.probe('m3', 'setParticles', false));
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 20_000 }).toBe(true);
+  if (!grid) await page.evaluate(() => window.scobaeditor.setGrid(false));
+  if (!particles) await page.evaluate(() => window.scobaeditor.probe('m3', 'setParticles', false));
   if (tab) await page.locator(`#tab-${tab}`).click();
   return errors;
 }
@@ -30,25 +30,25 @@ export function watch(page) {
 }
 
 /** The scene state (src/page/features/inspect/state.ts). */
-export const state = (page) => page.evaluate(() => window.sc2viewer.state());
+export const state = (page) => page.evaluate(() => window.scobaeditor.state());
 
 /** One item of the scene state, by id. */
 export const itemOf = async (page, id) => (await state(page)).items.find((item) => item.id === id);
 
 /** Wait until nothing loads: no model being added, no texture in flight. */
-export const idle = (page, timeout = 30_000) => page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout });
+export const idle = (page, timeout = 30_000) => page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout });
 
 /** Wait two animation frames: the page has drawn what it was told. */
 export const frames = (page) => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 
 /** Set the camera (yaw, pitch, distance, target). */
-export const view = (page, camera) => page.evaluate((c) => window.sc2viewer.view(c), camera);
+export const view = (page, camera) => page.evaluate((c) => window.scobaeditor.view(c), camera);
 
 /** A page point on the instance's picture, from the pick buffer; null when none is in view. */
-export const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
+export const onItem = (page, id) => page.evaluate((i) => window.scobaeditor.itemPixel(i), id);
 
 /** Where a world point lands, in page coordinates. */
-export const screenOf = (page, point) => page.evaluate((p) => window.sc2viewer.screenOf(p), point);
+export const screenOf = (page, point) => page.evaluate((p) => window.scobaeditor.screenOf(p), point);
 
 /** The texture window's page, once it is open. */
 export const textureFrame = (page) => page.frames().find((frame) => frame.url().includes('/texture-viewer.html'));

@@ -65,7 +65,7 @@ export const painted = (session, plane, colour = '#ff0000', name = 'paint') => [
 // ---- the page ----
 
 /** The page's edit state (src/page/features/edits): the editor window, the dialogs, the sessions read, what was offered. */
-export const editsState = (page) => page.evaluate(() => window.sc2viewer.edits.state());
+export const editsState = (page) => page.evaluate(() => window.scobaeditor.edits.state());
 
 /** The editor's frame, once the editor window is open on a session. */
 export const editorFrame = (page) => page.frames().find((frame) => frame.url().includes('/photocraft/'));
@@ -80,7 +80,7 @@ export async function openTextures(page, unit, asset) {
   await expect(row).toBeVisible();
   await row.dblclick();
   await expect(page.locator('#texture-window')).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.sc2viewer.textureWindow().originals), { timeout: 30_000 }).toBe('done');
+  await expect.poll(() => page.evaluate(() => window.scobaeditor.textureWindow().originals), { timeout: 30_000 }).toBe('done');
   const frame = page.frames().find((one) => one.url().includes('/texture-viewer.html'));
   // The pipeline reads each texture nobody asked for by name yet; a unit with many textures takes longer.
   const started = Date.now();

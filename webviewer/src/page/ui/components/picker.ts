@@ -60,7 +60,7 @@ export class Picker<T> {
     });
     this.search.addEventListener('input', () => {
       this.reload().catch((error: unknown) => {
-        console.warn('sc2viewer: picker search failed:', error);
+        console.warn('scobaeditor: picker search failed:', error);
         this.count.textContent = 'search failed';
       });
     });

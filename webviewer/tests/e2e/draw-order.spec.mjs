@@ -8,7 +8,7 @@ import { frames, idle, open, state } from '../page.mjs';
 // the one the last frame issued (M3ModelInstance.drawnOrder).
 
 async function drawn(page, id) {
-  await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0 }), id);
+  await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0 }), id);
   await idle(page);
   // A frame drawn with everything loaded: its order is the one read.
   await frames(page);
@@ -65,7 +65,7 @@ for (const [id, priorities] of [
 ]) {
   test(`negative: ${id}, already in order, is drawn in file order`, async ({ page }) => {
     // Its particle emitter 2 has a composite material, which particles do not draw: reported, by design.
-    if (id === 'ForceField') allowErrors('sc2viewer: Force Field: not drawn: particle emitter 2: material type 3 (composite)');
+    if (id === 'ForceField') allowErrors('scobaeditor: Force Field: not drawn: particle emitter 2: material type 3 (composite)');
     const errors = await open(page);
     const order = await drawn(page, id);
     const { blended } = expectRule(order);

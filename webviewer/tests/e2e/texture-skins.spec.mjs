@@ -112,7 +112,7 @@ test('Ctrl+L never reaches the browser, in the page, a text field or the texture
   expect(await cancelled('l', 'field')).toBe(true);
   await page.locator(`#scene li[data-id="${marine}"] .head .name`).dblclick();
   await expect(page.locator('#texture-window')).toBeVisible();
-  await page.waitForFunction(() => document.getElementById('texture-frame').contentDocument.readyState === 'complete' && window.sc2viewer.textureWindow().originals !== 'loading');
+  await page.waitForFunction(() => document.getElementById('texture-frame').contentDocument.readyState === 'complete' && window.scobaeditor.textureWindow().originals !== 'loading');
   expect(await cancelled('l', 'frame')).toBe(true);
   // Negative: Ctrl+H has no meaning here any more, and other keys keep the browser's.
   expect(await cancelled('h', 'page')).toBe(false);

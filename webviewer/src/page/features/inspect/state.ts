@@ -1,4 +1,4 @@
-// The scene state the tests read: sc2viewer.state(). What only a format
+// The scene state the tests read: scobaeditor.state(). What only a format
 // knows of an instance comes from that format (FormatModule.inspect).
 
 import type { FeatureContext } from '../../core/context';

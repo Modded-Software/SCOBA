@@ -2,16 +2,16 @@
 // open scene, wait for its writes, reload, and build scene files.
 
 /** The open scene as it would be stored now. */
-export const sceneOf = (page) => page.evaluate(() => window.sc2viewer.scenes.document());
+export const sceneOf = (page) => page.evaluate(() => window.scobaeditor.scenes.document());
 
 /** The scene list state: open, list, refused, loading, address. */
-export const scenesState = (page) => page.evaluate(() => window.sc2viewer.scenes.state());
+export const scenesState = (page) => page.evaluate(() => window.scobaeditor.scenes.state());
 
 /** Wait until every scene write asked so far is on disk. */
-export const flush = (page) => page.evaluate(() => window.sc2viewer.scenes.flush());
+export const flush = (page) => page.evaluate(() => window.scobaeditor.scenes.flush());
 
 /** Wait for the page to be ready and the open scene's items added. */
-export const settled = (page) => page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready && !window.sc2viewer.scenes.state().loading && window.sc2viewer.idle(), null, { timeout: 30_000 });
+export const settled = (page) => page.waitForFunction(() => window.scobaeditor && window.scobaeditor.ready && !window.scobaeditor.scenes.state().loading && window.scobaeditor.idle(), null, { timeout: 30_000 });
 
 /** Write, reload, and wait until the scene is back. */
 export async function reloadScene(page) {

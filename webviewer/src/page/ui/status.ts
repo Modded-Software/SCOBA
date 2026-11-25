@@ -137,7 +137,7 @@ export function installStatus(visibleRect: () => Rect): StatusService {
    * action already put the message in the status line; this also logs it.
    */
   function reportFailure(error: unknown): void {
-    console.warn('sc2viewer:', error);
+    console.warn('scobaeditor:', error);
     setStatus(messageOf(error), { failure: true });
   }
 

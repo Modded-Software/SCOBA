@@ -98,12 +98,12 @@ export async function openPage(page) {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
-export const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-export const viewState = (page) => page.evaluate(() => window.sc2viewer.state());
+export const idle = (page) => page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+export const viewState = (page) => page.evaluate(() => window.scobaeditor.state());
 
 /** What an instance shows: its skin, the overrides in place, its largest texture, the blue glow. */
 export async function shown(page, id) {
@@ -111,9 +111,9 @@ export async function shown(page, id) {
   return { skin: found.skin, overrides: found.overrides, largest: found.largestTexture, blue: found.blueGlow };
 }
 
-export const skinChoices = (page, id) => page.evaluate((i) => window.sc2viewer.skinChoices(i), id);
+export const skinChoices = (page, id) => page.evaluate((i) => window.scobaeditor.skinChoices(i), id);
 /** The open skin dialog (id, title, text, buttons); null: none is open. */
-export const skinDialog = (page) => page.evaluate(() => window.sc2viewer.skinDialog());
+export const skinDialog = (page) => page.evaluate(() => window.scobaeditor.skinDialog());
 /** The saved skins of an owner as the server stores them: name, textures. */
 export const storedSkins = (owner) => owner.skins.filter((one) => one.stored).map(({ name, textures }) => ({ name, textures }));
 
@@ -124,24 +124,24 @@ export async function pickRow(page, skin, part = 'pick') {
   await page.locator(`#anim-menu ul.skin-list li[data-skin="${skin}"] button.skin-${part}`).click();
 }
 export async function setSkin(page, id, skin) {
-  await page.evaluate(([i, s]) => window.sc2viewer.setSkin(i, s), [id, skin]);
+  await page.evaluate(([i, s]) => window.scobaeditor.setSkin(i, s), [id, skin]);
   await idle(page);
 }
 
 /** A unit standing still, the grid off, seen from the side. */
 export async function place(page, unit, options = {}) {
-  const id = await page.evaluate(([u, o]) => window.sc2viewer.addUnit(u, { x: 0, y: 0, pick: 0.5, sequence: -1, ...o }), [unit, options]);
+  const id = await page.evaluate(([u, o]) => window.scobaeditor.addUnit(u, { x: 0, y: 0, pick: 0.5, sequence: -1, ...o }), [unit, options]);
   await idle(page);
   await page.evaluate(() => {
-    window.sc2viewer.setGrid(false);
-    window.sc2viewer.view({ yaw: -Math.PI / 2, pitch: 0.5, distance: 6, target: [0, 0, 0.5] });
+    window.scobaeditor.setGrid(false);
+    window.scobaeditor.view({ yaw: -Math.PI / 2, pitch: 0.5, distance: 6, target: [0, 0, 0.5] });
   });
   return id;
 }
 
 /** Open the instance's menu by a right click on one of its pixels. */
 export async function menu(page, id) {
-  const at = await page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
+  const at = await page.evaluate((i) => window.scobaeditor.itemPixel(i), id);
   expect(at, `a pixel of instance ${id} in the view`).toBeTruthy();
   await page.mouse.click(at[0], at[1], { button: 'right' });
   await expect(page.locator('#anim-menu')).toBeVisible();

@@ -8,8 +8,8 @@ async function open(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
-  await page.evaluate(() => window.sc2viewer.setGrid(false));
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
+  await page.evaluate(() => window.scobaeditor.setGrid(false));
 }
 
 // Units by vertex format, from tools/vertex-survey.mjs (1474 model files).
@@ -25,11 +25,11 @@ const UNITS = ['KorhalGateEast', 'Armory', 'KerriganGhostLab', 'VoidThrasher', '
 for (const unit of UNITS) {
   test(`geometry: ${unit} is read with the file's vertex stride`, async ({ page }) => {
     // Terrain and lens flare materials are not drawn: reported, by design.
-    if (unit === 'VoidThrasher') allowErrors(/sc2viewer: Void Thrasher: not drawn: .*material type (4 \(terrain\)|11 \(lens flare\))/);
+    if (unit === 'VoidThrasher') allowErrors(/scobaeditor: Void Thrasher: not drawn: .*material type (4 \(terrain\)|11 \(lens flare\))/);
     await open(page);
-    await page.evaluate((id) => window.sc2viewer.addUnit(id, { x: 0, y: 0 }), unit);
-    await page.waitForFunction(() => window.sc2viewer.idle());
-    const item = (await page.evaluate(() => window.sc2viewer.state())).items[0];
+    await page.evaluate((id) => window.scobaeditor.addUnit(id, { x: 0, y: 0 }), unit);
+    await page.waitForFunction(() => window.scobaeditor.idle());
+    const item = (await page.evaluate(() => window.scobaeditor.state())).items[0];
     console.log(unit, JSON.stringify({ stride: item.vertexStride, count: item.vertexCount, bytes: item.vertexBytes }));
     expect(item.vertexCount).toBeGreaterThan(0);
     expect(item.vertexStride * item.vertexCount).toBe(item.vertexBytes);

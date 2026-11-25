@@ -59,7 +59,7 @@ export interface TextureWindow {
   editing(): { game: string; dataset: string } | null;
   /** Hand the edit sessions of a game's dataset to the page, when it shows that dataset (SPEC-PHOTOCRAFT 9.3). */
   edits(game: string, dataset: string, sessions: readonly EditSession[]): void;
-  /** For the tests (sc2viewer.textureWindow): whether the window is open, whose textures, how the read went. */
+  /** For the tests (scobaeditor.textureWindow): whether the window is open, whose textures, how the read went. */
   state(): { open: boolean; user: string | null; file: string | null; dataset: string | null; originals: string };
 }
 

@@ -25,14 +25,14 @@ test('the material lookup: zergling and crate draw with a texture', async ({ pag
   const errors = await open(page);
   for (const name of ['zergling', 'crate']) {
     const id = await add(page, `3D/Models/${name}.nod`);
-    await page.evaluate(() => window.sc2viewer.view('front'));
+    await page.evaluate(() => window.scobaeditor.view('front'));
     await frames(page);
     const groups = await probe(page, 'groups', id);
     const drawn = groups.filter((g) => g.kind !== null);
     expect(drawn.length, `${name}: ${JSON.stringify(groups)}`).toBeGreaterThan(0);
     for (const g of drawn) expect([g.material, g.textureLoaded, g.drawnLast]).toEqual([g.material, true, true]);
     expect((await itemOf(page, id)).undrawn).toEqual([]);
-    await page.evaluate((i) => window.sc2viewer.remove(i), id);
+    await page.evaluate((i) => window.scobaeditor.remove(i), id);
   }
   expect(errors).toEqual([]);
 });
@@ -51,12 +51,12 @@ test('a model without a motion set: no sequences; asking for a clip changes no b
 
 test('a Ghost instance has no team colour control and no skin choice', async ({ page }) => {
   const errors = await open(page);
-  const marine = await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: -2, y: 0, pick: 0.5, sequence: -1, team: 2 }));
+  const marine = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: -2, y: 0, pick: 0.5, sequence: -1, team: 2 }));
   const crate = await add(page, '3D/Models/crate.nod', 2);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
   const rows = page.locator('#scene li');
   await expect(rows).toHaveCount(2);
-  const items = (await page.evaluate(() => window.sc2viewer.state())).items;
+  const items = (await page.evaluate(() => window.scobaeditor.state())).items;
   const row = (id) => rows.nth(items.findIndex((i) => i.id === id));
   // The SC2 unit has the control: the test can see it.
   await expect(row(marine).locator('select.team')).toHaveCount(1);
@@ -64,18 +64,18 @@ test('a Ghost instance has no team colour control and no skin choice', async ({ 
   // Ghost has no texture service: its instance shows its own textures and offers no skin.
   const ghost = items.find((i) => i.id === crate);
   expect(ghost).toMatchObject({ skin: 'original', overrides: 0 });
-  expect(await page.evaluate((id) => window.sc2viewer.skinChoices(id), crate)).toEqual({ owner: null, choices: [], state: null, following: false });
+  expect(await page.evaluate((id) => window.scobaeditor.skinChoices(id), crate)).toEqual({ owner: null, choices: [], state: null, following: false });
   expect(errors).toEqual([]);
 });
 
 test('the Ghost tab makes Ghost the gallery game; the scene, the camera and the selection stay', async ({ page }) => {
   const errors = await open(page);
-  const marine = await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: 0, y: 0, pick: 0.5, sequence: -1, team: 2 }));
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  await page.evaluate((ids) => window.SC2App.setSelection(ids), [marine]);
-  const before = await page.evaluate(() => window.sc2viewer.state());
+  const marine = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: 0, y: 0, pick: 0.5, sequence: -1, team: 2 }));
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  await page.evaluate((ids) => window.SCOBAEdit.setSelection(ids), [marine]);
+  const before = await page.evaluate(() => window.scobaeditor.state());
   await page.locator('#game-tabs button[data-game="ghost"]').click();
-  await expect.poll(() => page.evaluate(() => window.sc2viewer.games.current())).toBe('ghost');
+  await expect.poll(() => page.evaluate(() => window.scobaeditor.games.current())).toBe('ghost');
   await expect(page.locator('#game-tabs button[data-game="ghost"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#pane-actors')).toHaveCount(1);
   await expect(page.locator('#pane-models')).toHaveCount(1);
@@ -83,46 +83,46 @@ test('the Ghost tab makes Ghost the gallery game; the scene, the camera and the 
   await expect(page.locator('#pane-actors li[data-id]').first()).toBeAttached({ timeout: 15_000 });
   // Negative: the other game's panes are gone; the scene, the camera and the selection did not change.
   await expect(page.locator('#pane-units')).toHaveCount(0);
-  const after = await page.evaluate(() => window.sc2viewer.state());
+  const after = await page.evaluate(() => window.scobaeditor.state());
   expect(after.items.map((i) => [i.id, i.game, i.x, i.y])).toEqual(before.items.map((i) => [i.id, i.game, i.x, i.y]));
   expect(after.camera).toEqual(before.camera);
-  expect(await page.evaluate(() => window.SC2App.selectedIds())).toEqual([marine]);
+  expect(await page.evaluate(() => window.SCOBAEdit.selectedIds())).toEqual([marine]);
   expect(errors).toEqual([]);
 });
 
 test('two games in one scene: selected together, moved, copied, pasted, back after a reload', async ({ page }) => {
   const errors = await open(page);
-  const marine = await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: -2, y: 0, pick: 0.5, sequence: -1, team: 2 }));
+  const marine = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: -2, y: 0, pick: 0.5, sequence: -1, team: 2 }));
   const crate = await add(page, '3D/Models/crate.nod', 2);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  await page.evaluate((ids) => window.SC2App.setSelection(ids), [marine, crate]);
-  expect((await page.evaluate(() => window.SC2App.selectedIds())).sort()).toEqual([marine, crate].sort());
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  await page.evaluate((ids) => window.SCOBAEdit.setSelection(ids), [marine, crate]);
+  expect((await page.evaluate(() => window.SCOBAEdit.selectedIds())).sort()).toEqual([marine, crate].sort());
   // Moved: the instance list's x field of each, by the same step.
   for (const id of [marine, crate]) {
-    const items = (await page.evaluate(() => window.sc2viewer.state())).items;
+    const items = (await page.evaluate(() => window.scobaeditor.state())).items;
     const field = page.locator('#scene li').nth(items.findIndex((i) => i.id === id)).locator('input.x');
     await field.fill(String(items.find((i) => i.id === id).x + 1));
     await field.press('Enter');
   }
-  const moved = (await page.evaluate(() => window.sc2viewer.state())).items;
+  const moved = (await page.evaluate(() => window.scobaeditor.state())).items;
   expect(moved.map((i) => [i.game, i.x])).toEqual([['sc2', -1], ['ghost', 3]]);
   // Copied and pasted off the view: the copies keep their game and place.
   // The x field keeps its own keys while it has the focus: leave it first.
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
   const panel = await page.locator('#gallery').boundingBox();
   await page.mouse.move(panel.x + panel.width / 2, panel.y + panel.height / 2);
-  await page.evaluate((ids) => window.SC2App.setSelection(ids), [marine, crate]);
+  await page.evaluate((ids) => window.SCOBAEdit.setSelection(ids), [marine, crate]);
   await page.locator('body').press('Control+c');
-  expect(await page.evaluate(() => window.SC2App.copiedCount())).toBe(2);
+  expect(await page.evaluate(() => window.SCOBAEdit.copiedCount())).toBe(2);
   await page.locator('body').press('Control+v');
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  const pasted = (await page.evaluate(() => window.sc2viewer.state())).items;
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  const pasted = (await page.evaluate(() => window.scobaeditor.state())).items;
   expect(pasted.map((i) => [i.game, i.path, i.x])).toEqual([...moved, ...moved].map((i) => [i.game, i.path, i.x]));
   // Saved: the stored scene names each item's game; back after a reload.
   const stored = await sceneOf(page);
   expect(stored.items.map((i) => i.game)).toEqual(['sc2', 'ghost', 'sc2', 'ghost']);
   await reloadScene(page);
-  const back = (await page.evaluate(() => window.sc2viewer.state())).items;
+  const back = (await page.evaluate(() => window.scobaeditor.state())).items;
   expect(back.map((i) => [i.game, i.path, i.x, i.loaded])).toEqual(pasted.map((i) => [i.game, i.path, i.x, true]));
   // Negative: nothing of one game came back as the other.
   expect(back.filter((i) => i.game === 'ghost').every((i) => i.path.toLowerCase().endsWith('.nod'))).toBe(true);

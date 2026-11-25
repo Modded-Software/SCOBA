@@ -272,11 +272,11 @@ export interface UiService {
   floatingWindow(spec: { id: string; title: string; escape?: boolean; closing?: () => void }): FloatingWindowHandle;
 }
 
-/** What a feature adds to the test API: `app` members go on window.SC2App, `viewer` on window.sc2viewer. */
+/** What a feature adds to the test API: `app` members go on window.SCOBAEdit, `viewer` on window.scobaeditor. */
 export interface TestApiBuilder {
   app(members: Readonly<Record<string, unknown>>): void;
   viewer(members: Readonly<Record<string, unknown>>): void;
-  /** A key of sc2viewer.state() that a feature knows (pick, dragPreview). */
+  /** A key of scobaeditor.state() that a feature knows (pick, dragPreview). */
   statePart(name: string, read: () => unknown): void;
   /** Every state part, read now (features/inspect). */
   stateParts(): Record<string, unknown>;
@@ -319,7 +319,7 @@ export function noItemOptions(raw: Readonly<Record<string, unknown>>): Record<st
 export interface GameParts {
   /** The grid glow class of an item: 0 the standard one, 1 the game's second. */
   glowOf(item: Item): number;
-  /** The game's facts of an item, for sc2viewer.state(). */
+  /** The game's facts of an item, for scobaeditor.state(). */
   itemFacts(item: Item): Record<string, unknown>;
   /** The game's settings of an item, checked; an unknown key is refused (thrown). */
   itemOptions(raw: Readonly<Record<string, unknown>>): Record<string, unknown>;

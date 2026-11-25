@@ -202,7 +202,7 @@ test('a placed unit takes its scale from the unit data', async ({ page }) => {
   // Negative: the same model file with no unit data is at scale 1.
   await page.locator('#clear').click();
   await page.locator('#clear-yes').click();
-  await page.evaluate((path) => window.sc2viewer.add(path), data.file);
+  await page.evaluate((path) => window.scobaeditor.add(path), data.file);
   await idle(page);
   const raw = (await state(page)).items[0];
   expect(raw.unit).toBeNull();
@@ -261,7 +261,7 @@ test('animation speed follows the model data and the walk speed', async ({ page 
 
   // The unit, and the same model file with no unit data, side by side.
   await addUnit(page, 'toshscoba', 'ToshSCOBA');
-  await page.evaluate((path) => window.sc2viewer.add(path), tosh.file);
+  await page.evaluate((path) => window.scobaeditor.add(path), tosh.file);
   await idle(page);
 
   const pick = async (index, pattern) => {
@@ -273,10 +273,10 @@ test('animation speed follows the model data and the walk speed', async ({ page 
   };
   /** Engine frames advanced by both instances over the same real time. */
   const measure = async () => {
-    await page.evaluate(() => window.sc2viewer.restart());
-    await page.waitForFunction(() => window.sc2viewer.state().items[1].frame > 250);
+    await page.evaluate(() => window.scobaeditor.restart());
+    await page.waitForFunction(() => window.scobaeditor.state().items[1].frame > 250);
     return page.evaluate(() => {
-      const items = window.sc2viewer.state().items;
+      const items = window.scobaeditor.state().items;
       return { unit: items[0].frame, model: items[1].frame, rate: items[0].rate, modelRate: items[1].rate };
     });
   };

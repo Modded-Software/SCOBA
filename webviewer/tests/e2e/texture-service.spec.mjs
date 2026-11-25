@@ -13,14 +13,14 @@ const STATES = /\/api\/sc2\/textures\?/;
 /** A skin of scoba's remastered Marine. */
 const MARINE = 'assets\\textures\\marine_remastered_diff.dds';
 
-const isIdle = (page) => page.evaluate(() => window.sc2viewer.idle());
-const addMarine = (page) => page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: 0, y: 0, pick: 0.5, sequence: -1 }));
+const isIdle = (page) => page.evaluate(() => window.scobaeditor.idle());
+const addMarine = (page) => page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: 0, y: 0, pick: 0.5, sequence: -1 }));
 
 /** The instance is in the scene, drawn, and takes a click: a pixel of the view is its picture, and a click there selects it. */
 async function usable(page, id) {
-  await page.evaluate(() => window.sc2viewer.view({ yaw: -Math.PI / 2, pitch: 0.5, distance: 6, target: [0, 0, 0.5] }));
+  await page.evaluate(() => window.scobaeditor.view({ yaw: -Math.PI / 2, pitch: 0.5, distance: 6, target: [0, 0, 0.5] }));
   let at = null;
-  await expect.poll(async () => (at = await page.evaluate((i) => window.sc2viewer.itemPixel(i), id)), { timeout: 15_000 }).not.toBeNull();
+  await expect.poll(async () => (at = await page.evaluate((i) => window.scobaeditor.itemPixel(i), id)), { timeout: 15_000 }).not.toBeNull();
   await page.mouse.click(at[0], at[1]);
   expect((await state(page)).pick.selection).toEqual([id]);
 }
@@ -62,7 +62,7 @@ test('an instance is added, drawn and takes a click when the texture states fail
   await usable(page, id);
   expect(await itemOf(page, id)).toMatchObject({ skin: 'original', overrides: 0 });
   // Negative: it offers no skin, and nothing is left loading.
-  expect(await page.evaluate((i) => window.sc2viewer.skinChoices(i), id)).toEqual({ owner: 'unit:Marine', choices: [], state: null, following: false });
+  expect(await page.evaluate((i) => window.scobaeditor.skinChoices(i), id)).toEqual({ owner: 'unit:Marine', choices: [], state: null, following: false });
   await idle(page);
 });
 

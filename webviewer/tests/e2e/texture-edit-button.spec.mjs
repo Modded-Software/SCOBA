@@ -105,10 +105,10 @@ test('negative: a game without a texture service gets no edit control in its tex
   const errors = await openGhost(page);
   const id = await add(page, '3D/Models/crate.nod');
   await frameItem(page, id);
-  const at = await page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
+  const at = await page.evaluate((i) => window.scobaeditor.itemPixel(i), id);
   await page.mouse.dblclick(at[0], at[1]);
   await expect(page.locator('#texture-window')).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.sc2viewer.textureWindow().originals), { timeout: 20_000 }).toBe('done');
+  await expect.poll(() => page.evaluate(() => window.scobaeditor.textureWindow().originals), { timeout: 20_000 }).toBe('done');
   const frame = textureFrame(page);
   expect((await frame.evaluate(() => window.hdtex.state())).edits).toMatchObject({ tools: false, manage: false, sessions: [] });
   await expect(frame.locator('.tile-edit')).toHaveCount(0);

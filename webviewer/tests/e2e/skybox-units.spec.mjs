@@ -20,13 +20,13 @@ async function open(page) {
     if (r.status() >= 400) errors.push(`http ${r.status()}: ${decodeURIComponent(r.url())}`);
   });
   await page.goto('/');
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
+  await page.waitForFunction(() => window.scobaeditor && window.scobaeditor.ready);
   return errors;
 }
 
 const units = async (page, query) => (await page.request.get(api.records('units', { limit: '500', ...query }))).json();
 const unit = async (page, id) => (await page.request.get(api.record('units', id))).json();
-const run = (page) => page.evaluate(() => window.SC2App.addAllState());
+const run = (page) => page.evaluate(() => window.SCOBAEdit.addAllState());
 
 test('api: the skybox units of Terran Campaign are marked; units are not', async ({ request, page }) => {
   const listed = await units(page, { family: 'Campaign', race: 'Terran' });
@@ -52,10 +52,10 @@ test('api: the skybox units of Terran Campaign are marked; units are not', async
 
 test('a skybox unit added alone becomes the sky and is not placed', async ({ page }) => {
   const errors = await open(page);
-  const result = await page.evaluate(() => window.sc2viewer.addUnit('SS_BackgroundSpaceTerran00'));
+  const result = await page.evaluate(() => window.scobaeditor.addUnit('SS_BackgroundSpaceTerran00'));
   expect(result).toBe(null);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 30_000 });
-  const s = await page.evaluate(() => window.sc2viewer.state());
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 30_000 });
+  const s = await page.evaluate(() => window.scobaeditor.state());
   expect(s.items).toEqual([]);
   expect(s.sceneInstances).toBe(0);
   expect(s.sky.id).toBe('SS_BackgroundSpaceTerran00');
@@ -63,10 +63,10 @@ test('a skybox unit added alone becomes the sky and is not placed', async ({ pag
   const name = (await unit(page, 'SS_BackgroundSpaceTerran00')).name;
   await expect(page.locator('#status')).toHaveText(`${name} is a skybox: set as the sky`);
   // Negative: an ordinary unit is placed and leaves the sky as it was.
-  const marine = await page.evaluate(() => window.sc2viewer.addUnit('Marine'));
+  const marine = await page.evaluate(() => window.scobaeditor.addUnit('Marine'));
   expect(marine).not.toBe(null);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 30_000 });
-  const after = await page.evaluate(() => window.sc2viewer.state());
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 30_000 });
+  const after = await page.evaluate(() => window.scobaeditor.state());
   expect(after.items.map((i) => i.unit)).toEqual(['Marine']);
   expect(after.sky.id).toBe('SS_BackgroundSpaceTerran00');
   expect(errors).toEqual([]);
@@ -91,9 +91,9 @@ test('add all on Terran Campaign units (the operator\'s 142): the dialog names t
     const r = await run(page);
     return r.running === false && r.asked === want && r.added + r.failed.length === want;
   }, { timeout: 240_000 }).toBe(true);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 60_000 });
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 60_000 });
   const r = await run(page);
-  const s = await page.evaluate(() => window.sc2viewer.state());
+  const s = await page.evaluate(() => window.scobaeditor.state());
   const sizes = r.layout.map((l) => l.size).sort((a, b) => a - b);
   const biggest = [...r.layout].sort((a, b) => b.size - a.size).slice(0, 10).map((l) => {
     const it = s.items.find((i) => i.id === l.id);
@@ -106,7 +106,7 @@ test('add all on Terran Campaign units (the operator\'s 142): the dialog names t
   for (const id of SKY_UNITS) expect(s.items.some((i) => i.unit === id)).toBe(false);
   expect(s.items.length).toBe(r.added);
   // The landmark reads like the list (operator 2026-11-21).
-  expect((await page.evaluate(() => window.SC2App.landmarks())).at(-1).name).toBe('Terran Campaign Units');
+  expect((await page.evaluate(() => window.SCOBAEdit.landmarks())).at(-1).name).toBe('Terran Campaign Units');
   // The sky was not touched by the run.
   expect(s.sky).toBe(null);
   // Known gap A4 (video textures): two layers name .ogv files the viewer

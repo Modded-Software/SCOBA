@@ -25,10 +25,10 @@ test('real units and a doodad load, are drawn, and nothing reports a problem', a
   await open(page);
   const ids = [];
   for (const [i, [unit, dataset]] of UNITS.entries()) {
-    ids.push(await page.evaluate(([u, x, d]) => window.sc2viewer.addUnit(u, { x, y: 0, pick: 0.5, dataset: d }), [unit, i * 6, dataset]));
+    ids.push(await page.evaluate(([u, x, d]) => window.scobaeditor.addUnit(u, { x, y: 0, pick: 0.5, dataset: d }), [unit, i * 6, dataset]));
   }
   for (const [doodad, dataset] of DOODADS) {
-    ids.push(await page.evaluate(([d, s]) => window.sc2viewer.addDoodad(d, { x: 0, y: 12, pick: 0.5, dataset: s }), [doodad, dataset]));
+    ids.push(await page.evaluate(([d, s]) => window.scobaeditor.addDoodad(d, { x: 0, y: 12, pick: 0.5, dataset: s }), [doodad, dataset]));
   }
   await idle(page, 60_000);
   await frames(page);
@@ -46,6 +46,6 @@ test('the page fixture records a texture request answered 500, and the viewer re
   await page.route('**/api/sc2/asset?**', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"forced"}' }));
   allowErrors(/^http 500 GET .*\/api\/sc2\/asset\?/, /^console\.\w+: viewer: /, /^console\.error: Failed to load resource/);
   await open(page);
-  await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: 0, y: 0, pick: 0.5 }));
+  await page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: 0, y: 0, pick: 0.5 }));
   await idle(page);
 });

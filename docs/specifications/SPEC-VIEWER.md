@@ -165,7 +165,7 @@ Optional. A missing one means the instance cannot do it (R-VIEW-6).
   animation waits for the clips.
 - Core sums what the post passes drew per frame. A test turns a pass off
   by its id.
-- Probes are reached as `sc2viewer.probe(format, name, ...)`. An unknown
+- Probes are reached as `scobaeditor.probe(format, name, ...)`. An unknown
   format or name is an error that names it.
 
 ### 6.4 Game plugin
@@ -232,7 +232,7 @@ test API builder.
   texture service's name of a texture an instance names (absent: no
   service), and what a double-click on an item or a record opens.
 - A game or feature adds test members through the test API builder. They
-  make `window.sc2viewer` and `window.SC2App`. A member given twice
+  make `window.scobaeditor` and `window.SCOBAEdit`. A member given twice
   throws.
 
 Events (`core/bus.ts`): item added, removed, swapped, changed; scene
@@ -472,7 +472,7 @@ under `viewer.`:
   Every e2e test fails on any of these, unless the test names it with
   `allowErrors(pattern)`:
   - an uncaught page error;
-  - a console error, or any `viewer:` / `sc2viewer:` report;
+  - a console error, or any `viewer:` / `scobaeditor:` report;
   - a reply of 400 or more, or a request with no reply (not an abort);
   - an error line in the worker server's log.
   An allowance that matches nothing fails the test too.
@@ -522,7 +522,7 @@ full run of section 13.
 
 | R-VIEW | State | Where |
 | --- | --- | --- |
-| 1 | [today] | `core-names.spec`: core code holds no game id and no game file extension. Comments and the test object's names still do. |
+| 1 | [today] | `core-names.spec`: core code holds no game id and no game file extension. Comments still do. The test objects are `scobaeditor` and `SCOBAEdit`; the spec allows no name. |
 | 2, 3 | [plan] | Not shown: the second game and format came with core edits. |
 | 4, 7 | [today] | the import rule; `import-rule.spec` |
 | 5, 26 | [today] | `contract.spec`, `ghost-mix.spec` |
@@ -655,6 +655,17 @@ What the page does. A number here is a constant of the code.
 | Double-click on a record or an instance | the game's own |
 
 The eye never goes under the ground.
+
+With an instance under the mouse (the one with the hover outline) at the
+press, that instance is the centre in place of the ground point
+(R-VIEW-149). Its centre is the middle of its cylinder (`cylinder`): its
+x, y and half its height. A middle drag orbits around it. A left drag
+holds the level plane through it, so the instance stays under the pointer.
+A slow left drag takes the plane point again where it becomes a drag
+(R-VIEW-142); a Ctrl left drag moves that plane a quarter of the way.
+With no instance under the mouse, the ground point as above. The wheel
+zooms along the view line and takes no point under the mouse; it is
+unchanged.
 
 A press on the view is a click until it becomes a drag (R-VIEW-142). It
 becomes a drag at the first pointer move that is either:
@@ -808,7 +819,7 @@ floating window, title drag (`drag.ts`), stepper (`stepper.ts`, 16.14):
 - An instance farther than 40 from the eye draws no edges. It keeps the
   choice.
 - The choice is not in the scene document and not in a copy.
-- Tests read `sc2viewer.state().edges` and `sc2viewer.edgePixels()`.
+- Tests read `scobaeditor.state().edges` and `scobaeditor.edgePixels()`.
 
 ### 16.14 Stepping drop-downs and number inputs
 
@@ -1252,6 +1263,7 @@ enlarges on a GPU.
 | Dialogs | each dialog's title and buttons start with a capital letter and name what they act on; delete and discard buttons are red | no dialog button in lower case; a button that keeps is not red | `texture-bake`, `scenes` |
 | Window tiles | In game is first; "used by" has a fixed height and scrolls; the info mark's tooltip names amber and red | no Use button; a click on In game changes no skin; a cursor of help | `texture-window`. Not tested: Include in preview (several variants in the view, a box picks nothing, the original's box fixed) |
 | Save to Skin | the picks of the window go to the chosen target in one dialog; the instance shows it | Cancel changes nothing; Revert Changes drops the picks; the bake is unchanged; no bar without an owner | `texture-window` (no bar without an owner). The rest: not tested (removed 2026-11-25) |
+| Unit centre | with an instance under the mouse, a middle drag orbits around its centre and a left drag keeps it under the pointer | with none under the mouse, the ground point is used | Not tested (R-VIEW-149, 2026-11-25) |
 | Original peek | Ctrl+. held shows Original on the selected instances; the release shows their skins again | the skin choice and the scene are unchanged; an unselected instance keeps its skin | Not tested (R-VIEW-148, 2026-11-25) |
 | Upscale progress | a request tile shows its stage, step, planes, bar and time; the tiles follow the state; the dialog says it may be closed and its button is busy while it sends | a done request leaves no tile; a failed one has Ask Again and Open Log, a running one has neither | Not tested (R-VIEW-145, 146, 2026-11-25) |
 | Variant removal | the trash asks, then the variant is gone from the tiles and the store | the picked, skin-named and baked variants have a disabled trash; In game and Original have none; the pipeline refuses a variant another dataset's skin names | Not tested (R-VIEW-147, R-HD-146, 2026-11-25) |

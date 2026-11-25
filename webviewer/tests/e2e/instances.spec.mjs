@@ -15,22 +15,22 @@ async function open(page) {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
 async function place(page, units) {
   const ids = [];
-  for (const [id, x, y] of units) ids.push(await page.evaluate(([u, ux, uy]) => window.sc2viewer.addUnit(u, { x: ux, y: uy, pick: 0.5 }), [id, x, y]));
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  await page.evaluate((v) => window.sc2viewer.view(v), VIEW);
+  for (const [id, x, y] of units) ids.push(await page.evaluate(([u, ux, uy]) => window.scobaeditor.addUnit(u, { x: ux, y: uy, pick: 0.5 }), [id, x, y]));
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  await page.evaluate((v) => window.scobaeditor.view(v), VIEW);
   return ids;
 }
 
-const state = (page) => page.evaluate(() => window.sc2viewer.state());
+const state = (page) => page.evaluate(() => window.scobaeditor.state());
 // A pixel on the unit's picture: the mouse hit goes by pixel.
-const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
-const onWorld = (page, p) => page.evaluate((q) => window.sc2viewer.screenOf(q), p);
+const onItem = (page, id) => page.evaluate((i) => window.scobaeditor.itemPixel(i), id);
+const onWorld = (page, p) => page.evaluate((q) => window.scobaeditor.screenOf(q), p);
 /** Ids of the rows marked selected in the instances panel. */
 const marked = (page) => page.locator('#scene li.selected').evaluateAll((rows) => rows.map((r) => Number(r.dataset.id)));
 

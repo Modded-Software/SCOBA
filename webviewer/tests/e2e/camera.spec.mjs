@@ -14,14 +14,14 @@ async function open(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
-  await page.evaluate((v) => window.sc2viewer.view(v), VIEW);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
+  await page.evaluate((v) => window.scobaeditor.view(v), VIEW);
   return page.locator('canvas#view').boundingBox();
 }
 
-const camera = async (page) => (await page.evaluate(() => window.sc2viewer.state())).camera;
+const camera = async (page) => (await page.evaluate(() => window.scobaeditor.state())).camera;
 /** The ground point under a canvas pixel (page coordinates in). */
-const groundAt = (page, box, x, y) => page.evaluate(([x, y]) => window.sc2viewer.groundUnder(x, y), [x - box.x, y - box.y]);
+const groundAt = (page, box, x, y) => page.evaluate(([x, y]) => window.scobaeditor.groundUnder(x, y), [x - box.x, y - box.y]);
 const eyeOf = (c) => [0, 1, 2].map((i) => c.target[i] + c.distance * [Math.cos(c.pitch) * Math.cos(c.yaw), Math.cos(c.pitch) * Math.sin(c.yaw), Math.sin(c.pitch)][i]);
 const gap = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
 
@@ -75,7 +75,7 @@ test('middle drag orbits around the ground point under the mouse', async ({ page
 
 test('negative: a middle drag that starts on the sky orbits around the target', async ({ page }) => {
   const box = await open(page);
-  await page.evaluate(() => window.sc2viewer.view({ pitch: 0.05 }));
+  await page.evaluate(() => window.scobaeditor.view({ pitch: 0.05 }));
   const sky = [box.x + box.width / 2, box.y + 5];
   expect(await groundAt(page, box, ...sky)).toBe(null);
   const c0 = await camera(page);
@@ -99,7 +99,7 @@ test('alt + middle drag turns the view around the eye', async ({ page }) => {
   expect(gap(c0.target, c1.target)).toBeGreaterThan(0.5);
   // Dragging right looks right: the old view centre is now left of centre.
   const old = await page.evaluate((t) => {
-    const s = window.sc2viewer.worldToCanvas(t[0], t[1], t[2]);
+    const s = window.scobaeditor.worldToCanvas(t[0], t[1], t[2]);
     return s;
   }, c0.target);
   expect(old[0]).toBeLessThan(box.width / 2 - 50);

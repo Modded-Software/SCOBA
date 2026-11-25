@@ -13,19 +13,19 @@ async function open(page) {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
-const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 20_000 });
+const idle = (page) => page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 20_000 });
 
 test('Helios acid drips stop at the ground; emitters without collideTerrain pass through', async ({ page }) => {
   const errors = await open(page);
-  const id = await page.evaluate(() => window.sc2viewer.addUnit('BattlecruiserHelios', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
+  const id = await page.evaluate(() => window.scobaeditor.addUnit('BattlecruiserHelios', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
   await idle(page);
   // 12 s of Stand in 1/60 s steps: drips live 10 s and fall from about z 4.
-  await page.evaluate((i) => window.sc2viewer.probe('m3', 'playParticles', i, 'Stand', 12), id);
-  const st = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
+  await page.evaluate((i) => window.scobaeditor.probe('m3', 'playParticles', i, 'Stand', 12), id);
+  const st = await page.evaluate((i) => window.scobaeditor.probe('m3', 'particles', i, true), id);
   const drip = st.emitters.find((e) => e.bone === 21);
   console.log('drip', JSON.stringify({ flags: drip.flags, bounce: drip.bounce, friction: drip.friction, live: drip.live, z: drip.particles.map((p) => Number(p.position[2].toFixed(3))), bounces: drip.particles.map((p) => p.bounces), rest: drip.particles.map((p) => p.rest) }));
   expect(drip.flags & 0x2).toBe(2);
@@ -45,10 +45,10 @@ test('Helios acid drips stop at the ground; emitters without collideTerrain pass
 
 test('negative: a colliding particle that has not reached the ground keeps its path from its birth point', async ({ page }) => {
   const errors = await open(page);
-  const id = await page.evaluate(() => window.sc2viewer.addUnit('BattlecruiserHelios', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
+  const id = await page.evaluate(() => window.scobaeditor.addUnit('BattlecruiserHelios', { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }));
   await idle(page);
-  await page.evaluate((i) => window.sc2viewer.probe('m3', 'playParticles', i, 'Stand', 0.4), id);
-  const st = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i, true), id);
+  await page.evaluate((i) => window.scobaeditor.probe('m3', 'playParticles', i, 'Stand', 0.4), id);
+  const st = await page.evaluate((i) => window.scobaeditor.probe('m3', 'particles', i, true), id);
   const drip = st.emitters.find((e) => e.bone === 21);
   expect(drip.particles.length).toBeGreaterThan(0);
   for (const p of drip.particles) {

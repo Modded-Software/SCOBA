@@ -8,7 +8,7 @@ import { api } from '../api.mjs';
 // canvas (operator 2026-11-21: "once they load in the units disappear"):
 // after each run the camera frames the new block, so all of them.
 
-const run = (page) => page.evaluate(() => window.SC2App.addAllState());
+const run = (page) => page.evaluate(() => window.SCOBAEdit.addAllState());
 
 async function addAllRun(page, total) {
   await page.locator('#add-all-units').click();
@@ -17,14 +17,14 @@ async function addAllRun(page, total) {
     const r = await run(page);
     return r.running === false && r.asked === total && r.added + r.failed.length === total;
   }, { timeout: 120_000 }).toBe(true);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 120_000 });
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 120_000 });
   return run(page);
 }
 
 /** Of these item ids: how many stand (ground point) in the part of the canvas no panel covers, and the camera. */
 const onCanvas = (page, ids) => page.evaluate((list) => {
-  const v = window.sc2viewer;
-  const box = window.SC2App.visibleRect();
+  const v = window.scobaeditor;
+  const box = window.SCOBAEdit.visibleRect();
   let inside = 0;
   for (const id of list) {
     const p = v.itemScreen(id, 0);
@@ -37,7 +37,7 @@ const onCanvas = (page, ids) => page.evaluate((list) => {
 test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overlap @slow', async ({ page }) => {
   test.setTimeout(300_000);
   await page.goto('/');
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
+  await page.waitForFunction(() => window.scobaeditor && window.scobaeditor.ready);
   await page.selectOption('#filter-units-family', 'is:Melee');
   await page.locator('#filter-units-race button[data-race="Zerg"]').click();
   const listed = await (await page.request.get(api.records('units', { limit: '500', family: 'Melee', race: 'Zerg' }))).json();
@@ -48,7 +48,7 @@ test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overla
     const ys = r.layout.map((l) => l.y);
     const seen = await onCanvas(page, r.layout.map((l) => l.id));
     if (i === 1) {
-      const s = await page.evaluate(() => window.sc2viewer.state());
+      const s = await page.evaluate(() => window.scobaeditor.state());
       const rows = r.layout.map((l) => {
         const it = s.items.find((x) => x.id === l.id);
         return [it.unit, +l.size.toFixed(1), +it.boundsRadius.toFixed(1)];
@@ -56,7 +56,7 @@ test('two "add all" runs of Melee Zerg: size clusters, outliers alone, no overla
       const sizes = rows.map((x) => x[1]).sort((a, b) => a - b);
       console.log(`sizes: median ${sizes[sizes.length >> 1]}, p90 ${sizes[Math.floor(sizes.length * 0.9)]}, max ${sizes.at(-1)}`);
       console.log('largest: ' + JSON.stringify(rows.sort((a, b) => b[1] - a[1]).slice(0, 12)));
-      const radii = await page.evaluate((ids) => ids.map((id) => window.SC2App.items.find((x) => x.id === id)).map((x) => [x.source.record.id, x.source.record.radius]), r.layout.map((l) => l.id));
+      const radii = await page.evaluate((ids) => ids.map((id) => window.SCOBAEdit.items.find((x) => x.id === id)).map((x) => [x.source.record.id, x.source.record.radius]), r.layout.map((l) => l.id));
       console.log('unit radius of the largest: ' + JSON.stringify(radii.filter(([u]) => rows.slice(0, 12).some((x) => x[0] === u))));
     }
     const clusters = [...new Set(r.layout.map((l) => l.cluster))].map((k) => {

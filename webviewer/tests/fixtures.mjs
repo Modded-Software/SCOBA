@@ -174,7 +174,7 @@ export function allowErrors(...patterns) {
 const SERVER_PROBLEM = /^(?:\w*Error\b|viewer: |sc2 webviewer: )/;
 
 /** A console report of the viewer's own (src/page/core/host.ts, src/page/ui/status.ts). */
-const VIEWER_REPORT = /^(?:sc2)?viewer:/;
+const VIEWER_REPORT = /^(?:scobaeditor|viewer):/;
 
 const matches = (pattern, problem) => (pattern instanceof RegExp ? pattern.test(problem) : problem.includes(pattern));
 

@@ -17,7 +17,7 @@ const FOV = Math.PI / 4;
 async function lookPastLeftEdge(page, offset, z) {
   const aspect = (await state(page)).camera.aspect;
   const halfWidth = DISTANCE * Math.tan(FOV / 2) * aspect;
-  await page.evaluate(([x, z, d]) => window.sc2viewer.view({ yaw: -Math.PI / 2, pitch: 0, distance: d, target: [x, 0, z] }), [halfWidth + offset, z, DISTANCE]);
+  await page.evaluate(([x, z, d]) => window.scobaeditor.view({ yaw: -Math.PI / 2, pitch: 0, distance: d, target: [x, 0, z] }), [halfWidth + offset, z, DISTANCE]);
   // `drawn` is set when a frame draws: read it after frames of the new view.
   await frames(page);
   return halfWidth;
@@ -32,7 +32,7 @@ const hits = (page, id) =>
       for (let b = 1; b < 20; b++) {
         const x = r.left + (r.width * a) / 40;
         const y = r.top + (r.height * b) / 20;
-        if (window.SC2App.itemAt(Math.min(x, r.right - 1), y)?.id === i) found.push(a / 40);
+        if (window.SCOBAEdit.itemAt(Math.min(x, r.right - 1), y)?.id === i) found.push(a / 40);
       }
     }
     return found;
@@ -40,7 +40,7 @@ const hits = (page, id) =>
 
 async function setup(page) {
   await open(page, { grid: false });
-  await page.evaluate(() => window.sc2viewer.addUnit('Thor', { x: 0, y: 0, rot: 0, pick: 0.5 }));
+  await page.evaluate(() => window.scobaeditor.addUnit('Thor', { x: 0, y: 0, rot: 0, pick: 0.5 }));
   await idle(page);
   const item = (await state(page)).items[0];
   expect(item.loaded).toBe(true);

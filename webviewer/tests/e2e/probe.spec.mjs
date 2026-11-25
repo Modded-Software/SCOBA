@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures.mjs';
 
 // A format's own test members (SPEC-VIEWER 6.3): reached only as
-// sc2viewer.probe(format, name, ...args). Truth: what the M3 probe returns
+// scobaeditor.probe(format, name, ...args). Truth: what the M3 probe returns
 // for a placed unit, and the errors for a format or a name it does not have.
 
 async function open(page) {
@@ -11,14 +11,14 @@ async function open(page) {
     if (m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
 /** The message a call throws, or null when it returns. */
 const thrown = (page, args) => page.evaluate((a) => {
   try {
-    window.sc2viewer.probe(...a);
+    window.scobaeditor.probe(...a);
     return null;
   } catch (e) {
     return e.message;
@@ -27,13 +27,13 @@ const thrown = (page, args) => page.evaluate((a) => {
 
 test('probe: an M3 probe answers for a placed unit; the old flat names are gone', async ({ page }) => {
   const errors = await open(page);
-  const id = await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }), 'Probe');
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 20_000 });
-  const s = await page.evaluate((i) => window.sc2viewer.probe('m3', 'particles', i), id);
+  const id = await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }), 'Probe');
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 20_000 });
+  const s = await page.evaluate((i) => window.scobaeditor.probe('m3', 'particles', i), id);
   expect(s.emitters.length).toBe(2);
   expect(typeof s.quads).toBe('number');
-  // Negative: no probe is a member of sc2viewer itself.
-  const flat = await page.evaluate(() => ['particles', 'setParticles', 'billboards', 'alphaTests', 'setAlphaTest', 'setConstantLayers', 'groundLights'].filter((n) => n in window.sc2viewer));
+  // Negative: no probe is a member of scobaeditor itself.
+  const flat = await page.evaluate(() => ['particles', 'setParticles', 'billboards', 'alphaTests', 'setAlphaTest', 'setConstantLayers', 'groundLights'].filter((n) => n in window.scobaeditor));
   expect(flat).toEqual([]);
   expect(errors).toEqual([]);
 });

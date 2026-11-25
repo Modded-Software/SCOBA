@@ -11,12 +11,12 @@ const BATCH = 24;
 
 test('every sampled doodad loads; none is rejected', async ({ page, request }) => {
   // Materials the m3 renderer does not draw (terrain, lens flare): reported, by design.
-  allowErrors(/^console\.warning: sc2viewer: .*: not drawn: .*material type (4 \(terrain\)|11 \(lens flare\))/);
+  allowErrors(/^console\.warning: scobaeditor: .*: not drawn: .*material type (4 \(terrain\)|11 \(lens flare\))/);
   test.setTimeout(600_000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 20_000 }).toBe(true);
 
   const all = [];
   for (let offset = 0; ; offset += 500) {
@@ -37,9 +37,9 @@ test('every sampled doodad loads; none is rejected', async ({ page, request }) =
     const ids = sample.slice(start, start + BATCH).map((d) => d.id);
     const result = await page.evaluate(async (ids) => {
       const failed = [];
-      await Promise.all(ids.map((id, i) => window.sc2viewer.addDoodad(id, { x: i * 40, y: 0, rot: 0 }).catch((error) => failed.push(`${id}: ${error.message}`))));
-      const items = window.sc2viewer.state().items.map((i) => ({ id: i.doodad, loaded: i.loaded, drawn: i.drawn, vertexCount: i.vertexCount, undrawn: i.undrawn }));
-      window.sc2viewer.clear();
+      await Promise.all(ids.map((id, i) => window.scobaeditor.addDoodad(id, { x: i * 40, y: 0, rot: 0 }).catch((error) => failed.push(`${id}: ${error.message}`))));
+      const items = window.scobaeditor.state().items.map((i) => ({ id: i.doodad, loaded: i.loaded, drawn: i.drawn, vertexCount: i.vertexCount, undrawn: i.undrawn }));
+      window.scobaeditor.clear();
       return { failed, items };
     }, ids);
     failed.push(...result.failed);
@@ -49,7 +49,7 @@ test('every sampled doodad loads; none is rejected', async ({ page, request }) =
       if (item.undrawn.length) undrawn.push(`${item.id}: ${item.undrawn.join('; ')}`);
     }
     // Negative: clear leaves nothing behind for the next batch.
-    expect((await page.evaluate(() => window.sc2viewer.state())).items).toEqual([]);
+    expect((await page.evaluate(() => window.scobaeditor.state())).items).toEqual([]);
   }
   console.log('survey', JSON.stringify({ catalog: all.length, sampled: sample.length, loaded, failed: failed.length, noGeometry: empty.length, withUndrawnParts: undrawn.length }));
   console.log('failed', JSON.stringify(failed));

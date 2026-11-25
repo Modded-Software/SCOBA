@@ -9,7 +9,7 @@ import { reloadScene } from '../scene.mjs';
 // Datasets here: scoba (default), stock, and the fixture fx (Marine at
 // actor scale 2 with the Zealot's skin; scripts/test-fixture.sh).
 
-const addUnit = (page, id, options = {}) => page.evaluate(([id, options]) => window.sc2viewer.addUnit(id, options), [id, options]);
+const addUnit = (page, id, options = {}) => page.evaluate(([id, options]) => window.scobaeditor.addUnit(id, options), [id, options]);
 const rowSelect = (page, id) => page.locator(`#scene li[data-id="${id}"] select.dataset`);
 /** Asset requests the page made for a texture, by the dataset they named. */
 const assetRequests = (page, name) =>
@@ -17,7 +17,7 @@ const assetRequests = (page, name) =>
 
 async function swap(page, id, dataset) {
   await rowSelect(page, id).selectOption(dataset);
-  await page.waitForFunction(([i, d]) => window.sc2viewer.state().items.find((x) => x.id === i).dataset === d, [id, dataset]);
+  await page.waitForFunction(([i, d]) => window.scobaeditor.state().items.find((x) => x.id === i).dataset === d, [id, dataset]);
   await idle(page);
 }
 
@@ -153,7 +153,7 @@ test('textures come from the instance\'s dataset: the same model, the skin asked
 });
 
 test('negative: a unit the other dataset does not have stays as it is, and the reason is shown', async ({ page }) => {
-  allowErrors(/^http 404 GET .*\/api\/sc2\/record\/units\?dataset=stock&id=ToshSCOBA$/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, 'sc2viewer: Error: ToshSCOBA is not in dataset "stock"');
+  allowErrors(/^http 404 GET .*\/api\/sc2\/record\/units\?dataset=stock&id=ToshSCOBA$/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, 'scobaeditor: Error: ToshSCOBA is not in dataset "stock"');
   await open(page);
   const id = await addUnit(page, 'ToshSCOBA', { x: 0, y: 0, pick: 0.5 });
   await idle(page);
@@ -165,14 +165,14 @@ test('negative: a unit the other dataset does not have stays as it is, and the r
   expect(after).toMatchObject({ id, dataset: 'scoba', path: before.path });
   await expect(rowSelect(page, id)).toHaveValue('scoba');
   // Adding from a dataset that does not exist fails too.
-  const error = await page.evaluate(() => window.sc2viewer.addUnit('Marine', { dataset: 'nosuch' }).then(() => null, (e) => e.message));
+  const error = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { dataset: 'nosuch' }).then(() => null, (e) => e.message));
   expect(error).toContain('no dataset "nosuch"');
   expect((await state(page)).items).toHaveLength(1);
 });
 
 test('a doodad swaps dataset too and keeps its variation', async ({ page }) => {
   await open(page);
-  const id = await page.evaluate(() => window.sc2viewer.addDoodad('ZerusTree', { x: 0, y: 0, pick: 0.5, variation: 7, rot: 30 }));
+  const id = await page.evaluate(() => window.scobaeditor.addDoodad('ZerusTree', { x: 0, y: 0, pick: 0.5, variation: 7, rot: 30 }));
   await idle(page);
   expect((await state(page)).items[0].dataScale.map((v) => +v.toFixed(4))).toEqual([5, 5, 7]);
   await swap(page, id, 'stock');

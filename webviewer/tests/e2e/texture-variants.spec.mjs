@@ -9,7 +9,7 @@ import { cleanOwner, idle, menu, openPage, ownerOf, place, post, shown, slotsOf,
 
 const UNIT = 'Infestor';
 const OWNER = `unit:${UNIT}`;
-const dialogState = (page) => page.evaluate(() => window.sc2viewer.upscaleDialog());
+const dialogState = (page) => page.evaluate(() => window.scobaeditor.upscaleDialog());
 /** The window for a step that waits on pipeline processes (judge, request, skin): they share the machine with the run. */
 const PIPELINE = 30_000;
 
@@ -46,7 +46,7 @@ test('the menu\'s Upscale makes New Skin of the owner; the instance shows it; ea
   await idle(page);
   expect((await shown(page, id)).skin).toBe('new');
   // Its variants are still being made: the page follows them (17.4).
-  const following = (await page.evaluate((i) => window.sc2viewer.skinChoices(i), id)).following;
+  const following = (await page.evaluate((i) => window.scobaeditor.skinChoices(i), id)).following;
   console.log(`after submit: following ${following}, overrides ${(await shown(page, id)).overrides}`);
   const after = await ownerOf(request, 'scoba', OWNER);
   // Negative: New Skin is the only change, stored; nothing is baked.
@@ -86,14 +86,14 @@ test('the menu\'s Upscale makes New Skin of the owner; the instance shows it; ea
     await expect.poll(async () => (await shown(page, id)).overrides, { timeout: 15_000 }).toBe(onModel);
   } catch (error) {
     // What the page holds: its owner (skins, shows) and the states it shows, against the server's.
-    const seen = await page.evaluate((i) => window.sc2viewer.skinChoices(i), id);
+    const seen = await page.evaluate((i) => window.scobaeditor.skinChoices(i), id);
     console.log(`page owner ${JSON.stringify(seen)}; status ${await page.locator('#status').textContent()}`);
     for (const asset of shownOnes) console.log(`server ${asset}: ${JSON.stringify((await stateOf(request, 'scoba', asset)).variants.map((one) => [one.id, one.stale, one.problems.length]))}`);
     throw error;
   }
   expect((await shown(page, id)).skin).toBe('new');
   // Negative: once every variant is made, the page stops reading their states.
-  await expect.poll(async () => (await page.evaluate((i) => window.sc2viewer.skinChoices(i), id)).following, { timeout: 5_000 }).toBe(false);
+  await expect.poll(async () => (await page.evaluate((i) => window.scobaeditor.skinChoices(i), id)).following, { timeout: 5_000 }).toBe(false);
   expect(errors).toEqual([]);
 });
 

@@ -52,7 +52,7 @@ export function installGameTabs({ games, drawers, status, events }: GameTabsDeps
   }
 
   events.on('startup', showGameTabs);
-  // The mark follows every game change (sc2viewer.games.choose too).
+  // The mark follows every game change (scobaeditor.games.choose too).
   events.on('game-changed', () => {
     if (bar.childElementCount) mark();
   });

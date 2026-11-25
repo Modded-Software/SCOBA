@@ -41,7 +41,7 @@ async function bakeByMenu(page, id, answer, kind = 'bake') {
 /** Look at an instance at x, so a right click finds its pixels. */
 async function lookAt(page, x) {
   await page.keyboard.press('Escape');
-  await page.evaluate((tx) => window.sc2viewer.view({ yaw: -Math.PI / 2, pitch: 0.5, distance: 6, target: [tx, 0, 0.5] }), x);
+  await page.evaluate((tx) => window.scobaeditor.view({ yaw: -Math.PI / 2, pitch: 0.5, distance: 6, target: [tx, 0, 0.5] }), x);
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 

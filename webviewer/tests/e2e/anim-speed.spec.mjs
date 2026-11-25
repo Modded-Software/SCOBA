@@ -17,18 +17,18 @@ async function open(page) {
   });
   await page.addInitScript(FAST_SCREEN);
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
 /** Animation time the renderer advanced over `ms` of real time, wraps skipped. */
 async function measure(page, id, ms) {
-  await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0 }), id);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
+  await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0 }), id);
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
   return page.evaluate(
     (span) =>
       new Promise((resolve) => {
-        const item = () => window.sc2viewer.state().items.at(-1);
+        const item = () => window.scobaeditor.state().items.at(-1);
         let start = 0;
         let last = 0;
         let advanced = 0;

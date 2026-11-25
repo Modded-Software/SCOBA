@@ -17,9 +17,9 @@ async function open(page, path = '/') {
   return errors;
 }
 
-const call = (page, name, ...args) => page.evaluate(([n, a]) => window.sc2viewer.scenes[n](...a), [name, args]);
-const addUnit = (page, id, options) => page.evaluate(([i, o]) => window.sc2viewer.addUnit(i, o), [id, options]);
-const units = async (page) => (await page.evaluate(() => window.sc2viewer.state())).items.map((i) => i.unit ?? i.doodad ?? i.path);
+const call = (page, name, ...args) => page.evaluate(([n, a]) => window.scobaeditor.scenes[n](...a), [name, args]);
+const addUnit = (page, id, options) => page.evaluate(([i, o]) => window.scobaeditor.addUnit(i, o), [id, options]);
+const units = async (page) => (await page.evaluate(() => window.scobaeditor.state())).items.map((i) => i.unit ?? i.doodad ?? i.path);
 /** Every message of the page so far: the message log (R-VIEW-64). */
 const log = async (page) => (await page.locator('#status-log').textContent()) ?? '';
 const MARINE = sceneItem({ category: 'units', record: 'Marine', variant: null }, { x: 1, y: 2, rot: 30, sequence: 0, options: { team: 3, skin: 'hd' } });
@@ -71,8 +71,8 @@ test('a first start makes one empty scene, "scene 1", and opens it; the address 
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('viewer.scene')))).toBe(s.open.id);
   // Negative: adding, moving and removing never write the address.
   const id = await addUnit(page, 'Marine', { x: 0, y: 0, pick: 0.5 });
-  await page.evaluate((i) => window.SC2App.setPosition(window.SC2App.items.find((x) => x.id === i), 4, 4), id);
-  await page.evaluate((i) => window.sc2viewer.remove(i), id);
+  await page.evaluate((i) => window.SCOBAEdit.setPosition(window.SCOBAEdit.items.find((x) => x.id === i), 4, 4), id);
+  await page.evaluate((i) => window.scobaeditor.remove(i), id);
   expect(page.url()).not.toContain('#');
   expect(errors).toEqual([]);
 });
@@ -93,7 +93,7 @@ test('every change writes the scene; a reload opens it again with every field', 
   const rows = page.locator('#scene li');
   await rows.nth(5).locator('input.x').fill('-5');
   await rows.nth(5).locator('input.x').dispatchEvent('change');
-  const before = (await page.evaluate(() => window.sc2viewer.state())).items;
+  const before = (await page.evaluate(() => window.scobaeditor.state())).items;
   const stored = await sceneOf(page);
   expect(stored.items[5].x).toBe(-5);
   // Negative: the address holds none of it.
@@ -110,7 +110,7 @@ test('every change writes the scene; a reload opens it again with every field', 
   // An item without the option has Original.
   expect(again.items[1].options.skin).toBe('original');
   // What the view made of them is the same: model, place, dataset data, variation, skin.
-  const items = (await page.evaluate(() => window.sc2viewer.state())).items;
+  const items = (await page.evaluate(() => window.scobaeditor.state())).items;
   const key = (i) => ({ path: i.path, unit: i.unit, doodad: i.doodad, variation: i.variation, dataset: i.dataset, x: i.x, y: i.y, rot: i.rot, sequence: i.sequence, team: i.team, skin: i.skin, dataScale: i.dataScale, loaded: i.loaded });
   expect(items.map(key)).toEqual(before.map(key));
   expect(items.every((i) => i.loaded)).toBe(true);
@@ -126,7 +126,7 @@ test('every change writes the scene; a reload opens it again with every field', 
 });
 
 test('negative: an item with an option the game does not know, or a bad team, animation or skin type, is refused and names why', async ({ page }) => {
-  allowErrors(/^console\.warning: sc2viewer: Error: (unknown item option "(hd|textures)"|option team: not a whole number|Marine: no team 99|option skin: not a name|Marine: no animation 9999)/);
+  allowErrors(/^console\.warning: scobaeditor: Error: (unknown item option "(hd|textures)"|option team: not a whole number|Marine: no team 99|option skin: not a name|Marine: no animation 9999)/);
   test.setTimeout(60_000);
   await open(page);
   const refused = [
@@ -292,7 +292,7 @@ test('negative: a file that fails the check is refused, names the fault, and cha
     [sceneText([MARINE, { ...TREE, x: '3' }]), /items\[1\]\.x: not a finite number/],
   ];
   for (const [text, fault] of bad) {
-    const message = await page.evaluate((t) => window.sc2viewer.scenes.importText(t).then(() => 'imported', (e) => e.message), text);
+    const message = await page.evaluate((t) => window.scobaeditor.scenes.importText(t).then(() => 'imported', (e) => e.message), text);
     expect(message, String(text).slice(0, 60)).toMatch(fault);
   }
   const after = await scenesState(page);

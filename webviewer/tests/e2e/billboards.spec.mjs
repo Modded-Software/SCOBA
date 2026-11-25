@@ -4,7 +4,7 @@ import { test, expect } from '../fixtures.mjs';
 // light cones and lens flares. Rules: WhiteoutFlakes io/m3/m3_billboard.cpp
 // (CBBSolver::ApplyBillboard); layout: m3addon structures.xml BBSC.
 // Truth: the bone world matrices the renderer skins with, read for two
-// camera views at one animation time (sc2viewer.probe('m3', 'billboards', ...)).
+// camera views at one animation time (scobaeditor.probe('m3', 'billboards', ...)).
 
 async function open(page) {
   const errors = [];
@@ -13,22 +13,22 @@ async function open(page) {
     if (m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
-  await page.evaluate(() => window.sc2viewer.setGrid(false));
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
+  await page.evaluate(() => window.scobaeditor.setGrid(false));
   return errors;
 }
 
-const idle = (page) => page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 20_000 });
+const idle = (page) => page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 20_000 });
 const unit = async (page, id) => {
-  const item = await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }), id);
+  const item = await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0, rot: 0, pick: 0.5, dataset: 'stock' }), id);
   await idle(page);
   return item;
 };
 
 /** Two views at one animation time: the bones are posed again with no time step after each camera move. */
 const twoViews = (page, id) => page.evaluate((i) => {
-  const v = window.sc2viewer;
-  const item = window.SC2App.items.find((x) => x.id === i);
+  const v = window.scobaeditor;
+  const item = window.SCOBAEdit.items.find((x) => x.id === i);
   const read = (yaw) => {
     v.view({ yaw, pitch: 0.5, distance: 60, target: [0, 0, 1] });
     item.instance.m3.skeleton.update(0);
@@ -75,9 +75,9 @@ test('negative: a model without BBSC records turns no bone, and its bones keep t
   expect(a.records).toEqual([]);
   expect(b.billboarded).toBe(0);
   const axes = await page.evaluate((i) => {
-    const item = window.SC2App.items.find((x) => x.id === i);
+    const item = window.SCOBAEdit.items.find((x) => x.id === i);
     const read = (yaw) => {
-      window.sc2viewer.view({ yaw, pitch: 0.5, distance: 60, target: [0, 0, 1] });
+      window.scobaeditor.view({ yaw, pitch: 0.5, distance: 60, target: [0, 0, 1] });
       item.instance.m3.skeleton.update(0);
       return Array.from(item.instance.m3.skeleton.nodes[1].worldMatrix);
     };

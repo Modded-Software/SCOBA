@@ -594,7 +594,7 @@ no step finds, a material missing from the export and a missing texture
 are not drawn and named in the model's `undrawn` list. `cull cull_off`
 draws both sides; else back faces are culled.
 
-Probes for tests (`window.sc2viewer.probe('nod', name, ...)`):
+Probes for tests (`window.scobaeditor.probe('nod', name, ...)`):
 
 | Probe | Gives |
 | --- | --- |
@@ -645,7 +645,7 @@ drawn (kind, both sides) or why not (`GroupLook.why`; "hidden by its
 shader" for `sky` and the rest of that list), groups and triangles. The
 format gives that data (`formats/nod/looks.ts`). A material without a
 texture file, and a texture that does not load, are in the page's
-problems. Test members: `sc2viewer.textureWindow()` and the page's
+problems. Test members: `scobaeditor.textureWindow()` and the page's
 `hdtex.entries()`, `hdtex.problems()`, `hdtex.textures()`.
 
 The model container that `/api/ghost/file` serves

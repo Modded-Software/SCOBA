@@ -10,9 +10,9 @@ import { idle, open } from '../page.mjs';
 /** The ground quad's half size as last drawn, with the camera at `distance`. */
 const radiusAt = (page, distance) =>
   page.evaluate(async (d) => {
-    window.SC2App.view({ target: [0, 0, 0], yaw: -Math.PI / 2, pitch: 0.9, distance: d });
+    window.SCOBAEdit.view({ target: [0, 0, 0], yaw: -Math.PI / 2, pitch: 0.9, distance: d });
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-    return window.SC2App.ground.drawnRadius;
+    return window.SCOBAEdit.ground.drawnRadius;
   }, distance);
 
 test('the ground quad grows with the camera distance', async ({ page }) => {
@@ -30,20 +30,20 @@ test('the ground quad grows with the camera distance', async ({ page }) => {
 
 test('every unit gets a ground spot, past the old 31-unit cap', async ({ page }) => {
   const errors = await open(page);
-  const max = await page.evaluate(() => window.SC2App.ground.maxSpots);
+  const max = await page.evaluate(() => window.SCOBAEdit.ground.maxSpots);
   console.log(`spots the shader holds: ${max}`);
   expect(max).toBeGreaterThanOrEqual(64);
   // 48 units in a row along y = 0, 4 apart.
   const N = 48;
-  for (let i = 0; i < N; i++) await page.evaluate((x) => window.sc2viewer.addUnit('Marine', { x, y: 0, pick: 0.5 }), i * 4);
+  for (let i = 0; i < N; i++) await page.evaluate((x) => window.scobaeditor.addUnit('Marine', { x, y: 0, pick: 0.5 }), i * 4);
   await idle(page, 60_000);
-  await expect.poll(() => page.evaluate(() => window.SC2App.ground.spotsDrawn)).toBe(N);
+  await expect.poll(() => page.evaluate(() => window.SCOBAEdit.ground.spotsDrawn)).toBe(N);
   expect(errors).toEqual([]);
 });
 
 test('negative: with no unit the ground draws no spot', async ({ page }) => {
   const errors = await open(page);
   await radiusAt(page, 20);
-  expect(await page.evaluate(() => window.SC2App.ground.spotsDrawn)).toBe(0);
+  expect(await page.evaluate(() => window.SCOBAEdit.ground.spotsDrawn)).toBe(0);
   expect(errors).toEqual([]);
 });

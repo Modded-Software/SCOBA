@@ -14,16 +14,16 @@ async function open(page) {
     if (m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
+  await page.waitForFunction(() => window.scobaeditor && window.scobaeditor.ready);
   return errors;
 }
 
 async function added(page, id) {
-  await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0 }), id);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 60_000 });
+  await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0 }), id);
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 60_000 });
   // `drawn` is the scene's list of instances drawn in the last frame: let two frames run.
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-  const item = (await page.evaluate(() => window.sc2viewer.state())).items.at(-1);
+  const item = (await page.evaluate(() => window.scobaeditor.state())).items.at(-1);
   console.log(`${id}: vertices ${item.vertexCount}, element bytes ${item.elementBytes}, largest index ${item.elementMax}`);
   return item;
 }

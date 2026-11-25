@@ -36,19 +36,19 @@ test('every skybox loads; one with a mesh draws all of it with all its textures 
   page.on('pageerror', (e) => problems.push(`${current}: pageerror ${e.message}`));
   page.on('console', (m) => {
     // The viewer logs a failed resource as "viewer: ..."; the page warns
-    // about undrawn parts with "sc2viewer: NAME: not drawn: ...".
-    if (m.text().startsWith('sc2viewer:') && m.text().includes('not drawn')) warned.add(current);
+    // about undrawn parts with "scobaeditor: NAME: not drawn: ...".
+    if (m.text().startsWith('scobaeditor:') && m.text().includes('not drawn')) warned.add(current);
     else if (m.text().startsWith('viewer:') || m.type() === 'error') problems.push(`${current}: ${m.text()}`);
   });
   await page.goto('/');
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready);
-  await page.evaluate(() => window.sc2viewer.setGrid(false));
+  await page.waitForFunction(() => window.scobaeditor && window.scobaeditor.ready);
+  await page.evaluate(() => window.scobaeditor.setGrid(false));
 
   const report = [];
   const meshless = [];
   for (const sky of items) {
     current = sky.id;
-    const thrown = await page.evaluate((choice) => window.sc2viewer.setSky(choice).then(() => null, (error) => error.message), sky);
+    const thrown = await page.evaluate((choice) => window.scobaeditor.setSky(choice).then(() => null, (error) => error.message), sky);
     await idle(page);
     const s = await state(page);
     let drawn = 0;
@@ -97,7 +97,7 @@ test('an uncompressed DDS texture decodes: spacesinglenebula3.dds', async ({ pag
   const image = await page.evaluate(async (url) => {
     const buffer = await (await fetch(url)).arrayBuffer();
     const file = new Uint8Array(buffer);
-    const dds = new window.sc2viewer.DdsImage();
+    const dds = new window.scobaeditor.DdsImage();
     dds.load(buffer);
     const top = dds.getMipmap(0);
     let differ = 0;

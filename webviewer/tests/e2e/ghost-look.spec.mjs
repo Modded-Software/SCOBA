@@ -14,7 +14,7 @@ test('a cutout group: its texture leaves holes the pick sees; a solid group has 
   const crate = await add(page, '3D/Models/crate.nod');
   await frameItem(page, crate);
   const solid = await triangleHits(page, crate, 0);
-  await page.evaluate((i) => window.sc2viewer.remove(i), crate);
+  await page.evaluate((i) => window.scobaeditor.remove(i), crate);
   const vine = await add(page, '3D/Models/AR_Plant_Vine_01.nod');
   await frameItem(page, vine);
   const groups = await probe(page, 'groups', vine);
@@ -49,7 +49,7 @@ test('an unknown shader and a material no step finds: not drawn, named in undraw
     }
     // Every named group, and only those, is in the item's list.
     expect(item.undrawn.length).toBe(groups.filter((g) => g.undrawn !== null).length);
-    await page.evaluate((i) => window.sc2viewer.remove(i), id);
+    await page.evaluate((i) => window.scobaeditor.remove(i), id);
   }
   expect(errors).toEqual([]);
 });
@@ -76,10 +76,10 @@ test('negative: without its shader file a model does not load, and the file is n
   allowErrors(/^http 404 GET .*\/shaders\/nod\.frag$/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, /^console\.warning: viewer: Failed to create a resource .*crate\.nod.* nod: 404 \/shaders\/nod\.frag/);
   await page.route('**/shaders/nod.frag', (route) => route.fulfill({ status: 404, body: 'gone' }));
   await page.goto('/');
-  await page.waitForFunction(() => window.sc2viewer && window.sc2viewer.ready, null, { timeout: 20_000 });
-  const result = await page.evaluate(() => window.sc2viewer.add('3D/Models/crate.nod', { game: 'ghost' }).then(() => 'added', (e) => 'failed: ' + e.message));
+  await page.waitForFunction(() => window.scobaeditor && window.scobaeditor.ready, null, { timeout: 20_000 });
+  const result = await page.evaluate(() => window.scobaeditor.add('3D/Models/crate.nod', { game: 'ghost' }).then(() => 'added', (e) => 'failed: ' + e.message));
   expect(result).toBe('failed: nod: 404 /shaders/nod.frag');
-  expect((await page.evaluate(() => window.sc2viewer.state())).items).toEqual([]);
+  expect((await page.evaluate(() => window.scobaeditor.state())).items).toEqual([]);
 });
 
 test('a refused model is reported with its error and not added', async ({ page }) => {
@@ -90,10 +90,10 @@ test('a refused model is reported with its error and not added', async ({ page }
     if (path.toLowerCase().endsWith('crate.nod')) return route.fulfill({ status: 200, contentType: 'application/octet-stream', body: refusedBody('bad group table') });
     return route.continue();
   });
-  const result = await page.evaluate(() => window.sc2viewer.add('3D/Models/crate.nod', { game: 'ghost' }).then(() => 'added', (e) => 'failed: ' + e.message));
+  const result = await page.evaluate(() => window.scobaeditor.add('3D/Models/crate.nod', { game: 'ghost' }).then(() => 'added', (e) => 'failed: ' + e.message));
   expect(result).toContain('refused: bad group table');
   await expect(page.locator('#status')).toContainText('bad group table');
-  expect((await page.evaluate(() => window.sc2viewer.state())).items).toEqual([]);
+  expect((await page.evaluate(() => window.scobaeditor.state())).items).toEqual([]);
   // Negative: another model of the same game still loads.
   const other = await add(page, '3D/Models/zergling.nod');
   expect((await itemOf(page, other)).loaded).toBe(true);

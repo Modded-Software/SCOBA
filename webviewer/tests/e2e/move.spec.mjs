@@ -13,22 +13,22 @@ async function open(page) {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
 async function place(page, id) {
-  const itemId = await page.evaluate((u) => window.sc2viewer.addUnit(u, { x: 0, y: 0, pick: 0.5 }), id);
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  await page.evaluate((v) => window.sc2viewer.view(v), VIEW);
+  const itemId = await page.evaluate((u) => window.scobaeditor.addUnit(u, { x: 0, y: 0, pick: 0.5 }), id);
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  await page.evaluate((v) => window.scobaeditor.view(v), VIEW);
   return itemId;
 }
 
-const state = (page) => page.evaluate(() => window.sc2viewer.state());
+const state = (page) => page.evaluate(() => window.scobaeditor.state());
 const itemOf = async (page, id) => (await state(page)).items.find((i) => i.id === id);
 // A pixel on the unit's picture: the mouse hit goes by pixel.
-const onItem = (page, id) => page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
-const onWorld = (page, p) => page.evaluate((q) => window.sc2viewer.screenOf(q), p);
+const onItem = (page, id) => page.evaluate((i) => window.scobaeditor.itemPixel(i), id);
+const onWorld = (page, p) => page.evaluate((q) => window.scobaeditor.screenOf(q), p);
 
 async function altDrag(page, from, to) {
   await page.keyboard.down('Alt');
@@ -49,7 +49,7 @@ test('alt + left drag on a unit moves it; the point pressed stays under the mous
   const to = (await onWorld(page, [2, 1, 0])).map(Math.round);
   // The point of the unit the press grabs.
   const hit = await page.evaluate(([x, y]) => {
-    const h = window.SC2App.hitAt(x, y);
+    const h = window.SCOBAEdit.hitAt(x, y);
     return h ? { id: h.item.id, point: h.point } : null;
   }, from);
   expect(hit, 'the press lands on the unit').toBeTruthy();

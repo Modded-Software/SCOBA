@@ -1,5 +1,5 @@
 // What an M3 model's materials and layers hold, for the tests: the M3
-// part of sc2viewer.state() (m3Facts) and the material switches.
+// part of scobaeditor.state() (m3Facts) and the material switches.
 
 import type M3Model from '@renderer/viewer/handlers/m3/model';
 import type M3ModelInstance from '@renderer/viewer/handlers/m3/modelinstance';

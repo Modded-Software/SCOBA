@@ -6,7 +6,7 @@
 // A post pass (SPEC-VIEWER 6.3): `enabled` off draws no displacement batch
 // (for comparing frames). `draw` runs right after a scene and returns how
 // many mesh batches it drew; particle quads are counted on each emitter
-// (sc2viewer.particles).
+// (scobaeditor.particles).
 
 import type ModelViewer from '@renderer/viewer/viewer';
 import M3ModelInstance from '@renderer/viewer/handlers/m3/modelinstance';

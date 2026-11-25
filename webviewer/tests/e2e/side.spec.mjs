@@ -11,14 +11,14 @@ const VIEW = { yaw: -Math.PI / 2, pitch: 0.5, distance: 9, target: [0, 0, 0.8] }
 
 async function place(page, units) {
   const ids = [];
-  for (const [id, x, y] of units) ids.push(await page.evaluate(([u, ux, uy]) => window.sc2viewer.addUnit(u, { x: ux, y: uy, pick: 0.5 }), [id, x, y]));
+  for (const [id, x, y] of units) ids.push(await page.evaluate(([u, ux, uy]) => window.scobaeditor.addUnit(u, { x: ux, y: uy, pick: 0.5 }), [id, x, y]));
   await idle(page);
   await view(page, VIEW);
   return ids;
 }
 
-const status = (page) => page.evaluate(() => window.SC2App.statusState());
-const visible = (page) => page.evaluate(() => window.SC2App.visibleRect());
+const status = (page) => page.evaluate(() => window.SCOBAEdit.statusState());
+const visible = (page) => page.evaluate(() => window.SCOBAEdit.visibleRect());
 const shownRows = (page) => page.locator('#scene li:not([hidden])').evaluateAll((rows) => rows.map((r) => Number(r.dataset.id)));
 const selectRow = (page, id) => page.locator(`#scene li[data-id="${id}"] .head .name`).click();
 
@@ -41,11 +41,11 @@ test('a status message shows at the top centre of the view, not in the gallery, 
   const [marine] = await place(page, [['Marine', 0, 0]]);
   // The add said "loading Marine"; with the add done, the toast goes down after that
   // message's minimum 0.1 s. Negative: nothing in the gallery either way.
-  expect((await page.evaluate(() => window.SC2App.statusLog())).shown).toEqual(['loading Marine']);
+  expect((await page.evaluate(() => window.SCOBAEdit.statusLog())).shown).toEqual(['loading Marine']);
   await expect.poll(async () => (await status(page)).up, { timeout: 6000 }).toBe(false);
   // It went down as a finished message (at least 0.1 s, as long as the add took),
   // not after a message's full 5 s. Timed in the page, so a slow test run does not count.
-  const done = await page.evaluate(() => window.SC2App.statusLog());
+  const done = await page.evaluate(() => window.SCOBAEdit.statusLog());
   console.log('loading message up ms', done.lastUpMs);
   expect(done.shown).toEqual(['loading Marine']);
   expect(done.lastUpMs).toBeGreaterThanOrEqual(100);
@@ -67,7 +67,7 @@ test('a status message shows at the top centre of the view, not in the gallery, 
 
   // It goes away by itself after 5 s, timed in the page: not before 4.5 s, by 6.5 s.
   await expect.poll(async () => (await status(page)).up, { timeout: 10_000 }).toBe(false);
-  const lasted = (await page.evaluate(() => window.SC2App.statusLog())).lastUpMs;
+  const lasted = (await page.evaluate(() => window.SCOBAEdit.statusLog())).lastUpMs;
   console.log('toast lasted ms', lasted);
   expect(lasted).toBeGreaterThanOrEqual(4500);
   expect(lasted).toBeLessThanOrEqual(6500);
@@ -79,7 +79,7 @@ test('a failure shows as a failure; it re-centres when a drawer closes; a click 
   allowErrors(/^http 404 GET .*\/api\/sc2\/file\?.*path=nope\.m3/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, /^console\.warning: viewer: Failed to fetch a resource: .*path=nope\.m3/);
   const errors = await open(page);
   // The add must fail: its error message is read, and a success is a test failure.
-  const failure = await page.evaluate(() => window.sc2viewer.add('nope.m3').then(() => 'added', (error) => `failed: ${error.message}`));
+  const failure = await page.evaluate(() => window.scobaeditor.add('nope.m3').then(() => 'added', (error) => `failed: ${error.message}`));
   console.log('add nope.m3:', failure);
   expect(failure).toMatch(/^failed: /);
   // "loading nope.m3" shows first, its minimum 0.1 s; then the failure replaces it.
@@ -123,14 +123,14 @@ test('messages in a row replace each other with the toast up; each shows at leas
   });
   // Three messages at once, then an empty text (as an add does), then a fourth.
   await page.evaluate(() => {
-    window.SC2App.setStatus('one');
-    window.SC2App.setStatus('two');
-    window.SC2App.setStatus('three', { failure: true });
-    window.SC2App.setStatus('');
-    window.SC2App.setStatus('four');
+    window.SCOBAEdit.setStatus('one');
+    window.SCOBAEdit.setStatus('two');
+    window.SCOBAEdit.setStatus('three', { failure: true });
+    window.SCOBAEdit.setStatus('');
+    window.SCOBAEdit.setStatus('four');
   });
-  await expect.poll(() => page.evaluate(() => window.SC2App.statusLog().shown.length), { timeout: 8000 }).toBe(4);
-  expect((await page.evaluate(() => window.SC2App.statusLog())).shown).toEqual(['one', 'two', 'three', 'four']);
+  await expect.poll(() => page.evaluate(() => window.SCOBAEdit.statusLog().shown.length), { timeout: 8000 }).toBe(4);
+  expect((await page.evaluate(() => window.SCOBAEdit.statusLog())).shown).toEqual(['one', 'two', 'three', 'four']);
   const trace = await page.evaluate(() => window.__toastTrace);
   // The toast went up once and did not go down between the messages.
   const ups = trace.filter((e, i) => i > 0 && e.up !== trace[i - 1].up);
@@ -149,10 +149,10 @@ test('messages in a row replace each other with the toast up; each shows at leas
   // Negative: a lone empty text with the toast down does nothing.
   await page.locator('#status').click();
   await page.keyboard.press('Escape');
-  await page.evaluate(() => window.SC2App.setStatus(''));
+  await page.evaluate(() => window.SCOBAEdit.setStatus(''));
   await frames(page);
   expect((await status(page)).up).toBe(false);
-  expect((await page.evaluate(() => window.SC2App.statusLog())).shown).toHaveLength(4);
+  expect((await page.evaluate(() => window.SCOBAEdit.statusLog())).shown).toHaveLength(4);
   expect(errors).toEqual([]);
 });
 
@@ -163,9 +163,9 @@ test('the message log holds every message, in order, with its time and failure m
   await expect(log).toBeHidden();
   const before = await page.locator('#status-log-dialog li').count();
   await page.evaluate(() => {
-    window.SC2App.setStatus('alpha');
-    window.SC2App.setStatus('beta', { failure: true });
-    window.SC2App.setStatus('gamma');
+    window.SCOBAEdit.setStatus('alpha');
+    window.SCOBAEdit.setStatus('beta', { failure: true });
+    window.SCOBAEdit.setStatus('gamma');
   });
   await page.locator('#status').click();
   await expect(log).toBeVisible();
@@ -178,13 +178,13 @@ test('the message log holds every message, in order, with its time and failure m
   // Each row has a clock time.
   for (const time of (await rows.locator('time').allTextContents()).slice(-3)) expect(time).toMatch(/^\d\d:\d\d:\d\d\.\d$/);
   // A message while the log is open joins it at the end.
-  await page.evaluate(() => window.SC2App.setStatus('delta'));
+  await page.evaluate(() => window.SCOBAEdit.setStatus('delta'));
   await expect(rows).toHaveCount(before + 4);
   await expect(rows.last().locator('.text')).toHaveText('delta');
   // The close button closes it; the history stays for the next look.
   await log.locator('.dialog-close').click();
   await expect(log).toBeHidden();
-  await page.evaluate(() => window.SC2App.setStatus('epsilon'));
+  await page.evaluate(() => window.SCOBAEdit.setStatus('epsilon'));
   await page.locator('#status').click();
   await expect(rows).toHaveCount(before + 5);
   await page.keyboard.press('Escape');
@@ -192,7 +192,7 @@ test('the message log holds every message, in order, with its time and failure m
 });
 
 test('a page bundle that does not load is reported as a failure, naming the file', async ({ page }) => {
-  allowErrors(/^http 404 GET .*\/vendor\/renderer\.js$/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, 'sc2viewer: page bundle did not load: /vendor/renderer.js');
+  allowErrors(/^http 404 GET .*\/vendor\/renderer\.js$/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, 'scobaeditor: page bundle did not load: /vendor/renderer.js');
   const problems = [];
   page.on('console', (m) => {
     if (m.type() === 'error') problems.push(m.text());
@@ -206,12 +206,12 @@ test('a page bundle that does not load is reported as a failure, naming the file
   console.log('reported', JSON.stringify(shown), JSON.stringify(problems));
   expect(shown).toMatch(/did not load: \/vendor\/renderer\.js/);
   expect(problems.some((p) => p.includes('did not load') && p.includes('/vendor/renderer.js'))).toBe(true);
-  expect(await page.evaluate(() => typeof window.sc2viewer)).toBe('undefined');
+  expect(await page.evaluate(() => typeof window.scobaeditor)).toBe('undefined');
   // Negative: a normal load reports nothing and hides the line.
   await page.unroute('**/vendor/renderer.js');
   problems.length = 0;
   await page.reload();
-  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   await expect(failure).toBeHidden();
   expect(problems.filter((p) => p.includes('did not load'))).toEqual([]);
 });
@@ -235,7 +235,7 @@ test('the instance search hides the rows that do not match, and only the rows', 
   expect(await shownRows(page)).toEqual([marine, zealot, zergling]);
   // A new instance follows the search.
   await page.locator('#instance-search').fill('zeal');
-  const second = await page.evaluate(() => window.sc2viewer.addUnit('Marine', { x: 0, y: 2, pick: 0.5 }));
+  const second = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: 0, y: 2, pick: 0.5 }));
   await idle(page);
   expect(await shownRows(page)).toEqual([zealot]);
   await expect(page.locator('#instance-count')).toHaveText('(1 of 4)');
@@ -270,7 +270,7 @@ test('each panel is a drawer: its tab slides it out to the left and back; the ch
   expect(g.x + g.width).toBeLessThanOrEqual(0);
   expect((await box('#instances')).x).toBe(0);
   expect((await box('#gallery-handle')).x).toBe(0);
-  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ gallery: false, instances: true });
+  expect(await page.evaluate(() => window.SCOBAEdit.drawerState())).toEqual({ gallery: false, instances: true });
   // A closed panel takes no keys.
   expect(await page.evaluate(() => {
     const input = document.getElementById('search-units');
@@ -287,8 +287,8 @@ test('each panel is a drawer: its tab slides it out to the left and back; the ch
 
   // Kept over a reload.
   await page.reload();
-  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready))).toBe(true);
-  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ gallery: false, instances: false });
+  await expect.poll(() => page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready))).toBe(true);
+  expect(await page.evaluate(() => window.SCOBAEdit.drawerState())).toEqual({ gallery: false, instances: false });
   expect((await visible(page)).left).toBe(0);
 
   // Back in.
@@ -311,13 +311,13 @@ test('with the drawers closed, a unit where the panels were is under the mouse; 
   // Move the camera so that the marine stands where the panels are.
   let at = null;
   for (const tx of [2, 3, 4, 5, 6, 7]) {
-    await page.evaluate((x) => window.sc2viewer.view({ ...window.sc2viewer.state().camera, target: [x, 0, 0.8] }), tx);
+    await page.evaluate((x) => window.scobaeditor.view({ ...window.scobaeditor.state().camera, target: [x, 0, 0.8] }), tx);
     await frames(page);
-    const p = await page.evaluate((id) => window.sc2viewer.itemScreen(id, 0), marine);
+    const p = await page.evaluate((id) => window.scobaeditor.itemScreen(id, 0), marine);
     if (p && p[0] > 60 && p[0] < 260) break;
   }
   // Negative: drawers open, the mouse there is on a panel, not on the unit.
-  at = await page.evaluate((id) => window.sc2viewer.itemPixel(id), marine);
+  at = await page.evaluate((id) => window.scobaeditor.itemPixel(id), marine);
   expect(at, 'a marine pixel under the panels').toBeTruthy();
   expect(at[0]).toBeLessThan(300);
   await page.mouse.move(at[0], at[1]);
@@ -327,9 +327,9 @@ test('with the drawers closed, a unit where the panels were is under the mouse; 
   await page.locator('#gallery-handle').click();
   await page.locator('#instances-handle').click();
   await settled(page);
-  const now = await page.evaluate((id) => window.sc2viewer.itemPixel(id), marine);
+  const now = await page.evaluate((id) => window.scobaeditor.itemPixel(id), marine);
   expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y).id, now)).toBe('view');
   await page.mouse.move(now[0], now[1]);
-  await expect.poll(() => page.evaluate(() => window.sc2viewer.state().pick.hovered)).toBe(marine);
+  await expect.poll(() => page.evaluate(() => window.scobaeditor.state().pick.hovered)).toBe(marine);
   expect(errors).toEqual([]);
 });

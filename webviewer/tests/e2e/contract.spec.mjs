@@ -36,7 +36,7 @@ async function firstRecord(request, game, dataset, categories) {
 
 test('page: in every available game a record is previewed, added, selected, moved, copied, pasted, kept, removed', async ({ page, request }) => {
   // The first Ghost actor's model has a group no material step finds: it is not drawn and is reported.
-  allowErrors('sc2viewer: _actorProps: not drawn: group 0 dflt: found by no step of the material lookup');
+  allowErrors('scobaeditor: _actorProps: not drawn: group 0 dflt: found by no step of the material lookup');
   test.setTimeout(120_000);
   const errors = await open(page);
   const state = () => viewState(page);
@@ -45,10 +45,10 @@ test('page: in every available game a record is previewed, added, selected, move
     const dataset = (await get(request, `/api/${game}/datasets`)).default;
     const categories = await get(request, `/api/${game}/categories?${new URLSearchParams({ dataset })}`);
     await page.locator(`#game-tabs button[data-game="${game}"]`).click();
-    await expect.poll(() => page.evaluate(() => window.sc2viewer.games.current())).toBe(game);
+    await expect.poll(() => page.evaluate(() => window.scobaeditor.games.current())).toBe(game);
     // The game's page part names only categories the server lists (a file category such as models has no
     // record kind there). A ground category has no pane (negative); every other server category has one.
-    const shown = await page.evaluate(() => window.sc2viewer.games.categories());
+    const shown = await page.evaluate(() => window.scobaeditor.games.categories());
     expect(categories.map((c) => c.id), game).toEqual(expect.arrayContaining(shown.map((c) => c.id)));
     const ground = new Set(shown.filter((c) => c.ground).map((c) => c.id));
     for (const c of categories) await expect(page.locator(`#pane-${c.id}`), `${game}: pane ${c.id}`).toHaveCount(ground.has(c.id) ? 0 : 1);
@@ -70,8 +70,8 @@ test('page: in every available game a record is previewed, added, selected, move
     console.log(`contract: ${game} ${category.id} ${record.id}: ${item.path}, loaded ${item.loaded}`);
     expect(item.game, game).toBe(game);
     // Selected, then moved by its x field.
-    await page.evaluate((ids) => window.SC2App.setSelection(ids), [item.id]);
-    expect(await page.evaluate(() => window.SC2App.selectedIds())).toEqual([item.id]);
+    await page.evaluate((ids) => window.SCOBAEdit.setSelection(ids), [item.id]);
+    expect(await page.evaluate(() => window.SCOBAEdit.selectedIds())).toEqual([item.id]);
     const field = page.locator('#scene li').first().locator('input.x');
     await field.fill(String(item.x + 2));
     await field.press('Enter');
@@ -80,7 +80,7 @@ test('page: in every available game a record is previewed, added, selected, move
     await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
     const panel = await page.locator('#gallery').boundingBox();
     await page.mouse.move(panel.x + panel.width / 2, panel.y + panel.height / 2);
-    await page.evaluate((ids) => window.SC2App.setSelection(ids), [item.id]);
+    await page.evaluate((ids) => window.SCOBAEdit.setSelection(ids), [item.id]);
     await page.locator('body').press('Control+c');
     await page.locator('body').press('Control+v');
     await idle();
@@ -91,7 +91,7 @@ test('page: in every available game a record is previewed, added, selected, move
     const back = (await state()).items;
     expect(back.map((i) => [i.game, i.path, i.loaded]), game).toEqual(pasted.map((i) => [i.game, i.path, item.loaded]));
     // Removed: the scene is empty again for the next game.
-    for (const i of back) await page.evaluate((id) => window.sc2viewer.remove(id), i.id);
+    for (const i of back) await page.evaluate((id) => window.scobaeditor.remove(id), i.id);
     expect((await state()).items, game).toEqual([]);
   }
   expect(errors).toEqual([]);

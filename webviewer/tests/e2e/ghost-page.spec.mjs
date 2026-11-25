@@ -7,7 +7,7 @@ import { open, add, probe, itemOf, hitId, frames } from '../ghost.mjs';
 test('a static model: one group, the triangles of the file, picked at its pixel and not beside it', async ({ page }) => {
   const errors = await open(page);
   const id = await add(page, '3D/Models/crate.nod');
-  await page.evaluate(() => window.sc2viewer.view('front'));
+  await page.evaluate(() => window.scobaeditor.view('front'));
   await frames(page);
   const item = await itemOf(page, id);
   expect([item.game, item.loaded, item.undrawn]).toEqual(['ghost', true, []]);
@@ -16,7 +16,7 @@ test('a static model: one group, the triangles of the file, picked at its pixel 
   expect(groups.length).toBe(1);
   expect(groups[0]).toEqual(expect.objectContaining({ material: 'chestCrate2', kind: 'solid', triangles: layout.indexCount / 3, textureLoaded: true, drawnLast: true }));
   expect(layout.indexCount).toBeGreaterThan(0);
-  const pixel = await page.evaluate((i) => window.sc2viewer.itemPixel(i), id);
+  const pixel = await page.evaluate((i) => window.scobaeditor.itemPixel(i), id);
   expect(pixel, 'the model has a pixel the pick finds').not.toBeNull();
   expect(await hitId(page, pixel)).toBe(id);
   // Negative: a pixel well beside it, still on the canvas, finds nothing.

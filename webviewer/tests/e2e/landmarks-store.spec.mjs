@@ -11,11 +11,11 @@ import { open, state, view } from '../page.mjs';
 
 async function reload(page) {
   await page.reload();
-  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 20_000 }).toBe(true);
 }
 
 const camera = async (page) => (await state(page)).camera;
-const marks = (page) => page.evaluate(() => window.SC2App.landmarkState());
+const marks = (page) => page.evaluate(() => window.SCOBAEdit.landmarkState());
 const names = async (page) => (await marks(page)).list.map((l) => l.name);
 const row = (page, name) => page.locator('#landmarks-list li', { has: page.locator('.go', { hasText: name }) });
 
@@ -111,7 +111,7 @@ test('the trash button asks, then deletes that landmark only; origin has no tras
   // Negative: origin cannot be deleted by any route.
   const refused = await page.evaluate(() => {
     try {
-      window.SC2App.removeLandmark(0);
+      window.SCOBAEdit.removeLandmark(0);
       return null;
     } catch (error) {
       return error.message;
@@ -131,7 +131,7 @@ test('landmarks and the chosen one are back after a reload; a deleted one stays 
   await view(page, b);
   await pin(page, 'beta');
   // One made by the page itself ("add all" makes them this way).
-  await page.evaluate(() => window.SC2App.addLandmark({ name: 'made', target: [1, 1, 0], yaw: 0, pitch: 0.5, distance: 9 }));
+  await page.evaluate(() => window.SCOBAEdit.addLandmark({ name: 'made', target: [1, 1, 0], yaw: 0, pitch: 0.5, distance: 9 }));
   await page.click('#landmarks-button');
   await row(page, 'alpha').locator('.go').click();
   const saved = await marks(page);
@@ -173,22 +173,22 @@ test('the exact camera, the grid toggle and the sky are back after a reload', as
   await drag('right', [], 55, 35);
   await drag('left', [], -60, 20);
   await page.mouse.wheel(0, 240);
-  await page.waitForFunction(() => window.SC2App.zoomGoal() === null);
+  await page.waitForFunction(() => window.SCOBAEdit.zoomGoal() === null);
   const sky = (await (await page.request.get(api.backdrops('limit=1'))).json()).items[0];
-  await page.evaluate((s) => window.sc2viewer.setSky(s), sky);
+  await page.evaluate((s) => window.scobaeditor.setSky(s), sky);
   await page.click('#grid-toggle');
-  await page.waitForFunction(() => window.sc2viewer.idle());
+  await page.waitForFunction(() => window.scobaeditor.idle());
   const before = await state(page);
   expect(before.grid).toBe(false);
   expect(before.sky).toMatchObject({ id: sky.id, file: sky.file });
-  const eye = await page.evaluate(() => window.SC2App.eye());
+  const eye = await page.evaluate(() => window.SCOBAEdit.eye());
 
   await reload(page);
-  await page.waitForFunction(() => window.sc2viewer.idle());
+  await page.waitForFunction(() => window.scobaeditor.idle());
   const after = await state(page);
   // Exact: the same numbers, not close ones.
   expect(after.camera).toEqual(before.camera);
-  expect(await page.evaluate(() => window.SC2App.eye())).toEqual(eye);
+  expect(await page.evaluate(() => window.SCOBAEdit.eye())).toEqual(eye);
   expect(after.grid).toBe(false);
   expect(after.sky).toEqual(before.sky);
   await expect(page.locator('#grid-toggle')).not.toHaveClass(/\bon\b/);
@@ -196,7 +196,7 @@ test('the exact camera, the grid toggle and the sky are back after a reload', as
 
   // Negative: grid on and no sky are kept just the same.
   await page.click('#grid-toggle');
-  await page.evaluate(() => window.sc2viewer.setSky(null));
+  await page.evaluate(() => window.scobaeditor.setSky(null));
   await reload(page);
   const last = await state(page);
   expect(last.grid).toBe(true);

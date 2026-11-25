@@ -16,29 +16,29 @@ async function open(page) {
     if (m.text().startsWith('viewer:') || m.type() === 'error') errors.push(m.text());
   });
   await page.goto('/');
-  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => errors.join(' | ') || page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 10_000 }).toBe(true);
   return errors;
 }
 
 /** Marine and zealot side by side, a zergling far to the right. */
 async function place(page) {
   const ids = [];
-  for (const [id, x, y] of [['Marine', 0, 0], ['Zealot', 2.5, 0], ['Zergling', 8, 0]]) ids.push(await page.evaluate(([u, ux, uy]) => window.sc2viewer.addUnit(u, { x: ux, y: uy, pick: 0.5 }), [id, x, y]));
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  await page.evaluate((v) => window.sc2viewer.view(v), VIEW);
+  for (const [id, x, y] of [['Marine', 0, 0], ['Zealot', 2.5, 0], ['Zergling', 8, 0]]) ids.push(await page.evaluate(([u, ux, uy]) => window.scobaeditor.addUnit(u, { x: ux, y: uy, pick: 0.5 }), [id, x, y]));
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  await page.evaluate((v) => window.scobaeditor.view(v), VIEW);
   // Two frames with this camera: a unit off screen before was not animated
   // (culled), and the mouse hit goes by what the last frame drew.
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   return ids;
 }
 
-const state = (page) => page.evaluate(() => window.sc2viewer.state());
+const state = (page) => page.evaluate(() => window.scobaeditor.state());
 const pick = async (page) => (await state(page)).pick;
 // With a height share `k`: that point of the unit's column (the select
 // rectangle goes by it). Without: a pixel on the unit's picture (the mouse
 // hit goes by pixel).
-const onItem = (page, id, k) => page.evaluate(([i, h]) => (h === null ? window.sc2viewer.itemPixel(i) : window.sc2viewer.itemScreen(i, h)), [id, k ?? null]);
-const onWorld = (page, p) => page.evaluate((q) => window.sc2viewer.screenOf(q), p);
+const onItem = (page, id, k) => page.evaluate(([i, h]) => (h === null ? window.scobaeditor.itemPixel(i) : window.scobaeditor.itemScreen(i, h)), [id, k ?? null]);
+const onWorld = (page, p) => page.evaluate((q) => window.scobaeditor.screenOf(q), p);
 const marked = (page) => page.locator('#scene li.selected').evaluateAll((rows) => rows.map((r) => Number(r.dataset.id)).sort((a, b) => a - b));
 
 /** The rectangle around the items `ids`, from its right bottom corner to its left top one. */
@@ -68,7 +68,7 @@ test('alt + left drag from the ground draws a rectangle; released, the instances
   const far = await onItem(page, zergling);
   // The zergling stands outside the rectangle, and the drag starts on bare ground.
   expect(far[0]).toBeGreaterThan(rect.from[0] + 20);
-  expect(await page.evaluate(([x, y]) => window.SC2App.itemAt(x, y), rect.from)).toBe(null);
+  expect(await page.evaluate(([x, y]) => window.SCOBAEdit.itemAt(x, y), rect.from)).toBe(null);
   const before = (await state(page)).camera;
 
   await dragRect(page, rect, {
@@ -224,15 +224,15 @@ test('more selected instances than two all get a ring', async ({ page }) => {
   await open(page);
   const ids = await page.evaluate(async () => {
     const out = [];
-    for (let i = 0; i < 12; i++) out.push(await window.sc2viewer.addUnit('Marine', { x: (i % 4) * 2, y: Math.floor(i / 4) * 2, pick: 0.5 }));
+    for (let i = 0; i < 12; i++) out.push(await window.scobaeditor.addUnit('Marine', { x: (i % 4) * 2, y: Math.floor(i / 4) * 2, pick: 0.5 }));
     return out;
   });
-  await page.waitForFunction(() => window.sc2viewer.idle(), null, { timeout: 15_000 });
-  await page.evaluate((list) => window.SC2App.setSelection(list), ids);
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  await page.evaluate((list) => window.SCOBAEdit.setSelection(list), ids);
   const s = await state(page);
   expect(s.pick.selection).toEqual(ids);
   expect(s.rings.filter(Boolean)).toHaveLength(12);
   // Negative: one taken out loses its ring.
-  await page.evaluate((id) => window.SC2App.toggleSelected(id), ids[5]);
+  await page.evaluate((id) => window.SCOBAEdit.toggleSelected(id), ids[5]);
   expect((await state(page)).rings.filter(Boolean)).toHaveLength(11);
 });

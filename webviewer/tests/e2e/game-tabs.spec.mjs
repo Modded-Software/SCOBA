@@ -31,7 +31,7 @@ test('one tab per game, vertical, at the top of the gallery right edge; sc2 is c
   const ghostTab = page.locator('#game-tabs button[data-game="ghost"]');
   await expect(ghostTab).toBeEnabled();
   await expect(ghostTab).toHaveAttribute('aria-pressed', 'false');
-  expect(await page.evaluate(() => window.sc2viewer.games.current())).toBe('sc2');
+  expect(await page.evaluate(() => window.scobaeditor.games.current())).toBe('sc2');
   const [tab, gallery] = [await box(page, '#game-tabs button[data-game="sc2"]'), await box(page, '#gallery')];
   // At the right edge, from the top.
   expect(Math.abs(tab.x - (gallery.x + gallery.width))).toBeLessThan(3);
@@ -65,17 +65,17 @@ test('a game the server cannot open and one with no page module: disabled, the r
   await expect(ghost).toHaveAttribute('title', 'StarCraft: Ghost: GHOST_PATH is not set');
   await expect(other).toBeDisabled();
   await expect(other).toHaveAttribute('title', 'Other Game: the page has no module for Other Game');
-  expect(await page.evaluate(() => [window.sc2viewer.games.refusal('ghost'), window.sc2viewer.games.refusal('sc2')])).toEqual(['GHOST_PATH is not set', null]);
+  expect(await page.evaluate(() => [window.scobaeditor.games.refusal('ghost'), window.scobaeditor.games.refusal('sc2')])).toEqual(['GHOST_PATH is not set', null]);
   // Negative: choosing a refused game fails and leaves the gallery on sc2.
-  const failed = await page.evaluate(() => window.sc2viewer.games.choose('ghost').then(() => 'chose', (e) => e.message));
+  const failed = await page.evaluate(() => window.scobaeditor.games.choose('ghost').then(() => 'chose', (e) => e.message));
   expect(failed).toBe('GHOST_PATH is not set');
-  expect(await page.evaluate(() => window.sc2viewer.games.current())).toBe('sc2');
+  expect(await page.evaluate(() => window.scobaeditor.games.current())).toBe('sc2');
   await expect(page.locator('#game-tabs button[data-game="sc2"]')).toHaveAttribute('aria-pressed', 'true');
   // A refused choice is not stored.
   expect(await page.evaluate(() => localStorage.getItem('viewer.game'))).toBeNull();
   // Negative: a click on a disabled tab changes nothing.
   await ghost.click({ force: true });
-  expect(await page.evaluate(() => [window.sc2viewer.games.current(), localStorage.getItem('viewer.game')])).toEqual(['sc2', null]);
+  expect(await page.evaluate(() => [window.scobaeditor.games.current(), localStorage.getItem('viewer.game')])).toEqual(['sc2', null]);
   expect(errors).toEqual([]);
 });
 
@@ -98,12 +98,12 @@ test('negative: a stored game the server cannot open stops the start with the pa
   await expect(page.locator('#search-units')).toBeHidden();
   // Clear removes that key only; the drawers setting is kept.
   await page.locator('#settings-refused-clear').click();
-  await expect.poll(() => page.evaluate(() => Boolean(window.sc2viewer && window.sc2viewer.ready)), { timeout: 20_000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => Boolean(window.scobaeditor && window.scobaeditor.ready)), { timeout: 20_000 }).toBe(true);
   const kept = await storedKeys(page);
   expect(kept['viewer.game'], 'the refused key is gone').toBeUndefined();
   expect(kept['viewer.drawers'], 'negative: a key that was not refused is kept').toBe(JSON.stringify({ gallery: true, instances: false }));
   // Nothing stored: the server's default game.
-  expect(await page.evaluate(() => window.sc2viewer.games.current())).toBe('sc2');
+  expect(await page.evaluate(() => window.scobaeditor.games.current())).toBe('sc2');
   expect(errors).toEqual([]);
 });
 
@@ -126,16 +126,16 @@ test('with the gallery closed the tabs stay at the window edge; a click opens th
   const errors = await open(page);
   await page.locator('#gallery-handle').click();
   await settled(page);
-  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ gallery: false, instances: true });
+  expect(await page.evaluate(() => window.SCOBAEdit.drawerState())).toEqual({ gallery: false, instances: true });
   const tab = await box(page, '#game-tabs button[data-game="sc2"]');
   expect(tab.x).toBeLessThan(2);
   await expect(page.locator('#game-tabs button[data-game="sc2"]')).toBeVisible();
   // The tab opens the gallery on its game; the instances drawer stays as it was.
   await page.locator('#game-tabs button[data-game="sc2"]').click();
   await settled(page);
-  expect(await page.evaluate(() => window.SC2App.drawerState())).toEqual({ gallery: true, instances: true });
+  expect(await page.evaluate(() => window.SCOBAEdit.drawerState())).toEqual({ gallery: true, instances: true });
   const [after, gallery] = [await box(page, '#game-tabs button[data-game="sc2"]'), await box(page, '#gallery')];
   expect(Math.abs(after.x - (gallery.x + gallery.width))).toBeLessThan(3);
-  expect(await page.evaluate(() => window.sc2viewer.games.current())).toBe('sc2');
+  expect(await page.evaluate(() => window.scobaeditor.games.current())).toBe('sc2');
   expect(errors).toEqual([]);
 });

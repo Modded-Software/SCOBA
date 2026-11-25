@@ -71,7 +71,7 @@ export function createHost(formats: readonly FormatModule[], setStatus: (text: s
   /** Say so when a loaded model has parts the renderer cannot draw. */
   function reportUndrawn(name: string, model: ViewerModel): void {
     if (!model.undrawn.length) return;
-    console.warn(`sc2viewer: ${name}: not drawn: ${model.undrawn.join('; ')}`);
+    console.warn(`scobaeditor: ${name}: not drawn: ${model.undrawn.join('; ')}`);
     setStatus(`${name}: ${model.undrawn.length} part(s) not drawn (${model.undrawn[0] ?? ''})`, { failure: true });
   }
 
