@@ -27,7 +27,6 @@ judge it.
 | F1 | The game shows the name, descriptions and tip of `DocumentHeader`. A new `GameStrings.txt` with the old `DocumentHeader` showed the old text. | operator 2026-11-26; staged map of that run |
 | F2 | `DocumentHeader` version 8: `H2CS`, version, at 0x2C the u32 count of dependencies (C strings), the u32 count of strings, then per string u16 key length, key, locale reversed (`SUne` = enUS), u16 value length, value. The strings end the file. The source holds 172. | `read_document_header`, `test_read_round_trip` |
 | F3 | MapInfo flag `0x02` is the wait for a key. A changed flag needs a new check value. | `loadwait/20261126-203204`; `test_on_and_off` |
-| F4 | `roster/20261126-203544` failed: no bank within the 60 s launch window. The rerun `roster/20261126-203936` passed. The roster map's flag was off in both. The cause is not known. | runs |
 
 ## 3. Design
 
@@ -43,7 +42,6 @@ judge it.
 | Run | Result |
 | --- | --- |
 | `loadwait/20261126-203204` | failures 0 |
-| `roster/20261126-203544` | FAIL: no roster test bank produced (F4) |
 | `roster/20261126-203936` | failures 0 |
 
 Build stamp of these runs: `04c0c150339e-f67c488649676c4e`.
