@@ -2,10 +2,11 @@
 // the bare texture viewer page (/texture-viewer.html), handed every texture
 // file a model's materials name, decoded, with what draws with it. Opened by
 // a double-click on an instance, an instance row, or a gallery row (actors
-// and models). Needs GHOST_PATH. The window's state, the page's hdtex API and
-// measured boxes decide; how it looks is an operator check.
+// and models), with the texture service (R-VIEW-152). Needs GHOST_PATH. The
+// window's state, the page's hdtex API and measured boxes decide; how it
+// looks is an operator check.
 import { allowErrors, test, expect } from '../fixtures.mjs';
-import { open, add, frameItem } from '../ghost.mjs';
+import { open, add, frameItem, CRATE, CRATE_OWNER, CRATE_TEXTURE } from '../ghost.mjs';
 
 const win = (page) => page.evaluate(() => window.scobaeditor.textureWindow());
 const textureFrame = (page) => page.frames().find((frame) => frame.url().includes('/texture-viewer.html'));
@@ -71,8 +72,8 @@ test('a double-click on a Ghost instance opens the shared texture window on its 
   const [entry] = shown.entries;
   expect(entry.plane).toBe('color');
   expect(new Set(shown.entries.map((e) => e.texture)).size).toBe(1);
-  // Ghost has no texture service: no state names a kind (texview categoryOf, R-VIEW-100).
-  for (const e of shown.entries) expect(e.category).toBe('kind not known');
+  // Every entry names its asset for the texture service (R-VIEW-152).
+  for (const e of shown.entries) expect(e.asset).toBe(CRATE_TEXTURE);
   expect(entry.texture).toMatch(/\.dds$/i);
   expect(entry.facts).toEqual([['material chestCrate2', expect.stringMatching(/^(shader \S+|no shader) · drawn solid · groups 0 · \d+ triangles$/)]]);
   // The entry's picture is the decoded texture at the size listed.
@@ -88,26 +89,90 @@ test('a double-click on a Ghost instance opens the shared texture window on its 
   expect(errors).toEqual([]);
 });
 
-test('negative: Ghost has no texture service: no state, no request, no skin, no Upscale, no ground texture (R-VIEW-100)', async ({ page }) => {
+test('Ghost has the texture service: the instance has its owner and skins, the window the states; opening asks for nothing to be made; no ground texture (R-VIEW-152)', async ({ page }) => {
   const asked = [];
   page.on('request', (r) => {
-    if (/\/api\/[^/]+\/textures/.test(new URL(r.url()).pathname)) asked.push(r.url());
+    if (/\/api\/[^/]+\/textures/.test(new URL(r.url()).pathname)) asked.push(`${r.method()} ${new URL(r.url()).pathname}`);
   });
   const errors = await open(page);
-  const id = await add(page, '3D/Models/crate.nod');
-  expect(await page.evaluate((i) => window.scobaeditor.skinChoices(i), id)).toEqual({ owner: null, choices: [], state: null, following: false });
+  const id = await add(page, CRATE);
+  await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
+  const choices = await page.evaluate((i) => window.scobaeditor.skinChoices(i), id);
+  expect(choices.owner).toBe(CRATE_OWNER);
+  expect(choices.choices[0]).toBe('original');
   await page.locator(`#scene li[data-id="${id}"] .head .name`).dblclick();
   const shown = await inside(page, 'crate.nod');
   expect(shown.entries.length).toBeGreaterThan(0);
-  for (const e of shown.entries) expect(e.asset, e.id).toBeNull();
-  expect(shown.textures).toEqual([]);
-  const frame = textureFrame(page);
-  await expect(frame.locator('#cards .upscale, #cards select')).toHaveCount(0);
-  await expect(frame.locator('#list .badge')).toHaveCount(0);
+  for (const e of shown.entries) expect(e.asset, e.id).toBe(CRATE_TEXTURE);
+  // The page holds the service's state of the texture it shows.
+  expect(shown.textures.map((t) => t.asset)).toEqual([CRATE_TEXTURE]);
+  // Negative: opening reads and judges; it asks for no variant, skin or bake.
+  expect(asked.filter((one) => /\/textures\/(request|skin|bake|unbake|remove)$/.test(one))).toEqual([]);
   // The Ghost tab: no ground texture to choose.
   await page.locator('#game-tabs button[data-game="ghost"]').click();
   await expect(page.locator('#ground-button')).toBeHidden();
-  expect(asked).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+/** The Details panel of the entry shown: each pair's label and value boxes, in page pixels of the frame. */
+const detailBoxes = (page) =>
+  textureFrame(page).evaluate(() =>
+    [...document.querySelectorAll('#cards .details dt')].map((dt) => {
+      const dd = dt.nextElementSibling;
+      const [a, b] = [dt.getBoundingClientRect(), dd.getBoundingClientRect()];
+      return { label: dt.textContent, fact: dt.classList.contains('fact'), labelBottom: a.bottom, valueTop: b.top, valueWidth: b.width, valueLines: Math.round(b.height / parseFloat(getComputedStyle(dd).lineHeight || '13')) };
+    }),
+  );
+
+test('the Details panel: a material fact is two lines, label above value; no value is squeezed to a column of letters', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = await open(page);
+  const id = await add(page, '3D/Models/nova.nod');
+  await page.locator(`#scene li[data-id="${id}"] .head .name`).dblclick();
+  const shown = await inside(page, 'nova.nod');
+  const rows = textureFrame(page).locator('#list .row');
+  const count = await rows.count();
+  expect(count).toBeGreaterThan(1);
+  let facts = 0;
+  for (let at = 0; at < count; at++) {
+    await rows.nth(at).click();
+    const boxes = await detailBoxes(page);
+    for (const box of boxes) {
+      // Every value has room: at least 60 px wide (a column of letters is about 10).
+      expect(box.valueWidth, `${shown.entries[at]?.texture}: ${box.label}`).toBeGreaterThanOrEqual(60);
+      if (!box.fact) continue;
+      facts++;
+      // A material fact: the value starts below its label.
+      expect(box.valueTop, box.label).toBeGreaterThanOrEqual(box.labelBottom - 0.5);
+    }
+  }
+  expect(facts).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
+test('the window of a Ghost model shows the Upscale Texture tile and who uses the texture; a texture that cannot be upscaled shows the reason and no tile', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = await open(page);
+  const crate = await add(page, CRATE);
+  await page.locator(`#scene li[data-id="${crate}"] .head .name`).dblclick();
+  await inside(page, 'crate.nod');
+  const frame = textureFrame(page);
+  // The tile shows once the pipeline has judged the texture.
+  await expect(frame.locator('#cards .skin-tile.upscale')).toHaveCount(1, { timeout: 20_000 });
+  expect((await frame.evaluate(() => window.hdtex.state())).tiles.map((tile) => tile.kind)).toContain('upscale');
+  const labels = (await detailBoxes(page)).map((box) => box.label);
+  expect(labels).toEqual(expect.arrayContaining(['format', 'kind', 'used by']));
+  await page.locator('#texture-window .window-close').click();
+
+  // Negative: SignBracket.dds is 16 pixels on a side; it has no role (R-HD-153).
+  const sign = await add(page, '3D/Models/sign_armory.nod', 4);
+  await page.locator(`#scene li[data-id="${sign}"] .head .name`).dblclick();
+  await inside(page, 'sign_armory.nod');
+  const signFrame = textureFrame(page);
+  await signFrame.locator('#list .row', { hasText: /SignBracket\.dds/i }).first().click();
+  await expect.poll(async () => (await detailBoxes(page)).find((box) => box.label === 'cannot be upscaled')?.label ?? null, { timeout: 20_000 }).toBe('cannot be upscaled');
+  await expect(signFrame.locator('#cards dd', { hasText: /smaller than 32 pixels/ })).toHaveCount(1);
+  await expect(signFrame.locator('#cards .skin-tile.upscale')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

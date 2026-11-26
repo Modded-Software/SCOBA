@@ -1,0 +1,106 @@
+From 0adea28266f94e7c69688af68540774a8d13b9d6 Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Wed, 25 Nov 2026 22:57:57 +0200
+Subject: [PATCH 58/59] m3: renderTriangles draws runs of triangles, each in
+ one flat colour
+
+A triangle is numbered by its place in the model's element list. renderTriangles draws the runs' triangles of the drawn batches' regions with the standard vertex shader, so they follow the pose; triangleCount is the numbering's size. The depth, blend and cull state are the caller's.
+---
+ src/viewer/handlers/m3/modelinstance.ts | 57 +++++++++++++++++++++++++
+ src/viewer/handlers/m3/region.ts        | 15 +++++++
+ 2 files changed, 72 insertions(+)
+
+diff --git a/src/viewer/handlers/m3/modelinstance.ts b/src/viewer/handlers/m3/modelinstance.ts
+index a92b6fba..f0fcc183 100644
+--- a/src/viewer/handlers/m3/modelinstance.ts
++++ b/src/viewer/handlers/m3/modelinstance.ts
+@@ -353,6 +353,63 @@ export default class M3ModelInstance extends ModelInstance {
+     return lines;
+   }
+ 
++  /**
++   * Draw runs of triangles, each run in one flat colour (r, g, b, a; a above
++   * 0), posed like the triangles (the same vertex shader). A triangle is
++   * numbered by its place in the model's element list: its first element
++   * index / 3. Only the regions of the drawn batches draw, as in
++   * renderEdges. The depth, blend and cull state are the caller's. Returns
++   * how many triangles it drew.
++   */
++  renderTriangles(runs: ReadonlyArray<{ first: number; count: number; color: ArrayLike<number> }>): number {
++    const model = <M3Model>this.model;
++    const regions = new Set(model.batches.filter((batch) => !this.solidOnly || batch.material.blendMode === 0).map((batch) => batch.region));
++
++    if (!regions.size || !runs.length) {
++      return 0;
++    }
++
++    const gl = model.viewer.gl;
++    const m3Cache = <M3HandlerObject>model.viewer.sharedCache.get('m3');
++    const shader = m3Cache.standardShaders[model.uvSetCount - 1];
++
++    this.useShader(shader);
++
++    // No material is bound: no cut-out, so every pixel of a triangle is drawn.
++    gl.uniform1f(shader.uniforms['u_alphaTest'], 0);
++
++    let drawn = 0;
++
++    for (const region of regions) {
++      const start = region.offset / model.elementBytes / 3;
++      const end = start + region.elements / 3;
++
++      for (const run of runs) {
++        const from = Math.max(run.first, start);
++        const to = Math.min(run.first + run.count, end);
++
++        if (from >= to) {
++          continue;
++        }
++
++        gl.uniform4f(shader.uniforms['u_pick'], run.color[0], run.color[1], run.color[2], run.color[3]);
++        region.renderTriangles(shader, from - start, to - from);
++        drawn += to - from;
++      }
++    }
++
++    gl.uniform4f(shader.uniforms['u_pick'], 0, 0, 0, 0);
++
++    return drawn;
++  }
++
++  /** How many triangles the model's element list holds: the numbering of renderTriangles. */
++  get triangleCount(): number {
++    const model = <M3Model>this.model;
++
++    return model.regions.reduce((top, region) => Math.max(top, region.offset / model.elementBytes / 3 + region.elements / 3), 0);
++  }
++
+   override updateAnimations(dt: number): void {
+     const sequenceId = this.sequence;
+ 
+diff --git a/src/viewer/handlers/m3/region.ts b/src/viewer/handlers/m3/region.ts
+index f6c9e121..cd69762f 100644
+--- a/src/viewer/handlers/m3/region.ts
++++ b/src/viewer/handlers/m3/region.ts
+@@ -61,6 +61,21 @@ export default class M3Region {
+     gl.drawElements(gl.TRIANGLES, this.elements, this.elementType, this.offset);
+   }
+ 
++  /**
++   * Draw `count` of the region's triangles from its triangle `first`. The
++   * model's element buffer must be bound.
++   */
++  renderTriangles(shader: Shader, first: number, count: number): void {
++    const gl = this.gl;
++    const bytes = this.elementType === gl.UNSIGNED_INT ? 4 : 2;
++
++    gl.uniform2f(shader.uniforms['u_uvTransform'], this.uvScale, this.uvOffset);
++    gl.uniform1f(shader.uniforms['u_firstBoneLookupIndex'], this.firstBoneLookupIndex);
++    gl.uniform1f(shader.uniforms['u_boneWeightPairsCount'], this.boneWeightPairsCount);
++
++    gl.drawElements(gl.TRIANGLES, count * 3, this.elementType, this.offset + first * 3 * bytes);
++  }
++
+   /** Draw the region's edges as lines. The model's edge buffer must be bound. */
+   renderEdges(shader: Shader): void {
+     if (!this.edgeCount) {

@@ -232,33 +232,39 @@ test('mouse orbits, zooms and pans the camera', async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
-test('drag sensitivity: rotate 0.004 rad per pixel, pan 0.0006 x distance per pixel', async ({ page }) => {
-  await open(page);
-  const box = await page.locator('canvas#view').boundingBox();
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
-  const c0 = (await state(page)).camera;
+// The base rates times the mouse sensitivity (R-VIEW-150): 0.6 with
+// nothing stored, else the stored value.
+for (const stored of [null, 1]) {
+  const k = stored ?? 0.6;
+  test(`drag sensitivity ${stored === null ? 'not stored (0.6)' : stored}: rotate 0.004 x ${k} rad per pixel, pan 0.0006 x ${k} x distance per pixel`, async ({ page }) => {
+    if (stored !== null) await page.addInitScript((v) => localStorage.setItem('viewer.mouse.sensitivity', JSON.stringify(v)), stored);
+    await open(page);
+    const box = await page.locator('canvas#view').boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const c0 = (await state(page)).camera;
 
-  // Middle drag 100 px right: yaw turns 0.4 rad (was 1.0). Pitch unchanged.
-  await page.mouse.move(cx, cy);
-  await page.mouse.down({ button: 'middle' });
-  await page.mouse.move(cx + 100, cy, { steps: 5 });
-  await page.mouse.up({ button: 'middle' });
-  const c1 = (await state(page)).camera;
-  expect(c0.yaw - c1.yaw).toBeCloseTo(0.4, 3);
-  expect(c1.pitch).toBeCloseTo(c0.pitch, 6);
+    // Middle drag 100 px right: yaw turns 0.4 x k rad. Pitch unchanged.
+    await page.mouse.move(cx, cy);
+    await page.mouse.down({ button: 'middle' });
+    await page.mouse.move(cx + 100, cy, { steps: 5 });
+    await page.mouse.up({ button: 'middle' });
+    const c1 = (await state(page)).camera;
+    expect(c0.yaw - c1.yaw).toBeCloseTo(0.4 * k, 3);
+    expect(c1.pitch).toBeCloseTo(c0.pitch, 6);
 
-  // Right drag 100 px right: the target moves 0.06 x distance (was 0.15 x).
-  await page.mouse.move(cx, cy);
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.move(cx + 100, cy, { steps: 5 });
-  await page.mouse.up({ button: 'right' });
-  const c2 = (await state(page)).camera;
-  const moved = Math.hypot(...c2.target.map((v, i) => v - c1.target[i]));
-  expect(moved).toBeCloseTo(0.06 * c1.distance, 3);
-  // Negative: panning does not turn the camera.
-  expect(c2.yaw).toBeCloseTo(c1.yaw, 6);
-});
+    // Right drag 100 px right: the target moves 0.06 x k x distance.
+    await page.mouse.move(cx, cy);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(cx + 100, cy, { steps: 5 });
+    await page.mouse.up({ button: 'right' });
+    const c2 = (await state(page)).camera;
+    const moved = Math.hypot(...c2.target.map((v, i) => v - c1.target[i]));
+    expect(moved).toBeCloseTo(0.06 * k * c1.distance, 3);
+    // Negative: panning does not turn the camera.
+    expect(c2.yaw).toBeCloseTo(c1.yaw, 6);
+  });
+}
 
 test('a model that fails to load is reported and not added', async ({ page }) => {
   allowErrors(/^http 404 GET .*\/api\/sc2\/file\?.*path=mods%5Cnope%5Cnope\.m3/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, /^console\.warning: viewer: Failed to fetch a resource: .*nope/);

@@ -185,7 +185,7 @@ test('right click on a unit: menu of all its animations; one plays once, then ba
   // All animations listed; the playing one (idle) marked; loop unchecked.
   // Its owner has textures, so the menu has the skin row (SPEC-VIEWER 17.4). Negative: no other spec makes a skin of
   // scoba's Marine, so it offers Original alone, nothing is baked, and Unbake cannot be used.
-  expect(s.pick.menu).toEqual({ item: marine, entries: item.sequences, playing: [idle], loop: false, skins: { value: 'original', label: 'Original', dropdown: true, choices: ['original'], rows: [{ name: 'original', label: 'Original', icons: [] }, { name: '', label: 'Add New Skin…', icons: [] }], bake: 'Unbake Skin', bakeDisabled: true, badge: null } });
+  expect(s.pick.menu).toEqual({ item: marine, entries: item.sequences, playing: [idle], loop: false, skins: { value: 'original', label: 'Original', dropdown: true, choices: ['original'], missing: '', rows: [{ name: 'original', label: 'Original', icons: [] }, { name: '', label: 'Add New Skin…', icons: [] }], bake: 'Unbake Skin', bakeDisabled: true, bakeTitle: 'nothing is baked', upscaleDisabled: false, upscaleTitle: 'Make the next New Skin N: every texture of this owner by one model at one size', badge: null } });
   await expect(page.locator('#anim-menu')).toBeVisible();
 
   const choice = item.sequences.find((n) => /^attack/i.test(n)) ?? item.sequences.find((n) => n !== idle);

@@ -1,5 +1,5 @@
-import { test, expect } from '../fixtures.mjs';
-import { add as addGhost } from '../ghost.mjs';
+import { test, expect, allowErrors } from '../fixtures.mjs';
+import { add as addGhost, addRecord as addGhostRecord, FOREIGN_CLIP } from '../ghost.mjs';
 import { frames, idle, open as openPage, state as viewState, view } from '../page.mjs';
 import { reloadScene } from '../scene.mjs';
 
@@ -158,6 +158,13 @@ test('farther than the range from the eye, a unit shows no edges; nearer, it doe
   const near = await edges(page);
   expect(near.lines).toBeGreaterThan(0);
   expect(near.far).toEqual([]);
+  expect(near.range).toBe(100);
+
+  // At 60, beyond the old range of 40 (operator 2026-11-25): still drawn.
+  await page.evaluate(() => window.scobaeditor.view({ distance: 60 }));
+  const sixty = await edges(page);
+  expect(sixty.far).toEqual([]);
+  expect(sixty.lines).toBe(near.lines);
 
   await page.evaluate((d) => window.scobaeditor.view({ distance: d }), near.range * 1.5);
   const far = await edges(page);
@@ -190,6 +197,64 @@ test('not kept: a paste and a reload start without edges', async ({ page }) => {
   await reloadScene(page);
   expect((await viewState(page)).items.length).toBe(2);
   expect(await edges(page)).toMatchObject({ on: [], lines: 0 });
+  expect(errors).toEqual([]);
+});
+
+// The key works whatever tab the gallery shows: each tab, a Ghost actor
+// and an SC2 unit, both get edges (operator 2026-11-25).
+for (const tab of ['ghost', 'sc2']) {
+  test(`${tab} tab chosen: Ctrl+/ draws the edges of a Ghost actor and an SC2 unit`, async ({ page }) => {
+    allowErrors(FOREIGN_CLIP);
+    const errors = await open(page);
+    // A click on the tab, as the operator chooses it.
+    await page.locator(`#game-tabs button[data-game="${tab}"]`).click();
+    await expect.poll(() => page.evaluate(() => window.scobaeditor.games.current())).toBe(tab);
+    const actor = await addGhostRecord(page, 'actors', 'zerg_critter', -1);
+    const marine = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { game: 'sc2', x: 1, y: 0, pick: 0.5, sequence: -1 }));
+    await idle(page);
+    await view(page, VIEW);
+    await page.mouse.move(1000, 80);
+    await select(page, [actor, marine]);
+    await page.keyboard.press('Control+/');
+    const status = await statusText(page).textContent();
+    const now = await edges(page);
+    const focus = await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80) ?? null);
+    console.log(`${tab} tab edges`, JSON.stringify({ status, focus, ...now }));
+    await expect(statusText(page)).toHaveText('edges on: 2 instances');
+    expect(now.on.sort()).toEqual([actor, marine].sort());
+    expect(now.far).toEqual([]);
+    expect(now.lines).toBeGreaterThan(100);
+    // Negative: again, none.
+    await page.keyboard.press('Control+/');
+    expect(await edges(page)).toMatchObject({ on: [], lines: 0 });
+    expect(errors).toEqual([]);
+  });
+}
+
+test('after typing in a gallery search, a click on the view gives the keys back: Ctrl+/ works', async ({ page }) => {
+  allowErrors(FOREIGN_CLIP);
+  const errors = await open(page);
+  await page.locator('#game-tabs button[data-game="ghost"]').click();
+  await expect.poll(() => page.evaluate(() => window.scobaeditor.games.current())).toBe('ghost');
+  const actor = await addGhostRecord(page, 'actors', 'zerg_critter');
+  await idle(page);
+  await view(page, VIEW);
+  const search = page.locator('#gallery input[type="search"]:visible').first();
+  await search.click();
+  await page.keyboard.type('z');
+  // An empty spot of the view: no unit under it.
+  await page.mouse.click(1000, 80);
+  const focus = await page.evaluate(() => document.activeElement?.tagName ?? null);
+  await select(page, [actor]);
+  await page.keyboard.press('Control+/');
+  console.log('after search', JSON.stringify({ focus, status: await statusText(page).textContent() }));
+  expect(focus).not.toBe('INPUT');
+  await expect(statusText(page)).toHaveText('edges on: 1 instance');
+  expect((await edges(page)).lines).toBeGreaterThan(100);
+  // Negative: while the search box has the focus, the key stays in it.
+  await search.click();
+  await page.keyboard.press('Control+/');
+  expect((await edges(page)).on).toEqual([actor]);
   expect(errors).toEqual([]);
 });
 

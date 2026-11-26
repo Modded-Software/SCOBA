@@ -49,6 +49,9 @@ bool gt_GUIEnvironmentSetup_Func (bool testConds, bool runActions) {
     UISetDragSelectEnabled(PlayerGroupAll(), false);
     UISetCommandAllowed(PlayerGroupAll(), c_uiCommandAllowMinimap, true);
     UISetCommandAllowed(PlayerGroupAll(), c_uiCommandAllowSmartClick, false);
+    // Space is jump and flight climb. The stock AlertRecall hotkey on Space
+    // moved the camera away (operator 2026-11-25, flying Viking). Off for all.
+    UISetHotkeyAllowed(PlayerGroupAll(), c_hotkeyAlertRecall, false);
     GameSetSpeedValue(c_gameSpeedNormal);
     GameSetSpeedLocked(true);
     Wait(0.01, c_timeGame);

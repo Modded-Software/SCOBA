@@ -8,14 +8,18 @@
 //   (Alt + left on a unit drags the unit: features/controls.)
 // - Delete removes the selected instances, unless a text field has the keys.
 // Copy, cut and paste of the selection: features/clipboard.
+// The rectangle's button and modifiers and the remove key are the input
+// map's (core/input.ts, R-VIEW-154); the page losing the focus drops the
+// rectangle without selecting.
 
 import type { Feature } from '../../core/context';
 import { make } from '../../core/dom';
+import { keyMatches, pressAction, resolveInput, type InputMap } from '../../core/input';
 import { dragsAt, pressAt, type Press } from '../../core/press';
+import { settings } from '../../core/settings';
 import type { SelectBox, Vec2 } from '../../core/types';
 
 const SHARES = [0, 0.5, 1]; // heights of the column tested
-const LEFT = 0;
 
 interface Drag {
   x0: number;
@@ -28,7 +32,8 @@ interface Drag {
 
 export const selectFeature: Feature = {
   id: 'select',
-  install({ render, scene, selection, status }) {
+  install({ render, scene, selection, status, store }) {
+    const inputMap = (): InputMap => resolveInput(store.read(settings.input));
     const node = make('div', { id: 'select-rect', hidden: true });
     document.body.append(node);
 
@@ -61,10 +66,18 @@ export const selectFeature: Feature = {
       return scene.items.filter((item) => SHARES.some((k) => within(selection.itemScreen(item.id, k)))).map((item) => item.id);
     }
 
-    // Alt + left on the ground or the sky: the rectangle starts.
+    function drop(): void {
+      rect = null;
+      node.hidden = true;
+      selection.setRect(null);
+    }
+
+    // The rect binding (Alt + left) on the ground or the sky: the rectangle starts.
     render.canvas.addEventListener('mousedown', (e) => {
-      if (e.button !== LEFT || !e.altKey || selection.hitAt(e.clientX, e.clientY)) return;
-      rect = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, press: pressAt(e) };
+      const map = inputMap();
+      // A rectangle only off every unit: on one the same press moves it (features/controls).
+      if (pressAction(map, e, { onUnit: false, selected: selection.hasSelection() }) !== 'rect' || selection.hitAt(e.clientX, e.clientY)) return;
+      rect = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, press: pressAt(e, map.rates) };
       show(rect);
     });
     window.addEventListener('mousemove', move);
@@ -76,13 +89,12 @@ export const selectFeature: Feature = {
         const ids = inside(rect);
         selection.setSelection(e.shiftKey ? [...selection.selectedIds().filter((id) => !ids.includes(id)), ...ids] : ids);
       }
-      rect = null;
-      node.hidden = true;
-      selection.setRect(null);
+      drop();
     });
+    window.addEventListener('blur', drop);
 
     window.addEventListener('keydown', (e) => {
-      if (e.key !== 'Delete') return;
+      if (!keyMatches(inputMap().keys.remove, e)) return;
       // A field being edited keeps its Delete key.
       if (selection.editingText(e.target)) return;
       const ids = selection.selectedIds();

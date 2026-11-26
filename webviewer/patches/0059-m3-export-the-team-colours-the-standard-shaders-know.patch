@@ -1,0 +1,39 @@
+From d133507fdce9f52fb5122f4575d8b44b03682fef Mon Sep 17 00:00:00 2001
+From: workspace-agent <workspace.vm.agent@gmail.com>
+Date: Thu, 26 Nov 2026 11:30:27 +0200
+Subject: [PATCH 59/59] m3: export the team colours the standard shaders know
+ (M3_TEAM_COLORS)
+
+---
+ src/viewer/handlers/m3/handler.ts | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/viewer/handlers/m3/handler.ts b/src/viewer/handlers/m3/handler.ts
+index 27739710..6cecddf2 100644
+--- a/src/viewer/handlers/m3/handler.ts
++++ b/src/viewer/handlers/m3/handler.ts
+@@ -42,11 +42,14 @@ export interface M3HandlerObject {
+   layerOptions: typeof layerOptions;
+ }
+ 
++/** The team colours the standard shaders know (u_teamColors), 0 to 255 per channel. */
++export const M3_TEAM_COLORS: readonly (readonly [number, number, number])[] = [[255, 3, 3], [0, 66, 255], [28, 230, 185], [84, 0, 129], [255, 252, 1], [254, 138, 14], [32, 192, 0], [229, 91, 176], [149, 150, 151], [126, 191, 241], [16, 98, 70], [78, 42, 4], [40, 40, 40], [0, 0, 0]];
++
+ export default {
+   load(viewer: ModelViewer): void {
+     const gl = viewer.gl;
+     const webgl = viewer.webgl;
+-    const teamColors = [[255, 3, 3], [0, 66, 255], [28, 230, 185], [84, 0, 129], [255, 252, 1], [254, 138, 14], [32, 192, 0], [229, 91, 176], [149, 150, 151], [126, 191, 241], [16, 98, 70], [78, 42, 4], [40, 40, 40], [0, 0, 0]];
++    const teamColors = M3_TEAM_COLORS;
+ 
+     // Bone textures.
+     if (!webgl.ensureExtension('OES_texture_float')) {
+@@ -62,7 +65,7 @@ export default {
+       // Bind the shader and set the team color uniforms.
+       shader.use();
+ 
+-      for (let i = 0; i < 14; i++) {
++      for (let i = 0; i < teamColors.length; i++) {
+         const color = teamColors[i];
+ 
+         gl.uniform3f(shader.uniforms['u_teamColors[' + i + ']'], color[0] / 255, color[1] / 255, color[2] / 255);

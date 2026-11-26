@@ -10,6 +10,22 @@ from .store import GameStore
 
 ACCEPTED = "accepted"  # key of an entry: why its problems do not refuse a bake
 EDIT = "edit"  # key of an entry a transfer made: its input, its changed planes, their hash
+# Key of an entry a model made: whether its edges were made to match across the border. An entry
+# written before the key was kept had them matched: every upscale did then.
+TILES = "tiles"
+
+
+def made_tiling(entry: dict) -> bool:
+    """Whether the variants of this entry had their edges matched across the border."""
+    return bool(entry.get(TILES, True))
+
+
+def edges_off(entry: dict, tiles: bool) -> bool:
+    """A model's variants whose edges were made for the other rule: matched for a texture that does not repeat, or not
+    matched for one that does. A person's edit is not upscaled: its edges are as the person left them.
+
+    Such a variant is shown and may be baked; it is not stale (operator 2026-11-26). A request of it makes it again."""
+    return not user_made(entry) and made_tiling(entry) != tiles
 
 
 def user_made(entry: dict) -> bool:
@@ -33,8 +49,10 @@ class Made(NamedTuple):
     """A recipe's variants, as one texture sees them."""
 
     entry: dict
-    stale: bool  # the original changed since
+    stale: bool  # it must be made again: the original changed since
     missed: tuple[limits.Missed, ...]  # the limits it misses for this texture: its problems
+    why_stale: str = ""  # why it is stale, in words; empty: it is not
+    edges_off: bool = False  # its edges were made for the other rule (edges_off): shown, and a request makes it again
 
     @property
     def accepted(self) -> str:
@@ -53,7 +71,7 @@ class Made(NamedTuple):
         """Why a bake cannot name this variant. Empty: it can."""
         _recipe, size = variants.split(variant)
         if self.stale:
-            return f"{variant} is stale: the original changed since it was made"
+            return f"{variant} is stale: {self.why_stale}"
         if str(size) not in self.entry["files"]:
             return f"{variant} is not kept; its recipe is kept at {', '.join(map(str, self.sizes()))}"
         if self.missed and not self.accepted:
@@ -75,9 +93,8 @@ def of(game: GameStore, texture: Texture, original_sha256: str) -> dict[str, Mad
                 if user_made(entry)
                 else tuple(limits.missed(entry["numbers"], texture.tiles))
             )
-            found[recipe] = Made(
-                entry, entry["original"]["sha256"] != original_sha256, missed
-            )
+            why = "the original changed since it was made" if entry["original"]["sha256"] != original_sha256 else ""
+            found[recipe] = Made(entry, bool(why), missed, why, edges_off(entry, texture.tiles))
     return found
 
 

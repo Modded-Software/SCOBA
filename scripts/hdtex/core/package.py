@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 from typing import NamedTuple
 
-from . import results, variants
+from . import bakes, results, variants
 from .dataset import Dataset
 from .interfaces import OwnerBake, Packed
 from .store import PACKAGE_RECORD as FILE
@@ -120,8 +120,10 @@ def package(dataset: Dataset, target: Path) -> dict:
     """Put what the bakes name into `target`, check it, and keep the record. Returns the record.
 
     A bake of a missing or stale variant, or of one with a problem that is
-    not accepted, fails it, before anything is written (R-HD-102).
+    not accepted, fails it, before anything is written (R-HD-102). A game
+    that bakes nothing is refused first (R-HD-115).
     """
+    bakes.refuse(dataset.adapter)
     planned = plan(dataset)
     if planned.problems:
         raise PackageError(
@@ -183,6 +185,7 @@ def package(dataset: Dataset, target: Path) -> dict:
 
 def package_in_store(dataset: Dataset) -> dict:
     """Package a dataset no build packages, into its own folder of the store. What was there goes first."""
+    bakes.refuse(dataset.adapter)
     target = dataset.folder / FOLDER
     if target.exists():
         shutil.rmtree(target)

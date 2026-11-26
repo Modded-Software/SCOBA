@@ -3,10 +3,13 @@
 // `models`, and the exports of NODExport (exporter.ts). The record and row
 // bodies are those of src/games/ghost/shared/records.ts.
 
+import { join } from 'node:path';
 import type { CategoryInfo } from '../../../shared/protocol';
 import type { DatasetInfo } from '../../../shared/records';
 import { HttpError, type GameBackend, type UnavailableGame } from '../../../server/core/backend';
+import { messageOf } from '../../../server/core/http';
 import type { CoreSettings } from '../../../server/core/settings';
+import { logDirOf, pipelineTextures, storeDirOf } from '../../../server/core/textures';
 import { findIn, ghostSettings, indexBuild, type BuildIndex } from './build';
 import { buildCatalog, searchActors, searchModels, type Catalog } from './catalog';
 import { createExporter } from './exporter';
@@ -14,7 +17,7 @@ import { createExporter } from './exporter';
 export const GHOST_DATASET = 'build';
 
 /** How Ghost is named, available or not: server/main.ts lists it with these when it cannot start. */
-export const GHOST_GAME: Omit<UnavailableGame, 'reason'> = { id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC: G' };
+export const GHOST_GAME: Omit<UnavailableGame, 'reason'> = { id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC:G' };
 
 const CATEGORIES: CategoryInfo[] = [
   {
@@ -54,6 +57,21 @@ export async function startGhost(core: CoreSettings, env: NodeJS.ProcessEnv = pr
   }
   let state = await load();
 
+  // The pipeline of SPEC-HD-TEXTURES 6: one dataset, no layer. It is handed the build and the NODExport this
+  // server uses, so both read the same files (R-VIEW-152).
+  const textures = pipelineTextures({
+    game: GHOST_GAME.id,
+    repoRoot: core.repoRoot,
+    storeDir: storeDirOf(env),
+    layerOf: () => null,
+    logDir: logDirOf(env, 'ghost', join(settings.cache, 'textures')),
+    env: { ...env, GHOST_PATH: settings.root, NODSDK_EXPORT: settings.exporter },
+  });
+  // Showing a model does not depend on the index: a failure is logged, the states stay as the index holds them (R-VIEW-110).
+  const indexTextures = (): Promise<void> => textures.sync(GHOST_DATASET).catch((error: unknown) => console.error(`viewer: the texture index of ghost "${GHOST_DATASET}" was not brought up to date: ${messageOf(error)}`));
+  // Built only when missing (operator 2026-11-25), as for SC2; a reload brings it up to date.
+  if (!textures.indexed(GHOST_DATASET)) await indexTextures();
+
   const info = (current: string): DatasetInfo => ({ id: GHOST_DATASET, label: 'Game build', builtin: true, signature: state.index.signature, current, changed: current !== state.index.signature });
   const dataset = (id: string): Loaded => {
     if (id !== GHOST_DATASET) throw new HttpError(404, { error: 'no such dataset', dataset: id });
@@ -73,6 +91,7 @@ export async function startGhost(core: CoreSettings, env: NodeJS.ProcessEnv = pr
     async reload(id) {
       dataset(id);
       state = await load();
+      await indexTextures();
       return info(state.index.signature);
     },
     categories(id) {
@@ -124,6 +143,7 @@ export async function startGhost(core: CoreSettings, env: NodeJS.ProcessEnv = pr
     icon: () => null,
     backdrops: () => ({ total: 0, items: [] }),
     extensions: {},
+    textures,
     banner: () => `ghost: ${state.catalog.actors.size} actors, ${state.catalog.models.size} models (${state.catalog.leftOut.length} left out, ${state.catalog.refused.length} refused)`,
   };
 }

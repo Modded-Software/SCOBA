@@ -67,7 +67,7 @@ test('Bake skin asks first; cancelled, nothing is baked; answered, the owner hol
   // The skin's variant, and `original` for every texture it does not name (R-HD-131).
   expect(owner.bake.skin).toBe(SKIN);
   expect(owner.bake.textures).toEqual({ ...Object.fromEntries(Object.keys(owner.bake.textures).map((asset) => [asset, 'original'])), [ASSET]: made.variant });
-  // The owner shows its own bake now; a saved skin names it, so no New Skin is offered.
+  // The owner shows its own bake now; its skins are the ones it holds, no other is offered.
   expect(owner.shows[ASSET]).toBe(made.variant);
   expect(owner.skins.map((one) => one.name)).toEqual([SKIN]);
   await menu(page, baker);

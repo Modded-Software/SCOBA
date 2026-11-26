@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import os
-import shutil
 
 from hdtex.core import edits, progress, removal, requests, skins
 from hdtex.core.removal import RemovalError
-from hdtex.core.store import ENTRY, read_json, write_json
+from hdtex.core.store import ENTRY, write_json
 
 from testkit.tests.textures.doubles import ROCK, Case
 
 ORIGIN = f"storage\\{ROCK}"
 UP = "pbrify@256"  # of a 64 texture: its own size
-SMALL = "pbrify@128"  # a second size the test writes into the entry
+SMALL = "pbrify@128"  # its half, the 2x size, kept with it
 ON_TOP = "pbrify@64+seedvr2@256"  # of a 16 texture: made from pbrify@64
 ROOM = "model:room"
 
@@ -35,18 +34,12 @@ class RemovalCase(Case):
             self.remove(variant)
         self.assertIn(words, str(caught.exception))
 
-    def two_sizes(self) -> None:
-        """The recipe kept at 256 and, written here, at 128."""
-        folder = self.folder()
-        entry = read_json(folder / ENTRY)
-        shutil.copy(folder / "256.dds", folder / "128.dds")
-        write_json(folder / ENTRY, {**entry, "files": {**entry["files"], "128": entry["files"]["256"]}})
-
-
 class RemoveTest(RemovalCase):
     def test_the_last_size_takes_the_recipe_folder(self) -> None:
         self.add()
         self.make()
+        self.remove(SMALL)
+        self.assertTrue(self.folder().exists(), "negative: one size is left")
         self.remove()
         self.assertFalse(self.folder().exists())
         self.assertEqual(self.dataset().made(self.dataset().texture(ROCK)), {})
@@ -54,7 +47,6 @@ class RemoveTest(RemovalCase):
     def test_one_size_goes_and_the_others_stay(self) -> None:
         self.add()
         self.make()
-        self.two_sizes()
         self.remove(SMALL)
         self.assertFalse((self.folder() / "128.dds").exists())
         self.assertTrue((self.folder() / "256.dds").is_file())
@@ -65,6 +57,7 @@ class RemoveTest(RemovalCase):
         self.add()
         self.make()
         write_json(self.folder() / progress.FILE, {"pid": 1, "started": 0, "step": 1, "steps": 1, "phase": "upscaling", "jobs": [], "failed": "it broke"})
+        self.remove(SMALL)
         self.remove()
         self.assertTrue((self.folder() / progress.FILE).is_file())
         self.assertFalse((self.folder() / ENTRY).exists())
@@ -76,13 +69,22 @@ class RefusalTest(RemovalCase):
         self.refused("original", "the original")
         self.refused(UP, "has no variant")
 
-    def test_a_variant_a_skin_names_is_refused_and_stays(self) -> None:
+    def test_a_skin_of_this_dataset_lets_it_go_and_names_the_original_after(self) -> None:
         self.add(users=["room"])
         self.make()
-        self.dataset().change_skin(ROOM, lambda found: skins.copied(found, skins.ORIGINAL_SKIN, "hd"))
-        self.dataset().set_texture(ROOM, "hd", ROCK, UP)
-        self.refused(UP, "skin hd of model:room in one")
-        self.assertTrue((self.folder() / "256.dds").is_file())
+        found = self.dataset()
+        found.change_skin(ROOM, lambda now: skins.copied(now, skins.ORIGINAL_SKIN, "hd"))
+        found.set_texture(ROOM, "hd", ROCK, UP)
+        found.change_skin(ROOM, lambda now: skins.made(now, "New Skin 1", {ROCK: UP}))
+        # Negative: a skin that names another size keeps it.
+        found.change_skin(ROOM, lambda now: skins.made(now, "small", {ROCK: SMALL}))
+        self.remove(UP)
+        self.assertFalse((self.folder() / "256.dds").exists())
+        held = self.dataset().skins_of(ROOM)
+        self.assertEqual(
+            {name: skin.textures for name, skin in held.items()},
+            {"hd": {}, "New Skin 1": {}, "small": {ROCK: SMALL}},
+        )
 
     def test_a_skin_of_another_dataset_refuses_it_too(self) -> None:
         self.add(users=["room"])

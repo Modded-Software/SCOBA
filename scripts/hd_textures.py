@@ -11,10 +11,11 @@ See docs/specifications/SPEC-HD-TEXTURES.md.
 from __future__ import annotations
 
 from hdtex.core import cli, registry
+from hdtex.ghost.game import GAME as GHOST
 from hdtex.sc2.game import GAME as SC2
 
 # The games this tool knows: each registers itself when its module loads (hdtex.core.registry).
-GAMES = (SC2,)
+GAMES = (SC2, GHOST)
 if not all(registry.GAMES.has(game.id) for game in GAMES):
     raise SystemExit("hd_textures: a game did not register")
 

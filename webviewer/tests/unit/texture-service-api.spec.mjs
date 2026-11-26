@@ -83,16 +83,16 @@ test('the server listed every dataset in a new state index when it started; a na
 
 test('a request whose process is gone shows as failed; asked again, the reply shows the new request and its variant is made', async ({ request }) => {
   test.setTimeout(120_000);
-  // The largest size fast may make from the original, as the pipeline says.
+  // The largest factor fast may have from the original, and its side, as the pipeline says.
   const judged = await judge(request, 'stock', { assets: [STOPPED] });
   expect(judged.status(), await judged.text()).toBe(200);
-  const sizes = (await judged.json()).textures[0].asks.find((one) => one.input === 'original').models.fast.sizes;
-  const SIZE = Math.max(...Object.entries(sizes).filter(([, why]) => why === '').map(([at]) => Number(at)));
+  const factors = (await judged.json()).textures[0].asks.find((one) => one.input === 'original').models.fast.factors;
+  const [FACTOR, { size: SIZE }] = Object.entries(factors).filter(([, one]) => one.reason === '').sort(([a], [b]) => Number(b) - Number(a))[0];
   const VARIANT = `fast@${SIZE}`;
   const RECIPE = 'fast';
   const read = async () => (await (await request.get(statesUrl('stock', [STOPPED]))).json()).textures[0];
   const made = (state) => state.variants.find((variant) => variant.id === VARIANT);
-  const ask = () => request.post(`/api/sc2/textures/request?${new URLSearchParams({ dataset: 'stock' })}`, { data: { asset: STOPPED, input: 'original', model: 'fast', size: SIZE } });
+  const ask = () => request.post(`/api/sc2/textures/request?${new URLSearchParams({ dataset: 'stock' })}`, { data: { asset: STOPPED, input: 'original', model: 'fast', factor: Number(FACTOR) } });
   const running = ['queued', 'upscaling', 'encoding'];
 
   const asked = await ask();
@@ -110,8 +110,8 @@ test('a request whose process is gone shows as failed; asked again, the reply sh
   await expect.poll(async () => (await read()).requests[RECIPE]?.state).toBe('failed');
   const gone = await read();
   expect(gone.requests[RECIPE].reason).toMatch(/process \d+\) stopped before it was done; ask again/);
-  // It may be asked again: the state offers fast at that size from the original.
-  expect(gone.asks.find((one) => one.input === 'original').models.fast).toMatchObject({ reason: '', sizes: { [SIZE]: '' } });
+  // It may be asked again: the state offers fast at that factor and side from the original.
+  expect(gone.asks.find((one) => one.input === 'original').models.fast).toMatchObject({ reason: '', factors: { [FACTOR]: { size: SIZE, reason: '' } } });
   expect(made(gone)).toBeUndefined();
 
   // Asked again: the reply holds the new request, not the one that is gone.
@@ -156,21 +156,27 @@ test('the judge route has the pipeline read a texture nobody asked for; before i
   expect((await request.get(`/api/sc2/textures/judge?${new URLSearchParams({ dataset: 'stock' })}`)).status()).toBe(405);
 });
 
-test('negative: the request route refuses seedvr2 on a data texture and a size the input cannot reach; nothing is queued', async ({ request }) => {
+test('negative: the request route refuses seedvr2 on a data texture, a factor that is none, a size no factor gives, and a body with both; nothing is queued', async ({ request }) => {
   test.setTimeout(60_000);
   const { textures } = await ownerOf(request, 'scoba', 'unit:Infestor');
   const judged = (await (await post(request, 'judge', 'scoba', { assets: textures })).json()).textures;
   const data = judged.find((state) => !state.colour && !state.reason);
   expect(data, 'a data texture of the Infestor').toBeTruthy();
-  const seed = await post(request, 'request', 'scoba', { asset: data.asset, input: 'original', model: 'seedvr2', size: 2048 });
+  const seed = await post(request, 'request', 'scoba', { asset: data.asset, input: 'original', model: 'seedvr2', factor: 2 });
   expect(seed.status(), await seed.text()).toBe(400);
   expect((await stateOf(request, 'scoba', data.asset)).requests.seedvr2).toBeUndefined();
-  const sizes = data.asks.find((one) => one.input === 'original').models.fast.sizes;
-  const unreachable = Object.entries(sizes).find(([, why]) => why !== '');
-  const tooBig = unreachable ? Number(unreachable[0]) : 8192;
-  const big = await post(request, 'request', 'scoba', { asset: data.asset, input: 'original', model: 'fast', size: tooBig });
-  expect(big.status(), `size ${tooBig}: ${await big.text()}`).toBe(400);
-  expect((await stateOf(request, 'scoba', data.asset)).variants.some((one) => one.id === `fast@${tooBig}`)).toBe(false);
+  const three = await post(request, 'request', 'scoba', { asset: data.asset, input: 'original', model: 'fast', factor: 3 });
+  expect(three.status(), await three.text()).toBe(400);
+  expect((await three.json()).error).toContain('3x is no factor of fast');
+  const big = await post(request, 'request', 'scoba', { asset: data.asset, input: 'original', model: 'fast', size: 8192 });
+  expect(big.status(), await big.text()).toBe(400);
+  expect((await big.json()).error).toContain('8192 is no size a factor of fast gives now');
+  const both = await post(request, 'request', 'scoba', { asset: data.asset, input: 'original', model: 'fast', factor: 2, size: 1024 });
+  expect(both.status(), await both.text()).toBe(400);
+  expect((await both.json()).error).toContain('one of the two');
+  const now = await stateOf(request, 'scoba', data.asset);
+  expect(now.variants.some((one) => one.id === 'fast@8192')).toBe(false);
+  expect(now.requests.fast, 'negative: nothing is queued').toBeUndefined();
 });
 
 test('negative: a bake of a skin that does not exist is refused and changes nothing; so is a body that names an owner and an asset', async ({ request }) => {

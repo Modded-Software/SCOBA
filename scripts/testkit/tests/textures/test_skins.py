@@ -6,8 +6,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from typing import ClassVar
 
+from hdtex import core
 from hdtex.core import bakes, skins
 from hdtex.core.bakes import Bake, BakeError, Bakes
 from hdtex.core.skins import Skin, SkinError
@@ -95,12 +95,30 @@ class SkinFileTest(FolderCase):
         for owner in ("rock", "doodad:x", "model:", ""):
             with self.assertRaises(SkinError, msg=owner):
                 skins.check_owner(owner)
-        for name in ("", "a b", "x" * 41, skins.ORIGINAL_SKIN, "../x"):
-            with self.assertRaises(SkinError, msg=name):
-                skins.check_name(name)
-        with self.assertRaises(SkinError):
-            skins.check_saved(skins.NEW)
-        self.assertEqual(skins.check_saved("mine"), "mine", "negative: a plain name")
+        # The names table of hdtex.core; the viewer's check is tested against it too.
+        table = json.loads(Path(core.__file__).with_name("skin_names.json").read_text(encoding="utf-8"))["names"]
+        self.assertTrue(any(row["ok"] for row in table) and any(not row["ok"] for row in table))
+        for row in table:
+            if row["ok"]:
+                self.assertEqual(skins.check_name(row["name"]), row["name"])
+            else:
+                with self.assertRaises(SkinError, msg=row["name"]):
+                    skins.check_name(row["name"])
+
+    def test_a_stored_skin_named_new_is_read_as_it_is(self) -> None:
+        # Data from before New Skin N: a skin called "new" is an ordinary skin; nothing renames it.
+        path = skins.file_of(self.folder, OWNER)
+        path.parent.mkdir(parents=True)
+        value = {"format": skins.FORMAT, "owner": OWNER, "skins": {"new": {"textures": {ROCK: "pbrify@2048"}}, "New Skin 2": {"textures": {}}}}
+        path.write_text(json.dumps(value))
+        before = path.read_bytes()
+        self.assertEqual(
+            skins.load(self.folder, OWNER),
+            {"new": Skin("new", {ROCK: "pbrify@2048"}), "New Skin 2": Skin("New Skin 2", {})},
+        )
+        # Negative: reading writes nothing.
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(skins.next_new(skins.load(self.folder, OWNER)), "New Skin 3")
 
     def test_a_skin_folder_file_that_names_no_owner_is_refused(self) -> None:
         folder = self.folder / skins.FOLDER
@@ -111,30 +129,30 @@ class SkinFileTest(FolderCase):
         self.assertIn("stray.json", str(refused.exception))
 
 
-class OfferTest(unittest.TestCase):
-    """The offered New Skin (R-HD-137): what the owner shows, when no skin names it."""
+def named(*names: str) -> dict[str, Skin]:
+    """Empty skins of these names."""
+    return {name: Skin(name, {}) for name in names}
 
-    SHOWS: ClassVar[dict[str, str]] = {ROCK: "pbrify@2048", "sand.dds": "original"}
 
-    def test_a_look_no_skin_names_is_offered(self) -> None:
-        self.assertEqual(skins.offered({}, self.SHOWS), {ROCK: "pbrify@2048"})
+class NextNewTest(unittest.TestCase):
+    """The name of a skin made without one (R-HD-137): New Skin N, one above the highest N in use."""
 
-    def test_nothing_is_offered_for_originals_a_saved_look_or_a_stored_new_skin(
-        self,
-    ) -> None:
-        self.assertIsNone(skins.offered({}, {ROCK: "original"}))
-        saved = {
-            "hd": Skin("hd", {ROCK: "pbrify@2048", "sand.dds": "original"})
-        }
-        self.assertIsNone(skins.offered(saved, self.SHOWS))
-        stored = {skins.NEW: Skin(skins.NEW, {})}
-        self.assertIsNone(skins.offered(stored, self.SHOWS))
-        other = {"hd": Skin("hd", {ROCK: "fast@2048"})}
+    def test_the_numbers_count_up_from_the_highest_in_use(self) -> None:
+        one = named  # short, so each case reads on one line
         self.assertEqual(
-            skins.offered(other, self.SHOWS),
-            {ROCK: "pbrify@2048"},
-            "a saved skin of another look is no match",
+            [
+                skins.next_new({}),
+                skins.next_new(one("hd")),
+                skins.next_new(one("New Skin 1")),
+                skins.next_new(one("New Skin 1", "New Skin 2")),
+                # A deleted number below the highest is not taken again.
+                skins.next_new(one("New Skin 3")),
+                skins.next_new(one("new skin 7", "New Skin 2")),
+            ],
+            ["New Skin 1", "New Skin 1", "New Skin 2", "New Skin 3", "New Skin 4", "New Skin 8"],
         )
+        # Negative: a name that only starts so is no New Skin N.
+        self.assertEqual(skins.next_new(one("New Skin 2b", "New Skin")), "New Skin 1")
 
 
 class SkinChangeTest(unittest.TestCase):
@@ -174,7 +192,7 @@ class SkinChangeTest(unittest.TestCase):
             self.assertIn("there is a skin 'hd' already", str(refused.exception))
         # Negative: a case change of the same skin is no clash.
         self.assertEqual(skins.renamed(found, "hd", "HD"), {"HD": Skin("HD", {})})
-        for reserved in ("Original", "ORIGINAL", "New", "NEW"):
+        for reserved in ("Original", "ORIGINAL"):
             with self.assertRaises(SkinError, msg=reserved):
                 skins.check_name(reserved)
 

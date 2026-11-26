@@ -42,8 +42,20 @@ export type Host = Omit<RenderHost, 'draw' | 'setPostPass' | 'displacedBatches'>
 /** The renderer with the model formats main.ts registered (SPEC-VIEWER 6.3). */
 export function createHost(formats: readonly FormatModule[], setStatus: (text: string, options: { failure: boolean }) => void): Host {
   const canvas = byIdAs('view', HTMLCanvasElement);
+  // A press on the view takes the focus from a field or a button: the
+  // canvas takes none itself, so a search box would keep the viewer's
+  // keys (Ctrl+/, Delete, copy) after the user went back to the view.
+  canvas.addEventListener(
+    'mousedown',
+    () => {
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused !== document.body) focused.blur();
+    },
+    { capture: true },
+  );
 
-  const viewer = new ModelViewer(canvas, { alpha: false, antialias: true });
+  // A stencil buffer for the glass shimmer of a hovered triangle (features/edges).
+  const viewer = new ModelViewer(canvas, { alpha: false, antialias: true, stencil: true });
   for (const format of formats) for (const handler of format.handlers) viewer.addHandler(handler);
   // The library reports failures as events. Show them; never drop them.
   // A format that refuses a file throws an Error with the reason; loadModel

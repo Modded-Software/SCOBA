@@ -2,15 +2,15 @@
 // through the container the server exports with NODExport. Its handler
 // takes only that container (it starts with "NODX"); its textures are DDS
 // files, read by the m3 format's DDS handler. Clips come through
-// attachClips. One capability, the edge draw: no team colour, tint or
-// texture override.
+// attachClips. Capabilities: the edge draw and the texture override of
+// each drawn group, per instance; no team colour or tint.
 
 import type ModelViewer from '@renderer/viewer/viewer';
-import type { Clip, FormatModule, RendererHandler, ViewerInstance } from '../../page/core/plugin';
+import type { Clip, FormatModule, RendererHandler, TextureSlot, ViewerInstance } from '../../page/core/plugin';
 import { adoptNod, NOD_FORMAT, nodInstance } from './adapter';
 import { readClip } from './clips';
 import { isContainer } from './container';
-import NodModel from './model';
+import NodModel, { type DrawGroup } from './model';
 import { createNodProbes } from './probes';
 import { loadShader } from '../../page/core/render/gl';
 import { SHADER_LOADING } from './instance';
@@ -33,6 +33,18 @@ const handler: RendererHandler = {
   isValidSource: isContainer,
   resource: NodModel,
 };
+
+/** One drawn group with a texture file (SPEC-VIEWER-GHOST 7): its source is that file, relative to the build. */
+class NodSlot implements TextureSlot {
+  constructor(readonly group: DrawGroup) {}
+  get source(): string {
+    return this.group.look.texture ?? '';
+  }
+  ownSize(): number {
+    const own = this.group.texture;
+    return own ? Math.max(own.width, own.height) : 0;
+  }
+}
 
 /** Fetch and read each clip; a clip that cannot be read is left out and named. */
 async function attachClips(view: ViewerInstance, clips: readonly Clip[], url: (reference: string) => string): Promise<readonly string[]> {
@@ -68,7 +80,18 @@ export const nodFormat: FormatModule = {
   attachClips,
   capabilities: (view) => {
     const instance = nodInstance(view);
-    return { edges: { draw: (r, g, b) => instance.renderEdges(r, g, b) } };
+    return {
+      textureOverride: {
+        slots: () => instance.model.groups.flatMap((group) => (group.look.kind && group.look.texture && group.indexCount ? [new NodSlot(group)] : [])),
+        set(slot, texture) {
+          if (!(slot instanceof NodSlot)) throw new Error('not a nod texture slot');
+          if (texture) instance.textureOverrides.set(slot.group.index, texture);
+          else instance.textureOverrides.delete(slot.group.index);
+        },
+        applied: () => instance.textureOverrides.size,
+      },
+      edges: { draw: (r, g, b) => instance.renderEdges(r, g, b), triangles: () => instance.triangleCount, drawTriangles: (runs) => instance.renderTriangles(runs) },
+    };
   },
   inspect(view) {
     const instance = nodInstance(view);

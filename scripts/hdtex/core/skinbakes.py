@@ -22,14 +22,20 @@ def _baked_as(dataset: Dataset, owner: str, name: str) -> bakes.Bake | None:
 
 
 def rename(dataset: Dataset, owner: str, name: str, new: str) -> dict[str, skins.Skin]:
-    """Rename a skin; renaming New Skin saves it (R-HD-137). A bake of it then names `new`."""
+    """Rename a skin. A bake of it then names `new`.
+
+    The rename is checked first, then the bake is written, then the skins: the owner's state, which the
+    viewer may read meanwhile, holds the new name in its skins and its bake at once.
+    """
     bake = _baked_as(dataset, owner, name)
-    found = dataset.stored_change(owner, name, lambda now: skins.renamed(now, name, new))
+    skins.renamed(dataset.skins_of(owner), name, new)  # a refusal writes nothing
     if bake is not None:
         bakes.save(
             dataset.folder,
             bakes.with_owner(dataset.baked, owner, bake._replace(skin=new)),
         )
+    found = dataset.change_skin(owner, lambda now: skins.renamed(now, name, new))
+    if bake is not None:
         dataset.owner_changed(owner, below=True)
     return found
 

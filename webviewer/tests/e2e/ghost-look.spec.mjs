@@ -73,7 +73,13 @@ test('a sky material: not drawn and not named', async ({ page }) => {
 const refusedBody = (message) => packContainer({ error: message });
 
 test('negative: without its shader file a model does not load, and the file is named', async ({ page }) => {
-  allowErrors(/^http 404 GET .*\/shaders\/nod\.frag$/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/, /^console\.warning: viewer: Failed to create a resource .*crate\.nod.* nod: 404 \/shaders\/nod\.frag/);
+  allowErrors(
+    /^http 404 GET .*\/shaders\/nod\.frag$/,
+    /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/,
+    // The handler reports the failed shader load once, naming the file (formats/nod/format.ts).
+    /^console\.error: viewer: the nod shaders did not load: nod: 404 \/shaders\/nod\.frag$/,
+    /^console\.warning: viewer: Failed to create a resource .*crate\.nod.* nod: 404 \/shaders\/nod\.frag/,
+  );
   await page.route('**/shaders/nod.frag', (route) => route.fulfill({ status: 404, body: 'gone' }));
   await page.goto('/');
   await page.waitForFunction(() => window.scobaeditor && window.scobaeditor.ready, null, { timeout: 20_000 });

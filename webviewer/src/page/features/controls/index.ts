@@ -16,21 +16,30 @@
 // - right drag: pan in the view plane;
 // - ctrl held during a left, middle or right camera drag: a quarter of the
 //   movement, for precision (ctrl + left with units selected turns them);
+// - the mouse sensitivity (stored setting mouse.sensitivity, 0.6 when none
+//   is stored) scales every camera drag; Ctrl's quarter comes on top of it.
+//   A unit move, a turn and the select rectangle follow the pointer exactly
+//   (R-VIEW-150);
 // - wheel: zoom (core/zoom.ts, the camera service).
+// Those are the default bindings and rates. Every button, modifier and rate
+// above is the input map's (core/input.ts, R-VIEW-154), read at each press;
+// the controls window (panel.ts) changes them.
+// - the cancel key (Escape) during a unit move or turn puts the units back
+//   where they were at the press and ends the drag;
+// - the page losing the focus ends any drag, as a release would.
 // The camera itself is the camera service (core/view.ts).
 
 import type { Feature } from '../../core/context';
 import type { Item, Vec2, Vec3 } from '../../core/types';
 import { add, cross, dot, scale, sub } from '../../core/camera';
-import { cylinder } from '../../core/geometry';
+import { restBox } from '../../core/geometry';
 import { direction } from '../../core/zoom';
 import { dragsAt, pressAt, type Press } from '../../core/press';
+import { settings } from '../../core/settings';
+import { held, keyIs, mouseMatches, pressAction, resolveInput, type InputMap, type Rates } from '../../core/input';
+import { createControlsPanel } from './panel';
 
-const ROTATE_RATE = 0.004; // radians per pixel of middle drag
-const PAN_RATE = 0.0006; // camera distances per pixel of right drag
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
-const PRECISE = 0.25; // share of each camera movement while Ctrl is held (R-VIEW-143)
-const BUTTON = { left: 0, middle: 1, right: 2 };
 const MODEL_FRONT_OFFSET = 90; // degrees: rotation 0 faces -y, see rotationFacing
 
 /**
@@ -56,7 +65,8 @@ interface At {
 }
 
 /** The drag in progress. `x`, `y`: the last place it acted from; where it became a drag, then the last move. */
-type Drag = { press: Press } & (
+/** `rates`: the input map's, read at the press; `before`: the units a move or turn changes, as they were at the press. */
+type Drag = { press: Press; sensitivity: number; rates: Readonly<Rates>; before: { item: Item; x: number; y: number; rot: number }[] } & (
   | (At & { mode: 'move'; item: Item; others: { item: Item; dx: number; dy: number }[]; z: number; offset: Vec2 })
   | (At & { mode: 'rect' | 'face' | 'look' | 'pan' })
   | (At & { mode: 'grab'; anchor: Vec2 | null; z: number })
@@ -65,10 +75,16 @@ type Drag = { press: Press } & (
 
 export const controlsFeature: Feature = {
   id: 'controls',
-  install({ render, camera: view, scene, selection, events }) {
+  install(context) {
+    const { render, camera: view, scene, selection, events, store } = context;
     const { canvas } = render;
     const { camera } = view;
     const { items } = scene;
+    const inputMap = (): InputMap => resolveInput(store.read(settings.input));
+    createControlsPanel(context);
+    /** For the tests: the last grab or orbit press, the unit it centred on (R-VIEW-149) and the orbit pivot. */
+    let lastPress: { mode: 'grab' | 'orbit'; unit: number | null; pivot: Vec3 | null } | null = null;
+    context.testApi.viewer({ lastPress: () => lastPress });
 
     /** Set yaw, pitch, distance and target from an eye and a target point. */
     function placeCamera(eye: Vec3, target: Vec3): void {
@@ -118,14 +134,13 @@ export const controlsFeature: Feature = {
     }
 
     /**
-     * The centre of a press (R-VIEW-149): the centre of the instance with the hover
-     * outline, else null (the ground point is used).
+     * The centre of a press (R-VIEW-149): the middle of the rest-pose vertex box of
+     * the instance with the hover outline (core/geometry.ts restBox, as the row
+     * focus), else null (the ground point is used).
      */
     function unitCentre(): Vec3 | null {
       const item = selection.hovered();
-      if (!item) return null;
-      const c = cylinder(item);
-      return [c.x, c.y, (c.z0 + c.z1) / 2];
+      return item ? restBox(item).centre : null;
     }
 
     /** Grab: move the camera along the plane at `z` so `anchor` is under the mouse. */
@@ -145,8 +160,8 @@ export const controlsFeature: Feature = {
       camera.target = [t[0] - (now[0] - before[0]) * k, t[1] - (now[1] - before[1]) * k, t[2]];
     }
 
-    function pan(dx: number, dy: number): void {
-      const k = camera.distance * PAN_RATE;
+    function pan(dx: number, dy: number, rate: number): void {
+      const k = camera.distance * rate;
       const { yaw, pitch } = camera;
       const right: Vec3 = [-Math.sin(yaw), Math.cos(yaw), 0];
       const up: Vec3 = [-Math.sin(pitch) * Math.cos(yaw), -Math.sin(pitch) * Math.sin(yaw), Math.cos(pitch)];
@@ -180,36 +195,46 @@ export const controlsFeature: Feature = {
     canvas.addEventListener('auxclick', (e) => e.preventDefault());
     canvas.addEventListener('mousedown', (e) => {
       e.preventDefault();
+      const map = inputMap();
       const ground = view.eventGround(e);
+      // The unit under the pointer, the ray cut with it: tested only for a press that can move one.
+      const hit = mouseMatches(map.mouse.move, e) ? selection.hitAt(e.clientX, e.clientY) : null;
+      const mode = pressAction(map, e, { onUnit: hit !== null, selected: selection.hasSelection() });
       // A click until core/press.ts says it is a drag (R-VIEW-142).
-      const at = { x: e.clientX, y: e.clientY, press: pressAt(e) };
-      // Alt + left on a unit: drag the unit. The point of the unit pressed
-      // stays under the mouse: the mouse ray is cut with the level plane
-      // through that point, and the unit keeps its offset from it.
-      const hit = e.button === BUTTON.left && e.altKey ? selection.hitAt(e.clientX, e.clientY) : null;
-      if (hit) {
+      const at = { x: e.clientX, y: e.clientY, press: pressAt(e, map.rates), sensitivity: store.read(settings.mouseSensitivity), rates: map.rates, before: [] };
+      const kept = (list: readonly Item[]): Drag['before'] => list.map((item) => ({ item, x: item.x, y: item.y, rot: item.rot }));
+      if (mode === 'move' && hit) {
+        // The point of the unit pressed stays under the mouse: the mouse ray is
+        // cut with the level plane through that point, and the unit keeps its offset from it.
         const p = hit.point;
         const pressed = hit.item;
         // On a selected unit the others selected come along, each keeping its
         // offset from the one pressed.
         const ids = selection.selectedIds();
-        const others = ids.includes(pressed.id) ? items.filter((i) => i !== pressed && ids.includes(i.id)).map((i) => ({ item: i, dx: i.x - pressed.x, dy: i.y - pressed.y })) : [];
-        drag = { mode: 'move', ...at, item: pressed, others, z: p[2], offset: [pressed.x - p[0], pressed.y - p[1]] };
-      } else if (e.button === BUTTON.left && e.altKey) {
-        // Alt + left on the ground or the sky: the select rectangle (features/select draws it).
+        const along = ids.includes(pressed.id) ? items.filter((i) => i !== pressed && ids.includes(i.id)) : [];
+        const others = along.map((i) => ({ item: i, dx: i.x - pressed.x, dy: i.y - pressed.y }));
+        drag = { mode: 'move', ...at, before: kept([pressed, ...along]), item: pressed, others, z: p[2], offset: [pressed.x - p[0], pressed.y - p[1]] };
+      } else if (mode === 'rect') {
+        // Off any unit: the select rectangle (features/select draws it).
         drag = { mode: 'rect', ...at };
-      } else if (e.button === BUTTON.left && e.ctrlKey && selection.hasSelection()) {
-        // Ctrl + left with units selected turns them.
-        drag = { mode: 'face', ...at };
+      } else if (mode === 'face') {
+        const ids = selection.selectedIds();
+        drag = { mode: 'face', ...at, before: kept(items.filter((i) => ids.includes(i.id))) };
         faceSelected(e);
-      } else if (e.button === BUTTON.left) {
+      } else if (mode === 'grab') {
         // A unit under the mouse: its centre's plane is held; else the ground (R-VIEW-149).
         const centre = unitCentre();
         drag = centre ? { mode: 'grab', ...at, anchor: heldAt(e.clientX, e.clientY, centre[2]), z: centre[2] } : { mode: 'grab', ...at, anchor: ground, z: 0 };
-      } else if (e.button === BUTTON.middle && e.altKey) drag = { mode: 'look', ...at };
+      } else if (mode === 'look') drag = { mode: 'look', ...at };
       // Around the unit under the mouse; else the ground point; off the ground (sky) around the target.
-      else if (e.button === BUTTON.middle) drag = { mode: 'orbit', ...at, pivot: unitCentre() ?? (ground ? [ground[0], ground[1], 0] : [...camera.target]) };
-      else if (e.button === BUTTON.right) drag = { mode: 'pan', ...at };
+      else if (mode === 'orbit') {
+        const centre = unitCentre();
+        const pivot: Vec3 = centre ?? (ground ? [ground[0], ground[1], 0] : [...camera.target]);
+        lastPress = { mode, unit: centre ? (selection.hovered()?.id ?? null) : null, pivot };
+        drag = { mode: 'orbit', ...at, pivot };
+      }
+      if (mode === 'grab') lastPress = { mode, unit: drag?.mode === 'grab' && drag.z !== 0 ? (selection.hovered()?.id ?? null) : null, pivot: null };
+      else if (mode === 'pan') drag = { mode: 'pan', ...at };
       if (drag) view.stopGlide();
     });
     /** A press became a drag at `e`: take the pointer's place now as its start. */
@@ -223,9 +248,23 @@ export const controlsFeature: Feature = {
         if (now) d.offset = [d.item.x - now[0], d.item.y - now[1]];
       }
     }
-    window.addEventListener('mouseup', (e) => {
-      // A moved unit goes into the URL once, on release.
+    /** The drag ends: a moved unit goes into the URL once, on release. */
+    function end(): void {
       if (drag && drag.mode === 'move') events.emit('scene-edited', { what: 'move' });
+      drag = null;
+    }
+    window.addEventListener('mouseup', end);
+    // A release outside the page is not seen: the page losing the focus ends the drag.
+    window.addEventListener('blur', end);
+    window.addEventListener('keydown', (e) => {
+      // The drag's own modifiers are held (Alt for a move): the cancel key matches with any held.
+      if (!drag || (drag.mode !== 'move' && drag.mode !== 'face') || !keyIs(inputMap().keys.cancel, e)) return;
+      e.preventDefault();
+      // The units go back to where they were at the press; nothing was edited.
+      for (const b of drag.before) {
+        scene.setPosition(b.item, b.x, b.y);
+        scene.setRotation(b.item, b.rot);
+      }
       drag = null;
     });
     window.addEventListener('mousemove', (e) => {
@@ -263,8 +302,12 @@ export const controlsFeature: Feature = {
         for (const o of drag.others) scene.setPosition(o.item, x + o.dx, y + o.dy);
         return;
       }
-      // Ctrl held: a quarter of each movement, for precision (R-VIEW-143). Read on every move.
-      const k = e.ctrlKey ? PRECISE : 1;
+      // The mouse sensitivity (R-VIEW-150), read at the press; the precision modifier held: its share of that on top (R-VIEW-143). It is read on every move.
+      const { rates } = drag;
+      const k = drag.sensitivity * (held(e, rates.precise) ? rates.preciseShare : 1);
+      const sx = rates.invertOrbitX ? -1 : 1;
+      const sy = rates.invertOrbitY ? -1 : 1;
+      const sp = rates.invertPan ? -1 : 1;
       if (drag.mode === 'grab') {
         if (k !== 1) {
           // The ground under the pointer moves a quarter of the way: the anchor is
@@ -274,9 +317,9 @@ export const controlsFeature: Feature = {
         } else if (!drag.anchor) drag.anchor = heldAt(e.clientX, e.clientY, drag.z);
         // Pressed on the sky: the first ground point reached becomes the anchor.
         else grab(drag.anchor, drag.z, e);
-      } else if (drag.mode === 'orbit') orbit(drag.pivot, -dx * ROTATE_RATE * k, dy * ROTATE_RATE * k);
-      else if (drag.mode === 'look') look(-dx * ROTATE_RATE * k, dy * ROTATE_RATE * k);
-      else pan(dx * k, dy * k);
+      } else if (drag.mode === 'orbit') orbit(drag.pivot, -dx * rates.orbit * k * sx, dy * rates.orbit * k * sy);
+      else if (drag.mode === 'look') look(-dx * rates.orbit * k * sx, dy * rates.orbit * k * sy);
+      else pan(dx * k * sp, dy * k * sp, rates.pan);
       view.applyCamera();
     });
 

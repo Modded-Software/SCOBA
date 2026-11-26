@@ -32,6 +32,8 @@ export interface ViewerEvents {
   'camera-changed': { camera: Readonly<CameraState> };
   /** A variant, a skin or a bake of a game's dataset changed (SPEC-VIEWER 17, R-VIEW-109). */
   'textures-changed': { game: string; dataset: string };
+  /** An item's skin was set (core/skins.ts set): the texture window on it counts its picks against it (R-VIEW-133). */
+  'skin-set': { item: Item };
   /** The texture window asks for the upscale dialog on one texture (SPEC-VIEWER 17.5). */
   'texture-upscale': { game: string; dataset: string; asset: string };
   /**
@@ -44,6 +46,11 @@ export interface ViewerEvents {
    * `done` gets true when it was removed, false when cancelled; an Error when refused.
    */
   'texture-remove': { game: string; dataset: string; asset: string; variant: string; done(removed: boolean | Error): void };
+  /**
+   * The texture window's Rename Skin… (R-VIEW-156): the main page asks the new name of the skin instance `item` shows,
+   * then renames it. `done` gets the new name, null when cancelled; an Error when refused.
+   */
+  'texture-rename': { item: number; done(renamed: string | null | Error): void };
   /** A tile's Edit Texture button: open the edit session of a texture's variant in the editor window (SPEC-PHOTOCRAFT 9.1). */
   'texture-edit': { game: string; dataset: string; asset: string; variant: string };
   /** The texture window's Manage Edits… button: list the edit sessions of a dataset (SPEC-PHOTOCRAFT 9.5). */

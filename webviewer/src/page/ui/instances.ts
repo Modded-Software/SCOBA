@@ -8,6 +8,8 @@ import type { EventBus, ItemField, ViewerEvents } from '../core/bus';
 import { byId, byIdAs, find, make, rows } from '../core/dom';
 import { ConfirmDialog } from './components/dialog';
 import { stepNumber, stepSelect } from './components/stepper';
+import { swatchPicker } from './components/swatchpicker';
+import { TRASH } from './icons';
 
 type NumberField = 'x' | 'y' | 'rot' | 'scale';
 
@@ -51,7 +53,7 @@ export function installInstances({ scene, selection, games, api, camera, status,
     const record = item.source ? item.source.record : null;
     const { placement } = item;
     const name = record ? record.name : (item.path.split('\\').pop() ?? item.path);
-    const removeButton = make('button', { className: 'remove danger', textContent: '×', title: 'Remove Instance' });
+    const removeButton = make('button', { type: 'button', className: 'remove trash', innerHTML: TRASH, title: 'Remove Instance' });
     removeButton.addEventListener('click', () => scene.remove(item.id));
     const anim = stepSelect(make('select', { className: 'anim' }, [option('-1', '(none)'), ...item.instance.sequences.map((s, i) => option(String(i), s.name))]));
     anim.value = String(item.sequence);
@@ -60,27 +62,28 @@ export function installInstances({ scene, selection, games, api, camera, status,
       scene.applySequence(item);
       edited('row');
     });
-    // Team colours the instance's format knows (SPEC-VIEWER 6.2); none: no control.
-    const teams = item.capabilities.teamColor ? item.capabilities.teamColor.count : 0;
-    const team = stepSelect(
-      make(
-        'select',
-        { className: 'team', title: 'team colour' },
-        Array.from({ length: teams }, (_, i) => option(String(i), 'team ' + (i + 1))),
-      ),
-    );
-    team.value = String(item.team);
-    team.addEventListener('change', () => {
-      item.team = Number.parseInt(team.value, 10);
-      scene.applyLook(item);
-      edited('row');
-    });
+    // Team colours the instance's format knows (SPEC-VIEWER 6.2), each with its colour box; none: no control.
+    const colors = item.capabilities.teamColor ? item.capabilities.teamColor.colors : [];
+    const team =
+      colors.length > 0
+        ? swatchPicker({
+            className: 'team',
+            title: 'team colour',
+            choices: colors.map((color, i) => ({ value: String(i), label: `team ${i + 1}`, color })),
+            value: String(item.team),
+            onChange: (value) => {
+              item.team = Number.parseInt(value, 10);
+              scene.applyLook(item);
+              edited('row');
+            },
+          })
+        : null;
     const head: HTMLElement[] = [make('span', { className: 'name', textContent: name, title: record ? `${record.id}  ${item.path}` : item.path }), removeButton];
     if (placement.icon) head.unshift(iconNode(placement.icon.name, item.dataset, item.game));
     // A record without a team colour (an SC2 doodad) has its model variants in its place.
     const controls: HTMLElement[] = [anim];
     if (placement.team) {
-      if (teams > 0) controls.push(team);
+      if (team) controls.push(team.node);
     } else if (placement.variants > 1) {
       const count = placement.variants;
       const variation = stepSelect(
@@ -125,15 +128,16 @@ export function installInstances({ scene, selection, games, api, camera, status,
     // A click on the row's name selects the unit in the view (features/pick).
     // With shift it adds the unit to the selection or takes it out.
     // With ctrl it selects the unit and points the camera at it.
+    const onRemove = (e: Event): boolean => e.target instanceof Node && removeButton.contains(e.target);
     headNode.addEventListener('click', (e) => {
-      if (e.target === removeButton) return;
+      if (onRemove(e)) return;
       if (e.shiftKey) selection.toggleSelected(item.id);
       else selection.select(item.id);
       if (e.ctrlKey && !e.shiftKey) camera.focusItem(item);
     });
     // A double-click opens what the game shows for the item (SC2: the texture window).
     headNode.addEventListener('dblclick', (e) => {
-      if (e.target !== removeButton) games.partsOf(item.game).openItem(item).catch(status.reportFailure);
+      if (!onRemove(e)) games.partsOf(item.game).openItem(item).catch(status.reportFailure);
     });
     return row;
   }

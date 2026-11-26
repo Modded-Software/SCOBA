@@ -1,7 +1,7 @@
 From 88e1b7d9189eefe2471ee7ac5eef53fe86545126 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sun, 22 Nov 2026 21:24:49 +0200
-Subject: [PATCH 29/57] m3: parse particle emitters (PAR_ v10-v24; m3addon
+Subject: [PATCH 29/59] m3: parse particle emitters (PAR_ v10-v24; m3addon
  layout)
 
 ---

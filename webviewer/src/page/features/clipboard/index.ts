@@ -11,6 +11,8 @@
 // The copy lives in the page, not the system clipboard.
 
 import type { Feature } from '../../core/context';
+import { bindingText, keyMatches, resolveInput } from '../../core/input';
+import { settings } from '../../core/settings';
 import type { Item, Vec2 } from '../../core/types';
 
 interface Entry {
@@ -56,7 +58,7 @@ const plural = (n: number): string => `${n} instance${n === 1 ? '' : 's'}`;
 
 export const clipboardFeature: Feature = {
   id: 'clipboard',
-  install({ scene, selection, camera, status, testApi }) {
+  install({ scene, selection, camera, status, testApi, store }) {
     const { items } = scene;
 
     /** The copied instances, in the scene's order; empty before the first copy. */
@@ -104,13 +106,14 @@ export const clipboardFeature: Feature = {
     }
 
     window.addEventListener('keydown', (e) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
-      const key = e.key.toLowerCase();
-      if (!['c', 'x', 'v'].includes(key) || selection.editingText(e.target)) return;
+      // The copy, cut and paste keys of the input map (core/input.ts, R-VIEW-154).
+      const { keys } = resolveInput(store.read(settings.input));
+      const key = keyMatches(keys.copy, e) ? 'c' : keyMatches(keys.cut, e) ? 'x' : keyMatches(keys.paste, e) ? 'v' : null;
+      if (key === null || selection.editingText(e.target)) return;
       e.preventDefault();
       if (key === 'v') {
         if (!copied.length) {
-          status.setStatus('nothing copied: select instances, then Ctrl+C or Ctrl+X before Ctrl+V');
+          status.setStatus(`nothing copied: select instances, then ${bindingText(keys.copy)} or ${bindingText(keys.cut)} before ${bindingText(keys.paste)}`);
           return;
         }
         const ground = camera.pointer();

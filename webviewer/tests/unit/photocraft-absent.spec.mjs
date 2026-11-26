@@ -38,6 +38,8 @@ test('every edit route answers 503 with the reason; the texture routes still ans
     ['PUT', '/api/sc2/textures/edit/0123456789abcdef/scratch'],
     ['POST', `/api/sc2/textures/edit/0123456789abcdef/transfer?${query}`],
     ['POST', `/api/sc2/textures/edit/0123456789abcdef/discard?${query}`],
+    // Ghost has the texture service too (R-VIEW-152): its edit routes are held back the same way.
+    ['GET', '/api/ghost/textures/edit?dataset=build'],
   ];
   for (const [method, route] of routes) {
     const answer = await fetch(`${server.url}${route}`, { method, ...(method === 'GET' ? {} : { body: '{}', headers: { 'content-type': 'application/json' } }) });
@@ -49,6 +51,6 @@ test('every edit route answers 503 with the reason; the texture routes still ans
   // Negative: the other routes of the texture service are not held back.
   const states = await fetch(`${server.url}/api/sc2/textures?${new URLSearchParams({ dataset: 'stock', asset: 'assets\\textures\\marine_diffuse_blood.dds' })}`);
   expect(states.status).toBe(200);
-  // Negative: a game without a texture service answers 404, not 503.
-  expect((await fetch(`${server.url}/api/ghost/textures/edit?dataset=build`)).status).toBe(404);
+  // Negative: a game the server does not have answers 404, not 503.
+  expect((await fetch(`${server.url}/api/nogame/textures/edit?dataset=build`)).status).toBe(404);
 });

@@ -8,7 +8,7 @@ const TEXT = 'text/plain; charset=utf-8';
 
 const FILES = new Map<string, readonly [string, string]>([
   ['/', ['public/index.html', 'text/html; charset=utf-8']],
-  ...['outline.vert', 'outline-blur.frag', 'outline-compose.frag', 'ground.vert', 'ground.frag', 'groundtex.frag', 'nod.vert', 'nod.frag'].map((name): [string, readonly [string, string]] => [`/shaders/${name}`, [`public/shaders/${name}`, TEXT]]),
+  ...['outline.vert', 'outline-blur.frag', 'outline-compose.frag', 'ground.vert', 'ground.frag', 'groundtex.frag', 'nod.vert', 'nod.frag', 'glass.frag'].map((name): [string, readonly [string, string]] => [`/shaders/${name}`, [`public/shaders/${name}`, TEXT]]),
   // The page of the texture window; a game hands it the textures it shows (page/core/texturewindow.ts).
   ['/texture-viewer.html', ['public/texture-viewer.html', 'text/html; charset=utf-8']],
   ['/vendor/texview.js', ['public/vendor/texview.js', 'text/javascript; charset=utf-8']],

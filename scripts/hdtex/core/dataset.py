@@ -42,11 +42,8 @@ class _Frames:
     def of(self, name: str) -> tuple[Bakes, dict | None]:
         if name not in self.found:
             game = self.dataset.game
-            self.found[name] = (
-                bakes.load(game.dataset_dir(name)),
-                game.package_record(name),
-            )
-            index.put_head(self.con, self.dataset.adapter.id, name, view.head())
+            self.found[name] = (bakes.load(game.dataset_dir(name)), game.package_record(name))
+            index.put_head(self.con, self.dataset.adapter.id, name, view.head(self.dataset.adapter.bakes))
         return self.found[name]
 
 
@@ -232,37 +229,41 @@ class Dataset:
         self.owner_changed(owner)
         return found
 
-    def stored_change(self, owner: str, name: str, change: Callable) -> dict[str, skins.Skin]:
-        """One change of skin `name`; New Skin is stored first when it is not: as offered, else empty (R-HD-137)."""
-        start = self.named_by(owner, name) if name == skins.NEW else None
-        return self.change_skin(owner, lambda found: change(found if start is None else skins.with_new(found, start)))  # fmt: skip
-
     def set_texture(self, owner: str, name: str, asset: str, variant: str | None) -> dict[str, skins.Skin]:  # fmt: skip
         """Set one texture of a skin."""
         assets = set(self.owner(owner).textures)
-        return self.stored_change(owner, name, lambda found: skins.with_texture(found, name, asset, variant, assets, self._named))  # fmt: skip
+        return self.change_skin(owner, lambda found: skins.with_texture(found, name, asset, variant, assets, self._named))  # fmt: skip
 
     def named_by(self, owner: str, name: str) -> dict[str, str]:
-        """What a skin names; New Skin not stored names what is offered (R-HD-137), else nothing."""
-        found = self.skins_of(owner)
-        if name == skins.NEW and name not in found:
-            state = view.owner_state(self.owner(owner), found, self.baked, None)
-            return skins.offered(found, state["shows"]) or {}
-        return skins.textures_of(found, name)
+        """What a skin names."""
+        return skins.textures_of(self.skins_of(owner), name)
+
+    def new_name(self, owner: str, name: str | None) -> str:
+        """`name`, or for None the next New Skin N of the owner (R-HD-137)."""
+        return skins.next_new(self.skins_of(owner)) if name is None else name
+
+    def copy_skin(self, owner: str, source: str, name: str | None) -> tuple[str, dict[str, skins.Skin]]:  # fmt: skip
+        """Make a skin naming what `source` names (R-HD-133); without a name, the next New Skin N. Returns its name and the skins."""
+        chosen = self.new_name(owner, name)
+        return chosen, self.change_skin(owner, lambda now: skins.copied(now, source, chosen))
 
     def upscale_skin(
-        self, owner: str, source: str, name: str, model: str, size: int
+        self, owner: str, source: str, name: str | None, model: str, factor: int
     ) -> dict:
-        """Make skin `name` from `source` with a variant of each texture by `model` at `size` (R-HD-134). Nothing is requested here.
+        """Make skin `name` (None: the next New Skin N) from `source` with a variant of each texture by `model` at
+        `factor` times its input (R-HD-134). Nothing is requested here.
 
-        Returns the new skin's requests and the textures that keep what `source` shows, each with the reason.
+        Returns the new skin's name, its requests and the textures that keep what `source` shows, each with the reason.
+        Refused, and nothing stored, when no texture would be asked for.
         """
+        name = self.new_name(owner, name)
         given_by_source = self.named_by(owner, source)
         found = {  # what `source` shows: what it names, else the original (R-HD-131)
             **dict.fromkeys(self.owner(owner).textures, variants.ORIGINAL),
             **given_by_source,
         }
-        named, kept = skinplan.plan(found, self.texture, lambda one: self._read(one).original, model, size)
+        named, kept = skinplan.plan(found, self.texture, lambda one: self._read(one).original, model, factor, variants.max_side())
+        skinplan.refuse_empty(owner, factor, named, kept)
         self.change_skin(
             owner,
             lambda now: skins.made(now, name, {**given_by_source, **named}),
@@ -273,11 +274,8 @@ class Dataset:
 
     def bake(self, owner: str, name: str) -> Bake:
         """Bake a skin of an owner: refused when a named variant is missing, stale or has a problem not accepted (R-HD-140, R-HD-102)."""
+        bakes.refuse(self.adapter)
         found = self.owner(owner)
-        if name == skins.NEW:
-            raise bakes.BakeError(
-                f"{owner}: New Skin is not saved; save it under a name, then bake it"
-            )
         if name == skins.ORIGINAL_SKIN:
             raise bakes.BakeError(
                 f"{owner}: Original needs no bake; remove the bake to show the game's textures"
@@ -308,14 +306,14 @@ class Dataset:
         return bake
 
     def unbake(self, owner: str) -> None:
-        bakes.save(
-            self.folder, bakes.with_owner(self.baked, skins.check_owner(owner), None)
-        )
+        bakes.refuse(self.adapter)
+        bakes.save(self.folder, bakes.with_owner(self.baked, skins.check_owner(owner), None))
         if owner in self.known_owners():
             self.owner_changed(owner, below=True)
 
     def bake_texture(self, asset: str, variant: str | None) -> None:
         """Bake one texture on its own, or unbake it with None (R-HD-145)."""
+        bakes.refuse(self.adapter)
         texture = self.texture(asset)
         if variant is not None and (reason := self._refusal(asset, variant)):
             raise bakes.BakeError(f"{asset}: {reason}")

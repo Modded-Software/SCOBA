@@ -164,7 +164,7 @@ class JobTest(ArcQueueCase):
     ) -> None:
         plane = self.root.resolve() / "plane.png"
         plane.write_bytes(b"no image")
-        job = self.arc.submit(plane, self.root / "out", "fast")
+        job = self.arc.submit(plane, self.root / "out", "fast", True)
         self.assertEqual(self.arc.state(job), JobState(WAITING))
         self.assertEqual(
             self.worker("--until-empty").wait(timeout=LIMIT_SECONDS), 0, self.said()
@@ -179,9 +179,9 @@ class JobTest(ArcQueueCase):
 
     def test_a_job_the_tool_refuses_raises_with_the_tools_reason(self) -> None:
         with self.assertRaises(RunnerError) as refused:
-            self.arc.submit(self.root / "missing.png", self.root / "out", "fast")
+            self.arc.submit(self.root / "missing.png", self.root / "out", "fast", True)
         self.assertIn(
-            "exit status 1: arc-upscale: error: input does not exist",
+            "exit status 1: stderr 'arc-upscale: error: input does not exist",
             str(refused.exception),
         )
         self.assertEqual(self.names("pending"), [])

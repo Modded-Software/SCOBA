@@ -87,7 +87,7 @@ test('a click previews a doodad; "add to scene" places it with a variation and a
   const placed = page.locator('#scene li[data-doodad="ZerusTree"]');
   await expect(placed).toHaveCount(1);
   await expect(placed.locator('select.variation')).toHaveValue(String(item.variation));
-  await expect(placed.locator('select.team')).toHaveCount(0);
+  await expect(placed.locator('.team')).toHaveCount(0);
   // Negative: it is not listed as a unit.
   await expect(page.locator('#scene li[data-unit]')).toHaveCount(0);
   expect(errors).toEqual([]);

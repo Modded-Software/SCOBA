@@ -37,21 +37,23 @@ export async function colourTexture(request, dataset, owner) {
 /** The assets of an instance's texture slots: what a skin can replace on it. */
 export const slotsOf = async (page, id) => (await viewState(page)).items.find((i) => i.id === id).textureSlots;
 
-/** The largest size the pipeline lets `model` make from `input`, read from the judge answer. */
-export async function largestSize(request, dataset, asset, model = 'fast', input = 'original') {
+/** The largest factor the pipeline lets `model` have from `input`, and the side it gives, read from the judge answer: { factor, size }. */
+export async function largestFactor(request, dataset, asset, model = 'fast', input = 'original') {
   const judged = await post(request, 'judge', dataset, { assets: [asset] });
   expect(judged.status(), await judged.text()).toBe(200);
-  const sizes = (await judged.json()).textures[0].asks.find((one) => one.input === input).models[model].sizes;
-  return Math.max(...Object.entries(sizes).filter(([, why]) => why === '').map(([at]) => Number(at)));
+  const factors = (await judged.json()).textures[0].asks.find((one) => one.input === input).models[model].factors;
+  const usable = Object.entries(factors).filter(([, one]) => one.reason === '').map(([factor, one]) => ({ factor: Number(factor), size: one.size }));
+  expect(usable.length, `${asset}: ${model} from ${input} has a factor: ${JSON.stringify(factors)}`).toBeGreaterThan(0);
+  return usable.sort((a, b) => b.factor - a.factor)[0];
 }
 
-/** The texture's `model` variant from the original at its largest size, made once per run: { state, variant, size }. */
+/** The texture's `model` variant from the original at its largest factor, made once per run: { state, variant, size }. */
 export async function madeVariant(request, dataset, asset, model = 'fast') {
-  const size = await largestSize(request, dataset, asset, model);
+  const { factor, size } = await largestFactor(request, dataset, asset, model);
   const variant = `${model}@${size}`;
   let state = await stateOf(request, dataset, asset);
   if (!state.variants.some((one) => one.id === variant) && !state.requests[model]) {
-    const asked = await post(request, 'request', dataset, { asset, input: 'original', model, size });
+    const asked = await post(request, 'request', dataset, { asset, input: 'original', model, factor });
     expect(asked.status(), await asked.text()).toBe(200);
   }
   await expect
@@ -64,15 +66,14 @@ export async function madeVariant(request, dataset, asset, model = 'fast') {
   return { state, variant, size };
 }
 
-/** The owner as a fresh store has it: no bake, no stored skin. No test depends on what another left. */
+/** The owner as a fresh store has it: no bake, no skin. No test depends on what another left. */
 export async function cleanOwner(request, dataset, owner) {
   const now = await ownerOf(request, dataset, owner);
   if (now.bake) {
     const unbaked = await post(request, 'unbake', dataset, { owner });
     expect(unbaked.status(), await unbaked.text()).toBe(200);
   }
-  // An offered New Skin is not stored: nothing to delete (R-HD-137).
-  for (const skin of now.skins.filter((one) => one.stored)) {
+  for (const skin of now.skins) {
     const gone = await post(request, 'skin', dataset, { owner, action: 'delete', name: skin.name });
     expect(gone.status(), await gone.text()).toBe(200);
   }
@@ -114,8 +115,8 @@ export async function shown(page, id) {
 export const skinChoices = (page, id) => page.evaluate((i) => window.scobaeditor.skinChoices(i), id);
 /** The open skin dialog (id, title, text, buttons); null: none is open. */
 export const skinDialog = (page) => page.evaluate(() => window.scobaeditor.skinDialog());
-/** The saved skins of an owner as the server stores them: name, textures. */
-export const storedSkins = (owner) => owner.skins.filter((one) => one.stored).map(({ name, textures }) => ({ name, textures }));
+/** The skins of an owner as the server stores them: name, textures. */
+export const storedSkins = (owner) => owner.skins.map(({ name, textures }) => ({ name, textures }));
 
 /** Open the menu's skin list and click the row of `skin` (its pick, or its icon `edit` / `trash`). */
 export async function pickRow(page, skin, part = 'pick') {

@@ -30,7 +30,8 @@ FORMAT = 2  # of the layout, and of an entry
 FORMAT_FILE = "format"
 ENTRY = "entry.json"
 PACKAGE_RECORD = "package.json"
-# A recipe is also kept at each level below its own, down to the first one of this side or less.
+# A recipe is also kept at each level below its own, down to the first one of this side or less,
+# and always at half its own side.
 SMALLEST_KEPT = 1024
 NAME = re.compile(r"[a-z0-9][a-z0-9_.-]*")
 
@@ -111,11 +112,13 @@ def read_plane(path: Path) -> np.ndarray:
         raise StoreError(f"{path} is not a whole image: {error}") from error
 
 
-def upscale_recipe(plane: str, model: str, runner: str) -> str:
-    """The name of one upscale: what went in, which model, which version of the upscaler."""
-    return hashlib.sha256(
-        json.dumps(["upscale", plane, model, runner]).encode()
-    ).hexdigest()
+def upscale_recipe(plane: str, model: str, runner: str, tiles: bool = True) -> str:
+    """The name of one upscale: what went in, which model, which version of the upscaler, whether its edges match.
+
+    An upscale with matched edges keeps the name it had before `tiles` was asked: every upscale then matched them.
+    """
+    words = ["upscale", plane, model, runner] + ([] if tiles else ["edges as they come"])
+    return hashlib.sha256(json.dumps(words).encode()).hexdigest()
 
 
 def origin_folder(origin: str) -> str:
@@ -130,9 +133,13 @@ def origin_folder(origin: str) -> str:
 
 
 def kept_sizes(longest: int) -> tuple[int, ...]:
-    """The longest sides a recipe with that own longest side is kept at, largest first."""
+    """The longest sides a recipe with that own longest side is kept at, largest first.
+
+    Half the own side is always kept: a 4x model's own side is 4x its input,
+    so its half is the 2x a request may ask for (variants.FACTORS).
+    """
     sizes = [longest]
-    while sizes[-1] > SMALLEST_KEPT and sizes[-1] % 2 == 0:
+    while sizes[-1] % 2 == 0 and (sizes[-1] > SMALLEST_KEPT or len(sizes) == 1):
         sizes.append(sizes[-1] // 2)
     return tuple(sizes)
 
@@ -179,9 +186,9 @@ class GameStore:
             raise StoreError(f"{path} does not hold the pixels its name says")
         return pixels
 
-    def upscale_dir(self, plane: str, model: str, runner: str) -> Path:
+    def upscale_dir(self, plane: str, model: str, runner: str, tiles: bool = True) -> Path:
         """The folder the upscaler writes one upscale into. Equal recipes share it."""
-        return self.upscaled / upscale_recipe(plane, model, runner)
+        return self.upscaled / upscale_recipe(plane, model, runner, tiles)
 
     # -------------------------------------------------------------- variants
 

@@ -109,6 +109,9 @@ class Codec(Protocol):
 
     id: str
     opaque: bool  # the encoder writes no alpha
+    # An uncompressed layout: its red, green, blue and alpha masks; the DDS
+    # header names it by them, not by a FourCC. None: a FourCC format.
+    masks: tuple[int, int, int, int] | None
 
     def level_size(self, width: int, height: int) -> int: ...
 
@@ -138,8 +141,11 @@ class Runner(Protocol):
         """The file a job for `plane` leaves in `folder`. It is there once the job is done."""
         ...
 
-    def submit(self, plane: Path, folder: Path, model: str) -> str:
-        """Ask for the image file `plane` enlarged into `folder`, with edges made to match. Returns the job's name."""
+    def submit(self, plane: Path, folder: Path, model: str, tiles: bool) -> str:
+        """Ask for the image file `plane` enlarged into `folder`. Returns the job's name.
+
+        `tiles`: the texture repeats, so the upscaler makes its edges match across the border. False: they are left as they come.
+        """
         ...
 
     def state(self, job: str) -> JobState:
@@ -165,6 +171,9 @@ class GameAdapter(Protocol):
     alone: frozenset[
         str
     ]  # the kinds of texture that are baked on their own, not through an owner (R-HD-145)
+    # Why the game bakes nothing; empty: it bakes (R-HD-115). A bake, an
+    # unbake and a package of its datasets are refused with this reason.
+    bakes: str
 
     def use(self, dataset: str, layer: Path) -> None:
         """Take the folder of a dataset's own files from the caller. A game that finds them itself refuses."""

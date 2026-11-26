@@ -23,7 +23,7 @@ class RepeatTest(Case):
         pixels = np.array([[[10, 20, 30], [40, 50, 60]]], dtype=np.uint8)
         Image.fromarray(pixels).save(plane)
         runner = RepeatRunner()
-        job = runner.submit(plane, self.root / "out", "fast")
+        job = runner.submit(plane, self.root / "out", "fast", True)
         self.assertEqual(runner.state(job).state, DONE)
         with Image.open(runner.output(plane, self.root / "out")) as made:
             got = np.asarray(made)
@@ -61,8 +61,8 @@ class ChoiceTest(Case):
             ROCK,
             "--model",
             "pbrify",
-            "--size",
-            "256",
+            "--factor",
+            "4",
             runner="repeat",
         )
         self.assertEqual(status, 0, answer)
@@ -71,7 +71,7 @@ class ChoiceTest(Case):
             [(one["asset"], one["variant"], one["recipe"]) for one in made],
             [(ROCK, "pbrify@256", "pbrify")],
         )
-        self.assertEqual(sorted(made[0]["files"]), ["256"])
+        self.assertEqual(sorted(made[0]["files"]), ["128", "256"])
 
     def test_negative_an_unknown_runner_is_refused_and_nothing_is_made(self) -> None:
         self.add(ROCK)

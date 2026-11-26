@@ -27,8 +27,8 @@ export function detailsOf(size: readonly number[], format: string, facts: readon
   const head = element('h3', '', 'Details');
   head.append(element('small', '', size.join('x')));
   const table = element('dl');
-  const add = (name: string, value: string | HTMLElement): void => {
-    table.append(element('dt', '', name), typeof value === 'string' ? element('dd', '', value) : value);
+  const add = (name: string, value: string | HTMLElement, className = ''): void => {
+    table.append(element('dt', className, name), typeof value === 'string' ? element('dd', className, value) : value);
   };
   add('format', format);
   if (state) {
@@ -37,7 +37,8 @@ export function detailsOf(size: readonly number[], format: string, facts: readon
     if (state.reason) add('cannot be upscaled', state.reason);
     if (state.bake) add('baked', `${state.bake}${state.packaged?.held ? ', packaged' : ''}`);
   }
-  for (const [name, value] of facts) add(name, value);
+  // The game's own facts may be long (a Ghost material and its shader): two lines each, label then value.
+  for (const [name, value] of facts) add(name, value, 'fact');
   made.append(head, table);
   // Nobody asked for it by name yet: what it may ask for shows once the pipeline has read it (the judge route).
   if (state && !state.judged) made.append(element('div', 'unread', 'reading what can be made of it'));

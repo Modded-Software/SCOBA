@@ -1,7 +1,28 @@
 // An item's ring radius and its column: what the rings, the select
 // rectangle and itemPixel measure.
 
-import type { Item } from './types';
+import type { Item, Vec3 } from './types';
+
+/**
+ * The middle of the item's rest-pose vertex box in the world, and the
+ * box's half diagonal. The culling sphere (bounds) also holds every
+ * animation, so it is several times too big for this. A model with no
+ * vertices has an empty box: its culling sphere stands in.
+ */
+export function restBox(item: Item): { centre: Vec3; reach: number } {
+  const [dx, dy, dz] = item.placement.scale;
+  const s: Vec3 = [dx * item.scale, dy * item.scale, dz * item.scale];
+  const box = item.model;
+  const empty = !Number.isFinite(box.vertexMin[0]);
+  const r = box.bounds.r;
+  const lo = (i: 0 | 1 | 2): number => (empty ? -r : (box.vertexMin[i] ?? 0));
+  const hi = (i: 0 | 1 | 2): number => (empty ? r : (box.vertexMax[i] ?? 0));
+  const mid = (i: 0 | 1 | 2): number => ((lo(i) + hi(i)) / 2) * s[i];
+  const half = (i: 0 | 1 | 2): number => ((hi(i) - lo(i)) / 2) * s[i];
+  const a = (item.rot * Math.PI) / 180;
+  const centre: Vec3 = [item.x + mid(0) * Math.cos(a) - mid(1) * Math.sin(a), item.y + mid(0) * Math.sin(a) + mid(1) * Math.cos(a), item.placement.height + mid(2)];
+  return { centre, reach: Math.hypot(half(0), half(1), half(2)) };
+}
 
 const MIN_RADIUS = 0.25; // world units: the smallest hit and ring radius
 

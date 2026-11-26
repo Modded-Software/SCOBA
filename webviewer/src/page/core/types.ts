@@ -42,10 +42,14 @@ export interface Item {
   team: number;
   /** The animation played once from the menu, or null. */
   oneShot: number | null;
-  /** The skin of its owner it shows (SPEC-VIEWER 17.4): "original", "new" or a saved skin's name. */
+  /** The skin of its owner it shows (SPEC-VIEWER 17.4): "original" or the name of a skin of its owner. */
   skin: string;
   /** The longest side of any texture it shows, once they are in; 0 before. */
   largestTexture: number;
+  /** The textures its skin names that cannot be shown, each "asset: variant: why": their slots show the original (SPEC-VIEWER 17.4). */
+  unshown: string[];
+  /** Its skin is not one its owner has: no slot is overridden, and the menu shows it as missing (SPEC-VIEWER 17.4). */
+  missingSkin: boolean;
   /** The game's settings of the item (SPEC-VIEWER 6.5), as its itemOptions checked them. */
   options: Record<string, unknown>;
 }
@@ -179,9 +183,10 @@ export interface MenuState {
    * The skin row (SPEC-VIEWER 17.4): the chosen skin and its label, whether the choice has its icon
    * and arrow (R-VIEW-137), the choices, the rows of the list with their icons ("Add New Skin…"
    * last, name ""), the bake button's verb and whether it is disabled, the shown bake badge (null:
-   * hidden); null: the menu has none.
+   * hidden); null: the menu has none. `missing`: why the chosen skin is missing (its row comes first,
+   * disabled); empty: the owner has it.
    */
-  skins: { value: string; label: string; dropdown: boolean; choices: string[]; rows: { name: string; label: string; icons: ('edit' | 'trash')[] }[]; bake: string; bakeDisabled: boolean; badge: string | null } | null;
+  skins: { value: string; label: string; dropdown: boolean; choices: string[]; missing: string; rows: { name: string; label: string; icons: ('edit' | 'trash')[] }[]; bake: string; bakeDisabled: boolean; bakeTitle: string; upscaleDisabled: boolean; upscaleTitle: string; badge: string | null } | null;
 }
 
 export interface PickState {

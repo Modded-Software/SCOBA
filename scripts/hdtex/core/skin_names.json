@@ -1,0 +1,22 @@
+{
+  "about": "Skin names and whether each is one (R-HD-137, R-HD-138). Data of hdtex.core: skins.check_name (test_skins.py) and the viewer's skinNameRefusal (tests/unit/skin-choices.spec.mjs, through REPO_ROOT) are each tested against every row.",
+  "names": [
+    { "name": "mine", "ok": true },
+    { "name": "New Skin 1", "ok": true },
+    { "name": "new", "ok": true },
+    { "name": "NEW", "ok": true },
+    { "name": "a b-c_d", "ok": true },
+    { "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "ok": true },
+    { "name": "", "ok": false },
+    { "name": "a  b", "ok": false },
+    { "name": " a", "ok": false },
+    { "name": "a ", "ok": false },
+    { "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "ok": false },
+    { "name": "original", "ok": false },
+    { "name": "Original", "ok": false },
+    { "name": "ORIGINAL", "ok": false },
+    { "name": "../x", "ok": false },
+    { "name": "a\tb", "ok": false },
+    { "name": "Hüll", "ok": false }
+  ]
+}

@@ -123,7 +123,7 @@ class SubmitTest(RunnerCase):
         self,
     ) -> None:
         with self.assertLogs(runner.LOG, "INFO") as logged:
-            self.assertEqual(ArcRunner().submit(PLANE, self.folder, "pbrify"), JOB)
+            self.assertEqual(ArcRunner().submit(PLANE, self.folder, "pbrify", True), JOB)
         self.assertEqual(
             self.called(),
             [
@@ -148,10 +148,16 @@ class SubmitTest(RunnerCase):
         )
         self.assertIn("exit status 0 after", "\n".join(logged.output))
 
+    def test_a_texture_that_does_not_repeat_is_asked_for_without_matched_edges(self) -> None:
+        ArcRunner().submit(PLANE, self.folder, "pbrify", False)
+        self.assertEqual(self.called(), ["submit", "--json", str(PLANE), "-o", str(self.folder), "-m", "pbrify"])
+        # Negative: no --tiling anywhere in the call.
+        self.assertNotIn("--tiling", self.called())
+
     def test_the_runner_writes_nothing_into_the_queue_and_starts_no_worker(
         self,
     ) -> None:
-        ArcRunner().submit(PLANE, self.folder, "fast")
+        ArcRunner().submit(PLANE, self.folder, "fast", True)
         self.assertFalse(self.queue.exists())
         self.assertNotIn("worker", self.called())
         self.assertNotIn("--queue", self.called())
@@ -161,8 +167,8 @@ class SubmitTest(RunnerCase):
     ) -> None:
         (self.checkout / "refuse").write_text("")
         with self.assertRaises(RunnerError) as refused:
-            ArcRunner().submit(PLANE, self.folder, "nomodel")
-        self.assertIn("exit status 2: error: unknown model", str(refused.exception))
+            ArcRunner().submit(PLANE, self.folder, "nomodel", True)
+        self.assertIn("exit status 2: stderr 'error: unknown model'", str(refused.exception))
 
     def test_an_answer_that_names_no_job_is_refused_with_the_answer(self) -> None:
         for text, reason in (
@@ -180,7 +186,7 @@ class SubmitTest(RunnerCase):
             with self.subTest(text=text):
                 self.answer(text)
                 with self.assertRaises(RunnerError) as refused:
-                    ArcRunner().submit(PLANE, self.folder, "fast")
+                    ArcRunner().submit(PLANE, self.folder, "fast", True)
                 self.assertIn(reason, str(refused.exception))
 
 

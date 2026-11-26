@@ -17,7 +17,8 @@ const settled = (page) => expect.poll(async () => (await camera(page)).zoomGoal)
 
 /** The share of the distance one notch moves, the target on the ground (zoom.ts). */
 function share(distance, pitch, ctrl = false) {
-  const s = 0.15 * Math.max(0.12, Math.min(1, (distance * Math.sin(pitch)) / 10));
+  // Times the mouse sensitivity when none is stored, 0.6 (R-VIEW-150).
+  const s = 0.15 * Math.max(0.12, Math.min(1, (distance * Math.sin(pitch)) / 10)) * 0.6;
   return ctrl ? s * 0.25 : s;
 }
 

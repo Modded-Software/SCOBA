@@ -9,6 +9,7 @@ import { focusItem } from './focus';
 import { frameBox } from './framebox';
 import type { Host } from './host';
 import type { CameraState, Vec2 } from './types';
+import { settings } from './settings';
 import { createZoom } from './zoom';
 
 export function createView(host: Host, store: Store, events: EventBus<ViewerEvents>): CameraService {
@@ -22,7 +23,7 @@ export function createView(host: Host, store: Store, events: EventBus<ViewerEven
     events.emit('camera-changed', { camera });
   }
 
-  const zoom = createZoom(camera, { eye: rig.eye, applyCamera });
+  const zoom = createZoom(camera, { eye: rig.eye, applyCamera, sensitivity: () => store.read(settings.mouseSensitivity) });
 
   function view(next: Partial<CameraState>): void {
     zoom.stop();

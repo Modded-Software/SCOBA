@@ -15,6 +15,7 @@ import { SCENE_ID_RULE } from '../../shared/scene';
 import { ID_RULE } from '../../shared/protocol';
 import type { CameraState, GroundChoice, Landmark, SkyChoice } from './types';
 import { messageOf } from './dom';
+import { parseInput, type InputSetting } from './input';
 
 const PREFIX = 'viewer.';
 
@@ -195,8 +196,25 @@ const editsOffered: DefaultedSetting<Record<string, string>> = {
   },
 };
 
+/** The share of each mouse camera movement and wheel zoom step: 0.6 when nothing is stored (R-VIEW-150). */
+export const MOUSE_SENSITIVITY_RANGE = [0.05, 4] as const;
+const mouseSensitivity: DefaultedSetting<number> = {
+  key: 'mouse.sensitivity',
+  initial: 0.6,
+  parse(value) {
+    const [low, high] = MOUSE_SENSITIVITY_RANGE;
+    if (!finite(value) || value < low || value > high) throw new Error(`the mouse sensitivity is a number from ${low} to ${high}`);
+    return value;
+  },
+};
+
+/** The input map's changes (core/input.ts, R-VIEW-154). Nothing stored: every binding and rate its default. */
+const input: DefaultedSetting<InputSetting> = { key: 'input', initial: {}, parse: parseInput };
+
 export const settings = {
   camera,
+  mouseSensitivity,
+  input,
   drawers,
   editsOffered,
   /** The gallery's game (R-VIEW-22). Nothing stored: the server's default game. */

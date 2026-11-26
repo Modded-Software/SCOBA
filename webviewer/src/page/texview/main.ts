@@ -18,7 +18,7 @@
 import type { DecodedTexture } from '../core/ddsdecode';
 import { inGameOf, textureTiles, tickElapsed, type TileState } from '../core/tiles';
 import type { PageOwner } from '../core/texturewindow';
-import { ORIGINAL, textureRoutes, type TextureJudgeAsk, type TextureState } from '../../shared/textures';
+import { firstSaveInto, hasSkin, namedInto, ORIGINAL, ORIGINAL_SKIN, skinLabel, textureRoutes, type TextureJudgeAsk, type TextureState } from '../../shared/textures';
 import { detailsOf } from './cards';
 import { bindControls } from './controls';
 import { createImageView, type Side } from './imageview';
@@ -59,6 +59,10 @@ export interface ShowRequest {
   save?(picks: TexturePick[]): Promise<string | null>;
   /** The edit sessions (edits.ts); absent: no edit control. */
   edit?: EditTools;
+  /** The skin the instance shows; null or absent: the window is on no instance. */
+  skin?: string | null;
+  /** Rename the skin the instance shows; the main page asks the name (R-VIEW-156). The new name, or null: cancelled. Absent: no instance with an owner. */
+  rename?(): Promise<string | null>;
 }
 
 interface Entry {
@@ -100,6 +104,8 @@ const filter: Filter = { category: ALL, plane: ALL, text: '' };
 let user = '';
 /** The owner as the window read it last; null: none. */
 let owner: PageOwner | null = null;
+/** The skin the instance shows, as the window said last; null: the window is on no instance. */
+let skin: string | null = null;
 /** The variants in the picture beside the original, by asset; absent: the pick, else In game. May be empty. */
 const compared = new Map<string, Set<string>>();
 /** The picks, by asset: only those that differ from In game (R-VIEW-133). */
@@ -109,6 +115,8 @@ let poll: number | null = null;
 let judging = false;
 /** A save to a skin is out: the bar waits for it. */
 let saving = false;
+/** A rename of the skin is out: its button waits for it. */
+let renaming = false;
 let message = '';
 let shownTiles: TileState[] = [];
 
@@ -123,10 +131,18 @@ function categoryOf(item: Entry): string {
 }
 /** What the game shows for an entry (R-VIEW-131). */
 const inGame = (item: Entry): ReturnType<typeof inGameOf> => inGameOf(item.asset ?? '', stateOf(item), owner);
+/**
+ * What a pick is a change against (R-VIEW-133): with an owner, what the target Save to Skin… offers first names
+ * (`firstSaveInto`), so the bar and the dialog count the same picks. Without an owner there is nothing to save: In game.
+ */
+function baseOf(item: Entry): string {
+  if (item.asset === null) return ORIGINAL;
+  return owner && asked?.save ? namedInto(owner, firstSaveInto(owner, skin), item.asset) : inGame(item).variant;
+}
 /** The tiles an entry shows beside its original. */
 function shownOf(item: Entry): Set<string> {
   if (item.asset === null) return new Set([ORIGINAL]);
-  return compared.get(item.asset) ?? new Set([picks.get(item.asset) ?? inGame(item).variant]);
+  return compared.get(item.asset) ?? new Set([picks.get(item.asset) ?? baseOf(item)]);
 }
 
 function say(text: string): void {
@@ -173,7 +189,7 @@ function schedule(): void {
 }
 
 /** The variant picked for an entry: the pick, else what the game shows (R-VIEW-133). */
-const pickedOf = (item: Entry): string => (item.asset === null ? ORIGINAL : (picks.get(item.asset) ?? inGame(item).variant));
+const pickedOf = (item: Entry): string => (item.asset === null ? ORIGINAL : (picks.get(item.asset) ?? baseOf(item)));
 
 /**
  * A click on a tile picks it (R-VIEW-133). It also goes in the picture, beside
@@ -187,7 +203,7 @@ function clicked(item: Entry, variant: string): void {
   compared.set(asset, set);
   // Only a thing with an owner has picks to save.
   if (asked?.save) {
-    if (variant === inGame(item).variant) picks.delete(asset);
+    if (variant === baseOf(item)) picks.delete(asset);
     else picks.set(asset, variant);
   }
   render();
@@ -311,7 +327,50 @@ const listed: FilterPage<Entry> = {
   element,
 };
 
+/** Why Rename Skin… cannot be used now; empty: it can (R-VIEW-156). */
+function renameBlock(): string {
+  if (!asked?.rename || skin === null) return 'this window is on no instance with skins';
+  if (skin === ORIGINAL_SKIN) return 'Original names nothing; pick or make a skin first';
+  if (missing()) return `${owner?.owner ?? 'the owner'} has no skin "${skin}"; choose another skin`;
+  if (renaming) return 'a rename is under way';
+  return '';
+}
+
+/** The instance is on a skin its owner does not have (SPEC-VIEWER 17.4). */
+const missing = (): boolean => owner !== null && skin !== null && !hasSkin(owner, skin);
+
+/** The skin line: the skin the instance shows, and Rename Skin…. */
+function skinLine(): void {
+  const line = $('skin-line');
+  line.hidden = !asked?.rename || skin === null;
+  $('skin-name').textContent = skin === null ? '' : `Skin: ${skinLabel(skin)}${missing() ? ' (missing)' : ''}`;
+  $('skin-name').classList.toggle('missing', missing());
+  const button = $('skin-rename') as HTMLButtonElement;
+  const block = renameBlock();
+  button.disabled = block !== '';
+  button.title = block || `Give skin "${skin ?? ''}" another name; every instance on it and its bake follow`;
+}
+
+$('skin-rename').addEventListener('click', () => {
+  const rename = asked?.rename;
+  if (!rename || renameBlock()) return;
+  renaming = true;
+  skinLine();
+  rename.call(asked).then(
+    () => {
+      renaming = false;
+      skinLine();
+    },
+    (error: unknown) => {
+      renaming = false;
+      say(`the skin was not renamed: ${error instanceof Error ? error.message : String(error)}`);
+      skinLine();
+    },
+  );
+});
+
 function render(): void {
+  skinLine();
   chips(listed, $('categories'), 'category', categoryOf);
   chips(listed, $('planes'), 'plane', (item) => item.plane);
   visible = [];
@@ -353,10 +412,12 @@ async function showTextures(request: ShowRequest): Promise<void> {
   picks.clear();
   judging = false;
   saving = false;
+  renaming = false;
   clearRetries();
   resetEdits(request.edit ?? null);
   asked = request;
   owner = request.owner;
+  skin = request.skin ?? null;
   user = request.user;
   index = -1;
   problems = request.failed;
@@ -371,11 +432,15 @@ async function showTextures(request: ShowRequest): Promise<void> {
   judge().catch((error: unknown) => say(`what can be made of these textures cannot be read: ${error instanceof Error ? error.message : String(error)}`));
 }
 
-/** The main page changed textures (a request, a bake, a save): take the owner, read the states again, and poll while one runs. */
-async function refresh(next: PageOwner | null = owner): Promise<void> {
+/**
+ * The main page changed textures (a request, a bake, a save) or the instance's skin: take the owner and the skin,
+ * read the states again, and poll while one runs. `shown` absent: the skin stays.
+ */
+async function refresh(next: PageOwner | null = owner, shown: string | null = skin): Promise<void> {
   owner = next;
-  // A pick In game now shows is no change any more.
-  for (const item of entries) if (item.asset !== null && picks.get(item.asset) === inGame(item).variant) picks.delete(item.asset);
+  skin = shown;
+  // A pick the target skin names now is no change any more.
+  for (const item of entries) if (item.asset !== null && picks.get(item.asset) === baseOf(item)) picks.delete(item.asset);
   await refreshStates();
   render();
   schedule();
@@ -431,6 +496,9 @@ Reflect.set(window, 'hdtex', {
       picks: Object.fromEntries(picks),
       draft: { shown: draft !== null && !draft.hidden, text: draft?.querySelector('.draft-count')?.textContent ?? '' },
       owner: owner?.owner ?? null,
+      skin,
+      // The skin line and Rename Skin… (R-VIEW-156).
+      skinLine: { shown: !$('skin-line').hidden, text: $('skin-name').textContent, renameDisabled: ($('skin-rename') as HTMLButtonElement).disabled, renameTitle: $('skin-rename').title },
       edits: editsState(),
     };
   },

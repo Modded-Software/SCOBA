@@ -9,10 +9,33 @@ import type { DatasetId, GameId } from './protocol';
 export const ORIGINAL = 'original';
 /** The Original skin: names nothing, every texture shows its original (R-HD-132). */
 export const ORIGINAL_SKIN = 'original';
-/** New Skin: the one unsaved skin of an owner (R-HD-137). */
-export const NEW_SKIN = 'new';
 /** What a list shows for a skin name. */
-export const skinLabel = (name: string): string => (name === ORIGINAL_SKIN ? 'Original' : name === NEW_SKIN ? 'New Skin' : name);
+export const skinLabel = (name: string): string => (name === ORIGINAL_SKIN ? 'Original' : name);
+/** A skin name (scripts/hdtex/core/skins.py check_name; both are tested against hdtex.core's skin_names.json). */
+const SKIN_NAME = /^(?=.{1,40}$)[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*$/;
+/** Why `name` is no skin name; empty: it is one. */
+export function skinNameRefusal(name: string): string {
+  if (!SKIN_NAME.test(name)) return 'a name is 1 to 40 letters, digits, - or _, with one space between words';
+  if (name.toLowerCase() === ORIGINAL_SKIN) return 'Original is the skin that names nothing';
+  return '';
+}
+/** Whether an owner has a skin: Original always. */
+export const hasSkin = (owner: { skins: readonly { name: string }[] }, skin: string): boolean => skin === ORIGINAL_SKIN || owner.skins.some((one) => one.name === skin);
+/** What a skin of an owner names for a texture now; a texture it does not name shows its original (R-HD-131). The skin must exist (`hasSkin`). */
+export function namedIn(owner: { owner: string; skins: readonly { name: string; textures: Record<string, string> }[] }, skin: string, asset: string): string {
+  if (skin === ORIGINAL_SKIN) return ORIGINAL;
+  const found = owner.skins.find((one) => one.name === skin);
+  if (!found) throw new Error(`${owner.owner} has no skin "${skin}"`);
+  return found.textures[asset] ?? ORIGINAL;
+}
+/** Where Save to Skin… sets the picks (R-VIEW-133): a skin made by the save (its name comes from the pipeline), or a skin the owner has. */
+export type SaveInto = { kind: 'new' } | { kind: 'existing'; skin: string };
+/** The target Save to Skin… offers first: the skin the instance shows when the owner has it and it is not Original; else a new skin. */
+export const firstSaveInto = (owner: { skins: readonly { name: string }[] }, shown: string | null): SaveInto =>
+  shown !== null && shown !== ORIGINAL_SKIN && hasSkin(owner, shown) ? { kind: 'existing', skin: shown } : { kind: 'new' };
+/** What a save target names for a texture before the save. A new skin is made from Original, so it names the original. */
+export const namedInto = (owner: { owner: string; skins: readonly { name: string; textures: Record<string, string> }[] }, into: SaveInto, asset: string): string =>
+  into.kind === 'new' ? ORIGINAL : namedIn(owner, into.skin, asset);
 /** Joins the steps of a recipe; `@` parts a step's model from its size. */
 const JOIN = '+';
 const AT = '@';
@@ -48,8 +71,12 @@ export interface TextureVariant {
   size: number;
   /** The recipe's own size: the largest it was made at. */
   own: number;
-  /** Its original changed since it was made. */
+  /** It must be made again: its original changed since. */
   stale: boolean;
+  /** Why it is stale, in words; empty: it is not. Absent in a state written before it was kept. */
+  staleWhy?: string;
+  /** Its edges were made for the other rule (tiles or not). It is shown; a request makes it again. Absent: false. */
+  edgesOff?: boolean;
   numbers: TextureNumber[];
   /** The limits it misses, each with its number and bound. */
   problems: { limit: string; value: number | null; bound: number }[];
@@ -63,10 +90,16 @@ export interface TextureVariant {
   sha256: string;
 }
 
-/** What a request may ask for from one input: per model, why it is refused (empty: it is not), and per size why it cannot be reached. */
+/** What one factor of the input's side gives: the side, at most the head's maxSide, and why it cannot be asked for (empty: it can). */
+export interface FactorAsk {
+  size: number;
+  reason: string;
+}
+
+/** What a request may ask for from one input: per model, why it is refused (empty: it is not), and per factor what it gives. */
 export interface TextureAsk {
   input: string;
-  models: Record<string, { reason: string; sizes: Record<string, string> }>;
+  models: Record<string, { reason: string; factors: Record<string, FactorAsk> }>;
 }
 
 /** A request that is not done, by its recipe. */
@@ -115,8 +148,6 @@ export interface TextureSkin {
   name: string;
   /** Asset to variant id; an asset it does not name shows its original. */
   textures: Record<string, string>;
-  /** False: New Skin offered from what the owner shows, not stored yet (R-HD-137). */
-  stored: boolean;
 }
 
 /** What the server says of one owner (17.2). */
@@ -128,6 +159,8 @@ export interface OwnerState {
   /** The owners below it, nearest first, each with its baked skin. */
   below: { owner: string; bake: string | null }[];
   skins: TextureSkin[];
+  /** The name the pipeline gives the next skin made without one (scripts/hdtex/core/skins.py `next_new`). */
+  next: string;
   /** Per asset: what the owner shows now: its bake, else the nearest bake below, else the original. */
   shows: Record<string, string>;
   bake: { skin: string; textures: Record<string, string> } | null;
@@ -137,10 +170,23 @@ export interface OwnerState {
 
 /** What holds for every texture of a dataset. */
 export interface TexturesHead {
-  sizes: number[];
+  /** How many times its input's side a request may ask for (R-HD-123). */
+  factors: number[];
+  /** The largest side a request may ask for: the setting TEXTURE_MAX_SIDE. */
+  maxSide: number;
   models: TextureModel[];
   limits: { limit: string; info: string }[];
+  /** Why the game bakes nothing (R-VIEW-151); empty: it bakes. */
+  bake: string;
+  /** The hash of the code that wrote its states (scripts/hdtex/core/view.py `code`); absent in a head written before it was kept. */
+  code?: string;
 }
+
+/** A head before the first answer: nothing offered, nothing refused. */
+export const EMPTY_HEAD: TexturesHead = { factors: [], maxSide: 0, models: [], limits: [], bake: '' };
+
+/** The head of an answer, without its body. */
+export const headPart = (body: TexturesHead): TexturesHead => ({ factors: body.factors, maxSide: body.maxSide, models: body.models, limits: body.limits, bake: body.bake });
 
 /** GET /api/<game>/textures. */
 export interface TexturesBody extends TexturesHead {
@@ -164,12 +210,13 @@ export interface TextureJudgeAsk {
   assets: string[];
 }
 
-/** POST /api/<game>/textures/request: one variant, from an input, by a model, at a size. */
+/** POST /api/<game>/textures/request: one variant, from an input, by a model, at a factor of the input's side; or at the size of a known variant id (Ask Again). One of the two. */
 export interface TextureRequestAsk {
   asset: string;
   input: string;
   model: string;
-  size: number;
+  factor?: number;
+  size?: number;
 }
 
 /** POST /api/<game>/textures/remove: one variant of an asset (R-HD-146). */
@@ -180,11 +227,13 @@ export interface TextureRemoveAsk {
 
 /** POST /api/<game>/textures/skin: one change of SPEC-HD-TEXTURES 4.8. */
 export type SkinAsk =
-  | { owner: string; action: 'copy'; name: string; from: string }
+  /** `name` null: the next New Skin N (R-HD-137). */
+  | { owner: string; action: 'copy'; name: string | null; from: string }
   | { owner: string; action: 'rename'; name: string; new: string }
   | { owner: string; action: 'delete'; name: string }
   | { owner: string; action: 'set'; name: string; asset: string; variant: string | null }
-  | { owner: string; action: 'upscale'; name: string; from: string; model: string; size: number };
+  /** `name` null: the next New Skin N. */
+  | { owner: string; action: 'upscale'; name: string | null; from: string; model: string; factor: number };
 
 /** What a skin upscale did: the variants it requested, and the textures that keep what the source shows, with why. */
 export interface SkinUpscaled {
@@ -197,6 +246,8 @@ export interface SkinUpscaled {
 /** POST /api/<game>/textures/skin: the owner, and for an upscale what it did. */
 export interface SkinBody extends OwnerBody {
   upscaled: SkinUpscaled | null;
+  /** The skin a copy or an upscale made; null for the other changes. */
+  made: string | null;
 }
 
 /** POST /api/<game>/textures/bake: an owner's skin, or a texture's variant. */
@@ -241,7 +292,7 @@ export function bandOf(variant: TextureVariant): Band {
   return variant.numbers.some((number) => number.band === 'near') ? 'near' : 'ok';
 }
 
-/** The models a request from `input` may use, and the sizes each reaches. Empty: none (not judged, or no such input). */
+/** The models a request from `input` may use, and what each factor gives. Empty: none (not judged, or no such input). */
 export const asksFrom = (state: TextureState, input: string): TextureAsk['models'] => state.asks.find((ask) => ask.input === input)?.models ?? {};
 
 /** The routes of the texture service, as the page builds them. */

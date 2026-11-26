@@ -84,6 +84,11 @@ The service runs `webviewer/scripts/start.sh`, so it gets the same paths.
 The server stops at start when `TEXTURE_STORE`, `SC2_PATH` or
 `WEBVIEWER_DATA` is unset.
 
+`TEXTURE_LOGS` is no derived path: the service leaves it unset, and the
+texture launch logs go below the game's cache. A test server sets it to a
+folder beside its own log (SPEC-VIEWER 17.1). A value that is not
+absolute stops the server.
+
 ## 6. Guards
 
 The host test `scripts/testkit/tests/test_workpaths.py` checks:

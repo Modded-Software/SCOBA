@@ -49,7 +49,7 @@ test('a model without a motion set: no sequences; asking for a clip changes no b
   expect(errors).toEqual([]);
 });
 
-test('a Ghost instance has no team colour control and no skin choice', async ({ page }) => {
+test('a Ghost instance has no team colour control; its skin choice is its own owner', async ({ page }) => {
   const errors = await open(page);
   const marine = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: -2, y: 0, pick: 0.5, sequence: -1, team: 2 }));
   const crate = await add(page, '3D/Models/crate.nod', 2);
@@ -59,12 +59,16 @@ test('a Ghost instance has no team colour control and no skin choice', async ({ 
   const items = (await page.evaluate(() => window.scobaeditor.state())).items;
   const row = (id) => rows.nth(items.findIndex((i) => i.id === id));
   // The SC2 unit has the control: the test can see it.
-  await expect(row(marine).locator('select.team')).toHaveCount(1);
-  await expect(row(crate).locator('select.team')).toHaveCount(0);
-  // Ghost has no texture service: its instance shows its own textures and offers no skin.
+  await expect(row(marine).locator('.team')).toHaveCount(1);
+  await expect(row(crate).locator('.team')).toHaveCount(0);
+  // Ghost has the texture service (R-VIEW-152): its instance shows Original, its owner is its model file.
   const ghost = items.find((i) => i.id === crate);
   expect(ghost).toMatchObject({ skin: 'original', overrides: 0 });
-  expect(await page.evaluate((id) => window.scobaeditor.skinChoices(id), crate)).toEqual({ owner: null, choices: [], state: null, following: false });
+  const choices = await page.evaluate((id) => window.scobaeditor.skinChoices(id), crate);
+  expect(choices.owner).toBe('model:3d\\models\\crate.nod');
+  expect(choices.choices[0]).toBe('original');
+  // Negative: the SC2 unit's owner is its own, not the crate's.
+  expect((await page.evaluate((id) => window.scobaeditor.skinChoices(id), marine)).owner).toBe('unit:Marine');
   expect(errors).toEqual([]);
 });
 

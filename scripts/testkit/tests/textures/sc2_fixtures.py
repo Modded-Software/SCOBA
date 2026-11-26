@@ -73,6 +73,7 @@ def layer(
     material: str = "standardMaterials",
     flipbook: bool = False,
     grid: tuple[int, int] | None = None,
+    moves: bool = False,
 ) -> dict:
     return {
         "material": material,
@@ -83,6 +84,9 @@ def layer(
         "flipbook": flipbook,
         "wrap": True,
         "grid": grid,
+        "moves": moves,
+        "spans": 0,
+        "triangles": 0,
     }
 
 
@@ -131,7 +135,7 @@ MODEL_LAYERS = {
         layer("Assets\\Textures\\boom.dds", flipbook=True)
     ],
     "assets\\doodads\\rock\\rock.m3": [
-        layer("Assets\\Textures\\rock_spec.dds", "specularLayer"),
+        layer("Assets\\Textures\\rock_spec.dds", "specularLayer", moves=True),  # it scrolls, say
         layer("Assets\\Textures\\rock_normal.dds", "normalLayer"),
         layer("Assets\\Textures\\waves.dds", "normalLayer", "displacementMaterials"),
         layer("Assets/Textures/Grass.dds"),

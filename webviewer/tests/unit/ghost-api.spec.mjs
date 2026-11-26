@@ -26,8 +26,8 @@ test('ghost is available', async ({ request }) => {
   const games = await (await request.get('/api/games')).json();
   const ghost = games.games.find((game) => game.id === 'ghost');
   expect(ghost, 'GHOST_PATH must name the build for this spec').toBeTruthy();
-  // Ghost offers no texture service (R-VIEW-100).
-  expect(ghost).toEqual({ id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC: G', available: true, reason: null, textures: false });
+  // Ghost offers the texture service (R-VIEW-152).
+  expect(ghost).toEqual({ id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC:G', available: true, reason: null, textures: true });
   expect(games.default).toBe('sc2');
   const health = await (await request.get('/api/health')).json();
   expect(health.games).toContainEqual({ id: 'ghost', available: true });

@@ -141,10 +141,10 @@ class ArcRunner:
             )
         return answer
 
-    def submit(self, plane: Path, folder: Path, model: str) -> str:
-        job = self._ask(
-            "submit", "--json", str(plane), "-o", str(folder), "-m", model, "--tiling"
-        ).get("job")
+    def submit(self, plane: Path, folder: Path, model: str, tiles: bool) -> str:
+        # --tiling makes the edges match across the border: only for a texture that repeats.
+        words = ["submit", "--json", str(plane), "-o", str(folder), "-m", model, *(["--tiling"] if tiles else [])]
+        job = self._ask(*words).get("job")
         if not isinstance(job, str) or not JOB_NAME.fullmatch(job):
             raise RunnerError(
                 f"arc-upscale submit named no job file for {plane.name}: {job!r}"

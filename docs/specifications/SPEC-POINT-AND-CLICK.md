@@ -135,6 +135,12 @@ weapons stay in the data.
 - Attack `single` has no shot while WASD-moving. A WASD `move` order replaces
   the attack order.
 - WASD issues plain `move` orders only.
+- W and S each run one loop per player (`gv_moveLoopFwd`, `gv_moveLoopBack`
+  in `systems/movement.galaxy`). W and S held together cancel. Releasing
+  one restarts the loop of the other if it is still held. A key repeat
+  does not start a second loop. A W or S release clears its key flag even
+  during an input hold. Fix for operator 2026-11-25 (flying Viking: W/S
+  sometimes stopped). [not tested]
 - With `Arc 360` the hero can fire without turning to the target. [operator]
 - Attack `auto` while moving: the engine picks the target. It may not be the
   clicked enemy. [open]

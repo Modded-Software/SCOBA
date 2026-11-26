@@ -162,7 +162,7 @@ class DdsTest(unittest.TestCase):
 
     def test_other_format_is_rejected(self) -> None:
         data = bytearray(dds.build(16, 16, self.chain(16)))
-        data[84:88] = b"DXT3"
+        data[84:88] = b"DXT2"
         with self.assertRaises(dds.DdsError):
             dds.parse(bytes(data))
 

@@ -1,7 +1,7 @@
 From 19330e66472704f33de238e4ba3cf9ca7f899ed0 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Mon, 23 Nov 2026 09:05:06 +0200
-Subject: [PATCH 43/57] m3 parser: PAR_ unknownFloat7 and unknown5AddedV21
+Subject: [PATCH 43/59] m3 parser: PAR_ unknownFloat7 and unknown5AddedV21
 
 Read the two floats after lengthWidthRatio (m3addon structures.xml),
 to find the type-9 far-end width (WhiteoutFlakes instanceDistance).

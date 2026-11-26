@@ -11,6 +11,7 @@
 //               store's state index, and each game's index/ (the game's
 //               own caches) as hard links to the base store's.
 //   server.log  the server's output
+//   server-texture-logs/<game>/  the launch output of requests and workers (TEXTURE_LOGS)
 // The port is 4518 plus the parallel index.
 //
 // The base store's state index is made once per run, by a server started
@@ -23,7 +24,7 @@ import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createWriteStream, existsSync, statSync } from 'node:fs';
 import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { basename, dirname, isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
 
 export { expect };
@@ -90,7 +91,9 @@ export async function startServer({ port, store, datasets, log, env = {} }) {
   );
   if (taken) throw new Error(`port ${port} is in use: a server a killed run left? (AGENTS.md: clean it up)`);
   const out = createWriteStream(log);
-  const child = spawn('node', ['build/server.js'], { env: { ...process.env, PORT: String(port), TEXTURE_STORE: store, WEBVIEWER_DATASETS: datasets, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  // The launch output of requests and workers: beside the server's log, never in the operator's cache (TEXTURE_LOGS).
+  const logs = join(dirname(log), `${basename(log, '.log')}-texture-logs`);
+  const child = spawn('node', ['build/server.js'], { env: { ...process.env, PORT: String(port), TEXTURE_STORE: store, WEBVIEWER_DATASETS: datasets, TEXTURE_LOGS: logs, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   const keep = (chunk) => {
     output += chunk;

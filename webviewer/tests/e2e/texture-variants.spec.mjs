@@ -1,9 +1,9 @@
-import { allowErrors, test, expect } from '../fixtures.mjs';
-import { cleanOwner, idle, menu, openPage, ownerOf, place, post, shown, slotsOf, stateOf, viewState } from '../skins.mjs';
+import { test, expect } from '../fixtures.mjs';
+import { cleanOwner, idle, menu, openPage, ownerOf, place, post, shown, slotsOf, stateOf } from '../skins.mjs';
 
 // The Upscale dialog (SPEC-VIEWER 17.5, src/page/features/skins/upscale.ts)
-// on an owner, from the instance menu: model and size; New Skin, whose
-// textures each get a request. Every refusal is the pipeline's (R-VIEW-116,
+// on an owner, from the instance menu: model and factor; the next New Skin N
+// (R-HD-137), whose textures each get a request. Every refusal is the pipeline's (R-VIEW-116,
 // 117). The Infestor is this file's owner alone: files run side by side.
 // The runner needs no GPU (HDTEX_RUNNER=repeat).
 
@@ -15,52 +15,63 @@ const PIPELINE = 30_000;
 
 // A data texture offers only fast: tests/unit/skin-choices.spec.mjs; the route refuses the rest: tests/unit/texture-service-api.spec.mjs.
 
-test('the menu\'s Upscale makes New Skin of the owner; the instance shows it; each texture gets a request', async ({ page, request }) => {
+test('the menu\'s Upscale makes New Skin 1 of the owner; the instance shows it; each texture gets a request', async ({ page, request }) => {
   test.setTimeout(180_000);
   await cleanOwner(request, 'scoba', OWNER);
   const { textures } = await ownerOf(request, 'scoba', OWNER);
   const judged = (await (await post(request, 'judge', 'scoba', { assets: textures })).json()).textures;
-  // The data textures that get a request at 2048: fast from the original reaches it.
-  const reaches = (state, model) => state.asks.find((one) => one.input === 'original')?.models[model]?.sizes['2048'] === '';
-  const dataCount = judged.filter((state) => !state.colour && !state.reason && reaches(state, 'fast')).length;
+  // What 2x gives a texture's model from the original; null: it cannot have it.
+  const twice = (state, model) => {
+    const found = state.asks.find((one) => one.input === 'original')?.models[model];
+    return found && !found.reason && found.factors['2']?.reason === '' ? found.factors['2'].size : null;
+  };
+  const dataCount = judged.filter((state) => !state.colour && !state.reason && twice(state, 'fast') !== null).length;
+  const askedCount = judged.filter((state) => !state.reason && twice(state, state.colour ? 'pbrify' : 'fast') !== null).length;
   const errors = await openPage(page);
   const id = await place(page, UNIT);
   await menu(page, id);
   await page.locator('#anim-menu button.skin-upscale').click();
   await expect(page.locator('#upscale-dialog')).toBeVisible();
   await expect.poll(async () => (await dialogState(page)).kind, { timeout: PIPELINE }).toBe('owner');
-  // The input is the skin the instance shows; it goes into New Skin, so there is no name box (R-VIEW-117).
+  // The input is the skin the instance shows; it goes into the next New Skin N, so there is no name box (R-VIEW-117).
   expect((await dialogState(page)).inputs).toEqual(['original']);
   await expect(page.locator('#upscale-dialog input')).toHaveCount(0);
   await expect(page.locator('#upscale-dialog button.upscale-submit')).toHaveText('Upscale Skin');
   await page.selectOption('#upscale-dialog select.upscale-model', 'pbrify');
-  await page.selectOption('#upscale-dialog select.upscale-size', '2048');
-  const lines = (await dialogState(page)).lines;
+  await page.selectOption('#upscale-dialog select.upscale-factor', '2');
+  const dialog = await dialogState(page);
+  const lines = dialog.lines;
   console.log(`owner plan ${JSON.stringify(lines)}`);
+  expect(dialog.factors.map((one) => [one.factor, one.label, one.disabled])).toEqual([[2, '2x', false], [4, '4x', false]]);
   expect(lines.some((line) => line === `${dataCount} data textures get fast`)).toBe(dataCount > 0);
-  expect(lines.filter((line) => /^\d+ textures get a request$/.test(line))).toHaveLength(1);
-  expect(lines.at(-1)).toBe('The result goes to New Skin; save it to give it a name.');
+  expect(lines.filter((line) => line === `${askedCount} textures get a request`)).toHaveLength(1);
+  expect(lines).toContain('Each texture gets 2x its side, at most 4096.');
+  expect(lines.at(-1)).toBe('The result goes to a new skin, New Skin 1; rename it at will.');
+  expect(dialog.submittable).toBe(askedCount > 0);
   await page.locator('#upscale-dialog button.upscale-submit').click();
-  // It closes once New Skin is stored and each texture's request is sent: pipeline steps.
+  // It closes once New Skin 1 is stored and each texture's request is sent: pipeline steps.
   await expect(page.locator('#upscale-dialog')).toBeHidden({ timeout: PIPELINE });
   await idle(page);
-  expect((await shown(page, id)).skin).toBe('new');
+  expect((await shown(page, id)).skin).toBe('New Skin 1');
+  // The status line counts what was asked and what was kept.
+  await expect(page.locator('#status')).toContainText(new RegExp(`New Skin 1 made \\(${askedCount} requested, ${textures.length - askedCount} kept\\)`));
   // Its variants are still being made: the page follows them (17.4).
   const following = (await page.evaluate((i) => window.scobaeditor.skinChoices(i), id)).following;
   console.log(`after submit: following ${following}, overrides ${(await shown(page, id)).overrides}`);
   const after = await ownerOf(request, 'scoba', OWNER);
-  // Negative: New Skin is the only change, stored; nothing is baked.
-  expect(after.skins.map((one) => [one.name, one.stored])).toEqual([['new', true]]);
+  // Negative: New Skin 1 is the only change; nothing is baked.
+  expect(after.skins.map((one) => one.name)).toEqual(['New Skin 1']);
   expect(after.bake).toBeNull();
   const skin = after.skins[0];
   // Negative: a skin names no other skin.
-  expect(Object.keys(skin).sort()).toEqual(['name', 'stored', 'textures']);
+  expect(Object.keys(skin).sort()).toEqual(['name', 'textures']);
   const named = Object.entries(skin.textures);
   expect(named.length).toBeGreaterThan(0);
   // Each named variant is made; data textures were asked of fast.
   for (const [asset, variant] of named) {
     const state = judged.find((one) => one.asset === asset);
-    expect(variant, asset).toBe(state.colour ? 'pbrify@2048' : 'fast@2048');
+    const chosen = state.colour ? 'pbrify' : 'fast';
+    expect(variant, asset).toBe(`${chosen}@${twice(state, chosen)}`);
     await expect
       .poll(async () => {
         const now = await stateOf(request, 'scoba', asset);
@@ -91,20 +102,18 @@ test('the menu\'s Upscale makes New Skin of the owner; the instance shows it; ea
     for (const asset of shownOnes) console.log(`server ${asset}: ${JSON.stringify((await stateOf(request, 'scoba', asset)).variants.map((one) => [one.id, one.stale, one.problems.length]))}`);
     throw error;
   }
-  expect((await shown(page, id)).skin).toBe('new');
+  expect((await shown(page, id)).skin).toBe('New Skin 1');
   // Negative: once every variant is made, the page stops reading their states.
   await expect.poll(async () => (await page.evaluate((i) => window.scobaeditor.skinChoices(i), id)).following, { timeout: 5_000 }).toBe(false);
   expect(errors).toEqual([]);
 });
 
-test('negative: an owner upscale while New Skin is stored is refused, says to save or discard it, and changes nothing', async ({ page, request }) => {
-  allowErrors(/^http 400 POST .*\/api\/sc2\/textures\/skin\?/, /^console\.error: Failed to load resource: the server responded with a status of 4\d\d/);
-  test.setTimeout(90_000);
+test('an owner upscale beside a New Skin 1 makes New Skin 2; New Skin 1 stays as it was', async ({ page, request }) => {
+  test.setTimeout(120_000);
   await cleanOwner(request, 'scoba', OWNER);
-  const made = await post(request, 'skin', 'scoba', { owner: OWNER, action: 'copy', name: 'new', from: 'original' });
+  const made = await post(request, 'skin', 'scoba', { owner: OWNER, action: 'copy', name: null, from: 'original' });
   expect(made.status(), await made.text()).toBe(200);
-  const before = await ownerOf(request, 'scoba', OWNER);
-  expect(before.skins.map((one) => [one.name, one.stored])).toEqual([['new', true]]);
+  expect((await made.json()).made).toBe('New Skin 1');
   const errors = await openPage(page);
   const id = await place(page, UNIT);
   await menu(page, id);
@@ -112,11 +121,15 @@ test('negative: an owner upscale while New Skin is stored is refused, says to sa
   // The dialog opens once the pipeline judged the owner's textures: a pipeline step, so the wider window.
   await expect.poll(async () => (await dialogState(page)).kind, { timeout: PIPELINE }).toBe('owner');
   await page.selectOption('#upscale-dialog select.upscale-model', 'fast');
+  expect((await dialogState(page)).lines.at(-1)).toBe('The result goes to a new skin, New Skin 2; rename it at will.');
   await page.locator('#upscale-dialog button.upscale-submit').click();
-  await expect.poll(async () => (await dialogState(page)).error, { timeout: PIPELINE }).toMatch(/save or discard New Skin first/);
-  await expect(page.locator('#upscale-dialog')).toBeVisible();
-  expect(await ownerOf(request, 'scoba', OWNER)).toEqual(before);
-  expect((await viewState(page)).items.find((item) => item.id === id).skin).toBe('original');
-  // The refusal reached the console as a failed fetch; nothing else did.
-  expect(errors.filter((line) => !/status of 400/.test(line))).toEqual([]);
+  await expect(page.locator('#upscale-dialog')).toBeHidden({ timeout: PIPELINE });
+  await idle(page);
+  expect((await shown(page, id)).skin).toBe('New Skin 2');
+  const after = await ownerOf(request, 'scoba', OWNER);
+  expect(after.skins.map((one) => one.name)).toEqual(['New Skin 1', 'New Skin 2']);
+  // Negative: the skin made before is not touched, and no refusal asks to save or discard it.
+  expect(after.skins[0].textures).toEqual({});
+  expect((await dialogState(page)).error).toBe('');
+  expect(errors).toEqual([]);
 });

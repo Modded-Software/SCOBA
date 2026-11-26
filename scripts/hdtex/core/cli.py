@@ -80,6 +80,7 @@ def _texture(dataset: Dataset, texture: Texture, runner: Callable[[], Runner]) -
                 "size": one.entry["size"],
                 "variants": [variants.variant_id(recipe, size) for size in one.sizes()],
                 "stale": one.stale,
+                "staleWhy": one.why_stale,
                 "problems": list(one.missed),
                 "accepted": one.accepted,
                 "models": one.entry["models"],
@@ -106,7 +107,8 @@ def status(
     return {
         "game": dataset.adapter.id,
         "dataset": dataset.name,
-        "sizes": list(variants.SIZES),
+        "factors": list(variants.FACTORS),
+        "maxSide": variants.max_side(),
         "models": list(variants.MODELS),
         "textures": [
             _texture(dataset, texture, runner)
@@ -133,24 +135,33 @@ def status(
 def indexed(
     dataset: Dataset, _runner: Callable[[], Runner], args: argparse.Namespace
 ) -> dict:
-    """Bring the index up to date; with --asset, find the role of those textures too."""
+    """Bring the index up to date; with --asset, find the role of those textures too.
+
+    With --states: write the head and each state again from what the index
+    holds, listing no file; for a setting that changed (TEXTURE_MAX_SIDE).
+    """
+    if args.states:
+        if args.asset:
+            raise UsageError("index --states takes no --asset")
+        dataset.changed_all()
+        return {"index": str(dataset.index.path), "states": True}
     return {"index": str(dataset.index.path), **dataset.sync(args.asset or ())}
 
 
 def request(
     dataset: Dataset, runner: Callable[[], Runner], args: argparse.Namespace
 ) -> dict:
-    """Make one variant: by --variant, or by --input, --model and --size."""
+    """Make one variant: by --variant, or by --input, --model and --factor."""
     if args.variant is not None and (
-        args.input is not None or args.model is not None or args.size is not None
+        args.input is not None or args.model is not None or args.factor is not None
     ):
-        raise UsageError("a request is --variant, or --input, --model and --size")
-    if args.variant is None and (args.model is None or args.size is None):
-        raise UsageError("a request is --variant, or --input, --model and --size")
-    variant = args.variant or variants.join(
-        args.input or variants.ORIGINAL, args.model, args.size
-    )
+        raise UsageError("a request is --variant, or --input, --model and --factor")
+    if args.variant is None and (args.model is None or args.factor is None):
+        raise UsageError("a request is --variant, or --input, --model and --factor")
     texture = dataset.texture(args.asset)
+    variant = args.variant or requests.by_factor(
+        dataset, texture, args.input or variants.ORIGINAL, args.model, args.factor
+    )
     entry = requests.make(dataset, runner(), texture, variant)
     return {
         "made": [
@@ -178,12 +189,11 @@ def skin(
     dataset: Dataset, runner: Callable[[], Runner], args: argparse.Namespace
 ) -> dict:
     owner = args.owner
+    made_name = None
     if args.action == "list":
         found = dataset.skins_of(owner)
     elif args.action == "copy":
-        found = dataset.change_skin(
-            owner, lambda now: skins.copied(now, args.source, args.name)
-        )
+        made_name, found = dataset.copy_skin(owner, args.source, args.name)
     elif args.action == "rename":
         found = skinbakes.rename(dataset, owner, args.name, args.new)
     elif args.action == "delete":
@@ -196,7 +206,7 @@ def skin(
         )
     else:
         made = dataset.upscale_skin(
-            owner, args.source, args.name, args.model, args.size
+            owner, args.source, args.name, args.model, args.factor
         )
         if args.defer:
             # The caller starts each request as a process of its own (SPEC-VIEWER 17.1).
@@ -214,6 +224,7 @@ def skin(
             name: {"textures": one.textures}
             for name, one in sorted(found.items())
         },
+        **({} if made_name is None else {"skin": made_name}),
     }
 
 
@@ -310,6 +321,11 @@ def parser() -> argparse.ArgumentParser:
         action="append",
         help="find the role of this texture too; may be given more than once",
     )
+    synced.add_argument(
+        "--states",
+        action="store_true",
+        help="write the head and each state again from the index, listing no file",
+    )
     asked = command("request", request)
     asked.add_argument("--asset", required=True)
     asked.add_argument("--variant", help="the variant id, such as pbrify@2048")
@@ -318,9 +334,10 @@ def parser() -> argparse.ArgumentParser:
     )
     asked.add_argument("--model", choices=sorted(variants.MODELS))
     asked.add_argument(
-        "--size",
+        "--factor",
         type=int,
-        help=f"{', '.join(map(str, variants.SIZES))}, or the variant's own size where it is smaller",
+        choices=variants.FACTORS,
+        help=f"times the input's longest side, at most {variants.MAX_SIDE_ENV} (default {variants.MAX_OUTPUT})",
     )
     removing = command("remove", remove)
     removing.add_argument("--asset", required=True)
@@ -332,7 +349,9 @@ def parser() -> argparse.ArgumentParser:
     skinned.add_argument(
         "--owner", required=True, help="unit:<id>, actor:<id> or model:<file>"
     )
-    skinned.add_argument("--name", help="the skin")
+    skinned.add_argument(
+        "--name", help="the skin; for copy and upscale it may be left out: the next New Skin N"
+    )
     skinned.add_argument(
         "--from",
         dest="source",
@@ -340,7 +359,7 @@ def parser() -> argparse.ArgumentParser:
         help="the skin a copy or an upscale is made from",
     )
     skinned.add_argument(
-        "--new", help="the new name, for rename; a rename of 'new' saves New Skin"
+        "--new", help="the new name, for rename"
     )
     skinned.add_argument("--asset", help="the texture, for set")
     skinned.add_argument("--variant", help="the variant id, for set")
@@ -351,9 +370,10 @@ def parser() -> argparse.ArgumentParser:
     )
     skinned.add_argument("--model", choices=sorted(variants.MODELS), help="for upscale")
     skinned.add_argument(
-        "--size",
+        "--factor",
         type=int,
-        help="for upscale; a texture that cannot have it keeps its variant, with the reason",
+        choices=variants.FACTORS,
+        help="for upscale: times each input's side; a texture that cannot have it keeps its variant, with the reason",
     )
     skinned.add_argument(
         "--defer",
@@ -384,14 +404,14 @@ def parser() -> argparse.ArgumentParser:
 
 def _check(args: argparse.Namespace) -> None:
     if args.command == "skin":
-        if args.action != "list" and args.name is None:
+        if args.action not in ("list", "copy", "upscale") and args.name is None:
             raise UsageError(f"skin {args.action} takes --name")
         if args.action == "rename" and args.new is None:
             raise UsageError("skin rename takes --new")
         if args.action == "set" and args.asset is None:
             raise UsageError("skin set takes --asset")
-        if args.action == "upscale" and (args.model is None or args.size is None):
-            raise UsageError("skin upscale takes --model and --size")
+        if args.action == "upscale" and (args.model is None or args.factor is None):
+            raise UsageError("skin upscale takes --model and --factor")
     if args.command == "edit":
         opening = args.action == "open"
         if opening and (args.asset is None or args.session is not None):

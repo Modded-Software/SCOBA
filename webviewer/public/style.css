@@ -89,7 +89,16 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 #scene .head { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 #scene .head .icon { width: 22px; height: 22px; }
 #scene .head .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#scene .remove { width: 20px; height: 20px; padding: 0; }
+#scene .remove { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; }
+#scene .swatch-button { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 6px; font-size: 11px; color: var(--dim); background: var(--bg); }
+#scene .swatch-button:hover { color: var(--text); }
+#scene .swatch-button::after { content: '\25BE'; margin-left: 2px; }
+#scene li.selected .swatch-button { background: var(--panel); }
+.swatch-list { font-size: 11px; }
+.swatch-entry { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: var(--radius); cursor: pointer; white-space: nowrap; }
+.swatch-entry:hover { background: var(--raised); }
+.swatch-entry.selected { background: var(--accent-bg); }
+.swatch { flex: none; width: 10px; height: 10px; border: 1px solid var(--line); border-radius: 2px; }
 #scene .row { display: flex; gap: 4px; margin-top: 4px; align-items: center; }
 #scene .row label { display: flex; align-items: center; gap: 3px; color: var(--dim); font-size: 11px; }
 #scene .row input, #scene .row select { height: 22px; font-size: 11px; background: var(--bg); }
@@ -102,6 +111,9 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 /* ---- view tools: top right of the view ---- */
 #view-tools { position: fixed; top: 8px; right: 8px; display: flex; gap: 2px; padding: 3px; background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: calc(var(--radius) + 3px); }
 #view-tools button { padding: 0 10px; }
+#controls-window .window-body { flex-direction: column; gap: 8px; padding: 8px; overflow-y: auto; }
+#controls-window #controls-reset { align-self: flex-start; }
+#controls-button { position: fixed; right: 8px; bottom: 8px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: calc(var(--radius) + 3px); }
 #landmarks-button { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 #landmarks-button::after { content: ' \25BE'; }
 #landmarks-list .go { flex: 1; text-align: left; }

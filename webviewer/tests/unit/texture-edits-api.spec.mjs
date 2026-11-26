@@ -90,8 +90,8 @@ test('a session is opened with a base per plane and a scratch of one group per p
   expect((await request.post(editUrl(DATASET), { data: {} })).status()).toBe(405);
   expect((await request.post(hostUrl(session.session, '/scratch'), { data: {} })).status()).toBe(405);
   expect((await request.get(hostUrl(session.session, ''))).status()).toBe(400);
-  // Negative: a game without a texture service has no edit route.
-  expect((await request.get('/api/ghost/textures/edit?dataset=build')).status()).toBe(404);
+  // Negative: a game the server does not have has no edit route.
+  expect((await request.get('/api/nogame/textures/edit?dataset=build')).status()).toBe(404);
 });
 
 test('a PUT writes the scratch and answers; a scratch written again with the same planes stays unchanged; a bad id and a body past the bound change no file', async ({ request, worker }) => {

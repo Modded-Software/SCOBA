@@ -1,7 +1,7 @@
 From d3202b501c8fb2c78cfbcbf631bfebd63d01feb2 Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 15:33:18 +0200
-Subject: [PATCH 20/57] m3: count layer binds
+Subject: [PATCH 20/59] m3: count layer binds
 
 Layer.binds counts draws that bound the layer, so an inspector can tell a drawn layer's uvTransform from the default of one no batch draws.
 ---

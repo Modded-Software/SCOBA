@@ -16,6 +16,7 @@ size. A transfer makes it; no request does.
 
 from __future__ import annotations
 
+import os
 import re
 from typing import NamedTuple
 
@@ -25,7 +26,12 @@ from .store import kept_sizes
 ORIGINAL = "original"
 JOIN = "+"
 AT = "@"
-SIZES = (1024, 2048, 4096)
+# A request names how much larger than its input a variant is: 2x or 4x of the
+# input's longest side, at most the largest side (operator 2026-11-26).
+FACTORS = (2, 4)
+# The setting of the largest side, and the values it may take; unset: MAX_OUTPUT.
+MAX_SIDE_ENV = "TEXTURE_MAX_SIDE"
+MAX_SIDES = (1024, 2048, 4096)
 SCALE = 4
 MAX_INPUT = 2048  # per side, of what the upscaler takes
 MAX_OUTPUT = 4096  # per side, of what a step keeps
@@ -151,12 +157,16 @@ def variant_id(recipe: str, size: int) -> str:
     return f"{recipe}{AT}{size}"
 
 
-def join(input_variant: str, model: str, size: int) -> str:
-    """The id of what `model` makes of `input_variant`, at `size`."""
+def extended(input_variant: str, model: str) -> str:
+    """The recipe of what `model` makes of `input_variant`."""
     _model(model, model)
     split(input_variant)  # refuses what is no variant
-    recipe = model if input_variant == ORIGINAL else f"{input_variant}{JOIN}{model}"
-    return variant_id(recipe, size)
+    return model if input_variant == ORIGINAL else f"{input_variant}{JOIN}{model}"
+
+
+def join(input_variant: str, model: str, size: int) -> str:
+    """The id of what `model` makes of `input_variant`, at `size`."""
+    return variant_id(extended(input_variant, model), size)
 
 
 def edited(input_variant: str, digest: str, size: int) -> str:
@@ -200,11 +210,48 @@ def after(longest: int, colour: bool) -> int:
     return fitted(fitted(longest, MAX_INPUT) * SCALE, MAX_OUTPUT)
 
 
-def own_size(steps: tuple[Step, ...], longest: int) -> int:
-    """The own longest side of a recipe made from an original with that longest side. An edit keeps its input's side."""
+def input_side(steps: tuple[Step, ...], longest: int) -> int:
+    """The longest side the last step of a recipe takes, made from an original with that longest side."""
     for step in steps[:-1]:
         longest = longest if step.edit else min(after(longest, True), step.size or 0)
+    return longest
+
+
+def own_size(steps: tuple[Step, ...], longest: int) -> int:
+    """The own longest side of a recipe made from an original with that longest side. An edit keeps its input's side."""
+    longest = input_side(steps, longest)
     return longest if steps[-1].edit else after(longest, True)
+
+
+def max_side() -> int:
+    """The largest side a request may ask for: the setting TEXTURE_MAX_SIDE, read now; unset, MAX_OUTPUT."""
+    named = os.environ.get(MAX_SIDE_ENV, "")
+    if not named:
+        return MAX_OUTPUT
+    if not named.isdigit() or int(named) not in MAX_SIDES:
+        raise VariantError(
+            f"{MAX_SIDE_ENV} is {named!r}; it is one of {', '.join(map(str, MAX_SIDES))}"
+        )
+    return int(named)
+
+
+def factor_side(recipe: str, factor: int, longest: int, cap: int) -> tuple[int, str]:
+    """The side `factor` times the input of the recipe's last step gives, at most `cap`; and why it cannot be had (empty: it can).
+
+    `longest`: the original's longest side. The side is also at most what
+    the recipe makes (`own_size`).
+    """
+    if factor not in FACTORS:
+        return 0, f"{factor}x is no factor; a request is {' or '.join(f'{one}x' for one in FACTORS)}"
+    steps = parse_recipe(recipe)
+    given = input_side(steps, longest)
+    side = min(given * factor, cap, own_size(steps, longest))
+    if side <= given:
+        return side, (
+            f"{factor}x of a side of {given} gives {side} here (the largest side is {cap}); "
+            "that adds nothing"
+        )
+    return side, size_refusal(recipe, side, longest)
 
 
 def sizes_of(step: Step, own: int) -> tuple[int, ...]:

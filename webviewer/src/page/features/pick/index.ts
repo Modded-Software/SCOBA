@@ -16,27 +16,32 @@
 // - right click on a unit: the animation menu (menu.ts); Ctrl+L switches its "loop" choice;
 // - double-click on a unit: what its game opens for it (openItem).
 // A press is a click until core/press.ts says it is a drag (2 px and 150 ms, or 12 px at once, R-VIEW-142).
+// The buttons, modifiers and keys above are the input map's defaults
+// (core/input.ts, R-VIEW-154); the double click is the browser's.
 
 import type { Feature } from '../../core/context';
 import { radius } from '../../core/geometry';
+import { bindingText, clickAction, keyMatches, pressAction, resolveInput, type ClickAction, type InputMap } from '../../core/input';
 import { dragsAt, pressAt, type Press } from '../../core/press';
+import { settings } from '../../core/settings';
 import type { Ring } from '../../core/render/ground';
 import type { Item, PickState, Vec2 } from '../../core/types';
 import { createMenu } from './menu';
 
 const SELECT_RING: Pick<Ring, 'width' | 'color'> = { width: 0.07, color: [0.2, 1.0, 0.25] };
 const HOVER_RING: Pick<Ring, 'width' | 'color'> = { width: 0.035, color: [0.75, 1.0, 0.75] };
-const BUTTON = { left: 0, right: 2 };
 
 export const pickFeature: Feature = {
   id: 'pick',
   install(context) {
-    const { render, scene, selection, games, status, events, testApi } = context;
+    const { render, scene, selection, games, status, events, testApi, store } = context;
     const { canvas, ground } = render;
     const { items } = scene;
+    const inputMap = (): InputMap => resolveInput(store.read(settings.input));
 
     let mouse: Vec2 | null = null; // last [clientX, clientY] over the canvas
-    let press: { button: number; at: Press; ctrl: boolean; shift: boolean } | null = null;
+    /** `click`: what the press is if it stays a click, decided at the press. */
+    let press: { button: number; at: Press; click: ClickAction | null } | null = null;
 
     const byId = (id: number | null): Item | null => items.find((item) => item.id === id) ?? null;
     const ring = (item: Item | null, look: Pick<Ring, 'width' | 'color'>): Ring | null => (item ? { x: item.x, y: item.y, radius: radius(item), ...look } : null);
@@ -83,27 +88,27 @@ export const pickFeature: Feature = {
       mouse = null;
     });
     canvas.addEventListener('mousedown', (e) => {
-      press = { button: e.button, at: pressAt(e), ctrl: e.ctrlKey, shift: e.shiftKey };
+      const map = inputMap();
+      // A turn of the selection is a hold: it keeps the selection, and is no click.
+      const turns = pressAction(map, e, { onUnit: false, selected: selection.hasSelection() }) === 'face';
+      press = { button: e.button, at: pressAt(e, map.rates), click: turns ? null : clickAction(map, e) };
     });
     window.addEventListener('mousemove', (e) => {
       if (press) dragsAt(press.at, e);
     });
+    window.addEventListener('blur', () => {
+      press = null;
+    });
     window.addEventListener('mouseup', (e) => {
       const p = press;
       press = null;
-      if (!p || p.at.dragging || p.button !== e.button) return;
-      if (p.button === BUTTON.left) {
-        // Ctrl + left with a selection turns the unit; it keeps the selection.
-        if (p.ctrl && selection.selectedId() !== null) return;
-        const item = selection.itemAt(e.clientX, e.clientY);
-        // Shift: add the unit or take it out; on the ground, keep the selection.
-        if (p.shift) {
-          if (item) selection.toggleSelected(item.id);
-        } else selection.select(item ? item.id : null);
-      } else if (p.button === BUTTON.right) {
-        const item = selection.itemAt(e.clientX, e.clientY);
-        if (item) menu.open(item, e.clientX, e.clientY);
-      }
+      if (!p || p.at.dragging || p.button !== e.button || p.click === null) return;
+      const item = selection.itemAt(e.clientX, e.clientY);
+      // addSelect: add the unit or take it out; on the ground, keep the selection.
+      if (p.click === 'addSelect') {
+        if (item) selection.toggleSelected(item.id);
+      } else if (p.click === 'select') selection.select(item ? item.id : null);
+      else if (item) menu.open(item, e.clientX, e.clientY);
     });
     // A double-click on an instance opens what its game shows for it (SC2: the texture window).
     canvas.addEventListener('dblclick', (e) => {
@@ -114,14 +119,15 @@ export const pickFeature: Feature = {
     // ---- keys ----
 
     window.addEventListener('keydown', (e) => {
-      if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.key.toLowerCase() !== 'l') return;
-      // The viewer owns Ctrl+L everywhere on the page: the browser's address bar
+      const loop = inputMap().keys.loop;
+      if (!keyMatches(loop, e)) return;
+      // The viewer owns Ctrl+L (the loop key) everywhere on the page: the browser's address bar
       // never opens, with or without a selection, in a text field too (operator 2026-11-22).
       e.preventDefault();
       // A field being edited: the key is consumed and does nothing.
       if (selection.editingText(e.target)) return;
       if (!selection.hasSelection()) {
-        status.setStatus('Ctrl+L: select an instance first');
+        status.setStatus(`${bindingText(loop)}: select an instance first`);
         return;
       }
       status.setStatus(`loop ${menu.toggleLoop() ? 'on' : 'off'}`);

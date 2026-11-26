@@ -19,6 +19,22 @@ export async function open(page) {
  */
 export const FOREIGN_CLIP = /clips left out: .*deathblown \(nova_death_byZergling\.nad\): clip deathblown: track \d+ names bone 32; the model has 32/;
 
+/** The one dataset, and the crate: one material, one texture file (SPEC-VIEWER-GHOST 9). */
+export const DATASET = 'build';
+export const CRATE = '3D/Models/crate.nod';
+export const CRATE_OWNER = 'model:3d\\models\\crate.nod';
+export const CRATE_TEXTURE = '3d\\materials\\chestcrate2.dds';
+/** Why Ghost bakes nothing (R-HD-154, R-VIEW-151). */
+export const NO_BAKE = 'baking is not enabled for StarCraft: Ghost';
+
+const query = (more = {}) => new URLSearchParams({ dataset: DATASET, ...more });
+/** POST one texture route of Ghost (SPEC-VIEWER 17.2). */
+export const texturePost = (request, route, data) => request.post(`/api/ghost/textures/${route}?${query()}`, { data });
+/** The state of one Ghost texture, with the head. */
+export const textureBody = async (request, asset) => (await request.get(`/api/ghost/textures?${query({ asset })}`)).json();
+/** One Ghost owner, or null. */
+export const ownerLookup = async (request, owner) => (await (await request.get(`/api/ghost/textures/owner?${query({ owner })}`)).json()).owner;
+
 export const add = (page, path, x = 0) => page.evaluate(([p, at]) => window.scobaeditor.add(p, { game: 'ghost', x: at, y: 0, rot: 0 }), [path, x]);
 export const addRecord = (page, category, id, x = 0) => page.evaluate(([c, i, at]) => window.scobaeditor.addRecord(c, i, { game: 'ghost', x: at, y: 0, rot: 0 }), [category, id, x]);
 export const probe = (page, name, ...args) => page.evaluate(([n, a]) => window.scobaeditor.probe('nod', n, ...a), [name, args]);

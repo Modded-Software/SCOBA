@@ -1,7 +1,7 @@
 From a1e39c29444067ca7464ed20f19103dce97a878f Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 13:58:38 +0200
-Subject: [PATCH 11/57] m3: composite materials draw their standard sections;
+Subject: [PATCH 11/59] m3: composite materials draw their standard sections;
  undrawn material types are listed
 
 ---

@@ -4,7 +4,7 @@ import { cleanOwner, menu, openPage, ownerOf, place, shown, skinChoices, viewSta
 // The skins of the instances (SPEC-VIEWER 17.4, src/page/core/skins.ts): an
 // instance shows one skin of its owner. Original names nothing: it shows the
 // game's textures (R-HD-131). A skin names a variant per texture. The menu's
-// skin list chooses it: Original, the saved skins and New Skin with edit and
+// skin list chooses it: Original, then the owner's skins with edit and
 // trash, then "Add New Skin…" (R-VIEW-126). The choice has a skin icon
 // and an arrow (R-VIEW-137). Ctrl+L switches the menu's "loop". The
 // tests' store is fresh each run; the Zergling's owner never gets a skin.
@@ -12,13 +12,13 @@ import { cleanOwner, menu, openPage, ownerOf, place, shown, skinChoices, viewSta
 const ADD = { name: '', label: 'Add New Skin…', icons: [] };
 const ORIGINAL_ROW = { name: 'original', label: 'Original', icons: [] };
 /** The menu's skin state on Original with nothing baked: Unbake is there and disabled. */
-const onOriginal = (choices, rows) => ({ value: 'original', label: 'Original', dropdown: true, choices, rows: [...rows, ADD], bake: 'Unbake Skin', bakeDisabled: true, badge: null });
+const onOriginal = (choices, rows) => ({ value: 'original', label: 'Original', dropdown: true, choices, missing: '', rows: [...rows, ADD], bake: 'Unbake Skin', bakeDisabled: true, bakeTitle: 'nothing is baked', upscaleDisabled: false, upscaleTitle: 'Make the next New Skin N: every texture of this owner by one model at one size', badge: null });
 
 const selectRow = (page, id) => page.locator(`#scene li[data-id="${id}"] .head .name`).click();
 
 test('negative: an owner with no skin offers Original alone and shows its own textures', async ({ page, request }) => {
   const clean = await cleanOwner(request, 'scoba', 'unit:Zergling');
-  // Negative: nothing is baked, so no New Skin is offered (R-HD-137).
+  // Negative: no skin is offered that was not made (R-HD-137).
   expect(clean.skins).toEqual([]);
   const errors = await openPage(page);
   const zergling = await place(page, 'Zergling');

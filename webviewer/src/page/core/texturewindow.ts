@@ -5,7 +5,8 @@
 // their states and compares the variants (R-VIEW-101). Its Upscale Texture
 // tile is the event "texture-upscale", its Save to Skin… the event
 // "texture-save" (R-VIEW-133), a variant's trash the event "texture-remove"
-// (R-VIEW-147); a change made in the main page
+// (R-VIEW-147), its Rename Skin… the event "texture-rename" (R-VIEW-156);
+// a change made in the main page
 // ("textures-changed") makes it read the states and the owner again. The
 // owner tells the page what the game shows (In game, R-VIEW-131).
 
@@ -24,6 +25,9 @@ const MARGIN = 16;
 const TOP = 48; // below the view tools
 // The first size; a smaller page gives a smaller window (SPEC-VIEWER 17.3).
 const SIZE = [1100, 760] as const;
+
+/** The window's title: the thing, and the skin its instance shows. */
+const titleOf = (name: string, skin: string | null): string => `textures · ${name}${skin === null ? '' : ` · ${skinLabel(skin)}`}`;
 
 /** The page of the window, served by the server's core. */
 export const TEXTURE_PAGE = '/texture-viewer.html';
@@ -71,9 +75,9 @@ interface PageEdits {
 
 /** What the texture viewer page offers the window. */
 interface TexturePage {
-  show(request: { user: string; game: string; dataset: string; service: boolean; owner: PageOwner | null; textures: ShownTexture[]; failed: string[]; changed(): void; upscale?(asset: string): void; remove?(asset: string, variant: string): Promise<boolean>; save?(picks: { asset: string; variant: string }[]): Promise<string | null>; edit?: PageEdits }): Promise<void>;
-  /** Read the states again: the main page changed textures; `owner` as it is now. */
-  refresh(owner: PageOwner | null): Promise<void>;
+  show(request: { user: string; game: string; dataset: string; service: boolean; owner: PageOwner | null; skin: string | null; textures: ShownTexture[]; failed: string[]; changed(): void; upscale?(asset: string): void; remove?(asset: string, variant: string): Promise<boolean>; save?(picks: { asset: string; variant: string }[]): Promise<string | null>; rename?(): Promise<string | null>; edit?: PageEdits }): Promise<void>;
+  /** Read the states again: the main page changed textures or the instance's skin; `owner` and `skin` as they are now. */
+  refresh(owner: PageOwner | null, skin: string | null): Promise<void>;
   /** The dataset's edit sessions, as the main page read them now. */
   edits(sessions: readonly EditSession[]): void;
 }
@@ -111,7 +115,7 @@ function pageOf(frame: HTMLIFrameElement): TexturePage {
   if (typeof show !== 'function' || typeof refresh !== 'function' || typeof edits !== 'function') throw new Error('the texture viewer page has no hdtex.show, hdtex.refresh or hdtex.edits');
   return {
     show: (request) => Promise.resolve(Reflect.apply(show, hdtex, [request])),
-    refresh: (owner) => Promise.resolve(Reflect.apply(refresh, hdtex, [owner])),
+    refresh: (owner, skin) => Promise.resolve(Reflect.apply(refresh, hdtex, [owner, skin])),
     // The page's edits() answers nothing: it takes the sessions and draws.
     edits: (sessions) => {
       Reflect.apply(edits, hdtex, [sessions]);
@@ -137,7 +141,7 @@ export function createTextureWindow(ui: Pick<UiService, 'floatingWindow'>, rende
     });
   });
   /** `edit`: its page has the edit controls. */
-  let shown: { user: string; file: string; dataset: string; game: string; item: number | null; owner: string | null; edit: boolean } | null = null;
+  let shown: { user: string; file: string; dataset: string; game: string; item: number | null; owner: string | null; skin: string | null; name: string; edit: boolean } | null = null;
   /** Counts the opens, so a slow read for an earlier one is dropped. */
   let turn = 0;
   let urls: string[] = [];
@@ -157,12 +161,15 @@ export function createTextureWindow(ui: Pick<UiService, 'floatingWindow'>, rende
 
   async function open(request: TextureRequest): Promise<void> {
     const skin = request.skin ?? null;
-    win.title.textContent = `textures · ${request.name}${skin === null ? '' : ` · ${skinLabel(skin)}`}`;
+    win.title.textContent = titleOf(request.name, skin);
     win.open(firstPlace());
-    // The same textures again: the window shows them already, or is reading them.
-    if (shown && shown.user === request.user && shown.file === request.file && shown.dataset === request.dataset && shown.item === (request.item ?? null) && !originals.startsWith('failed')) return;
+    // The same textures again: the window shows them already, or is reading them. The skin is the one shown now.
+    if (shown && shown.user === request.user && shown.file === request.file && shown.dataset === request.dataset && shown.item === (request.item ?? null) && !originals.startsWith('failed')) {
+      if (shown.skin !== skin) skinShown(shown, skin);
+      return;
+    }
     const owner = request.service ? (request.owner ?? null) : null;
-    const now = { user: request.user, file: request.file, dataset: request.dataset, game: request.game, item: request.item ?? null, owner, edit: false };
+    const now = { user: request.user, file: request.file, dataset: request.dataset, game: request.game, item: request.item ?? null, owner, skin, name: request.name, edit: false };
     shown = now;
     const mine = ++turn;
     for (const url of urls) URL.revokeObjectURL(url);
@@ -192,7 +199,26 @@ export function createTextureWindow(ui: Pick<UiService, 'floatingWindow'>, rende
         new Promise((done, fail) => {
           events.emit('texture-remove', { game: request.game, dataset: request.dataset, asset, variant, done: (removed) => (removed instanceof Error ? fail(removed) : done(removed)) });
         });
-      await pageOf(frame).show({ user: request.user, game: request.game, dataset: request.dataset, service: request.service, owner: ownerState, textures: found.textures, failed: found.failed, changed, ...(request.service ? { upscale, remove } : {}), ...(ownerState ? { save } : {}), ...(editable ? { edit } : {}) });
+      // Rename Skin…: the main page asks the new name of the skin the instance shows (R-VIEW-156); the title follows.
+      const item = request.item ?? null;
+      const rename = (): Promise<string | null> =>
+        new Promise((done, fail) => {
+          if (item === null) {
+            done(null);
+            return;
+          }
+          events.emit('texture-rename', {
+            item,
+            done: (renamed) => {
+              if (renamed instanceof Error) fail(renamed);
+              else {
+                if (renamed !== null && shown === now) skinShown(now, renamed);
+                done(renamed);
+              }
+            },
+          });
+        });
+      await pageOf(frame).show({ user: request.user, game: request.game, dataset: request.dataset, service: request.service, owner: ownerState, skin: now.skin, textures: found.textures, failed: found.failed, changed, ...(request.service ? { upscale, remove } : {}), ...(ownerState ? { save } : {}), ...(ownerState && item !== null ? { rename } : {}), ...(editable ? { edit } : {}) });
       now.edit = editable;
       originals = 'done';
     } catch (error) {
@@ -201,13 +227,28 @@ export function createTextureWindow(ui: Pick<UiService, 'floatingWindow'>, rende
     }
   }
 
+  /** Read the owner again and hand it to the page with the skin shown now. */
+  function reread(mine: NonNullable<typeof shown>): void {
+    readOwner(mine.game, mine.dataset, mine.owner)
+      .then((owner) => (shown === mine ? pageOf(frame).refresh(owner, mine.skin) : undefined))
+      .catch((error: unknown) => console.error(`the texture window was not read again: ${messageOf(error)}`));
+  }
+
+  /** The instance of the window shows another skin: the title names it, and the page counts its picks against it (R-VIEW-133). */
+  function skinShown(mine: NonNullable<typeof shown>, skin: string | null): void {
+    mine.skin = skin;
+    win.title.textContent = titleOf(mine.name, skin);
+    if (originals === 'done') reread(mine);
+  }
+
   // A change made in the main page (the upscale dialog, a bake) shows in the open window.
   events.on('textures-changed', ({ game, dataset }) => {
     if (!win.isOpen || originals !== 'done' || !shown || shown.dataset !== dataset || shown.game !== game) return;
-    const mine = shown;
-    readOwner(game, dataset, mine.owner)
-      .then((owner) => (shown === mine ? pageOf(frame).refresh(owner) : undefined))
-      .catch((error: unknown) => console.error(`the texture window was not read again: ${messageOf(error)}`));
+    reread(shown);
+  });
+  events.on('skin-set', ({ item }) => {
+    if (!win.isOpen || !shown || shown.item !== item.id || shown.skin === item.skin) return;
+    skinShown(shown, item.skin);
   });
 
   const editing = (): { game: string; dataset: string } | null => (win.isOpen && originals === 'done' && shown?.edit ? { game: shown.game, dataset: shown.dataset } : null);

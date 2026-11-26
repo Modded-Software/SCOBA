@@ -30,7 +30,7 @@ class RepeatRunner:
     def output(self, plane: Path, folder: Path) -> Path:
         return folder / f"{plane.stem}_{SCALE}x.png"
 
-    def submit(self, plane: Path, folder: Path, model: str) -> str:
+    def submit(self, plane: Path, folder: Path, model: str, tiles: bool) -> str:
         output = self.output(plane, folder)
         output.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(plane) as image:

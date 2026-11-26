@@ -2,16 +2,18 @@
 // animations, the playing one marked. A click plays one once, then the
 // unit goes back to its own animation; with "loop" checked it becomes the
 // unit's own and loops. An instance whose owner has textures has the skin
-// row (SPEC-VIEWER 17.4, core/skins.ts). The menu stays open until Escape
-// or a click elsewhere. A drag on its title moves it (R-VIEW-138).
+// row (SPEC-VIEWER 17.4, core/skins.ts). The menu stays open until Escape,
+// a click elsewhere, a window that opens, or a click in a window's frame
+// (R-VIEW-157). A drag on its title moves it (R-VIEW-138).
 
-import { NEW_SKIN, ORIGINAL_SKIN, skinLabel } from '../../../shared/textures';
+import { ORIGINAL_SKIN, skinLabel } from '../../../shared/textures';
 import type { SceneService, StatusService } from '../../core/context';
 import type { Skins } from '../../core/skins';
 import type { Item, MenuState } from '../../core/types';
 import { find, make } from '../../core/dom';
 import { ConfirmDialog } from '../../ui/components/dialog';
 import { draggable } from '../../ui/components/drag';
+import { WINDOW_OPENED } from '../../ui/components/floatingwindow';
 import { Dropdown } from '../../ui/components/dropdown';
 import { PENCIL, SKIN, TRASH } from '../../ui/icons';
 
@@ -30,7 +32,7 @@ export interface AnimMenu {
 
 export interface MenuDeps {
   readonly scene: SceneService;
-  readonly skins: Pick<Skins, 'choices' | 'set' | 'owner' | 'bake' | 'tools'>;
+  readonly skins: Pick<Skins, 'choices' | 'set' | 'owner' | 'bake' | 'bakeRefusal' | 'tools'>;
   readonly status: StatusService;
 }
 
@@ -40,12 +42,38 @@ const bakeText = (item: Item): string => (item.skin === ORIGINAL_SKIN ? 'Unbake 
 /** The icons of a row of the skin list: Original has none (R-VIEW-126). */
 const iconsOf = (name: string): ('edit' | 'trash')[] => (name === ORIGINAL_SKIN ? [] : ['edit', 'trash']);
 
+/** Why the item's skin cannot be acted on: its owner does not have it (SPEC-VIEWER 17.4); empty: it has it. */
+const missingWhy = (skins: MenuDeps['skins'], item: Item): string =>
+  item.missingSkin ? `${skins.owner(item)?.owner ?? 'the owner'} has no skin "${item.skin}"; choose another skin` : '';
+
 /** Why the bake button cannot be used now; empty: it can (R-VIEW-127). */
 function bakeBlock(skins: MenuDeps['skins'], item: Item): string {
-  if (item.skin === NEW_SKIN) return 'New Skin is not saved: save it first, then bake it';
+  // A game that bakes nothing: shown, disabled, with its reason (R-VIEW-151).
+  const refused = skins.bakeRefusal(item);
+  if (refused) return refused;
+  const missing = missingWhy(skins, item);
+  if (missing) return missing;
   if (item.skin === ORIGINAL_SKIN && !skins.owner(item)?.bake) return 'nothing is baked';
   return '';
 }
+
+/** Show the chosen skin on the list's button: a missing one in red, said so. */
+function showChoice(label: HTMLElement, skins: MenuDeps['skins'], item: Item): void {
+  const missing = missingWhy(skins, item);
+  label.textContent = `${skinLabel(item.skin)}${missing ? ' (missing)' : ''}`;
+  label.classList.toggle('missing', missing !== '');
+  label.title = missing;
+}
+
+/** Show a button that acts on the item's skin (Upscale Skin, Add New Skin…): disabled while the skin is missing. */
+function showSkinAction(button: HTMLButtonElement, skins: MenuDeps['skins'], item: Item, title: string): void {
+  const missing = missingWhy(skins, item);
+  button.disabled = missing !== '';
+  button.title = missing || title;
+}
+
+const UPSCALE_TITLE = 'Make the next New Skin N: every texture of this owner by one model at one size';
+const ADD_TITLE = 'Make the next New Skin N from this skin, show it, and open the texture window on it';
 
 /** Show the bake button as it is now. */
 function showBakeButton(button: HTMLButtonElement, skins: MenuDeps['skins'], item: Item): void {
@@ -89,14 +117,16 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
    * press outside the menu). The wheel and Up/Down on the button choose the skin before or after (16.14).
    */
   function skinList(item: Item, chosen: () => void): HTMLElement {
-    const label = make('span', { className: 'skin-label', textContent: skinLabel(item.skin) });
+    const label = make('span', { className: 'skin-label' });
+    showChoice(label, skins, item);
     const button = make('button', { type: 'button', className: 'skin-choice', title: 'Choose the skin this instance shows; it changes no other instance and no bake' }, [make('span', { className: 'skin-icon', innerHTML: SKIN }), label]);
     const list = make('ul', { className: 'skin-list', hidden: true });
     const root = make('div', { className: 'skin-choose' }, [button, list]);
     const tools = (): ReturnType<MenuDeps['skins']['tools']> => skins.tools();
     /** Show the instance's skin: the button's label, the marked row, the menu's bake controls. */
     const shown = (): void => {
-      label.textContent = skinLabel(item.skin);
+      showChoice(label, skins, item);
+      showSkinAction(add, skins, item, ADD_TITLE);
       if (dropdown.isOpen) fill();
       chosen();
     };
@@ -118,9 +148,18 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
         },
       },
     });
+    /** The row of a skin the instance names and its owner does not have: red, disabled, with the reason. */
+    function missingRow(): HTMLElement[] {
+      const why = missingWhy(skins, item);
+      if (!why) return [];
+      const pick = make('button', { type: 'button', className: 'skin-pick chosen missing', textContent: `${skinLabel(item.skin)} (missing)`, title: why, disabled: true });
+      const row = make('li', { className: 'skin-missing-row' }, [pick]);
+      row.dataset['skin'] = item.skin;
+      return [row];
+    }
     function rows(): HTMLElement[] {
       const baked = bakedSkin(skins, item);
-      return skins.choices(item).map((name) => {
+      return [...missingRow(), ...skins.choices(item).map((name) => {
         const pick = make('button', { type: 'button', className: `skin-pick${name === item.skin ? ' chosen' : ''}`, textContent: skinLabel(name) });
         // The list stays open (R-VIEW-139).
         pick.addEventListener('click', () => choose(name));
@@ -135,7 +174,7 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
         }
         if (iconsOf(name).includes('trash')) {
           // Red (R-VIEW-136); the baked skin cannot be deleted (R-HD-136).
-          const trash = make('button', { type: 'button', className: 'skin-trash trash', innerHTML: TRASH, title: name === NEW_SKIN ? 'Discard New Skin' : `Delete Skin "${name}"` });
+          const trash = make('button', { type: 'button', className: 'skin-trash trash', innerHTML: TRASH, title: `Delete Skin "${name}"` });
           if (name === baked) {
             trash.disabled = true;
             trash.title = 'baked: unbake it or bake another skin first';
@@ -152,12 +191,13 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
         const row = make('li', {}, [pick, ...icons]);
         row.dataset['skin'] = name;
         return row;
-      });
+      })];
     }
-    const add = make('button', { type: 'button', className: 'skin-add', textContent: 'Add New Skin…', title: 'Open the texture window; Save to Skin… there makes New Skin' });
+    const add = make('button', { type: 'button', className: 'skin-add', textContent: 'Add New Skin…' });
+    showSkinAction(add, skins, item, ADD_TITLE);
     add.addEventListener('click', () => {
       dropdown.close();
-      tools()?.edit(item, NEW_SKIN);
+      tools()?.create(item);
     });
     function fill(): void {
       list.replaceChildren(...rows(), make('li', { className: 'skin-add-row' }, [add]));
@@ -171,7 +211,8 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
 
   function skinRow(item: Item): HTMLElement[] {
     if (!skins.choices(item).length) return [];
-    const upscale = make('button', { type: 'button', className: 'skin-upscale', textContent: 'Upscale Skin', title: 'Make New Skin: every texture of this owner by one model at one size' });
+    const upscale = make('button', { type: 'button', className: 'skin-upscale', textContent: 'Upscale Skin' });
+    showSkinAction(upscale, skins, item, UPSCALE_TITLE);
     upscale.addEventListener('click', () => skins.tools()?.upscale(item));
     const bakeButton = make('button', { type: 'button', className: 'skin-bake' });
     showBakeButton(bakeButton, skins, item);
@@ -185,7 +226,10 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
         })
         .catch(status.reportFailure),
     );
-    const list = skinList(item, () => showBakeButton(bakeButton, skins, item));
+    const list = skinList(item, () => {
+      showBakeButton(bakeButton, skins, item);
+      showSkinAction(upscale, skins, item, UPSCALE_TITLE);
+    });
     return [make('div', { className: 'skin-row' }, [list, upscale, bakeButton, badge])];
   }
   let menu: { node: HTMLElement; itemId: number } | null = null;
@@ -250,7 +294,11 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
     const loop = find(menu.node, 'input.loop', HTMLInputElement);
     if (loop) loop.checked = loopChoice;
     const choice = find(menu.node, 'button.skin-choice .skin-label', HTMLSpanElement);
-    if (choice) choice.textContent = skinLabel(item.skin);
+    if (choice) showChoice(choice, skins, item);
+    const upscale = find(menu.node, 'button.skin-upscale', HTMLButtonElement);
+    if (upscale) showSkinAction(upscale, skins, item, UPSCALE_TITLE);
+    const add = find(menu.node, 'button.skin-add', HTMLButtonElement);
+    if (add) showSkinAction(add, skins, item, ADD_TITLE);
     const button = find(menu.node, 'button.skin-bake', HTMLButtonElement);
     if (button) showBakeButton(button, skins, item);
     const badge = find(menu.node, 'span.skin-baked', HTMLSpanElement);
@@ -274,6 +322,12 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
     },
     true,
   );
+  // Another window opens (R-VIEW-157): ui/components/floatingwindow.ts sends it.
+  window.addEventListener(WINDOW_OPENED, close);
+  // A press inside a window's frame never reaches this page; the focus going into the frame says it.
+  window.addEventListener('blur', () => {
+    if (menu && document.activeElement instanceof HTMLIFrameElement) close();
+  });
 
   function state(): MenuState | null {
     if (!menu) return null;
@@ -283,6 +337,7 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
     const badge = find(node, 'span.skin-baked', HTMLSpanElement);
     const names = item && button ? skins.choices(item) : [];
     const choice = find(node, 'button.skin-choice', HTMLButtonElement);
+    const upscale = find(node, 'button.skin-upscale', HTMLButtonElement);
     return {
       item: menu.itemId,
       entries: entryButtons(node).map((b) => b.textContent),
@@ -297,9 +352,17 @@ export function createMenu({ scene, skins, status }: MenuDeps, byId: (id: number
               // The choice holds a skin icon (R-VIEW-137). Its arrow and look are an operator check.
               dropdown: Boolean(choice?.querySelector('.skin-icon svg')),
               choices: names,
-              rows: [...names.map((name) => ({ name, label: skinLabel(name), icons: iconsOf(name) })), { name: '', label: 'Add New Skin…', icons: [] }],
+              missing: missingWhy(skins, item),
+              rows: [
+                ...(item.missingSkin ? [{ name: item.skin, label: `${skinLabel(item.skin)} (missing)`, icons: [] }] : []),
+                ...names.map((name) => ({ name, label: skinLabel(name), icons: iconsOf(name) })),
+                { name: '', label: 'Add New Skin…', icons: [] },
+              ],
               bake: button.textContent,
               bakeDisabled: button.disabled,
+              bakeTitle: button.title,
+              upscaleDisabled: upscale?.disabled ?? true,
+              upscaleTitle: upscale?.title ?? '',
               badge: badge && !badge.hidden ? badge.textContent : null,
             }
           : null,

@@ -11,7 +11,7 @@ import logging
 import time
 from pathlib import Path
 
-from ..core import dds, package, registry, roles
+from ..core import codecs, dds, package, registry, roles
 from ..core.bakes import BakeError
 from ..core.dataset import Dataset, DatasetError
 from ..core.interfaces import GameError, Owner, OwnerBake, Packed, Texture
@@ -32,6 +32,8 @@ COLOR_SLOTS = frozenset(
     {"diffuseLayer", "decalLayer", "emissiveLayer", "emissive2Layer"}
 )
 ABSENT = "not in the game storage"
+# The core's formats. Another game's codec in the registry (DXT3, RGBA32) is not one of StarCraft II's (SPEC-HD-TEXTURES 5).
+FORMATS = (codecs.DXT1.id, codecs.DXT5.id)
 
 LOG = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ def role_of(use: modelindex.Use, data: bytes) -> tuple[str | None, str]:
         return None, str(error)
     if info.cube:
         return None, "cube map"
-    if not registry.CODECS.has(info.format):
+    if info.format not in FORMATS:
         return None, f"format {info.format}"
     if min(info.width, info.height) < MIN_SIDE:
         return None, f"smaller than {MIN_SIDE} pixels"
@@ -99,6 +101,7 @@ def role_of(use: modelindex.Use, data: bytes) -> tuple[str | None, str]:
 class Sc2Game:
     id = ID
     alone = frozenset({pack.TERRAIN})  # kinds of texture baked on their own (R-HD-145)
+    bakes = ""  # SC2 bakes (R-HD-115)
 
     def __init__(self, casc: Casc | None = None, index: Path | None = None) -> None:
         """`casc`, `index`: the game's storage and the folder of this game's caches; found when first needed."""
@@ -196,7 +199,7 @@ class Sc2Game:
                 pack.MODEL,
                 None,
                 reason,
-                False,
+                use.repeats,  # tiles when a model shows it more than once (m3tex.repeating)
                 grid,
                 users,
                 judged=bool(reason),

@@ -10,8 +10,12 @@ description, what is known of its original, and the files of the store.
 
 from __future__ import annotations
 
+import functools
+import hashlib
 from collections.abc import Callable
 from typing import TypedDict
+
+from project_root import project_root
 
 from . import limits, progress, results, skins, variants
 from .bakes import Bakes
@@ -46,9 +50,14 @@ class VariantState(TypedDict):
     sha256: str
 
 
+class FactorAsk(TypedDict):
+    size: int  # the side the factor gives, at most the largest side
+    reason: str  # why it cannot be asked for; "" when it may be
+
+
 class ModelAsk(TypedDict):
     reason: str
-    sizes: dict[str, str]  # size -> why it is refused; "" when it may be asked for
+    factors: dict[str, FactorAsk]  # factor -> what it gives
 
 
 class InputAsk(TypedDict):
@@ -77,6 +86,8 @@ def _variants(game: GameStore, texture: Texture, made: dict[str, Made]) -> list[
                 "size": size,
                 "own": one.own,
                 "stale": one.stale,
+                "staleWhy": one.why_stale,
+                "edgesOff": one.edges_off,
                 "numbers": numbers,
                 "problems": list(one.missed),
                 "accepted": one.accepted,
@@ -91,9 +102,10 @@ def _variants(game: GameStore, texture: Texture, made: dict[str, Made]) -> list[
 def _asks(
     texture: Texture, original: Original | None, made: dict[str, Made]
 ) -> list[InputAsk]:
-    """For each input a request may take, each model with why it is refused, and the sizes it reaches (R-VIEW-116)."""
+    """For each input a request may take, each model with why it is refused, and the side each factor gives with why it cannot be had (R-VIEW-116)."""
     if texture.role is None or original is None or original.unreadable:
         return []  # a request is refused with the reason (`reason`), or the texture was never asked for
+    cap = variants.max_side()
     inputs = [variants.ORIGINAL] + [
         variants.variant_id(recipe, size)
         for recipe, one in sorted(made.items())
@@ -110,16 +122,12 @@ def _asks(
                 else f"{given}{variants.JOIN}{model}"
             )
             reason = progress.refusal(texture, recipe, original.longest)
-            sizes: dict[str, str] = {}
+            factors: dict[str, FactorAsk] = {}
             if not reason:
-                for size in variants.SIZES:
-                    sizes[str(size)] = variants.size_refusal(
-                        recipe, size, original.longest
-                    )
-                own = variants.own_size(variants.parse_recipe(recipe), original.longest)
-                if own < variants.SIZES[0]:
-                    sizes[str(own)] = ""
-            models[model] = {"reason": reason, "sizes": sizes}
+                for factor in variants.FACTORS:
+                    side, why = variants.factor_side(recipe, factor, original.longest, cap)
+                    factors[str(factor)] = {"size": side, "reason": why}
+            models[model] = {"reason": reason, "factors": factors}
         found.append({"input": given, "models": models})
     return found
 
@@ -198,15 +206,10 @@ def shown_now(owner: Owner, asset: str, baked: Bakes) -> str:
 def owner_state(
     owner: Owner, found: dict[str, skins.Skin], baked: Bakes, record: dict | None
 ) -> dict:
-    """The state of one owner: its skins with the offered New Skin, what it shows now, its bake (SPEC-VIEWER 17.2)."""
+    """The state of one owner: its skins, what it shows now, its bake (SPEC-VIEWER 17.2)."""
     below = {name: baked.owners.get(name) for name in owner.below}
     shows = {asset: shown_now(owner, asset, baked) for asset in owner.textures}
-    listed = [
-        {"name": skin.name, "textures": skin.textures, "stored": True}
-        for skin in sorted(found.values())
-    ]
-    if (offer := skins.offered(found, shows)) is not None:
-        listed.append({"name": skins.NEW, "textures": offer, "stored": False})
+    listed = [{"name": skin.name, "textures": skin.textures} for skin in sorted(found.values())]
     bake = baked.owners.get(owner.id)
     held = None if record is None else record.get("owners", {}).get(owner.id)
     return {
@@ -219,6 +222,8 @@ def owner_state(
             for name, bake in below.items()
         ],
         "skins": listed,
+        # The name a skin made without one gets now (R-HD-137): the viewer shows it, it does not work it out.
+        "next": skins.next_new(found),
         "shows": shows,
         "bake": None
         if bake is None
@@ -229,10 +234,35 @@ def owner_state(
     }
 
 
-def head() -> dict:
-    """What holds for every texture of a dataset: the words a reader offers."""
+@functools.cache  # one process runs one code
+def code() -> str:
+    """The hash of the code that works states out: every `.py` under scripts/hdtex/ and every file under
+    sql/texture-index/, by path from the repository root, in path order. Any change gives another hash, so
+    the viewer indexes a head of other code again (webviewer/src/server/core/textures.ts `pipelineCode`)."""
+    root = project_root()
+    files = sorted(
+        [*(root / "scripts" / "hdtex").rglob("*.py"), *(f for f in (root / "sql" / "texture-index").rglob("*") if f.is_file())],
+        key=lambda one: one.relative_to(root).as_posix(),
+    )  # fmt: skip
+    digest = hashlib.sha256()
+    for one in files:
+        digest.update(one.relative_to(root).as_posix().encode() + b"\0")
+        digest.update(one.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def head(bake: str) -> dict:
+    """What holds for every texture of a dataset: the words a reader offers.
+
+    `bake`: why the dataset's game bakes nothing; empty: it bakes (R-HD-115).
+    """
     return {
-        "sizes": list(variants.SIZES),
+        "bake": bake,
+        "factors": list(variants.FACTORS),
+        # The largest side a request may ask for; a head with another one is indexed again.
+        "maxSide": variants.max_side(),
+        # The code that wrote its states; a head of other code is indexed again.
+        "code": code(),
         "models": [
             {"id": model.id, "title": model.title, "note": model.note}
             for model in variants.MODELS.values()

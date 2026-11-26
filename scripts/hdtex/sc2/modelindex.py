@@ -26,7 +26,7 @@ from .catalog import CatalogError
 from .sources import SourceError, file_name, stored_name
 from .storage import GAP_FILES, GAP_MODELS, OWN, Storage
 
-FORMAT = 1
+FORMAT = 3  # 3: each layer's `moves`, `spans` and `triangles` (m3tex.layers)
 FILE = "model-layers.json"
 CATALOG = shown.MODELS
 PARALLEL_FROM = (
@@ -67,6 +67,7 @@ class Use(NamedTuple):
     # None: no file reads it with known cells, or as many files read it one way as another.
     grid: tuple[int, int] | None
     others: tuple[ModelFile, ...] = ()  # the files that read it with other cells
+    repeats: bool = False  # it tiles: `repeating` of the layers of `files`
 
 
 def variation_assets(base: str, count: int) -> list[str]:
@@ -221,6 +222,14 @@ def cells(
     }
 
 
+def repeating(layers: list[m3tex.Layer]) -> bool:
+    """Whether a texture tiles: a layer that names it tiles or scrolls (m3tex.moves), or at least
+    m3tex.TILE_SHARE of the triangles drawn with it span a whole-number line of their coordinates."""
+    triangles = sum(layer.triangles for layer in layers)
+    spans = sum(layer.spans for layer in layers)
+    return any(layer.moves for layer in layers) or (triangles > 0 and spans >= m3tex.TILE_SHARE * triangles)
+
+
 class Models(NamedTuple):
     """The model files of a dataset and what each names: read once, for its textures and its owners."""
 
@@ -258,6 +267,7 @@ def uses(storage: Storage, read: Models) -> list[Use]:
                 any(layer.flipbook for layer in mine),
                 grid,
                 tuple(sorted(others)),
+                repeating(mine),
             )
         )
     LOG.info(

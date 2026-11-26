@@ -72,9 +72,10 @@ export interface Removal {
 }
 
 /**
- * Why a variant cannot be removed now (R-VIEW-147): it is picked, the game shows it, a skin or a bake names it,
+ * Why a variant cannot be removed now (R-VIEW-147): it is picked, the game shows it, a bake names it,
  * an edit session is open on it, another variant is made from it, or its recipe is being made. Empty: it can.
- * The pipeline refuses what the page cannot see: the skins and bakes of other datasets (R-HD-146).
+ * A skin of this dataset that names it does not keep it. The pipeline refuses what the page cannot see:
+ * the skins and bakes of other datasets (R-HD-146).
  */
 function removalRefusal({ owner, picked }: Removal, state: TextureState, variant: string): string {
   const asset = state.asset;
@@ -82,8 +83,7 @@ function removalRefusal({ owner, picked }: Removal, state: TextureState, variant
   if (owner) {
     if (owner.shows[asset] === variant) return 'the game shows it: it is baked';
     if (owner.bake?.textures[asset] === variant) return `it is baked in skin ${skinLabel(owner.bake.skin)}`;
-    const skin = owner.skins.find((one) => one.textures[asset] === variant);
-    if (skin) return `skin ${skinLabel(skin.name)} names it`;
+    // A skin that names it does not keep it: the skin names the original after (operator 2026-11-26).
   }
   if (state.bake === variant) return 'it is baked';
   if (tileEdits(state)?.session(variant)) return 'an edit session is open on it; discard it first';

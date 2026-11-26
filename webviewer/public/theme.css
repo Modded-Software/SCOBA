@@ -33,6 +33,8 @@ button.danger, button.trash { color: var(--danger); }
 button.danger:hover, button.trash:hover { color: var(--danger); background: rgba(255, 122, 122, 0.12); }
 button.primary.danger { color: var(--bg); background: var(--danger); }
 button.primary.danger:hover { color: var(--bg); background: #ff9a9a; }
+/* A skin the owner does not have, where an instance names it (SPEC-VIEWER 17.4). */
+.missing { color: var(--danger); }
 select { cursor: pointer; color: var(--dim); padding: 0 4px; }
 select:hover { color: var(--text); }
 

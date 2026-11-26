@@ -14,7 +14,7 @@ import { searchSkyboxes } from './skyboxes';
 import { createStorage } from './storage';
 import { searchTerrain, terrainRecord } from './terrain';
 import { messageOf } from '../../../server/core/http';
-import { pipelineTextures, storeDirOf } from '../../../server/core/textures';
+import { logDirOf, pipelineTextures, storeDirOf } from '../../../server/core/textures';
 
 /** The game id, as the pipeline knows it too (`--game`). */
 const SC2 = 'sc2';
@@ -68,7 +68,7 @@ export async function startSc2(core: CoreSettings, env: NodeJS.ProcessEnv = proc
   };
   const noCategory = (category: string): HttpError => new HttpError(404, { error: 'no such category', category });
   // The pipeline of SPEC-HD-TEXTURES; a dataset's own folder is its map layer.
-  const textures = pipelineTextures({ game: SC2, repoRoot: core.repoRoot, storeDir: storeDirOf(env), layerOf: (id) => dataOf(id).mapDir, logDir: join(dirs.cache, 'textures'), env });
+  const textures = pipelineTextures({ game: SC2, repoRoot: core.repoRoot, storeDir: storeDirOf(env), layerOf: (id) => dataOf(id).mapDir, logDir: logDirOf(env, SC2, join(dirs.cache, 'textures')), env });
   // The pipeline brings its state index up to date with each dataset's files. Showing a model does not
   // depend on it: a failure is logged, and the states stay as the index holds them (R-VIEW-110).
   const indexTextures = (id: string): Promise<void> => textures.sync(id).catch((error: unknown) => console.error(`viewer: the texture index of dataset "${id}" was not brought up to date: ${messageOf(error)}`));

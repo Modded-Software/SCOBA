@@ -57,6 +57,7 @@ class FolderGame:
 
     def __init__(self, root: Path) -> None:
         self.root = root
+        self.bakes = ""  # it bakes; a test sets a reason to have it bake nothing (R-HD-115)
         self.read: list[str] = []  # the assets whose original was asked for
         self.judged: list[str] = []  # the assets whose role was asked for
         self.owners_listed = 0  # how often every owner was listed
@@ -287,6 +288,7 @@ class StandIn:
         self.empty = False  # a job ends and writes nothing
         self.no_worker = ""  # why no job will start; empty: a worker runs
         self.looks = 0  # how often `idle` was asked
+        self.tiling: list[bool] = []  # `tiles` of each submit, in order
         self.jobs: dict[
             str, tuple[JobState, Path, Path]
         ] = {}  # every job ever asked for, by name
@@ -308,8 +310,9 @@ class StandIn:
         if self.broken:
             output.write_bytes(output.read_bytes()[:40])
 
-    def submit(self, plane: Path, folder: Path, model: str) -> str:
+    def submit(self, plane: Path, folder: Path, model: str, tiles: bool) -> str:
         self.asked.append((plane.name, model))
+        self.tiling.append(tiles)
         job = f"{len(self.asked):04d}.json"
         state = (
             JobState(FAILED, self.fail[model])

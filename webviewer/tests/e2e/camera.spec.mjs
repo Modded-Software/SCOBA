@@ -1,14 +1,16 @@
 import { test, expect } from '../fixtures.mjs';
 
 // Mouse camera controls:
-// - left drag holds the ground point under the mouse and pulls the map;
+// - left drag pulls the map by 0.6 of the ground the pointer crossed (R-VIEW-150);
 // - middle drag orbits around the ground point under the mouse at press;
 // - alt + middle drag turns the view around the eye (mouse-look, R-VIEW-143).
 // Each drag's first move is 12 px or more: a fast drag, acting from the press
 // point (core/press.ts, R-VIEW-142), so the rates are exact.
 
 const VIEW = { yaw: -Math.PI / 2, pitch: 0.6, distance: 12, target: [0, 0, 0] };
-const RATE = 0.004; // radians per pixel
+// The mouse sensitivity when none is stored (R-VIEW-150): every camera drag is that share.
+const SENSITIVITY = 0.6;
+const RATE = 0.004 * SENSITIVITY; // radians per pixel
 
 async function open(page) {
   const errors = [];
@@ -34,18 +36,19 @@ async function drag(page, button, from, to, alt = false) {
   if (alt) await page.keyboard.up('Alt');
 }
 
-test('left drag holds the ground under the mouse and pulls the map', async ({ page }) => {
+test('left drag pulls the map by the sensitivity share of the ground crossed', async ({ page }) => {
   const box = await open(page);
   const from = [box.x + box.width * 0.4, box.y + box.height * 0.6];
   const to = [box.x + box.width * 0.65, box.y + box.height * 0.45];
   const anchor = await groundAt(page, box, ...from);
+  const reached = await groundAt(page, box, ...to);
   const c0 = await camera(page);
   await drag(page, 'left', from, to);
   const c1 = await camera(page);
-  const under = await groundAt(page, box, ...to);
-  console.log('anchor', JSON.stringify(anchor), 'now under the mouse', JSON.stringify(under), 'target', JSON.stringify(c1.target));
-  // The grabbed point is under the mouse again, within 1% of the view distance.
-  expect(gap(anchor, under)).toBeLessThan(0.01 * c0.distance);
+  // A move along the ground shifts every ground point alike: the map moves 0.6 of the ground the pointer crossed.
+  const wanted = [0, 1].map((i) => c0.target[i] - SENSITIVITY * (reached[i] - anchor[i]));
+  console.log('crossed', JSON.stringify([anchor, reached]), 'target', JSON.stringify(c1.target), 'wanted', JSON.stringify(wanted));
+  expect(gap(wanted, c1.target.slice(0, 2))).toBeLessThan(0.01 * c0.distance);
   expect(gap(c0.target, c1.target)).toBeGreaterThan(1);
   // Negative: it slides along the ground; no turn, no zoom, no height change.
   expect(c1.yaw).toBeCloseTo(c0.yaw, 9);

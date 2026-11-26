@@ -80,9 +80,11 @@ class LayoutTest(unittest.TestCase):
         for index in range(len(small.levels)):
             self.assertEqual(small.level_bytes(index), large.level_bytes(index + 1))
 
-    def test_a_small_result_is_kept_at_its_own_size_only(self) -> None:
+    def test_a_small_result_is_kept_at_its_own_size_and_its_half(self) -> None:
         self.assertEqual(
-            sorted(result_of("diffuse", colour_rgba(), repeat).files), [SIZE * 4]
+            sorted(result_of("diffuse", colour_rgba(), repeat).files),
+            [SIZE * 2, SIZE * 4],
+            "4x and the 2x a request may ask for; negative: no smaller level",
         )
 
     def test_transparent_pixels_in_an_opaque_format_are_refused(self) -> None:

@@ -1,7 +1,7 @@
 From 8c3d72382a16331fa768113a1d3946388c3b807c Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sun, 22 Nov 2026 23:15:48 +0200
-Subject: [PATCH 36/57] M3: displacement particles; video textures are not
+Subject: [PATCH 36/59] M3: displacement particles; video textures are not
  fetched
 
 Emitters with a displacement material (type 2) run and draw after the

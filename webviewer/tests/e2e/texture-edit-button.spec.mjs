@@ -100,7 +100,7 @@ test('negative: a texture that cannot be upscaled has the button disabled, with 
   expect(errors).toEqual([]);
 });
 
-test('negative: a game without a texture service gets no edit control in its texture window', async ({ page }) => {
+test('Ghost has the texture service (R-VIEW-152): its texture window gets the edit tools; opening it starts no session', async ({ page, request }) => {
   test.setTimeout(60_000);
   const errors = await openGhost(page);
   const id = await add(page, '3D/Models/crate.nod');
@@ -110,12 +110,12 @@ test('negative: a game without a texture service gets no edit control in its tex
   await expect(page.locator('#texture-window')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.scobaeditor.textureWindow().originals), { timeout: 20_000 }).toBe('done');
   const frame = textureFrame(page);
-  expect((await frame.evaluate(() => window.hdtex.state())).edits).toMatchObject({ tools: false, manage: false, sessions: [] });
-  await expect(frame.locator('.tile-edit')).toHaveCount(0);
-  await expect(frame.locator('#manage-edits')).toBeHidden();
-  // Negative: nothing is read of edit sessions for it: two polls pass and the page holds none.
-  await page.waitForTimeout(4500);
-  expect((await editsState(page)).sessions).toEqual({});
+  expect((await frame.evaluate(() => window.hdtex.state())).edits).toMatchObject({ tools: true });
+  await expect(frame.locator('#cards .skin-tile[data-tile="original"] .tile-edit')).toHaveCount(1);
+  // Negative: opening the window opens no edit session.
+  const answer = await request.get('/api/ghost/textures/edit?dataset=build');
+  expect(answer.status()).toBe(200);
+  expect((await answer.json()).sessions).toEqual([]);
   expect(errors).toEqual([]);
 });
 

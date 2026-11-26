@@ -19,7 +19,7 @@ wrong so far.
 | --- | --- |
 | Game id | `ghost` |
 | Label | StarCraft: Ghost |
-| Tab text | SC: G (operator 2026-11-24) |
+| Tab text | SC:G (operator 2026-11-25) |
 | Formats | `nod` (models, with NAD clips, NSA materials and DDS textures) |
 | Datasets | one: `build`, the extracted game build |
 
@@ -573,9 +573,13 @@ Refusals (R-VIEW-82), each with the file and the value:
 - a clip track whose bone number is outside the model's bones, or whose
   kind is not 0 or 1.
 
-Capabilities: `edges` only (SPEC-VIEWER 6.2, 16.13): the drawn groups'
-triangle edges as lines, by `NodInstance.renderEdges`. No team colour, no
-tint, no texture override.
+Capabilities (SPEC-VIEWER 6.2, 16.13): `edges`, the drawn groups'
+triangle edges as lines, by `NodInstance.renderEdges`; and
+`textureOverride` (R-VIEW-152). A slot is one drawn group with a texture
+file; its `source` is that file, relative to the build. A set swaps the
+group's texture on that instance alone: the model keeps its own, so two
+instances of one model show two skins. `applied` counts the groups that
+hold another texture. No team colour, no tint.
 
 A clip that fails is left out; the others play. `attachClips` returns
 the clips left out, each with its reason (HTTP status, or the check that
@@ -631,11 +635,26 @@ tags, motion flags, markers.
 by material name, answered as JSON (a control character in the name gives
 400); `animation` by clip name, answered as the clip's JSON.
 
+The texture service (operator 2026-11-25, R-VIEW-152): core's service over
+the pipeline (`server/core/textures.ts`) for the game `ghost`, dataset
+`build`, with no layer. The pipeline's side is SPEC-HD-TEXTURES section
+6. The server indexes the dataset at start when the index does not hold
+it, and again on a reload, as SC2 does. Its head names the bake reason,
+so Bake Skin and Unbake Skin are disabled (R-VIEW-151).
+
+- Asset of a slot (`textureAsset`): the file relative to the build, lower
+  case, `\` between folders.
+- Owner of an instance (`textureOwner`): an actor row gives
+  `actor:<template>`; a model row and a bare model file give
+  `model:<asset of the file>`.
+- The blue grid glow: an instance that shows a texture of 2048 or more on
+  a side, as SC2.
+
 The texture window (operator 2026-11-24): the one window of core
 (`page/core/texturewindow.ts`), the same as SC2's, on the texture page
-(`/texture-viewer.html`, `page/texview`). Ghost has no texture service, so
-the page shows the originals alone: no state, no step, no pick, no
-default, and Ghost has no ground button (R-VIEW-100). A double-click on a
+(`/texture-viewer.html`, `page/texview`). It opens with the service: the
+states, tiles, Upscale Texture, picks and Save to Skin… of SPEC-VIEWER
+17.3; Ghost has no ground button. A double-click on a
 gallery row (actors and models), an instance row or an instance in the
 view opens it on that model. `page/textures.ts` hands the page every
 texture file the model's materials name, decoded with core's DDS decode
@@ -717,11 +736,14 @@ On the server and in the page (Playwright, `webviewer/tests/`):
 | Materials | `ghost-look` | a `cutout` group of `AR_Plant_Vine_01` is picked inside fewer of its triangles than the solid `crate` (5 points lower or more); `sky` is not drawn and not named (`undrawn` and `why` null) | an unknown shader (`dynamic`) and a material no step finds (`pCannon_collide`) are not drawn; the probe's `why` is the reason and `undrawn` is "material: why" |
 | Material lookup | `ghost-mix` | `zergling` and `crate` draw every group with a texture; `undrawn` is empty | |
 | Refusal | `ghost-look`; `ex-1` | a container with `{error}` fails to load with its message; the changed files of `ex-1` are refused by NODExport | another model of the game still loads |
-| Texture window | `ghost-textures` | the shared window on `/texture-viewer.html`. A double-click on `crate` in the view: one texture, its colour plane first, the fact `material chestCrate2` "drawn solid, groups 0", the picture at the size listed, on the page's card. An actor row (`zerg_critter`) and a models row (`zergling`): `zergling.nod`, the same textures, each with its facts. An instance row of `AR_Plant_Vine_01`: the cutout texture has colour and alpha planes. `dynamic`, `pCannon_collide` and sky give their reasons in words. Layout, measured: the frame fills the window; the list rows have height and do not overlap; the card fits the page | no texture route is asked; no texture names a service asset; no default chooser, step button, pick or badge; no ground button; no texture set choice; nothing is added; a material without a texture file has no entry, only its problem line; a texture answered 404 is named in the problems, and the instance keeps its own |
+| Texture window | `ghost-textures` | the shared window on `/texture-viewer.html`. A double-click on `crate` in the view: one texture, its colour plane first, the fact `material chestCrate2` "drawn solid, groups 0", the picture at the size listed, on the page's card. An actor row (`zerg_critter`) and a models row (`zergling`): `zergling.nod`, the same textures, each with its facts. An instance row of `AR_Plant_Vine_01`: the cutout texture has colour and alpha planes. `dynamic`, `pCannon_collide` and sky give their reasons in words. Layout, measured: the frame fills the window; the list rows have height and do not overlap; the card fits the page. Each entry names its service asset; the page holds the service's state of it; the `crate` instance's owner is `model:3d\models\crate.nod`, its first choice Original. The `crate` window shows the Upscale Texture tile and the rows format, kind, used by. In every entry of `nova`'s window each Details value is at least 60 px wide, and a material fact's value starts below its name (without the two-line rule a value was 33 px) | `SignBracket.dds` of `sign_armory` (16 px) shows "cannot be upscaled: smaller than 32 pixels" and no Upscale Texture tile; no ground button; no texture set choice; nothing is added; opening asks for no variant, skin, bake or removal; a material without a texture file has no entry, only its problem line; a texture answered 404 is named in the problems, and the instance keeps its own |
+| Upscale | `ghost-upscale` | with the stand-in runner: `crate`'s texture asks `fast` at its largest allowed factor; the variant is a DXT1 DDS of the size that factor gives, served. Upscale Skin of `BorgoWelcomeSign` makes New Skin 1 naming its texture's variant; the instance that shows it holds an override per group of that texture, and its largest texture is the variant's size; Original again holds none. Upscale Texture from the window's tile, and Upscale Skin from the instance menu with the window open on the sign: the window shows the request tile, then the variant tile, with no reload; the launch output is in the worker's own `TEXTURE_LOGS`. The window on the sign showing New Skin 1: nothing is picked, the New Skin 1 variant has the outline; a click on Original is one pick, and Save to Skin… says "1 of 1 textures change in New Skin 1." with Save enabled. The trash of a variant New Skin 1 names is enabled once another tile is picked; its dialog says the skin uses the original after. Upscale Skin of `actor:Nova` with `novaface04`'s variant accepted: its slots hold overrides, each other texture is in `unshown` | a size no factor gives (8192) is refused with the reason and no variant; the second sign instance and a `crate` stay on Original with no override; a click on the variant New Skin 1 names is no pick; the trash of the variant picked now is disabled; `crate`'s variant misses the seam limit: New Skin 1 on it is shown with no override, the texture in `unshown`, said once on the status line, not again on a second apply, and no error is thrown |
+| No bake | `ghost-bake-off` | the head's `bake` is "baking is not enabled for StarCraft: Ghost"; the menu of a `crate` instance on Original shows Unbake Skin disabled, that reason its title | bake and unbake, by owner and by asset, answer 400 with `ghost: <reason>`; `bakes.json` is not written; SC2's head names no reason; an SC2 Marine's menu keeps its own title, "nothing is baked" |
+| Edit tools | `texture-edit-button` | the `crate` texture window has the edit tools and an Edit Texture button on its Original tile | opening it opens no edit session |
 | Gallery | `ghost-gallery` | the preview names an actor and its model; its add button and a row dragged into the view add it; the `motion` and `skin` buttons give the server's counts; add all adds the listed actors with the landmark `Animated Ghost actors "zergling"`; the game's list names; a dataset reload with nothing changed keeps the signature and the summary | one click adds nothing; a cancelled add all adds nothing; no skinned model under `rigid`; no toast; the SC2 tab names its list its own way; GET and an unknown dataset are refused |
 | Contract | `contract` (core) | the shared routes and the shared page flow, run for each available game | unknown ids, categories and datasets give 404 |
 | Shader files | `ghost-look` | | `nod.frag` answered 404: the model fails with "nod: 404 /shaders/nod.frag" and is not added |
-| Capabilities | `ghost-mix` | the SC2 unit's row has the team control, its state `hd` | the Ghost row has no team control, its state no `hd` |
+| Capabilities | `ghost-mix` | the SC2 unit's row has the team control, its state `hd`; the Ghost instance shows Original with no override, its owner its model file | the Ghost row has no team control, its state no `hd`; the SC2 unit's owner is its unit |
 | Two games | `ghost-mix` | a unit and a model: selected together, moved, copied, pasted off the view, stored with their games, back after a reload | each comes back as its own game's file |
 
 ## 10. Operator checks
@@ -772,5 +794,6 @@ open as written there; this change does not answer them.
 | O-GHOST-11 | 79 material names (163 slots) are found by no step of 4.4. They are not drawn. |
 | O-GHOST-12 | 540 textures have bytes past their declared levels, most often one block. What they hold is not known. |
 | O-GHOST-13 | 90 template properties use ids 177 to 184, past the engine table of [sdk]. `scourge_track` has an empty `basedon`. Both are reported; neither is read. |
+| O-GHOST-16 | Every Ghost texture is taken to tile (SPEC-HD-TEXTURES 6.2), so each variant is held to the seam limit. With the tests' stand-in upscaler, 30 of the 31 textures with a role among 40 sampled on 2026-11-25 missed it (`BorgoWelcome.dds` did not). Whether a real upscale keeps the seams, and which Ghost textures do not tile, is not measured. |
 | O-GHOST-14 | A bone's `position` is not `parent offset - offset` in 18 models, and its `orientation` is not the identity in some (`lurker_alt`, `Zangakar`, `Goliath_test`, `4_4_Free_Prison`). The rest pose fits the files only with both unread (4.2). What they are for is not known. |
 | O-GHOST-15 | Motion sets list clips for another model's bones: the victim's side of a paired death (`zergling.nms`: `deathblown`). They are left out and named. Playing them on the other actor is not designed. |

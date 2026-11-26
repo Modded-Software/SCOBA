@@ -2,10 +2,14 @@
 
 A variant is one size of a recipe. Its file goes, and its size leaves the
 recipe's entry; the last size takes the recipe's folder with it. What still
-needs the variant refuses its removal: a skin or a bake of any dataset of
-the game, a recipe made from it, an open request of its recipe, an edit
-session on it. Variants live by origin, so every dataset that shares the
-origin loses it; their skins and bakes are read too.
+needs the variant refuses its removal: a bake of any dataset of the game,
+a skin of another dataset, a recipe made from it, an open request of its
+recipe, an edit session on it. Variants live by origin, so every dataset
+that shares the origin loses it; their skins and bakes are read too.
+
+A skin of this dataset does not refuse it (operator 2026-11-26: only the
+variant picked now is kept, and the page refuses that one). Each skin of
+this dataset that names it names the original for that texture after.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ class RemovalError(ValueError):
 
 
 def _named_in(dataset: Dataset, asset: str, variant: str) -> list[str]:
-    """Each skin and bake, in any dataset of the game, that names `variant` for `asset`."""
+    """Each bake, in any dataset of the game, and each skin of another dataset, that names `variant` for `asset`."""
     found = []
     root = dataset.game.root / "datasets"
     for folder in sorted(root.iterdir()) if root.is_dir() else []:
@@ -35,11 +39,25 @@ def _named_in(dataset: Dataset, asset: str, variant: str) -> list[str]:
         for owner, bake in sorted(baked.owners.items()):
             if bake.textures.get(asset) == variant:
                 found.append(f"the bake of {owner} (skin {bake.skin}) in {folder.name}")
+        if folder.name == dataset.name:
+            continue  # this dataset's skins let it go (_release)
         for owner in skins.owners(folder):
             for name, skin in sorted(skins.load(folder, owner).items()):
                 if skin.textures.get(asset) == variant:
                     found.append(f"skin {name} of {owner} in {folder.name}")
     return found
+
+
+def _release(dataset: Dataset, asset: str, variant: str) -> None:
+    """Each skin of this dataset that names `variant` for `asset` names the original for it from now on."""
+    for owner in skins.owners(dataset.folder):
+        held = skins.load(dataset.folder, owner)
+        if not any(skin.textures.get(asset) == variant for skin in held.values()):
+            continue
+        dataset.change_skin(owner, lambda found: {
+            name: skin._replace(textures={key: one for key, one in skin.textures.items() if not (key == asset and one == variant)})
+            for name, skin in found.items()
+        })  # fmt: skip
 
 
 def refusal(dataset: Dataset, texture: Texture, variant: str) -> str:
@@ -72,6 +90,8 @@ def remove(dataset: Dataset, texture: Texture, variant: str) -> None:
     """Remove one variant of a texture, or refuse with the reason. Every dataset with its origin sees it gone."""
     if reason := refusal(dataset, texture, variant):
         raise RemovalError(f"{texture.asset}, {variant}: {reason}")
+    # The skins first: no skin names a variant that is gone.
+    _release(dataset, texture.asset, variant)
     recipe, size = variants.split(variant)
     game = dataset.game
     folder = game.recipe_dir(texture.origin, recipe)

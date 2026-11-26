@@ -41,7 +41,11 @@ Out of scope:
 - how the viewer shows and edits all this. That is
   [REQ-VIEWER](REQ-VIEWER.md), section 3.11;
 - textures of the user interface;
-- any game but StarCraft II; a second game is not in scope (R-HD-111).
+- baking and packaging for StarCraft: Ghost (operator 2026-11-25: "add
+  full support for texture upscaling to SC:G, only without BAKING for
+  NOW"). Ghost has variants, skins and requests; its bake is refused
+  (3.11);
+- any game but StarCraft II and StarCraft: Ghost.
 
 Implementation lives in
 [SPEC-HD-TEXTURES](../specifications/SPEC-HD-TEXTURES.md).
@@ -72,8 +76,9 @@ Implementation lives in
 - **Original skin** (`original`): names no variant. Each texture shows its
   original. It always exists and cannot be changed. It replaces the
   default skin (operator 2026-11-25).
-- **New Skin** (`new`): the one unsaved skin of an owner. Changes that are
-  not to a saved skin go to it. Saving gives it a name.
+- **New Skin N** (`New Skin 1`, `New Skin 2`, …): the name a skin gets
+  when it is made without one. It is stored and baked as any skin, and can
+  be renamed.
 - **Bake**: making a skin the one the dataset's package holds for its
   owner. A terrain texture is baked on its own, as one variant.
 - **Package**: the files the baked skins and terrain variants put into the
@@ -103,11 +108,11 @@ Implementation lives in
 | ID | Requirement |
 | --- | --- |
 | R-HD-120 | Each texture MUST be able to have any number of variants. The original MUST be one of them. |
-| R-HD-121 | A variant MUST be made on request from three choices: an input variant of the same texture, a model of the `upscale-on-arc` tool, and an output size from a list: 1024, 2048, 4096. An edited variant is made another way: by the transfer of an edit of an input variant, at the input's size (R-PC-51). [agent, O-PC-14] |
+| R-HD-121 | A variant MUST be made on request from three choices: an input variant of the same texture, a model of the `upscale-on-arc` tool, and a factor: 2x or 4x of the input's longest side. An edited variant is made another way: by the transfer of an edit of an input variant, at the input's size (R-PC-51). [agent, O-PC-14] |
 | R-HD-122 | `seedvr2` MUST NOT be chosen for a data texture. On a colour texture with a data plane, `seedvr2` MUST make the colour and `fast` MUST make the data plane. Where `seedvr2` is chosen for many textures at once, every data texture among them MUST get `fast`. [agent, O-HD-10: with `pbrify` too, data planes get `fast`, as today] |
-| R-HD-123 | A size above four times the input's longest side MUST be refused with the reason. The model's output MUST be shrunk to the chosen size. An input with a side above 2048 MUST be shrunk until no side is above 2048, before the model. |
-| R-HD-124 | Two requests with the same input, model and size MUST give one variant. A variant MUST record its input, its model per plane, its size and its quality numbers. An edited variant MUST also record the planes that changed and the hash of the rendered planes; two transfers with the same input and the same rendered planes MUST give one variant (R-PC-54, R-PC-55). [agent, O-PC-14] |
-| R-HD-146 | A variant MUST be removable on request. The removal MUST be refused, with the reason, while a skin or a bake of any dataset names it, while another variant is made from it, while a request of its recipe is open, or while an edit session is open on it. The original MUST NOT be removable. [operator 2026-11-25: "add a trash icon for all textures with confirmation dialog; make currently selected, skin-selected and baked texture non-deletable"; the other refusals are the agent's] |
+| R-HD-123 | The size of a variant MUST be the factor times the input's longest side, at most the largest side. The largest side MUST be a setting of the viewer, `TEXTURE_MAX_SIDE`: 1024, 2048 or 4096; unset, 4096. A factor that gives no side above the input's MUST be refused with the reason, and so MUST a size above the largest side. The model's output MUST be shrunk to that size. An input with a side above 2048 MUST be shrunk until no side is above 2048, before the model. [operator 2026-11-26] |
+| R-HD-124 | Two requests with the same input, model and resulting size MUST give one variant. A variant MUST record its input, its model per plane, its size and its quality numbers. An edited variant MUST also record the planes that changed and the hash of the rendered planes; two transfers with the same input and the same rendered planes MUST give one variant (R-PC-54, R-PC-55). [agent, O-PC-14] |
+| R-HD-146 | A variant MUST be removable on request. A skin of the dataset the removal is asked in MUST NOT refuse it; that skin MUST name the original for the texture after. The removal MUST be refused, with the reason, while a bake of any dataset or a skin of another dataset names it, while another variant is made from it, while a request of its recipe is open, or while an edit session is open on it. The original MUST NOT be removable. [operator 2026-11-25: "add a trash icon for all textures with confirmation dialog; make currently selected, skin-selected and baked texture non-deletable"; operator 2026-11-26: a skin does not keep it, "only the one that is currently selected"; the other refusals are the agent's] |
 | R-HD-10 | A variant MUST keep the layout of its original: the same compression format, a full mip chain, the same channel meaning, and the bytes the game stores after the last mip. |
 | R-HD-11 | A variant a model made MUST show the same picture as its original. Brightness, colour, and surface tilt seen from far away MUST match the original. A variant a model made from an edited variant MUST match the nearest edited variant among its inputs instead (R-PC-83). An edited variant is not bound by this (R-PC-80). |
 | R-HD-12 | A variant of a texture that tiles MUST tile as well as its original does. |
@@ -121,7 +126,7 @@ Implementation lives in
 | --- | --- |
 | R-HD-13 | The tooling MUST measure R-HD-10 to R-HD-12 on every variant and keep the numbers with it. |
 | R-HD-90 | A variant that misses a limit MUST be kept, with the limit and the number: a problem. A bake whose skin names a variant with a problem MUST be refused with the problem. A variant marked accepted MUST show its problems, which MUST NOT refuse a bake. No command MUST set the mark. [agent: whether a problem refuses a bake is not stated by the operator; see O-HD-9] The limits bind a variant a model made. An edited variant MUST NOT have a problem, and its numbers MUST NOT refuse a bake (R-PC-80, R-PC-81). |
-| R-HD-91 | The seam limit of R-HD-12 MUST apply only to a texture that tiles. |
+| R-HD-91 | The seam limit of R-HD-12 MUST apply only to a texture that tiles. A texture that does not tile MUST NOT be upscaled or joined with its edges matched across its border; a variant made by the other rule MUST still be shown, and a request of it MUST make it again (operator 2026-11-26). |
 
 ### 3.4 Texture store
 
@@ -136,17 +141,22 @@ Implementation lives in
 
 ### 3.5 Skins
 
+History: until 2026-11-25 an owner had one unsaved New Skin, stored as
+`new`, saved by a name and never baked. Since 2026-11-26 a skin made
+without a name is New Skin N (R-HD-137); a stored `new` is an ordinary
+skin of that name.
+
 | ID | Requirement |
 | --- | --- |
 | R-HD-130 | A skin MUST belong to one owner in one dataset: a unit, an actor or a model. In SC2 a unit's skin MUST cover the models of its actors; a doodad's skin MUST cover the models of its actor. |
 | R-HD-131 | A skin MUST be able to name one variant for each texture of its owner's models. A texture it does not name MUST show its original, previewed and baked (operator 2026-11-25: Original is the game's textures only). |
 | R-HD-132 | Every owner MUST have the Original skin. It MUST NOT be changed, renamed, deleted, baked or used as a name. |
 | R-HD-133 | A skin MUST be made, renamed, changed per texture, and deleted. A skin MUST be made as a copy of another. |
-| R-HD-134 | One request MUST make New Skin of an owner and queue a variant of each of its textures, with one model and one size. The input of each MUST be its variant in the skin the request names as its source. A skin MUST NOT name or keep a link to another skin. Each texture of New Skin MUST name its variant once it is made. The request MUST be refused while the owner has a stored New Skin. |
-| R-HD-137 | An owner MUST have at most one New Skin. It MUST be made by its first change. Saving MUST rename it to a name the person gives. It MUST NOT be baked. Discarding MUST delete it. When what an owner shows (its bake, else the bakes below) names a variant that is not the original and no saved skin names exactly those variants, the owner MUST offer a New Skin that names them, until one is stored (operator 2026-11-25: "currently baked user texture automatically fall under unsaved New Skins"). |
+| R-HD-134 | One request MUST make a skin of an owner and queue a variant of each of its textures, with one model and one factor. Without a name the skin MUST be the next New Skin N (R-HD-137). A request that would queue no variant MUST be refused with each texture's reason, and MUST store no skin. The input of each MUST be its variant in the skin the request names as its source. A skin MUST NOT name or keep a link to another skin. Each texture of the skin MUST name its variant once it is made. |
+| R-HD-137 | A skin made without a name (a copy, an upscale) MUST be stored at once as `New Skin N`, N one above the highest N of the owner's skins named so (from 1); a deleted number below it MUST NOT be taken again. An owner MAY have any number of them. Each MUST be renamed, baked and deleted as any skin. No change MUST ask to save or discard another skin first. No skin MUST be offered that was not made. A skin name MUST be 1 to 40 letters, digits, `-` or `_`, one space between words; `original` (ignoring case) MUST be refused. A stored skin MUST be read under the name it is stored with; reading MUST NOT rename or write it. The owner's state MUST name the next New Skin N, so a reader shows the name the pipeline gives. (Operator 2026-11-26: "some of the old logic for saving new skins before creating new ones remains; this should be removed, subsequent New Skin 1, New Skin 2, etc. created instead"; nothing may stand in for a skin, the operator's rule in capitals.) |
 | R-HD-135 | A skin MUST NOT name a variant of another texture. |
 | R-HD-136 | A bake MUST name the skin it was made from. Changing a skin MUST NOT change a bake's textures until the skin is baked again. Renaming a baked skin MUST rename it in the bake. Deleting a baked skin MUST be refused (operator 2026-11-25). |
-| R-HD-138 | The skin names of an owner MUST be unique, ignoring case. A change or a skin file that would give two skins one name MUST be refused. `original` and `new` MUST NOT be used in another case (operator 2026-11-25). |
+| R-HD-138 | The skin names of an owner MUST be unique, ignoring case. A change or a skin file that would give two skins one name MUST be refused. `original` MUST NOT be used in another case (operator 2026-11-25). |
 
 ### 3.6 On demand
 
@@ -187,7 +197,26 @@ Implementation lives in
 | R-HD-108 | A game MUST plug in through one written interface: list the textures of a dataset, read an original, name where every texture file of a dataset lies, say how a texture is split into planes and whether it tiles, name its users, list the owners and the textures of each, package the bakes, check a package. |
 | R-HD-109 | A texture file format MUST plug in through one written interface: read, decode, encode. |
 | R-HD-110 | Adding a game or a format MUST NOT take an edit to the core or to another game. |
-| R-HD-111 | StarCraft II is the first game. No other game is built now. Each interface MUST have a second implementation under test. |
+| R-HD-111 | StarCraft II is the first game, StarCraft: Ghost the second (3.11, operator 2026-11-25). Each interface MUST have a second implementation under test. |
+| R-HD-115 | A game MUST be able to say that it bakes nothing, with the reason. Then a bake, an unbake and a package of its datasets MUST be refused with that reason and MUST change no file. Every reader of a state MUST be able to read the reason. [agent: "without BAKING for NOW"] |
+
+### 3.11 StarCraft: Ghost
+
+Operator 2026-11-25: "plan how to add full support for texture upscaling
+to SC:G, only without BAKING for NOW; meaning db, pipeline, viewers,
+menus, the entire shebang, just don't enable baking yet". The choices of
+the plan were the operator's the same day: the material lookup of
+NODExport, owners actor and model, the original's format kept, the bake
+control disabled with the reason.
+
+| ID | Requirement |
+| --- | --- |
+| R-HD-150 | Ghost MUST be a game of the tooling, with one dataset: the extracted game build that `GHOST_PATH` names. The tooling MUST NOT write into the build. |
+| R-HD-151 | Its textures MUST be the texture files the materials of its model files name, found by the material lookup the viewer uses (NODExport). No second copy of the lookup rules MUST exist. |
+| R-HD-152 | Its owners MUST be a model file (`model:`) and an actor, a template of `Global.not` with a model (`actor:`). An actor MUST show its model file. |
+| R-HD-153 | A variant MUST keep its original's compression format: DXT1, DXT3, DXT5, or 32-bit ARGB without compression. Any other file MUST be refused with the reason: DXT2, a cube map, a volume, DXT1 with transparent pixels, a side under 32 pixels. |
+| R-HD-154 | Ghost MUST bake nothing (R-HD-115). The reason MUST be "baking is not enabled for StarCraft: Ghost". |
+| R-HD-155 | Requests, the queue, the limits, skins, New Skin N, removal and edits MUST hold for Ghost as for StarCraft II. |
 
 ### 3.9 Classic skins
 

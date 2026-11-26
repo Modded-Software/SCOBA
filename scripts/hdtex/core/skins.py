@@ -3,7 +3,8 @@
 A skin is a name and a variant id per asset. A skin stands alone: it
 names no other skin.
 `original` names nothing and is not in the file: every texture shows its
-original. `new` is New Skin, the one unsaved skin of an owner (R-HD-137).
+original. A skin made without a name is called New Skin 1, New Skin 2 and
+so on (`next_new`, R-HD-137); it is stored and saved as any other.
 One file per owner, in the dataset's folder of the store. Only this
 module writes it.
 """
@@ -22,8 +23,10 @@ from .store import read_json, write_json
 FORMAT = 1
 FOLDER = "skins"
 ORIGINAL_SKIN = "original"
-NEW = "new"
-NAME = re.compile(r"[A-Za-z0-9_-]{1,40}")
+NEW_PREFIX = "New Skin"
+NUMBERED = re.compile(r"new skin ([0-9]+)")
+# Words of letters, digits, '-' or '_', one space between them; 1 to 40 characters.
+NAME = re.compile(r"(?=.{1,40}$)[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*")
 OWNER = re.compile(r"(unit|actor|model):(.+)")
 
 
@@ -47,22 +50,19 @@ def check_owner(owner: str) -> str:
 def check_name(name: str) -> str:
     if not isinstance(name, str) or not NAME.fullmatch(name):
         raise SkinError(
-            f"a skin name is 1 to 40 letters, digits, '-' or '_'; got {name!r}"
+            f"a skin name is 1 to 40 letters, digits, '-' or '_', with one space between words; got {name!r}"
         )
     if name.lower() == ORIGINAL_SKIN:
         raise SkinError(
             f"{name!r} is the Original skin: it names nothing and cannot be made, changed or removed"
         )
-    if name.lower() == NEW and name != NEW:
-        raise SkinError(f"{name!r} reads as New Skin; New Skin is {NEW!r}")
     return name
 
 
-def check_saved(name: str) -> str:
-    """A name a skin can be saved under: not New Skin's."""
-    if check_name(name) == NEW:
-        raise SkinError(f"{NEW!r} is New Skin; save it under a name of its own")
-    return name
+def next_new(skins: dict[str, Skin]) -> str:
+    """The name of the next skin made without one: New Skin N, N one above the highest in use (from 1)."""
+    numbers = [int(found.group(1)) for name in skins if (found := NUMBERED.fullmatch(name.lower()))]
+    return f"{NEW_PREFIX} {max(numbers, default=0) + 1}"
 
 
 def _taken(skins: dict[str, Skin], name: str, but: str | None = None) -> None:
@@ -169,50 +169,23 @@ def textures_of(skins: dict[str, Skin], name: str) -> dict[str, str]:
     return dict(skins[name].textures)
 
 
-def offered(skins: dict[str, Skin], shows: dict[str, str]) -> dict[str, str] | None:
-    """What the offered New Skin names (R-HD-137); None: none is offered.
-
-    Offered when the owner holds no New Skin, shows a variant that is not
-    the original, and no saved skin names exactly those variants.
-    """
-    look = _changed(shows)
-    if NEW in skins or not look:
-        return None
-    if any(_changed(skin.textures) == look for skin in skins.values()):
-        return None
-    return look
-
-
-def _changed(textures: dict[str, str]) -> dict[str, str]:
-    """The textures that name a variant other than the original."""
-    return {asset: one for asset, one in textures.items() if one != variants.ORIGINAL}
-
-
 def made(
     skins: dict[str, Skin], name: str, textures: dict[str, str]
 ) -> dict[str, Skin]:
-    """The skins with a new one naming `textures`. New Skin is refused while it is stored."""
-    if check_name(name) == NEW and NEW in skins:
-        raise SkinError(f"there is a skin {NEW!r} already; save or discard New Skin first")
-    _taken(skins, name)
+    """The skins with a new one naming `textures`."""
+    _taken(skins, check_name(name))
     return {**skins, name: Skin(name, dict(textures))}
-
-
-def with_new(skins: dict[str, Skin], start: dict[str, str]) -> dict[str, Skin]:
-    """The skins with New Skin stored: as it is, else naming `start` (R-HD-137)."""
-    return skins if NEW in skins else made(skins, NEW, start)
 
 
 def copied(skins: dict[str, Skin], source: str, name: str) -> dict[str, Skin]:
     """The skins with a new one naming what `source` names now (R-HD-133)."""
-    _taken(skins, check_name(name))
-    return {**skins, name: Skin(name, textures_of(skins, source))}
+    return made(skins, name, textures_of(skins, source))
 
 
 def renamed(skins: dict[str, Skin], name: str, new: str) -> dict[str, Skin]:
     if check_name(name) not in skins:
         raise SkinError(f"there is no skin {name!r}")
-    _taken(skins, check_saved(new), but=name)
+    _taken(skins, check_name(new), but=name)
     found = {key: skin for key, skin in skins.items() if key != name}
     found[new] = skins[name]._replace(name=new)
     return found

@@ -8,7 +8,7 @@
 // item of it is applied again. A change made here emits that event.
 // While Ctrl+. is held, the items held show Original (`peek`, R-VIEW-148).
 
-import { isUsable, NEW_SKIN, ORIGINAL, ORIGINAL_SKIN, recipeOf, textureRoutes, type OwnerLookup, type OwnerState, type TexturesBody, type TextureState } from '../../shared/textures';
+import { EMPTY_HEAD, hasSkin, headPart, isUsable, namedIn, ORIGINAL, ORIGINAL_SKIN, recipeOf, skinLabel, textureRoutes, type OwnerLookup, type OwnerState, type TexturesBody, type TextureState } from '../../shared/textures';
 import type { EventBus, ViewerEvents } from './bus';
 import type { GameRegistry, StatusService } from './context';
 import type { Host } from './host';
@@ -20,9 +20,11 @@ import type { Item } from './types';
 export interface SkinTools {
   /** Show this skin on the item, then open the texture window on it. */
   edit(item: Item, skin: string): void;
+  /** Make the next New Skin N from the item's skin, show it, then open the texture window on it (R-HD-137). */
+  create(item: Item): void;
   /** Open the upscale dialog on the item's whole owner. */
   upscale(item: Item): void;
-  /** Ask, then delete a saved skin of the item's owner, or discard New Skin (R-VIEW-126). False: cancelled. */
+  /** Ask, then delete a skin of the item's owner (R-VIEW-126). False: cancelled. */
   remove(item: Item, skin: string): Promise<boolean>;
 }
 
@@ -39,7 +41,7 @@ export interface Skins {
   owner(item: Item): OwnerState | null;
   /** Read an owner; null when the service holds no such owner. */
   readOwner(game: string, dataset: string, owner: string): Promise<OwnerState | null>;
-  /** The skin names an item may choose: `original`, the saved skins, `new` when the owner has it; empty: it has no skin controls. */
+  /** The skin names an item may choose: `original`, then the owner's skins; empty: it has no skin controls. */
   choices(item: Item): string[];
   /** Show an item's skin on its instance, and measure what it shows. */
   apply(item: Item): Promise<void>;
@@ -51,6 +53,8 @@ export interface Skins {
   shownSkin(item: Item): string;
   /** Bake the item's skin for its owner; `original` unbakes (R-VIEW-122). A refusal is thrown with its reason. */
   bake(item: Item): Promise<void>;
+  /** Why the item's game bakes nothing (R-VIEW-151); empty: it bakes, or its owner is not read yet. */
+  bakeRefusal(item: Item): string;
   /** POST a change to a texture route; the textures of that dataset are read again. A refusal is thrown with its reason. */
   change<T>(game: string, dataset: string, route: string, body: unknown): Promise<T>;
   /** Whether the item's skin waits on variants still being made: their states are read again each second. */
@@ -80,24 +84,27 @@ async function answer<T>(response: Response, what: string): Promise<T> {
   return found as T;
 }
 
-/**
- * What a skin names for one texture. Original names nothing, and a texture a skin does not name is its
- * original (R-HD-131). A skin the owner does not have is refused.
- */
-export function shownVariant(owner: OwnerState, skin: string, asset: string): string {
-  if (skin === ORIGINAL_SKIN) return ORIGINAL;
-  const found = owner.skins.find((one) => one.name === skin);
-  if (!found) throw new Error(`${owner.owner} has no skin "${skin}"`);
-  return found.textures[asset] ?? ORIGINAL;
-}
+/** What a failed quality check means for the eye, by limit (SPEC-HD-TEXTURES limits). */
+const CHECK_MEANS: Record<string, string> = {
+  seam: 'its edges would show as lines where it repeats',
+  encode_psnr: 'it would look blocky after compression',
+  correlation: 'it does not match the original picture',
+  coarse_rmse: 'from far away its brightness or colour would be wrong',
+};
 
-/** Why a named variant cannot be shown now: it is stale, has a problem not accepted, or is not made and not asked for. */
+/** Why a named variant cannot be shown now, in plain words: stale, a failed check not accepted, or never made. */
 function unshowable(state: TextureState | undefined, variant: string): string {
   const found = state?.variants.find((one) => one.id === variant);
-  if (!state) return 'the texture service does not know the texture';
-  if (!found) return 'it is not made, and no request for it runs';
-  return found.stale ? 'it is stale: its original changed' : 'it has a problem that is not accepted';
+  if (!state) return 'the texture service does not know this texture';
+  if (!found) return 'its upscaled version was never made';
+  if (found.stale) return `its upscaled version is out of date: ${found.staleWhy || 'the original changed'}; upscale it again`;
+  const checks = found.problems.map((one) => `${one.limit} check (${one.value === null ? 'no number' : Number(one.value.toFixed(2))}, limit ${Number(one.bound.toFixed(2))})`).join(', ');
+  const means = found.problems.map((one) => CHECK_MEANS[one.limit]).filter(Boolean).join('; ');
+  return `its upscale failed the ${checks}${means ? `: ${means}` : ''}`;
 }
+
+/** The file name of an asset path, for a message. */
+const fileOf = (asset: string): string => asset.split(/[\\/]/).at(-1) ?? asset;
 
 export function createSkins({ host, games, status, events, items }: SkinDeps): Skins {
   /** By game and dataset: the states asked so far, by asset (null: no texture), and the owners (null: none). */
@@ -111,7 +118,7 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
 
   const entryOf = (game: string, dataset: string) => {
     const key = keyOf(game, dataset);
-    const found = known.get(key) ?? { head: { sizes: [], models: [], limits: [] }, states: new Map(), owners: new Map() };
+    const found = known.get(key) ?? { head: EMPTY_HEAD, states: new Map(), owners: new Map() };
     known.set(key, found);
     return found;
   };
@@ -124,7 +131,7 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     const missing = [...new Set(assets)].filter((asset) => !entry.states.has(asset));
     if (missing.length) {
       const body = await answer<TexturesBody>(await fetch(textureRoutes.states(game, dataset, missing)), `the texture states of ${dataset}`);
-      entry.head = { sizes: body.sizes, models: body.models, limits: body.limits };
+      entry.head = headPart(body);
       for (const asset of missing) entry.states.set(asset, null);
       for (const state of body.textures) entry.states.set(state.asset, state);
     }
@@ -151,7 +158,9 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     const entry = entryOf(game, dataset);
     if (!entry.owners.has(owner)) {
       const response = await fetch(textureRoutes.owner(game, dataset, owner));
-      entry.owners.set(owner, (await answer<OwnerLookup>(response, `the owner ${owner} in ${dataset}`)).owner);
+      const body = await answer<OwnerLookup>(response, `the owner ${owner} in ${dataset}`);
+      entry.head = headPart(body);
+      entry.owners.set(owner, body.owner);
     }
     return entry.owners.get(owner) ?? null;
   }
@@ -195,6 +204,8 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     const override = item.capabilities.textureOverride;
     if (!override) {
       item.largestTexture = 0;
+      item.unshown = [];
+      item.missingSkin = false;
       ownerOfItem.delete(item);
       return;
     }
@@ -202,23 +213,31 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     const assetOf = games.partsOf(item.game).textureAsset;
     const name = ownerOf(item);
     const urls = new Map<TextureSlot, string>();
+    /** The named variants that cannot be shown: their slots keep the model's own texture; the others show theirs. */
+    const unshown: { key: string; asset: string; why: string }[] = [];
     let owner: OwnerState | null = null;
+    /** The item names a skin its owner does not have: no slot is overridden, and it is said (SPEC-VIEWER 17.4). */
+    let missing = false;
     if (assetOf && name && offered(item.game) && slots.length) {
       owner = await readOwner(item.game, item.dataset, name);
-      if (owner) {
+      missing = owner !== null && !hasSkin(owner, shownSkin(item));
+      if (owner && !missing) {
         const body = await states(item.game, item.dataset, slots.map((slot) => assetOf(slot.source)));
         const byAsset = new Map(body.textures.map((state) => [state.asset, state]));
         const waiting = new Set<string>();
         for (const slot of slots) {
           const asset = assetOf(slot.source);
           const state = byAsset.get(asset);
-          const named = shownVariant(owner, shownSkin(item), asset);
+          const named = namedIn(owner, shownSkin(item), asset);
           if (named === ORIGINAL) continue;
           const own = variantUrl(item.game, item.dataset, state, named);
           if (own !== null) urls.set(slot, own);
           // Still being made: the model's own texture until it is, read again each second (17.4).
           else if (state && isOpen(state, named)) waiting.add(asset);
-          else throw new Error(`skin "${item.skin}" of ${owner.owner}: ${asset}: ${named} cannot be shown: ${unshowable(state, named)}`);
+          else if (!unshown.some((one) => one.asset === asset)) {
+            const why = unshowable(state, named);
+            unshown.push({ key: `${asset}: ${named}: ${why}`, asset, why });
+          }
         }
         if (waiting.size) follow(item, [...waiting]);
       }
@@ -226,6 +245,15 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     // Swapped while the states came: leave the new instance alone.
     if (item.instance !== instance) return;
     ownerOfItem.set(item, owner);
+    // Said once, when it becomes so; it stays in item.missingSkin while it is.
+    if (missing && !item.missingSkin && owner) status.setStatus(`${owner.title}: skin "${item.skin}" does not exist in ${item.dataset}; it shows its own textures until another skin is chosen.`, { failure: true });
+    item.missingSkin = missing;
+    // Each texture that cannot be shown is said once, when it becomes so; it stays in item.unshown while it is.
+    const said = new Set(item.unshown);
+    item.unshown = [...unshown].map((one) => one.key);
+    for (const one of unshown) {
+      if (!said.has(one.key)) status.setStatus(`${owner?.title ?? ''}, ${skinLabel(item.skin)}: ${fileOf(one.asset)} keeps its original texture. ${one.why[0]?.toUpperCase() ?? ''}${one.why.slice(1)}.`, { failure: true });
+    }
     let largest = 0;
     for (const slot of slots) {
       const url = urls.get(slot);
@@ -248,23 +276,24 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
   function choices(item: Item): string[] {
     const owner = ownerOfItem.get(item);
     if (!owner) return [];
-    // Original, the saved skins, then New Skin (stored or offered).
-    const saved = owner.skins.filter((skin) => skin.name !== NEW_SKIN).map((skin) => skin.name);
-    return [ORIGINAL_SKIN, ...saved, ...(owner.skins.some((skin) => skin.name === NEW_SKIN) ? [NEW_SKIN] : [])];
+    // Original, then the skins the owner holds, as the pipeline sorts them.
+    return [ORIGINAL_SKIN, ...owner.skins.map((skin) => skin.name)];
   }
 
-  /** A skin that cannot be shown is refused: the item keeps the skin it had, shown again. */
+  /**
+   * A skin the owner does not have is refused before anything changes. A named variant that cannot be shown is no
+   * refusal: its slot shows the model's own texture (item.unshown). A file that does not load is thrown after the
+   * choice is made: the item is on the chosen skin and the failure is said.
+   */
   async function set(item: Item, skin: string): Promise<void> {
-    const before = item.skin;
+    const id = ownerOf(item);
+    const owner = id ? await readOwner(item.game, item.dataset, id) : null;
+    if (!owner) throw new Error('this instance has no texture owner');
+    if (!hasSkin(owner, skin)) throw new Error(`${owner.owner} has no skin "${skin}"`);
     item.skin = skin;
-    try {
-      await apply(item);
-    } catch (failure) {
-      item.skin = before;
-      await apply(item);
-      throw failure;
-    }
     events.emit('scene-edited', { what: 'skin' });
+    events.emit('skin-set', { item });
+    await apply(item);
   }
 
   /** No scene-edited event: the hold changes no choice. Items without skins are left alone. */
@@ -285,9 +314,14 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     return found;
   }
 
+  /** Why the item's game bakes nothing, as its dataset's head said with its owner (R-VIEW-151); empty: it bakes. */
+  const bakeRefusal = (item: Item): string => known.get(keyOf(item.game, item.dataset))?.head.bake ?? '';
+
   async function bake(item: Item): Promise<void> {
     const owner = ownerOf(item);
     if (!owner) throw new Error('this instance has no texture owner');
+    const refused = bakeRefusal(item);
+    if (refused) throw new Error(refused);
     if (item.skin === ORIGINAL_SKIN) await change(item.game, item.dataset, textureRoutes.unbake(item.game, item.dataset), { owner });
     else await change(item.game, item.dataset, textureRoutes.bake(item.game, item.dataset), { owner, skin: item.skin });
   }
@@ -297,5 +331,5 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     for (const item of items()) if (item.game === game && item.dataset === dataset) apply(item).catch(status.reportFailure);
   });
 
-  return { offered, states, judge, ownerOf, owner: (item) => ownerOfItem.get(item) ?? null, readOwner, choices, apply, set, peek, shownSkin, bake, change, following: (item) => polling.has(item), variantUrl, tools: () => tools, setTools: (made) => (tools = made) };
+  return { offered, states, judge, ownerOf, owner: (item) => ownerOfItem.get(item) ?? null, readOwner, choices, apply, set, peek, shownSkin, bake, bakeRefusal, change, following: (item) => polling.has(item), variantUrl, tools: () => tools, setTools: (made) => (tools = made) };
 }

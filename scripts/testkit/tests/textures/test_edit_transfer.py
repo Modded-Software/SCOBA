@@ -8,7 +8,7 @@ from __future__ import annotations
 import subprocess
 from unittest import mock
 
-from hdtex.core import dds, edits, edittransfer, encode, limits, photocraft, progress, variants
+from hdtex.core import dds, edits, edittransfer, encode, limits, photocraft, progress, results, variants
 from hdtex.core.interfaces import FAILED
 from hdtex.core.roles import ROLES
 from hdtex.core.store import file_sha256
@@ -88,6 +88,16 @@ class TransferTest(TransferCase):
         # Negative: the original is the file it was, and nothing was handed to the upscaler.
         self.assertEqual(file_sha256(self.original_file()), original)
         self.assertEqual(self.runner.asked, [])
+
+    def test_an_edit_is_joined_across_the_border_only_for_a_texture_that_tiles(self) -> None:
+        found = {}
+        for tiles in (True, False):
+            self.add(tiles=tiles)
+            with mock.patch.object(edittransfer.encode, "encode", wraps=encode.encode) as called:
+                variant = self.transfer(self.edited() if tiles else self.inverted())
+            found[tiles] = (called.call_args.kwargs["tiles"], self.entry(variant)[results.TILES], self.shown(variant)["stale"])
+        # Negative: the one that does not tile is not joined across it; neither is stale.
+        self.assertEqual(found, {True: (True, True, False), False: (False, False, False)})
 
     def test_the_same_scratch_twice_is_one_variant(self) -> None:
         session = self.edited()
@@ -204,7 +214,7 @@ class LimitsTest(TransferCase):
     def test_a_models_variant_with_such_pixels_has_the_problem_and_its_bake_is_refused(self) -> None:
         self.runner.enlarge = invert
         self.ok("request", "--asset", ROCK, "--variant", UP)
-        [shown] = self.indexed()["variants"]
+        shown = self.shown(UP)
         self.assertEqual(shown["edited"], False)
         self.assertIn("correlation", [miss["limit"] for miss in shown["problems"]])
         self.assertIn(limits.PROBLEM, {number["band"] for number in shown["numbers"]})
@@ -214,7 +224,7 @@ class LimitsTest(TransferCase):
 
     def upscaled(self, edit: str) -> str:
         """A model's variant made from the edited variant `edit`."""
-        [made] = self.ok("request", "--asset", ROCK, "--input", edit, "--model", "pbrify", "--size", "256")["made"]
+        [made] = self.ok("request", "--asset", ROCK, "--input", edit, "--model", "pbrify", "--factor", "4")["made"]
         return made["variant"]
 
     def test_a_models_variant_made_from_an_edit_is_compared_with_the_edit(self) -> None:
@@ -247,5 +257,5 @@ class LimitsTest(TransferCase):
     def test_a_variant_with_no_edit_among_its_inputs_keeps_the_original_as_its_reference(self) -> None:
         self.ok("request", "--asset", ROCK, "--variant", UP)
         self.assertEqual(self.entry(UP)["reference"], "")
-        [shown] = self.indexed()["variants"]
+        shown = self.shown(UP)
         self.assertEqual((shown["reference"], shown["problems"]), ("", []))

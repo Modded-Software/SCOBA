@@ -120,7 +120,7 @@ def _wait(
 
 
 def _ask(
-    runner: Runner, source: Path, folder: Path, output: Path, model: str
+    runner: Runner, source: Path, folder: Path, output: Path, model: str, tiles: bool
 ) -> str | None:
     """See that `output` is made. Returns the job to wait for. None: the output is there."""
     job = job_of(folder)
@@ -141,7 +141,7 @@ def _ask(
             before.state,
             f": {before.error}" if before.error else "",
         )
-    job = runner.submit(source, folder, model)
+    job = runner.submit(source, folder, model, tiles)
     write_json(folder / JOB_FILE, {"job": job})
     return job
 
@@ -176,10 +176,10 @@ def _step(
         if given is None:
             continue
         source = game.plane_path(game.put_plane(given))
-        folder = game.upscale_dir(source.stem, model.model_for(plane), version)
+        folder = game.upscale_dir(source.stem, model.model_for(plane), version, texture.tiles)
         outputs[plane.name] = runner.output(source, folder)
         folders.append(str(folder))
-        job = _ask(runner, source, folder, outputs[plane.name], model.model_for(plane))
+        job = _ask(runner, source, folder, outputs[plane.name], model.model_for(plane), texture.tiles)
         if job is not None:
             jobs[job] = outputs[plane.name]
     note(phase=UPSCALING, jobs=folders)
@@ -226,7 +226,8 @@ def _make(
     reference_id = ""
     for index, prefix in enumerate(variants.prefixes(recipe)):
         kept = game.entry(texture.origin, prefix)
-        there = kept is not None and kept["original"]["sha256"] == sha256
+        # Kept, of the original as it is, with its edges made for this texture's rule (results.edges_off).
+        there = kept is not None and kept["original"]["sha256"] == sha256 and not results.edges_off(kept, texture.tiles)
         # A recipe that holds no planes is whole as variants. The next step cannot build on it.
         if there and (kept["planes"] or prefix == recipe):
             LOG.info("step %d, %s: its variants are there", index + 1, prefix)
@@ -268,7 +269,7 @@ def _make(
         )
         planes = step["planes"]
         LOG.info("step %d, %s: encoding", index + 1, prefix)
-        encoded = encode.encode(original, role, planes, reference)
+        encoded = encode.encode(original, role, planes, reference, tiles=texture.tiles)
         entry = game.write_recipe(
             texture.origin,
             prefix,
@@ -287,6 +288,7 @@ def _make(
                 "models": step["models"],
                 "runner": step["runner"],
                 "encoder": encode.ENCODER_VERSION,
+                results.TILES: texture.tiles,
                 "numbers": encoded.numbers,
             },
             encoded.files,
@@ -314,6 +316,40 @@ def _logged(path: Path) -> Iterator[None]:
         handler.close()
 
 
+def _longest(texture: Texture, original: Path) -> int:
+    try:
+        header = dds.parse(original)
+    except dds.DdsError as error:
+        raise RequestError(
+            f"{texture.asset}: its original cannot be read: {error}"
+        ) from error
+    return max(header.width, header.height)
+
+
+def _cap() -> int:
+    try:
+        return variants.max_side()
+    except variants.VariantError as error:
+        raise RequestError(str(error)) from error
+
+
+def by_factor(dataset: Dataset, texture: Texture, given: str, model: str, factor: int) -> str:
+    """The variant `factor` times its input's side asks for, at most the largest side (R-HD-123)."""
+    try:
+        recipe = variants.extended(given, model)
+    except variants.VariantError as error:
+        raise RequestError(f"{texture.asset}: {error}") from error
+    if reason := model_refusal(texture, recipe):
+        raise RequestError(f"{texture.asset}, {recipe}: {reason}")
+    longest = _longest(texture, dataset.original(texture))
+    if reason := refusal(texture, recipe, longest):
+        raise RequestError(f"{texture.asset}, {recipe}: {reason}")
+    side, reason = variants.factor_side(recipe, factor, longest, _cap())
+    if reason:
+        raise RequestError(f"{texture.asset}, {recipe}, {factor}x: {reason}")
+    return variants.variant_id(recipe, side)
+
+
 def make(
     dataset: Dataset,
     runner: Runner,
@@ -322,6 +358,8 @@ def make(
     wait: Callable[[float], None] = time.sleep,
 ) -> dict:
     """Make a variant of a texture: its recipe, at every kept size, and the recipes before it. Returns the recipe's entry.
+
+    Its size is at most the largest side (variants.max_side).
 
     What is there and not stale is not made again. A refused request leaves
     nothing. A failure leaves the reason in request.json, its trace in
@@ -347,13 +385,12 @@ def make(
     if reason := model_refusal(texture, recipe):
         raise RequestError(f"{texture.asset}, {recipe}: {reason}")
     original = dataset.original(texture)
-    try:
-        header = dds.parse(original)
-    except dds.DdsError as error:
+    longest = _longest(texture, original)
+    cap = _cap()
+    if size > cap:
         raise RequestError(
-            f"{texture.asset}: its original cannot be read: {error}"
-        ) from error
-    longest = max(header.width, header.height)
+            f"{texture.asset}, {variant}: {size} is above the largest side, {cap} ({variants.MAX_SIDE_ENV})"
+        )
     if reason := refusal(texture, recipe, longest) or variants.size_refusal(
         recipe, size, longest
     ):

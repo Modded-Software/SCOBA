@@ -15,6 +15,7 @@ class BlockCodec:
         self.id = key
         self.opaque = opaque
         self.blocks = blocks
+        self.masks = None  # a FourCC format
 
     def level_size(self, width: int, height: int) -> int:
         return bc3.block_count(width, height) * self.blocks.BLOCK_BYTES

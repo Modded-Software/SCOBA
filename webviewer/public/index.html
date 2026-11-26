@@ -43,6 +43,7 @@
     <button id="ground-button" title="choose a ground texture" hidden>ground</button>
     <button id="sky-button" title="choose a skybox">sky</button>
   </nav>
+  <button id="controls-button" title="controls: mouse buttons, keys and rates" aria-label="controls"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M6.6 1h2.8l.4 2 1.3.7 1.9-.8 1.4 2.4-1.5 1.4v1.5l1.5 1.4-1.4 2.4-1.9-.8-1.3.7-.4 2H6.6l-.4-2-1.3-.7-1.9.8-1.4-2.4 1.5-1.4V6.7L1.6 5.3 3 2.9l1.9.8 1.3-.7zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg></button>
   <!-- The page is one bundle (src/page/main.ts). When it does not load, nothing of the page runs: these lines say so, naming the file. -->
   <p id="load-failure" role="alert" hidden></p>
   <script src="/vendor/renderer.js" onerror="const text = 'page bundle did not load: ' + this.getAttribute('src') + '; restart the viewer server'; console.error('scobaeditor: ' + text); const node = document.getElementById('load-failure'); node.textContent = text; node.hidden = false;"></script>

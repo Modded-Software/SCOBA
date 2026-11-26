@@ -14,6 +14,7 @@ class PlainCodec:
 
     id = "RAW4"
     opaque = False
+    masks = None  # named by a FourCC
 
     def level_size(self, width: int, height: int) -> int:
         return width * height * 4
@@ -46,7 +47,9 @@ class TableTest(unittest.TestCase):
 
 class CoreFormatsTest(unittest.TestCase):
     def test_the_core_brings_dxt1_and_dxt5_and_the_four_roles(self) -> None:
-        self.assertEqual(registry.CODECS.ids(), ("DXT1", "DXT5"))
+        # A game may register more formats from its own package (Ghost: SPEC-HD-TEXTURES 6.3).
+        core = sorted(key for key, codec in registry.CODECS.items.items() if type(codec).__module__ == "hdtex.core.codecs")
+        self.assertEqual(core, ["DXT1", "DXT5"])
         self.assertEqual(
             roles.ROLES.ids(), ("data", "diffuse", "normal", "normal_red")
         )

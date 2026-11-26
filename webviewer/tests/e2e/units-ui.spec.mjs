@@ -147,10 +147,11 @@ test('a drop above the horizon places nothing and says why', async ({ page }) =>
   const problems = watch(page);
   await open(page);
   // Tilt the camera level (middle drag), so the top of the view shows sky:
-  // 112 px up at 0.004 rad/px lowers the pitch from 0.5 to 0.052.
+  // 187 px up at 0.004 x 0.6 rad/px (the mouse sensitivity with nothing
+  // stored, R-VIEW-150) lowers the pitch from 0.5 to 0.051.
   await page.mouse.move(700, 400);
   await page.mouse.down({ button: 'middle' });
-  await page.mouse.move(700, 288, { steps: 5 });
+  await page.mouse.move(700, 213, { steps: 5 });
   await page.mouse.up({ button: 'middle' });
   const pitch = (await state(page)).camera.pitch;
   expect(pitch).toBeLessThan(0.1);
@@ -321,14 +322,68 @@ test('team colour can be set per unit and reaches the engine instance', async ({
   await addUnit(page, 'marine', 'Marine');
   await addUnit(page, 'marine', 'Marine');
   const before = await state(page);
-  const team = page.locator('#scene li').first().locator('select.team');
-  await team.selectOption('1');
+  const team = page.locator('#scene li').first().locator('.team');
+  await team.locator('.swatch-button').click();
+  const shownList = page.locator('.swatch-list:not([hidden])');
+  await expect(shownList).toHaveCount(1);
+  // Each entry: a colour box in the shaders' team colour, then its name.
+  const entries = await shownList.locator('.swatch-entry').evaluateAll((all) => all.map((e) => [getComputedStyle(e.querySelector('.swatch')).backgroundColor, e.textContent]));
+  expect(entries.length).toBe(14);
+  expect(entries[0]).toEqual(['rgb(255, 3, 3)', 'team 1']);
+  expect(entries[1]).toEqual(['rgb(0, 66, 255)', 'team 2']);
+  expect(new Set(entries.map((e) => e[0])).size).toBe(14);
+  // Reachable as a person sees it: every entry inside the window, on top at its own centre (nothing clips or covers it), the list next to the button.
+  const reach = await page.evaluate(() => {
+    const list = document.querySelector('.swatch-list:not([hidden])');
+    const button = document.querySelector('#scene li .team .swatch-button').getBoundingClientRect();
+    const box = list.getBoundingClientRect();
+    const hits = [...list.querySelectorAll('.swatch-entry')].map((e) => {
+      const r = e.getBoundingClientRect();
+      const inside = r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth;
+      return inside && e.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+    });
+    return { hits, gap: Math.min(Math.abs(box.top - button.bottom), Math.abs(button.top - box.bottom)) };
+  });
+  console.log('team list reach', JSON.stringify(reach));
+  expect(reach.hits).toEqual(Array(14).fill(true));
+  expect(reach.gap).toBeLessThan(8);
+  // A real click on the entry chooses it.
+  const second = await shownList.locator('.swatch-entry[data-value="1"]').boundingBox();
+  await page.mouse.click(second.x + second.width / 2, second.y + second.height / 2);
   const after = await state(page);
   expect(after.items[0].team).toBe(1);
   expect(after.items[0].engineTeam).toBe(1);
   expect(after.items[0].engineTeam).not.toBe(before.items[0].engineTeam);
+  // The button shows the chosen team's box and name; the list closed.
+  expect(await team.locator('.swatch-button').evaluate((b) => [getComputedStyle(b.querySelector('.swatch')).backgroundColor, b.textContent])).toEqual(['rgb(0, 66, 255)', 'team 2']);
+  await expect(page.locator('.swatch-list:not([hidden])')).toHaveCount(0);
+  // Negative: a press outside closes an open list and chooses nothing.
+  await team.locator('.swatch-button').click();
+  await expect(page.locator('.swatch-list:not([hidden])')).toHaveCount(1);
+  // (The list may open upwards over the instance search: press the gallery's search, which it does not cover.)
+  await page.locator('#search-units').click();
+  await expect(page.locator('.swatch-list:not([hidden])')).toHaveCount(0);
+  expect((await state(page)).items[0].team).toBe(1);
   // Negative: the other marine keeps its team.
   expect(after.items[1].engineTeam).toBe(before.items[1].engineTeam);
+  // The wheel over the button steps to the next team.
+  await team.locator('.swatch-button').hover();
+  await page.mouse.wheel(0, 100);
+  expect((await state(page)).items[0].team).toBe(2);
+  expect(problems).toEqual([]);
+});
+
+test('the row trash is the trash icon; it removes that instance only', async ({ page }) => {
+  const problems = watch(page);
+  await open(page);
+  await addUnit(page, 'marine', 'Marine');
+  await addUnit(page, 'marine', 'Marine');
+  const before = await state(page);
+  const remove = page.locator('#scene li').first().locator('button.remove');
+  expect(await remove.evaluate((b) => ({ svg: b.querySelector('svg') !== null, text: b.textContent.trim(), trash: b.classList.contains('trash') }))).toEqual({ svg: true, text: '', trash: true });
+  await remove.click();
+  const after = await state(page);
+  expect(after.items.map((i) => i.id)).toEqual([before.items[1].id]);
   expect(problems).toEqual([]);
 });
 

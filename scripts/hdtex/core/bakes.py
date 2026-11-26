@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from . import skins, variants
+from .interfaces import GameAdapter
 from .store import read_json, write_json
 
 FORMAT = 1
@@ -19,6 +20,12 @@ FILE = "bakes.json"
 
 class BakeError(ValueError):
     """A bake or a bake file is not valid."""
+
+
+def refuse(adapter: GameAdapter) -> None:
+    """Refuse a bake, an unbake or a package of a game that bakes nothing, before any file is read or written (R-HD-115)."""
+    if adapter.bakes:
+        raise BakeError(f"{adapter.id}: {adapter.bakes}")
 
 
 class Bake(NamedTuple):

@@ -2,7 +2,8 @@
 //
 // One wheel notch (deltaY 100) moves the camera a share of its distance:
 // 15% with the eye high up, less as it comes down to the ground (down to
-// 1.8% at 1.2 units and below). Ctrl makes every step a quarter.
+// 1.8% at 1.2 units and below). Ctrl makes every step a quarter. The mouse
+// sensitivity (0.6 when none is stored, R-VIEW-150) scales every step.
 // The zoom works from the eye's height above the ground (z = 0): when a
 // zoom starts, the target is moved to where the view line meets the
 // ground, the eye staying put, so the distance is the eye height over
@@ -37,7 +38,7 @@ export interface Zoom {
   notchShare(distance: number, ctrl: boolean): number;
 }
 
-export function createZoom(camera: CameraState, rig: { eye(): Vec3; applyCamera(): void }): Zoom {
+export function createZoom(camera: CameraState, rig: { eye(): Vec3; applyCamera(): void; sensitivity(): number }): Zoom {
   /**
    * Put the target on the ground along the view line, the eye staying put.
    * False when the view line does not meet the ground in front of the eye.
@@ -106,7 +107,8 @@ export function createZoom(camera: CameraState, rig: { eye(): Vec3; applyCamera(
       rig.applyCamera();
     }
     const start = zoomGoal ?? camera.distance;
-    const step = Math.log(1 + notchShare(start, e.ctrlKey)) * notches;
+    // The mouse sensitivity scales each step too (R-VIEW-150).
+    const step = Math.log(1 + notchShare(start, e.ctrlKey) * rig.sensitivity()) * notches;
     zoomGoal = Math.min(MAX_DISTANCE, Math.max(nearest(), start * Math.exp(step)));
     if (!gliding) {
       zoomTime = performance.now();

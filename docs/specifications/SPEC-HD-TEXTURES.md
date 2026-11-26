@@ -123,9 +123,17 @@ kept in one folder (4.4).
 - A texture without a colour plane takes `fast` only. A request with
   `pbrify` or `seedvr2` for it is refused with the reason. A skin request
   for many textures (4.6) gives such a texture `fast` at the same size.
-- Sizes: 1024, 2048, 4096. A recipe's own size is four times its input's
-  longest side, at most 4096. A size above it is refused (R-HD-123). A
-  recipe whose own size is below 1024 has that size only.
+- Factors: 2x and 4x (operator 2026-11-26). A request names a factor; its
+  size is the factor times the input's longest side, at most the largest
+  side and at most the recipe's own size (`variants.factor_side`). The
+  largest side is `TEXTURE_MAX_SIDE`: 1024, 2048 or 4096; unset, 4096;
+  another value is an error. A factor whose size is not above the input's
+  side is refused: it adds nothing. A size above the largest side is
+  refused (R-HD-123).
+- A recipe's own size is four times its input's longest side, at most
+  4096. It is kept at its own size, at each half down to the first of 1024
+  or less, and always at its own half: the 2x of a 4x model (`store.kept_sizes`).
+  An odd side has no half.
 - A `pbrify` or `fast` step whose input already has a side of 4096 is
   refused: it can add nothing.
 - The size rule needs the original's longest side. A side of 0 or below
@@ -140,11 +148,14 @@ One step, per plane:
 
 1. The input is the plane of the input variant, or of the original.
 2. An input above 2048 on a side is halved until it is not.
-3. The runner upscales it four times, with edges made to match.
+3. The runner upscales it four times. Only for a texture that tiles are
+   its edges made to match (`--tiling`); for one that does not, its edges
+   are taken as they come.
 4. The output is halved until no side is above 4096: the recipe's own
    size.
 
-Then the planes are joined, matched to the original's coarse content,
+Then the planes are joined (wrapped across the border only for a texture
+that tiles), matched to the original's coarse content,
 given a mip chain, and encoded. A variant at a smaller size is that mip
 chain without its largest levels. Colour is halved and averaged in linear
 light (H6). In each step a flip book gets a rim of 16 of its own edge
@@ -158,7 +169,8 @@ An edited variant is what the transfer of an edit makes
 (SPEC-PHOTOCRAFT 10, `core/edittransfer.py`). The planes the edit
 changed are the scratch's rendered planes; the others are the input's
 own. They are joined with no source, so the result is not matched to the
-original's coarse content. It has one size, its input's. No model and no
+original's coarse content; across the border only for a texture that
+tiles. The entry keeps `tiles`. It has one size, its input's. No model and no
 runner takes part, and `request` cannot make one. Its entry holds `edit`:
 the input, the changed planes, the hash and the session.
 
@@ -180,12 +192,21 @@ git, not on the repository disk (R-HD-85). The store holds no queue: the queue i
 | `<game>/index/` | the game's own caches |
 | `index.sqlite` | the state index (4.9) |
 
-- An upscale's recipe: the hash of the input plane, the model, and the
-  runner's version. Equal recipes share one folder, so a plane is upscaled
-  once (R-HD-6, R-HD-86).
+- An upscale's recipe: the hash of the input plane, the model, the
+  runner's version, and `edges as they come` for a texture that does not
+  tile. Equal recipes share one folder, so a plane is upscaled once
+  (R-HD-6, R-HD-86).
 - Datasets that resolve an asset to the same origin share its variants
   (R-HD-87).
-- A variant whose original now has another hash is stale (R-HD-88).
+- A variant whose original now has another hash is stale (R-HD-88). The
+  state gives the reason as `staleWhy`.
+- A variant whose edges were made for the other rule is not stale: it is
+  shown and may be baked (operator 2026-11-26). Its entry's `tiles`
+  differs from the texture's; an entry without `tiles` was made with
+  matched edges. The state marks it `edgesOff`; a request of it makes it
+  again, and the viewer does not skip that request. An edited variant is
+  never off (`results.edges_off`). Was, for one hour: stale, which hid
+  every SC2 model variant made before 2026-11-26.
 - A file is written under a temporary name and renamed. A variant's entry
   is written last and removed first, so half a variant is never read as
   one. A failed request leaves no variant. Upscaled planes stay
@@ -232,9 +253,11 @@ to variant id (R-HD-130, 131). A skin names no other skin: a copy or an
 upscale reads its source once, and keeps no link to it.
 
 - `original` is no entry: it names nothing (R-HD-132). A name is 1 to 40
-  letters, digits, `-` or `_`. `original` is refused as a name, `new` as
-  a name to save under; both in any case. The names of an owner are
-  unique ignoring case (R-HD-138): a copy, an upscale or a rename to a
+  characters: words of letters, digits, `-` or `_`, one space between
+  them. `original` is refused as a name, in any case. The rule's cases
+  are data of `hdtex.core`, `skin_names.json`: `skins.check_name` and the
+  viewer's `skinNameRefusal` are each tested against every row. The names
+  of an owner are unique ignoring case (R-HD-138): a copy, an upscale or a rename to a
   name another skin holds is refused. A case change of one skin is no
   clash.
 - A store file (skins, bakes) with a key given twice is refused; the
@@ -246,16 +269,16 @@ upscale reads its source once, and keeps no link to it.
   names `original` for each texture of the owner its skin does not name,
   so the game shows what the viewer previews.
 - A bake of `original` is refused: `unbake` removes a bake.
-- `new` is New Skin (R-HD-137). It is stored like any skin. `set` or
-  `rename` on an owner without a stored `new` stores it first: as the
-  offered New Skin below, else empty. `rename --name new --new N` saves
-  it. `delete --name new` discards it. A bake of `new` is refused. `copy`
-  and `upscale` to `new` are refused while `new` is stored. `rename` to
-  `new` is refused.
-- The offered New Skin: when the owner holds no `new`, and what it shows
-  (4.9 `shows`) names a variant other than `original`, and no saved skin
-  names exactly those variants (the rest `original`), the owner's state
-  lists `new` with them and `"stored": false`. Nothing is written.
+- New Skin N (R-HD-137): a `copy` or an `upscale` without `--name` makes
+  `New Skin N` (`skins.next_new`), N one above the highest N of the
+  owner's skins named `New Skin <number>` (ignoring case), from 1. A
+  deleted number below the highest is not taken again. The answer names
+  the skin made (`skin`). It is stored, renamed, baked and deleted as any
+  skin; any number of them may be there. Nothing is offered that was not
+  made. The owner's state names the next one (`next`, 4.9).
+- A skin is read under the name it is stored with. Reading renames
+  nothing and writes nothing. A skin `new` stored before New Skin N is an
+  ordinary skin of that name.
 - A skin may name a variant that is not made yet. Until it is made, the
   texture shows its original, with the request's state.
 - A skin may name `original` for a texture. Baked, it shows the original
@@ -265,20 +288,24 @@ upscale reads its source once, and keeps no link to it.
 - Only `core/skins.py` writes the file. A refused change leaves it as it
   was.
 - **Skin upscale** (R-HD-134): makes skin N from skin S, with one model
-  and one size. The viewer asks for N = `new`. For each texture of the
+  and one factor. The viewer asks for no N: the next New Skin N. For each texture of the
   owner: the input is what S names for it, else `original`; the variant
   is the input's id joined with `model@size`, or `fast@size` for a
-  texture without a colour plane (R-HD-122). N names it, and it is
-  requested. A texture that cannot reach the size, has no role, or has an
-  original whose header cannot be read, keeps what S names and is listed
-  with the reason.
+  texture without a colour plane (R-HD-122), where the size is the
+  factor's for that input (4.3). N names it, and it is requested. A
+  texture that cannot have the factor, has no role, or has an original
+  whose header cannot be read, keeps what S names and is listed with the
+  reason. When no texture gets a variant, the upscale is refused with
+  each reason and no skin is written (`skinplan.refuse_empty`).
 - `bakes.json` holds a format number, per owner the skin's name and its
   map as it was when baked, and per terrain asset a variant id (R-HD-140,
   R-HD-145). A bake names the skin it was made from (R-HD-136):
   changing the skin does not change the bake's map; renaming it renames
   it in the bake; deleting it is refused while it is baked ("skin S is
   baked; unbake it or bake another skin first"). Only
-  `core/skinbakes.py` renames or deletes a skin.
+  `core/skinbakes.py` renames or deletes a skin. A rename is checked
+  first, then writes the bake, then the skins, so the owner's state never
+  holds the new name beside the old bake name.
 - Only `core/bakes.py` writes `bakes.json`. A bake is refused, and the
   file left, when a named variant is missing, stale, or has a problem and
   is not accepted (R-HD-102, O-HD-9). The refusal names each texture.
@@ -358,11 +385,11 @@ show one.
 | Command | Does |
 | --- | --- |
 | `status` | the textures with descriptions, variants, requests; the owners with skins and bakes; `gaps` (below) |
-| `index` | brings the dataset's part of the index up to date with its files (4.9). `--asset` also finds the role of those textures. |
+| `index` | brings the dataset's part of the index up to date with its files (4.9). `--asset` also finds the role of those textures. `--states` writes the head and each state again from what the index holds, listing no file and reading no original: for a changed `TEXTURE_MAX_SIDE`; it takes no `--asset`. |
 | `upscaler` | the runner's worker command and whether it is idle |
-| `request` | makes one variant: `--asset`, `--input` (a variant id or `original`), `--model`, `--size` |
-| `remove` | removes one variant: `--asset A --variant V` (R-HD-146). Its file and its size in the entry go; the last size takes the recipe's folder with it. Refused while a skin or a bake of any dataset of the game names `A` with `V`, a recipe of the origin starts with `V+`, a request of its recipe is open, or an edit session of the origin and `V` is there. `original` is refused. |
-| `skin` | `list`, `copy --from S --name N`, `rename --name N --new M` (from `new`: save), `delete` (of `new`: discard), `set --asset A --variant V` (or `--clear`), `upscale --from S --name N --model M --size Z`; each with `--owner O`. `new` is New Skin (4.6). |
+| `request` | makes one variant: `--asset`, then `--variant V`, or `--input` (a variant id or `original`), `--model` and `--factor` (2 or 4) |
+| `remove` | removes one variant: `--asset A --variant V` (R-HD-146). Its file and its size in the entry go; the last size takes the recipe's folder with it. Each skin of this dataset that names `A` with `V` names the original for `A` after; its owner's state is written again. Refused while a bake of any dataset of the game, or a skin of another dataset, names `A` with `V`, a recipe of the origin starts with `V+`, a request of its recipe is open, or an edit session of the origin and `V` is there. `original` is refused. |
+| `skin` | `list`, `copy --from S [--name N]`, `rename --name N --new M`, `delete`, `set --asset A --variant V` (or `--clear`), `upscale --from S [--name N] --model M --factor F`; each with `--owner O`. Without `--name`, `copy` and `upscale` make the next New Skin N and answer its name as `skin` (4.6). |
 | `bake` | `--owner O --skin N`, or `--asset A --variant V` for a terrain texture |
 | `unbake` | `--owner O`, or `--asset A` |
 | `package` | packages a dataset no build packages (R-HD-106); `gaps` (below) |
@@ -404,17 +431,18 @@ no statement text, except the pragmas and the transaction control.
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `dataset` | game and dataset | the sizes, the models, the limits with their bands and info texts |
+| `dataset` | game and dataset | the factors, the largest side it was written with (`maxSide`), the hash of the pipeline code that wrote it (`code`, SPEC-VIEWER 17.1), the models, the limits with their bands and info texts |
 | `text` | distinct JSON text | the text once, compressed (zlib); its SHA-256 as the key; how many fields name it |
 | `texture` | game, dataset and asset | the origin, the kind, and as `text` ids: the listing, the description of 4.2, and the state |
 | `original` | game and origin | the hash and the longest side of the original, why its header cannot be read (empty when it can; the side is then 0 and is not a size), and the size and time of its file when they were read |
 | `origin` | game, dataset and asset | the origin of every texture file the dataset can show, listed or not (5.1) |
-| `owner` | game, dataset and owner | its title, its layer, the owners below it, its textures, its skins (with the offered New Skin of 4.6), what it shows now (`shows`: its bake, else the nearest bake below, else `original`) and its bake; its description and state as `text` ids |
+| `owner` | game, dataset and owner | its title, its layer, the owners below it, its textures, its skins (name and textures), the name of the next skin made without one (`next`), what it shows now (`shows`: its bake, else the nearest bake below, else `original`) and its bake; its description and state as `text` ids |
 
 The state of a texture is what a reader shows of it, in the shape of
 SPEC-VIEWER 17.2: its variants with input, models, size, numbers,
-problems, stale and accepted; its open requests; the models and sizes a
-request may ask for, with the reason of each refusal; the path and hash
+problems, stale and accepted; its open requests; the models and factors a
+request may ask for, each factor with its size and the reason of each
+refusal; the path and hash
 of each variant file; the terrain bake and whether the package holds its
 file.
 
@@ -496,7 +524,7 @@ folder on top. The caller names the folder; this code finds none itself.
 | Kind | Found from | Users | Tiles |
 | --- | --- | --- | --- |
 | `terrain` | every `CTerrainTex` of the dataset's catalogs in load order, its own layer last | the terrain sets that name the entry | yes |
-| `model` | every texture a material of a model file names; the files are those of every `CModel` entry of the dataset's catalogs (the game's and the map's own), with variations | the model files | no |
+| `model` | every texture a material of a model file names; the files are those of every `CModel` entry of the dataset's catalogs (the game's and the map's own), with variations | the model files | when a layer of one of its users repeats it (below) |
 
 - Every dataset lists every `CModel` of its catalogs, shown or not, so an
   unplaced unit or doodad has textures and a skin (operator 2026-11-25).
@@ -525,7 +553,9 @@ folder on top. The caller names the folder; this code finds none itself.
   name it and from its file, so it is found when the texture is asked for.
 - No role, with the reason: a cube map, DXT3, under 32 pixels, a normal
   layer of a displacement material, a flip book without usable cells,
-  slots that disagree.
+  slots that disagree. SC2 takes the core's DXT1 and DXT5 only
+  (`sc2/game.py` `FORMATS`): a codec another game registers (Ghost's DXT3,
+  RGBA32, 6.3) is not one of SC2's.
 - Model files may read one texture with different flip book cells. The
   cells most model files use hold. A file that reads it another way, or
   with unknown cells, is not among its users: the pack step leaves that
@@ -533,9 +563,40 @@ folder on top. The caller names the folder; this code finds none itself.
   reads it with known cells, or as many files read it one way as another
   (R-HD-56). For `scoba`, 5 textures have such files.
 - Codecs: DXT5, and DXT1 without transparent pixels.
-- The textures each model file names are cached by the file's hash. The
-  first list of `stock` took 17773 model files out of the storage in
-  132 s. A later list takes 3 to 12 s.
+- A model texture tiles (`sc2/modelindex.py` `repeating`) when a layer
+  of a model file among its users moves, or when at least 1% of the
+  triangles drawn with its layers, over all those files, span a line
+  (`m3tex.TILE_SHARE`).
+  - A layer moves (`m3tex.moves`) when its sampler wraps on an axis
+    (`textureWrapX` or `Y`) and its `uvTiling` is above 1 (0.02 of
+    slack) or animated, or its `uvOffset` is animated (it scrolls).
+  - A triangle spans a line when its coordinates of the layer's
+    `uvSource` (0 to 3: `uv0` to `uv3`) cross a whole number of u or v
+    by more than 0.02. A coordinate is stored × `uvwMult` / 16 / 2048 +
+    `uvwOffset` of its region. A composite batch draws the materials of
+    its sections. A triangle of no area in texture space counts for
+    nothing. A layer that wraps on no axis clamps: its triangles span
+    nothing.
+  - The wrap bits alone say nothing: 97% of the 200990 layers of the
+    cache set both. An animation reference counts as animated when its
+    `animFlags` hold 6; whether its keys move is not read.
+  - The share 1% is a choice (2026-11-26). In the cache, 3426 batches
+    of 2370 model files have a triangle that spans a line of `uv0`;
+    their shares run from 0.002% to 100%: 72 at most 0.1%, 430 at most
+    1%, 1627 at most 10%. A texture drawn only by the 430 no longer
+    tiles. `thorbirth.m3` spans 3 of 4152 triangles; over Thor's two
+    files `Thor_Diffuse` spans 3 of 10090.
+  - Measured 2026-11-26: on `battlecruiser_remastered.m3` the hull
+    textures (0 of 4644) and the particle textures do not tile;
+    `FireTile4`, `WarpLine2_Orange` (they scroll), `grad3` (tiling 3)
+    and `BigWaves` (tiling 2 by 5, scrolling) do; the decal clamps. Of
+    `thorex1.m3` and `thorbirth.m3` none tiles. Was: no model texture
+    tiled.
+  - Ghost (6.2) counts any one spanning triangle, without the share.
+- The textures each model file names are cached by the file's hash, in
+  format 3 (`moves`, `spans` and `triangles` of each layer); a cache of
+  another format is read again whole. The first list of `stock` took 17773 model files out of the
+  storage in 132 s. A later list takes 3 to 12 s.
 - A model file the map build makes itself is read from the built map.
 
 
@@ -648,11 +709,108 @@ copy as well: the game shows the copy (`validate_slow_deaths.py`).
 
 The log checks fail on a texture warning in a new `Graphics.txt` (H9).
 
-## 6. Second Game
+## 6. StarCraft: Ghost
 
-Not built (R-HD-111). It takes an adapter under `scripts/hdtex/<game>/`, a
-codec for each format the core lacks, and one registration line. No core
-file changes.
+`scripts/hdtex/ghost/`. Game id `ghost`. R-HD-150 to R-HD-155. The game,
+its files and NODExport are those of
+[SPEC-VIEWER-GHOST](SPEC-VIEWER-GHOST.md).
+
+### 6.1 Settings and dataset
+
+- `GHOST_PATH`: the extracted build, a viewer setting of
+  `webviewer/local.env` (SPEC-VIEWER-GHOST 3), not a work path of
+  SPEC-PATHS. `NODSDK_EXPORT`: the NODExport program; unset,
+  `build/nodsdk/cmake/NODExport` below `WEBVIEWER_WORK`
+  (`workpaths.path`), where the viewer's link points. Both are read
+  when a command runs, never at import. Unset `GHOST_PATH`, a build
+  without `3D/Models`, or no NODExport: every command of the game is
+  refused and names the setting.
+- One dataset, `build`. It takes no layer: `use` refuses one.
+- Nothing is written into the build (R-HD-150). NODExport writes to a
+  temporary folder below the game's index folder.
+
+### 6.2 Textures
+
+| Kind | Found from | Users | Tiles |
+| --- | --- | --- | --- |
+| `model` | the texture files of the materials of every model file the catalog lists | the model files | yes |
+
+- The catalog is NODExport `catalog`. The material names of one model are
+  NODExport `nod` (its `materials`). The materials are one NODExport
+  `materials` call for every name at once. So the lookup of
+  SPEC-VIEWER-GHOST 4.4 is NODExport's alone (R-HD-151).
+- The names of each model are cached by the hash of its file, in
+  `<store>/ghost/index/models.json`. The materials are cached by the
+  hash of every `.nsa`, `.nas`, `shaderlist.txt` and `MaterialDirs.txt`
+  and of the list of texture files.
+- A texture key is `texture`, `texture2`, `glow`, `envmap` or `detail`,
+  as NODExport exports them. Each names a file relative to the build.
+- Asset: that path, lower case, `\` between folders:
+  `3d\materials\chestcrate2.dds`. The page builds the same name from
+  the path the container gives (SPEC-VIEWER-GHOST 8).
+- Origin: the path as it is on disk, with `/`. `origins` names every
+  `.dds` of `3D/Materials` and of the folders under `Materials`.
+- A Ghost texture tiles when it repeats on a model: a triangle of a
+  material that names it spans a whole-number line of u or v, with 0.02
+  of slack (`ghost/export.py` `repeating`, from the UVs of `NODExport
+  nod`). A triangle moved whole by a whole number samples no border and
+  is no repeat. One model that repeats it is enough. The listing keeps
+  each model's repeating materials (`repeats`, listing format 2).
+  Measured 2026-11-26: no triangle of Nova's 9 materials spans one;
+  `crate`'s `chestCrate2` (20 of 76) and the terrain pieces' materials
+  (most triangles) do. Was: every Ghost texture taken to tile, so Nova's
+  textures missed the seam limit and were upscaled with matched edges
+  (operator 2026-11-26).
+- No role, with the reason, before the file is read: a file that is not
+  `.dds`; a material whose shader is `sky`, `invis` or `video`, or starts
+  with `constraint_`, when no other material names the file.
+- No role, with the reason, from the file: a cube map, a volume, a format
+  no codec reads (DXT2), DXT1 with transparent pixels, a side under 32
+  pixels.
+- Roles: `diffuse` for a file named by `texture`, `texture2`, `glow` or
+  `detail` (colour, alpha a data plane). `envmap` alone: `data`. Keys
+  that disagree: the colour key wins; the users say which keys.
+- `gaps`: model files NODExport refused, materials found by no step,
+  material texture files that are missing.
+
+### 6.3 Codecs
+
+Registered by the adapter in `CODECS` (R-HD-109). No core codec changes.
+
+| Id | Layout | Encode |
+| --- | --- | --- |
+| `DXT3` | 16 bytes a block: 4-bit alpha per pixel, then a DXT1 colour block in four-colour mode | alpha rounded to 4 bits; colour by the core's DXT1 block encoder |
+| `RGBA32` | 4 bytes a pixel, B G R A in memory: masks `FF0000`, `FF00`, `FF`, `FF000000` | the bytes as they are |
+
+- `core/dds.py` names an uncompressed format `RGB<bits>` or
+  `RGBA<bits>` (`describe`). A codec may give `masks`: the red, green,
+  blue and alpha masks of an uncompressed layout. `parse` then takes a
+  file without a FourCC whose name and masks are the codec's, and
+  `build` writes such a header. A file with other masks is refused. This
+  is a change of the container, for any game; the core names no format.
+- DXT1 with transparent pixels is refused (R-HD-153): the core's DXT1
+  encoder writes no alpha.
+
+### 6.4 Owners
+
+- `model:<asset>`: one model file, `3d\models\<file>` lower case. Its
+  textures are those its materials name.
+- `actor:<template>`: a template of the catalog with a model file the
+  catalog lists. Its `below` is that model's owner; its textures are the
+  model's. A template whose model is missing or refused is no owner.
+- Ghost has no `unit:` layer.
+
+### 6.5 No bake
+
+- The adapter's `bakes` is the reason "baking is not enabled for
+  StarCraft: Ghost" (R-HD-154). SC2's is empty.
+- `Dataset.bake`, `bake_texture` and `unbake` and `package.package` refuse
+  a game with a reason, before a file is read or written (R-HD-115).
+- The head of each dataset (4.9, `dataset.head`) holds `bake`: the reason,
+  or empty. It is JSON in the row, so the schema number stays 4.
+- The adapter's `package` and `check` raise the same reason.
+- The interface gained `bakes` with this change. That is one core edit
+  for a new rule of every game, not for Ghost alone (R-HD-110).
 
 ## 7. Requirement State
 
@@ -665,24 +823,25 @@ passed on that day.
 | --- | --- | --- |
 | R-HD-1, 2 | [host] | `test_sc2_check.py` (`MapSourceTest`, `BuiltMapTest`); the build of 2026-11-24 |
 | R-HD-3, 4, 112 | [host] | `test_sc2_game.py`, `test_sc2_sources.py` (`ArchiveTest`) |
-| R-HD-113, 114 | [host] for textures; [plan] for owners, skins, bakes | `test_index.py` |
+| R-HD-113, 114 | [host] for textures; [plan] for owners, skins, bakes | `test_index.py`, `test_index_write.py` |
 | R-HD-5, 6 | [host] | `test_runner.py`, `test_arc_queue.py`, `test_requests.py`; no request has run on the real GPU queue |
 | R-HD-10 to 13, 52, 91 | [host] | `test_codec.py`, `test_encode.py` |
 | R-HD-90 | [plan] | problems no longer hide; bake refusal |
 | R-HD-53, 56 | [host] | `test_sc2_sources.py` (`RoleTest`), `test_sc2_game.py` (`ModelTest`), `test_steps.py` |
-| R-HD-120 to 124 | [host] for ids, models per plane, sizes, refusals; [plan] for the viewer | `test_variants.py`, run 2026-11-25 |
+| R-HD-120 to 124 | [host] for ids, models per plane, sizes, refusals; [host] for factors, the largest side, the kept half and `index --states`; [e2e] for the viewer | `test_variants.py`, run 2026-11-25; `test_cli.py` (`--factor`, the cap, a factor that adds nothing), `test_store.py`, `test_encode.py`, `test_index.py`, run 2026-11-26; `texture-max-side` (e2e, `TEXTURE_MAX_SIDE=1024`), run 2026-11-26 |
 | R-HD-85 to 88 | [host] for results; [plan] for variants | `test_store.py`, `test_dataset.py` |
 | R-HD-130 to 133, 135, 136 | [host] for the skin and bake files and skin changes; [plan] for the viewer | `test_skins.py`, run 2026-11-25 |
-| R-HD-134 | [plan] | skin upscale has no host test; the refusal while `new` is stored is in `test_skins.py` |
-| R-HD-137 | [plan] until `test_skins.py` and `test_dataset.py` pass on New Skin | New Skin and its offer, 2026-11-25 |
+| R-HD-134 | [host]; [e2e] for the viewer | `test_dataset.py` (by factor, kept with reason, nothing asked: refused and nothing stored), `test_cli.py`, run 2026-11-26; an upscale without a name makes New Skin 1 then New Skin 2 (`test_dataset.py`); `texture-max-side`, `texture-variants` (e2e) |
+| R-HD-137 | [host]; [e2e] for the viewer | `test_skins.py` (next_new counts up from the highest, a name that only starts so is none; every row of `skin_names.json`; a stored `new` read as `new`, nothing written), `test_new_skin.py` (copies count up and stand side by side, a deleted number is not taken again; a New Skin N bakes and renames, the bake follows; taken and reserved names refused, nothing requested), `test_dataset.py`, `test_index.py` (negative: nothing offered above a bake); `texture-new-skins` (e2e); run 2026-11-26 (host 526 OK, e2e 47 passed) |
 | R-HD-97 to 100 | [host] for chains; [plan] for variant ids | `test_requests.py`, `test_arc_queue.py`; R-HD-98 on GPU 1 is not run |
 | R-HD-140 to 143 | [host] for what the package writes; not in game | `test_sc2_owners.py`, run 2026-11-25; E-1, E-2 need a game run |
 | R-HD-144 | [plan] | event-line models are not copied (section 5.2) |
 | R-HD-145 | [host] | `test_sc2_game.py` (`PackageTest`, terrain tests) |
-| R-HD-101 to 106, 54, 22 | [host] for picks; [plan] for bakes | `test_package.py`, `test_sc2_game.py` (`PackageTest`), `test_sc2_packaged.py`, `test_cli.py`, `test_sc2_check.py` (`BuiltMapTest`) |
+| R-HD-101 to 106, 54, 22 | [host] for picks; [plan] for bakes | `test_package.py`, `test_sc2_game.py` (`PackageTest`), `test_sc2_packaged.py`, `test_cli_bake.py`, `test_sc2_check.py` (`BuiltMapTest`) |
 | R-HD-24 | [host] | `test_sc2_check.py` (`CheckTest`) |
 | R-HD-21, 55 | [boot] | run `tps/20261124-220055`, picks; not run with bakes |
 | R-HD-107 to 111 | [host] | `test_registry.py`, `doubles.py`: a second game, a second format, a stand-in upscaler |
+| R-HD-115, 150 to 155 | [host] [viewer], run 2026-11-25; not on the GPU queue (O-HDS-17) | `test_ghost_game.py` (a made-up build, a stand-in NODExport), `test_ghost_codecs.py`, `test_ghost_bake.py`; SC2 keeps refusing DXT3 with Ghost's codecs loaded (`test_sc2_sources.py`); viewer `ghost-upscale`, `ghost-bake-off`, `ghost-textures`, `ghost-mix`, `texture-edit-button` |
 | R-HD-60 to 65 | section 12 | |
 | R-HD-70 to 72 | section 13 | |
 
@@ -701,6 +860,9 @@ passed on that day.
 | O-HDS-12 | Which asset folder the running game reads is not checked: whether `teen.sc2assets` ever wins over `base.sc2assets`, and which language folder an install of another language reads. The rule of 5.1 names `enus` in the code. |
 | O-HDS-13 | `newgoosculpted_diffuseblood.dds` misses the correlation limit with Upscale 4x (0.477) and with Soft 4x (0.447), so the build packages its original. Whether another model reaches the limit is not tried. |
 | O-HDS-14 | Three items of an audit of 2026-11-24 were kept in session notes only and are lost but for their titles: "encode profile", "intermediate sizes", "batch `judge`". What each asked for is not known. |
+| O-HDS-15 | Ghost: a texture tiles when its UVs repeat it (6.2). A material key for a wrap or clamp mode was not found in what NODExport exports; the game's material format was not searched for one. A texture named only by `envmap` is judged by the UVs too, though an environment map is not sampled by them. |
+| O-HDS-16 | Ghost: a texture several model files name, where one material reads it as colour and another as `envmap`, takes `diffuse`. Whether the environment map then looks right is not checked. |
+| O-HDS-17 | Ghost: no request has run on the real GPU queue; the host and viewer tests use the stand-in runners. |
 | O-HDS-11 | The waterfall model `ZerusWaterfall` names the terrain texture `zerus_4`. It now shows the terrain's pick of it (Soft 4x at 4096). The map of the variant code gave the model a file of its own (Upscale 4x at 2048). Not seen in the game. |
 
 ## 9. Not Tested

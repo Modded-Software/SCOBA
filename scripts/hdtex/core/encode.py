@@ -75,6 +75,7 @@ def encode(
     planes: Planes,
     reference: Planes | None = None,
     matched: bool = True,
+    tiles: bool = True,
 ) -> Encoded:
     """The result of `planes` for the texture file `original`, at every kept size.
 
@@ -83,16 +84,18 @@ def encode(
     is given the edit's planes (SPEC-PHOTOCRAFT 10, R-PC-83).
     `matched`: False for a person's edit. Its coarse content stays as the
     planes have it: matching would take a part of the edit back.
+    `tiles`: the texture repeats. Its coarse content is matched across the
+    border too; one that does not repeat is matched with its edges apart.
     The file's format, its trailer and what `finish` restores are always
     the original's.
     """
     source, source_rgba = read_texture(original)
     source_planes = role.split(source_rgba) if reference is None else reference
-    # Every texture is joined as one that tiles: the upscaler made its edges match.
+    # A texture that repeats is joined across its border, as the upscaler made its edges match; one that does not, apart.
     levels = role.finish(
-        role.join(planes, source_planes if matched else None, True), source_rgba
+        role.join(planes, source_planes if matched else None, tiles), source_rgba
     )
-    reference_levels = role.finish(role.join(source_planes, None, True), source_rgba)
+    reference_levels = role.finish(role.join(source_planes, None, tiles), source_rgba)
     compared = source_rgba if reference is None else reference_levels[0]
     height, width = levels[0].shape[:2]
     if (

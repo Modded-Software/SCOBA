@@ -45,7 +45,7 @@ test('one tab per game, vertical, at the top of the gallery right edge; sc2 is c
   await expect.poll(() => page.evaluate(() => localStorage.getItem('viewer.game'))).toBe('"sc2"');
   // The labels; the chosen tab is pressed, the other not.
   await expect(sc2).toHaveText('SC2');
-  await expect(ghostTab).toHaveText('SC: G');
+  await expect(ghostTab).toHaveText('SC:G');
   await ghostTab.click();
   await expect(ghostTab).toHaveAttribute('aria-pressed', 'true');
   await expect(sc2).toHaveAttribute('aria-pressed', 'false');
@@ -54,7 +54,7 @@ test('one tab per game, vertical, at the top of the gallery right edge; sc2 is c
 
 test('a game the server cannot open and one with no page module: disabled, the reason as the title', async ({ page }) => {
   await withGames(page, [
-    { id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC: G', available: false, reason: 'GHOST_PATH is not set' },
+    { id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC:G', available: false, reason: 'GHOST_PATH is not set' },
     { id: 'other', label: 'Other Game', tab: 'Other', available: true, reason: null },
   ]);
   const errors = await open(page);
@@ -81,7 +81,7 @@ test('a game the server cannot open and one with no page module: disabled, the r
 
 test('negative: a stored game the server cannot open stops the start with the panel; no other game stands in', async ({ page }) => {
   allowErrors('viewer: stored settings refused: viewer.game: GHOST_PATH is not set');
-  await withGames(page, [{ id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC: G', available: false, reason: 'GHOST_PATH is not set' }]);
+  await withGames(page, [{ id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC:G', available: false, reason: 'GHOST_PATH is not set' }]);
   await page.addInitScript(() => {
     if (!sessionStorage.getItem('seeded')) {
       localStorage.setItem('viewer.game', '"ghost"');

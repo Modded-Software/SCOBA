@@ -407,6 +407,12 @@ the built map (256 cells).
   Alert recall targets are cleared every 0.25 s (Space is also the stock
   AlertRecall key; this cause is not proven by a test). Not during the
   intro or a hero drop.
+- AlertRecall is off for all players at map start:
+  `UISetHotkeyAllowed(PlayerGroupAll(), c_hotkeyAlertRecall, false)` in
+  `systems/gui_environment`. Operator 2026-11-25: Space on the flying Viking
+  moved the camera elsewhere. The refollow stays: it also covers the
+  other camera jumps.
+  [operator check: no test can press the real hotkey]
 - Tests: baseai flight group, `baseai_feel.galaxy` / `baseai_feel.py`
   (camera, turn clip, speed, footfall dust and splash).
 - Regular units (not Tosh or Kerrigan): Point & Click only, no TPS; a right

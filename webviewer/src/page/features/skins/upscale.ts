@@ -6,13 +6,13 @@
 // closes when the call answers; a refusal keeps it open with the reason
 // (R-VIEW-123).
 
-import { NEW_SKIN, skinLabel, textureRoutes, type OwnerState, type TexturesHead, type TextureState } from '../../../shared/textures';
+import { EMPTY_HEAD, hasSkin, skinLabel, textureRoutes, type OwnerState, type SkinBody, type TexturesHead, type TextureState } from '../../../shared/textures';
 import type { FeatureContext } from '../../core/context';
 import { make, messageOf } from '../../core/dom';
 import type { Item } from '../../core/types';
 import { Dialog } from '../../ui/components/dialog';
 import { stepSelect } from '../../ui/components/stepper';
-import { inputsOf, modelChoices, ownerPlan, sizeChoices, type Choice } from './choices';
+import { factorChoices, inputsOf, modelChoices, ownerFactorChoices, ownerPlan, type Choice } from './choices';
 
 /** What the open dialog is on. */
 type Target = { kind: 'texture'; game: string; dataset: string; state: TextureState } | { kind: 'owner'; item: Item; owner: OwnerState; states: Map<string, TextureState> };
@@ -22,8 +22,10 @@ export interface UpscaleState {
   kind: 'texture' | 'owner' | null;
   inputs: string[];
   models: { id: string; disabled: boolean; reason: string }[];
-  sizes: { size: number; disabled: boolean; reason: string }[];
+  factors: { factor: number; label: string; disabled: boolean; reason: string }[];
   lines: string[];
+  /** The submit button may be pressed. */
+  submittable: boolean;
   error: string;
   /** It waits for the state: "Reading what can be made…" shows. */
   reading: boolean;
@@ -55,16 +57,16 @@ export function createUpscale({ skins, status }: Pick<FeatureContext, 'skins' | 
   const dialog = new Dialog({ id: 'upscale-dialog', title: 'Upscale' });
   const input = stepSelect(make('select', { className: 'upscale-input' }));
   const model = stepSelect(make('select', { className: 'upscale-model' }));
-  const size = stepSelect(make('select', { className: 'upscale-size' }));
+  const times = stepSelect(make('select', { className: 'upscale-factor' }));
   const what = make('div', { className: 'upscale-what' });
   const lines = make('div', { className: 'upscale-lines' });
   const error = make('div', { className: 'upscale-error failure' });
   const wait = make('div', { className: 'upscale-wait', textContent: 'Reading what can be made…', hidden: true });
   const note = make('div', { className: 'upscale-note' });
   const submit = make('button', { className: 'primary upscale-submit', textContent: 'Upscale' });
-  dialog.body.append(what, wait, make('label', { className: 'upscale-row' }, ['Input ', input]), make('label', { className: 'upscale-row' }, ['Model ', model]), make('label', { className: 'upscale-row' }, ['Size ', size]), lines, note, error, make('div', { className: 'answers' }, [submit]));
+  dialog.body.append(what, wait, make('label', { className: 'upscale-row' }, ['Input ', input]), make('label', { className: 'upscale-row' }, ['Model ', model]), make('label', { className: 'upscale-row' }, ['Factor ', times]), lines, note, error, make('div', { className: 'answers' }, [submit]));
   let target: Target | null = null;
-  let head: TexturesHead = { sizes: [], models: [], limits: [] };
+  let head: TexturesHead = EMPTY_HEAD;
   /** Counts the opens: a judge or a call that answers after another open changes nothing of it. */
   let turn = 0;
   /** The call of this turn is out (R-VIEW-145). */
@@ -89,7 +91,7 @@ export function createUpscale({ skins, status }: Pick<FeatureContext, 'skins' | 
     wait.hidden = false;
     error.textContent = '';
     lines.replaceChildren();
-    for (const select of [input, model, size]) {
+    for (const select of [input, model, times]) {
       select.replaceChildren();
       select.disabled = true;
     }
@@ -103,29 +105,36 @@ export function createUpscale({ skins, status }: Pick<FeatureContext, 'skins' | 
   function ready(): void {
     wait.hidden = true;
     model.disabled = false;
-    size.disabled = false;
+    times.disabled = false;
   }
 
   function update(): void {
     if (!target) return;
     submit.textContent = sending ? 'Requesting…' : label;
     submit.classList.toggle('busy', sending);
-    for (const select of [model, size]) select.disabled = sending;
+    for (const select of [model, times]) select.disabled = sending;
     if (target.kind === 'texture') input.disabled = sending;
     lines.replaceChildren();
+    let nothing = false;
+    const line = (className: string, textContent: string, title = ''): void => {
+      lines.append(make('div', { className, textContent, title }));
+    };
     if (target.kind === 'texture') {
       fill(model, modelChoices(target.state, head, input.value), model.value);
-      fill(size, sizeChoices(target.state, head, input.value, model.value), size.value);
+      fill(times, factorChoices(target.state, head, input.value, model.value), times.value);
+      line('upscale-cap', `At most ${head.maxSide} per side.`);
     } else {
       fill(model, head.models.map((one) => ({ value: one.id, label: one.title, reason: '' })), model.value);
-      fill(size, head.sizes.map((one) => ({ value: String(one), label: String(one), reason: '' })), size.value);
-      const plan = ownerPlan(target.owner, target.item.skin, target.states, model.value, Number(size.value));
-      if (plan.data) lines.append(make('div', { className: 'upscale-data', textContent: `${plan.data} data textures get fast` }));
-      if (plan.kept.length) lines.append(make('div', { className: 'upscale-kept', textContent: `${plan.kept.length} textures cannot reach ${size.value} and keep their variant`, title: plan.kept.join('\n') }));
-      lines.append(make('div', { className: 'upscale-asked', textContent: `${plan.asked} textures get a request` }));
-      lines.append(make('div', { className: 'upscale-into', textContent: 'The result goes to New Skin; save it to give it a name.' }));
+      fill(times, ownerFactorChoices(head), times.value);
+      const plan = ownerPlan(target.owner, target.item.skin, target.states, model.value, Number(times.value));
+      if (plan.data) line('upscale-data', `${plan.data} data textures get fast`);
+      if (plan.kept.length) line('upscale-kept', `${plan.kept.length} textures cannot have ${times.value}x and keep their variant`, plan.kept.map((one) => `${one.asset}: ${one.reason}`).join('\n'));
+      line('upscale-asked', `${plan.asked.length} textures get a request`, plan.asked.map((one) => `${one.asset}: ${one.size}`).join('\n'));
+      line('upscale-cap', `Each texture gets ${times.value}x its side, at most ${head.maxSide}.`);
+      line('upscale-into', `The result goes to a new skin, ${target.owner.next}; rename it at will.`);
+      nothing = plan.asked.length === 0;
     }
-    submit.disabled = sending || !model.value || !size.value || [...model.selectedOptions, ...size.selectedOptions].some((option) => option.disabled);
+    submit.disabled = sending || nothing || !model.value || !times.value || [...model.selectedOptions, ...times.selectedOptions].some((option) => option.disabled);
   }
 
   /** A judge that failed: the dialog stays open with the reason. */
@@ -161,6 +170,7 @@ export function createUpscale({ skins, status }: Pick<FeatureContext, 'skins' | 
   async function openOwner(item: Item): Promise<void> {
     const owner = skins.owner(item);
     if (!owner) throw new Error('this instance has no texture owner');
+    if (!hasSkin(owner, item.skin)) throw new Error(`${owner.owner} has no skin "${item.skin}"; choose another skin first`);
     const mine = opening('Upscale Skin', `${owner.title} (${owner.owner}) in ${item.dataset}: ${owner.textures.length} textures`, "each texture's tile");
     let body: Awaited<ReturnType<typeof skins.judge>>;
     try {
@@ -181,16 +191,20 @@ export function createUpscale({ skins, status }: Pick<FeatureContext, 'skins' | 
   async function send(): Promise<void> {
     const mine = target;
     if (!mine) return;
-    const sized = Number(size.value);
+    const factor = Number(times.value);
     if (mine.kind === 'texture') {
-      await skins.change(mine.game, mine.dataset, textureRoutes.request(mine.game, mine.dataset), { asset: mine.state.asset, input: input.value, model: model.value, size: sized });
-      status.setStatus(`${mine.state.asset}: ${model.value} at ${sized} requested`);
+      const side = times.selectedOptions[0]?.textContent ?? `${factor}x`;
+      await skins.change(mine.game, mine.dataset, textureRoutes.request(mine.game, mine.dataset), { asset: mine.state.asset, input: input.value, model: model.value, factor });
+      status.setStatus(`${mine.state.asset}: ${model.value} at ${side} requested`);
     } else {
       const { item, owner } = mine;
-      // Into New Skin (R-VIEW-117); the server refuses it while New Skin is stored.
-      await skins.change(item.game, item.dataset, textureRoutes.skin(item.game, item.dataset), { owner: owner.owner, action: 'upscale', name: NEW_SKIN, from: item.skin, model: model.value, size: sized });
-      await skins.set(item, NEW_SKIN);
-      status.setStatus(`${owner.title}: New Skin made; save it to give it a name`);
+      // Into the next New Skin N (R-VIEW-117, R-HD-137); the server refuses it when it asks for nothing.
+      const body = await skins.change<SkinBody>(item.game, item.dataset, textureRoutes.skin(item.game, item.dataset), { owner: owner.owner, action: 'upscale', name: null, from: item.skin, model: model.value, factor });
+      if (body.made === null) throw new Error(`${owner.owner}: the upscale named no skin`);
+      await skins.set(item, body.made);
+      const done = body.upscaled;
+      const counts = done ? `${Object.keys(done.requests).length} requested, ${Object.keys(done.kept).length} kept` : 'no counts';
+      status.setStatus(`${owner.title}: ${body.made} made (${counts})`);
     }
   }
 
@@ -225,7 +239,7 @@ export function createUpscale({ skins, status }: Pick<FeatureContext, 'skins' | 
       },
     );
   });
-  for (const select of [input, model, size]) select.addEventListener('change', update);
+  for (const select of [input, model, times]) select.addEventListener('change', update);
 
   function state(): UpscaleState {
     const options = (select: HTMLSelectElement) => [...select.options];
@@ -234,8 +248,9 @@ export function createUpscale({ skins, status }: Pick<FeatureContext, 'skins' | 
       kind: target?.kind ?? null,
       inputs: options(input).map((option) => option.value),
       models: options(model).map((option) => ({ id: option.value, disabled: option.disabled, reason: option.dataset['reason'] ?? '' })),
-      sizes: options(size).map((option) => ({ size: Number(option.value), disabled: option.disabled, reason: option.dataset['reason'] ?? '' })),
+      factors: options(times).map((option) => ({ factor: Number(option.value), label: option.textContent, disabled: option.disabled, reason: option.dataset['reason'] ?? '' })),
       lines: [...lines.children].map((line) => line.textContent),
+      submittable: Boolean(target) && !submit.disabled,
       error: error.textContent,
       reading: !wait.hidden,
       sending,

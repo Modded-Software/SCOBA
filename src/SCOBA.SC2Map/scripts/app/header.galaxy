@@ -428,6 +428,7 @@ bool gt_AimMoveTick_Func (bool testConds, bool runActions);
 void gt_AimMoveTick_Init ();
 fixed gf_AnimInputHeading (int lp_player);
 void gf_ForwardBegin (int lp_player);
+void gf_BackwardBegin (int lp_player);
 void gf_SideBegin (int lp_player, bool lp_left);
 void gf_SideEnd (int lp_player, bool lp_left);
 void gf_MouseForwardStart (int lp_player);

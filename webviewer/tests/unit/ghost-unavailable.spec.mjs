@@ -20,7 +20,7 @@ test.afterAll(async () => {
 test('ghost is listed as not available, with the setting named', async () => {
   const games = await (await fetch(`${server.url}/api/games`)).json();
   expect(games.default).toBe('sc2');
-  expect(games.games.find((g) => g.id === 'ghost')).toEqual({ id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC: G', available: false, reason: 'GHOST_PATH is not set', textures: false });
+  expect(games.games.find((g) => g.id === 'ghost')).toEqual({ id: 'ghost', label: 'StarCraft: Ghost', tab: 'SC:G', available: false, reason: 'GHOST_PATH is not set', textures: false });
   const health = await (await fetch(`${server.url}/api/health`)).json();
   expect(health.games).toEqual([
     { id: 'sc2', available: true },

@@ -1,7 +1,7 @@
 From 4aa974fdad597f68e943aaeaf23e02bdf08591dc Mon Sep 17 00:00:00 2001
 From: workspace-agent <workspace.vm.agent@gmail.com>
 Date: Sat, 21 Nov 2026 21:46:21 +0200
-Subject: [PATCH 25/57] m3: 32-bit element indices past 65536 vertices
+Subject: [PATCH 25/59] m3: 32-bit element indices past 65536 vertices
 
 Element indices are the region's local index plus its first vertex. In a Uint16Array they wrapped past 65535 and joined far vertices (SpaceStationValerian: 200005 vertices, 6 of 8 regions past 65535). Such a model now uses a Uint32Array and UNSIGNED_INT (OES_element_index_uint). The model keeps the largest index stored, for inspection.
 ---

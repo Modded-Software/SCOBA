@@ -139,12 +139,13 @@ class UpscaleFolderTest(StoreCase):
 
 
 class SizeTest(unittest.TestCase):
-    def test_a_result_is_kept_at_its_own_size_and_the_levels_down_to_1024(self) -> None:
+    def test_a_result_is_kept_at_its_own_size_its_half_and_the_levels_down_to_1024(self) -> None:
         self.assertEqual(store.kept_sizes(4096), (4096, 2048, 1024))
         self.assertEqual(store.kept_sizes(2048), (2048, 1024))
-        self.assertEqual(store.kept_sizes(1024), (1024,))
-        self.assertEqual(store.kept_sizes(512), (512,))
+        self.assertEqual(store.kept_sizes(1024), (1024, 512), "its half: the 2x of a 256 input")
+        self.assertEqual(store.kept_sizes(512), (512, 256))
         self.assertEqual(store.kept_sizes(3072), (3072, 1536, 768))
+        self.assertEqual(store.kept_sizes(75), (75,), "negative: an odd side has no half")
 
 
 class RecipeTest(StoreCase):

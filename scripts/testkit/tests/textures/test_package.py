@@ -10,7 +10,8 @@ from hdtex.core import index, package, requests, skins
 from hdtex.core.dataset import Dataset, DatasetError
 from hdtex.core.index import Index
 from hdtex.core.package import PackageError
-from hdtex.core.store import file_sha256
+from hdtex.core.results import ACCEPTED
+from hdtex.core.store import ENTRY, file_sha256, read_json, write_json
 
 from testkit.tests.textures.doubles import FLOOR, GAME, NAMES, ROCK, Case, StandIn
 from testkit.tests.textures.fixtures import repeat
@@ -242,10 +243,16 @@ class RefusalTest(PackageCase):
         self,
     ) -> None:
         self.runner = StandIn(repeat)
-        self.add(ROCK, tiles=False)
+        # It tiles: its seam counts, and the stand-in's repeated pixels miss it. (Made for one rule and read with the
+        # other, it would be stale, not a problem: results.edges_off.)
+        self.add(ROCK, tiles=True)
         self.make()
+        # Accepted while it is baked, then no longer: the package sees the problem the bake let through.
+        entry_file = self.store.game(GAME).recipe_dir(ROCK_ORIGIN, "pbrify") / ENTRY
+        entry = read_json(entry_file)
+        write_json(entry_file, {**entry, ACCEPTED: "for the bake"})
         self.baked()
-        self.add(ROCK, tiles=True)  # now it tiles: its seam counts
+        write_json(entry_file, entry)
         said = self.refused()
         self.assertIn(f"{ROCK} ({ROOM}, skin hd): {UP} has problems: seam", said)
         self.assertIn(

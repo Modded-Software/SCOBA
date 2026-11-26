@@ -38,7 +38,8 @@ async function rig(camera) {
     waiting = null;
   };
   const cam = { yaw: -Math.PI / 2, ...camera };
-  const zoom = createZoom(cam, { eye: () => eyeOf(cam), applyCamera() {} });
+  // Sensitivity 1: the rates as written (R-VIEW-150 scales them in the page).
+  const zoom = createZoom(cam, { eye: () => eyeOf(cam), applyCamera() {}, sensitivity: () => 1 });
   const frame = (dt = FRAME) => {
     now += dt;
     const step = waiting;

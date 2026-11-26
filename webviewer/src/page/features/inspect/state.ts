@@ -76,6 +76,8 @@ export function createState({ render, scene, camera: view, games, testApi }: Pic
       // The textures a skin can replace: the asset of each override slot (`overrides` counts slots).
       textureSlots: textureSlots(item),
       largestTexture: item.largestTexture,
+      unshown: [...item.unshown],
+      missingSkin: item.missingSkin,
       // The game's facts (SC2: blueGlow).
       ...games.partsOf(item.game).itemFacts(item),
       // Geometry layout as the renderer reads it (the format's facts).

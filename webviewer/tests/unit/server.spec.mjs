@@ -93,16 +93,22 @@ test('the page bundle is served; nothing else under its folder', async ({ reques
 
 test('health and games name the games; no counts', async ({ request }) => {
   // The test server has GHOST_PATH (ghost-unavailable.spec starts one without it).
-  expect(await (await request.get(api.health)).json()).toEqual({
+  const health = await (await request.get(api.health)).json();
+  // Also photocraft (SPEC-PHOTOCRAFT 7): installed with its pins, or not, with why; the install is the machine's.
+  const { photocraft, ...rest } = health;
+  expect(rest).toEqual({
     games: [
       { id: 'sc2', available: true },
       { id: 'ghost', available: true },
     ],
   });
+  expect(Object.keys(photocraft).sort()).toEqual(['installed', 'pins', 'reason']);
+  if (photocraft.installed) expect({ reason: photocraft.reason, pinned: photocraft.pins.length > 0 && photocraft.pins.every((one) => typeof one === 'string') }).toEqual({ reason: null, pinned: true });
+  else expect({ pins: photocraft.pins, reason: photocraft.reason }).toEqual({ pins: [], reason: expect.stringContaining('run: make install-photocraft') });
   const games = await (await request.get(api.games)).json();
   expect(games.default).toBe('sc2');
-  // SC2 offers the texture service; Ghost does not (R-VIEW-100).
-  expect(games.games).toEqual([expect.objectContaining({ id: 'sc2', available: true, reason: null, textures: true }), expect.objectContaining({ id: 'ghost', available: true, reason: null, textures: false })]);
+  // Both games offer the texture service (R-VIEW-100; SPEC-HD-TEXTURES 6, the Ghost pipeline).
+  expect(games.games).toEqual([expect.objectContaining({ id: 'sc2', available: true, reason: null, textures: true }), expect.objectContaining({ id: 'ghost', available: true, reason: null, textures: true })]);
   for (const game of games.games) {
     expect(typeof game.label).toBe('string');
     expect(typeof game.tab).toBe('string');

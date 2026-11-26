@@ -7,6 +7,9 @@
 import { make } from '../../core/dom';
 import { draggable, placeWithin } from './drag';
 
+/** The window event sent as a window opens; the instance menu closes on it (R-VIEW-157). */
+export const WINDOW_OPENED = 'viewer-window-opened';
+
 /** Where a window opens the first time. */
 export interface Place {
   left: number;
@@ -53,6 +56,7 @@ export class FloatingWindow {
   open(place: Place): void {
     if (this.isOpen) return;
     this.node.hidden = false;
+    window.dispatchEvent(new Event(WINDOW_OPENED));
     if (!this.placed) {
       this.node.style.width = `${place.width}px`;
       this.node.style.height = `${place.height}px`;

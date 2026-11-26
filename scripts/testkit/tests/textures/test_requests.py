@@ -7,7 +7,7 @@ import subprocess
 import sys
 from unittest import mock
 
-from hdtex.core import encode, progress, requests, variants
+from hdtex.core import encode, progress, requests, results, variants
 from hdtex.core.interfaces import FAILED
 from hdtex.core.requests import RequestError
 from hdtex.core.store import file_sha256, write_json
@@ -148,6 +148,55 @@ class ReuseTest(RequestCase):
         self.runner.tool = "v2"
         self.assertEqual(self.make()["runner"], "v2")
         self.assertEqual(len(self.runner.asked), 6)
+
+
+class TilingTest(RequestCase):
+    def test_a_texture_that_repeats_is_upscaled_with_matched_edges_and_says_so(self) -> None:
+        self.add()
+        made = self.make()
+        self.assertEqual(self.runner.tiling, [True, True])
+        self.assertIs(made["tiles"], True)
+
+    def test_a_texture_that_does_not_repeat_is_upscaled_and_joined_with_its_edges_apart(self) -> None:
+        self.folder_game.add("one", ROCK, texture_file("diffuse", colour_rgba()), tiles=False)
+        with mock.patch.object(encode, "encode", wraps=encode.encode) as joined:
+            made = self.make()
+        self.assertEqual(self.runner.tiling, [False, False])
+        self.assertIs(made["tiles"], False)
+        self.assertIs(joined.call_args.kwargs["tiles"], False)
+
+    def test_an_upscale_with_matched_edges_is_not_reused_for_a_texture_that_does_not_repeat(self) -> None:
+        self.add()
+        self.make()
+        self.folder_game.add("one", ROCK, texture_file("diffuse", colour_rgba()), tiles=False)
+        made = self.make()
+        # Made again, each plane asked for again without matched edges: the matched upscale is another one.
+        self.assertEqual(self.runner.tiling, [True, True, False, False])
+        self.assertIs(made["tiles"], False)
+
+    def test_a_variant_with_matched_edges_of_a_texture_that_does_not_repeat_is_shown_not_stale_and_marked(self) -> None:
+        self.add()
+        made = self.make()
+        self.folder_game.add("one", ROCK, texture_file("diffuse", colour_rgba()), tiles=False)
+        found = self.dataset()
+        texture = found.texture(ROCK)
+        recipes = results.of(self.store.game(self.folder_game.id), texture, made["original"]["sha256"])
+        # Not stale: it is shown and may be baked (operator 2026-11-26). Marked, so a request makes it again.
+        self.assertEqual((recipes["pbrify"].stale, recipes["pbrify"].why_stale, recipes["pbrify"].edges_off), (False, "", True))
+        self.assertEqual(results.refusal(recipes, UP), "")
+        # Negative: the texture as it was made, repeating, is not marked.
+        tiled = results.of(self.store.game(self.folder_game.id), texture._replace(tiles=True), made["original"]["sha256"])
+        self.assertFalse(tiled["pbrify"].edges_off)
+
+    def test_an_entry_from_before_the_rule_counts_as_matched(self) -> None:
+        self.folder_game.add("one", ROCK, texture_file("diffuse", colour_rgba()), tiles=False)
+        self.make()
+        entry = self.entry()
+        del entry[results.TILES]
+        self.assertTrue(results.made_tiling(entry))
+        self.assertTrue(results.edges_off(entry, False))
+        # Negative: a person's edit is never off: it is not upscaled.
+        self.assertFalse(results.edges_off({**entry, results.EDIT: {"changed": ["color"]}}, False))
 
 
 class RefusalTest(RequestCase):

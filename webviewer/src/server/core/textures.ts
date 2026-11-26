@@ -14,11 +14,12 @@
 // none runs, with the command the pipeline names (its GPU is the pipeline's
 // rule).
 
-import { existsSync, realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { basename, join, sep } from 'node:path';
+import { basename, join, relative, sep } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { asksFrom, ORIGINAL, recipeOf, variantId, type BakeAsk, type BakeBody, type OwnerBody, type OwnerLookup, type SkinAsk, type SkinBody, type SkinUpscaled, type TextureRemoveAsk, type TextureRequestAsk, type TexturesBody, type TexturesHead, type TextureState, type UnbakeAsk } from '../../shared/textures';
+import { asksFrom, ORIGINAL, recipeOf, variantId, type TextureAsk, type BakeAsk, type BakeBody, type OwnerBody, type OwnerLookup, type SkinAsk, type SkinBody, type SkinUpscaled, type TextureRemoveAsk, type TextureRequestAsk, type TexturesBody, type TexturesHead, type TextureState, type UnbakeAsk } from '../../shared/textures';
 import { HttpError } from './backend';
 import { messageOf } from './http';
 import { requiredPath } from './settings';
@@ -44,7 +45,7 @@ export interface TextureService {
   origin(dataset: string, asset: string): string | null;
   /** A variant's file on disk; null when there is none. */
   file(dataset: string, asset: string, variant: string): string | null;
-  /** The index holds the dataset: it was brought up to date at least once. */
+  /** The index holds the dataset, with a head of this pipeline: it was brought up to date at least once since. */
   indexed(dataset: string): boolean;
   /** Bring the dataset's rows up to date with its files (its files changed, or the server starts). One at a time per dataset. */
   sync(dataset: string): Promise<void>;
@@ -97,23 +98,78 @@ export interface PipelineSettings {
 /** The texture store, as the pipeline finds it (scripts/hdtex/core/store.py): TEXTURE_STORE. */
 export const storeDirOf = (env: NodeJS.ProcessEnv): string => requiredPath(env, 'TEXTURE_STORE');
 
+/**
+ * The folder of a game's launch output: `TEXTURE_LOGS/<game>` when set (a test server sets its own,
+ * tests/fixtures.mjs), else `cacheLogs`, the folder below the game's cache.
+ */
+export const logDirOf = (env: NodeJS.ProcessEnv, game: string, cacheLogs: string): string => (env['TEXTURE_LOGS'] ? join(requiredPath(env, 'TEXTURE_LOGS'), game) : cacheLogs);
+
 const text = (value: unknown, what: string): string => {
   if (typeof value !== 'string' || !value) throw new HttpError(400, { error: `${what} is required` });
   return value;
 };
+
+/**
+ * The hash of the code that works states out, as scripts/hdtex/core/view.py `code` makes it: every `.py` under
+ * scripts/hdtex/ and every file under sql/texture-index/, by path from the repository root, in path order.
+ * A head of other code is indexed again at the start, so a change of the pipeline needs no step of a person.
+ */
+export function pipelineCode(repoRoot: string): string {
+  const files = [
+    ...readdirSync(join(repoRoot, 'scripts', 'hdtex'), { recursive: true, withFileTypes: true }).filter((one) => one.isFile() && one.name.endsWith('.py')),
+    ...readdirSync(join(repoRoot, 'sql', 'texture-index'), { recursive: true, withFileTypes: true }).filter((one) => one.isFile()),
+  ].map((one) => relative(repoRoot, join(one.parentPath, one.name)).split(sep).join('/'));
+  // Python sorts str by code point; so does this for the ASCII paths of the repository.
+  files.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const digest = createHash('sha256');
+  for (const one of files) {
+    digest.update(`${one}\0`);
+    digest.update(readFileSync(join(repoRoot, one)));
+    digest.update('\0');
+  }
+  return digest.digest('hex');
+}
+
+/** The sides TEXTURE_MAX_SIDE may name (scripts/hdtex/core/variants.py MAX_SIDES); unset, the largest. */
+export const MAX_SIDES = [1024, 2048, 4096] as const;
+
+/** The largest side a request may ask for: TEXTURE_MAX_SIDE, read at the start; another value stops the server. */
+export function maxSideOf(env: NodeJS.ProcessEnv): number {
+  const named = (env['TEXTURE_MAX_SIDE'] ?? '').trim();
+  if (!named) return MAX_SIDES[MAX_SIDES.length - 1] as number;
+  const side = Number(named);
+  if (!(MAX_SIDES as readonly number[]).includes(side)) throw new Error(`TEXTURE_MAX_SIDE is ${JSON.stringify(named)}; it is one of ${MAX_SIDES.join(', ')}`);
+  return side;
+}
 
 export function pipelineTextures(settings: PipelineSettings): TextureService {
   const env = { ...(settings.env ?? process.env) };
   // The pipeline's Python, not the caller's.
   delete env['VIRTUAL_ENV'];
   delete env['PYTHONPATH'];
+  // The pipeline reads the same setting; it is passed on as it was read.
+  const maxSide = maxSideOf(env);
+  env['TEXTURE_MAX_SIDE'] = String(maxSide);
   const index = new IndexReader(join(settings.storeDir, 'index.sqlite'), settings.game, join(settings.repoRoot, 'sql', 'texture-index'));
   /** The index's head of a dataset. The server indexes each dataset before it serves it; none yet is an error, not an empty head. */
   function headOf(dataset: string): TexturesHead {
     const head = index.head(dataset);
     if (head === null) throw new HttpError(503, { error: `the texture index holds no ${dataset} yet; it is indexed at the server start` });
+    if (!current(head)) throw new HttpError(503, { error: `the texture index head of ${dataset} was written by an older pipeline or with another largest side (bake ${JSON.stringify(head.bake)}, maxSide ${JSON.stringify(head.maxSide)}, this server's ${maxSide}); it is indexed again at the server start` });
     return head;
   }
+  /** A head of this pipeline, written with this server's largest side: it names the bake reason (R-VIEW-151) and the side. Another one is indexed again. */
+  const current = (head: TexturesHead): boolean => typeof head.bake === 'string' && head.maxSide === maxSide;
+  // The pipeline's code at the start. Only the start compares it: the code may change while the server runs,
+  // and the next command writes the head of the code it ran.
+  const code = pipelineCode(settings.repoRoot);
+  /** The dataset's head was written by this code: its states need not be worked out again. */
+  const sameCode = (head: TexturesHead): boolean => head.code === code;
+  /** The dataset's head is of this pipeline and this code, written with another largest side: its states are written again, its files not listed. */
+  const otherSide = (dataset: string): boolean => {
+    const head = index.head(dataset);
+    return head !== null && typeof head.bake === 'string' && sameCode(head) && typeof head.maxSide === 'number' && head.maxSide !== maxSide;
+  };
 
   function states(dataset: string, assets: readonly string[]): TexturesBody {
     if (assets.length === 0) throw new HttpError(400, { error: 'asset is required' });
@@ -170,7 +226,14 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
   function sync(dataset: string): Promise<void> {
     const before = syncing.get(dataset) ?? Promise.resolve();
     // The run before was answered to its own caller, failed or not; this one starts either way.
-    const run = (): Promise<void> => command('index', dataset, []).then(() => undefined);
+    // A head of this pipeline with another largest side needs its states written again, not its files listed;
+    // should that fail, the whole index is built again.
+    const full = (): Promise<void> => command('index', dataset, []).then(() => undefined);
+    const again = (error: unknown): Promise<void> => {
+      console.error(`viewer: the texture states of ${dataset} were not written again (${messageOf(error)}); it is indexed whole`);
+      return full();
+    };
+    const run = (): Promise<void> => (otherSide(dataset) ? command('index', dataset, ['--states']).then(() => undefined, again) : full());
     const mine = before.then(run, run);
     syncing.set(dataset, mine);
     // Leave the queue when done; the outcome goes to the caller through `mine`.
@@ -212,36 +275,50 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
   /** Start `request` for one variant. Its state and log are in the store. */
   const startRequest = (dataset: string, asset: string, variant: string): Promise<string> => start('request', dataset, ['--asset', asset, '--variant', variant], 'requests.out');
 
-  /** Why the state does not offer this request; empty: it does. */
-  function refusal(state: TextureState, input: string, model: string, size: number): string {
-    if (!state.judged) return `${state.asset} is not judged yet`;
-    if (state.reason) return `${state.asset} cannot be upscaled: ${state.reason}`;
+  /** The side the state offers for this request, or why it does not offer it. `factor` or `size`: one of the two. */
+  function offeredSide(state: TextureState, input: string, model: string, factor: number | undefined, size: number | undefined): { side: number; why: string } {
+    const no = (why: string) => ({ side: 0, why });
+    if (!state.judged) return no(`${state.asset} is not judged yet`);
+    if (state.reason) return no(`${state.asset} cannot be upscaled: ${state.reason}`);
     const models = asksFrom(state, input);
-    if (!(model in models)) return `${input} is no input ${state.asset} may take now; it may take: ${state.asks.map((ask) => ask.input).join(', ') || 'none'}`;
-    const offered = models[model] as { reason: string; sizes: Record<string, string> };
-    if (offered.reason) return offered.reason;
-    const why = offered.sizes[String(size)];
-    if (why === undefined) return `${size} is no size of ${model}; it may take: ${Object.keys(offered.sizes).join(', ')}`;
-    return why;
+    if (!(model in models)) return no(`${input} is no input ${state.asset} may take now; it may take: ${state.asks.map((ask) => ask.input).join(', ') || 'none'}`);
+    const offered = models[model] as TextureAsk['models'][string];
+    if (offered.reason) return no(offered.reason);
+    const factors = Object.entries(offered.factors);
+    if (factor !== undefined) {
+      const found = offered.factors[String(factor)];
+      if (!found) return no(`${factor}x is no factor of ${model}; it may take: ${factors.map(([one]) => `${one}x`).join(', ')}`);
+      return found.reason ? no(found.reason) : { side: found.size, why: '' };
+    }
+    // A known variant id, asked again: its size is one a factor gives now.
+    const reached = factors.find(([, one]) => one.size === size && !one.reason);
+    if (reached) return { side: reached[1].size, why: '' };
+    return no(`${size} is no size a factor of ${model} gives now; it may take: ${factors.map(([one, given]) => `${one}x ${given.size}${given.reason ? ` (${given.reason})` : ''}`).join(', ')}`);
   }
 
   async function request(dataset: string, ask: TextureRequestAsk): Promise<TexturesBody> {
     const asset = text(ask.asset, 'asset');
     const input = typeof ask.input === 'string' && ask.input ? ask.input : ORIGINAL;
     const model = text(ask.model, 'model');
-    if (!Number.isInteger(ask.size) || ask.size <= 0) throw new HttpError(400, { error: 'a request names a whole size' });
+    const whole = (value: unknown): boolean => Number.isInteger(value) && (value as number) > 0;
+    if (whole(ask.factor) === whole(ask.size) || (ask.factor !== undefined && !whole(ask.factor)) || (ask.size !== undefined && !whole(ask.size))) {
+      throw new HttpError(400, { error: 'a request names a whole factor, or the whole size of a variant; one of the two' });
+    }
     let texture = states(dataset, [asset]).textures[0];
     // Nobody asked for it by name yet: the pipeline reads what it needs to say what it may ask for.
     if (!texture || !texture.judged) texture = (await judge(dataset, [asset])).textures[0];
     if (!texture) throw new HttpError(400, { error: `${dataset} has no texture ${asset}` });
-    const why = refusal(texture, input, model, ask.size);
+    const { side, why } = offeredSide(texture, input, model, ask.factor, ask.size);
     if (why) throw new HttpError(400, { error: why });
     await ensureWorker(dataset);
-    await startSeen(dataset, asset, variantId(input, model, ask.size));
+    await startSeen(dataset, asset, variantId(input, model, side));
     return states(dataset, [asset]);
   }
 
-  /** Start a request and wait until the index shows it or its variant: a reply after it shows the request, and the page polls only while it sees one. */
+  /**
+   * Start a request and wait until the index shows it or its variant: a reply after it shows the request, and the page
+   * polls only while it sees one. A variant made and not stale is not asked for again (an Upscale Skin names it as it is).
+   */
   async function startSeen(dataset: string, asset: string, variant: string): Promise<void> {
     const recipe = recipeOf(variant);
     // What the index holds of this recipe now: an attempt that failed, or a stale variant, is not the new request.
@@ -252,6 +329,11 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
       return made || open ? JSON.stringify([open, made]) : null;
     };
     const before = held();
+    // Made, not stale, with its edges for this texture, and nothing asked: a request would find its variant there and
+    // write nothing, so nothing would show. One whose edges were made for the other rule is made again.
+    const now = index.textures(dataset, [asset]).get(asset);
+    const made = now?.variants.find((one) => one.id === variant);
+    if (made && !made.stale && !made.edgesOff && !now?.requests[recipe]) return;
     await startRequest(dataset, asset, variant);
     const until = Date.now() + REQUEST_SEEN_MS;
     for (;;) {
@@ -277,19 +359,20 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
   }
 
   function skinWords(ask: SkinAsk): string[] {
-    const name = text(ask.name, 'name');
+    /** A copy or an upscale without a name makes the next New Skin N (R-HD-137). */
+    const named = (name: string | null | undefined): string[] => (name === null || name === undefined ? [] : ['--name', text(name, 'name')]);
     switch (ask.action) {
       case 'copy':
-        return ['copy', '--name', name, '--from', text(ask.from, 'from')];
+        return ['copy', ...named(ask.name), '--from', text(ask.from, 'from')];
       case 'rename':
-        return ['rename', '--name', name, '--new', text(ask.new, 'new')];
+        return ['rename', '--name', text(ask.name, 'name'), '--new', text(ask.new, 'new')];
       case 'delete':
-        return ['delete', '--name', name];
+        return ['delete', '--name', text(ask.name, 'name')];
       case 'set':
-        return ['set', '--name', name, '--asset', text(ask.asset, 'asset'), ...(ask.variant === null ? ['--clear'] : ['--variant', text(ask.variant, 'variant')])];
+        return ['set', '--name', text(ask.name, 'name'), '--asset', text(ask.asset, 'asset'), ...(ask.variant === null ? ['--clear'] : ['--variant', text(ask.variant, 'variant')])];
       case 'upscale':
-        if (!Number.isInteger(ask.size)) throw new HttpError(400, { error: 'an upscale names a whole size' });
-        return ['upscale', '--name', name, '--from', text(ask.from, 'from'), '--model', text(ask.model, 'model'), '--size', String(ask.size), '--defer'];
+        if (!Number.isInteger(ask.factor)) throw new HttpError(400, { error: 'an upscale names a whole factor' });
+        return ['upscale', ...named(ask.name), '--from', text(ask.from, 'from'), '--model', text(ask.model, 'model'), '--factor', String(ask.factor), '--defer'];
       default:
         throw new HttpError(400, { error: 'action is copy, rename, delete, set or upscale' });
     }
@@ -315,7 +398,8 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
       const failed: SkinUpscaled['failed'] = started.filter((one): one is SkinUpscaled['failed'][number] => one !== null);
       upscaled = { requests, kept: asObject(answer['kept']) as Record<string, string>, failed };
     }
-    return { ...owner(dataset, name), upscaled };
+    const made = answer['skin'];
+    return { ...owner(dataset, name), upscaled, made: typeof made === 'string' ? made : null };
   }
 
   async function bake(dataset: string, ask: BakeAsk): Promise<BakeBody> {
@@ -344,5 +428,8 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
     judge: (dataset, asset) => judge(dataset, [asset]).then(() => undefined),
   });
 
-  return { states, owner, lookup, listKind, origin: (dataset, asset) => index.origin(dataset, asset), file, indexed: (dataset) => index.head(dataset) !== null, sync, judge, request, remove, requestLog, skin, bake, unbake, edits };
+  return { states, owner, lookup, listKind, origin: (dataset, asset) => index.origin(dataset, asset), file, indexed: (dataset) => {
+    const head = index.head(dataset);
+    return head !== null && current(head) && sameCode(head);
+  }, sync, judge, request, remove, requestLog, skin, bake, unbake, edits };
 }

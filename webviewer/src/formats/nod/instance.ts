@@ -12,6 +12,7 @@ import { STRIDE } from './container';
 import { KIND_CODE, type DrawKind } from './materials';
 import type NodModel from './model';
 import type { DrawGroup } from './model';
+import type { TriangleRun } from '../../page/core/plugin';
 
 /** The viewer's axes from the file's: Y mirrored (SPEC-VIEWER-GHOST 4.8). */
 export const MIRROR = mat4.fromScaling(mat4.create(), [1, -1, 1]);
@@ -131,7 +132,8 @@ export default class NodInstance extends ModelInstance {
   private draw(shader: Shader, group: DrawGroup, kind: DrawKind): void {
     const gl = this.model.viewer.gl;
     gl.uniform1f(at(shader, 'u_kind'), KIND_CODE[kind]);
-    this.model.viewer.webgl.bindTexture(group.texture, 0);
+    // The base class's overrides, by group index: the texture this instance shows instead of the model's (a skin, R-VIEW-152).
+    this.model.viewer.webgl.bindTexture(this.textureOverrides.get(group.index) ?? group.texture, 0);
     if (group.look.twoSided) gl.disable(gl.CULL_FACE);
     else {
       gl.enable(gl.CULL_FACE);
@@ -215,5 +217,40 @@ export default class NodInstance extends ModelInstance {
     }
     gl.uniform4f(at(shader, 'u_pick'), 0, 0, 0, 0);
     return lines;
+  }
+
+  /** How many triangles the element list holds: the numbering of renderTriangles. */
+  get triangleCount(): number {
+    return this.model.groups.reduce((top, g) => Math.max(top, (g.firstIndex + g.indexCount) / 3), 0);
+  }
+
+  /**
+   * Runs of triangles, each in one flat colour (a above 0), posed like the
+   * triangles. A triangle is numbered by its first element index / 3. Only
+   * the drawn groups draw, as in renderEdges. The depth, blend and cull
+   * state are the caller's. Returns how many triangles it drew.
+   */
+  renderTriangles(runs: readonly TriangleRun[]): number {
+    const groups = this.model.drawn(this.solidOnly ? OPAQUE : [...OPAQUE, ...TRANSLUCENT]);
+    if (!groups.length || !runs.length) return 0;
+    const gl = this.model.viewer.gl;
+    const shader = nodShader(this);
+    this.use(shader);
+    gl.uniform1f(at(shader, 'u_kind'), KIND_CODE.solid);
+    let drawn = 0;
+    for (const group of groups) {
+      const start = group.firstIndex / 3;
+      const end = start + group.indexCount / 3;
+      for (const run of runs) {
+        const from = Math.max(run.first, start);
+        const to = Math.min(run.first + run.count, end);
+        if (from >= to) continue;
+        gl.uniform4f(at(shader, 'u_pick'), run.color[0], run.color[1], run.color[2], run.color[3]);
+        gl.drawElements(gl.TRIANGLES, (to - from) * 3, gl.UNSIGNED_INT, from * 12);
+        drawn += to - from;
+      }
+    }
+    gl.uniform4f(at(shader, 'u_pick'), 0, 0, 0, 0);
+    return drawn;
   }
 }

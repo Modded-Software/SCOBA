@@ -88,7 +88,8 @@ export interface TextureSlot {
 
 /** Optional. A missing member means the instance cannot do it (R-VIEW-6). */
 export interface Capabilities {
-  teamColor?: { readonly count: number; set(index: number): void };
+  /** `colors`: each team's colour, 0 to 255 per channel; a team is its index. */
+  teamColor?: { readonly colors: readonly (readonly [number, number, number])[]; set(index: number): void };
   tint?: { set(color: Rgb | null): void };
   textureOverride?: {
     slots(): readonly TextureSlot[];
@@ -101,7 +102,28 @@ export interface Capabilities {
    * posed like the triangles. The caller sets the depth and blend state.
    * Returns how many lines it drew.
    */
-  edges?: { draw(r: number, g: number, b: number): number };
+  edges?: {
+    draw(r: number, g: number, b: number): number;
+    /** How many triangles the model's element list holds: the numbering of TriangleRun. */
+    triangles(): number;
+    /**
+     * The runs' triangles of the drawn parts, each run in its flat colour,
+     * posed like the triangles. The caller sets the depth, blend and cull
+     * state. Returns how many triangles it drew.
+     */
+    drawTriangles(runs: readonly TriangleRun[]): number;
+  };
+}
+
+/**
+ * Triangles [first, first + count) of a model's element list (a triangle's
+ * number is its first element index / 3), in one flat colour r, g, b, a;
+ * a above 0.
+ */
+export interface TriangleRun {
+  readonly first: number;
+  readonly count: number;
+  readonly color: readonly [number, number, number, number];
 }
 
 /** A draw after the scene. Returns how many parts it drew. */

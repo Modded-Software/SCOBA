@@ -20,6 +20,10 @@
   #side h1 { margin: 0; padding: 0 12px; font-size: 13px; font-weight: 600; }
   #side h1 small { color: var(--dim); font-size: 11px; font-weight: 400; margin-left: 8px; }
   #search { width: 100%; }
+  /* The skin the instance shows, and Rename Skin… (R-VIEW-156). */
+  #skin-line { display: flex; gap: 6px; align-items: center; padding: 0 12px; }
+  #skin-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #skin-rename:disabled { cursor: default; opacity: 0.45; }
   .filter { padding: 0 12px; }
   .chips { display: flex; flex-wrap: wrap; gap: 2px; }
   body.embed .chips { max-height: 74px; overflow-y: auto; }
@@ -69,6 +73,9 @@
   .details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
   /* "used by": one user per line, 4.5 lines high, scrolls inside (R-VIEW-134). */
   .details dd.used-by { height: 72px; overflow-y: auto; padding-right: 4px; }
+  /* A game's own fact (Ghost's materials): its label on one line, its value below, each the panel's full width. */
+  .details dt.fact, .details dd.fact { grid-column: 1 / -1; }
+  .details dd.fact { margin-bottom: 4px; }
   .details .unread { margin-top: 4px; color: var(--dim); }
   .tiles-area { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; min-height: 0; }
   .tiles-area .skin-tiles { flex: 1; min-height: 0; padding: 0; overflow-y: auto; }
@@ -80,6 +87,7 @@
 <body>
 <aside id="side">
   <h1><span>Textures</span><small id="count"></small></h1>
+  <div id="skin-line" hidden><span id="skin-name"></span><button id="skin-rename" title="Give the skin this instance shows another name">Rename Skin&#8230;</button></div>
   <div class="filter"><input id="search" type="search" placeholder="Search  ( / )" title="Search name, plane, kind, or user" aria-label="Search name, plane, kind, or user" autocomplete="off"></div>
   <div class="filter"><div class="chips" id="categories" aria-label="Kind"></div></div>
   <div class="filter"><div class="chips" id="planes" aria-label="Plane"></div></div>

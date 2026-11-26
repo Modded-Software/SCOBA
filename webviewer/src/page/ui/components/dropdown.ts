@@ -1,6 +1,7 @@
 // A button that opens a list below it: the scene list, the landmarks, the
 // skin list of the instance menu. A click on the button opens or closes it.
-// Escape and a press outside `root` (or the area `within` names) close it. Choosing an entry closes it
+// Escape and a press outside `root` (or the area `within` names) and
+// outside the list (which its owner may have moved out of `root`) close it. Choosing an entry closes it
 // only when the owner calls close() (the skin list stays open, R-VIEW-139).
 // With `steps`, the wheel over the button and Up/Down on it choose the
 // entry before or after (stepper.ts, SPEC-VIEWER 16.14).
@@ -15,6 +16,8 @@ export interface DropdownOptions {
   steps?: ListChoices;
   /** The area a press inside of does not close it; absent: `root`. The skin list: its whole menu. */
   within?: () => HTMLElement | null;
+  /** Called on every close. */
+  onClose?: () => void;
 }
 
 /** The open drop-downs: one pair of window listeners closes them all. */
@@ -28,7 +31,7 @@ function listen(): void {
     if (e.key === 'Escape') for (const one of [...open]) one.close();
   });
   window.addEventListener('mousedown', (e) => {
-    for (const one of [...open]) if (!one.root.isConnected || !(e.target instanceof Node) || !one.area().contains(e.target)) one.close();
+    for (const one of [...open]) if (!one.root.isConnected || !(e.target instanceof Node) || !(one.area().contains(e.target) || one.list.contains(e.target))) one.close();
   });
 }
 
@@ -39,7 +42,10 @@ export class Dropdown {
   /** Where a press keeps it open. */
   readonly area: () => HTMLElement;
 
-  constructor({ root, button, list, steps, within }: DropdownOptions) {
+  private readonly onClose: (() => void) | undefined;
+
+  constructor({ root, button, list, steps, within, onClose }: DropdownOptions) {
+    this.onClose = onClose;
     this.root = root;
     this.button = button;
     this.list = list;
@@ -68,5 +74,6 @@ export class Dropdown {
   close(): void {
     this.list.hidden = true;
     open.delete(this);
+    this.onClose?.();
   }
 }

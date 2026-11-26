@@ -8,6 +8,8 @@
 // town, selection) re-follows the hero at once; a watchdog re-follows when
 // the camera lost the hero by any other way. Not during the intro or a
 // hero drop, which own the camera.
+// 2026-11-25: the hotkey itself is now off (UISetHotkeyAllowed,
+// systems/gui_environment). This module stays for the other camera jumps.
 
 const fixed c_REFOLLOW_PERIOD = 0.25;
 // Camera target this far from the hero: lost. A following camera sat 10.4

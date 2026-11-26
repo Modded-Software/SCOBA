@@ -120,6 +120,11 @@ class TerrainTest(GameCase):
 
 
 class ModelTest(GameCase):
+    def test_a_model_texture_tiles_when_a_layer_shows_it_more_than_once(self) -> None:
+        found = self.textures()
+        # Negative: tree_normal, whose layer does not repeat it, does not tile.
+        self.assertEqual((found[T + "rock_spec.dds"].tiles, found[T + "tree_normal.dds"].tiles), (True, False))
+
     def test_every_model_entry_gives_its_textures_with_the_model_files_as_users(
         self,
     ) -> None:

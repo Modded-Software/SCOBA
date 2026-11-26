@@ -1,4 +1,7 @@
-"""The state index: whoever changes a texture's or an owner's state writes it, and a reader only reads (R-HD-113, R-HD-114)."""
+"""The state index: whoever changes a texture's or an owner's state writes it, and a reader only reads (R-HD-113, R-HD-114).
+
+IndexCase and the names here serve test_index_write.py too.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +9,7 @@ import os
 from pathlib import Path
 from unittest import mock
 
-from hdtex.core import encode, index, limits, progress, requests
+from hdtex.core import index, limits, requests, variants, view
 from hdtex.core.index import FILE, Index
 from hdtex.core.interfaces import FAILED
 from hdtex.core.store import file_sha256
@@ -24,6 +27,7 @@ SAND = "textures\\sand.dds"
 MOSS = "textures\\moss.diffuse.dds"  # the folder game reads its role from its name, when asked
 NONE = "textures\\none.dds"
 MODELS = ["fast", "pbrify", "seedvr2"]
+HALF = "pbrify@128"  # the half of UP, kept with it: 2x of 64
 
 
 def askable(state: dict, given: str = "original") -> list[str]:
@@ -86,7 +90,8 @@ class StateTest(IndexCase):
         self.ok("index", "--asset", ROCK)
         found = self.read(ROCK, NONE)
         self.assertEqual(
-            (found["head"]["sizes"], found["unknown"]), ([1024, 2048, 4096], [NONE])
+            (found["head"]["factors"], found["head"]["maxSide"], found["unknown"]),
+            ([2, 4], 4096, [NONE]),
         )
         self.assertEqual(
             [model["id"] for model in found["head"]["models"]],
@@ -107,11 +112,66 @@ class StateTest(IndexCase):
         self.assertEqual(
             (rock["judged"], inputs(rock), askable(rock)), (True, ["original"], MODELS)
         )
-        sizes = rock["asks"][0]["models"]["pbrify"]["sizes"]
-        self.assertEqual(sizes["256"], "", "the own size of a small texture is offered")
-        self.assertIn(
-            "not at 4096", sizes["4096"], "negative: a size it cannot reach says why"
+        self.assertEqual(
+            rock["asks"][0]["models"]["pbrify"]["factors"],
+            {"2": {"size": 128, "reason": ""}, "4": {"size": 256, "reason": ""}},
+            "2x and 4x of its side of 64",
         )
+
+    def test_a_variant_whose_edges_were_made_for_the_other_rule_is_shown_with_edges_off_and_not_stale(self) -> None:
+        self.add(ROCK)
+        found = self.dataset()
+        requests.make(found, self.runner, found.texture(ROCK), UP, wait=lambda _seconds: self.runner.advance())
+        self.ok("index", "--asset", ROCK)
+        [before] = [one for one in self.read(ROCK)["textures"][ROCK]["variants"] if one["id"] == UP]
+        self.add(ROCK, tiles=False)  # the same file: it no longer repeats
+        self.ok("index", "--asset", ROCK)
+        [after] = [one for one in self.read(ROCK)["textures"][ROCK]["variants"] if one["id"] == UP]
+        # Negative: made for its own rule, it is not marked.
+        self.assertEqual((before["edgesOff"], before["stale"]), (False, False))
+        self.assertEqual((after["edgesOff"], after["stale"], after["staleWhy"]), (True, False, ""))
+
+    def test_the_head_names_the_hash_of_the_pipeline_code(self) -> None:
+        self.add(ROCK)
+        self.ok("index", "--asset", ROCK)
+        code = self.read(ROCK)["head"]["code"]
+        self.assertRegex(code, r"^[0-9a-f]{64}$")
+        self.assertEqual(code, view.code())
+        # Negative: another file content gives another hash.
+        view.code.cache_clear()
+        real = Path.read_bytes
+
+        def changed(path: Path) -> bytes:
+            return real(path) + (b"#" if path.name == "view.py" else b"")
+
+        with mock.patch.object(Path, "read_bytes", changed):
+            self.assertNotEqual(view.code(), code)
+        view.code.cache_clear()
+        self.assertEqual(view.code(), code)
+
+    def test_index_states_writes_the_head_and_states_again_for_another_largest_side(self) -> None:
+        self.add(ROCK, size=512)
+        self.ok("index", "--asset", ROCK)
+        read = list(self.folder_game.read)
+        with mock.patch.dict(os.environ, {variants.MAX_SIDE_ENV: "1024"}):
+            self.assertEqual(self.ok("index", "--states")["states"], True)
+        found = self.read(ROCK)
+        self.assertEqual(found["head"]["maxSide"], 1024)
+        factors = found["textures"][ROCK]["asks"][0]["models"]["pbrify"]["factors"]
+        self.assertEqual(factors["4"], {"size": 1024, "reason": ""}, "4x of 512 capped at 1024")
+        self.assertEqual(self.folder_game.read, read, "negative: no original is read again")
+        self.assertIn("index --states takes no --asset", self.error("index", "--states", "--asset", ROCK))
+
+    def test_a_factor_past_the_largest_side_says_why(self) -> None:
+        self.add(ROCK, size=2048)
+        with mock.patch.dict(os.environ, {variants.MAX_SIDE_ENV: "2048"}):
+            self.ok("index", "--asset", ROCK)
+            found = self.read(ROCK)
+        self.assertEqual(found["head"]["maxSide"], 2048)
+        factors = found["textures"][ROCK]["asks"][0]["models"]["pbrify"]["factors"]
+        self.assertEqual([factors[one]["size"] for one in ("2", "4")], [2048, 2048])
+        for one in ("2", "4"):
+            self.assertIn("that adds nothing", factors[one]["reason"], f"negative: {one}x")
 
     def test_a_texture_without_colour_may_ask_for_fast_only(self) -> None:
         self.folder_game.add(
@@ -128,7 +188,8 @@ class StateTest(IndexCase):
         self.add(ROCK)
         self.ok("request", "--asset", ROCK, "--variant", UP)
         rock = self.state()
-        [variant] = rock["variants"]
+        self.assertEqual([one["id"] for one in rock["variants"]], [UP, HALF])
+        variant = rock["variants"][0]
         kept = self.store.game(GAME).variant_file(ORIGIN + ROCK, "pbrify", 256)
         self.assertEqual(
             (
@@ -145,11 +206,13 @@ class StateTest(IndexCase):
         self.assertEqual(
             (variant["path"], variant["sha256"]), (str(kept), file_sha256(kept))
         )
-        self.assertEqual(inputs(rock), ["original", UP])
+        self.assertEqual(inputs(rock), ["original", UP, HALF])
         self.assertEqual(askable(rock, UP), MODELS)
-        sizes = rock["asks"][1]["models"]["pbrify"]["sizes"]
-        self.assertEqual(sizes["1024"], "", "a variant of 256 goes on to 1024")
-        self.assertIn("not at 2048", sizes["2048"])
+        self.assertEqual(
+            rock["asks"][1]["models"]["pbrify"]["factors"],
+            {"2": {"size": 512, "reason": ""}, "4": {"size": 1024, "reason": ""}},
+            "a variant of 256 goes on to 512 or 1024",
+        )
 
     def test_a_failed_request_is_listed_with_its_reason_and_may_be_asked_again(
         self,
@@ -172,7 +235,8 @@ class StateTest(IndexCase):
         self.runner = StandIn(invert)
         self.add(ROCK)
         self.ok("request", "--asset", ROCK, "--variant", UP)
-        [variant] = self.state()["variants"]
+        variant = self.state()["variants"][0]
+        self.assertEqual(variant["id"], UP)
         self.assertTrue(variant["problems"], "the limits it misses")
         self.assertEqual(variant["accepted"], "")
         self.assertIn(limits.PROBLEM, {band["band"] for band in variant["numbers"]})
@@ -210,7 +274,7 @@ class OwnerTest(IndexCase):
         self.hd()
         self.assertEqual(
             self.owner()["skins"],
-            [{"name": "hd", "textures": {ROCK: UP}, "stored": True}],
+            [{"name": "hd", "textures": {ROCK: UP}}],
         )
         self.ok("bake", "--owner", ROOM, "--skin", "hd")
         self.assertEqual(
@@ -225,9 +289,7 @@ class OwnerTest(IndexCase):
         self.ok("package")
         self.assertTrue(self.owner()["held"])
 
-    def test_an_owner_above_a_bake_is_offered_it_as_new_skin(self) -> None:
-        # Operator 2026-11-25: "currently baked user texture automatically
-        # fall under unsaved New Skins".
+    def test_an_owner_above_a_bake_shows_it_and_lists_only_the_skins_it_holds(self) -> None:
         self.add(ROCK)
         self.add(SAND, seed=4, users=["room"])
         self.folder_game.above("one", "unit:Room", [ROOM])
@@ -239,29 +301,17 @@ class OwnerTest(IndexCase):
             (unit["layer"], unit["below"], unit["shows"]),
             ("unit", [{"owner": ROOM, "bake": "hd"}], {ROCK: UP, SAND: "original"}),
         )
-        offer = {"name": "new", "textures": {ROCK: UP}, "stored": False}
-        self.assertEqual(unit["skins"], [offer])
-        self.assertEqual(
-            self.ok("skin", "list", "--owner", "unit:Room")["skins"],
-            {},
-            "negative: an offer writes nothing",
-        )
-        # The first change stores it: what was offered, and the change.
-        self.ok(
-            "skin", "set", "--owner", "unit:Room", "--name", "new", "--asset", SAND,
-            "--variant", "original",
-        )  # fmt: skip
-        self.assertEqual(
-            self.owner("unit:Room")["skins"],
-            [{**offer, "textures": {ROCK: UP, SAND: "original"}, "stored": True}],
-        )
-        self.ok("skin", "delete", "--owner", "unit:Room", "--name", "new")
+        # Negative: no unsaved New Skin is offered (R-HD-137).
+        self.assertEqual(unit["skins"], [])
+        self.ok("skin", "copy", "--owner", "unit:Room")
+        self.assertEqual(self.owner("unit:Room")["skins"], [{"name": "New Skin 1", "textures": {}}])
+        self.ok("skin", "delete", "--owner", "unit:Room", "--name", "New Skin 1")
         self.ok("unbake", "--owner", ROOM)
         unit = self.owner("unit:Room")
         self.assertEqual(
             (unit["shows"], unit["skins"]),
             ({ROCK: "original", SAND: "original"}, []),
-            "negative: unbaked, it shows the original and nothing is offered",
+            "negative: unbaked, it shows the original",
         )
 
     def test_an_owner_the_game_lists_no_longer_leaves_the_index(self) -> None:
@@ -387,103 +437,4 @@ class AskedTest(IndexCase):
         self.assertFalse(
             (self.store.root / FILE).exists(),
             "negative: a refused command writes no index",
-        )
-
-
-class WriteTest(IndexCase):
-    def test_a_request_writes_the_state_of_a_dataset_that_was_never_indexed(
-        self,
-    ) -> None:
-        self.add(ROCK)
-        self.add(SAND, seed=4)
-        self.ok("request", "--asset", ROCK, "--variant", UP)
-        found = self.read(ROCK, SAND)
-        self.assertEqual(
-            [one["id"] for one in found["textures"][ROCK]["variants"]], [UP]
-        )
-        self.assertEqual(
-            found["unknown"],
-            [SAND],
-            "negative: only the texture that changed is written",
-        )
-
-    def test_datasets_that_share_an_original_both_show_its_variant(self) -> None:
-        self.add(ROCK)
-        self.add(ROCK, dataset="two")
-        self.folder_game.add(
-            "three", ROCK, texture_file("diffuse", colour_rgba(7, 64, 64)), own=True
-        )
-        self.run_in("two", "index")
-        self.run_in("three", "index")
-        self.ok("request", "--asset", ROCK, "--variant", UP)
-        self.assertEqual(
-            [one["id"] for one in self.state(dataset="two")["variants"]],
-            [UP],
-            "R-HD-87",
-        )
-        self.assertEqual(
-            self.state(dataset="three")["variants"],
-            [],
-            "negative: a file of its own is another original",
-        )
-
-    def test_a_texture_bake_writes_its_row_only(self) -> None:
-        self.add(SAND, kind=FLOOR)
-        self.add(ROCK, seed=4)
-        self.ok("request", "--asset", SAND, "--variant", UP)
-        self.ok("index")
-        before = self.state(ROCK)
-        self.ok("bake", "--asset", SAND, "--variant", UP)
-        self.assertEqual(self.state(SAND)["bake"], UP)
-        self.assertEqual(
-            self.state(ROCK), before, "negative: another texture's row is as it was"
-        )
-        self.assertIn(
-            "is not made", self.error("bake", "--asset", ROCK, "--variant", UP)
-        )
-        self.assertIsNone(
-            self.state(ROCK)["bake"], "negative: a refused bake changes no row"
-        )
-
-    def test_the_state_follows_a_request_while_it_runs(self) -> None:
-        self.add(ROCK)
-        self.runner.hold = True
-        seen: list[str] = []
-        programs: set[tuple[int, int]] = set()
-
-        def look() -> None:
-            request = self.state()["requests"]["pbrify"]
-            seen.append(request["state"])
-            programs.add((request["pid"], request["started"]))
-
-        def wait(_seconds: float) -> None:
-            look()
-            self.runner.advance()
-
-        encoder = encode.encode
-
-        def watched(*args, **kwargs):
-            look()
-            return encoder(*args, **kwargs)
-
-        found = self.dataset()
-        with mock.patch.object(encode, "encode", watched):
-            requests.make(found, self.runner, found.texture(ROCK), UP, wait=wait)
-        self.assertEqual(
-            seen,
-            [
-                progress.QUEUED,
-                progress.UPSCALING,
-                progress.UPSCALING,
-                progress.ENCODING,
-            ],
-        )
-        self.assertEqual(
-            programs,
-            {(os.getpid(), progress.started(os.getpid()))},
-            "a reader can tell that the program is gone",
-        )
-        rock = self.state()
-        self.assertEqual(
-            (rock["requests"], [one["id"] for one in rock["variants"]]), ({}, [UP])
         )

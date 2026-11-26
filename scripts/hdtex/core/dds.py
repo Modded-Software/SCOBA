@@ -1,8 +1,9 @@
 """DDS container for compressed textures with a mip chain.
 
-Only one layout is supported: a 124-byte header, a FourCC that names a
-registered codec, and a mip chain. Anything else is rejected, so a texture
-in another format is reported instead of converted wrongly.
+One layout is supported: a 124-byte header, a FourCC that names a
+registered codec, or the masks of a registered uncompressed codec, and a
+mip chain. Anything else is rejected, so a texture in another format is
+reported instead of converted wrongly.
 
 Bytes after the last mip are kept as `trailer`. Some games end a file in a
 tag of their own, and it is written back unchanged.
@@ -22,8 +23,12 @@ DATA_OFFSET = 4 + HEADER_SIZE
 
 # DDSD_CAPS | HEIGHT | WIDTH | PIXELFORMAT | MIPMAPCOUNT | LINEARSIZE
 HEADER_FLAGS = 0x1 | 0x2 | 0x4 | 0x1000 | 0x20000 | 0x80000
+# The same with PITCH in place of LINEARSIZE: an uncompressed layout.
+UNCOMPRESSED_FLAGS = 0x1 | 0x2 | 0x4 | 0x8 | 0x1000 | 0x20000
 PIXEL_FORMAT_SIZE = 32
 PIXEL_FORMAT_FOURCC = 0x4
+PIXEL_FORMAT_ALPHA = 0x1
+PIXEL_FORMAT_RGB = 0x40
 # DDSCAPS_COMPLEX | TEXTURE | MIPMAP
 CAPS = 0x8 | 0x1000 | 0x400000
 
@@ -99,15 +104,22 @@ def parse(data: bytes) -> Dds:
     )
     if size != HEADER_SIZE:
         raise DdsError(f"unexpected DDS header size {size}")
-    pf_size, pf_flags, fourcc = struct.unpack_from("<II4s", data, 76)
-    name = fourcc.decode("ascii", errors="replace")
+    pf_size, pf_flags, fourcc, bits, *masks = struct.unpack_from("<II4s5I", data, 76)
+    if pf_flags & PIXEL_FORMAT_FOURCC:
+        name = fourcc.decode("ascii", errors="replace")
+        layout = None
+    else:
+        # An uncompressed layout: named as `describe` names it, and held to the codec's masks.
+        name = f"{'RGBA' if masks[3] else 'RGB'}{bits}"
+        layout = tuple(masks)
     if (
         pf_size != PIXEL_FORMAT_SIZE
-        or not pf_flags & PIXEL_FORMAT_FOURCC
         or not CODECS.has(name)
+        or CODECS.get(name).masks != layout
     ):
+        shown = fourcc if layout is None else f"{name} with masks {', '.join(f'{m:X}' for m in masks)}"
         raise DdsError(
-            f"unsupported pixel format {fourcc!r}; only {' and '.join(CODECS.ids())} are supported"
+            f"unsupported pixel format {shown!r}; only {' and '.join(CODECS.ids())} are supported"
         )
     if width <= 0 or height <= 0:
         raise DdsError(f"bad size {width}x{height}")
@@ -147,26 +159,34 @@ def build(
                 f"mip {index} is {len(blob)} bytes, {level_w}x{level_h} needs {expected}"
             )
         level_w, level_h = max(1, level_w // 2), max(1, level_h // 2)
+    masks = CODECS.get(format).masks
     header = bytearray(HEADER_SIZE)
     struct.pack_into(
         "<7I",
         header,
         0,
         HEADER_SIZE,
-        HEADER_FLAGS,
+        HEADER_FLAGS if masks is None else UNCOMPRESSED_FLAGS,
         height,
         width,
-        len(mips[0]),
+        len(mips[0]) if masks is None else len(mips[0]) // height,
         0,
         len(mips),
     )
-    struct.pack_into(
-        "<II4s",
-        header,
-        72,
-        PIXEL_FORMAT_SIZE,
-        PIXEL_FORMAT_FOURCC,
-        format.encode("ascii"),
-    )
+    if masks is None:
+        struct.pack_into(
+            "<II4s",
+            header,
+            72,
+            PIXEL_FORMAT_SIZE,
+            PIXEL_FORMAT_FOURCC,
+            format.encode("ascii"),
+        )
+    else:
+        bits = sum(bin(mask).count("1") for mask in masks)
+        flags = PIXEL_FORMAT_RGB | (PIXEL_FORMAT_ALPHA if masks[3] else 0)
+        struct.pack_into(
+            "<II4s5I", header, 72, PIXEL_FORMAT_SIZE, flags, b"\0\0\0\0", bits, *masks
+        )
     struct.pack_into("<I", header, 104, CAPS)
     return MAGIC + bytes(header) + b"".join(mips) + trailer

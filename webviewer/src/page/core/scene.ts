@@ -150,12 +150,14 @@ export function createScene({ host, games, api, status, events, sky, skins }: Sc
         team: options.team ?? 0,
         skin: options.skin ?? ORIGINAL_SKIN,
         largestTexture: 0,
+        unshown: [],
+        missingSkin: false,
         oneShot: null,
         options: partsOf(game).itemOptions(options.options ?? {}),
       };
       // An animation or a team the model does not have is refused, not replaced.
       if (!Number.isInteger(item.sequence) || item.sequence < -1 || item.sequence >= item.instance.sequences.length) throw new Error(`${name}: no animation ${item.sequence}; it has ${item.instance.sequences.length}`);
-      const teams = item.capabilities.teamColor ? item.capabilities.teamColor.count : 1;
+      const teams = item.capabilities.teamColor ? item.capabilities.teamColor.colors.length : 1;
       if (!(Number.isInteger(item.team) && item.team >= 0 && item.team < teams)) throw new Error(`${name}: no team ${item.team}; it has ${teams}`);
       applyTransform(item);
       applySequence(item);
@@ -235,7 +237,7 @@ export function createScene({ host, games, api, status, events, sky, skins }: Sc
       const playing = item.sequence >= 0 ? (item.instance.sequences[item.sequence]?.name ?? null) : null;
       const same = playing === null ? -1 : made.instance.sequences.findIndex((s) => s.name === playing);
       item.instance.detach();
-      Object.assign(item, { path: placement.file, source, dataset, placement, ...made, largestTexture: 0, sequence: same >= 0 ? same : pluginOf(item.game).restSequence(made.instance.sequences) });
+      Object.assign(item, { path: placement.file, source, dataset, placement, ...made, largestTexture: 0, unshown: [], missingSkin: false, sequence: same >= 0 ? same : pluginOf(item.game).restSequence(made.instance.sequences) });
       applyTransform(item);
       applySequence(item);
       applyLook(item);

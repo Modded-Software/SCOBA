@@ -21,7 +21,7 @@ import time
 
 import numpy as np
 
-from . import edits, encode, variants
+from . import edits, encode, results, variants
 from .dataset import Dataset
 from .edits import BASE_DIR, RENDERED_DIR, SESSION, EditError
 from .interfaces import Planes, Texture
@@ -77,7 +77,8 @@ def _encode(
     role = ROLES.get(texture.role or "")
     planes = _planes(dataset, record, said, changed)
     # No source: the result is not matched to the original's coarse content. That would take a part of the edit back.
-    encoded = encode.encode(original, role, planes, matched=False)
+    # Joined across the border only for a texture that tiles (R-HD-91).
+    encoded = encode.encode(original, role, planes, matched=False, tiles=texture.tiles)
     own = max(encoded.size)
     models = _input_models(dataset, texture, record)
     return game.write_recipe(
@@ -95,6 +96,7 @@ def _encode(
             "runner": None,  # no upscaler made it
             "encoder": encode.ENCODER_VERSION,
             "numbers": encoded.numbers,
+            results.TILES: texture.tiles,
             # A variant whose entry names a changed plane is user-made (R-PC-80).
             "edit": {"input": record["variant"], "changed": changed, "hash": digest, "session": record["session"]},
         },
