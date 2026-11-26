@@ -303,6 +303,16 @@ cmd_check() {
     else
         report OPTIONAL lsfg-vk "layer not installed; only the SCOBA FG entry needs it"
     fi
+    # The launch dialog of the dock entries (REQ-LAUNCH-DIALOG): gjs with
+    # GTK 4 and libadwaita. Its --check loads them and opens nothing.
+    local gjs_path dialog
+    if ! gjs_path="$(command -v gjs)"; then
+        report OPTIONAL launch-dialog "gjs not found; only the dock entries need it (gjs, GTK 4, libadwaita)"
+    elif dialog="$("$gjs_path" -m "$ROOT_DIR/scripts/launchui/main.js" --check 2>&1)"; then
+        report OK launch-dialog "$dialog"
+    else
+        report OPTIONAL launch-dialog "cannot load (${dialog%%$'\n'*}); only the dock entries need it (gjs, GTK 4, libadwaita)"
+    fi
     if [[ -x "$UPSCALE_DIR/arc-upscale" ]]; then
         report OK upscale-on-arc "$UPSCALE_DIR"
     else

@@ -110,6 +110,68 @@ test('Save to Skin offers the instance\'s skin first when the owner has it; else
   expect(namedInto(owner, { kind: 'new' }, 'a.dds')).toBe('original');
 });
 
+test('Ask Again of a revision asks for its model without the revision; the pipeline picks the id that serves it', async () => {
+  // R-HD-158: `pbrify~2@512` stands beside `pbrify@512`. The request route takes a model, and `pbrify~2` is none.
+  const { askOf, recipeOf } = await source('src/shared/textures.ts');
+  expect(askOf('a.dds', 'pbrify~2@512')).toEqual({ asset: 'a.dds', input: 'original', model: 'pbrify', size: 512 });
+  // The input keeps its revision: it names one kept variant.
+  expect(askOf('a.dds', 'pbrify~2@256+seedvr2~3@1024')).toEqual({ asset: 'a.dds', input: 'pbrify~2@256', model: 'seedvr2', size: 1024 });
+  // Negative: an id without a revision is asked as it is; a recipe keeps its revision, as the requests are named by it.
+  expect(askOf('a.dds', 'fast@2048')).toEqual({ asset: 'a.dds', input: 'original', model: 'fast', size: 2048 });
+  expect(recipeOf('pbrify~2@512')).toBe('pbrify~2');
+  expect(askOf('a.dds', 'original')).toBeNull();
+});
+
+test('the users badge counts model files from 2 up; it is amber when another owner bakes a variant; "named by" lists the bakes first', async () => {
+  // R-VIEW-160, R-VIEW-161: read from the state's `users` and `namedBy`; nothing is worked out of files here.
+  const { usersBadge, namedByLines } = await source('src/shared/textures.ts');
+  const state = (users, namedBy = []) => ({ ...COLOUR, users, namedBy });
+  expect(usersBadge(state(['a.m3', 'b.m3']), 'unit:X')).toEqual({ count: 2, title: 'read by 2 model files\na.m3\nb.m3', sharedBake: false });
+  // Negative: one model file, or none: no badge.
+  expect(usersBadge(state(['a.m3']), 'unit:X')).toBeNull();
+  expect(usersBadge(state([]), null)).toBeNull();
+  const own = { owner: 'unit:X', skin: 'hd', variant: 'fast@512', baked: true };
+  const skins = [{ ...own, baked: false }, { owner: 'unit:Y', skin: 'two', variant: 'fast@256', baked: false }];
+  // Negative: the window's own bake and the skins of others are no bake of another owner.
+  expect(usersBadge(state(['a.m3', 'b.m3'], [own, ...skins]), 'unit:X').sharedBake).toBe(false);
+  const other = { owner: 'unit:Z', skin: 'up', variant: 'fast@512', baked: true };
+  const more = { owner: 'model:a.m3', skin: 'old', variant: 'fast@256', baked: true };
+  expect(usersBadge(state(['a.m3', 'b.m3'], [own, ...skins, other]), 'unit:X')).toEqual({
+    count: 2,
+    title: 'read by 2 model files\na.m3\nb.m3\nbaked by 1 other owner\nunit:Z',
+    sharedBake: true,
+  });
+  expect(usersBadge(state(['a.m3', 'b.m3'], [more, other]), 'unit:X').title).toBe('read by 2 model files\na.m3\nb.m3\nbaked by 2 other owners\nmodel:a.m3\nunit:Z');
+  // One model file, and another owner bakes it (a unit over its model file's bake): the badge says so, with no count.
+  expect(usersBadge(state(['a.m3'], [more]), 'unit:X')).toEqual({ count: null, title: 'baked by 1 other owner\nmodel:a.m3', sharedBake: true });
+  // A window on no owner: every bake is another's.
+  expect(usersBadge(state(['a.m3', 'b.m3'], [own]), null).sharedBake).toBe(true);
+
+  expect(namedByLines(state([], [own, ...skins, other]))).toEqual(['unit:X · hd · fast@512 · baked', 'unit:Z · up · fast@512 · baked', 'unit:X · hd · fast@512', 'unit:Y · two · fast@256']);
+  // Negative: nobody names it: no line.
+  expect(namedByLines(state([]))).toEqual([]);
+});
+
+test('the Delete Variant dialog lists the other owners that name the variant, the bakes first; none: it says so', async () => {
+  // R-VIEW-162: read from the state's `namedBy`; the dialog only words it.
+  const { removalWarning } = await source('src/shared/textures.ts');
+  const state = (namedBy) => ({ ...COLOUR, namedBy });
+  const own = { owner: 'unit:X', skin: 'hd', variant: 'fast@512', baked: true };
+  const skin = { owner: 'unit:Y', skin: 'two', variant: 'fast@512', baked: false };
+  const bake = { owner: 'unit:Z', skin: 'up', variant: 'fast@512', baked: true };
+  const otherSize = { owner: 'unit:W', skin: 'small', variant: 'fast@256', baked: true };
+  expect(removalWarning(state([own, skin, bake, otherSize]), 'fast@512', 'unit:X')).toEqual({
+    head: '2 skins or bakes of other owners name it:',
+    lines: ['unit:Z · up (baked)', 'unit:Y · two'],
+  });
+  expect(removalWarning(state([own, skin]), 'fast@512', 'unit:X')).toEqual({ head: '1 skin or bake of another owner names it:', lines: ['unit:Y · two'] });
+  // A window on no owner: every entry is another's.
+  expect(removalWarning(state([own]), 'fast@512', null).lines).toEqual(['unit:X · hd (baked)']);
+  // Negative: the window's own owner and another variant of the texture are not listed; nobody: it says so.
+  expect(removalWarning(state([own, otherSize]), 'fast@512', 'unit:X')).toEqual({ head: 'No other owner names it.', lines: [] });
+  expect(removalWarning(state([]), 'fast@512', 'unit:X')).toEqual({ head: 'No other owner names it.', lines: [] });
+});
+
 test('the skin name rule agrees with the pipeline on every row of hdtex.core skin_names.json', async () => {
   const { skinNameRefusal } = await source('src/shared/textures.ts');
   const root = process.env['REPO_ROOT'];

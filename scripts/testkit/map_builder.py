@@ -8,6 +8,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Callable, Mapping, NamedTuple, Optional
 
+from mapgen import loading_screen
+
 from .profiles.registry import PROFILE_BANKS, PROFILE_MAPS, profile_output
 
 
@@ -24,74 +26,10 @@ class TestMapSpec(NamedTuple):
     patch: Optional[Callable[[Path], None]] = None
 
 
-def _read_cstr(data: bytes, pos: int) -> tuple[bytes, int]:
-    end = data.index(b"\x00", pos)
-    return data[pos:end], end + 1
-
-
 def patch_mapinfo(path: Path) -> None:
-    data = bytearray(path.read_bytes())
-    version = struct.unpack_from("<I", data, 4)[0]
-    pos = 8 + 8
-    struct.unpack_from("<II", data, pos)
-    pos += 8
-    locale_mode = struct.unpack_from("<I", data, pos)[0]
-    pos += 4
-    if locale_mode == 2:
-        pos = data.index(b"\x00", pos) + 1
-    if version >= 22:
-        preview_type = struct.unpack_from("<I", data, pos)[0]
-        pos += 4
-        if preview_type == 2:
-            pos = data.index(b"\x00", pos) + 1
-    if version >= 28:
-        pos = data.index(b"\x00", pos) + 1
-    if version >= 37:
-        pos = data.index(b"\x00", pos) + 1
-    if version >= 29:
-        pos += 4
-    if version >= 11:
-        pos += 4
-    if version >= 3:
-        pos = data.index(b"\x00", pos) + 1
-    desc, pos = _read_cstr(data, pos)
-    bounds_off = pos
-    left, bottom, right, top = struct.unpack_from("<4i", data, bounds_off)
-    pos += 16
-    if version >= 19:
-        pos += 4
-    if version >= 14:
-        pos += 4
-        pos = data.index(b"\x00", pos) + 1
-    if version >= 23:
-        bar_len = struct.unpack_from("<H", data, pos)[0]
-        pos += 2 + bar_len
-    if version >= 20:
-        pos += 24
-    if version >= 35:
-        pos = data.index(b"\x00", pos) + 1
-        locale_len = struct.unpack_from("<H", data, pos)[0]
-        pos += 2 + locale_len
-    if version >= 39:
-        str_len = struct.unpack_from("<H", data, pos)[0]
-        pos += 2 + str_len
-    flags_off = pos
-    flags = struct.unpack_from("<I", data, flags_off)[0]
-    flags &= ~0x02
-    struct.pack_into("<I", data, flags_off, flags)
-    popcount = bin(flags).count("1")
-    dx, dy = right - left, top - bottom
-    width, height = struct.unpack_from("<II", data, 16)
-    hash_value = (
-        len(desc)
-        + 7 * height
-        + 2 * (dx * dx + dy * dy)
-        + 3 * width
-        - popcount
-        - 17
-    )
-    struct.pack_into("<Q", data, 8, hash_value)
-    path.write_bytes(bytes(data))
+    """A test map enters the game by itself: the built map waits for a key
+    (REQ-LOADING-SCREEN R-LOAD-5), and a run has nobody to press one."""
+    path.write_bytes(loading_screen.set_wait_for_key(path.read_bytes(), False))
 
 
 def patch_banklist(path: Path, bank_names: tuple[str, ...]) -> None:
@@ -204,7 +142,9 @@ def build_instrumented_map(spec: TestMapSpec) -> Path:
     patch_base_ai(spec.output)
     if spec.patch is not None:
         spec.patch(spec.output)
-    patch_mapinfo(spec.output / "MapInfo")
+    # wait_for_key: the map keeps the built map's wait (profile loadwait).
+    if not spec.options.get("wait_for_key"):
+        patch_mapinfo(spec.output / "MapInfo")
     patch_banklist(spec.output / "BankList.xml", spec.bank_names + ("SCOBACLIPMETRICS",))
     harness_root = spec.output / "scripts" / "test" / spec.profile
     harness_root.mkdir(parents=True, exist_ok=True)

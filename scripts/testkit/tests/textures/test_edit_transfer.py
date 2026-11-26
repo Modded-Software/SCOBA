@@ -11,7 +11,7 @@ from unittest import mock
 from hdtex.core import dds, edits, edittransfer, encode, limits, photocraft, progress, results, variants
 from hdtex.core.interfaces import FAILED
 from hdtex.core.roles import ROLES
-from hdtex.core.store import file_sha256
+from hdtex.core.store import ENTRY, file_sha256, write_json
 
 from testkit.tests.textures.doubles import ROCK
 from testkit.tests.textures.edit_fixtures import ORIGIN, EditCase, base_of, cmd, painted, run_on
@@ -108,6 +108,25 @@ class TransferTest(TransferCase):
         self.assertEqual(self.recipes(), [variants.split(first)[0]])
         self.assertEqual(file.stat().st_mtime_ns, written, "negative: the variant was not made again")
         self.assertEqual(len(edits.read_record(self.game, session)["transfers"]), 1)
+
+    def test_an_edit_kept_for_another_original_stays_and_the_transfer_makes_a_revision(self) -> None:
+        """R-HD-158: a kept variant is never written again, an edit neither."""
+        session = self.edited()
+        first = self.transfer(session)
+        recipe = variants.split(first)[0]
+        folder = self.game.recipe_dir(ORIGIN, recipe)
+        # The entry as a store holds it when the edit was kept for an original that is not the one of now.
+        entry = self.entry(first)
+        write_json(folder / ENTRY, {**entry, "original": {**entry["original"], "sha256": "0" * 64}})
+        before = {path.name: path.read_bytes() for path in sorted(folder.iterdir())}
+        second = self.transfer(session)
+        self.assertEqual(second, variants.variant_id(f"{recipe}~2", 64))
+        self.assertEqual(self.entry(second)["edit"]["session"], session)
+        self.assertEqual(self.shown(second)["title"], "Edit #2 at 64")
+        # Negative: the kept one is the same byte for byte, and a third transfer makes no third.
+        self.assertEqual({path.name: path.read_bytes() for path in sorted(folder.iterdir())}, before)
+        self.assertEqual(self.transfer(session), second)
+        self.assertEqual(self.recipes(), [recipe, f"{recipe}~2"])
 
     def test_an_edit_after_a_transfer_is_edited_again_and_makes_a_second_variant(self) -> None:
         session = self.edited()

@@ -110,8 +110,9 @@ test('the controls window has a row for every action; the last rows scroll into 
   expect(lower).toEqual([]);
 });
 
-test('a rebound key acts and the default key no longer does: edges on Ctrl+E', async ({ page }) => {
-  await openWith(page, { keys: { edges: { code: 'KeyE', key: 'e', mods: ['ctrl'] } } });
+// Ctrl+B: no default key of the map (Ctrl+E is play/pause, R-VIEW-159).
+test('a rebound key acts and the default key no longer does: edges on Ctrl+B', async ({ page }) => {
+  await openWith(page, { keys: { edges: { code: 'KeyB', key: 'b', mods: ['ctrl'] } } });
   const id = await page.evaluate(() => window.scobaeditor.addUnit('Marine', { x: 0, y: 0, pick: 0.5 }));
   await page.waitForFunction(() => window.scobaeditor.idle(), null, { timeout: 15_000 });
   await page.evaluate((i) => window.SCOBAEdit.setSelection([i]), id);
@@ -119,7 +120,7 @@ test('a rebound key acts and the default key no longer does: edges on Ctrl+E', a
   // Negative first: Ctrl+/ is no longer the edges key.
   await page.keyboard.press('Control+Slash');
   expect(await on()).toEqual([]);
-  await page.keyboard.press('Control+KeyE');
+  await page.keyboard.press('Control+KeyB');
   expect(await on()).toEqual([id]);
 });
 

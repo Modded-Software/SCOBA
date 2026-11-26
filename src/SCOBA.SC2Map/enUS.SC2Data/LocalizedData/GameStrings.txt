@@ -1,9 +1,11 @@
 ﻿Abil/Name/SummonCompanion=Summon Companion
 Button/Name/Salvage2=Summon Companion
 Button/Tooltip/Salvage2=Summons a companion that follows your hero and aids you in combat.
-DocInfo/Author=Blizzard Entertainment
-DocInfo/Name=SCOBA
-LoadingScreen/Tip=Destroy all enemy structures.<n/><n/><WASD> to move.<n/><RIGHT-CLICK> to auto-attack units.<n/><CTRL> to zoom in.<n/> <n/>Each level you gain 3 stat points.<n/> <n/>Every 3 levels you can select one new ability until you reach level 15.<n/><n/>At level 20, one of 4 ultimate abilities is unlocked (depending on the skill tree you have invested most points in).
+DocInfo/Author=SCOBA
+DocInfo/DescLong=Up to three players fight as Terran heroes beside their lane armies, Terran against Zerg, across six lanes. Gain XP, spend stat points and learn abilities.
+DocInfo/DescShort=Co-op hero arena for up to 3 players. Six lanes, two control modes.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=BOTH MODES<n/>W, A, S, D - move<n/>Shift (hold) - slow walk<n/>Space - deploy at the start, then jump<n/>Z (hold) - zoom<n/>Mouse wheel - camera distance<n/>Ctrl+E - order mode. Ctrl+C - leave it<n/><n/>WASD / POINT & CLICK<n/>Left click - pick a target<n/>Right click - attack. With Chase on Move, also move<n/>Hold a mouse button and drag - turn the camera<n/>Ctrl+C - cancel the attack<n/>Attack button - Single or Auto. Chase button - Stand or Move<n/><n/>ACTIONS (TPS)<n/>Mouse - turn the camera<n/>Right hold - aim. Left click while aiming - shoot<n/>Middle click - show or hide the cursor<n/><n/>HERO<n/>3 stat points per level. A new ability at levels 3, 6, 9, 12 and 15. At level 20, one ultimate from a skill tree with 3 points in it.
 MapInfo/Player00/Name=Neutral
 MapInfo/Player01/Name=Tosh
 MapInfo/Player02/Name=Nova

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TypedDict
 
 from project_root import project_root
@@ -41,9 +41,10 @@ class VariantState(TypedDict):
     size: int
     own: bool
     stale: bool
+    remake: str  # the id that serves a request of it (results.served)
     numbers: list[limits.Band]
     problems: list[limits.Missed]
-    accepted: bool
+    accepted: str  # why its problems do not refuse a bake; empty: they do
     edited: bool  # a person made it: its numbers have no band and make no problem
     reference: str  # the variant its numbers compare with; empty: the original
     path: str
@@ -88,6 +89,8 @@ def _variants(game: GameStore, texture: Texture, made: dict[str, Made]) -> list[
                 "stale": one.stale,
                 "staleWhy": one.why_stale,
                 "edgesOff": one.edges_off,
+                # The id that serves a request of it: its own when it is sound, else a revision (R-HD-158).
+                "remake": results.served(made, variant),
                 "numbers": numbers,
                 "problems": list(one.missed),
                 "accepted": one.accepted,
@@ -132,6 +135,38 @@ def _asks(
     return found
 
 
+class NamedBy(TypedDict):
+    """One owner that names a variant of a texture (R-HD-156)."""
+
+    owner: str
+    skin: str
+    variant: str
+    baked: bool  # the line is the owner's bake; False: a skin of it
+
+
+def named_by(baked: Bakes, skinned: dict[str, dict[str, skins.Skin]]) -> dict[str, list[NamedBy]]:
+    """By asset: each owner of a dataset whose bake or skin names a variant of it other than the original (R-HD-156).
+
+    `skinned`: owner -> its skins. Sorted by owner, the bake before the
+    skins, the skins by name. A skin that names what the bake names is
+    listed too: the bake holds the skin as it was, the skin is as it is.
+    """
+    found: dict[str, list[NamedBy]] = {}
+
+    def add(owner: str, skin: str, textures: dict[str, str], is_bake: bool) -> None:
+        for asset, variant in sorted(textures.items()):
+            if variant != variants.ORIGINAL:
+                found.setdefault(asset, []).append({"owner": owner, "skin": skin, "variant": variant, "baked": is_bake})
+
+    for owner in sorted(set(baked.owners) | set(skinned)):
+        bake = baked.owners.get(owner)
+        if bake is not None:
+            add(owner, bake.skin, bake.textures, True)
+        for skin in sorted(skinned.get(owner, {}).values()):
+            add(owner, skin.name, skin.textures, False)
+    return found
+
+
 def texture_state(
     game: GameStore,
     texture: Texture,
@@ -139,12 +174,14 @@ def texture_state(
     baked: Bakes,
     record: dict | None,
     runner: Callable[[], Runner],
+    named: Sequence[NamedBy] = (),
 ) -> dict:
     """The state of one texture of one dataset.
 
     `original`: None when nobody read it yet. Then the texture must have no
     variant: whether a variant is stale is a fact of the original.
     `baked` and `record`: the dataset's bakes and its package record.
+    `named`: the owners of the dataset that name a variant of it (`named_by`).
     """
     if original is None and game.recipes(texture.origin):
         raise ValueError(
@@ -178,6 +215,7 @@ def texture_state(
         "bake": bake,
         "bakeProblem": results.refusal(made, bake) if bake else "",
         "packaged": _held(held, bake, found),
+        "namedBy": list(named),
     }
 
 

@@ -50,7 +50,7 @@ class LayoutTest(unittest.TestCase):
                 (made.format, made.size, made.source_size),
                 (format, (SIZE * 4, SIZE * 4), (SIZE, SIZE)),
             )
-            texture = dds.parse(made.files[SIZE * 4])
+            texture = dds.parse(made.file(SIZE * 4))
             self.assertEqual(
                 (texture.format, texture.width, texture.height, texture.trailer),
                 (format, SIZE * 4, SIZE * 4, TRAILER),
@@ -62,7 +62,7 @@ class LayoutTest(unittest.TestCase):
 
     def test_a_normal_map_keeps_its_channels(self) -> None:
         made = result_of("normal", normal_rgba(), repeat)
-        _texture, rgba = encode.read_texture(made.files[SIZE * 4])
+        _texture, rgba = encode.read_texture(made.file(SIZE * 4))
         self.assertGreaterEqual(int(rgba[:, :, 0].min()), 247)
         self.assertLessEqual(int(rgba[:, :, 2].max()), 8)
         self.assertGreater(int(rgba[:, :, 3].std()), 0)
@@ -71,8 +71,7 @@ class LayoutTest(unittest.TestCase):
     def test_a_smaller_size_is_the_same_chain_without_its_largest_levels(self) -> None:
         rgba = colour_rgba(width=512, height=16)
         made = result_of("diffuse", rgba, repeat)
-        self.assertEqual(sorted(made.files), [1024, 2048])
-        large, small = dds.parse(made.files[2048]), dds.parse(made.files[1024])
+        large, small = dds.parse(made.file(2048)), dds.parse(made.file(1024))
         self.assertEqual(
             (small.width, small.height, len(small.levels)),
             (1024, 32, len(large.levels) - 1),
@@ -80,12 +79,16 @@ class LayoutTest(unittest.TestCase):
         for index in range(len(small.levels)):
             self.assertEqual(small.level_bytes(index), large.level_bytes(index + 1))
 
-    def test_a_small_result_is_kept_at_its_own_size_and_its_half(self) -> None:
-        self.assertEqual(
-            sorted(result_of("diffuse", colour_rgba(), repeat).files),
-            [SIZE * 2, SIZE * 4],
-            "4x and the 2x a request may ask for; negative: no smaller level",
-        )
+    def test_a_file_is_made_for_the_size_asked_and_for_no_other(self) -> None:
+        # R-HD-123: the caller names the size. The result holds no file nobody asked for.
+        made = result_of("diffuse", colour_rgba(), repeat)
+        half = dds.parse(made.file(SIZE * 2))
+        self.assertEqual((half.width, half.height), (SIZE * 2, SIZE * 2))
+        self.assertFalse(hasattr(made, "files"), "negative: no file of every size")
+        # Negative: a side that is no level of the chain is no size of it.
+        for side in (SIZE * 3, SIZE * 8, 0):
+            with self.assertRaisesRegex(encode.EncodeError, "has no level"):
+                made.file(side)
 
     def test_transparent_pixels_in_an_opaque_format_are_refused(self) -> None:
         rgba = colour_rgba()
@@ -94,7 +97,7 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(
             int(
                 encode.read_texture(
-                    result_of("diffuse", rgba, repeat, "DXT1").files[SIZE * 4]
+                    result_of("diffuse", rgba, repeat, "DXT1").file(SIZE * 4)
                 )[1][:, :, 3].min()
             ),
             255,

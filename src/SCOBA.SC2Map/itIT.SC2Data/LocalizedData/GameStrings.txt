@@ -1,7 +1,8 @@
-DocInfo/Author=Blizzard Entertainment
-DocInfo/DescLong=
-DocInfo/DescShort=THanson02
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
+DocInfo/Author=SCOBA
+DocInfo/DescLong=Fino a tre giocatori combattono come eroi terran accanto agli eserciti della propria corsia, terran contro zerg, su sei corsie. Ottieni PE, assegna punti statistica e impara abilità.
+DocInfo/DescShort=Arena cooperativa di eroi fino a 3 giocatori. Sei corsie, due modalità di controllo.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=ENTRAMBE LE MODALITÀ<n/>W, A, S, D - muoversi<n/>Shift (tieni premuto) - camminare piano<n/>Space - schierarsi all'inizio, poi saltare<n/>Z (tieni premuto) - zoom<n/>Rotella del mouse - distanza della telecamera<n/>Ctrl+E - modalità ordini. Ctrl+C - uscirne<n/><n/>WASD / POINT & CLICK<n/>Clic sinistro - scegliere un bersaglio<n/>Clic destro - attaccare. Con Chase su Move, anche muoversi<n/>Tieni premuto un tasto del mouse e trascina - ruotare la telecamera<n/>Ctrl+C - annullare l'attacco<n/>Pulsante Attack - Single o Auto. Pulsante Chase - Stand o Move<n/><n/>ACTIONS (TPS)<n/>Mouse - ruotare la telecamera<n/>Tieni premuto il destro - mirare. Clic sinistro mentre miri - sparare<n/>Clic centrale - mostrare o nascondere il cursore<n/><n/>EROE<n/>3 punti statistica per livello. Una nuova abilità ai livelli 3, 6, 9, 12 e 15. Al livello 20, un'abilità suprema da un albero con 3 punti.
 MapInfo/Player00/Name=Neutrale
 MapInfo/Player01/Name=Randagi di Raynor
 MapInfo/Player02/Name=Rifugiati di Agria

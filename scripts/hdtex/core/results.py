@@ -6,9 +6,8 @@ from typing import NamedTuple
 
 from . import limits, variants
 from .interfaces import Texture
-from .store import GameStore, StoreError
+from .store import ACCEPTED, GameStore, StoreError
 
-ACCEPTED = "accepted"  # key of an entry: why its problems do not refuse a bake
 EDIT = "edit"  # key of an entry a transfer made: its input, its changed planes, their hash
 # Key of an entry: whether its edges were made to match across the border (store FORMAT 3).
 TILES = "tiles"
@@ -26,7 +25,8 @@ def edges_off(entry: dict, tiles: bool) -> bool:
     """A model's variants whose edges were made for the other rule: matched for a texture that does not repeat, or not
     matched for one that does. A person's edit is not upscaled: its edges are as the person left them.
 
-    Such a variant is shown and may be baked; it is not stale (operator 2026-11-26). A request of it makes it again."""
+    Such a variant is shown and may be baked; it is not stale (operator 2026-11-26). A request of it makes a new
+    variant beside it (`served`, R-HD-158)."""
     return not user_made(entry) and made_tiling(entry) != tiles
 
 
@@ -54,7 +54,7 @@ class Made(NamedTuple):
     stale: bool  # it must be made again: the original changed since
     missed: tuple[limits.Missed, ...]  # the limits it misses for this texture: its problems
     why_stale: str = ""  # why it is stale, in words; empty: it is not
-    edges_off: bool = False  # its edges were made for the other rule (edges_off): shown, and a request makes it again
+    edges_off: bool = False  # its edges were made for the other rule (edges_off): shown; a request makes a revision
 
     @property
     def accepted(self) -> str:
@@ -64,6 +64,11 @@ class Made(NamedTuple):
     @property
     def own(self) -> int:
         return max(self.entry["size"])
+
+    @property
+    def sound(self) -> bool:
+        """It is what a request would make now: of the original as it is, its edges of the texture's rule."""
+        return not self.stale and not self.edges_off
 
     def sizes(self) -> list[int]:
         """The sizes its variants are kept at, smallest first."""
@@ -98,6 +103,38 @@ def of(game: GameStore, texture: Texture, original_sha256: str) -> dict[str, Mad
             why = "the original changed since it was made" if entry["original"]["sha256"] != original_sha256 else ""
             found[recipe] = Made(entry, bool(why), missed, why, edges_off(entry, texture.tiles))
     return found
+
+
+def served(made: dict[str, Made], variant: str) -> str:
+    """The id that serves a request of `variant` of a texture with these recipes (R-HD-158).
+
+    From the revision asked for upward: the first recipe that is sound, or
+    not kept. A kept variant is never made again, so one that is stale or
+    has edges of the other rule is passed over; what is made gets the first
+    free revision. The original serves itself.
+    """
+    if variant == variants.ORIGINAL:
+        return variant
+    recipe, size = variants.split(variant)
+    plain, revision = variants.revision_of(recipe)
+    while True:
+        one = variants.revised(plain, revision)
+        if one not in made or made[one].sound:
+            return variants.variant_id(one, size)
+        revision += 1
+
+
+def made_refusal(made: dict[str, Made], variant: str) -> str:
+    """Why a bake cannot name `variant`, where it is made at its size. Empty: it can, or it is not made (yet).
+
+    A skin upscale asks by it (R-HD-162): a variant whose numbers are there and miss a limit is not left in its skin.
+    """
+    if variant == variants.ORIGINAL:
+        return ""
+    recipe, size = variants.split(variant)
+    if recipe not in made or str(size) not in made[recipe].entry["files"]:
+        return ""
+    return made[recipe].refusal(variant)
 
 
 def refusal(made: dict[str, Made], variant: str) -> str:

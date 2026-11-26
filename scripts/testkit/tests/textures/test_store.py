@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -140,13 +141,13 @@ class UpscaleFolderTest(StoreCase):
 
 
 class SizeTest(unittest.TestCase):
-    def test_a_result_is_kept_at_its_own_size_its_half_and_the_levels_down_to_1024(self) -> None:
-        self.assertEqual(store.kept_sizes(4096), (4096, 2048, 1024))
-        self.assertEqual(store.kept_sizes(2048), (2048, 1024))
-        self.assertEqual(store.kept_sizes(1024), (1024, 512), "its half: the 2x of a 256 input")
-        self.assertEqual(store.kept_sizes(512), (512, 256))
-        self.assertEqual(store.kept_sizes(3072), (3072, 1536, 768))
-        self.assertEqual(store.kept_sizes(75), (75,), "negative: an odd side has no half")
+    def test_a_request_may_ask_for_the_own_size_its_half_and_the_levels_down_to_1024(self) -> None:
+        self.assertEqual(store.offered_sizes(4096), (4096, 2048, 1024))
+        self.assertEqual(store.offered_sizes(2048), (2048, 1024))
+        self.assertEqual(store.offered_sizes(1024), (1024, 512), "its half: the 2x of a 256 input")
+        self.assertEqual(store.offered_sizes(512), (512, 256))
+        self.assertEqual(store.offered_sizes(3072), (3072, 1536, 768))
+        self.assertEqual(store.offered_sizes(75), (75,), "negative: an odd side has no half")
 
 
 class RecipeTest(StoreCase):
@@ -203,15 +204,128 @@ class RecipeTest(StoreCase):
         self.assertIsNone(self.game.entry(ORIGIN, "pbrify"))
         self.assertEqual(list(self.game.recipe_dir(ORIGIN, "pbrify").iterdir()), [])
 
-    def test_new_variants_replace_all_of_the_old_ones(self) -> None:
+    def test_a_kept_recipe_is_never_written_again(self) -> None:
+        """R-HD-158: what a skin or a bake names stays as it was made."""
         self.game.write_recipe(ORIGIN, "pbrify", {}, {256: b"old", 128: b"old"})
-        self.game.write_recipe(ORIGIN, "pbrify", {}, {64: b"new"})
+        folder = self.game.recipe_dir(ORIGIN, "pbrify")
+        # A person's mark, by hand: no program writes it (R-HD-161).
+        store.write_json(folder / store.ENTRY, {**store.read_json(folder / store.ENTRY), "accepted": "a person looked"})
+        before = {path.name: path.read_bytes() for path in sorted(folder.iterdir())}
+        with self.assertRaisesRegex(StoreError, "pbrify.*is kept"):
+            self.game.write_recipe(ORIGIN, "pbrify", {}, {256: b"new", 64: b"new"})
+        # Negative: no file changed, none came, none went.
+        self.assertEqual({path.name: path.read_bytes() for path in sorted(folder.iterdir())}, before)
+        self.assertEqual(sorted(before), ["128.dds", "256.dds", "entry.json"])
+        # A revision is another recipe: it is written beside it.
+        self.game.write_recipe(ORIGIN, "pbrify~2", {}, {64: b"new"})
+        self.assertEqual(self.game.recipes(ORIGIN), ["pbrify", "pbrify~2"])
+        self.assertEqual({path.name: path.read_bytes() for path in sorted(folder.iterdir())}, before)
+
+    def test_a_size_is_added_to_a_kept_recipe_and_nothing_else_changes(self) -> None:
+        """R-HD-123, R-HD-6: a size asked for later stands beside the first. R-HD-158: no kept file changes."""
+        self.game.write_recipe(ORIGIN, "pbrify", {"role": "diffuse"}, {128: b"small"})
+        folder = self.game.recipe_dir(ORIGIN, "pbrify")
+        store.write_json(folder / store.ENTRY, {**store.read_json(folder / store.ENTRY), "accepted": "a person looked"})
+        before = self.game.entry(ORIGIN, "pbrify")
+        written = self.game.add_size(ORIGIN, "pbrify", 256, b"large")
+        self.assertEqual(self.game.entry(ORIGIN, "pbrify"), written)
+        self.assertEqual(self.game.variant_file(ORIGIN, "pbrify", 256).read_bytes(), b"large")
         self.assertEqual(
-            sorted(
-                path.name for path in self.game.recipe_dir(ORIGIN, "pbrify").iterdir()
-            ),
-            ["64.dds", "entry.json"],
+            written["files"]["256"],
+            {"sha256": store.file_sha256(self.game.variant_file(ORIGIN, "pbrify", 256)), "bytes": 5},
         )
+        # Negative: the first file, its hash, the mark and every other key are as they were.
+        self.assertEqual(self.game.variant_file(ORIGIN, "pbrify", 128).read_bytes(), b"small")
+        self.assertEqual({**written, "files": before["files"]}, before)
+        self.assertEqual(written["files"]["128"], before["files"]["128"])
+        self.assertEqual(sorted(path.name for path in folder.iterdir()), ["128.dds", "256.dds", "entry.json"])
+
+    def test_a_size_that_is_kept_is_never_written_again(self) -> None:
+        self.game.write_recipe(ORIGIN, "pbrify", {}, {128: b"small"})
+        folder = self.game.recipe_dir(ORIGIN, "pbrify")
+        before = {path.name: path.read_bytes() for path in sorted(folder.iterdir())}
+        with self.assertRaisesRegex(StoreError, "pbrify.*is kept at 128"):
+            self.game.add_size(ORIGIN, "pbrify", 128, b"other")
+        # Negative: no byte changed, the same bytes are refused too, and no file came.
+        with self.assertRaisesRegex(StoreError, "is kept at 128"):
+            self.game.add_size(ORIGIN, "pbrify", 128, b"small")
+        self.assertEqual({path.name: path.read_bytes() for path in sorted(folder.iterdir())}, before)
+
+    def test_a_size_is_added_to_a_kept_recipe_only(self) -> None:
+        with self.assertRaisesRegex(StoreError, "pbrify.*is not kept"):
+            self.game.add_size(ORIGIN, "pbrify", 256, b"large")
+        # Negative: no file and no entry came of it.
+        self.assertIsNone(self.game.entry(ORIGIN, "pbrify"))
+        self.assertFalse(self.game.variant_file(ORIGIN, "pbrify", 256).exists())
+
+    def test_a_size_whose_entry_cannot_be_written_leaves_no_file(self) -> None:
+        self.game.write_recipe(ORIGIN, "pbrify", {}, {128: b"small"})
+        folder = self.game.recipe_dir(ORIGIN, "pbrify")
+        before = {path.name: path.read_bytes() for path in sorted(folder.iterdir())}
+        with mock.patch.object(store, "write_json", side_effect=OSError("disk full")), self.assertRaises(OSError):
+            self.game.add_size(ORIGIN, "pbrify", 256, b"large")
+        self.assertEqual({path.name: path.read_bytes() for path in sorted(folder.iterdir())}, before)
+
+    def test_no_program_writes_the_accepted_mark(self) -> None:
+        """R-HD-161: only a person marks a variant accepted."""
+        with self.assertRaisesRegex(StoreError, "only a person marks a variant accepted"):
+            self.game.write_recipe(ORIGIN, "pbrify", {"accepted": "a program says so"}, {256: b"x"})
+        # Negative: nothing is kept of it, no entry and no file.
+        self.assertIsNone(self.game.entry(ORIGIN, "pbrify"))
+        self.assertEqual(self.game.recipes(ORIGIN), [])
+        self.assertEqual(list(self.game.recipe_dir(ORIGIN, "pbrify").glob("*")), [])
+        # The same entry without the mark is kept; a mark set by hand is read.
+        self.game.write_recipe(ORIGIN, "pbrify", {}, {256: b"x"})
+        path = self.game.recipe_dir(ORIGIN, "pbrify") / store.ENTRY
+        store.write_json(path, {**store.read_json(path), "accepted": "a person looked"})
+        self.assertEqual(self.game.entry(ORIGIN, "pbrify")["accepted"], "a person looked")
+
+    def test_of_two_writers_of_one_recipe_the_second_is_refused_and_removes_nothing(self) -> None:
+        """R-HD-158: the check and the write are one step. The first writer is held between its files and its entry."""
+        entered, release = threading.Event(), threading.Event()
+        real = store.write_json
+
+        def held(path: Path, value: object) -> None:
+            if threading.current_thread().name == "first":
+                entered.set()
+                release.wait(10)
+            real(path, value)
+
+        ended: dict[str, object] = {}
+
+        def write(name: str, data: bytes) -> None:
+            try:
+                ended[name] = self.game.write_recipe(ORIGIN, "pbrify", {"by": name}, {256: data})
+            except StoreError as error:
+                ended[name] = error
+
+        first = threading.Thread(target=write, args=("first", b"first"), name="first")
+        second = threading.Thread(target=write, args=("second", b"second"), name="second")
+        with mock.patch.object(store, "write_json", held):
+            first.start()
+            self.assertTrue(entered.wait(10))
+            second.start()
+            second.join(0.5)
+            # The second waits for the first: it has neither written nor removed anything.
+            self.assertTrue(second.is_alive(), ended.get("second"))
+            self.assertEqual(self.game.variant_file(ORIGIN, "pbrify", 256).read_bytes(), b"first")
+            release.set()
+            first.join(10)
+            second.join(10)
+        self.assertIsInstance(ended["second"], StoreError)
+        self.assertIn("is kept", str(ended["second"]))
+        # Negative: the first one's variant is whole and its own.
+        self.assertEqual(self.game.entry(ORIGIN, "pbrify")["by"], "first")
+        self.assertEqual(self.game.entry(ORIGIN, "pbrify"), ended["first"])
+        self.assertEqual(self.game.variant_file(ORIGIN, "pbrify", 256).read_bytes(), b"first")
+
+    def test_files_left_without_an_entry_are_replaced(self) -> None:
+        """Half a recipe is no variant: a write that was cut short does not stand in the way."""
+        folder = self.game.recipe_dir(ORIGIN, "pbrify")
+        folder.mkdir(parents=True)
+        (folder / "256.dds").write_bytes(b"half")
+        self.game.write_recipe(ORIGIN, "pbrify", {}, {64: b"new"})
+        self.assertEqual(sorted(path.name for path in folder.iterdir()), ["64.dds", "entry.json"])
 
     def test_a_dropped_recipe_is_gone_and_its_request_stays(self) -> None:
         self.game.write_recipe(ORIGIN, "pbrify", {}, {256: b"x"})

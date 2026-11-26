@@ -1,5 +1,8 @@
 import { test, expect } from '../fixtures.mjs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { api } from '../api.mjs';
 import { cleanOwner, colourTexture, madeVariant, makeSkin, ownerOf, post, stateOf } from '../skins.mjs';
 
@@ -123,7 +126,99 @@ test('a request whose process is gone shows as failed; asked again, the reply sh
     const now = await read();
     return now.requests[RECIPE]?.state === 'failed' ? now.requests[RECIPE].reason : Boolean(made(now));
   }, { timeout: 60_000 }).toBe(true);
-  expect((await read()).requests[RECIPE]).toBeUndefined();
+  const done = await read();
+  expect(done.requests[RECIPE]).toBeUndefined();
+  // One request, one variant: the size asked for (R-HD-123). Negative: no half of it is listed, as an input neither.
+  expect(done.variants.map((one) => one.id)).toEqual([VARIANT]);
+  expect(done.asks.map((one) => one.input)).toEqual(['original', VARIANT]);
+});
+
+test('a request of a kept variant with edges of the other rule makes a revision beside it; the kept one stays byte for byte; asked again, no third is made', async ({ request, worker }) => {
+  // R-HD-158, SPEC-VIEWER 17.1: the server follows the state's `remake`. No other test uses this unit.
+  test.setTimeout(180_000);
+  const asset = await colourTexture(request, 'stock', 'unit:Corruptor');
+  const { variant, size } = await madeVariant(request, 'stock', asset);
+  const REVISED = `fast~2@${size}`;
+  const MARK = 'a person looked at it';
+  const find = (state, id) => state.variants.find((one) => one.id === id);
+  const ask = () => post(request, 'request', 'stock', { asset, input: 'original', model: 'fast', size });
+  // Negative: sound, it serves itself.
+  expect(find(await stateOf(request, 'stock', asset), variant)).toMatchObject({ edgesOff: false, remake: variant });
+
+  // By hand, in this worker's own store: a person accepted it, and its entry says its edges were made by the other rule.
+  const origins = join(worker.store, 'sc2', 'variants');
+  const [origin] = readdirSync(origins).filter((one) => one.startsWith(`${asset.split('\\').pop()}-`) && existsSync(join(origins, one, 'fast', 'entry.json')));
+  const kept = join(origins, origin, 'fast');
+  const entry = JSON.parse(readFileSync(join(kept, 'entry.json'), 'utf8'));
+  writeFileSync(join(kept, 'entry.json'), JSON.stringify({ ...entry, tiles: !entry.tiles, accepted: MARK }));
+  const bytes = () => Object.fromEntries(readdirSync(kept).sort().map((file) => [file, createHash('sha256').update(readFileSync(join(kept, file))).digest('hex')]));
+  const before = bytes();
+  const judged = await judge(request, 'stock', { assets: [asset] });
+  expect(judged.status(), await judged.text()).toBe(200);
+  expect(find((await judged.json()).textures[0], variant)).toMatchObject({ edgesOff: true, stale: false, accepted: MARK, remake: REVISED });
+
+  // Asked by the kept id: the reply shows the revision, as a request or made.
+  const asked = await ask();
+  expect(asked.status(), await asked.text()).toBe(200);
+  const shown = (await asked.json()).textures[0];
+  expect(Boolean(shown.requests['fast~2']) || Boolean(find(shown, REVISED)), JSON.stringify(shown.requests)).toBe(true);
+  await expect.poll(async () => {
+    const now = await stateOf(request, 'stock', asset);
+    const open = now.requests['fast~2'];
+    return open && open.state === 'failed' ? open.reason : Boolean(find(now, REVISED));
+  }, { timeout: 60_000 }).toBe(true);
+  const after = await stateOf(request, 'stock', asset);
+  expect(find(after, REVISED)).toMatchObject({ recipe: 'fast~2', edgesOff: false, accepted: '', remake: REVISED });
+  // Negative: the kept one is the same byte for byte, mark and all, and still listed.
+  expect(bytes()).toEqual(before);
+  expect(find(after, variant)).toMatchObject({ edgesOff: true, accepted: MARK, remake: REVISED });
+  expect(after.requests.fast).toBeUndefined();
+
+  // Asked again: the revision serves it. No request starts, and no third is made.
+  const again = await ask();
+  expect(again.status(), await again.text()).toBe(200);
+  expect((await again.json()).textures[0].requests).toEqual({});
+  expect(readdirSync(join(origins, origin)).sort()).toEqual(['fast', 'fast~2']);
+  expect(bytes()).toEqual(before);
+});
+
+test('an Upscale Skin does not leave its skin naming a variant that misses a limit: its input is back; a sound one stays named', async ({ request }) => {
+  // R-HD-162, SPEC-VIEWER 17.1: each request the upscale starts names the skin it is for. The Battlecruiser has
+  // effect textures that tile (firetile4, grad3, warpline2_orange). The tests' runner repeats pixels: the seam comes
+  // out at 4 times the original's, past the bound, so those variants miss the seam limit. No other unit test uses
+  // this unit.
+  test.setTimeout(300_000);
+  const OWNER = 'unit:Battlecruiser';
+  const SKIN = 'revert';
+  await cleanOwner(request, 'stock', OWNER);
+  const answer = await post(request, 'skin', 'stock', { owner: OWNER, action: 'upscale', name: SKIN, from: 'original', model: 'fast', factor: 2 });
+  expect(answer.status(), await answer.text()).toBe(200);
+  const { upscaled } = await answer.json();
+  expect(upscaled.failed).toEqual([]);
+  const asked = Object.entries(upscaled.requests);
+  expect(asked.length, JSON.stringify(upscaled)).toBeGreaterThan(1);
+  const states = async () => Object.fromEntries(await Promise.all(asked.map(async ([asset]) => [asset, await stateOf(request, 'stock', asset)])));
+  // Until each is made, or one failed.
+  await expect.poll(async () => {
+    const now = await states();
+    const failed = asked.flatMap(([asset]) => Object.values(now[asset].requests).filter((one) => one.state === 'failed').map((one) => `${asset}: ${one.reason}`));
+    return failed.length ? failed.join('; ') : asked.every(([asset, variant]) => now[asset].variants.some((one) => one.id === variant) && Object.keys(now[asset].requests).length === 0);
+  }, { timeout: 240_000, intervals: [1000] }).toBe(true);
+  const now = await states();
+  const refused = asked.filter(([asset, variant]) => {
+    const made = now[asset].variants.find((one) => one.id === variant);
+    return made.problems.length > 0 && !made.accepted;
+  });
+  const sound = asked.filter((one) => !refused.includes(one));
+  // The run proves both sides only with one of each.
+  expect(refused.length, `a variant that misses a limit among ${JSON.stringify(upscaled.requests)}`).toBeGreaterThan(0);
+  expect(sound.length, 'a sound variant').toBeGreaterThan(0);
+  // The request that puts the input back ends after its variant shows: poll the skin.
+  const named = async () => (await ownerOf(request, 'stock', OWNER)).skins.find((one) => one.name === SKIN).textures;
+  await expect.poll(named, { timeout: 30_000 }).toEqual(Object.fromEntries(sound));
+  // Negative: the variants that miss stay kept and listed; nothing is baked.
+  for (const [asset, variant] of refused) expect(now[asset].variants.map((one) => one.id), asset).toContain(variant);
+  expect((await ownerOf(request, 'stock', OWNER)).bake).toBeNull();
 });
 
 test('the judge route has the pipeline read a texture nobody asked for; before it the texture offers no request', async ({ request }) => {

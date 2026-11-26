@@ -26,6 +26,8 @@ ICON_DIR="$HOME/.local/share/icons/hicolor/${ICON_SIZE}x${ICON_SIZE}/apps"
 APPS_DIR="$HOME/.local/share/applications"
 DESKTOP_FILE="$APPS_DIR/$APP_ID"
 LAUNCHER="$ROOT_DIR/scripts/launch-editor.sh"
+# The launch dialog (REQ-LAUNCH-DIALOG) runs the launcher and shows its log.
+DIALOG="$ROOT_DIR/scripts/launch-dialog.sh"
 
 # shellcheck source=paths.sh
 source "$ROOT_DIR/scripts/paths.sh" || exit 1
@@ -43,6 +45,7 @@ fail() {
 }
 
 [ -f "$LAUNCHER" ] || fail "launcher not found: $LAUNCHER"
+[ -f "$DIALOG" ] || fail "launch dialog not found: $DIALOG"
 [ -f "$ICON_EXE" ] || fail "StarCraft II editor not found: $ICON_EXE"
 for tool in wrestool icotool gsettings; do
     if ! tool_path="$(command -v "$tool")"; then
@@ -54,6 +57,9 @@ done
 # Fail here, not on the first click, when the launcher cannot resolve its paths.
 if ! output="$(DRY_RUN=1 SC2_PROJECT_ROOT="$ROOT_DIR" bash "$LAUNCHER" 2>&1)"; then
     fail "launcher dry run failed: $output"
+fi
+if ! output="$(SC2_PROJECT_ROOT="$ROOT_DIR" bash "$DIALOG" --check 2>&1)"; then
+    fail "launch dialog cannot start: $output"
 fi
 
 WORK_DIR="$(mktemp -d -p "$SC2_TMP")"
@@ -80,11 +86,11 @@ done
 mkdir -p "$ICON_DIR" "$APPS_DIR"
 cp -f "$ICON_SOURCE" "$ICON_DIR/$ICON_NAME.png"
 
-printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=env SC2_PROJECT_ROOT="%s" bash "%s"\nPath=%s\nIcon=%s\nTerminal=false\nType=Application\nCategories=Development;\nStartupNotify=true\nStartupWMClass=sc2editor_x64.exe\n' \
+printf '[Desktop Entry]\nName=%s\nComment=%s\nExec=env SC2_PROJECT_ROOT="%s" bash "%s" editor\nPath=%s\nIcon=%s\nTerminal=false\nType=Application\nCategories=Development;\nStartupNotify=true\nStartupWMClass=sc2editor_x64.exe\n' \
     "$APP_NAME" \
     "Open the unpacked SCOBA map in the StarCraft II editor" \
     "$ROOT_DIR" \
-    "$LAUNCHER" \
+    "$DIALOG" \
     "$ROOT_DIR" \
     "$ICON_NAME" > "$DESKTOP_FILE"
 

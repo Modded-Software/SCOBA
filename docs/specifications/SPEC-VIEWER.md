@@ -229,7 +229,8 @@ test API builder.
 - `main.ts` builds the services in order. Then each game installs and
   gives its parts. Then each feature installs.
 - Features: `dataset-reload`, `controls`, `landmarks`, `add-all`, `drag`,
-  `sky`, `pick`, `select`, `clipboard`, `inspect`, `scenes`, `edges`.
+  `sky`, `pick`, `select`, `playback`, `clipboard`, `inspect`, `scenes`,
+  `edges`, `skins`, `edits`.
 - A game's parts: its glow class, its facts, its options check, the
   texture service's name of a texture an instance names (absent: no
   service), and what a double-click on an item or a record opens.
@@ -622,6 +623,8 @@ this file's git history.
 | O-VSPEC-2 | The commit hooks have not been seen on `.ts` files here. |
 | O-VSPEC-3 | A capability for a format's own effects (particles, lights) is left to probes and post passes until a second format needs it. |
 | O-VSPEC-6 | Section 16 was written from the page code and the test titles. What no test asserts there is read from the code. |
+| O-VSPEC-7 | [agent] 2026-11-26, read from the code, not reproduced by a test, not fixed. An owner's `held` (`scripts/hdtex/core/view.py` `owner_state`) is true only when the owner itself has a bake that the package holds. A unit that shows the bake of its model file (a bake below) has `held` false, so its In game tile would say "not in the package yet: build the map" though the package holds the file. The tile also does not say which owner and skin baked what it shows; the "named by" row does (R-VIEW-161). Open: whether `held` follows the bake below, and whether the tile names the baker. |
+| O-VSPEC-8 | [agent] 2026-11-26, seen in the operator's viewer, not reproduced by a test, not fixed. The texture window on a unit whose model file is baked (`unit:Barracks`) shows no draft bar after a click on the tile the game shows: a pick is counted against the target Save to Skin… offers (`baseOf`, R-VIEW-133), not against In game. Open: whether that is wanted. |
 
 ## 16. Feature behaviour
 
@@ -723,7 +726,8 @@ it.
 
 - Actions: press actions move, rect, face, grab, look, orbit, pan; click
   actions select, addSelect, menu; the double press action open; key
-  actions remove, copy, cut, paste, loop, edges, original, cancel.
+  actions remove, copy, cut, paste, loop, playPause, edges, original,
+  cancel.
 - A mouse binding is a button and modifiers. It matches when its button
   is pressed and its modifiers are held; others may be held. Of the
   matching press actions the one with the most modifiers wins, then the
@@ -797,6 +801,7 @@ it.
 | Delete | removes the selected instances |
 | Ctrl+C, Ctrl+X, Ctrl+V | copy, cut, paste |
 | Ctrl+L | switches the menu's "loop" choice, with a selection |
+| Ctrl+E | holds the animations of the selected instances at their frame, or lets them run on (16.6.1, R-VIEW-159) |
 | Ctrl+/ | switches the edges of the selected instances (16.13) |
 | Ctrl+. held | the selected instances with skins show Original while it is held (R-VIEW-148). The release of "." or Ctrl, or the page losing the focus, ends it. Their skin choice stays; the scene is not edited. The instances held are those selected at the press |
 | Escape | closes the open menu, dialog or floating window; during a unit move or turn, cancels it (16.3) |
@@ -808,6 +813,28 @@ it.
 - A Ctrl key the viewer owns never reaches the browser, wherever the keys
   are.
 - A game adds its own keys through the UI service.
+
+#### 16.6.1 Play and pause
+
+The key is the input map's `playPause` (16.3.1): Ctrl+E when nothing is
+stored (`features/playback`, R-VIEW-159). The keyboard's media play/pause
+key is not used: the browser takes it before the page.
+
+- A paused item has `paused` true and its instance's time scale 0. Its
+  frame stays. `scene.setPaused` sets both; played again, the time scale
+  is the game's rate of the animation it shows.
+- The selection acts as one. While any selected instance plays, the key
+  pauses them all. With all of them paused, it plays them all.
+- A paused one-shot (16.5) stays a one-shot and does not end while held.
+- An animation started after ends the pause: a choice in the menu,
+  restart, a swap of the item's model.
+- With nothing selected the key pauses nothing; the status line says
+  "Ctrl+E: select an instance first". A text field keeps the key. Else
+  the page takes it (`preventDefault`), with or without a selection, so
+  the browser's own Ctrl+E does not act. A key held down counts once.
+- The status line says "paused N instance(s)" or "playing N instance(s)".
+- The pause is not in the scene document and not in a copy.
+- The state has `paused` per item; `rate` is 0 while paused.
 
 ### 16.7 Clipboard
 
@@ -1017,7 +1044,7 @@ passed yet.
 | `index --asset` | the judge route; a request for a texture not judged yet |
 | `upscaler` | before a request. It names the worker's command; the service starts the worker when none runs. |
 | `request` | the request route. It outlives the server (R-VIEW-121). |
-| `skin` | the skin route. `skin upscale --defer` writes the skin and starts no request; the service then starts one `request` per texture it names, side by side, each outliving the server, and answers once the index shows each. |
+| `skin` | the skin route. `skin upscale --defer` writes the skin and starts no request; the service then starts one `request` per texture it names, side by side, each outliving the server, and answers once the index shows each. Each such `request` carries `--owner` and `--skin` of the skin the upscale made: the pipeline puts a texture's input back in that skin when the variant made misses a limit without the accepted mark (R-HD-162, SPEC-HD-TEXTURES 4.6). The owner's state is written by that request, after the reply. |
 | `bake`, `unbake` | their routes |
 | `edit` | the edit routes (SPEC-PHOTOCRAFT 10): `open` and `discard` waited for; `check` started and not waited for; `transfer` outlives the server |
 
@@ -1031,6 +1058,12 @@ passed yet.
   asked for again: such a request writes nothing the index would show, so
   the wait ran out after 30 s and the skin upscale reported it failed
   (`ghost-upscale`, 2026-11-26).
+- The server follows the variant's `remake` (SPEC-HD-TEXTURES
+  4.7, 4.9): the id that serves a request of it. It waits for that id or
+  a request of its recipe, and skips the request when that id is made,
+  serves itself and is not asked for. A variant the index does not hold
+  is its own `remake`. The server works no revision out itself
+  (`texture-service-api.spec.mjs`, 2026-11-26).
 - The launch output of the worker and the requests (`worker.log`,
   `worker.out`, `requests.out`, `transfers.out`) goes to
   `$TEXTURE_LOGS/<game>` when it is set, else to `textures/` below the
@@ -1054,6 +1087,7 @@ What the server says of one texture:
 | factors | per model and factor (2, 4): the size it gives, at most `maxSide`, and why it cannot be asked for, or empty |
 | requests | those not done, by recipe: `state`, `reason`, `step`, `steps`, `planes`, `done` (planes whose job is done in this step), `variant` (the id it was asked as; empty for the transfer of an edit), `since` (its start, seconds since 1970; null when not known). The log's path stays on the server: the log route serves it |
 | bake | for a terrain texture: the baked variant, and whether the package holds its file |
+| namedBy | each owner of the dataset whose bake or skin names a variant of it other than `original`: `{owner, skin, variant, baked}`; `baked` true for the bake, false for a skin. Sorted by owner, bake first (R-HD-156) |
 
 What the server says of one owner:
 
@@ -1116,9 +1150,27 @@ frame. The page is viewer code. It compares; it changes a skin only by
   names.
 - The list has one entry per texture and plane: a small picture, the size,
   and state badges. Chips filter by kind and plane; a search by name.
+- Users badge (R-VIEW-160, `.users-badge`): on the bottom right of the
+  thumbnail, the number of `users` (the model files that read the
+  texture; SC2 and Ghost alike) when it is 2 or more. Its title: "read by
+  <n> model files", then one file per line. Amber (`.shared-bake`) when a
+  `namedBy` entry is a bake of another owner than the window's
+  (R-VIEW-161); the title then adds "baked by <m> other owners" ("1 other
+  owner"), one owner per line. Without a state: no badge. Units and
+  doodads are not counted (operator 2026-11-26: model files only).
+  A window on no owner takes every bake as another's.
+  `[agent]` One model file reads it and another owner bakes it (a unit
+  over its model file's bake): the badge has no count; it reads "baked",
+  amber, with the bakers in its title. R-VIEW-160 gives such a texture no
+  count; R-VIEW-161 asks that the row say who bakes it.
+  `usersBadge` and `namedByLines` (`shared/textures.ts`) work both out
+  from the state.
 - Below the view: the details of the chosen texture (format, kind,
-  "used by", why it cannot be upscaled, its bake, the game's facts), then
-  its tiles (17.6.1, R-VIEW-132).
+  "used by" with its count, "named by", why it cannot be upscaled, its
+  bake, the game's facts), then its tiles (17.6.1, R-VIEW-132).
+  "named by" lists `namedBy`, one line each: "<owner> · <skin> ·
+  <variant>", the bakes first, marked "baked"; in a box like "used by"
+  (R-VIEW-161). Without an entry the row is absent.
   "used by" lists one user per line in a box 72 px high (about 4.5 lines)
   that scrolls (R-VIEW-134). A game's fact (Ghost's `material <name>`)
   takes two lines: its name, then its value below, each the panel's full
@@ -1311,6 +1363,9 @@ texture) (R-VIEW-115 to 117, 119).
   goes to the status line.
 - A line under the choices says: "You can close this dialog. The progress
   shows on the texture's tile in the texture window."
+- The dialog says nothing of other owners: a request changes no kept
+  variant, so it changes nothing another owner shows (R-HD-158,
+  SPEC-HD-TEXTURES 4.7).
 
 ### 17.6 Skin editing
 
@@ -1362,6 +1417,13 @@ R-VIEW-132):
   the texture after, and the pipeline makes it so. The pipeline refuses
   the rest (a skin or bake of another dataset, R-HD-146); the refusal
   shows in the window. In game and Original have no trash.
+  The Delete Variant dialog lists each `namedBy` entry of the
+  variant, of another owner than the window's, one per line, the bakes
+  first: "<owner> · <skin>", with " (baked)" for a bake
+  (`.variant-named`). The line above them gives their number. Without
+  one it says "No other owner names it." (R-VIEW-162). It reads the
+  texture's state when it opens. The list disables nothing; the pipeline
+  still refuses a bake (R-HD-146).
 - Each open request (R-VIEW-145): the recipe, a stage line and a bar.
   | State | Line | Bar |
   | --- | --- | --- |
@@ -1377,7 +1439,10 @@ R-VIEW-132):
   Again calls the request route with the request's own variant (`variant`:
   input, model, size), with no dialog; the button says "Asking…" while the
   call is out. A request with no `variant` (the transfer of an edit) has
-  no Ask Again. Open Log opens the log route in a new tab. A request tile
+  no Ask Again. The model it sends is the step's model without
+  its revision (`pbrify` of `pbrify~2@512`); the pipeline picks the id
+  that serves it (`skin-choices.spec.mjs`, 2026-11-26; the button itself
+  is not tested with a revision). Open Log opens the log route in a new tab. A request tile
   cannot be clicked.
 - Last, **Upscale Texture**, as large as a preview tile (R-VIEW-129).
 
@@ -1470,9 +1535,11 @@ enlarges on a GPU.
 | Menu drag, stepping | a drag on the menu title moves the menu; the wheel and Up/Down step every drop-down and number input (16.14) | the menu stays open while dragged; a step past the last choice moves nothing | Not tested (R-VIEW-138, 140, 2026-11-25) |
 | Dialogs | each dialog's title and buttons start with a capital letter and name what they act on; delete and discard buttons are red | no dialog button in lower case; a button that keeps is not red | `texture-bake`, `scenes` |
 | Window tiles | In game is first; "used by" has a fixed height and scrolls; the info mark's tooltip names amber and red | no Use button; a click on In game changes no skin; a cursor of help | `texture-window`. Not tested: Include in preview (several variants in the view, a box picks nothing, the original's box fixed) |
+| Shared textures | a texture two model files read has the users badge with 2 and their names; a texture another owner bakes has it amber and the "named by" row lists that owner as baked; the Delete Variant dialog lists the other owner | a texture one model file reads has no badge; a texture no other owner names: no amber, no "named by" row, the dialog says no other owner names it; the warning disables nothing | R-VIEW-160, 161: `texture-shared` (e2e) and `skin-choices` (unit), run 2026-11-26: each row of the Corruptor has the badge with its state's count and the files in its title; a skin of another owner gives a "named by" line and no amber; its bake turns the badge amber, names the owner in the title and lists the bake first; unbaked, the amber is gone. Negative: no bake, no amber and no "named by" row; another texture's badge does not change; the unit gets no skin and no bake. One model file, no badge: unit only (no texture of the test's unit has one reader). R-VIEW-162: `texture-shared` (e2e) and `skin-choices` (unit), run 2026-11-26 (SPEC-HD-TEXTURES 10, "Delete dialog"): the Delete Variant dialog lists the other owner's skin, then its bake first and marked, with their number; Delete Variant stays enabled; cancelled, the variant is still there. Negative: nobody names the variant, it says so and lists nobody; the window's own owner and another variant of the texture are not listed (unit). How the badge and the dialog's list look: operator check |
 | Save to Skin | the picks of the window go to the chosen target in one dialog; the instance shows it | Cancel changes nothing; Revert Changes drops the picks; the bake is unchanged; no bar without an owner | `texture-window` (no bar without an owner). The rest: not tested (removed 2026-11-25) |
 | Mouse sensitivity | an orbit, a look and a wheel step are 0.6 of the sensitivity-1 rates; a left grab moves the map 0.6 of the ground crossed | none | `camera.spec`, `zoom.spec` (e2e, updated, not run), `zoom.spec` (unit, at sensitivity 1). A stored value and Ctrl on top: not tested (R-VIEW-150, 2026-11-25) |
 | Input map | the default map decides every press, click and key as before; a stored binding acts and the old one does not; the controls window rebinds and resets; Escape puts a moved unit back; a faulty stored map is refused; the double press opens on the binding of `open`; zoom to the pointer keeps the ground point under the pointer; invert zoom turns the wheel round; the controls window sets both wheel flags | a rebound key with the default key pressed; the old mouse button with the camera unchanged; a double left press with `open` on the middle button; a double middle press with nothing stored; the wheel with nothing stored: the target stays and the point leaves the pointer; the pointer on the sky: the target stays | `input.spec` (unit and e2e), `zoom.spec` (unit: the wheel flags), `centre.spec` (R-VIEW-149: middle and left on a hovered unit, the vertex box middle; negative: bare ground). Not tested: the invert rates of orbit and pan, a rebound rate, the blur end of a drag, the turn cancel, the per-row default, a double right press in the page (its first press opens the animation menu over the place) (R-VIEW-154, 2026-11-26) |
+| Play and pause | the key holds the selected instance at its frame and its time scale is 0; again, it runs on from that frame; a mixed selection pauses all, then plays all; a held one-shot stays one; a menu choice and restart end the pause; a held key counts once; a rebound key acts | the unselected instance plays on; nothing selected: nothing pauses, the status says to select first; a text field keeps the key; Ctrl+E after a rebind; no other default key is Ctrl+E | `play-pause.spec` (e2e), `input.spec` (unit: the binding). Not tested: a model swap ending the pause, the pause left out of a saved scene and a copy (R-VIEW-159, 2026-11-26) |
 | Unit centre | with an instance under the mouse, a middle drag orbits around its centre and a left drag keeps it under the pointer | with none under the mouse, the ground point is used | Not tested (R-VIEW-149, 2026-11-25) |
 | Original peek | Ctrl+. held shows Original on the selected instances; the release shows their skins again | the skin choice and the scene are unchanged; an unselected instance keeps its skin | Not tested (R-VIEW-148, 2026-11-25) |
 | Upscale progress | a request tile shows its stage, step, planes, bar and time; the tiles follow the state; the dialog says it may be closed and its button is busy while it sends | a done request leaves no tile; a failed one has Ask Again and Open Log, a running one has neither | Not tested (R-VIEW-145, 146, 2026-11-25) |

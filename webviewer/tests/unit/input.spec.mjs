@@ -92,6 +92,24 @@ test('keys: by the typed sign with Shift free, by a letter with Shift exact; Met
   expect(got).toEqual({ edgesUs: true, edgesShifted: true, edgesAlt: false, copy: true, copyMeta: true, copyShift: false, copyBare: false, remove: true });
 });
 
+test('the play/pause key: Ctrl+E when nothing is stored', async () => {
+  const { keyMatches, parseInput, resolveInput, bindingText, KEY_ACTIONS } = await input();
+  const { keys } = resolveInput(null);
+  expect(KEY_ACTIONS).toContain('playPause');
+  expect(keys.playPause).toEqual({ code: 'KeyE', key: 'e', mods: ['ctrl'] });
+  expect(bindingText(keys.playPause)).toBe('Ctrl+E');
+  expect(keyMatches(keys.playPause, key('e', 'KeyE', ['ctrl']))).toBe(true);
+  // Negative: a bare E, Shift or Alt held too, the media key, another Ctrl letter.
+  const others = [key('e', 'KeyE'), key('E', 'KeyE', ['ctrl', 'shift']), key('e', 'KeyE', ['ctrl', 'alt']), key('MediaPlayPause', 'MediaPlayPause'), key('l', 'KeyL', ['ctrl'])];
+  expect(others.map((e) => keyMatches(keys.playPause, e))).toEqual([false, false, false, false, false]);
+  // No other default key is Ctrl+E.
+  const same = Object.entries(keys).filter(([, binding]) => keyMatches(binding, key('e', 'KeyE', ['ctrl']))).map(([action]) => action);
+  expect(same).toEqual(['playPause']);
+  // Rebound: the new key is it, Ctrl+E no longer.
+  const rebound = resolveInput(parseInput({ keys: { playPause: { code: 'KeyP', key: 'p', mods: [] } } })).keys.playPause;
+  expect([keyMatches(rebound, key('p', 'KeyP')), keyMatches(rebound, key('e', 'KeyE', ['ctrl']))]).toEqual([true, false]);
+});
+
 test('a stored map with a fault is refused, naming it', async () => {
   const { parseInput } = await input();
   const faults = [

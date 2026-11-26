@@ -45,7 +45,7 @@ export interface ViewerEvents {
    * A variant tile's trash (SPEC-VIEWER 17.6.1, R-VIEW-147): the main page asks first, then removes it.
    * `done` gets true when it was removed, false when cancelled; an Error when refused.
    */
-  'texture-remove': { game: string; dataset: string; asset: string; variant: string; done(removed: boolean | Error): void };
+  'texture-remove': { game: string; dataset: string; asset: string; variant: string; owner: string | null; done(removed: boolean | Error): void };
   /**
    * The texture window's Rename Skin… (R-VIEW-156): the main page asks the new name of the skin instance `item` shows,
    * then renames it. `done` gets the new name, null when cancelled; an Error when refused.

@@ -167,6 +167,8 @@ section { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 /* The Save to Skin dialog (17.6.2): one line per pick. */
 .skin-changes { max-height: 160px; overflow-y: auto; margin: 0; padding: 0; font-size: 11px; }
 .skin-changes .same { color: var(--dim); }
+/* The Delete Variant dialog (17.6.1): who else names the variant, one line each. */
+.variant-named { max-height: 160px; overflow-y: auto; margin: 0; padding: 0; font-size: 11px; }
 /* The tiles are in theme.css, with the texture window's page (17.6.1). */
 .picker-list li.with-preview { display: flex; gap: 8px; align-items: center; }
 .ground-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); }

@@ -156,7 +156,7 @@ class StatusTest(CliCase):
             list(
                 self.ok("request", "--asset", late, "--variant", UP)["made"][0]["files"]
             ),
-            ["128", "256"],
+            ["256"],
         )
 
     def test_an_unknown_game_or_dataset_is_an_error_in_json(self) -> None:
@@ -186,8 +186,8 @@ class RequestTest(CliCase):
                 list(made["files"]),
                 answer["failed"],
             ),
-            (ROCK, UP, "pbrify", ["128", "256"], []),
-            "4x of 64 is 256; its half, 2x, is kept too",
+            (ROCK, UP, "pbrify", ["256"], []),
+            "4x of 64 is 256; negative: its half, 2x, was not asked for and is not kept (R-HD-123)",
         )
         found = self.texture()
         self.assertEqual(
@@ -195,7 +195,7 @@ class RequestTest(CliCase):
             {
                 "pbrify": {
                     "folder": str(self.store.game(GAME).recipe_dir(ROCK_ORIGIN, "pbrify")),
-                    "size": [256, 256], "variants": ["pbrify@128", UP], "stale": False, "staleWhy": "", "problems": [], "accepted": "",
+                    "size": [256, 256], "variants": [UP], "stale": False, "staleWhy": "", "problems": [], "accepted": "",
                     "models": {"color": "pbrify", "alpha": "fast"},
                 }
             },
@@ -215,6 +215,20 @@ class RequestTest(CliCase):
         self.assertEqual(
             sorted(self.texture()["recipes"]), ["pbrify", "pbrify@64+seedvr2"]
         )
+
+    def test_a_request_names_the_variant_that_served_it_and_the_id_it_was_asked_as(self) -> None:
+        """R-HD-158: a kept variant that cannot serve a request stays; the reply names the revision made beside it."""
+        self.add(ROCK)
+        [first] = self.ok("request", "--asset", ROCK, "--variant", UP)["made"]
+        # Negative: a first make, and a sound variant asked again, are their own id.
+        self.assertEqual((first["variant"], first["asked"]), (UP, UP))
+        self.add(ROCK, tiles=False)  # the same file: it no longer repeats
+        self.ok("index", "--asset", ROCK)
+        [made] = self.ok("request", "--asset", ROCK, "--variant", UP)["made"]
+        self.assertEqual((made["variant"], made["asked"], made["recipe"]), ("pbrify~2@256", UP, "pbrify~2"))
+        [again] = self.ok("request", "--asset", ROCK, "--model", "pbrify", "--factor", "4")["made"]
+        self.assertEqual((again["variant"], again["asked"], again["files"]), ("pbrify~2@256", UP, made["files"]))
+        self.assertEqual(sorted(self.texture()["recipes"]), ["pbrify", "pbrify~2"])
 
     def test_a_factor_is_capped_at_the_largest_side(self) -> None:
         self.add(ROCK, size=512)
@@ -290,157 +304,3 @@ class RequestTest(CliCase):
                 words,
             )
         self.assertEqual(self.runner.asked, [])
-
-
-class SkinTest(CliCase):
-    def test_a_skin_is_copied_set_renamed_listed_and_deleted(self) -> None:
-        self.add(ROCK)
-        self.hd()
-        self.assertEqual(
-            self.ok("skin", "list", "--owner", ROOM),
-            {
-                "owner": ROOM,
-                "skins": {"hd": {"textures": {ROCK: UP}}},
-            },
-        )
-        self.ok("skin", "rename", "--owner", ROOM, "--name", "hd", "--new", "sharp")
-        self.ok(
-            "skin",
-            "set",
-            "--owner",
-            ROOM,
-            "--name",
-            "sharp",
-            "--asset",
-            ROCK,
-            "--clear",
-        )
-        self.assertEqual(
-            self.ok("skin", "list", "--owner", ROOM)["skins"],
-            {"sharp": {"textures": {}}},
-        )
-        self.assertEqual(
-            self.ok("skin", "delete", "--owner", ROOM, "--name", "sharp")["skins"], {}
-        )
-
-    def test_a_skin_change_that_is_refused_changes_nothing(self) -> None:
-        self.add(ROCK)
-        self.add(SAND, seed=4, users=["hall"])
-        self.hd()
-        before = self.ok("skin", "list", "--owner", ROOM)
-        self.assertIn(
-            "names nothing",
-            self.error(
-                "skin",
-                "set",
-                "--owner",
-                ROOM,
-                "--name",
-                "original",
-                "--asset",
-                ROCK,
-                "--variant",
-                UP,
-            ),
-        )
-        self.assertIn(
-            "no texture of this owner",
-            self.error(
-                "skin",
-                "set",
-                "--owner",
-                ROOM,
-                "--name",
-                "hd",
-                "--asset",
-                SAND,
-                "--variant",
-                UP,
-            ),
-        )
-        self.assertIn(
-            "already", self.error("skin", "copy", "--owner", ROOM, "--name", "hd")
-        )
-        self.assertIn(
-            "has no owner",
-            self.error("skin", "copy", "--owner", "model:none", "--name", "hd"),
-        )
-        self.assertIn(
-            "skin set takes --variant, or --clear",
-            self.error("skin", "set", "--owner", ROOM, "--name", "hd", "--asset", ROCK),
-        )
-        self.assertIn(
-            "skin rename takes --new",
-            self.error("skin", "rename", "--owner", ROOM, "--name", "hd"),
-        )
-        self.assertEqual(self.ok("skin", "list", "--owner", ROOM), before)
-
-    def test_an_upscale_makes_a_skin_and_its_variants(self) -> None:
-        self.add(ROCK)
-        answer = self.ok(
-            "skin",
-            "upscale",
-            "--owner",
-            ROOM,
-            "--name",
-            "up",
-            "--model",
-            "pbrify",
-            "--factor",
-            "4",
-        )
-        self.assertEqual(
-            (answer["skin"], answer["requests"], answer["kept"], answer["failed"]),
-            ("up", {ROCK: UP}, {}, []),
-        )
-        self.assertEqual(list(self.texture()["recipes"]), ["pbrify"])
-        self.assertEqual(
-            self.ok("skin", "list", "--owner", ROOM)["skins"]["up"]["textures"],
-            {ROCK: UP},
-        )
-
-    def test_an_upscale_that_asks_for_nothing_stores_no_skin(self) -> None:
-        self.add(ROCK, size=2048)
-        words = ("skin", "upscale", "--owner", ROOM, "--model", "pbrify", "--factor", "2")
-        with mock.patch.dict(os.environ, {variants.MAX_SIDE_ENV: "2048"}):
-            said = self.error(*words)
-        self.assertIn("2x asks for no texture, so no skin is made", said)
-        self.assertIn(f"{ROCK}: 2x of a side of 2048 gives 2048", said, "with each texture's reason")
-        self.assertEqual(self.ok("skin", "list", "--owner", ROOM)["skins"], {}, "negative: no skin stored")
-        self.assertEqual(self.runner.asked, [], "negative: nothing was asked")
-
-    def test_a_deferred_upscale_writes_the_skin_and_requests_nothing(self) -> None:
-        self.add(ROCK)
-        answer = self.ok(
-            "skin",
-            "upscale",
-            "--owner",
-            ROOM,
-            "--name",
-            "up",
-            "--model",
-            "pbrify",
-            "--factor",
-            "4",
-            "--defer",
-        )
-        self.assertEqual((answer["requests"], answer["failed"]), ({ROCK: UP}, []))
-        self.assertEqual(self.runner.asked, [], "negative: no job was submitted")
-        self.assertEqual(self.texture()["recipes"], {}, "negative: no variant made")
-        self.assertEqual(
-            self.ok("skin", "list", "--owner", ROOM)["skins"]["up"]["textures"],
-            {ROCK: UP},
-        )
-
-    def test_the_status_lists_the_owners_with_skins_and_what_they_show_now(
-        self,
-    ) -> None:
-        self.add(ROCK)
-        self.hd()
-        [owner] = self.ok("status")["owners"]
-        self.assertEqual(
-            (owner["owner"], owner["layer"], owner["shows"], owner["bake"]),
-            (ROOM, "model", {ROCK: "original"}, None),
-        )
-        hd = {"name": "hd", "textures": {ROCK: UP}}
-        self.assertEqual(owner["skins"], [hd])

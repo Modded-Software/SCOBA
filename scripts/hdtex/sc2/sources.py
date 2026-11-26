@@ -4,6 +4,7 @@ texture folder, the archives a dependency loads, a map's terrain textures.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -22,6 +23,10 @@ HD_DIR = "Assets\\Textures\\scoba_hd"
 HD_MARK = "_scoba_hd"
 # The mark of a texture only model files name. A terrain texture of the same name gets a file of its own.
 MODEL_MARK = HD_MARK + "_m"
+# Hex digits of a variant's hash in the name of a second variant of one texture (`tagged_mark`).
+TAG = 6
+# The end of a packaged file's stem: the mark, its model form, or the model form with a tag.
+MARKED = re.compile(rf".*{re.escape(HD_MARK)}(?:_m|_[0-9a-f]{{{TAG}}}_m)?", re.DOTALL)
 
 # Archives a dependency loads, first to last. A later archive wins. The game
 # ships no dependency list for its own archives, so the order is fixed here.
@@ -98,6 +103,11 @@ def marked_name(name: str, mark: str) -> str:
     return f"{stem}{mark}.{extension}"
 
 
+def tagged_mark(variant: str) -> str:
+    """The mark of another variant of a texture than the one that keeps the plain name: a tag of its id, in the model form."""
+    return f"{HD_MARK}_{hashlib.sha256(variant.encode()).hexdigest()[:TAG]}_m"
+
+
 def is_marked(name: str) -> bool:
-    """Does this file name carry a mark of a packaged texture?"""
-    return name.rpartition(".")[0].lower().endswith((HD_MARK, MODEL_MARK))
+    """Does this file name carry a mark of a packaged texture? The three forms of SPEC-HD-TEXTURES 5.2, and no other."""
+    return bool(MARKED.fullmatch(name.rpartition(".")[0].lower()))

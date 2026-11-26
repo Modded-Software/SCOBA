@@ -82,6 +82,67 @@ class IdTest(unittest.TestCase):
         self.assertEqual(variants.title(variants.ORIGINAL), "Original")
 
 
+class RevisionTest(unittest.TestCase):
+    """A variant made again stands beside the first, with a revision on its last step (R-HD-158)."""
+
+    def test_a_step_may_carry_a_revision_and_keeps_its_model(self) -> None:
+        self.assertEqual(variants.split("pbrify~2@512"), ("pbrify~2", 512))
+        self.assertEqual(variants.variant_id("pbrify~2", 512), "pbrify~2@512")
+        self.assertEqual(
+            variants.split("pbrify~2@256+seedvr2~3@1024"), ("pbrify~2@256+seedvr2~3", 1024)
+        )
+        steps = variants.parse_recipe("pbrify~2@256+seedvr2")
+        self.assertEqual(
+            [(step.model.id, step.revision, step.size) for step in steps],
+            [("pbrify", 2, 256), ("seedvr2", 1, None)],
+        )
+        self.assertEqual(
+            variants.prefixes("pbrify~2@256+seedvr2"), ("pbrify~2", "pbrify~2@256+seedvr2")
+        )
+        self.assertEqual(variants.input_of("pbrify~2@256+seedvr2@1024"), "pbrify~2@256")
+        self.assertEqual(variants.join("pbrify~2@256", "seedvr2", 1024), "pbrify~2@256+seedvr2@1024")
+        self.assertEqual(variants.title("pbrify~2@512"), "PBRify #2 at 512")
+        self.assertEqual(variants.title("pbrify~2@256+seedvr2@1024"), "PBRify #2, then SeedVR2 at 1024")
+        # The sizes and refusals of a revision are those of its model.
+        self.assertEqual(variants.refusal("pbrify~2", 64, True), variants.refusal("pbrify", 64, True))
+        self.assertEqual(variants.size_refusal("pbrify~2", 256, 64), "")
+        self.assertIn("no model for it", variants.model_refusal("pbrify~2", False))
+
+    def test_the_revision_of_a_recipe_is_that_of_its_last_step(self) -> None:
+        self.assertEqual(variants.revision_of("pbrify"), ("pbrify", 1))
+        self.assertEqual(variants.revision_of("pbrify~4"), ("pbrify", 4))
+        self.assertEqual(variants.revision_of("pbrify~2@256+seedvr2"), ("pbrify~2@256+seedvr2", 1))
+        self.assertEqual(variants.revision_of("pbrify~2@256+seedvr2~3"), ("pbrify~2@256+seedvr2", 3))
+        self.assertEqual(variants.revised("pbrify", 2), "pbrify~2")
+        self.assertEqual(variants.revised("pbrify~2", 3), "pbrify~3")
+        self.assertEqual(variants.revised("pbrify~2@256+seedvr2", 2), "pbrify~2@256+seedvr2~2")
+        # The first make has no revision: one variant has one id.
+        self.assertEqual(variants.revised("pbrify~2", 1), "pbrify")
+        with self.assertRaises(VariantError):
+            variants.revised("pbrify", 0)
+
+    def test_an_edit_step_may_carry_a_revision_too(self) -> None:
+        steps = variants.parse_recipe("pbrify@256+edit3fa9c1d2aa10~2")
+        self.assertEqual((steps[-1].edit, steps[-1].revision), (True, 2))
+        self.assertEqual(variants.split("edit3fa9c1d2aa10~2@64"), ("edit3fa9c1d2aa10~2", 64))
+
+    def test_a_revision_below_two_or_no_plain_number_names_nothing(self) -> None:
+        for text in (
+            "pbrify~1@512",
+            "pbrify~0@512",
+            "pbrify~02@512",
+            "pbrify~@512",
+            "pbrify~x@512",
+            "pbrify~-2@512",
+            "~2@512",
+            "pbrify~2~3@512",
+            "pbrify@512~2",
+            "pbrify~1@256+seedvr2@1024",
+        ):
+            with self.assertRaises(VariantError, msg=repr(text)):
+                variants.split(text)
+
+
 class ModelTest(unittest.TestCase):
     def test_data_planes_get_fast_from_every_model(self) -> None:
         for model in MODELS.values():

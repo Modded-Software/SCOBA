@@ -23,11 +23,11 @@ Behavior/Name/UnitRunMeele=Unit Run
 Button/Name/Move2=Move Copy
 Button/Name/ResearchNeosteelFrame=Research Neosteel Frame
 Button/Tooltip/Move2=Orders selected units to move to the target area or follow the target unit. Moving units will not engage enemies.
-DocInfo/Author=Blizzard, =[iWaNN]=
-DocInfo/DescLong=Outbreak singleplayer mission 3 Players Cooperative with FPS/TPS/RPG/RTS modes
-DocInfo/DescShort=Outbreak 3 Players Coop with FPS/TPS/RPG/RTS modes
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
-LoadingScreen/Tip=PAGE UP - Enter unit to TPS Mode<n/>PAGE DOWN - Exit unit to RTS Mode<n/><n/>E, D, S and F - Move unit in TPS/FPS Mode<n/>SHIFT - Run<n/>LEFT MOUSE CLICK - Attack in TPS/FPS Mode<n/>SPACE - Turn On mouse cursor in TPS/FPS Mode for using unit abilities<n/>TAB - Change TPS/FPS modes<n/>G, R, T and A - Used unit abilities in TPS/FPS Mode (G - main ability, R - secondary, T and A - other abilities)
+DocInfo/Author=SCOBA
+DocInfo/DescLong=Up to three players fight as Terran heroes beside their lane armies, Terran against Zerg, across six lanes. Gain XP, spend stat points and learn abilities.
+DocInfo/DescShort=Co-op hero arena for up to 3 players. Six lanes, two control modes.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=BOTH MODES<n/>W, A, S, D - move<n/>Shift (hold) - slow walk<n/>Space - deploy at the start, then jump<n/>Z (hold) - zoom<n/>Mouse wheel - camera distance<n/>Ctrl+E - order mode. Ctrl+C - leave it<n/><n/>WASD / POINT & CLICK<n/>Left click - pick a target<n/>Right click - attack. With Chase on Move, also move<n/>Hold a mouse button and drag - turn the camera<n/>Ctrl+C - cancel the attack<n/>Attack button - Single or Auto. Chase button - Stand or Move<n/><n/>ACTIONS (TPS)<n/>Mouse - turn the camera<n/>Right hold - aim. Left click while aiming - shoot<n/>Middle click - show or hide the cursor<n/><n/>HERO<n/>3 stat points per level. A new ability at levels 3, 6, 9, 12 and 15. At level 20, one ultimate from a skill tree with 3 points in it.
 MapInfo/Player00/Name=Neutral
 MapInfo/Player01/Name=Alpha Team
 MapInfo/Player02/Name=Bravo Team

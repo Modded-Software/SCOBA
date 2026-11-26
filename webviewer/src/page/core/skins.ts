@@ -33,6 +33,8 @@ export interface Skins {
   offered(game: string): boolean;
   /** The states of these textures in a dataset of a game. */
   states(game: string, dataset: string, assets: readonly string[]): Promise<TexturesBody>;
+  /** The state of one texture, read now and not from what was read before. A name that is no texture is an error. */
+  readState(game: string, dataset: string, asset: string): Promise<TextureState>;
   /** Have the pipeline read what a request of these textures needs (17.2); their states. */
   judge(game: string, dataset: string, assets: readonly string[]): Promise<TexturesBody>;
   /** The texture owner of an item, as its game names it; null: none. */
@@ -137,6 +139,14 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     }
     const textures = assets.map((asset) => entry.states.get(asset)).filter((state): state is TextureState => Boolean(state));
     return { ...entry.head, textures, unknown: assets.filter((asset) => !entry.states.get(asset)) };
+  }
+
+  async function readState(game: string, dataset: string, asset: string): Promise<TextureState> {
+    const body = await answer<TexturesBody>(await fetch(textureRoutes.states(game, dataset, [asset])), `the texture state of ${fileOf(asset)}`);
+    const state = body.textures.find((one) => one.asset === asset);
+    if (!state) throw new Error(`${dataset} has no texture ${asset}`);
+    entryOf(game, dataset).states.set(asset, state);
+    return state;
   }
 
   async function judge(game: string, dataset: string, assets: readonly string[]): Promise<TexturesBody> {
@@ -331,5 +341,5 @@ export function createSkins({ host, games, status, events, items }: SkinDeps): S
     for (const item of items()) if (item.game === game && item.dataset === dataset) apply(item).catch(status.reportFailure);
   });
 
-  return { offered, states, judge, ownerOf, owner: (item) => ownerOfItem.get(item) ?? null, readOwner, choices, apply, set, peek, shownSkin, bake, bakeRefusal, change, following: (item) => polling.has(item), variantUrl, tools: () => tools, setTools: (made) => (tools = made) };
+  return { offered, states, readState, judge, ownerOf, owner: (item) => ownerOfItem.get(item) ?? null, readOwner, choices, apply, set, peek, shownSkin, bake, bakeRefusal, change, following: (item) => polling.has(item), variantUrl, tools: () => tools, setTools: (made) => (tools = made) };
 }

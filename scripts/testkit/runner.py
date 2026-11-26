@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Callable, NamedTuple
+from typing import Callable, NamedTuple, Optional
 
 import workpaths
 from m3dump.dump_m3_clip_metrics import map_models, write_docs_bank
@@ -44,6 +44,10 @@ class TestContext:
         self.errors: list[str] = []
         self.frame_data: dict = {}
         self.anim_data: dict = {}
+        # Seconds from the launch to the first sight of the test bank.
+        self.bank_seen_s: float | None = None
+        # Seconds from the launch of each key a wait hook pressed.
+        self.wait_keys: list[float] = []
 
 
 class TestRunSpec(NamedTuple):
@@ -59,6 +63,9 @@ class TestRunSpec(NamedTuple):
     run_root: Path
     on_ready: Callable
     check: Callable
+    # Called about once a second with (ctx, seconds since the launch) while
+    # the test bank is absent: a profile whose map waits for input acts here.
+    on_wait: Optional[Callable] = None
 
 
 def _sc2_pids() -> list[int]:
@@ -156,7 +163,14 @@ def run_test(spec: TestRunSpec) -> int:
                 return 1
         bank_path = find_latest_bank(docs, spec.bank_names[0], started)
         if bank_path is None:
+            if spec.on_wait is not None:
+                try:
+                    spec.on_wait(ctx, time.time() - started)
+                except Exception as exc:
+                    ctx.errors.append(f"wait hook: {exc}")
             continue
+        if ctx.bank_seen_s is None:
+            ctx.bank_seen_s = time.time() - started
         try:
             data = read_bank(bank_path)
         except RuntimeError as exc:

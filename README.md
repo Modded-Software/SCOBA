@@ -158,7 +158,7 @@ action rebuilds the map first.
 | `make map-stage OUT=<folder>` | Expand the map into a folder without checks, to measure a changed map. |
 
 The texture pipeline (`scripts/hd_textures.py`) runs from the viewer, which
-gives it the paths. See [SPEC-HD-TEXTURES](docs/specifications/SPEC-HD-TEXTURES.md),
+gives it the paths. By hand: `make hd-textures ARGS="<command> ..."`. See [SPEC-HD-TEXTURES](docs/specifications/SPEC-HD-TEXTURES.md),
 section 4.8.
 
 The map build packages the picks of the dataset `scoba` as its last step. It
@@ -221,6 +221,15 @@ scripts read them at run time. The installer also reads them, writes them into
 the entries when set, and validates the GPU render nodes and the installed
 lsfg-vk layer. It does not install lsfg-vk.
 
+`scripts/install-editor-dock-icon.sh` provisions `SCOBA Editor`.
+
+Every entry starts through the launch dialog (`scripts/launch-dialog.sh`,
+[REQ-LAUNCH-DIALOG](docs/requirements/REQ-LAUNCH-DIALOG.md)). It shows the
+steps, the progress and the log of the build and the launch, and stays open
+when the run shows an error. The log of the last run of each action is in
+`~/.local/state/scoba/dialog-<action>.log`. Run both installers again after
+a change to the entries.
+
 ## Requirements
 
 - StarCraft II installed under a Wine or Proton prefix, launched with
@@ -231,6 +240,7 @@ lsfg-vk layer. It does not install lsfg-vk.
 - `git`, `node` and `npm`, `cmake`, a C++ compiler, and the FUSE 2 headers.
 - The GLM headers, for the nodsdk parser library: `sudo make init`.
 - Optional: lsfg-vk, for the `SCOBA FG` entry. An Intel Arc GPU, for
-  texture requests.
+  texture requests. `gjs` with GTK 4 and libadwaita, for the launch dialog
+  of the desktop entries (GNOME ships them).
 
 `make deps-check` checks all of these.

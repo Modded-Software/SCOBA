@@ -62,6 +62,8 @@ export function createState({ render, scene, camera: view, games, testApi }: Pic
       highlight: item.instance.highlight,
       // The animation from the menu while it plays once, by name; else null.
       oneShot: item.oneShot !== null ? sequenceName(item, item.oneShot) : null,
+      // Held at its frame by the play/pause key (R-VIEW-159); `rate` is 0 then.
+      paused: item.paused,
       // The playing sequence's length in ms.
       sequenceLength: playing ? playing.length : 0,
       location: Array.from(item.instance.location),

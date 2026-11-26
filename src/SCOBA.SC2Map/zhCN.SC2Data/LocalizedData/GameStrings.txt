@@ -1,7 +1,8 @@
-DocInfo/Author=暴雪娱乐
-DocInfo/DescLong=
-DocInfo/DescShort=THanson02
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
+DocInfo/Author=SCOBA
+DocInfo/DescLong=最多三名玩家扮演人类英雄，与本兵线的部队并肩作战，在六条兵线上人类对抗异虫。获取经验，分配属性点并学习技能。
+DocInfo/DescShort=最多3名玩家的合作英雄竞技场。六条兵线，两种操作模式。
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=两种模式通用<n/>W, A, S, D - 移动<n/>Shift (按住) - 慢走<n/>Space - 开局时空降，之后跳跃<n/>Z (按住) - 缩放<n/>鼠标滚轮 - 镜头距离<n/>Ctrl+E - 命令模式。Ctrl+C - 退出命令模式<n/><n/>WASD / POINT & CLICK<n/>左键单击 - 选择目标<n/>右键单击 - 攻击。Chase 为 Move 时也会移动<n/>按住鼠标键拖动 - 旋转镜头<n/>Ctrl+C - 取消攻击<n/>Attack 按钮 - Single 或 Auto。Chase 按钮 - Stand 或 Move<n/><n/>ACTIONS (TPS)<n/>鼠标 - 旋转镜头<n/>按住右键 - 瞄准。瞄准时左键单击 - 射击<n/>中键单击 - 显示或隐藏光标<n/><n/>英雄<n/>每级 3 属性点。在 3、6、9、12 和 15 级获得新技能。20 级时，从投入了 3 点的技能树中选择一个终极技能。
 MapInfo/Player00/Name=中立
 MapInfo/Player01/Name=雷诺的游骑兵
 MapInfo/Player02/Name=阿格瑞亚难民

@@ -34,6 +34,11 @@
   .row:hover { background: var(--raised); }
   .row.current { background: var(--accent-bg); box-shadow: inset 2px 0 0 var(--accent); }
   .row img { width: 32px; height: 32px; object-fit: contain; background: var(--bg); border-radius: 4px; flex: none; }
+  /* The users badge on the thumbnail's bottom right corner: the model files that read the texture (R-VIEW-160);
+     amber when another owner bakes a variant of it (R-VIEW-161). */
+  .row .thumb { position: relative; flex: none; width: 32px; height: 32px; }
+  .users-badge { position: absolute; right: -3px; bottom: -3px; min-width: 13px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: var(--bg); font-size: 9px; font-weight: 700; line-height: 13px; text-align: center; }
+  .users-badge.shared-bake { background: #ffb36b; color: #000; }
   .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row .meta { color: var(--dim); font-size: 11px; }
   .row .text { min-width: 0; }
@@ -73,6 +78,8 @@
   .details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
   /* "used by": one user per line, 4.5 lines high, scrolls inside (R-VIEW-134). */
   .details dd.used-by { height: 72px; overflow-y: auto; padding-right: 4px; }
+  /* "named by": one owner per line, the bakes first; at most as high as "used by", scrolls inside (R-VIEW-161). */
+  .details dd.named-by { max-height: 72px; overflow-y: auto; padding-right: 4px; }
   /* A game's own fact (Ghost's materials): its label on one line, its value below, each the panel's full width. */
   .details dt.fact, .details dd.fact { grid-column: 1 / -1; }
   .details dd.fact { margin-bottom: 4px; }

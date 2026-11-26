@@ -37,6 +37,8 @@ def rename(dataset: Dataset, owner: str, name: str, new: str) -> dict[str, skins
     found = dataset.change_skin(owner, lambda now: skins.renamed(now, name, new))
     if bake is not None:
         dataset.owner_changed(owner, below=True)
+        # The bake's line in each texture's `namedBy` holds the skin's name (R-HD-156).
+        dataset.names_changed(bake.textures)
     return found
 
 

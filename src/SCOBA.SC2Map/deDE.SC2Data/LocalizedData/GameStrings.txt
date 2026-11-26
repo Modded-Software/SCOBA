@@ -1,7 +1,8 @@
-DocInfo/Author=Blizzard Entertainment
-DocInfo/DescLong=
-DocInfo/DescShort=THanson02
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
+DocInfo/Author=SCOBA
+DocInfo/DescLong=Bis zu drei Spieler kämpfen als terranische Helden an der Seite ihrer Lane-Armeen, Terraner gegen Zerg, auf sechs Lanes. Sammelt EP, verteilt Attributpunkte und lernt Fähigkeiten.
+DocInfo/DescShort=Koop-Heldenarena für bis zu 3 Spieler. Sechs Lanes, zwei Steuerungsmodi.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=BEIDE MODI<n/>W, A, S, D - bewegen<n/>Shift (halten) - langsam gehen<n/>Space - zu Beginn absetzen, danach springen<n/>Z (halten) - zoomen<n/>Mausrad - Kameraabstand<n/>Ctrl+E - Befehlsmodus. Ctrl+C - verlassen<n/><n/>WASD / POINT & CLICK<n/>Linksklick - Ziel wählen<n/>Rechtsklick - angreifen. Mit Chase auf Move auch bewegen<n/>Maustaste halten und ziehen - Kamera drehen<n/>Ctrl+C - Angriff abbrechen<n/>Attack-Taste - Single oder Auto. Chase-Taste - Stand oder Move<n/><n/>ACTIONS (TPS)<n/>Maus - Kamera drehen<n/>Rechts halten - zielen. Linksklick beim Zielen - schießen<n/>Mittelklick - Cursor zeigen oder verbergen<n/><n/>HELD<n/>3 Attributpunkte pro Stufe. Eine neue Fähigkeit auf den Stufen 3, 6, 9, 12 und 15. Auf Stufe 20 eine ultimative Fähigkeit aus einem Fähigkeitenbaum mit 3 Punkten.
 MapInfo/Player00/Name=Neutral
 MapInfo/Player01/Name=Raynor's Raiders
 MapInfo/Player02/Name=Agria-Flüchtlinge

@@ -12,7 +12,6 @@ variations share one base path.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import shutil
 from pathlib import Path
@@ -30,13 +29,13 @@ from .sources import (
     file_name,
     marked_name,
     stored_name,
+    tagged_mark,
 )
 from .storage import Storage
 
 TERRAIN = "terrain"
 MODEL_KIND = "model"
 MARKS = {TERRAIN: HD_MARK, MODEL_KIND: MODEL_MARK}
-TAG = 6  # hex digits of a variant's hash in the name of a second variant of one texture
 
 LOG = logging.getLogger(__name__)
 
@@ -76,9 +75,7 @@ def packaged_paths(
         name = spelled.get(asset) or file_name(asset)
         mark = MARKS[item.texture.kind]
         if first.setdefault(asset, item.variant) != item.variant:
-            mark = (
-                f"{HD_MARK}_{hashlib.sha256(item.variant.encode()).hexdigest()[:TAG]}_m"
-            )
+            mark = tagged_mark(item.variant)
         path = f"{HD_DIR}\\{marked_name(name, mark)}"
         if owners.setdefault(path.lower(), (asset, item.variant)) != (
             asset,

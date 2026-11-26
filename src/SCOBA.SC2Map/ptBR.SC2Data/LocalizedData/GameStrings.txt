@@ -1,7 +1,8 @@
-DocInfo/Author=Blizzard Entertainment
-DocInfo/DescLong=
-DocInfo/DescShort=THanson02
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
+DocInfo/Author=SCOBA
+DocInfo/DescLong=Até três jogadores lutam como heróis terranos ao lado dos exércitos de sua rota, terranos contra zergs, em seis rotas. Ganhe XP, distribua pontos de atributo e aprenda habilidades.
+DocInfo/DescShort=Arena cooperativa de heróis para até 3 jogadores. Seis rotas, dois modos de controle.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=AMBOS OS MODOS<n/>W, A, S, D - mover<n/>Shift (segurar) - andar devagar<n/>Space - desembarcar no início, depois pular<n/>Z (segurar) - zoom<n/>Roda do mouse - distância da câmera<n/>Ctrl+E - modo de ordens. Ctrl+C - sair dele<n/><n/>WASD / POINT & CLICK<n/>Clique esquerdo - escolher um alvo<n/>Clique direito - atacar. Com Chase em Move, também mover<n/>Segurar um botão do mouse e arrastar - girar a câmera<n/>Ctrl+C - cancelar o ataque<n/>Botão Attack - Single ou Auto. Botão Chase - Stand ou Move<n/><n/>ACTIONS (TPS)<n/>Mouse - girar a câmera<n/>Segurar o botão direito - mirar. Clique esquerdo mirando - atirar<n/>Clique do meio - mostrar ou ocultar o cursor<n/><n/>HERÓI<n/>3 pontos de atributo por nível. Uma nova habilidade nos níveis 3, 6, 9, 12 e 15. No nível 20, uma habilidade suprema de uma árvore com 3 pontos.
 MapInfo/Player00/Name=Neutro
 MapInfo/Player01/Name=Saqueadores do Raynor
 MapInfo/Player02/Name=Refugiados de Agria

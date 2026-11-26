@@ -197,7 +197,7 @@ export function createTextureWindow(ui: Pick<UiService, 'floatingWindow'>, rende
       // A variant tile's trash: the main page asks first (R-VIEW-147).
       const remove = (asset: string, variant: string): Promise<boolean> =>
         new Promise((done, fail) => {
-          events.emit('texture-remove', { game: request.game, dataset: request.dataset, asset, variant, done: (removed) => (removed instanceof Error ? fail(removed) : done(removed)) });
+          events.emit('texture-remove', { game: request.game, dataset: request.dataset, asset, variant, owner, done: (removed) => (removed instanceof Error ? fail(removed) : done(removed)) });
         });
       // Rename Skin…: the main page asks the new name of the skin the instance shows (R-VIEW-156); the title follows.
       const item = request.item ?? null;

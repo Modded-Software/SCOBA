@@ -21,9 +21,9 @@ class WriteTest(IndexCase):
         self.add(SAND, seed=4)
         self.ok("request", "--asset", ROCK, "--variant", UP)
         found = self.read(ROCK, SAND)
-        self.assertEqual(
-            [one["id"] for one in found["textures"][ROCK]["variants"]], [UP, HALF]
-        )
+        ids = [one["id"] for one in found["textures"][ROCK]["variants"]]
+        self.assertEqual(ids, [UP])
+        self.assertNotIn(HALF, ids, "negative: a size nobody asked for is no variant (R-HD-123)")
         self.assertEqual(
             found["unknown"],
             [SAND],
@@ -41,7 +41,7 @@ class WriteTest(IndexCase):
         self.ok("request", "--asset", ROCK, "--variant", UP)
         self.assertEqual(
             [one["id"] for one in self.state(dataset="two")["variants"]],
-            [UP, HALF],
+            [UP],
             "R-HD-87",
         )
         self.assertEqual(
@@ -108,5 +108,5 @@ class WriteTest(IndexCase):
         )
         rock = self.state()
         self.assertEqual(
-            (rock["requests"], [one["id"] for one in rock["variants"]]), ({}, [UP, HALF])
+            (rock["requests"], [one["id"] for one in rock["variants"]]), ({}, [UP])
         )

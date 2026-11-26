@@ -6,10 +6,13 @@ made entry as it shows the stock one (E-1, E-2) needs a game run.
 
 from __future__ import annotations
 
+import hashlib
 import xml.etree.ElementTree as ET
 
 from hdtex.core import package, requests, skins
+from hdtex.sc2 import check
 from hdtex.sc2.packaged import HD_DIR, HD_MODEL_DIR
+from hdtex.sc2.sources import HD_MARK, MODEL_MARK
 from hdtex.sc2.storage import GAP_ACTORS
 
 from testkit.tests.textures.sc2_fixtures import (
@@ -26,6 +29,7 @@ TREE_MODEL = "model:assets\\doodads\\tree\\tree.m3"
 SPEC = TEXTURES + "rock_spec.dds"
 NORMAL = TEXTURES + "rock_normal.dds"
 FAST = "fast@256"
+HALF = "fast@128"  # the same recipe at its half, asked for on its own: another variant of the texture
 UNITS = '<Catalog><CUnit id="Guard"/></Catalog>'
 
 
@@ -35,14 +39,14 @@ class OwnerCase(PackCase):
         self.casc.files[GAMEDATA + "unitdata.xml"] = UNITS.encode()
         (self.map_dir / "Objects").write_text(objects(PLACED, ("Guard",)))
 
-    def made(self, *assets: str) -> None:
+    def made(self, *assets: str, variant: str = FAST) -> None:
         found = self.dataset()
         for asset in assets:
             requests.make(
                 found,
                 self.runner,
                 found.texture(asset),
-                FAST,
+                variant,
                 wait=lambda _seconds: None,
             )
 
@@ -289,6 +293,36 @@ class UnitBakeTest(OwnerCase):
         self.assertTrue(
             self.paths(f"{HD_MODEL_DIR}\\Rock.m3")[0].startswith(HD_DIR + "\\"),
             "negative: the model's own copy still shows its variant",
+        )
+
+    def test_a_unit_bake_of_another_variant_than_its_models_gets_a_file_of_its_own_that_passes_the_check(
+        self,
+    ) -> None:
+        # Build 2026-11-26: unit:MengskBC baked another variant of a texture
+        # its model file bakes. The pack step gave the second file a tag of
+        # its variant id, and the check refused that name.
+        self.made(SPEC)
+        self.made(SPEC, variant=HALF)  # a size is kept when it is asked for (R-HD-123)
+        self.bake(ROCK_MODEL, {SPEC: FAST})
+        self.bake("unit:Guard", {SPEC: HALF})
+        package.package(self.dataset(), self.map_dir)  # ends with the check
+        check.check(self.map_dir)
+        # The variant id that sorts first keeps the plain name (pack.packaged_paths): fast@128 before fast@256.
+        tag = hashlib.sha256(FAST.encode()).hexdigest()[:6]
+        self.assertEqual(
+            self.paths(f"{HD_MODEL_DIR}\\Guard\\Rock.m3")[0].lower(),
+            f"{HD_DIR}\\rock_spec{MODEL_MARK}.dds".lower(),
+            "the unit's variant, first by id, keeps the plain name",
+        )
+        self.assertEqual(
+            self.paths(f"{HD_MODEL_DIR}\\Rock.m3")[0].lower(),
+            f"{HD_DIR}\\rock_spec{HD_MARK}_{tag}_m.dds".lower(),
+            "the model file's variant has a file of its own, with the tag of its id",
+        )
+        self.assertNotEqual(
+            self.map_file(self.paths(f"{HD_MODEL_DIR}\\Rock.m3")[0]).read_bytes(),
+            self.map_file(self.paths(f"{HD_MODEL_DIR}\\Guard\\Rock.m3")[0]).read_bytes(),
+            "negative: the two files are not one variant under two names",
         )
 
     def test_a_unit_bake_of_originals_over_no_bake_makes_nothing(self) -> None:

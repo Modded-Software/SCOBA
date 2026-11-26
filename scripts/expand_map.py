@@ -30,6 +30,7 @@ from footfall.fx import generate as generate_footfall_fx
 from hdtex.sc2.game import package_map as package_hd_textures
 from hdtex.sc2.model_backfaces import generate as generate_back_faces
 from hitvolumes.intro_trees import apply_intro_tree_clearing
+from mapgen import loading_screen
 from mapgen.footprints.build import apply_scaled_footprints
 from mapgen.melee_map import apply as apply_melee_map
 from mapgen.player_slots import apply as apply_player_slots
@@ -238,65 +239,23 @@ def expand_water(src: Path, dst: Path) -> None:
 
 def expand_mapinfo(src: Path, dst: Path) -> None:
     data = bytearray(read(src))
-    assert data[:4] == b"IpaM"
-    version = struct.unpack_from("<I", data, 4)[0]
-    pos = 8
-    hash_off = pos
-    pos += 8
-    width, height = struct.unpack_from("<II", data, pos)
+    at = loading_screen.header(bytes(data))
+    width, height = struct.unpack_from("<II", data, loading_screen.SIZE_OFF)
     assert width == OLD_CELLS and height == OLD_CELLS
-    struct.pack_into("<II", data, pos, NEW_CELLS, NEW_CELLS)
-    pos += 8
-    locale_mode = struct.unpack_from("<I", data, pos)[0]
-    pos += 4
-    if locale_mode == 2:
-        pos = data.index(0, pos) + 1
-    if version >= 22:
-        preview_type = struct.unpack_from("<I", data, pos)[0]
-        pos += 4
-        if preview_type == 2:
-            pos = data.index(0, pos) + 1
-    if version >= 28:
-        pos = data.index(0, pos) + 1
-    if version >= 37:
-        pos = data.index(0, pos) + 1
-    if version >= 29:
-        pos += 4
-    if version >= 11:
-        pos += 4
-    if version >= 3:
-        pos = data.index(0, pos) + 1
-    desc_start = pos
-    desc_end = data.index(0, pos)
-    desc_len = desc_end - desc_start
-    pos = desc_end + 1
-    bounds_off = pos
-    struct.pack_into("<4i", data, bounds_off, 2, 3, 254, 254)
-    pos += 16
-    if version >= 19:
-        pos += 4
-    if version >= 14:
-        pos += 4
-        pos = data.index(0, pos) + 1
-    if version >= 23:
-        bar_len = struct.unpack_from("<H", data, pos)[0]
-        pos += 2 + bar_len
-    if version >= 20:
-        pos += 24
-    if version >= 35:
-        pos = data.index(0, pos) + 1
-        locale_len = struct.unpack_from("<H", data, pos)[0]
-        pos += 2 + locale_len
-    if version >= 39:
-        str_len = struct.unpack_from("<H", data, pos)[0]
-        pos += 2 + str_len
-    flags = struct.unpack_from("<I", data, pos)[0] & ~0x02
-    struct.pack_into("<I", data, pos, flags)
-    popcount = bin(flags).count("1")
-    dx, dy = 254 - 2, 254 - 3
-    hash_value = desc_len + 7 * NEW_CELLS + 2 * (dx * dx + dy * dy) + 3 * NEW_CELLS - popcount - 17
-    struct.pack_into("<Q", data, hash_off, hash_value)
-    write(dst, bytes(data))
+    struct.pack_into("<II", data, loading_screen.SIZE_OFF, NEW_CELLS, NEW_CELLS)
+    struct.pack_into("<4i", data, at.bounds_off, 2, 3, 254, 254)
+    # The built map waits for a key on its loading screen (REQ-LOADING-SCREEN
+    # R-LOAD-5, operator 2026-11-26; the build cleared the flag before). The
+    # check value is redone with the flag.
+    write(dst, loading_screen.set_wait_for_key(bytes(data), True))
+
+
+def expand_document_header(map_dir: Path) -> None:
+    # The game shows the loading screen text of DocumentHeader. It takes the
+    # fields of every locale from its GameStrings (REQ-LOADING-SCREEN R-LOAD-7).
+    strings = {locale: loading_screen.read_strings(map_dir, locale) for locale in loading_screen.LOCALES}
+    path = map_dir / "DocumentHeader"
+    write(path, loading_screen.sync_document_header(read(path), strings))
 
 
 def scale_xml_objects(src: Path, dst: Path) -> None:
@@ -423,6 +382,7 @@ def main() -> int:
     shutil.copytree(src, dst)
     (dst / "t3SyncHeightMap").unlink(missing_ok=True)
     expand_mapinfo(src / "MapInfo", dst / "MapInfo")
+    expand_document_header(dst)
     apply_player_slots(dst)
     expand_terrain_xml(src / "t3Terrain.xml", dst / "t3Terrain.xml")
     expand_heightmap(src / "t3HeightMap", dst / "t3HeightMap")

@@ -131,6 +131,26 @@ class DepsTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertRegex(result.stdout, r"(?m)^OPTIONAL +lsfg-vk ")
         self.assertRegex(result.stdout, r"(?m)^OPTIONAL +upscale-on-arc ")
+        self.assertRegex(result.stdout, r"(?m)^OPTIONAL +launch-dialog +gjs not found; only the dock entries need it")
+
+    def test_launch_dialog_is_ok_when_its_toolkit_loads(self) -> None:
+        self.full_machine()
+        self.stub("gjs", 'echo "gjs 18002, GTK 4.14.5, libadwaita 1.5.0"\n')
+        result = self.run_deps("check")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertRegex(result.stdout, r"(?m)^OK +launch-dialog +gjs 18002, GTK 4\.14\.5, libadwaita 1\.5\.0$")
+        self.assertIn(f"gjs -m {self.root}/scripts/launchui/main.js --check", self.calls_made())
+
+    def test_launch_dialog_that_cannot_load_is_named_and_does_not_fail_the_check(self) -> None:
+        self.full_machine()
+        self.stub("gjs", 'echo "Gjs-CRITICAL: Typelib file for namespace Adw not found" >&2\nexit 1\n')
+        result = self.run_deps("check")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertRegex(
+            result.stdout,
+            r"(?m)^OPTIONAL +launch-dialog +cannot load \(Gjs-CRITICAL: Typelib file for namespace Adw not found\); only the dock entries need it",
+        )
+        self.assertNotRegex(result.stdout, r"(?m)^OK +launch-dialog ")
 
     def test_check_fails_and_names_each_missing_dependency(self) -> None:
         self.full_machine()

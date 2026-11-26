@@ -84,6 +84,8 @@ actions:
                          hill
   hdbake                 rebuild, then a map with a unit and an actor HD bake:
                          the made model entries in the game (SPEC-HD-TEXTURES E-1)
+  loadwait               rebuild, then a map that keeps the wait for a key: no game
+                         for 90 s with no input, the game after a key (about 2 min)
   waterfeat              rebuild, water features: carved ground, pool pathing,
                          a walk into each pool, the pipe unit
   dissolveview           rebuild, build the doodad physics view map, launch it
@@ -154,7 +156,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|slowwalk|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake) ;;
+        combat|tps|jump|slowwalk|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake|loadwait) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -210,7 +212,7 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake)
+    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake|loadwait)
         run_profile "$ACTION"
         ;;
     picklog)

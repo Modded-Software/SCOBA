@@ -1,7 +1,8 @@
-DocInfo/Author=Blizzard Entertainment
-DocInfo/DescLong=
-DocInfo/DescShort=THanson02
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
+DocInfo/Author=SCOBA
+DocInfo/DescLong=Maksymalnie trzech graczy walczy jako bohaterowie Terran u boku armii swoich linii, Terranie przeciw Zergom, na sześciu liniach. Zdobywaj PD, rozdzielaj punkty atrybutów i ucz się umiejętności.
+DocInfo/DescShort=Kooperacyjna arena bohaterów dla maksymalnie 3 graczy. Sześć linii, dwa tryby sterowania.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=OBA TRYBY<n/>W, A, S, D - ruch<n/>Shift (przytrzymaj) - powolny chód<n/>Space - zrzut na starcie, potem skok<n/>Z (przytrzymaj) - przybliżenie<n/>Kółko myszy - odległość kamery<n/>Ctrl+E - tryb rozkazów. Ctrl+C - wyjście z niego<n/><n/>WASD / POINT & CLICK<n/>Lewy przycisk - wybór celu<n/>Prawy przycisk - atak. Przy Chase na Move także ruch<n/>Przytrzymaj przycisk myszy i przeciągnij - obrót kamery<n/>Ctrl+C - anulowanie ataku<n/>Przycisk Attack - Single lub Auto. Przycisk Chase - Stand lub Move<n/><n/>ACTIONS (TPS)<n/>Mysz - obrót kamery<n/>Przytrzymaj prawy przycisk - celowanie. Lewy przycisk podczas celowania - strzał<n/>Środkowy przycisk - pokaż lub ukryj kursor<n/><n/>BOHATER<n/>3 punkty atrybutów na poziom. Nowa umiejętność na poziomach 3, 6, 9, 12 i 15. Na poziomie 20 jedna umiejętność ostateczna z drzewka z 3 punktami.
 MapInfo/Player00/Name=Neutralny
 MapInfo/Player01/Name=Rekieterzy Raynora
 MapInfo/Player02/Name=Uchodźcy z Agrii

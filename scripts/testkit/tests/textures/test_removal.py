@@ -12,7 +12,7 @@ from testkit.tests.textures.doubles import ROCK, Case
 
 ORIGIN = f"storage\\{ROCK}"
 UP = "pbrify@256"  # of a 64 texture: its own size
-SMALL = "pbrify@128"  # its half, the 2x size, kept with it
+SMALL = "pbrify@128"  # its half, the 2x size: kept when it is asked for (R-HD-123)
 ON_TOP = "pbrify@64+seedvr2@256"  # of a 16 texture: made from pbrify@64
 ROOM = "model:room"
 
@@ -35,9 +35,14 @@ class RemovalCase(Case):
         self.assertIn(words, str(caught.exception))
 
 class RemoveTest(RemovalCase):
-    def test_the_last_size_takes_the_recipe_folder(self) -> None:
+    def both(self) -> None:
+        """The recipe at two sizes: each asked for."""
         self.add()
         self.make()
+        self.make(SMALL)
+
+    def test_the_last_size_takes_the_recipe_folder(self) -> None:
+        self.both()
         self.remove(SMALL)
         self.assertTrue(self.folder().exists(), "negative: one size is left")
         self.remove()
@@ -45,8 +50,7 @@ class RemoveTest(RemovalCase):
         self.assertEqual(self.dataset().made(self.dataset().texture(ROCK)), {})
 
     def test_one_size_goes_and_the_others_stay(self) -> None:
-        self.add()
-        self.make()
+        self.both()
         self.remove(SMALL)
         self.assertFalse((self.folder() / "128.dds").exists())
         self.assertTrue((self.folder() / "256.dds").is_file())
@@ -54,8 +58,7 @@ class RemoveTest(RemovalCase):
         self.assertEqual(made["pbrify"].sizes(), [256])
 
     def test_a_failed_request_keeps_its_note(self) -> None:
-        self.add()
-        self.make()
+        self.both()
         write_json(self.folder() / progress.FILE, {"pid": 1, "started": 0, "step": 1, "steps": 1, "phase": "upscaling", "jobs": [], "failed": "it broke"})
         self.remove(SMALL)
         self.remove()

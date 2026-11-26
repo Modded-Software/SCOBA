@@ -50,17 +50,29 @@ export function createScene({ host, games, api, status, events, sky, skins }: Sc
   /** The speed of one animation of an item, as its game says. */
   const rateOf = (item: Item, sequence: number): number => pluginOf(item.game).playRate(item.source ? item.source.record : null, item.instance.sequences[sequence]);
 
-  /** Play the item's own (idle) animation, looping. Ends a one-shot. */
+  /** Play the item's own (idle) animation, looping. Ends a one-shot and a pause. */
   function applySequence(item: Item): void {
     item.oneShot = null;
+    item.paused = false;
     item.instance.setSequence(item.sequence);
     item.instance.setLoop(true);
     item.instance.timeScale = rateOf(item, item.sequence);
   }
 
-  /** Play one animation once; then the item goes back to its own (see endOneShots). */
+  /**
+   * Hold the item's animation at the frame it shows, or let it run on from
+   * there (R-VIEW-159). A held one-shot stays a one-shot. An animation
+   * started after (applySequence, playOnce) ends the pause.
+   */
+  function setPaused(item: Item, paused: boolean): void {
+    item.paused = paused;
+    item.instance.timeScale = paused ? 0 : rateOf(item, item.oneShot ?? item.sequence);
+  }
+
+  /** Play one animation once; then the item goes back to its own (see endOneShots). Ends a pause. */
   function playOnce(item: Item, sequence: number): void {
     item.oneShot = sequence;
+    item.paused = false;
     item.instance.setSequence(sequence);
     item.instance.setLoop(false);
     item.instance.timeScale = rateOf(item, sequence);
@@ -153,6 +165,7 @@ export function createScene({ host, games, api, status, events, sky, skins }: Sc
         unshown: [],
         missingSkin: false,
         oneShot: null,
+        paused: false,
         options: partsOf(game).itemOptions(options.options ?? {}),
       };
       // An animation or a team the model does not have is refused, not replaced.
@@ -341,6 +354,7 @@ export function createScene({ host, games, api, status, events, sky, skins }: Sc
     restart,
     playOnce,
     loopSequence,
+    setPaused,
     endOneShots,
     setRotation,
     setPosition,

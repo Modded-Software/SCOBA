@@ -4,7 +4,7 @@
 // height that scrolls (R-VIEW-134). The tiles beside it are core/tiles.ts,
 // the same as the skin editor's (R-VIEW-132).
 
-import type { TextureState } from '../../shared/textures';
+import { namedByLines, type TextureState } from '../../shared/textures';
 
 const element = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text?: string): HTMLElementTagNameMap[K] => {
   const made = document.createElement(tag);
@@ -13,13 +13,16 @@ const element = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
   return made;
 };
 
-/** "used by": one user per line, fixed height, scrolls (R-VIEW-134). */
-function usedBy(users: readonly string[]): HTMLElement {
-  const box = element('dd', 'used-by');
-  box.title = users.join('\n');
-  box.append(...users.map((user) => element('div', '', user)));
+/** A box of lines, one per line, that scrolls inside; its hover holds them all. */
+function lineBox(className: string, lines: readonly string[]): HTMLElement {
+  const box = element('dd', className);
+  box.title = lines.join('\n');
+  box.append(...lines.map((line) => element('div', '', line)));
   return box;
 }
+
+/** "used by": one user per line, fixed height, scrolls (R-VIEW-134). */
+const usedBy = (users: readonly string[]): HTMLElement => lineBox('used-by', users);
 
 /** The details block: a heading with the size, then name and value pairs. */
 export function detailsOf(size: readonly number[], format: string, facts: readonly (readonly [string, string])[], state: TextureState | null): HTMLElement {
@@ -34,6 +37,9 @@ export function detailsOf(size: readonly number[], format: string, facts: readon
   if (state) {
     add('kind', state.kind);
     if (state.users.length) add('used by', usedBy(state.users));
+    // Who names a variant of it, the bakes first (R-VIEW-161). Nobody: no row.
+    const named = namedByLines(state);
+    if (named.length) add('named by', lineBox('named-by', named));
     if (state.reason) add('cannot be upscaled', state.reason);
     if (state.bake) add('baked', `${state.bake}${state.packaged?.held ? ', packaged' : ''}`);
   }

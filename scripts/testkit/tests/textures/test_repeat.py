@@ -71,7 +71,7 @@ class ChoiceTest(Case):
             [(one["asset"], one["variant"], one["recipe"]) for one in made],
             [(ROCK, "pbrify@256", "pbrify")],
         )
-        self.assertEqual(sorted(made[0]["files"]), ["128", "256"])
+        self.assertEqual(sorted(made[0]["files"]), ["256"], "the size asked for; negative: no half (R-HD-123)")
 
     def test_negative_an_unknown_runner_is_refused_and_nothing_is_made(self) -> None:
         self.add(ROCK)

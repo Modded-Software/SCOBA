@@ -274,8 +274,18 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
     return full;
   }
 
-  /** Start `request` for one variant. Its state and log are in the store. */
-  const startRequest = (dataset: string, asset: string, variant: string): Promise<string> => start('request', dataset, ['--asset', asset, '--variant', variant], 'requests.out');
+  /** The skin a request is for: the one an Upscale Skin made (R-HD-162). */
+  interface ForSkin {
+    owner: string;
+    skin: string;
+  }
+
+  /**
+   * Start `request` for one variant. Its state and log are in the store. `of`: the skin it is for; the pipeline puts
+   * the input back there when the result is one a bake would refuse (SPEC-HD-TEXTURES 4.6, Revert).
+   */
+  const startRequest = (dataset: string, asset: string, variant: string, of?: ForSkin): Promise<string> =>
+    start('request', dataset, ['--asset', asset, '--variant', variant, ...(of ? ['--owner', of.owner, '--skin', of.skin] : [])], 'requests.out');
 
   /** The side the state offers for this request, or why it does not offer it. `factor` or `size`: one of the two. */
   function offeredSide(state: TextureState, input: string, model: string, factor: number | undefined, size: number | undefined): { side: number; why: string } {
@@ -321,22 +331,27 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
    * Start a request and wait until the index shows it or its variant: a reply after it shows the request, and the page
    * polls only while it sees one. A variant made and not stale is not asked for again (an Upscale Skin names it as it is).
    */
-  async function startSeen(dataset: string, asset: string, variant: string): Promise<void> {
-    const recipe = recipeOf(variant);
-    // What the index holds of this recipe now: an attempt that failed, or a stale variant, is not the new request.
+  async function startSeen(dataset: string, asset: string, variant: string, of?: ForSkin): Promise<void> {
+    // The id that serves the request (R-HD-158): a kept variant is never made again. One that is stale, or has edges
+    // of the other rule, stays; the pipeline makes or finds a revision beside it and names it as `remake`. A variant
+    // the index does not hold serves itself. The pipeline decides this; nothing is worked out here.
+    const kept = index.textures(dataset, [asset]).get(asset)?.variants.find((one) => one.id === variant);
+    const target = kept?.remake ?? variant;
+    const recipe = recipeOf(target);
+    // What the index holds of that recipe now: an attempt that failed is not the new request.
     const held = (): string | null => {
       const now = index.textures(dataset, [asset]).get(asset);
-      const made = now?.variants.find((one) => one.id === variant) ?? null;
+      const made = now?.variants.find((one) => one.id === target) ?? null;
       const open = now?.requests[recipe] ?? null;
       return made || open ? JSON.stringify([open, made]) : null;
     };
     const before = held();
-    // Made, not stale, with its edges for this texture, and nothing asked: a request would find its variant there and
-    // write nothing, so nothing would show. One whose edges were made for the other rule is made again.
+    // Made, serving itself, and nothing asked: a request would find its variant there and write nothing, so nothing
+    // would show.
     const now = index.textures(dataset, [asset]).get(asset);
-    const made = now?.variants.find((one) => one.id === variant);
-    if (made && !made.stale && !made.edgesOff && !now?.requests[recipe]) return;
-    await startRequest(dataset, asset, variant);
+    const made = now?.variants.find((one) => one.id === target);
+    if (made && made.remake === target && !now?.requests[recipe]) return;
+    await startRequest(dataset, asset, variant, of);
     const until = Date.now() + REQUEST_SEEN_MS;
     for (;;) {
       const now = held();
@@ -388,11 +403,13 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
     if (ask.action === 'upscale') {
       const requests = asObject(answer['requests']) as Record<string, string>;
       if (Object.keys(requests).length) await ensureWorker(dataset);
+      // Each request names the skin the upscale made: a result a bake would refuse puts its input back there (R-HD-162).
+      const of: ForSkin = { owner: name, skin: text(answer['skin'], 'the skin an upscale made') };
       // Started side by side; the reply waits until the index shows each (as the request route does).
       const started = await Promise.all(
         Object.entries(requests)
           .sort()
-          .map(([asset, variant]) => startSeen(dataset, asset, variant).then(
+          .map(([asset, variant]) => startSeen(dataset, asset, variant, of).then(
             () => null,
             (error: unknown) => ({ asset, variant, error: messageOf(error) }),
           )),

@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 from . import progress, skins, variants
 from .interfaces import Texture
-from .results import Original
+from .results import Made, Original, made_refusal, served
 
 
 def plan(
@@ -23,12 +23,17 @@ def plan(
     model: str,
     factor: int,
     cap: int,
+    made: Callable[[Texture, Original], dict[str, Made]],
 ) -> tuple[dict[str, str], dict[str, str]]:
     """The variants to name and request, and the textures kept with the reason.
 
     `shows`: asset -> what the source skin shows of it. `original`: what was
     read of a texture's original; one whose header cannot be read is kept.
     Each variant is `factor` times its input's side, at most `cap`.
+    `made`: the texture's recipes. The skin names the id that serves the
+    request (results.served): a kept variant that cannot is not made again.
+    A serving variant that is made and that a bake would refuse is kept
+    with that reason (R-HD-162).
     """
     named: dict[str, str] = {}
     kept: dict[str, str] = {}
@@ -51,7 +56,13 @@ def plan(
         if reason:
             kept[asset] = reason
             continue
-        named[asset] = variants.variant_id(recipe, side)
+        recipes = made(found, read)
+        serving = served(recipes, variants.variant_id(recipe, side))
+        # Made already, and a bake would refuse it: the skin never names it (R-HD-162).
+        if reason := made_refusal(recipes, serving):
+            kept[asset] = reason
+            continue
+        named[asset] = serving
     return named, kept
 
 

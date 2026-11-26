@@ -42,9 +42,9 @@ def plan(dataset: Dataset) -> Plan:
     """What the bakes mean for the dataset. Nothing is written."""
     baked = dataset.baked
     where = f"--game {dataset.adapter.id} --dataset {dataset.name}"
-    wanted: dict[
-        tuple[str, str], tuple[str, str]
-    ] = {}  # (asset, variant) -> who bakes it, and how to unbake that
+    # (asset, variant) -> everyone who bakes it, each with how to unbake that (R-HD-157),
+    # how to bake it again, and the file the bake took (its pin, R-HD-160; None: it has none)
+    wanted: dict[tuple[str, str], list[tuple[str, str, str, str | None]]] = {}
     owners: list[OwnerBake] = []
     unused: list[str] = []
     for owner_id, bake in sorted(baked.owners.items()):
@@ -66,17 +66,25 @@ def plan(dataset: Dataset) -> Plan:
         for asset, variant in named.items():
             if variant == variants.ORIGINAL:
                 continue
-            wanted.setdefault(
-                (asset, variant),
-                (f"{owner_id}, skin {bake.skin}", f"--owner {owner_id!r}"),
-            )
+            # Quoted as it is, not by repr: that doubles each backslash of a model path, and the command names no owner.
+            wanted.setdefault((asset, variant), []).append((
+                f"{owner_id}, skin {bake.skin}",
+                f"--owner '{owner_id}'",
+                f"--owner '{owner_id}' --skin '{bake.skin}'",
+                baked.pins.owners.get(owner_id, {}).get(asset),
+            ))
     textures: dict[str, str] = {}
     for asset, variant in sorted(baked.textures.items()):
         if asset not in dataset.textures:
             unused.append(asset)
             continue
         textures[asset] = variant
-        wanted.setdefault((asset, variant), ("its own bake", f"--asset {asset!r}"))
+        wanted.setdefault((asset, variant), []).append((
+            "its own bake",
+            f"--asset '{asset}'",
+            f"--asset '{asset}' --variant {variant}",
+            baked.pins.textures.get(asset),
+        ))
     # A variant is checked against its original. Those originals are taken out in one go.
     dataset.adapter.fetch(
         dataset.name,
@@ -88,10 +96,15 @@ def plan(dataset: Dataset) -> Plan:
     )
     files: list[Packed] = []
     problems: list[str] = []
-    for (asset, variant), (who, unbake) in sorted(wanted.items()):
+    for (asset, variant), bakers in sorted(wanted.items()):
+        # Everyone who bakes it, with their number and the command that unbakes each (R-HD-157).
+        named = "\n".join(
+            [f"  baked by {len(bakers)} owner{'' if len(bakers) == 1 else 's'}:"]
+            + [f"    {who}: {COMMAND} unbake {where} {unbake}" for who, unbake, _again, _pin in bakers]
+        )
         if asset not in dataset.textures:
             problems.append(
-                f"{asset}: {who} names it and the dataset does not list it; run: {COMMAND} index {where}"
+                f"{asset}: {variant} is baked and the dataset does not list the texture; run: {COMMAND} index {where}\n{named}"
             )
             continue
         texture = dataset.texture(asset)
@@ -101,10 +114,20 @@ def plan(dataset: Dataset) -> Plan:
             if recipe not in made or made[recipe].stale:
                 fix = f"run: {COMMAND} request {where} --asset '{asset}' --variant {variant}"
             else:  # a variant with a problem is not made better by making it again
-                fix = f"name another variant of it in the skin and bake again, or run: {COMMAND} unbake {where} {unbake}"
-            problems.append(f"{asset} ({who}): {reason}; {fix}")
+                fix = "name another variant of it in each skin and bake again, or unbake"
+            problems.append(f"{asset}: {reason}; {fix}\n{named}")
             continue
         entry = made[recipe].entry
+        # A bake pins the file it took. The id alone does not say that the file is still that one (R-HD-160).
+        now = entry["files"][str(size)]["sha256"]
+        off = [(who, again) for who, _unbake, again, pin in bakers if pin is not None and pin != now]
+        if off:
+            problems.append(
+                f"{asset}: {variant} is not the file {len(off)} bake{'' if len(off) == 1 else 's'} took: "
+                "its file has another hash now; bake again to take it as it is, or name another variant\n"
+                + "\n".join(f"    {who}: {COMMAND} bake {where} {again}" for who, again in off)
+            )
+            continue
         files.append(
             Packed(
                 texture,

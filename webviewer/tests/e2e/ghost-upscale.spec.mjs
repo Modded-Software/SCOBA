@@ -305,10 +305,39 @@ test('the trash: only the variant picked now is kept; one New Skin 1 names is de
 
 const statusLog = (page) => page.evaluate(() => window.SCOBAEdit.statusLog().shown);
 
+/**
+ * New Skin 1 of an owner, made by a person: it names the texture's largest `fast` variant, whatever its numbers
+ * (R-HD-90: a problem hides nothing, and a skin may name it). An Upscale Skin leaves no such variant in its skin
+ * (R-HD-162), so the skin is copied and set.
+ */
+async function namedByHand(request, owner, asset) {
+  await clean(request, owner);
+  const { factor, size } = await largest(request, asset);
+  const variant = `${MODEL}@${size}`;
+  const [had] = (await textureBody(request, asset)).textures;
+  if (!had.variants.some((one) => one.id === variant)) {
+    const asked = await texturePost(request, 'request', { asset, input: 'original', model: MODEL, factor });
+    expect(asked.status(), await asked.text()).toBe(200);
+  }
+  await made(request, variant, asset);
+  const copied = await texturePost(request, 'skin', { owner, action: 'copy', name: null, from: 'original' });
+  expect(copied.status(), await copied.text()).toBe(200);
+  expect((await copied.json()).made).toBe(NEW1);
+  const set = await texturePost(request, 'skin', { owner, action: 'set', name: NEW1, asset, variant });
+  expect(set.status(), await set.text()).toBe(200);
+  return { factor, size };
+}
+
 test('negative: a variant of the skin with a problem not accepted is not shown: its slot keeps the original, said once; no error', async ({ page, request }) => {
   test.setTimeout(120_000);
   // The stand-in repeats pixels: across the crate's wrap-around edge its variant misses the seam limit (R-HD-91).
-  const size = await upscaleSkin(request, CRATE_OWNER, CRATE_TEXTURE);
+  const { factor, size } = await namedByHand(request, CRATE_OWNER, CRATE_TEXTURE);
+  // An Upscale Skin does not name it (R-HD-162): the crate has this one texture, so the upscale asks for nothing
+  // and is refused with the problem. No second skin is made.
+  const upscale = await texturePost(request, 'skin', { owner: CRATE_OWNER, action: 'upscale', name: null, from: 'original', model: MODEL, factor });
+  expect(upscale.status(), await upscale.text()).toBe(400);
+  expect((await upscale.json()).error).toContain(`asks for no texture, so no skin is made (${CRATE_TEXTURE}: ${MODEL}@${size} has problems: seam `);
+  expect((await ownerLookup(request, CRATE_OWNER)).skins.map((one) => one.name)).toEqual([NEW1]);
   const [state] = (await textureBody(request, CRATE_TEXTURE)).textures;
   const variant = state.variants.find((one) => one.id === `${MODEL}@${size}`);
   expect(variant.problems.map((one) => one.limit)).toEqual(['seam']);

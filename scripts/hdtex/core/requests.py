@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import dds, encode, results, steps, variants
+from . import dds, encode, keptrecipe, results, steps, variants
 from .dataset import Dataset
 from .interfaces import DONE, FAILED, RUNNING, WAITING, Runner, Texture
 from .progress import (
@@ -32,6 +32,7 @@ from .progress import (
     JOB_FILE,
     LOG_FILE,
     UPSCALING,
+    RequestError,
     job_of,
     model_refusal,
     refusal,
@@ -48,10 +49,6 @@ IDLE_LIMIT_SECONDS = 30.0
 IDLE_LOOK_SECONDS = 10.0  # how often a request whose jobs all wait asks for a worker
 
 LOG = logging.getLogger(__name__)
-
-
-class RequestError(RuntimeError):
-    """Why a request failed."""
 
 
 def _wait(
@@ -210,10 +207,12 @@ def _make(
     runner: Runner,
     texture: Texture,
     recipe: str,
+    size: int,
     original: bytes,
     note: Callable[..., None],
     wait,
 ) -> dict:
+    """Make `recipe` at `size`, and each recipe before it at the size the id names. Returns the entry of `recipe`."""
     game = dataset.game
     recipe_steps = variants.parse_recipe(recipe)
     role = ROLES.get(texture.role or "")
@@ -226,35 +225,34 @@ def _make(
     reference_id = ""
     for index, prefix in enumerate(variants.prefixes(recipe)):
         kept = game.entry(texture.origin, prefix)
-        # Kept, of the original as it is, with its edges made for this texture's rule (results.edges_off).
-        there = kept is not None and kept["original"]["sha256"] == sha256 and not results.edges_off(kept, texture.tiles)
-        # A recipe that holds no planes is whole as variants. The next step cannot build on it.
-        if there and (kept["planes"] or prefix == recipe):
-            LOG.info("step %d, %s: its variants are there", index + 1, prefix)
-            entry, planes = (
-                kept,
-                {name: game.get_plane(key) for name, key in kept["planes"].items()},
-            )
+        last = prefix == recipe
+        if kept is not None:
+            # A kept recipe is never made again (R-HD-158). `make` picked a last step that serves the request, and
+            # refused a stale step before it; a step before the last is taken as it is kept (R-HD-159).
+            if kept["original"]["sha256"] != sha256 or (last and results.edges_off(kept, texture.tiles)):
+                raise RequestError(
+                    f"step {index + 1}, {prefix}, is kept and does not serve this request; a kept variant is not made again"
+                )
+            LOG.info("step %d, %s: its recipe is kept", index + 1, prefix)
+            if last:
+                if not keptrecipe.holds(kept, size):
+                    note(step=index + 1, phase=ENCODING, jobs=[])
+                return keptrecipe.with_size(game, texture, kept, size, original, reference)
+            planes = keptrecipe.planes(game, texture, prefix, kept, recipe_steps[index].size or 0)
             if results.user_made(kept):
                 reference = planes
                 reference_id = variants.variant_id(prefix, max(kept["size"]))
             continue
         if recipe_steps[index].edit:
-            # No model makes an edit again: only its transfer does.
+            # No model makes an edit: only its transfer does.
             raise RequestError(
-                f"step {index + 1}, {prefix}, is a person's edit that is not there for the original as it is now; transfer the edit again"
-            )
-        if there:
-            LOG.info(
-                "step %d, %s: its variants are there without their planes; the next step needs them, so it is made again",
-                index + 1,
-                prefix,
+                f"step {index + 1}, {prefix}, is a person's edit that is not there; transfer the edit again"
             )
         if index:
             # The input of this step is the variant of the recipe before it at the size the recipe names.
-            size = recipe_steps[index - 1].size or 0
+            given = recipe_steps[index - 1].size or 0
             planes = {
-                plane.name: steps.fit(planes[plane.name], size, plane.colour)
+                plane.name: steps.fit(planes[plane.name], given, plane.colour)
                 for plane in role.planes
             }
         LOG.info("step %d, %s: upscaling", index + 1, prefix)
@@ -270,9 +268,13 @@ def _make(
         planes = step["planes"]
         LOG.info("step %d, %s: encoding", index + 1, prefix)
         encoded = encode.encode(original, role, planes, reference, tiles=texture.tiles)
-        entry = game.write_recipe(
-            texture.origin,
+        # One size is kept: the one asked for, and of a step before the last the one the id names (R-HD-123).
+        wanted = size if last else recipe_steps[index].size or 0
+        entry = keptrecipe.keep(
+            game,
+            texture,
             prefix,
+            sha256,
             {
                 # The variant its numbers compare with; empty: the original.
                 "reference": reference_id,
@@ -291,8 +293,11 @@ def _make(
                 results.TILES: texture.tiles,
                 "numbers": encoded.numbers,
             },
-            encoded.files,
+            {wanted: encoded.file(wanted)},
         )
+        if last:
+            # Another request kept the recipe meanwhile, at another size: this one's is added to it.
+            entry = keptrecipe.with_size(game, texture, entry, size, original, reference)
     return entry
 
 
@@ -357,31 +362,29 @@ def make(
     variant: str,
     wait: Callable[[float], None] = time.sleep,
 ) -> dict:
-    """Make a variant of a texture: its recipe, at every kept size, and the recipes before it. Returns the recipe's entry.
+    """Make a variant of a texture: its recipe, at the size asked for, and the recipes before it. Returns the entry
+    of the recipe that serves the request.
 
-    Its size is at most the largest side (variants.max_side).
+    Its size is at most the largest side (variants.max_side). The file of
+    that size is kept, and of no other (R-HD-123). A recipe that is kept
+    and lacks the size gets it with no job (`keptrecipe.with_size`).
 
-    What is there and not stale is not made again. A refused request leaves
-    nothing. A failure leaves the reason in request.json, its trace in
-    request.log, and no variant; the planes that were upscaled stay.
+    A kept variant is never made again (R-HD-158). One that is sound is
+    the answer. One that is stale, or has edges of the other rule, stays
+    as it is: the request makes the next revision beside it, or finds a
+    revision that is sound (results.served). The entry's `recipe` names
+    which. A kept step before the last is the input as it is (R-HD-159); a
+    stale one refuses the request.
+
+    A refused request leaves nothing. A failure leaves the reason in
+    request.json, its trace in request.log, and no variant; the planes
+    that were upscaled stay.
 
     Every change of its state goes to the state index: `note` writes it.
     """
     recipe, size = variants.split(variant)
     if not recipe:
         raise RequestError(f"{texture.asset}: the original is not made; it is there")
-    folder = dataset.game.recipe_dir(texture.origin, recipe)
-    said = {
-        "pid": os.getpid(),
-        "started": started(os.getpid()),
-        "since": time.time(),
-        "variant": variant,
-        "step": 1,
-        "steps": len(variants.parse_recipe(recipe)),
-        "phase": UPSCALING,
-        "jobs": [],
-        "failed": "",
-    }
     if reason := model_refusal(texture, recipe):
         raise RequestError(f"{texture.asset}, {recipe}: {reason}")
     original = dataset.original(texture)
@@ -395,6 +398,37 @@ def make(
         recipe, size, longest
     ):
         raise RequestError(f"{texture.asset}, {variant}: {reason}")
+    made = dataset.made(texture)
+    if reason := keptrecipe.input_refusal(made, recipe):
+        raise RequestError(f"{texture.asset}, {variant}: {reason}")
+    return _run(dataset, runner, texture, results.served(made, variant), made, original, wait)
+
+
+def _run(
+    dataset: Dataset,
+    runner: Runner,
+    texture: Texture,
+    variant: str,
+    made: dict[str, results.Made],
+    original: bytes,
+    wait: Callable[[float], None],
+) -> dict:
+    """Run the request of the variant that serves it (`results.served`): write its state, make it, clear the state."""
+    recipe, size = variants.split(variant)
+    if recipe in made and (reason := keptrecipe.size_refusal(made[recipe].entry, size)):
+        raise RequestError(f"{texture.asset}, {variant}: {reason}")
+    folder = dataset.game.recipe_dir(texture.origin, recipe)
+    said = {
+        "pid": os.getpid(),
+        "started": started(os.getpid()),
+        "since": time.time(),
+        "variant": variant,
+        "step": 1,
+        "steps": len(variants.parse_recipe(recipe)),
+        "phase": UPSCALING,
+        "jobs": [],
+        "failed": "",
+    }
 
     def note(**fields: object) -> None:
         said.update(fields)
@@ -406,7 +440,7 @@ def make(
         LOG.info("request: %s, %s, in dataset %s", texture.asset, recipe, dataset.name)
         start = time.monotonic()
         try:
-            entry = _make(dataset, runner, texture, recipe, original, note, wait)
+            entry = _make(dataset, runner, texture, recipe, size, original, note, wait)
         except BaseException as error:
             # Whatever stops the request is written down where the next reader looks, with its trace.
             reason = (
@@ -422,6 +456,7 @@ def make(
                 f"{texture.asset}, {recipe}: {reason}; the trace is in {folder / LOG_FILE}"
             ) from error
         LOG.info("done after %.1f s", time.monotonic() - start)
-    (folder / FILE).unlink()
+    # Another request of the same recipe may have ended first and removed it.
+    (folder / FILE).unlink(missing_ok=True)
     dataset.changed(texture)
     return entry

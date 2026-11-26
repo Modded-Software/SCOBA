@@ -45,7 +45,7 @@ export const PRESS_ACTIONS = ['move', 'rect', 'face', 'grab', 'look', 'orbit', '
 export const CLICK_ACTIONS = ['select', 'addSelect', 'menu'] as const;
 /** A double press on a unit (features/pick). */
 export const DOUBLE_ACTIONS = ['open'] as const;
-export const KEY_ACTIONS = ['remove', 'copy', 'cut', 'paste', 'loop', 'edges', 'original', 'cancel'] as const;
+export const KEY_ACTIONS = ['remove', 'copy', 'cut', 'paste', 'loop', 'playPause', 'edges', 'original', 'cancel'] as const;
 export type PressAction = (typeof PRESS_ACTIONS)[number];
 export type ClickAction = (typeof CLICK_ACTIONS)[number];
 export type DoubleAction = (typeof DOUBLE_ACTIONS)[number];
@@ -69,6 +69,7 @@ export const ACTION_LABEL: Record<MouseAction | KeyAction, string> = {
   cut: 'Cut',
   paste: 'Paste',
   loop: 'Menu "loop" choice',
+  playPause: 'Play or pause the selected',
   edges: 'Triangle edges',
   original: 'Show Original skin while held',
   cancel: 'Cancel a unit move or turn',
@@ -129,6 +130,7 @@ export const DEFAULT_INPUT: InputMap = {
     cut: { code: 'KeyX', key: 'x', mods: ['ctrl'] },
     paste: { code: 'KeyV', key: 'v', mods: ['ctrl'] },
     loop: { code: 'KeyL', key: 'l', mods: ['ctrl'] },
+    playPause: { code: 'KeyE', key: 'e', mods: ['ctrl'] },
     edges: { code: 'Slash', key: '/', mods: ['ctrl'] },
     original: { code: 'Period', key: '.', mods: ['ctrl'] },
     cancel: { code: 'Escape', mods: [] },

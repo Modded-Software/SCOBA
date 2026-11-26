@@ -5,13 +5,13 @@ from __future__ import annotations
 import os
 from unittest import mock
 
-from hdtex.core import bakes, requests, skinbakes, skins, variants
-from hdtex.core.bakes import Bake, BakeError
+from hdtex.core import bakes, requests, results, skins, variants
 from hdtex.core.dataset import Dataset, DatasetError
 from hdtex.core.registry import RegistryError
 from hdtex.core.skins import SkinError
+from hdtex.core.store import ENTRY, read_json, write_json
 
-from testkit.tests.textures.doubles import FLOOR, GAME, ROCK, Case, StandIn
+from testkit.tests.textures.doubles import GAME, ROCK, Case, StandIn
 from testkit.tests.textures.fixtures import (
     colour_rgba,
     invert,
@@ -134,7 +134,7 @@ class MadeTest(DatasetCase):
         found = self.dataset()
         made = found.made(found.texture(ROCK))
         self.assertEqual(list(made), ["pbrify"])
-        self.assertEqual((made["pbrify"].own, made["pbrify"].sizes()), (256, [128, 256]))
+        self.assertEqual((made["pbrify"].own, made["pbrify"].sizes()), (256, [256]))
         self.assertFalse(made["pbrify"].stale)
         self.assertEqual(made["pbrify"].missed, ())
         self.assertEqual(made["pbrify"].refusal(UP), "")
@@ -271,6 +271,39 @@ class SkinTest(DatasetCase):
             said["requests"], {ROCK: "pbrify@128", "textures\\big.dds": "pbrify@256"}
         )
 
+    def test_an_upscale_names_the_revision_where_the_kept_variant_cannot_serve(self) -> None:
+        """R-HD-158: the skin names what its request will make, not the kept variant the request leaves alone."""
+        self.add(ROCK)
+        self.make()
+        # Negative: a sound kept variant is named as it is.
+        said = self.dataset().upscale_skin(ROOM, skins.ORIGINAL_SKIN, "same", "pbrify", 4)
+        self.assertEqual(said["requests"], {ROCK: UP})
+        self.add(ROCK, tiles=False)  # the same file: it no longer repeats
+        said = self.dataset().upscale_skin(ROOM, skins.ORIGINAL_SKIN, "again", "pbrify", 4)
+        self.assertEqual(said["requests"], {ROCK: "pbrify~2@256"})
+        self.assertEqual(self.dataset().skins_of(ROOM)["again"].textures, {ROCK: "pbrify~2@256"})
+        # Negative: the skin made before names the kept one as before.
+        self.assertEqual(self.dataset().skins_of(ROOM)["same"].textures, {ROCK: UP})
+
+    def test_an_upscale_does_not_name_a_made_variant_a_bake_would_refuse(self) -> None:
+        """R-HD-162: its numbers are there already, so the skin never names it."""
+        self.runner = StandIn(invert)
+        self.add(ROCK)
+        self.add(SAND, seed=4)
+        self.make()
+        asked = len(self.runner.asked)
+        said = self.dataset().upscale_skin(ROOM, skins.ORIGINAL_SKIN, "up", "pbrify", 4)
+        self.assertIn(f"{UP} has problems: ", said["kept"][ROCK])
+        # Negative: the other texture is asked for; the rock is not named and nothing is requested here.
+        self.assertEqual(said["requests"], {SAND: UP})
+        self.assertEqual(self.dataset().skins_of(ROOM)["up"].textures, {SAND: UP})
+        self.assertEqual(len(self.runner.asked), asked)
+        # With a person's mark a bake takes it: it is named.
+        path = self.store.game(GAME).recipe_dir(self.dataset().texture(ROCK).origin, "pbrify") / ENTRY
+        write_json(path, {**read_json(path), results.ACCEPTED: "a person looked"})
+        said = self.dataset().upscale_skin(ROOM, skins.ORIGINAL_SKIN, "marked", "pbrify", 4)
+        self.assertEqual((said["requests"], said["kept"]), ({ROCK: UP, SAND: UP}, {}))
+
     def test_an_upscale_keeps_what_a_texture_cannot_have_with_the_reason(self) -> None:
         self.add(ROCK)
         self.add("textures\\big.dds", seed=3, size=2048)
@@ -313,154 +346,3 @@ class SkinTest(DatasetCase):
         self.add(ROCK, dataset="two")
         self.skin(dataset="one")
         self.assertEqual(self.dataset("two").skins_of(ROOM), {})
-
-
-class BakeTest(DatasetCase):
-    def test_a_bake_holds_the_skin_as_it_was_and_unbake_removes_it(self) -> None:
-        self.add(ROCK)
-        self.make()
-        self.skin()
-        found = self.dataset()
-        found.set_texture(ROOM, "hd", ROCK, UP)
-        self.assertEqual(found.bake(ROOM, "hd"), Bake("hd", {ROCK: UP}))
-        found.set_texture(ROOM, "hd", ROCK, None)
-        self.assertEqual(
-            found.baked.owners[ROOM],
-            Bake("hd", {ROCK: UP}),
-            "a change of the skin leaves the bake",
-        )
-        found.unbake(ROOM)
-        self.assertEqual(found.baked.owners, {})
-        self.assertFalse(self.bakes_file().exists())
-
-    def test_a_second_bake_replaces_the_first(self) -> None:
-        self.add(ROCK)
-        self.make()
-        self.skin()
-        self.skin(name="other")
-        found = self.dataset()
-        found.set_texture(ROOM, "hd", ROCK, UP)
-        found.bake(ROOM, "hd")
-        found.bake(ROOM, "other")
-        # A texture the skin does not name is baked as its original (R-HD-131).
-        self.assertEqual(found.baked.owners, {ROOM: Bake("other", {ROCK: "original"})})
-
-    def test_original_is_not_baked_and_a_new_skin_n_is(self) -> None:
-        self.add(ROCK)
-        self.make()
-        self.skin()
-        found = self.dataset()
-        found.set_texture(ROOM, "hd", ROCK, UP)
-        found.bake(ROOM, "hd")
-        with self.assertRaises(BakeError) as refused:
-            found.bake(ROOM, skins.ORIGINAL_SKIN)
-        self.assertIn("remove the bake", str(refused.exception))
-        self.assertEqual(found.baked.owners[ROOM].skin, "hd", "negative: kept after Original")
-        name, _ = found.copy_skin(ROOM, "hd", None)
-        self.assertEqual(found.bake(ROOM, name), Bake("New Skin 1", {ROCK: UP}))
-
-    def test_an_owner_above_a_bake_is_offered_no_skin(self) -> None:
-        self.add(ROCK)
-        self.folder_game.above("one", "unit:Room", [ROOM])
-        self.make()
-        self.skin()
-        found = self.dataset()
-        found.set_texture(ROOM, "hd", ROCK, UP)
-        found.bake(ROOM, "hd")
-        # Negative: the unit above shows the bake below, and has no skin it did not make (R-HD-137).
-        self.assertEqual(found.skins_of("unit:Room"), {})
-
-    def test_a_rename_of_a_baked_skin_renames_it_in_the_bake_and_keeps_its_textures(self) -> None:
-        self.add(ROCK)
-        self.make()
-        self.skin()
-        self.skin(name="other")
-        found = self.dataset()
-        found.set_texture(ROOM, "hd", ROCK, UP)
-        found.bake(ROOM, "hd")
-        skinbakes.rename(found, ROOM, "hd", "sharp")
-        self.assertEqual(found.baked.owners, {ROOM: Bake("sharp", {ROCK: UP})})
-        # Negative: a rename of a skin that is not baked leaves the bake.
-        skinbakes.rename(found, ROOM, "other", "two")
-        self.assertEqual(found.baked.owners, {ROOM: Bake("sharp", {ROCK: UP})})
-
-    def test_a_delete_of_a_baked_skin_is_refused_and_changes_nothing(self) -> None:
-        self.add(ROCK)
-        self.make()
-        self.skin()
-        self.skin(name="other")
-        found = self.dataset()
-        found.set_texture(ROOM, "hd", ROCK, UP)
-        found.bake(ROOM, "hd")
-        before = (found.skins_of(ROOM), found.baked)
-        with self.assertRaises(SkinError) as refused:
-            skinbakes.delete(found, ROOM, "hd")
-        self.assertIn("is baked; unbake it or bake another skin first", str(refused.exception))
-        self.assertEqual((found.skins_of(ROOM), found.baked), before)
-        # Negative: a skin that is not baked is deleted.
-        skinbakes.delete(found, ROOM, "other")
-        self.assertEqual(set(found.skins_of(ROOM)), {"hd"})
-        # Unbaked, the skin can go.
-        found.unbake(ROOM)
-        skinbakes.delete(found, ROOM, "hd")
-        self.assertEqual(found.skins_of(ROOM), {})
-
-    def test_an_upscale_to_a_taken_name_is_refused(self) -> None:
-        self.add(ROCK)
-        found = self.dataset()
-        found.copy_skin(ROOM, skins.ORIGINAL_SKIN, "hd")
-        before = found.skins_of(ROOM)
-        with self.assertRaises(SkinError) as refused:
-            found.upscale_skin(ROOM, skins.ORIGINAL_SKIN, "HD", "pbrify", 4)
-        self.assertIn("there is a skin 'hd' already", str(refused.exception))
-        self.assertEqual(found.skins_of(ROOM), before, "negative: nothing changed")
-
-    def test_a_missing_stale_or_unsound_variant_refuses_the_bake_and_writes_nothing(
-        self,
-    ) -> None:
-        self.add(ROCK)
-        self.skin()
-        found = self.dataset()
-        found.set_texture(ROOM, "hd", ROCK, UP)
-        with self.assertRaises(BakeError) as missing:
-            found.bake(ROOM, "hd")
-        self.assertIn("not made", str(missing.exception))
-        self.make()
-        self.add(ROCK, seed=2)
-        with self.assertRaises(BakeError) as stale:
-            self.dataset().bake(ROOM, "hd")
-        self.assertIn("stale", str(stale.exception))
-        self.runner = StandIn(invert)
-        self.make()
-        with self.assertRaises(BakeError) as unsound:
-            self.dataset().bake(ROOM, "hd")
-        self.assertIn("has problems", str(unsound.exception))
-        self.assertFalse(self.bakes_file().exists())
-
-    def test_a_size_that_is_not_kept_refuses_the_bake(self) -> None:
-        self.add(ROCK)
-        self.make()
-        self.skin()
-        self.dataset().set_texture(ROOM, "hd", ROCK, "pbrify@1024")
-        with self.assertRaises(BakeError) as refused:
-            self.dataset().bake(ROOM, "hd")
-        self.assertIn("is not kept", str(refused.exception))
-
-    def test_a_texture_of_its_own_kind_is_baked_alone(self) -> None:
-        self.add(SAND, kind=FLOOR)
-        self.make(SAND)
-        self.dataset().bake_texture(SAND, UP)
-        self.assertEqual(self.dataset().baked.textures, {SAND: UP})
-        self.dataset().bake_texture(SAND, None)
-        self.assertEqual(self.dataset().baked.textures, {})
-        with self.assertRaises(BakeError):
-            self.dataset().bake_texture(SAND, "fast@256")
-        self.assertFalse(self.bakes_file().exists())
-
-    def test_datasets_do_not_share_bakes(self) -> None:
-        self.add(ROCK, dataset="one")
-        self.add(ROCK, dataset="two")
-        self.make()
-        self.skin(dataset="one")
-        self.dataset("one").bake(ROOM, "hd")
-        self.assertEqual(self.dataset("two").baked.owners, {})

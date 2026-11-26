@@ -35,6 +35,7 @@ PROFILE_MAPS = {
         "ground": "SCOBA256_ground.SC2Map",
         "waterfeat": "SCOBA256_waterfeat.SC2Map",
         "hdbake": "SCOBA256_hdbake.SC2Map",
+        "loadwait": "SCOBA256_loadwait.SC2Map",
 }
 
 
@@ -75,6 +76,7 @@ PROFILE_BANKS = {
     "ground": ("SCOBAGROUND",),
     "waterfeat": ("SCOBAWATERFEAT",),
     "hdbake": ("SCOBAHDBAKE",),
+    "loadwait": ("SCOBALOADWAIT",),
 }
 
 
@@ -163,4 +165,7 @@ def profile_module(name):
     if name == "hdbake":
         from . import hdbake
         return hdbake
+    if name == "loadwait":
+        from . import loadwait
+        return loadwait
     raise SystemExit(f"unknown test profile: {name}")

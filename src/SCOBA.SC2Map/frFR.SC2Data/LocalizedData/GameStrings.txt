@@ -1,7 +1,8 @@
-DocInfo/Author=Blizzard Entertainment
-DocInfo/DescLong=
-DocInfo/DescShort=Thanson02
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
+DocInfo/Author=SCOBA
+DocInfo/DescLong=Jusqu'à trois joueurs combattent en héros terrans aux côtés des armées de leur voie, Terrans contre Zergs, sur six voies. Gagnez de l'XP, répartissez vos points de caractéristique et apprenez des techniques.
+DocInfo/DescShort=Arène coopérative de héros jusqu'à 3 joueurs. Six voies, deux modes de contrôle.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=LES DEUX MODES<n/>W, A, S, D - se déplacer<n/>Shift (maintenir) - marcher lentement<n/>Space - se déployer au début, puis sauter<n/>Z (maintenir) - zoom<n/>Molette de la souris - distance de la caméra<n/>Ctrl+E - mode ordres. Ctrl+C - le quitter<n/><n/>WASD / POINT & CLICK<n/>Clic gauche - choisir une cible<n/>Clic droit - attaquer. Avec Chase sur Move, aussi se déplacer<n/>Maintenir un bouton de la souris et glisser - tourner la caméra<n/>Ctrl+C - annuler l'attaque<n/>Bouton Attack - Single ou Auto. Bouton Chase - Stand ou Move<n/><n/>ACTIONS (TPS)<n/>Souris - tourner la caméra<n/>Maintenir le bouton droit - viser. Clic gauche en visant - tirer<n/>Clic central - afficher ou masquer le curseur<n/><n/>HÉROS<n/>3 points de caractéristique par niveau. Une nouvelle technique aux niveaux 3, 6, 9, 12 et 15. Au niveau 20, une technique ultime d'un arbre avec 3 points investis.
 MapInfo/Player00/Name=Neutre
 MapInfo/Player01/Name=Les Rebelles de Raynor
 MapInfo/Player02/Name=Réfugié d'Agria

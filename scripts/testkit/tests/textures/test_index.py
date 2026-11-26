@@ -27,7 +27,7 @@ SAND = "textures\\sand.dds"
 MOSS = "textures\\moss.diffuse.dds"  # the folder game reads its role from its name, when asked
 NONE = "textures\\none.dds"
 MODELS = ["fast", "pbrify", "seedvr2"]
-HALF = "pbrify@128"  # the half of UP, kept with it: 2x of 64
+HALF = "pbrify@128"  # the half of UP, 2x of 64: kept when it is asked for (R-HD-123)
 
 
 def askable(state: dict, given: str = "original") -> list[str]:
@@ -131,6 +131,36 @@ class StateTest(IndexCase):
         self.assertEqual((before["edgesOff"], before["stale"]), (False, False))
         self.assertEqual((after["edgesOff"], after["stale"], after["staleWhy"]), (True, False, ""))
 
+    def test_a_variant_names_the_id_that_serves_a_request_of_it(self) -> None:
+        """R-HD-158: `remake` is the variant's own id while it is sound, else the revision a request makes or finds."""
+        self.add(ROCK)
+
+        def ask() -> None:
+            # Each size is asked for: one request keeps one size (R-HD-123).
+            for variant in (UP, HALF):
+                found = self.dataset()
+                requests.make(found, self.runner, found.texture(ROCK), variant, wait=lambda _seconds: self.runner.advance())
+
+        def remakes() -> dict[str, str]:
+            return {one["id"]: one["remake"] for one in self.state()["variants"]}
+
+        ask()
+        self.ok("index", "--asset", ROCK)
+        # Negative: sound, each is its own.
+        self.assertEqual(remakes(), {UP: UP, HALF: HALF})
+        self.add(ROCK, tiles=False)  # the same file: it no longer repeats
+        self.ok("index", "--asset", ROCK)
+        self.assertEqual(remakes(), {UP: "pbrify~2@256", HALF: "pbrify~2@128"})
+        # The request writes the state: the revision is listed beside the kept one, and serves both.
+        ask()
+        self.assertEqual(
+            remakes(),
+            {UP: "pbrify~2@256", HALF: "pbrify~2@128", "pbrify~2@256": "pbrify~2@256", "pbrify~2@128": "pbrify~2@128"},
+        )
+        titles = {one["id"]: (one["title"], one["recipe"], one["edgesOff"]) for one in self.state()["variants"]}
+        self.assertEqual(titles[UP], ("PBRify at 256", "pbrify", True))
+        self.assertEqual(titles["pbrify~2@256"], ("PBRify #2 at 256", "pbrify~2", False))
+
     def test_the_head_names_the_hash_of_the_pipeline_code(self) -> None:
         self.add(ROCK)
         self.ok("index", "--asset", ROCK)
@@ -188,7 +218,7 @@ class StateTest(IndexCase):
         self.add(ROCK)
         self.ok("request", "--asset", ROCK, "--variant", UP)
         rock = self.state()
-        self.assertEqual([one["id"] for one in rock["variants"]], [UP, HALF])
+        self.assertEqual([one["id"] for one in rock["variants"]], [UP], "negative: no half nobody asked for (R-HD-123)")
         variant = rock["variants"][0]
         kept = self.store.game(GAME).variant_file(ORIGIN + ROCK, "pbrify", 256)
         self.assertEqual(
@@ -206,8 +236,13 @@ class StateTest(IndexCase):
         self.assertEqual(
             (variant["path"], variant["sha256"]), (str(kept), file_sha256(kept))
         )
-        self.assertEqual(inputs(rock), ["original", UP, HALF])
+        self.assertEqual(inputs(rock), ["original", UP])
         self.assertEqual(askable(rock, UP), MODELS)
+        # The half, asked for, is added: a variant and an input of its own.
+        self.ok("request", "--asset", ROCK, "--variant", HALF)
+        rock = self.state()
+        self.assertEqual([one["id"] for one in rock["variants"]], [UP, HALF])
+        self.assertEqual(inputs(rock), ["original", UP, HALF])
         self.assertEqual(
             rock["asks"][1]["models"]["pbrify"]["factors"],
             {"2": {"size": 512, "reason": ""}, "4": {"size": 1024, "reason": ""}},

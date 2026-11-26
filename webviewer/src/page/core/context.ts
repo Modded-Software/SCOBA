@@ -131,6 +131,8 @@ export interface SceneService {
   restart(): void;
   playOnce(item: Item, sequence: number): void;
   loopSequence(item: Item, sequence: number): void;
+  /** Hold the item's animation at its frame, or let it run on (R-VIEW-159). */
+  setPaused(item: Item, paused: boolean): void;
   endOneShots(): void;
   setRotation(item: Item, rot: number): void;
   setPosition(item: Item, x: number, y: number): void;

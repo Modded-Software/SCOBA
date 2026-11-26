@@ -2,7 +2,8 @@
 
 The file keeps the original's format and the bytes after its last mip. It
 has a full mip chain. The same chain without its largest levels is the
-result at a smaller size.
+result at a smaller size. A file is made for the size its caller names
+(`Encoded.file`), and for no other (R-HD-123).
 """
 
 from __future__ import annotations
@@ -14,7 +15,6 @@ import numpy as np
 
 from . import dds, lowfreq, metrics
 from .interfaces import Planes, Role
-from .store import kept_sizes
 
 ENCODER_VERSION = 1  # raise it when the same planes would give another file
 
@@ -28,8 +28,19 @@ class Encoded(NamedTuple):
     size: tuple[int, int]  # width, height at its own size
     mips: int
     source_size: tuple[int, int]
-    files: dict[int, bytes]  # longest side to file
     numbers: dict
+    shapes: tuple[tuple[int, int], ...]  # width, height of each level, largest first
+    levels: tuple[bytes, ...]  # each level, encoded
+    trailer: bytes
+
+    def file(self, longest: int) -> bytes:
+        """The texture file with that longest side: the chain from that level down."""
+        for skip, (width, height) in enumerate(self.shapes):
+            if max(width, height) == longest:
+                return dds.build(width, height, list(self.levels[skip:]), self.trailer, self.format)
+        raise EncodeError(
+            f"a result of {self.size[0]}x{self.size[1]} has no level with a longest side of {longest}"
+        )
 
 
 def read_texture(data: bytes) -> tuple[dds.Dds, np.ndarray]:
@@ -77,7 +88,7 @@ def encode(
     matched: bool = True,
     tiles: bool = True,
 ) -> Encoded:
-    """The result of `planes` for the texture file `original`, at every kept size.
+    """The result of `planes` for the texture file `original`: its levels and its numbers.
 
     `reference`: the planes the result is matched to and measured against.
     None: the original's own. A model's variant made from a person's edit
@@ -115,25 +126,16 @@ def encode(
         for level in levels:
             level[:, :, 3] = 255
     blobs = [codec.encode(level) for level in levels]
-    files = {}
-    for longest in kept_sizes(max(width, height)):
-        skip = next(
-            index
-            for index, level in enumerate(levels)
-            if max(level.shape[:2]) == longest
-        )
-        top = levels[skip]
-        files[longest] = dds.build(
-            top.shape[1], top.shape[0], blobs[skip:], source.trailer, source.format
-        )
     numbers = measure(
         levels, codec.decode(blobs[0], width, height), compared, reference_levels
     )
     return Encoded(
-        source.format,
-        (width, height),
-        len(levels),
-        (source.width, source.height),
-        files,
-        numbers,
+        format=source.format,
+        size=(width, height),
+        mips=len(levels),
+        source_size=(source.width, source.height),
+        numbers=numbers,
+        shapes=tuple((level.shape[1], level.shape[0]) for level in levels),
+        levels=tuple(blobs),
+        trailer=source.trailer,
     )

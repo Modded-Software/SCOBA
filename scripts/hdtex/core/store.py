@@ -4,6 +4,7 @@
     <game>/planes/                       what the upscaler takes, named by the hash of its pixels
     <game>/upscaled/<hash>/              what the upscaler gave for one plane and model, as it wrote it
     <game>/variants/<origin>/<recipe>/   entry.json and one file per kept size; request.json while it is made
+    <game>/locks/                        one empty file per recipe ever written: the lock of its write
     <game>/datasets/<dataset>/           skins/, bakes.json, package record
     <game>/index/                        the game's own caches
     index.sqlite                         the state index (core/index.py)
@@ -15,10 +16,13 @@ entry.json does.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -30,15 +34,25 @@ ENV = "TEXTURE_STORE"
 FORMAT = 3
 FORMAT_FILE = "format"
 ENTRY = "entry.json"
+# Key of an entry: why its problems do not refuse a bake. A person writes it by hand; `write_recipe` refuses it (R-HD-161).
+ACCEPTED = "accepted"
 PACKAGE_RECORD = "package.json"
-# A recipe is also kept at each level below its own, down to the first one of this side or less,
-# and always at half its own side.
-SMALLEST_KEPT = 1024
+# A request may also ask for each level below a recipe's own, down to the first one of this side or less,
+# and always for half its own side.
+SMALLEST_OFFERED = 1024
 NAME = re.compile(r"[a-z0-9][a-z0-9_.-]*")
 
 
 class StoreError(RuntimeError):
     """The store cannot be read or written as asked."""
+
+
+class RecipeKept(StoreError):
+    """A write of a recipe that is kept (R-HD-158)."""
+
+
+class SizeKept(StoreError):
+    """A write of a size its recipe is kept at (R-HD-158)."""
 
 
 def store_root() -> Path:
@@ -134,14 +148,15 @@ def origin_folder(origin: str) -> str:
     return f"{tail[:80]}-{hashlib.sha256(origin.encode()).hexdigest()[:16]}"
 
 
-def kept_sizes(longest: int) -> tuple[int, ...]:
-    """The longest sides a recipe with that own longest side is kept at, largest first.
+def offered_sizes(longest: int) -> tuple[int, ...]:
+    """The longest sides a request may ask for of a recipe with that own longest side, largest first. The recipe
+    is kept at those that were asked for (R-HD-123).
 
-    Half the own side is always kept: a 4x model's own side is 4x its input,
-    so its half is the 2x a request may ask for (variants.FACTORS).
+    Half the own side is always one: a 4x model's own side is 4x its input,
+    so its half is the 2x of the model (variants.FACTORS).
     """
     sizes = [longest]
-    while sizes[-1] % 2 == 0 and (sizes[-1] > SMALLEST_KEPT or len(sizes) == 1):
+    while sizes[-1] % 2 == 0 and (sizes[-1] > SMALLEST_OFFERED or len(sizes) == 1):
         sizes.append(sizes[-1] // 2)
     return tuple(sizes)
 
@@ -162,6 +177,7 @@ class GameStore:
         self.planes = root / "planes"
         self.upscaled = root / "upscaled"
         self.variants = root / "variants"
+        self.locks = root / "locks"
         self.index = root / "index"
 
     # ---------------------------------------------------------------- planes
@@ -232,30 +248,89 @@ class GameStore:
     def write_recipe(
         self, origin: str, recipe: str, entry: dict, files: dict[int, bytes]
     ) -> dict:
-        """Keep the variants of a recipe: its files, then its entry. Returns the entry as written."""
-        self.drop_recipe(origin, recipe)
+        """Keep the variants of a recipe: its files, then its entry. Returns the entry as written.
+
+        A kept recipe is never written again (R-HD-158): what names it keeps
+        its files and its marks. Files left without an entry are no variant;
+        they go first.
+        """
         folder = self.recipe_dir(origin, recipe)
-        try:
-            for size, data in sorted(files.items()):
-                write_atomic(folder / f"{size}.dds", data)
-            written = {
-                **entry,
-                "format": FORMAT,
-                "origin": origin,
-                "recipe": recipe,
-                "files": {
-                    str(size): {
-                        "sha256": hashlib.sha256(data).hexdigest(),
-                        "bytes": len(data),
-                    }
-                    for size, data in sorted(files.items())
-                },
-            }
-            write_json(folder / ENTRY, written)
-        except BaseException:
+        if ACCEPTED in entry:
+            raise StoreError(
+                f"{recipe} of {origin}: its entry holds {ACCEPTED!r}; only a person marks a variant accepted, no program writes the mark"
+            )
+        # The check and the write are one step: of two programs that make one recipe, the second finds it kept.
+        with self._writing(origin, recipe):
+            if (folder / ENTRY).is_file():
+                raise RecipeKept(
+                    f"{recipe} of {origin} is kept at {folder}; a kept variant is not written again, a new one gets a revision"
+                )
             self.drop_recipe(origin, recipe)
-            raise
+            try:
+                for size, data in sorted(files.items()):
+                    write_atomic(folder / f"{size}.dds", data)
+                written = {
+                    **entry,
+                    "format": FORMAT,
+                    "origin": origin,
+                    "recipe": recipe,
+                    "files": {
+                        str(size): {
+                            "sha256": hashlib.sha256(data).hexdigest(),
+                            "bytes": len(data),
+                        }
+                        for size, data in sorted(files.items())
+                    },
+                }
+                write_json(folder / ENTRY, written)
+            except BaseException:
+                # Its own half only: the recipe had no entry when the lock was taken.
+                self.drop_recipe(origin, recipe)
+                raise
         return written
+
+    def add_size(self, origin: str, recipe: str, size: int, data: bytes) -> dict:
+        """Keep one more size of a kept recipe: its file, then its hash in the entry. Returns the entry as written.
+
+        A request keeps the size it asks for (R-HD-123); one asked for later
+        is added here. A size that is kept is never written again, and
+        nothing else of the entry changes (R-HD-158).
+        """
+        folder = self.recipe_dir(origin, recipe)
+        with self._writing(origin, recipe):
+            entry = self.entry(origin, recipe)
+            if entry is None:
+                raise StoreError(f"{recipe} of {origin} is not kept; a size is added to a kept recipe only")
+            if str(size) in entry["files"]:
+                raise SizeKept(f"{recipe} of {origin} is kept at {size}; a kept file is not written again")
+            path = folder / f"{size}.dds"
+            try:
+                write_atomic(path, data)
+                written = {
+                    **entry,
+                    "files": {
+                        **entry["files"],
+                        str(size): {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)},
+                    },
+                }
+                write_json(folder / ENTRY, written)
+            except BaseException:
+                # Its own file only: the entry did not name the size when the lock was taken.
+                path.unlink(missing_ok=True)
+                raise
+        return written
+
+    @contextmanager
+    def _writing(self, origin: str, recipe: str) -> Iterator[None]:
+        """Hold the lock of one recipe's write: `locks/<origin>.<recipe>.lock`, by flock. The system frees it when
+        the program ends, however it ends. The file stays; it holds nothing."""
+        self.locks.mkdir(parents=True, exist_ok=True)
+        with (self.locks / f"{origin_folder(origin)}.{recipe}.lock").open("a") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
     # -------------------------------------------------------------- datasets
 

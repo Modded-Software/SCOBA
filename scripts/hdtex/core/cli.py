@@ -163,16 +163,22 @@ def request(
         dataset, texture, args.input or variants.ORIGINAL, args.model, args.factor
     )
     entry = requests.make(dataset, runner(), texture, variant)
+    # The variant that serves the request: a kept one is never made again (R-HD-158).
+    serving = variants.variant_id(entry["recipe"], variants.split(variant)[1])
+    # The skin the request is for does not keep a result a bake would refuse (R-HD-162).
+    reverted = None if args.owner is None else dataset.revert_refused(args.owner, args.skin, texture.asset, variant, serving)
     return {
         "made": [
             {
                 "asset": texture.asset,
-                "variant": variant,
+                "variant": serving,
+                "asked": variant,
                 "recipe": entry["recipe"],
                 "files": entry["files"],
             }
         ],
         "failed": [],
+        **({} if reverted is None else {"reverted": reverted}),
     }
 
 
@@ -212,12 +218,19 @@ def skin(
             # The caller starts each request as a process of its own (SPEC-VIEWER 17.1).
             return {**made, "failed": []}
         failed = []
+        reverted = []
         for asset, variant in sorted(made["requests"].items()):
             try:
-                requests.make(dataset, runner(), dataset.texture(asset), variant)
+                entry = requests.make(dataset, runner(), dataset.texture(asset), variant)
             except requests.RequestError as error:
+                # Nothing is made: the skin keeps the name, and the request can be asked again.
                 failed.append({"asset": asset, "variant": variant, "error": str(error)})
-        return {**made, "failed": failed}
+                continue
+            serving = variants.variant_id(entry["recipe"], variants.split(variant)[1])
+            back = dataset.revert_refused(owner, made["skin"], asset, variant, serving)
+            if back is not None:
+                reverted.append(back)
+        return {**made, "failed": failed, "reverted": reverted}
     return {
         "owner": owner,
         "skins": {
@@ -339,6 +352,8 @@ def parser() -> argparse.ArgumentParser:
         choices=variants.FACTORS,
         help=f"times the input's longest side, at most {variants.MAX_SIDE_ENV} (default {variants.MAX_OUTPUT})",
     )
+    asked.add_argument("--owner", help="with --skin: the skin the request is for; a result a bake would refuse puts its input back there")
+    asked.add_argument("--skin", help="with --owner")
     removing = command("remove", remove)
     removing.add_argument("--asset", required=True)
     removing.add_argument("--variant", required=True, help="the variant id, such as pbrify@2048")
@@ -403,6 +418,8 @@ def parser() -> argparse.ArgumentParser:
 
 
 def _check(args: argparse.Namespace) -> None:
+    if args.command == "request" and (args.owner is None) != (args.skin is None):
+        raise UsageError("request takes --owner and --skin together, or neither")
     if args.command == "skin":
         if args.action not in ("list", "copy", "upscale") and args.name is None:
             raise UsageError(f"skin {args.action} takes --name")

@@ -152,6 +152,7 @@ Implementation lives in [SPEC-VIEWER](../specifications/SPEC-VIEWER.md).
 | R-VIEW-143 | Mouse-look (turning the view around the eye) MUST be Alt + middle drag, not Ctrl + middle. Ctrl held during a left, middle or right camera drag MUST make that movement slower, for precision. | operator 2026-11-25 (the quarter is the agent's number, as the Ctrl wheel) |
 | R-VIEW-144 | A saved landmark MUST keep the camera's exact parameters (target, yaw, pitch, distance), unrounded, as the view settles: during a zoom glide, the distance it ends at. Going to it MUST give back exactly that view. | operator 2026-11-25 |
 | R-VIEW-141 | The stepping of R-VIEW-140 MUST be one shared component, used by every drop-down and number input. Dragging by a title (R-VIEW-138, the floating windows) MUST be one shared component too. | operator 2026-11-25 |
+| R-VIEW-159 | With instances selected, Ctrl+E MUST hold their animations at the frame they show. Pressed again, it MUST let them run on from that frame. An instance that is not selected MUST NOT change. With nothing selected the key MUST pause nothing. The key MUST be a binding of the input map (R-VIEW-154). The pause MUST NOT be kept with the scene. | operator 2026-11-26 ("if an unit is selected using the media play/pause button should play/pause the current animation (frame)"; the browser takes the media key first, so the same day: "just change default mapping to ctrl + e forget the media key"); the agent's: a mixed selection pauses all, an animation started after ends the pause, a held key counts once |
 
 ### 3.7 View
 
@@ -301,6 +302,9 @@ Source "operator" is that statement. "agent" marks the agent's own rows.
 | R-VIEW-132 | The texture window MUST show a texture's choices as tiles: In game, Original, each variant, the open requests, Upscale. The picked tile MUST have the blue outline. Each tile that shows a variant MUST have the **Edit Texture** button of REQ-PHOTOCRAFT (R-PC-20) while PhotoCraft is installed. | operator, revised 2026-11-25; the button sentence is the agent's pointer to the operator's REQ-PHOTOCRAFT |
 | R-VIEW-133 | A click on a tile MUST only preview it and mark it picked. It MUST change no skin, no bake and no instance. The picks of a window MUST be kept per texture until saved or reverted. **Save to Skin…** MUST ask first in one dialog: the target as two separate choices, a new skin under the name the pipeline gives next (made then, from Original) or an existing skin of the owner, each change from and to, whether a skin is made, and which instance shows the target. Only then MUST it set each pick in the target. **Revert Changes** MUST drop the picks. Cancel MUST change nothing. A pick MUST be a change against the target the dialog offers first, so the window's count and the dialog's count MUST agree. | operator 2026-11-25; revised 2026-11-26 (the bar said a change, the dialog said 0) |
 | R-VIEW-134 | "used by" MUST have a fixed height and scroll inside. | operator 2026-11-25 |
+| R-VIEW-160 | The thumbnail of each row in the texture window's list MUST carry a badge with the number of model files that read the texture, when it is 2 or more. Its hover MUST name them. A texture one model file reads MUST have no such badge. | operator 2026-11-26 ("we need clear indication (badge) with a texture list panel thumbnail … with the number of users / dependents"; model files only) |
+| R-VIEW-161 | The details of a texture MUST list each owner of the dataset whose bake or skin names a variant of it: the owner, the skin, the variant, and whether it is the bake. A row of a texture that a bake of another owner names MUST say so on its thumbnail badge. | agent, for R-VIEW-160 (the build of 2026-11-26 failed on a variant 18 owners baked) |
+| R-VIEW-162 | The Delete Variant dialog MUST list, before it acts, each other owner whose bake or skin names the variant it removes, with the skin. Without such an owner it MUST say that no other owner names it. The warning MUST NOT block the action. | operator 2026-11-26 (a warning, not a block; the Upscale dialog's line: "drop it", a request makes no kept variant again, R-HD-158) |
 | R-VIEW-135 | The info mark of a tile MUST NOT change the cursor. On hover it MUST show a tooltip that says amber is near a limit, red misses a limit, and which numbers miss. | operator 2026-11-25 |
 | R-VIEW-136 | A button or icon that deletes or discards MUST be red, in every window and dialog. | operator 2026-11-25 |
 | R-VIEW-137 | The skin choice MUST start with a skin icon and end with a down arrow, so it reads as a drop-down. | operator 2026-11-25 |
@@ -354,6 +358,9 @@ Only a person can judge these:
   the red of delete buttons, the skin choice's icon and arrow, the ground chooser and the skybox
   chooser read well and are easy to use;
 - whether the previews and the quality colours read well;
+- whether the users badge on a list thumbnail, its amber, the "named by"
+  row and the shared-variant warnings of the dialogs read well
+  (R-VIEW-160 to 162);
 - whether the game tabs and the handles look right and are easy to hit;
 - whether the scene list looks right and is easy to use;
 - whether dragging the menu by its title, and stepping a drop-down or a

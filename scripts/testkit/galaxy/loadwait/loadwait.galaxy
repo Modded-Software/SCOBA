@@ -1,0 +1,29 @@
+// Loading screen wait harness (REQ-LOADING-SCREEN R-LOAD-5).
+// The map keeps the built map's wait for a key. The bank is written one
+// game second after map init: game time runs only once the game is
+// entered. So the bank file on disk says "the game has started". The host
+// measures when it appears (profiles/loadwait.py).
+
+trigger gt_LoadWaitTest;
+bank gv_lwBank;
+
+bool gt_LoadWaitTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    // No bank call before this wait: the first save makes the file.
+    Wait(1.0, c_timeGame);
+    gv_lwBank = BankLoad("SCOBALOADWAIT", 1);
+    BankValueSetFromString(gv_lwBank, "meta", "profile", "loadwait");
+    BankValueSetFromInt(gv_lwBank, "lw_start", "ready", 1);
+    // Raw: the game clock at the write, in ms.
+    BankValueSetFromInt(gv_lwBank, "lw_game", "timeMs", FixedToInt(GameGetMissionTime() * 1000.0));
+    BankValueSetFromInt(gv_lwBank, "meta", "done", 1);
+    BankSave(gv_lwBank);
+    return true;
+}
+
+void gt_LoadWaitTest_Init () {
+    gt_LoadWaitTest = TriggerCreate("gt_LoadWaitTest_Func");
+    TriggerAddEventMapInit(gt_LoadWaitTest);
+}

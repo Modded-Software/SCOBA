@@ -63,7 +63,7 @@ init: ## Root steps only, run first: sudo make init. Installs the system package
 	test "$$(id -u)" -eq 0 || { echo "ERROR: make init holds only root steps; run: sudo make init" >&2; exit 1; }
 	apt-get install -y $(SYSTEM_PACKAGES)
 
-deps-check: ## Report every dependency (tools, StarCraft II, GE-Proton, lsfg-vk, GLM, nodsdk); installs nothing
+deps-check: ## Report every dependency (tools, StarCraft II, GE-Proton, lsfg-vk, GLM, nodsdk, launch dialog); installs nothing
 	$(DEPS) check
 
 install: install-deps ## Full install: deps (hooks install separately, root-only: sudo make install-hooks)
@@ -183,6 +183,11 @@ classic-skins: ## Rewrite the classic skin data from the game storage (ARGS=--li
 .PHONY: texture-store-migrate
 texture-store-migrate: ## Bring the texture store from layout 2 to 3: each entry names its edge rule (ARGS=--dry-run)
 	$(PATHS) $(PYMOD) hdtex.core.storemigrate $(ARGS)
+
+.PHONY: hd-textures
+hd-textures: ## Run one command of the texture pipeline (ARGS="status --game sc2 --dataset scoba --layer src/SCOBA.SC2Map")
+	test -n "$(ARGS)" || { echo "ERROR: name the command: make hd-textures ARGS=\"<command> --game G --dataset D\"" >&2; exit 1; }
+	$(PATHS) cd "$(REPO_ROOT)" && uv --project "$(REPO_ROOT)" run python "$(REPO_ROOT)/scripts/hd_textures.py" $(ARGS)
 
 # =============================================================================
 # SC2 model web viewer (webviewer/). Machine paths go in webviewer/local.env.

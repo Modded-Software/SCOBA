@@ -39,6 +39,8 @@ export const namedInto = (owner: { owner: string; skins: readonly { name: string
 /** Joins the steps of a recipe; `@` parts a step's model from its size. */
 const JOIN = '+';
 const AT = '@';
+/** Parts a step's model from its revision: `pbrify~2` is the second make of `pbrify` (SPEC-HD-TEXTURES 4.7). */
+const REVISION = '~';
 
 /** A model of the pipeline (SPEC-HD-TEXTURES 4.3). */
 export interface TextureModel {
@@ -75,8 +77,13 @@ export interface TextureVariant {
   stale: boolean;
   /** Why it is stale, in words; empty: it is not. */
   staleWhy: string;
-  /** Its edges were made for the other rule (tiles or not). It is shown; a request makes it again. */
+  /** Its edges were made for the other rule (tiles or not). It is shown; a request makes a revision beside it. */
   edgesOff: boolean;
+  /**
+   * The id that serves a request of it (SPEC-HD-TEXTURES 4.7, R-HD-158): its own while it is sound; else the
+   * revision the pipeline makes or finds beside it (`pbrify~2@512`). A kept variant is never made again.
+   */
+  remake: string;
   numbers: TextureNumber[];
   /** The limits it misses, each with its number and bound. */
   problems: { limit: string; value: number | null; bound: number }[];
@@ -141,6 +148,67 @@ export interface TextureState {
   bakeProblem: string;
   /** What the package holds of that bake, and whether it is the file the bake names. Null: nothing. */
   packaged: { variant: string | null; held: boolean } | null;
+  /**
+   * Each owner of the dataset whose bake or skin names a variant of it other than the original (R-HD-156):
+   * sorted by owner, the bake before the skins. The pipeline works it out; nothing here does.
+   */
+  namedBy: TextureNamedBy[];
+}
+
+/** One owner that names a variant of a texture: by its bake (`baked`), or by a skin. */
+export interface TextureNamedBy {
+  owner: string;
+  skin: string;
+  variant: string;
+  baked: boolean;
+}
+
+/** The users badge of a row's thumbnail (R-VIEW-160, R-VIEW-161). */
+export interface UsersBadge {
+  /** The model files that read the texture, from 2 up; null: one file reads it, and the badge only says who bakes it. */
+  count: number | null;
+  /** Its hover: the model files, then the other owners that bake a variant, one per line. */
+  title: string;
+  /** Another owner than the window's bakes a variant of it: the badge is amber. */
+  sharedBake: boolean;
+}
+
+/**
+ * The badge of a texture in a window on `owner` (null: on no owner, so every bake is another's). Null: no badge:
+ * fewer than 2 model files read it and no other owner bakes a variant of it.
+ */
+export function usersBadge(state: Pick<TextureState, 'users' | 'namedBy'>, owner: string | null): UsersBadge | null {
+  const bakers = [...new Set(state.namedBy.filter((one) => one.baked && one.owner !== owner).map((one) => one.owner))];
+  const count = state.users.length >= 2 ? state.users.length : null;
+  if (count === null && bakers.length === 0) return null;
+  const lines = [
+    ...(count === null ? [] : [`read by ${count} model files`, ...state.users]),
+    ...(bakers.length ? [`baked by ${bakers.length} other owner${bakers.length === 1 ? '' : 's'}`, ...bakers] : []),
+  ];
+  return { count, title: lines.join('\n'), sharedBake: bakers.length > 0 };
+}
+
+/** The lines of "named by" (R-VIEW-161): "<owner> · <skin> · <variant>", the bakes first, each marked "baked". */
+export function namedByLines(state: Pick<TextureState, 'namedBy'>): string[] {
+  const line = (one: TextureNamedBy): string => `${one.owner} · ${one.skin} · ${one.variant}${one.baked ? ' · baked' : ''}`;
+  return [...state.namedBy.filter((one) => one.baked), ...state.namedBy.filter((one) => !one.baked)].map(line);
+}
+
+/** What the Delete Variant dialog says of other owners (R-VIEW-162): a head line, and one line per skin or bake. */
+export interface RemovalWarning {
+  head: string;
+  lines: string[];
+}
+
+/**
+ * Who else names `variant` of a texture, for a window on `owner` (null: on no owner, so every entry is another's):
+ * "<owner> · <skin>", the bakes first, each marked "(baked)". Nobody: the head says so, and there is no line.
+ */
+export function removalWarning(state: Pick<TextureState, 'namedBy'>, variant: string, owner: string | null): RemovalWarning {
+  const others = state.namedBy.filter((one) => one.variant === variant && one.owner !== owner);
+  const lines = [...others.filter((one) => one.baked), ...others.filter((one) => !one.baked)].map((one) => `${one.owner} · ${one.skin}${one.baked ? ' (baked)' : ''}`);
+  if (lines.length === 0) return { head: 'No other owner names it.', lines };
+  return { head: lines.length === 1 ? '1 skin or bake of another owner names it:' : `${lines.length} skins or bakes of other owners name it:`, lines };
 }
 
 /** One skin of an owner. */
@@ -262,13 +330,18 @@ export type BakeBody = OwnerBody | TexturesBody;
 /** A variant id: the input's steps, then the model at the size. */
 export const variantId = (input: string, model: string, size: number): string => `${input === ORIGINAL ? '' : input + JOIN}${model}${AT}${size}`;
 
-/** The input, model and size a variant id was asked as; null: its last step is no model and size (an edit). */
+/**
+ * The input, model and size a variant id was asked as; null: its last step is no model and size (an edit).
+ * The model is the step's without its revision (`pbrify` of `pbrify~2@512`): the pipeline picks the id that
+ * serves the request (R-HD-158).
+ */
 export function askOf(asset: string, variant: string): TextureRequestAsk | null {
   const at = variant.lastIndexOf(AT);
   const join = variant.lastIndexOf(JOIN);
   const size = Number(variant.slice(at + 1));
   if (at < 0 || at < join || !Number.isInteger(size) || size <= 0) return null;
-  return { asset, input: join < 0 ? ORIGINAL : variant.slice(0, join), model: variant.slice(join + 1, at), size };
+  const [model = ''] = variant.slice(join + 1, at).split(REVISION);
+  return { asset, input: join < 0 ? ORIGINAL : variant.slice(0, join), model, size };
 }
 
 /** The recipe of a variant: the id without its last size. */

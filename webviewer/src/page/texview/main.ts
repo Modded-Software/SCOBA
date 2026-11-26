@@ -18,7 +18,7 @@
 import type { DecodedTexture } from '../core/ddsdecode';
 import { inGameOf, textureTiles, tickElapsed, type TileState } from '../core/tiles';
 import type { PageOwner } from '../core/texturewindow';
-import { firstSaveInto, hasSkin, namedInto, ORIGINAL, ORIGINAL_SKIN, skinLabel, textureRoutes, type TextureJudgeAsk, type TextureState } from '../../shared/textures';
+import { firstSaveInto, hasSkin, namedByLines, namedInto, ORIGINAL, ORIGINAL_SKIN, skinLabel, textureRoutes, usersBadge, type TextureJudgeAsk, type TextureState } from '../../shared/textures';
 import { detailsOf } from './cards';
 import { bindControls } from './controls';
 import { createImageView, type Side } from './imageview';
@@ -379,7 +379,7 @@ function render(): void {
     if (!passes(listed, item)) return;
     visible.push(at);
     const picked = item.asset === null ? null : (picks.get(item.asset) ?? null);
-    const row = listRow(item, { index: at, current: at === index, state: stateOf(item), picked });
+    const row = listRow(item, { index: at, current: at === index, state: stateOf(item), picked, owner: owner?.owner ?? null });
     row.addEventListener('click', () => show(at, true));
     list.append(row);
   });
@@ -476,7 +476,7 @@ Reflect.set(window, 'hdtex', {
   entries: () => visible.map((at) => {
     const item = entries[at];
     const state = item ? stateOf(item) : undefined;
-    return item && { id: item.id, asset: item.asset, texture: item.texture, plane: item.plane, category: categoryOf(item), size: item.size, variants: state ? state.variants.map((variant) => variant.id) : [], image: item.image, facts: item.facts };
+    return item && { id: item.id, asset: item.asset, texture: item.texture, plane: item.plane, category: categoryOf(item), size: item.size, variants: state ? state.variants.map((variant) => variant.id) : [], image: item.image, facts: item.facts, usersBadge: state ? usersBadge(state, owner?.owner ?? null) : null };
   }),
   state: () => {
     const item = entry();
@@ -490,6 +490,8 @@ Reflect.set(window, 'hdtex', {
       polling: poll !== null,
       judging,
       current: item ? { id: item.id, texture: item.texture, asset: item.asset } : null,
+      // The lines of "named by" of the current texture (R-VIEW-161).
+      namedBy: item ? namedByLines({ namedBy: stateOf(item)?.namedBy ?? [] }) : [],
       // What the view shows beside the original, the tiles, the picks and their bar (R-VIEW-130, 133).
       shown: item ? [...shownOf(item)] : [],
       tiles: [...shownTiles],

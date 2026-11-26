@@ -71,8 +71,8 @@ export const skinsFeature: Feature = {
         },
       );
     });
-    events.on('texture-remove', ({ game, dataset, asset, variant, done }) => {
-      actions.removeVariant(game, dataset, asset, variant).then(
+    events.on('texture-remove', ({ game, dataset, asset, variant, owner, done }) => {
+      actions.removeVariant(game, dataset, asset, variant, owner).then(
         (removed) => {
           if (removed) status.setStatus(`variant ${variant} deleted`);
           done(removed);

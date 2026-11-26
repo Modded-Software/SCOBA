@@ -12,6 +12,10 @@ A step may also be a person's edit: `edit` and 12 hex digits of a hash of
 the edited planes, as in `pbrify@2048+edit3fa9c1d2aa10@2048`
 (SPEC-PHOTOCRAFT 10). An edit keeps the size of its input and has that one
 size. A transfer makes it; no request does.
+
+A step made again carries a revision: `pbrify~2@512` stands beside
+`pbrify@512` (R-HD-158). The first make has none. Its model, sizes and
+refusals are those of the step without it.
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ import re
 from typing import NamedTuple
 
 from .interfaces import Plane
-from .store import kept_sizes
+from .store import offered_sizes
 
 ORIGINAL = "original"
 JOIN = "+"
@@ -35,7 +39,9 @@ MAX_SIDES = (1024, 2048, 4096)
 SCALE = 4
 MAX_INPUT = 2048  # per side, of what the upscaler takes
 MAX_OUTPUT = 4096  # per side, of what a step keeps
-STEP = re.compile(r"([a-z0-9]+)(?:@([0-9]+))?")
+REVISION = "~"  # parts a step's model from its revision: pbrify~2 (R-HD-158)
+# A step: its model, its revision from 2 (the first make has none), its size.
+STEP = re.compile(r"([a-z0-9]+)(?:~([1-9][0-9]*))?(?:@([0-9]+))?")
 EDIT = "edit"  # the model of a plane a person changed
 EDIT_DIGITS = 12
 EDIT_STEP = re.compile(rf"{EDIT}[0-9a-f]{{{EDIT_DIGITS}}}")
@@ -90,6 +96,7 @@ def is_edit(name: str) -> bool:
 class Step(NamedTuple):
     model: Model
     size: int | None  # the size the next step takes; None for the last step of a recipe
+    revision: int = 1  # which make of the step it is; the first has no mark in the id
 
     @property
     def edit(self) -> bool:
@@ -125,17 +132,41 @@ def parse_recipe(recipe: object) -> tuple[Step, ...]:
     for number, part in enumerate(parts, 1):
         match = STEP.fullmatch(part)
         last = number == len(parts)
-        if match is None or (match.group(2) is None) != last:
+        if match is None or (match.group(3) is None) != last:
             raise VariantError(
                 f"step {number} of {recipe!r} is {part!r}; a step is model@size, the last one model alone"
             )
         found.append(
             Step(
                 _model(match.group(1), recipe),
-                None if last else _size(match.group(2), recipe),
+                None if last else _size(match.group(3), recipe),
+                _revision(match.group(2), recipe),
             )
         )
     return tuple(found)
+
+
+def _revision(value: str | None, text: str) -> int:
+    """The revision a step names; without one, the first. `~1` names nothing: one variant has one id."""
+    if value is None:
+        return 1
+    if int(value) < 2:
+        raise VariantError(f"a revision in {text!r} is a number from 2; the first make has none")
+    return int(value)
+
+
+def revision_of(recipe: str) -> tuple[str, int]:
+    """A recipe without the revision of its last step, and that revision."""
+    last = parse_recipe(recipe)[-1]
+    return (recipe.rpartition(REVISION)[0] if last.revision > 1 else recipe), last.revision
+
+
+def revised(recipe: str, revision: int) -> str:
+    """The recipe with its last step at `revision`."""
+    if revision < 1:
+        raise VariantError(f"a revision is a number from 1; got {revision}")
+    plain, _now = revision_of(recipe)
+    return plain if revision == 1 else f"{plain}{REVISION}{revision}"
 
 
 def split(variant: object) -> tuple[str, int]:
@@ -256,7 +287,7 @@ def factor_side(recipe: str, factor: int, longest: int, cap: int) -> tuple[int, 
 
 def sizes_of(step: Step, own: int) -> tuple[int, ...]:
     """The sizes a step with that own side is kept at: an edit at its one size."""
-    return (own,) if step.edit else kept_sizes(own)
+    return (own,) if step.edit else offered_sizes(own)
 
 
 def model_refusal(recipe: str, colour: bool) -> str:
@@ -316,7 +347,8 @@ def title(variant: str) -> str:
     recipe, size = split(variant)
     return (
         ", then ".join(
-            _model(step.split(AT)[0], variant).title for step in recipe.split(JOIN)
+            step.model.title + (f" #{step.revision}" if step.revision > 1 else "")
+            for step in parse_recipe(recipe)
         )
         + f" at {size}"
     )

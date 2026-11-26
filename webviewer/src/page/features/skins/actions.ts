@@ -5,7 +5,7 @@
 // (R-VIEW-128); a delete is red (R-VIEW-136). A change goes through
 // core/skins.ts, so each instance follows without a reload.
 
-import { firstSaveInto, hasSkin, namedInto, ORIGINAL_SKIN, skinLabel, skinNameRefusal, textureRoutes, type OwnerState, type SaveInto, type SkinBody, type TextureRemoveAsk } from '../../../shared/textures';
+import { firstSaveInto, hasSkin, namedInto, ORIGINAL_SKIN, removalWarning, skinLabel, skinNameRefusal, textureRoutes, type OwnerState, type SaveInto, type SkinBody, type TextureRemoveAsk } from '../../../shared/textures';
 import type { FeatureContext } from '../../core/context';
 import { make } from '../../core/dom';
 import type { Item } from '../../core/types';
@@ -46,16 +46,19 @@ export interface SkinActions {
   remove(item: Item, skin: string): Promise<boolean>;
   /** Ask the target and show each change, then set the picks in it; the instance shows it (R-VIEW-133). Null: cancelled. */
   saveTo(ask: SaveAsk): Promise<string | null>;
-  /** Ask, then remove one variant of a texture (R-VIEW-147). False: cancelled. A refusal throws with the pipeline's reason. */
-  removeVariant(game: string, dataset: string, asset: string, variant: string): Promise<boolean>;
+  /**
+   * Ask, then remove one variant of a texture (R-VIEW-147). The question lists the owners other than `owner` that
+   * name it (R-VIEW-162). False: cancelled. A refusal throws with the pipeline's reason.
+   */
+  removeVariant(game: string, dataset: string, asset: string, variant: string, owner: string | null): Promise<boolean>;
   /** For the tests: the open dialog; null: none is open. */
   state(): { id: string; title: string; text: string; buttons: string[]; danger: boolean; into: SaveInto | null; next: string; skins: string[]; existingDisabled: boolean; lines: string[]; name: string; yesDisabled: boolean } | null;
 }
 
-/** One red dialog that asks a yes or no question. */
-function asking(id: string, title: string, yes: string) {
+/** One red dialog that asks a yes or no question; `more` stands under the question. */
+function asking(id: string, title: string, yes: string, more: readonly Node[] = []) {
   const text = make('p', { className: 'skin-question' });
-  const dialog = new ConfirmDialog({ id, title, yesText: yes, content: [text], danger: true });
+  const dialog = new ConfirmDialog({ id, title, yesText: yes, content: [text, ...more], danger: true });
   async function ask(question: string): Promise<boolean> {
     text.textContent = question;
     const answer = dialog.ask();
@@ -70,7 +73,10 @@ const fileOf = (asset: string): string => asset.split('\\').pop() ?? asset;
 
 export function createSkinActions({ skins, scene, events }: Pick<FeatureContext, 'skins' | 'scene' | 'events'>): SkinActions {
   const deleting = asking('skin-delete-dialog', 'Delete Skin', 'Delete Skin');
-  const removing = asking('variant-delete-dialog', 'Delete Variant', 'Delete Variant');
+  // Delete Variant: who else names the variant, under the question (R-VIEW-162). It disables nothing.
+  const namedHead = make('p', { className: 'variant-named-head' });
+  const named = make('ul', { className: 'variant-named' });
+  const removing = asking('variant-delete-dialog', 'Delete Variant', 'Delete Variant', [namedHead, named]);
 
   // Rename Skin (R-VIEW-156): a name box, checked as it is typed.
   const nameBox = make('input', { id: 'skin-rename-name', type: 'text', autocomplete: 'off', spellcheck: false, maxLength: 40 });
@@ -174,7 +180,11 @@ export function createSkinActions({ skins, scene, events }: Pick<FeatureContext,
     return true;
   }
 
-  async function removeVariant(game: string, dataset: string, asset: string, variant: string): Promise<boolean> {
+  async function removeVariant(game: string, dataset: string, asset: string, variant: string, owner: string | null): Promise<boolean> {
+    // Read now: another owner may name the variant since a page read it.
+    const warning = removalWarning(await skins.readState(game, dataset, asset), variant, owner);
+    namedHead.textContent = warning.head;
+    named.replaceChildren(...warning.lines.map((line) => make('li', { textContent: line })));
     if (!(await removing.ask(`Delete variant ${variant} of ${fileOf(asset)} in the texture store? Its file is removed for every dataset that shares this texture. A skin that names it uses the original for this texture from then on. The original and the bakes do not change.`))) return false;
     const response = await fetch(textureRoutes.remove(game, dataset), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ asset, variant } satisfies TextureRemoveAsk) });
     const answer: unknown = await response.json();
@@ -238,6 +248,15 @@ export function createSkinActions({ skins, scene, events }: Pick<FeatureContext,
     return into;
   }
 
+  const textOf = (node: Element): string => node.textContent ?? '';
+  /** The lines under the open dialog's question: the changes, why a name is refused, or who else names the variant. */
+  function linesOf(open: ConfirmDialog): string[] {
+    if (open === draft) return [...changes.children].map(textOf);
+    if (open === renaming) return [textOf(renameWhy)];
+    if (open === removing.dialog) return [textOf(namedHead), ...[...named.children].map(textOf)];
+    return [];
+  }
+
   function state(): ReturnType<SkinActions['state']> {
     const open = [...all.map((one) => one.dialog), draft].find((one) => one.dialog.isOpen);
     if (!open) return null;
@@ -254,7 +273,7 @@ export function createSkinActions({ skins, scene, events }: Pick<FeatureContext,
       next: isDraft ? (newLabel.textContent ?? '') : '',
       skins: isDraft ? [...existing.options].map((option) => option.value) : [],
       existingDisabled: isDraft ? intoExisting.disabled : false,
-      lines: isDraft ? [...changes.children].map((line) => line.textContent ?? '') : isRename ? [renameWhy.textContent ?? ''] : [],
+      lines: linesOf(open),
       name: isRename ? nameBox.value : '',
       yesDisabled: open.yes.disabled,
     };

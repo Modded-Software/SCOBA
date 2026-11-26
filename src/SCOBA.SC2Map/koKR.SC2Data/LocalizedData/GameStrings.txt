@@ -1,7 +1,8 @@
-DocInfo/Author=블리자드 엔터테인먼트
-DocInfo/DescLong=
-DocInfo/DescShort=테란 핸슨 02
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
+DocInfo/Author=SCOBA
+DocInfo/DescLong=최대 세 명의 플레이어가 테란 영웅이 되어 공격로의 아군 병력과 함께 싸웁니다. 여섯 공격로에서 테란과 저그가 맞섭니다. 경험치를 얻고 능력치 포인트를 분배하고 능력을 배우십시오.
+DocInfo/DescShort=최대 3인 협동 영웅 아레나. 공격로 여섯 개, 조작 모드 두 가지.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=두 모드 공통<n/>W, A, S, D - 이동<n/>Shift (누르고 있기) - 천천히 걷기<n/>Space - 시작 시 투하, 이후 점프<n/>Z (누르고 있기) - 확대<n/>마우스 휠 - 카메라 거리<n/>Ctrl+E - 명령 모드. Ctrl+C - 명령 모드 종료<n/><n/>WASD / POINT & CLICK<n/>왼쪽 클릭 - 대상 선택<n/>오른쪽 클릭 - 공격. Chase가 Move이면 이동도 함<n/>마우스 버튼을 누른 채 끌기 - 카메라 회전<n/>Ctrl+C - 공격 취소<n/>Attack 버튼 - Single 또는 Auto. Chase 버튼 - Stand 또는 Move<n/><n/>ACTIONS (TPS)<n/>마우스 - 카메라 회전<n/>오른쪽 버튼 누르고 있기 - 조준. 조준 중 왼쪽 클릭 - 사격<n/>가운데 클릭 - 커서 표시 또는 숨기기<n/><n/>영웅<n/>레벨마다 능력치 포인트 3. 레벨 3, 6, 9, 12, 15에 새 능력. 레벨 20에 3포인트를 투자한 기술 트리에서 궁극기 하나.
 MapInfo/Player00/Name=중립
 MapInfo/Player01/Name=레이너 특공대
 MapInfo/Player02/Name=아그리아 피난민

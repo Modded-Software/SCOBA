@@ -19,6 +19,7 @@ from testkit.tests.textures.fixtures import colour_rgba, normal_rgba, texture_fi
 SAND = "textures\\sand.dds"
 ORIGIN = f"storage\\{ROCK}"
 UP = "pbrify@256"  # of a 64 texture: its own size
+HALF = "pbrify@128"  # of a 64 texture: the 2x of its 4x model
 TWO = "pbrify@64+seedvr2@256"  # of a 16 texture
 
 
@@ -140,14 +141,17 @@ class ReuseTest(RequestCase):
         self.assertEqual(sorted(self.models()), ["fast", "pbrify", "pbrify"])
 
     def test_another_version_of_the_upscaler_shares_no_plane(self) -> None:
+        # Three textures with the same pixels: equal planes, one variant each.
         self.add()
         self.make()
-        self.add(seed=2)
-        self.make()
-        self.add(seed=1)
+        self.add(SAND)
         self.runner.tool = "v2"
-        self.assertEqual(self.make()["runner"], "v2")
-        self.assertEqual(len(self.runner.asked), 6)
+        self.assertEqual(self.make(SAND)["runner"], "v2")
+        self.assertEqual(len(self.runner.asked), 4)
+        # Negative: the same version shares them.
+        self.add("textures\\moss.dds")
+        self.make("textures\\moss.dds")
+        self.assertEqual(len(self.runner.asked), 4)
 
 
 class TilingTest(RequestCase):

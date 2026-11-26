@@ -1,7 +1,8 @@
-DocInfo/Author=Blizzard Entertainment
-DocInfo/DescLong=
-DocInfo/DescShort=THanson02
-DocInfo/Name=Outbreak [FPS/TPS/RPG/RTS]
+DocInfo/Author=SCOBA
+DocInfo/DescLong=Hasta tres jugadores luchan como héroes terran junto a los ejércitos de su carril, terran contra zerg, en seis carriles. Gana XP, reparte puntos de atributo y aprende habilidades.
+DocInfo/DescShort=Arena cooperativa de héroes para hasta 3 jugadores. Seis carriles, dos modos de control.
+DocInfo/Name=SCOBA: StarCraft Online Battle Arena
+LoadingScreen/Tip=AMBOS MODOS<n/>W, A, S, D - moverse<n/>Shift (mantener) - caminar despacio<n/>Space - desplegarse al inicio, luego saltar<n/>Z (mantener) - zoom<n/>Rueda del mouse - distancia de la cámara<n/>Ctrl+E - modo de órdenes. Ctrl+C - salir de él<n/><n/>WASD / POINT & CLICK<n/>Clic izquierdo - elegir un objetivo<n/>Clic derecho - atacar. Con Chase en Move, también moverse<n/>Mantener un botón del mouse y arrastrar - girar la cámara<n/>Ctrl+C - cancelar el ataque<n/>Botón Attack - Single o Auto. Botón Chase - Stand o Move<n/><n/>ACTIONS (TPS)<n/>Mouse - girar la cámara<n/>Mantener el botón derecho - apuntar. Clic izquierdo al apuntar - disparar<n/>Clic central - mostrar u ocultar el cursor<n/><n/>HÉROE<n/>3 puntos de atributo por nivel. Una habilidad nueva en los niveles 3, 6, 9, 12 y 15. En el nivel 20, una habilidad definitiva de un árbol con 3 puntos.
 MapInfo/Player00/Name=Neutral
 MapInfo/Player01/Name=Los Rebeldes de Raynor
 MapInfo/Player02/Name=Refugiados de Agria

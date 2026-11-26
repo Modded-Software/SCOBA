@@ -28,6 +28,10 @@ UPSCALING = "upscaling"
 ENCODING = "encoding"
 
 
+class RequestError(RuntimeError):
+    """Why a request failed."""
+
+
 def started(pid: int) -> int | None:
     """When the process began, in clock ticks since the host started. None: there is no such process.
 

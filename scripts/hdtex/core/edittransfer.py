@@ -100,7 +100,7 @@ def _encode(
             # A variant whose entry names a changed plane is user-made (R-PC-80).
             "edit": {"input": record["variant"], "changed": changed, "hash": digest, "session": record["session"]},
         },
-        {own: encoded.files[own]},
+        {own: encoded.file(own)},
     )
 
 
@@ -126,11 +126,14 @@ def transfer(dataset: Dataset, session: str) -> dict:
     if not changed:
         raise EditError(f"the edit of {texture.asset} changes no plane: there is nothing to transfer")
     digest = planes_digest(record, said)
-    variant = variants.edited(record["variant"], digest, max(record["width"], record["height"]))
-    recipe, _size = variants.split(variant)
     original = dataset.original(texture)
+    # An edit kept for another original stays as it is; this one gets a revision beside it (R-HD-158).
+    variant = results.served(
+        dataset.made(texture), variants.edited(record["variant"], digest, max(record["width"], record["height"]))
+    )
+    recipe, _size = variants.split(variant)
     kept = game.entry(texture.origin, recipe)
-    if kept is None or kept["original"]["sha256"] != hashlib.sha256(original).hexdigest():
+    if kept is None:
         kept = _noted(dataset, texture, record, said, recipe, original, changed, digest)
     if not record["transfers"] or record["transfers"][-1] != {"variant": variant, "planes": said["planes"]}:
         record["transfers"].append({"variant": variant, "planes": said["planes"]})

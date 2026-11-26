@@ -35,6 +35,7 @@ import { dragFeature } from './features/drag';
 import { skyFeature } from './features/sky';
 import { pickFeature } from './features/pick';
 import { selectFeature } from './features/select';
+import { playbackFeature } from './features/playback';
 import { clipboardFeature } from './features/clipboard';
 import { inspectFeature } from './features/inspect';
 import { scenesFeature } from './features/scenes';
@@ -56,7 +57,7 @@ const GAMES = [
   { game: ghostGame, install: installGhostPage },
 ];
 /** In install order: a feature listens before the ones after it. */
-const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, clipboardFeature, inspectFeature, scenesFeature, edgesFeature, skinsFeature, editsFeature];
+const FEATURES: readonly Feature[] = [datasetReloadFeature, controlsFeature, landmarksFeature, addAllFeature, dragFeature, skyFeature, pickFeature, selectFeature, playbackFeature, clipboardFeature, inspectFeature, scenesFeature, edgesFeature, skinsFeature, editsFeature];
 
 declare global {
   interface Window {

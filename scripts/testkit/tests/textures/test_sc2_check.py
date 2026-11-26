@@ -154,6 +154,33 @@ class CheckTest(PackCase):
         self.fails("does not say what stood there")
 
 
+class MarkTest(unittest.TestCase):
+    """The three names a packaged texture may have, and no other (SPEC-HD-TEXTURES 5.2)."""
+
+    def test_the_three_forms_are_marked(self) -> None:
+        for name in (
+            "grass_scoba_hd.dds",
+            "rock_spec_scoba_hd_m.dds",
+            "battlecruiser_diffuse_scoba_hd_edb63b_m.dds",  # the name the build of 2026-11-26 refused
+            "Rock_Spec_SCOBA_HD_EDB63B_M.DDS",
+        ):
+            self.assertTrue(is_marked(name), name)
+
+    def test_any_other_name_is_not_marked(self) -> None:
+        for name in (
+            "rock_spec.dds",  # the original's name
+            "scoba_hd_rock_spec.dds",  # the mark in front
+            "rock_spec_scoba_hd_edb63b.dds",  # a tag without the model form
+            "rock_spec_scoba_hd_edb63_m.dds",  # 5 digits
+            "rock_spec_scoba_hd_edb63b0_m.dds",  # 7 digits
+            "rock_spec_scoba_hd_edb63g_m.dds",  # not hex
+            "rock_spec_scoba_hd__m.dds",  # no tag
+            "rock_spec_scoba_hd_edb63b_m_old.dds",  # the mark not at the end
+            "_scoba_hd_edb63b_m",  # no extension
+        ):
+            self.assertFalse(is_marked(name), name)
+
+
 class MapSourceTest(unittest.TestCase):
     def test_the_map_source_holds_nothing_packaged(self) -> None:
         self.assertFalse((SOURCE_MAP / HD_FOLDER).exists())

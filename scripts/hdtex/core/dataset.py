@@ -8,18 +8,18 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import sqlite3
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from functools import cached_property
 from pathlib import Path
 
-from . import bakes, dds, index, progress, results, skinplan, skins, variants, view
+from . import bakes, dds, index, progress, results, skinplan, skins, variants
 from .bakes import Bake, Bakes
 from .index import Index, Kept, Row
 from .interfaces import GameError, Owner, Runner, Texture
 from .registry import GAMES, RUNNERS
 from .results import Made, Original
 from .runner import ID as DEFAULT_RUNNER
+from .statewriter import StateWriter
 from .store import Store
 
 LOG = logging.getLogger(__name__)
@@ -30,21 +30,6 @@ class DatasetError(LookupError):
 
     def __str__(self) -> str:
         return str(self.args[0])
-
-
-class _Frames:
-    """What holds for all textures of a dataset, read once per change: its bakes and its package record."""
-
-    def __init__(self, dataset: Dataset, con: sqlite3.Connection) -> None:
-        self.dataset, self.con = dataset, con
-        self.found: dict[str, tuple[Bakes, dict | None]] = {}
-
-    def of(self, name: str) -> tuple[Bakes, dict | None]:
-        if name not in self.found:
-            game = self.dataset.game
-            self.found[name] = (bakes.load(game.dataset_dir(name)), game.package_record(name))
-            index.put_head(self.con, self.dataset.adapter.id, name, view.head(self.dataset.adapter.bakes))
-        return self.found[name]
 
 
 class Dataset:
@@ -165,7 +150,7 @@ class Dataset:
     def original(self, texture: Texture) -> bytes:
         return self.adapter.original(self.name, texture).read_bytes()
 
-    def _read(self, texture: Texture) -> Kept:
+    def read_original(self, texture: Texture) -> Kept:
         """Read the original now: its hash and its longest side, with the size and time of its file."""
         path = self.adapter.original(self.name, texture)
         stat = path.stat()
@@ -224,9 +209,12 @@ class Dataset:
     ) -> dict[str, skins.Skin]:
         """Apply one change to an owner's skins and keep it. A refused change leaves the file as it was."""
         self.owner(owner)
-        found = change(self.skins_of(owner))
+        before = self.skins_of(owner)
+        found = change(before)
         skins.save(self.folder, owner, found)
         self.owner_changed(owner)
+        # Who names a texture is in the texture's state (R-HD-156): the rows of what the skins named or name now.
+        self.names_changed({asset for held in (before, found) for skin in held.values() for asset in skin.textures})
         return found
 
     def set_texture(self, owner: str, name: str, asset: str, variant: str | None) -> dict[str, skins.Skin]:  # fmt: skip
@@ -262,13 +250,41 @@ class Dataset:
             **dict.fromkeys(self.owner(owner).textures, variants.ORIGINAL),
             **given_by_source,
         }
-        named, kept = skinplan.plan(found, self.texture, lambda one: self._read(one).original, model, factor, variants.max_side())
+        named, kept = skinplan.plan(
+            found,
+            self.texture,
+            lambda one: self.read_original(one).original,
+            model,
+            factor,
+            variants.max_side(),
+            lambda one, read: results.of(self.game, one, read.sha256),
+        )
         skinplan.refuse_empty(owner, factor, named, kept)
         self.change_skin(
             owner,
             lambda now: skins.made(now, name, {**given_by_source, **named}),
         )
         return {"skin": name, "requests": named, "kept": kept}
+
+    def revert_refused(self, owner: str, name: str, asset: str, *ids: str) -> dict | None:
+        """Put a texture's input back in the skin a request was for, when what it made is a variant a bake would
+        refuse (R-HD-162). `ids`: the id the request was asked as and the id that serves it.
+
+        Returns what changed, or None: the variant is sound, the skin is gone, or it names something else by now.
+        The variant stays kept; a bake is not changed.
+        """
+        found = self.skins_of(owner)
+        if name not in found:
+            return None
+        now = found[name].textures.get(asset)
+        if now is None or now not in ids:
+            return None
+        why = results.made_refusal(self.made(self.texture(asset)), now)
+        if not why:
+            return None
+        given = variants.input_of(now)
+        self.set_texture(owner, name, asset, None if given == variants.ORIGINAL else given)
+        return {"owner": owner, "skin": name, "asset": asset, "from": now, "to": given, "reason": why}
 
     # -------------------------------------------------------------- bakes
 
@@ -301,15 +317,29 @@ class Dataset:
                 f"{owner}, skin {name} cannot be baked:\n" + "\n".join(problems)
             )
         bake = Bake(name, textures)
-        bakes.save(self.folder, bakes.with_owner(self.baked, owner, bake))
+        # The file each variant has now: the package compares it with the file of then (R-HD-160).
+        pins = {asset: self._pin(asset, variant) for asset, variant in textures.items() if variant != variants.ORIGINAL}
+        before = self.baked
+        bakes.save(self.folder, bakes.with_owner(before, owner, bake, pins))
         self.owner_changed(owner, below=True)
+        old = before.owners.get(owner)
+        self.names_changed({*textures, *(old.textures if old is not None else ())})
         return bake
+
+    def _pin(self, asset: str, variant: str) -> str:
+        """The hash of a made variant's file, as its entry holds it."""
+        recipe, size = variants.split(variant)
+        return self.made(self.texture(asset))[recipe].entry["files"][str(size)]["sha256"]
 
     def unbake(self, owner: str) -> None:
         bakes.refuse(self.adapter)
-        bakes.save(self.folder, bakes.with_owner(self.baked, skins.check_owner(owner), None))
+        before = self.baked
+        bakes.save(self.folder, bakes.with_owner(before, skins.check_owner(owner), None))
         if owner in self.known_owners():
             self.owner_changed(owner, below=True)
+        old = before.owners.get(owner)
+        if old is not None:
+            self.names_changed(old.textures)
 
     def bake_texture(self, asset: str, variant: str | None) -> None:
         """Bake one texture on its own, or unbake it with None (R-HD-145)."""
@@ -317,77 +347,11 @@ class Dataset:
         texture = self.texture(asset)
         if variant is not None and (reason := self._refusal(asset, variant)):
             raise bakes.BakeError(f"{asset}: {reason}")
-        bakes.save(self.folder, bakes.with_texture(self.baked, asset, variant))
+        pin = None if variant in (None, variants.ORIGINAL) else self._pin(asset, variant)
+        bakes.save(self.folder, bakes.with_texture(self.baked, asset, variant, pin))
         self.changed(texture, everywhere=False)
 
     # ----------------------------------------------------------- state index
-
-    def _known(
-        self, con: sqlite3.Connection, texture: Texture, asked: bool, look: bool = True
-    ) -> tuple[Original | None, bool]:
-        """What is known of a texture's original, and whether its file changed since that was read.
-
-        The file is read when the texture has a variant, or when it was
-        `asked` for by name and has a file. Otherwise a file that changed
-        is forgotten, not read. Without `look`, what is kept is taken as it
-        is: the change at hand is none of the original.
-        """
-        must = bool(self.game.recipes(texture.origin)) or (
-            asked and bool(texture.origin)
-        )
-        before = index.kept(con, self.adapter.id, texture.origin)
-        if before is None and not must:
-            return None, False
-        if before is not None and not look:
-            return before.original, False
-        path = self.adapter.original(self.name, texture)
-        stat = path.stat()
-        if before is not None and (before.bytes, before.changed) == (
-            stat.st_size,
-            stat.st_mtime_ns,
-        ):
-            return before.original, False
-        if not must:
-            index.forget(con, self.adapter.id, texture.origin)
-            return None, True
-        read = self._read(texture)
-        index.keep(con, self.adapter.id, texture.origin, read)
-        return read.original, before is not None
-
-    def _put(
-        self,
-        con: sqlite3.Connection,
-        frames: _Frames,
-        before: Row | None,
-        row: Row,
-        original: Original | None,
-    ) -> bool:
-        """Work out a row's state and write the row. False: it is as it was."""
-        baked, record = frames.of(row.dataset)
-        after = row._replace(
-            state=view.texture_state(
-                self.game, row.texture, original, baked, record, self.runner
-            )
-        )
-        if after == before:
-            return False
-        index.put(con, self.adapter.id, after)
-        return True
-
-    def _put_owner(
-        self,
-        con: sqlite3.Connection,
-        frames: _Frames,
-        owner: Owner,
-        before: tuple[Owner, dict] | None = None,
-    ) -> bool:
-        """Work out an owner's state and write its row. False: it is as `before`, and nothing was written."""
-        baked, record = frames.of(self.name)
-        state = view.owner_state(owner, self.skins_of(owner.id), baked, record)
-        if before == (owner, state):
-            return False
-        index.put_owner(con, self.adapter.id, self.name, owner, state)
-        return True
 
     def changed(self, texture: Texture, everywhere: bool = True) -> None:
         """A variant, a request, the bake or the role of this texture changed: write its state again.
@@ -398,7 +362,7 @@ class Dataset:
         """
         game = self.adapter.id
         with self.index.writing() as con:
-            frames = _Frames(self, con)
+            writer = StateWriter(self, con)
             mine = index.rows(con, game, self.name, [texture.asset]).get(texture.asset)
             listed = (
                 mine.listed
@@ -407,25 +371,38 @@ class Dataset:
             )
             if mine is not None and not texture.judged:
                 texture = mine.texture  # the role that was found for it before
-            original, _moved = self._known(
-                con, texture, asked=everywhere and texture.judged
-            )
-            self._put(con, frames, mine, Row(self.name, listed, texture, {}), original)
+            original, _moved = writer.known(texture, asked=everywhere and texture.judged)
+            writer.put(mine, Row(self.name, listed, texture, {}), original)
             if not everywhere:
                 return
             for row in index.rows_at(con, game, texture.origin):
                 if (row.dataset, row.texture.asset) != (self.name, texture.asset):
-                    self._put(con, frames, row, row, original)
+                    writer.put(row, row, original)
 
     def owner_changed(self, owner: str, below: bool = False) -> None:
         """A skin or a bake of an owner changed: write its row again. `below`: and every owner above it, whose default shows its bake."""
         with self.index.writing() as con:
-            frames = _Frames(self, con)
-            self._put_owner(con, frames, self.owner(owner))
+            writer = StateWriter(self, con)
+            writer.put_owner(self.owner(owner))
             if below:
                 for other in self.known_owners().values():
                     if owner in other.below:
-                        self._put_owner(con, frames, other)
+                        writer.put_owner(other)
+
+    def names_changed(self, assets: Iterable[str]) -> None:
+        """A skin or a bake that names these textures changed: write their rows again, for `namedBy` (R-HD-156).
+
+        Only rows the index holds: `index` writes the others. No original is looked at: the change is none of it.
+        """
+        wanted = sorted(set(assets))
+        if not wanted:
+            return
+        game = self.adapter.id
+        with self.index.writing() as con:
+            writer = StateWriter(self, con)
+            for row in index.rows(con, game, self.name, wanted).values():
+                original, _moved = writer.known(row.texture, asked=False, look=False)
+                writer.put(row, row, original)
 
     def changed_all(self) -> None:
         """The package or a texture bake of this dataset changed: write the state of each of its rows again.
@@ -435,22 +412,20 @@ class Dataset:
         """
         game = self.adapter.id
         with self.index.writing() as con:
-            frames = _Frames(self, con)
-            frames.of(self.name)
+            writer = StateWriter(self, con)
+            writer.of(self.name)
             for asset, row in index.rows(con, game, self.name).items():
                 try:
-                    original, _moved = self._known(
-                        con, row.texture, asked=False, look=False
-                    )
+                    original, _moved = writer.known(row.texture, asked=False, look=False)
                 except (GameError, OSError) as error:
                     raise DatasetError(
                         f"{self.name}: {asset}: its original cannot be read ({error}); "
                         "the index is out of date: run index, then this again"
                     ) from error
-                self._put(con, frames, row, row, original)
+                writer.put(row, row, original)
             # An owner's row holds its description: its state is written again without listing the owners.
             for described, _state in index.owners(con, game, self.name).values():
-                self._put_owner(con, frames, described)
+                writer.put_owner(described)
 
     def sync(self, judge: Sequence[str] = ()) -> dict:
         """Bring this dataset's part of the index up to date with its files. Returns what was done, in numbers.
@@ -469,8 +444,8 @@ class Dataset:
         owners = self.owners
         written = 0
         with self.index.writing() as con:
-            frames = _Frames(self, con)
-            frames.of(self.name)
+            writer = StateWriter(self, con)
+            writer.of(self.name)
             before = index.rows(con, game, self.name)
             for asset, fresh in listed.items():
                 row = before.get(asset)
@@ -478,16 +453,14 @@ class Dataset:
                 texture = asked.get(asset) or (
                     row.texture if row is not None and same else fresh
                 )
-                original, moved = self._known(con, texture, asked=asset in asked)
+                original, moved = writer.known(texture, asked=asset in asked)
                 if asset not in asked and (
                     moved or (original is None and texture.judged and not fresh.judged)
                 ):
                     texture = (
                         fresh  # its role was read from a file that is another one now
                     )
-                written += self._put(
-                    con, frames, row, Row(self.name, fresh, texture, {}), original
-                )
+                written += writer.put(row, Row(self.name, fresh, texture, {}), original)
             removed = sorted(set(before) - set(listed))
             index.drop(con, game, self.name, removed)
             moved_origins = index.put_origins(con, game, self.name, origins)
@@ -495,7 +468,7 @@ class Dataset:
             gone_owners = sorted(set(held) - set(owners))
             index.drop_owners(con, game, self.name, gone_owners)
             for owner in owners.values():
-                written += self._put_owner(con, frames, owner, held.get(owner.id))
+                written += writer.put_owner(owner, held.get(owner.id))
         LOG.info(
             "%s: the index holds %d textures and %d owners; %d rows written, %d removed; %d origins%s",
             self.name, len(listed), len(owners), written, len(removed), len(origins), "" if moved_origins else ", as before",

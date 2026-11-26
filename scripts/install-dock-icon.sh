@@ -46,6 +46,8 @@ fail() {
 
 [ -f "$ICON_SOURCE" ] || fail "icon not found: $ICON_SOURCE"
 [ -x "$ROOT_DIR/scripts/playtest.sh" ] || fail "entrypoint not executable: $ROOT_DIR/scripts/playtest.sh"
+DIALOG="$ROOT_DIR/scripts/launch-dialog.sh"
+[ -f "$DIALOG" ] || fail "launch dialog not found: $DIALOG"
 [ "$GAME_GPU" != "$FG_GPU" ] || fail "game GPU and frame-generation GPU are both $GAME_GPU"
 [ -e "$DRM_BY_PATH/pci-$GAME_GPU-render" ] || fail "game GPU render node not found: $DRM_BY_PATH/pci-$GAME_GPU-render"
 [ -e "$DRM_BY_PATH/pci-$FG_GPU-render" ] || fail "frame-generation GPU render node not found: $DRM_BY_PATH/pci-$FG_GPU-render"
@@ -58,6 +60,10 @@ fi
 if ! command -v gsettings; then
     fail "gsettings not found"
 fi
+# Fail here, not on the first click, when the launch dialog cannot load.
+if ! output="$(SC2_PROJECT_ROOT="$ROOT_DIR" bash "$DIALOG" --check 2>&1)"; then
+    fail "launch dialog cannot start: $output"
+fi
 
 mkdir -p "$ICON_DIR" "$APPS_DIR"
 cp -f "$ICON_SOURCE" "$ICON_DIR/$ICON_NAME.png"
@@ -65,12 +71,14 @@ cp -f "$ICON_SOURCE" "$ICON_DIR/$ICON_NAME.png"
 # The launch command. $1 is the playtest.sh action. $2 is extra environment
 # for this desktop entry. The textures of a build are the picks of the
 # dataset `scoba` in the texture store, not a choice of the entry.
+# The launch dialog (REQ-LAUNCH-DIALOG) runs the action with this
+# environment and shows its progress and its log.
 launch_exec() {
     local entry="$1"
     local extra="${2:-}"
     [ -z "$extra" ] || extra="$extra "
-    printf 'env %sUV_BIN="%s" SC2_PROJECT_ROOT="%s" SC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s/scripts/playtest.sh" %s' \
-        "$extra" "$UV_BIN" "$ROOT_DIR" "$ROOT_DIR" "$entry"
+    printf 'env %sUV_BIN="%s" SC2_PROJECT_ROOT="%s" SC2_WINDOW_WIDTH="1920" SC2_WINDOW_HEIGHT="1080" bash "%s" %s' \
+        "$extra" "$UV_BIN" "$ROOT_DIR" "$DIALOG" "$entry"
 }
 
 # Right-click entries of the dock icon: action id, name, playtest.sh action.

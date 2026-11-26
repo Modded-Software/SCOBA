@@ -42,6 +42,8 @@ export interface Item {
   team: number;
   /** The animation played once from the menu, or null. */
   oneShot: number | null;
+  /** Its animation is held at the frame it shows (R-VIEW-159). Not kept with the scene. */
+  paused: boolean;
   /** The skin of its owner it shows (SPEC-VIEWER 17.4): "original" or the name of a skin of its owner. */
   skin: string;
   /** The longest side of any texture it shows, once they are in; 0 before. */
