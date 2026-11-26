@@ -14,14 +14,15 @@
 //   point under the mouse (features/controls);
 // - alt + left hold on a unit: drags the unit over the ground (features/controls);
 // - right click on a unit: the animation menu (menu.ts); Ctrl+L switches its "loop" choice;
-// - double-click on a unit: what its game opens for it (openItem).
+// - double press on a unit: what its game opens for it (openItem).
 // A press is a click until core/press.ts says it is a drag (2 px and 150 ms, or 12 px at once, R-VIEW-142).
 // The buttons, modifiers and keys above are the input map's defaults
-// (core/input.ts, R-VIEW-154); the double click is the browser's.
+// (core/input.ts, R-VIEW-154); the double press takes the browser's count
+// of presses (MouseEvent.detail), on the button and modifiers of `open`.
 
 import type { Feature } from '../../core/context';
 import { radius } from '../../core/geometry';
-import { bindingText, clickAction, keyMatches, pressAction, resolveInput, type ClickAction, type InputMap } from '../../core/input';
+import { bindingText, clickAction, keyMatches, opens, pressAction, resolveInput, type ClickAction, type InputMap } from '../../core/input';
 import { dragsAt, pressAt, type Press } from '../../core/press';
 import { settings } from '../../core/settings';
 import type { Ring } from '../../core/render/ground';
@@ -110,8 +111,10 @@ export const pickFeature: Feature = {
       } else if (p.click === 'select') selection.select(item ? item.id : null);
       else if (item) menu.open(item, e.clientX, e.clientY);
     });
-    // A double-click on an instance opens what its game shows for it (SC2: the texture window).
-    canvas.addEventListener('dblclick', (e) => {
+    // A double press on an instance opens what its game shows for it (SC2: the texture window).
+    // The release of the second press, on the binding of `open` (core/input.ts).
+    canvas.addEventListener('mouseup', (e) => {
+      if (!opens(inputMap(), e)) return;
       const item = selection.itemAt(e.clientX, e.clientY);
       if (item) games.partsOf(item.game).openItem(item).catch(status.reportFailure);
     });

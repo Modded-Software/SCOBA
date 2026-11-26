@@ -226,14 +226,16 @@ export function pipelineTextures(settings: PipelineSettings): TextureService {
   function sync(dataset: string): Promise<void> {
     const before = syncing.get(dataset) ?? Promise.resolve();
     // The run before was answered to its own caller, failed or not; this one starts either way.
-    // A head of this pipeline with another largest side needs its states written again, not its files listed;
-    // should that fail, the whole index is built again.
-    const full = (): Promise<void> => command('index', dataset, []).then(() => undefined);
-    const again = (error: unknown): Promise<void> => {
-      console.error(`viewer: the texture states of ${dataset} were not written again (${messageOf(error)}); it is indexed whole`);
-      return full();
+    // A head of this pipeline with another largest side needs its states written again, not its files listed.
+    // One command either way; its failure goes to the caller.
+    // The run must leave a head this server serves; one it would answer 503 is a failure here, with the head's words.
+    const run = async (): Promise<void> => {
+      await command('index', dataset, otherSide(dataset) ? ['--states'] : []);
+      const head = index.head(dataset);
+      if (head === null || !current(head) || !sameCode(head)) {
+        throw new Error(`the index ran, but its head of ${dataset} is not this server's (bake ${JSON.stringify(head?.bake)}, maxSide ${JSON.stringify(head?.maxSide)} of ${maxSide}, code ${head?.code === code ? 'this' : JSON.stringify(head?.code)})`);
+      }
     };
-    const run = (): Promise<void> => (otherSide(dataset) ? command('index', dataset, ['--states']).then(() => undefined, again) : full());
     const mine = before.then(run, run);
     syncing.set(dataset, mine);
     // Leave the queue when done; the outcome goes to the caller through `mine`.

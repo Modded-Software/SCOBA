@@ -10,7 +10,7 @@ from unittest import mock
 from hdtex.core import encode, progress, requests, results, variants
 from hdtex.core.interfaces import FAILED
 from hdtex.core.requests import RequestError
-from hdtex.core.store import file_sha256, write_json
+from hdtex.core.store import StoreError, file_sha256, write_json
 from hdtex.core.variants import VariantError
 
 from testkit.tests.textures.doubles import ROCK, Case
@@ -188,15 +188,16 @@ class TilingTest(RequestCase):
         tiled = results.of(self.store.game(self.folder_game.id), texture._replace(tiles=True), made["original"]["sha256"])
         self.assertFalse(tiled["pbrify"].edges_off)
 
-    def test_an_entry_from_before_the_rule_counts_as_matched(self) -> None:
+    def test_an_entry_without_the_edge_rule_is_refused_and_an_edit_is_never_off(self) -> None:
         self.folder_game.add("one", ROCK, texture_file("diffuse", colour_rgba()), tiles=False)
         self.make()
         entry = self.entry()
+        self.assertIs(results.made_tiling(entry), False)
         del entry[results.TILES]
-        self.assertTrue(results.made_tiling(entry))
-        self.assertTrue(results.edges_off(entry, False))
-        # Negative: a person's edit is never off: it is not upscaled.
-        self.assertFalse(results.edges_off({**entry, results.EDIT: {"changed": ["color"]}}, False))
+        with self.assertRaisesRegex(StoreError, "has no 'tiles'"):
+            results.made_tiling(entry)
+        # Negative: a person's edit is never off: it is not upscaled, and its key is not read.
+        self.assertFalse(results.edges_off({**entry, results.EDIT: {"changed": ["color"]}}, True))
 
 
 class RefusalTest(RequestCase):

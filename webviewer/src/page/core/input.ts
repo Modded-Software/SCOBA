@@ -15,8 +15,12 @@
 // meets a Ctrl, for macOS), by KeyboardEvent.code with exactly its Shift,
 // or by the character it types (`key`). A typed letter needs its Shift
 // exactly too; a typed sign does not (on many layouts "/" needs Shift).
-// The double click that opens textures is the browser's dblclick, left
-// button only; it is not in the map.
+// The double press (`open`) is a second press of its button that the
+// browser counts as the second of two (MouseEvent.detail 2): the browser's
+// own double-click time and distance, on any of the three buttons.
+// The wheel has two flags in the rates: `invertZoom` turns its direction,
+// `zoomToPointer` keeps the ground point under the pointer in place
+// (core/zoom.ts). Both are off when nothing is stored.
 
 export type Button = 'left' | 'middle' | 'right';
 export type Mod = 'ctrl' | 'alt' | 'shift' | 'meta';
@@ -39,11 +43,14 @@ export interface KeyBinding {
 export const PRESS_ACTIONS = ['move', 'rect', 'face', 'grab', 'look', 'orbit', 'pan'] as const;
 /** A click without a drag (features/pick). */
 export const CLICK_ACTIONS = ['select', 'addSelect', 'menu'] as const;
+/** A double press on a unit (features/pick). */
+export const DOUBLE_ACTIONS = ['open'] as const;
 export const KEY_ACTIONS = ['remove', 'copy', 'cut', 'paste', 'loop', 'edges', 'original', 'cancel'] as const;
 export type PressAction = (typeof PRESS_ACTIONS)[number];
 export type ClickAction = (typeof CLICK_ACTIONS)[number];
+export type DoubleAction = (typeof DOUBLE_ACTIONS)[number];
 export type KeyAction = (typeof KEY_ACTIONS)[number];
-export type MouseAction = PressAction | ClickAction;
+export type MouseAction = PressAction | ClickAction | DoubleAction;
 
 export const ACTION_LABEL: Record<MouseAction | KeyAction, string> = {
   move: 'Move a unit (on a unit)',
@@ -56,6 +63,7 @@ export const ACTION_LABEL: Record<MouseAction | KeyAction, string> = {
   select: 'Select',
   addSelect: 'Add to or take from the selection',
   menu: 'Animation menu',
+  open: 'Open a unit (double press)',
   remove: 'Remove the selected',
   copy: 'Copy',
   cut: 'Cut',
@@ -78,6 +86,10 @@ export interface Rates {
   invertOrbitX: boolean;
   invertOrbitY: boolean;
   invertPan: boolean;
+  /** The wheel the other way round: up moves away. */
+  invertZoom: boolean;
+  /** The wheel keeps the ground point under the pointer in place (core/zoom.ts). */
+  zoomToPointer: boolean;
   /** Pixels and milliseconds that make a press a drag (core/press.ts, R-VIEW-142). */
   dragSlop: number;
   dragHoldMs: number;
@@ -109,6 +121,7 @@ export const DEFAULT_INPUT: InputMap = {
     select: { button: 'left', mods: [] },
     addSelect: { button: 'left', mods: ['shift'] },
     menu: { button: 'right', mods: [] },
+    open: { button: 'left', mods: [] },
   },
   keys: {
     remove: { code: 'Delete', mods: [] },
@@ -128,6 +141,8 @@ export const DEFAULT_INPUT: InputMap = {
     invertOrbitX: false,
     invertOrbitY: false,
     invertPan: false,
+    invertZoom: false,
+    zoomToPointer: false,
     dragSlop: 2,
     dragHoldMs: 150,
     fastSlop: 12,
@@ -265,6 +280,9 @@ export function pressAction(map: InputMap, e: MouseEvent, at: { onUnit: boolean;
 
 /** The click a press without a drag is, or null; the modifiers at the press decide. */
 export const clickAction = (map: InputMap, pressed: MouseEvent): ClickAction | null => best(map, CLICK_ACTIONS, pressed);
+
+/** Whether a release is the double press of `open`: the second press the browser counts, on its binding. */
+export const opens = (map: InputMap, released: MouseEvent): boolean => released.detail === 2 && mouseMatches(map.mouse.open, released);
 
 /** Whether a key event is `binding`. */
 export function keyMatches(binding: KeyBinding, e: KeyboardEvent): boolean {

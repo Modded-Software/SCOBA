@@ -61,7 +61,7 @@ test('the head names the largest side; every factor gives at most it; a size pas
   const body = await judged(owner.textures);
   // The index the store held was written with 4096: at its start the server wrote its states again (index --states).
   expect([body.factors, body.maxSide]).toEqual([[2, 4], MAX]);
-  expect(server.output(), 'negative: no second run that indexes the whole dataset').not.toContain('were not written again');
+  expect(server.output(), 'negative: the states rewrite at the start did not fail').not.toContain('was not brought up to date');
   const sides = body.textures.flatMap((state) => state.asks.flatMap((ask) => Object.values(ask.models).flatMap((model) => Object.values(model.factors))));
   console.log(`sides ${JSON.stringify([...new Set(sides.map((one) => one.size))].sort((a, b) => a - b))}`);
   expect(sides.length).toBeGreaterThan(0);

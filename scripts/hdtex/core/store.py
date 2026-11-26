@@ -26,7 +26,8 @@ import workpaths
 from PIL import Image
 
 ENV = "TEXTURE_STORE"
-FORMAT = 2  # of the layout, and of an entry
+# Of the layout, and of an entry. 3: every entry names `tiles` (results.TILES); storemigrate.py brings a store of 2 to 3.
+FORMAT = 3
 FORMAT_FILE = "format"
 ENTRY = "entry.json"
 PACKAGE_RECORD = "package.json"
@@ -112,10 +113,11 @@ def read_plane(path: Path) -> np.ndarray:
         raise StoreError(f"{path} is not a whole image: {error}") from error
 
 
-def upscale_recipe(plane: str, model: str, runner: str, tiles: bool = True) -> str:
+def upscale_recipe(plane: str, model: str, runner: str, tiles: bool) -> str:
     """The name of one upscale: what went in, which model, which version of the upscaler, whether its edges match.
 
-    An upscale with matched edges keeps the name it had before `tiles` was asked: every upscale then matched them.
+    The words of an upscale with matched edges are the first four alone; one whose edges come as the model gives
+    them adds a fifth. So the cache of the store's earlier upscales, which all matched edges, keeps its names.
     """
     words = ["upscale", plane, model, runner] + ([] if tiles else ["edges as they come"])
     return hashlib.sha256(json.dumps(words).encode()).hexdigest()
@@ -186,7 +188,7 @@ class GameStore:
             raise StoreError(f"{path} does not hold the pixels its name says")
         return pixels
 
-    def upscale_dir(self, plane: str, model: str, runner: str, tiles: bool = True) -> Path:
+    def upscale_dir(self, plane: str, model: str, runner: str, tiles: bool) -> Path:
         """The folder the upscaler writes one upscale into. Equal recipes share it."""
         return self.upscaled / upscale_recipe(plane, model, runner, tiles)
 
@@ -284,6 +286,7 @@ class Store:
         elif (found := marker.read_text().strip()) != str(FORMAT):
             raise StoreError(
                 f"{self.root} has layout {found!r}; this tooling reads layout {FORMAT}"
+                + ("; bring it up with: make texture-store-migrate" if found == str(FORMAT - 1) else "")
             )
 
     def game(self, game: str) -> GameStore:

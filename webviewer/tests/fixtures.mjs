@@ -116,6 +116,14 @@ export async function startServer({ port, store, datasets, log, env = {} }) {
       { timeout: 170_000, intervals: [250] },
     )
     .toBe(true);
+  // A texture index the start did not bring up to date answers every texture route 503: the start fails here, with why.
+  const stale = output.split('\n').filter((line) => line.includes('was not brought up to date'));
+  if (stale.length) {
+    child.kill();
+    await once(child, 'exit');
+    out.end();
+    throw new Error(`the server on ${port} started with a texture index it does not serve:\n${stale.join('\n')}`);
+  }
   return {
     url,
     output: () => output,

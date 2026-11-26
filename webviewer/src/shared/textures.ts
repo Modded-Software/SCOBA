@@ -73,10 +73,10 @@ export interface TextureVariant {
   own: number;
   /** It must be made again: its original changed since. */
   stale: boolean;
-  /** Why it is stale, in words; empty: it is not. Absent in a state written before it was kept. */
-  staleWhy?: string;
-  /** Its edges were made for the other rule (tiles or not). It is shown; a request makes it again. Absent: false. */
-  edgesOff?: boolean;
+  /** Why it is stale, in words; empty: it is not. */
+  staleWhy: string;
+  /** Its edges were made for the other rule (tiles or not). It is shown; a request makes it again. */
+  edgesOff: boolean;
   numbers: TextureNumber[];
   /** The limits it misses, each with its number and bound. */
   problems: { limit: string; value: number | null; bound: number }[];
@@ -178,15 +178,15 @@ export interface TexturesHead {
   limits: { limit: string; info: string }[];
   /** Why the game bakes nothing (R-VIEW-151); empty: it bakes. */
   bake: string;
-  /** The hash of the code that wrote its states (scripts/hdtex/core/view.py `code`); absent in a head written before it was kept. */
-  code?: string;
+  /** The hash of the code that wrote its states (scripts/hdtex/core/view.py `code`). At its start the server indexes a head of other code again. */
+  code: string;
 }
 
 /** A head before the first answer: nothing offered, nothing refused. */
-export const EMPTY_HEAD: TexturesHead = { factors: [], maxSide: 0, models: [], limits: [], bake: '' };
+export const EMPTY_HEAD: TexturesHead = { factors: [], maxSide: 0, models: [], limits: [], bake: '', code: '' };
 
 /** The head of an answer, without its body. */
-export const headPart = (body: TexturesHead): TexturesHead => ({ factors: body.factors, maxSide: body.maxSide, models: body.models, limits: body.limits, bake: body.bake });
+export const headPart = (body: TexturesHead): TexturesHead => ({ factors: body.factors, maxSide: body.maxSide, models: body.models, limits: body.limits, bake: body.bake, code: body.code });
 
 /** GET /api/<game>/textures. */
 export interface TexturesBody extends TexturesHead {

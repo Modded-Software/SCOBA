@@ -121,21 +121,22 @@ class PlaneTest(StoreCase):
 class UpscaleFolderTest(StoreCase):
     def test_equal_recipes_share_one_folder(self) -> None:
         self.assertEqual(
-            self.game.upscale_dir("in", "fast", "v1"),
-            self.game.upscale_dir("in", "fast", "v1"),
+            self.game.upscale_dir("in", "fast", "v1", True),
+            self.game.upscale_dir("in", "fast", "v1", True),
         )
         self.assertEqual(
-            self.game.upscale_dir("in", "fast", "v1").parent, self.game.upscaled
+            self.game.upscale_dir("in", "fast", "v1", True).parent, self.game.upscaled
         )
 
-    def test_another_input_model_or_version_is_another_folder(self) -> None:
+    def test_another_input_model_version_or_edge_rule_is_another_folder(self) -> None:
         folders = {
-            self.game.upscale_dir("in", "fast", "v1"),
-            self.game.upscale_dir("other", "fast", "v1"),
-            self.game.upscale_dir("in", "pbrify", "v1"),
-            self.game.upscale_dir("in", "fast", "v2"),
+            self.game.upscale_dir("in", "fast", "v1", True),
+            self.game.upscale_dir("other", "fast", "v1", True),
+            self.game.upscale_dir("in", "pbrify", "v1", True),
+            self.game.upscale_dir("in", "fast", "v2", True),
+            self.game.upscale_dir("in", "fast", "v1", False),
         }
-        self.assertEqual(len(folders), 4)
+        self.assertEqual(len(folders), 5)
 
 
 class SizeTest(unittest.TestCase):

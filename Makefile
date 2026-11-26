@@ -180,6 +180,10 @@ measure-water-features: ## Measure the water feature models (ARGS=--print)
 classic-skins: ## Rewrite the classic skin data from the game storage (ARGS=--list)
 	$(PATHS) $(PYMOD) hdtex.sc2.classic_skins $(ARGS)
 
+.PHONY: texture-store-migrate
+texture-store-migrate: ## Bring the texture store from layout 2 to 3: each entry names its edge rule (ARGS=--dry-run)
+	$(PATHS) $(PYMOD) hdtex.core.storemigrate $(ARGS)
+
 # =============================================================================
 # SC2 model web viewer (webviewer/). Machine paths go in webviewer/local.env.
 # =============================================================================

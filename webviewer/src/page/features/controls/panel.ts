@@ -15,6 +15,7 @@ import {
   bindingText,
   CLICK_ACTIONS,
   DEFAULT_INPUT,
+  DOUBLE_ACTIONS,
   KEY_ACTIONS,
   keyBindingOf,
   mouseBindingOf,
@@ -36,7 +37,7 @@ export interface ControlsPanelState {
 }
 
 const NUMBER_RATES = ['orbit', 'pan', 'preciseShare', 'dragSlop', 'dragHoldMs', 'fastSlop'] as const;
-const FLAG_RATES = ['invertOrbitX', 'invertOrbitY', 'invertPan'] as const;
+const FLAG_RATES = ['invertOrbitX', 'invertOrbitY', 'invertPan', 'invertZoom', 'zoomToPointer'] as const;
 const RATE_LABEL: Record<(typeof NUMBER_RATES)[number] | (typeof FLAG_RATES)[number] | 'precise', string> = {
   orbit: 'Orbit and look, radians per pixel',
   pan: 'Pan, distances per pixel',
@@ -48,6 +49,8 @@ const RATE_LABEL: Record<(typeof NUMBER_RATES)[number] | (typeof FLAG_RATES)[num
   invertOrbitX: 'Invert orbit and look left and right',
   invertOrbitY: 'Invert orbit and look up and down',
   invertPan: 'Invert pan',
+  invertZoom: 'Invert the wheel zoom',
+  zoomToPointer: 'Zoom to the pointer',
 };
 
 export function createControlsPanel({ ui, store, status, testApi }: FeatureContext): void {
@@ -144,8 +147,7 @@ export function createControlsPanel({ ui, store, status, testApi }: FeatureConte
     const heading = (text: string): HTMLElement => make('tr', {}, [make('th', { colSpan: 3, textContent: text })]);
     const table = make('table', { id: 'controls-table' }, [
       heading('Mouse'),
-      ...[...PRESS_ACTIONS, ...CLICK_ACTIONS].map((a) => bindingRow(a, 'mouse')),
-      make('tr', {}, [make('td', { textContent: 'Open textures' }), make('td', { textContent: 'Double click, Left (fixed)' })]),
+      ...[...PRESS_ACTIONS, ...CLICK_ACTIONS, ...DOUBLE_ACTIONS].map((a) => bindingRow(a, 'mouse')),
       heading('Keys'),
       ...KEY_ACTIONS.map((a) => bindingRow(a, 'keys')),
       heading('Rates'),

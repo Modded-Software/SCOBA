@@ -182,7 +182,7 @@ git, not on the repository disk (R-HD-85). The store holds no queue: the queue i
 
 | Path | Holds |
 | --- | --- |
-| `format` | the layout version |
+| `format` | the layout version: 3. Every entry of 3 names `tiles`. A store of 2 is refused with the command that brings it to 3, `make texture-store-migrate` (`storemigrate.py`): it gives each entry without `tiles` the value true, since every upscale before the key matched edges; an entry of 2 that names `tiles` keeps its value. It checks every entry before it writes the first, writes the layout last, and refuses while a request is open |
 | `<game>/planes/` | every plane a step takes or keeps, named by the hash of its pixels |
 | `<game>/upscaled/<recipe>/` | the runner's output file for one upscale; `job.json`, the name of the job last asked to make it; an output that was no whole image, renamed with `.broken` |
 | `<game>/variants/<origin>/<recipe>/` | `entry.json` (recipe, models per plane, own size, hashes, numbers) and one file per size; `request.json` while it is made, or after that failed; `request.log` (4.7) |
@@ -202,11 +202,10 @@ git, not on the repository disk (R-HD-85). The store holds no queue: the queue i
   state gives the reason as `staleWhy`.
 - A variant whose edges were made for the other rule is not stale: it is
   shown and may be baked (operator 2026-11-26). Its entry's `tiles`
-  differs from the texture's; an entry without `tiles` was made with
-  matched edges. The state marks it `edgesOff`; a request of it makes it
-  again, and the viewer does not skip that request. An edited variant is
-  never off (`results.edges_off`). Was, for one hour: stale, which hid
-  every SC2 model variant made before 2026-11-26.
+  differs from the texture's; an entry without `tiles` is refused. The
+  state marks it `edgesOff`; a request of it makes it again, and the
+  viewer does not skip that request. An edited variant is never off
+  (`results.edges_off`).
 - A file is written under a temporary name and renamed. A variant's entry
   is written last and removed first, so half a variant is never read as
   one. A failed request leaves no variant. Upscaled planes stay
@@ -829,7 +828,7 @@ passed on that day.
 | R-HD-90 | [plan] | problems no longer hide; bake refusal |
 | R-HD-53, 56 | [host] | `test_sc2_sources.py` (`RoleTest`), `test_sc2_game.py` (`ModelTest`), `test_steps.py` |
 | R-HD-120 to 124 | [host] for ids, models per plane, sizes, refusals; [host] for factors, the largest side, the kept half and `index --states`; [e2e] for the viewer | `test_variants.py`, run 2026-11-25; `test_cli.py` (`--factor`, the cap, a factor that adds nothing), `test_store.py`, `test_encode.py`, `test_index.py`, run 2026-11-26; `texture-max-side` (e2e, `TEXTURE_MAX_SIDE=1024`), run 2026-11-26 |
-| R-HD-85 to 88 | [host] for results; [plan] for variants | `test_store.py`, `test_dataset.py` |
+| R-HD-85 to 88 | [host] for results; [plan] for variants | `test_store.py`, `test_dataset.py`; layout 2 to 3: `test_storemigrate.py` |
 | R-HD-130 to 133, 135, 136 | [host] for the skin and bake files and skin changes; [plan] for the viewer | `test_skins.py`, run 2026-11-25 |
 | R-HD-134 | [host]; [e2e] for the viewer | `test_dataset.py` (by factor, kept with reason, nothing asked: refused and nothing stored), `test_cli.py`, run 2026-11-26; an upscale without a name makes New Skin 1 then New Skin 2 (`test_dataset.py`); `texture-max-side`, `texture-variants` (e2e) |
 | R-HD-137 | [host]; [e2e] for the viewer | `test_skins.py` (next_new counts up from the highest, a name that only starts so is none; every row of `skin_names.json`; a stored `new` read as `new`, nothing written), `test_new_skin.py` (copies count up and stand side by side, a deleted number is not taken again; a New Skin N bakes and renames, the bake follows; taken and reserved names refused, nothing requested), `test_dataset.py`, `test_index.py` (negative: nothing offered above a bake); `texture-new-skins` (e2e); run 2026-11-26 (host 526 OK, e2e 47 passed) |

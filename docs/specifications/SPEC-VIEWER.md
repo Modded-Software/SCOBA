@@ -656,10 +656,10 @@ What the page does. A number here is a constant of the code.
 | Alt + middle drag | turns the view around the eye |
 | Ctrl held during a left, middle or right camera drag | a quarter of the movement (the rate `preciseShare` 0.25, 16.3.1), read on every move (R-VIEW-143). A left grab with Ctrl moves the ground a quarter of the sensitivity share of the pointer's way, without a jump when Ctrl is pressed or released. Ctrl + left with a selection still turns the units (above) |
 | Right drag | pans, 0.0006 x the camera distance per pixel |
-| Wheel | zooms, gliding over a few frames; less per notch near the ground; a quarter with Ctrl; distance at most 2000 |
+| Wheel | zooms, gliding over a few frames; less per notch near the ground; a quarter with Ctrl; distance at most 2000. Down moves away, along the view line; the map can turn the direction and zoom to the pointer (16.3.1) |
 | Left click | selects |
 | Right click on an instance | opens its animation menu |
-| Double-click on a record or an instance | the game's own |
+| Double-click on a record or an instance | the game's own. On an instance in the view it is the action `open` of the map (16.3.1); on a row it is the browser's |
 
 The eye never goes under the ground.
 
@@ -682,8 +682,8 @@ holds the level plane through it, so the instance stays under the pointer.
 A slow left drag takes the plane point again where it becomes a drag
 (R-VIEW-142); a Ctrl left drag moves that plane a quarter of the way.
 With no instance under the mouse, the ground point as above. The wheel
-zooms along the view line and takes no point under the mouse; it is
-unchanged.
+takes no instance under the mouse: it zooms along the view line, or, with
+`zoomToPointer`, to the ground point under the pointer (16.3.1).
 
 A press on the view is a click until it becomes a drag (R-VIEW-142). It
 becomes a drag at the first pointer move that is either:
@@ -695,7 +695,8 @@ becomes a drag at the first pointer move that is either:
 
 The rule is in `core/press.ts`; the three numbers are rates of the input map (16.3.1). Until then nothing moves: no camera,
 no instance, no rectangle. A press released before that is a click: left
-selects, right opens the menu, two quick left clicks are a double-click.
+selects, right opens the menu, two quick presses of the button of `open`
+(left) are a double press.
 A slow drag holds what is under the pointer when it starts: the ground
 point for a grab, the pointer's offset from the instance for a move. The
 move that starts it moves nothing, so nothing jumps or snaps. A fast drag
@@ -714,13 +715,15 @@ not edited. It acts with any modifiers held, since the drag holds its own. The p
 The buttons, modifiers and keys in 16.3 and 16.6, the rates (0.004,
 0.0006, the quarter, the precision modifier Ctrl) and the three drag
 numbers are the defaults of one input map, `core/input.ts` (R-VIEW-154).
-Inversions of orbit left and right, orbit up and down, and pan are in it
-too, off by default. The stored setting `viewer.input` (10.3) holds what
-was changed; the rest is the default. Each press and each key reads it.
+Inversions of orbit left and right, orbit up and down, pan and the wheel
+zoom are in it too, and zoom to the pointer; all are off when nothing is
+stored. The stored setting `viewer.input` (10.3) holds what was changed;
+the rest is the default. Each press, each key and each wheel event reads
+it.
 
 - Actions: press actions move, rect, face, grab, look, orbit, pan; click
-  actions select, addSelect, menu; key actions remove, copy, cut, paste,
-  loop, edges, original, cancel.
+  actions select, addSelect, menu; the double press action open; key
+  actions remove, copy, cut, paste, loop, edges, original, cancel.
 - A mouse binding is a button and modifiers. It matches when its button
   is pressed and its modifiers are held; others may be held. Of the
   matching press actions the one with the most modifiers wins, then the
@@ -730,8 +733,12 @@ was changed; the rest is the default. Each press and each key reads it.
   Alt and Meta must be exactly the binding's; Meta also meets a Ctrl.
   By the code, Shift must be exact. By the typed character, Shift must be
   exact for a letter and is free for a sign.
-- The double-click that opens what a game shows is the browser's, left
-  button only. It is not in the map.
+- The double press that opens what a game shows is the action `open`:
+  left, no modifiers, when nothing is stored. It is the release of the
+  press the browser counts as the second of two (`MouseEvent.detail` 2),
+  on the button and modifiers of `open`. The double-click time and
+  distance are the browser's, on any of the three buttons
+  (`features/pick`, `input.opens`).
 - The small gear button at the bottom right of the view opens the
   controls window above it; a second click closes it. Its body scrolls,
   so every row is reachable at any window size. Labels, headings and
@@ -743,7 +750,13 @@ was changed; the rest is the default. Each press and each key reads it.
   **default** on a row puts back that binding. **reset all** clears
   `viewer.input`. A rate out of its range is not written; the status line
   says the range.
-- The wheel is not in the map: it zooms along the view line as above.
+- The wheel has two flags in the rates, read at each wheel event
+  (`core/zoom.ts`). `invertZoom`: the wheel the other way round.
+  `zoomToPointer`: the ground point under the pointer stays under it; the
+  target, on the ground, moves towards that point by the share the
+  distance changes. With the pointer on the sky, or a view line that does
+  not meet the ground, the zoom is along the view line as above. The
+  steps, the glide and the height floor are the same with either flag.
 
 ### 16.4 Pick and selection
 
@@ -1064,8 +1077,13 @@ What the server says of one owner:
   4096; unset, 4096; another value stops the server at its start). The
   server passes it to the pipeline. A head written with another `maxSide`
   is not current either: at its start the server runs `index --states`,
-  which writes the head and the states again without listing files; if
-  that fails, it logs why and indexes the dataset whole (R-HD-123).
+  which writes the head and the states again without listing files. If
+  that fails, it logs why; there is no second run (R-HD-123).
+- An index run that ends with a head the server would not serve (no
+  `bake`, another `maxSide`, another code) is a failed run: the server
+  logs it with the head's values. A test server that logs a failed start
+  run does not start (tests/fixtures.mjs `startServer`), so no spec meets
+  a 503 from a stale head.
 - "Held by the package" is decided by the file: the package record names
   it, and the file at the recorded place has the recorded hash.
 - A refused request, skin change or bake is a 400 with the pipeline's
@@ -1454,7 +1472,7 @@ enlarges on a GPU.
 | Window tiles | In game is first; "used by" has a fixed height and scrolls; the info mark's tooltip names amber and red | no Use button; a click on In game changes no skin; a cursor of help | `texture-window`. Not tested: Include in preview (several variants in the view, a box picks nothing, the original's box fixed) |
 | Save to Skin | the picks of the window go to the chosen target in one dialog; the instance shows it | Cancel changes nothing; Revert Changes drops the picks; the bake is unchanged; no bar without an owner | `texture-window` (no bar without an owner). The rest: not tested (removed 2026-11-25) |
 | Mouse sensitivity | an orbit, a look and a wheel step are 0.6 of the sensitivity-1 rates; a left grab moves the map 0.6 of the ground crossed | none | `camera.spec`, `zoom.spec` (e2e, updated, not run), `zoom.spec` (unit, at sensitivity 1). A stored value and Ctrl on top: not tested (R-VIEW-150, 2026-11-25) |
-| Input map | the default map decides every press, click and key as before; a stored binding acts and the old one does not; the controls window rebinds and resets; Escape puts a moved unit back; a faulty stored map is refused | a rebound key with the default key pressed; the old mouse button with the camera unchanged | `input.spec` (unit and e2e), `centre.spec` (R-VIEW-149: middle and left on a hovered unit, the vertex box middle; negative: bare ground). Not tested: the invert rates, a rebound rate, the blur end of a drag, the turn cancel, the per-row default (R-VIEW-154, 2026-11-26) |
+| Input map | the default map decides every press, click and key as before; a stored binding acts and the old one does not; the controls window rebinds and resets; Escape puts a moved unit back; a faulty stored map is refused; the double press opens on the binding of `open`; zoom to the pointer keeps the ground point under the pointer; invert zoom turns the wheel round; the controls window sets both wheel flags | a rebound key with the default key pressed; the old mouse button with the camera unchanged; a double left press with `open` on the middle button; a double middle press with nothing stored; the wheel with nothing stored: the target stays and the point leaves the pointer; the pointer on the sky: the target stays | `input.spec` (unit and e2e), `zoom.spec` (unit: the wheel flags), `centre.spec` (R-VIEW-149: middle and left on a hovered unit, the vertex box middle; negative: bare ground). Not tested: the invert rates of orbit and pan, a rebound rate, the blur end of a drag, the turn cancel, the per-row default, a double right press in the page (its first press opens the animation menu over the place) (R-VIEW-154, 2026-11-26) |
 | Unit centre | with an instance under the mouse, a middle drag orbits around its centre and a left drag keeps it under the pointer | with none under the mouse, the ground point is used | Not tested (R-VIEW-149, 2026-11-25) |
 | Original peek | Ctrl+. held shows Original on the selected instances; the release shows their skins again | the skin choice and the scene are unchanged; an unselected instance keeps its skin | Not tested (R-VIEW-148, 2026-11-25) |
 | Upscale progress | a request tile shows its stage, step, planes, bar and time; the tiles follow the state; the dialog says it may be closed and its button is busy while it sends | a done request leaves no tile; a failed one has Ask Again and Open Log, a running one has neither | Not tested (R-VIEW-145, 146, 2026-11-25) |

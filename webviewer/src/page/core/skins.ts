@@ -97,7 +97,7 @@ function unshowable(state: TextureState | undefined, variant: string): string {
   const found = state?.variants.find((one) => one.id === variant);
   if (!state) return 'the texture service does not know this texture';
   if (!found) return 'its upscaled version was never made';
-  if (found.stale) return `its upscaled version is out of date: ${found.staleWhy || 'the original changed'}; upscale it again`;
+  if (found.stale) return `its upscaled version is out of date: ${found.staleWhy}; upscale it again`;
   const checks = found.problems.map((one) => `${one.limit} check (${one.value === null ? 'no number' : Number(one.value.toFixed(2))}, limit ${Number(one.bound.toFixed(2))})`).join(', ');
   const means = found.problems.map((one) => CHECK_MEANS[one.limit]).filter(Boolean).join('; ');
   return `its upscale failed the ${checks}${means ? `: ${means}` : ''}`;

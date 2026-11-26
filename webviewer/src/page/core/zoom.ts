@@ -9,8 +9,16 @@
 // ground, the eye staying put, so the distance is the eye height over
 // sin(pitch) whatever pan, orbit or mouse-look did to the target. The eye
 // never comes closer than MIN_HEIGHT to the ground.
+// Two flags of the input map (core/input.ts, R-VIEW-154), read at each
+// wheel event, both off when nothing is stored:
+// - invertZoom: the wheel the other way round;
+// - zoomToPointer: the ground point under the pointer stays under it. The
+//   target, on the ground, moves towards that point by the share the
+//   distance changes: target = point + (target - point) * new / old. With
+//   the pointer on the sky, or the view line not meeting the ground, the
+//   zoom is along the view line as without the flag.
 
-import type { CameraState, Vec3 } from './types';
+import type { CameraState, Vec2, Vec3 } from './types';
 
 const NOTCH_SHARE = 0.15;
 const MIN_HEIGHT = 0.3;
@@ -38,7 +46,17 @@ export interface Zoom {
   notchShare(distance: number, ctrl: boolean): number;
 }
 
-export function createZoom(camera: CameraState, rig: { eye(): Vec3; applyCamera(): void; sensitivity(): number }): Zoom {
+export interface ZoomRig {
+  eye(): Vec3;
+  applyCamera(): void;
+  sensitivity(): number;
+  /** The ground point under the pointer of a wheel event, or null on the sky. */
+  pointerGround(e: WheelEvent): Vec2 | null;
+  /** The wheel flags of the input map, as stored now. */
+  flags(): { invertZoom: boolean; zoomToPointer: boolean };
+}
+
+export function createZoom(camera: CameraState, rig: ZoomRig): Zoom {
   /**
    * Put the target on the ground along the view line, the eye staying put.
    * False when the view line does not meet the ground in front of the eye.
@@ -71,10 +89,24 @@ export function createZoom(camera: CameraState, rig: { eye(): Vec3; applyCamera(
   let zoomGoal: number | null = null;
   let zoomTime = 0;
   let zoomFrame = 0;
+  /** Whether the glide started with the target on the ground. */
+  let grounded = false;
+  /** zoomToPointer: the ground point the glide keeps under the pointer. */
+  let anchor: Vec2 | null = null;
 
   function stop(): void {
     cancelAnimationFrame(zoomFrame);
     zoomGoal = null;
+    anchor = null;
+  }
+
+  /** Set the distance; with an anchor, move the target so the anchor stays on its pixel. */
+  function setDistance(next: number): void {
+    const share = next / camera.distance;
+    camera.distance = next;
+    if (!anchor) return;
+    const t = camera.target;
+    camera.target = [anchor[0] + (t[0] - anchor[0]) * share, anchor[1] + (t[1] - anchor[1]) * share, t[2]];
   }
 
   function zoomStep(now: number): void {
@@ -87,10 +119,11 @@ export function createZoom(camera: CameraState, rig: { eye(): Vec3; applyCamera(
     const from = Math.log(camera.distance);
     const to = Math.log(zoomGoal);
     if (Math.abs(to - from) < 1e-4) {
-      camera.distance = zoomGoal;
+      setDistance(zoomGoal);
       zoomGoal = null;
+      anchor = null;
     } else {
-      camera.distance = Math.exp(from + (to - from) * k);
+      setDistance(Math.exp(from + (to - from) * k));
       zoomFrame = requestAnimationFrame(zoomStep);
     }
     rig.applyCamera();
@@ -99,13 +132,16 @@ export function createZoom(camera: CameraState, rig: { eye(): Vec3; applyCamera(
   function wheel(e: WheelEvent): void {
     // Also keeps ctrl + wheel from zooming the page.
     e.preventDefault();
-    const notches = (e.deltaY * (DELTA_UNIT[e.deltaMode] ?? 1)) / 100;
+    const flags = rig.flags();
+    const notches = ((e.deltaY * (DELTA_UNIT[e.deltaMode] ?? 1)) / 100) * (flags.invertZoom ? -1 : 1);
     const gliding = zoomGoal !== null;
     // A glide already started from the ground; a new zoom anchors first.
     if (!gliding) {
-      targetToGround();
+      grounded = targetToGround();
       rig.applyCamera();
     }
+    // The point under the pointer now, mid-glide too: the pointer may have moved.
+    anchor = flags.zoomToPointer && grounded ? rig.pointerGround(e) : null;
     const start = zoomGoal ?? camera.distance;
     // The mouse sensitivity scales each step too (R-VIEW-150).
     const step = Math.log(1 + notchShare(start, e.ctrlKey) * rig.sensitivity()) * notches;

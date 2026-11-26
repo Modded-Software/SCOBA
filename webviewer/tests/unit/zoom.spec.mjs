@@ -24,8 +24,11 @@ const eyeOf = (c) => [
   c.target[2] + c.distance * Math.sin(c.pitch),
 ];
 
-/** A camera, its zoom, and a frame clock: `frame(dt)` runs the waiting frame `dt` ms on. */
-async function rig(camera) {
+/**
+ * A camera, its zoom, and a frame clock: `frame(dt)` runs the waiting frame `dt` ms on.
+ * `flags`: the wheel flags of the input map; `ground`: the ground point under the pointer.
+ */
+async function rig(camera, { flags = {}, ground = null } = {}) {
   const { createZoom } = await source('src/page/core/zoom.ts');
   let now = 1000;
   let waiting = null;
@@ -39,7 +42,14 @@ async function rig(camera) {
   };
   const cam = { yaw: -Math.PI / 2, ...camera };
   // Sensitivity 1: the rates as written (R-VIEW-150 scales them in the page).
-  const zoom = createZoom(cam, { eye: () => eyeOf(cam), applyCamera() {}, sensitivity: () => 1 });
+  const pointer = { ground };
+  const zoom = createZoom(cam, {
+    eye: () => eyeOf(cam),
+    applyCamera() {},
+    sensitivity: () => 1,
+    pointerGround: () => pointer.ground,
+    flags: () => ({ invertZoom: false, zoomToPointer: false, ...flags }),
+  });
   const frame = (dt = FRAME) => {
     now += dt;
     const step = waiting;
@@ -58,7 +68,15 @@ async function rig(camera) {
     expect(zoom.goal()).toBeNull();
     return cam.distance;
   };
-  return { cam, zoom, frame, wheel, settle };
+  return { cam, zoom, frame, wheel, settle, pointer };
+}
+
+/** The unit direction from the eye to a ground point: the pixel it is on, the view not turning. */
+function towards(cam, point) {
+  const eye = eyeOf(cam);
+  const d = [point[0] - eye[0], point[1] - eye[1], -eye[2]];
+  const length = Math.hypot(d[0], d[1], d[2]);
+  return d.map((v) => v / length);
 }
 
 /** From distance and pitch (target on the ground), one wheel turn; the distance after. */
@@ -152,6 +170,82 @@ test('negative: zooming in never takes the eye under the ground, also with the t
     expect(eye[2]).toBeGreaterThanOrEqual(0.3 - 1e-9);
     expect(eye[2]).toBeCloseTo(Math.max(0.3, 0.5 * Math.sin(0.8)), 6);
   }
+});
+
+test('invertZoom turns the wheel round: the same share the other way; off, it does not', async () => {
+  const start = { distance: 20, pitch: 1.2, target: [0, 0, 0] };
+  const away = 20 * (1 + share(20, 1.2));
+  const closer = 20 / (1 + share(20, 1.2));
+  const plain = await rig(start);
+  plain.wheel(100);
+  expect(plain.settle()).toBeCloseTo(away, 6);
+  const down = await rig(start, { flags: { invertZoom: true } });
+  down.wheel(100);
+  expect(down.settle()).toBeCloseTo(closer, 6);
+  const up = await rig(start, { flags: { invertZoom: true } });
+  up.wheel(-100);
+  expect(up.settle()).toBeCloseTo(away, 6);
+});
+
+test('zoomToPointer keeps the ground point under the pointer on its pixel, every frame; the distance is as without it', async () => {
+  const start = { yaw: 0.4, pitch: 0.7, distance: 20, target: [1, -2, 0] };
+  const point = [6, 3];
+  // One rig at a time: a rig takes the frame clock.
+  const plain = await rig(start);
+  plain.wheel(-300);
+  const along = plain.settle();
+  const r = await rig(start, { flags: { zoomToPointer: true }, ground: point });
+  const before = towards(r.cam, point);
+  r.wheel(-300);
+  for (let i = 0; i < 1000 && r.zoom.goal() !== null; i++) {
+    r.frame();
+    const now = towards(r.cam, point);
+    for (const axis of [0, 1, 2]) expect(now[axis], `frame ${i} axis ${axis}`).toBeCloseTo(before[axis], 9);
+  }
+  expect(r.zoom.goal()).toBeNull();
+  // The same distance as along the view line; the view did not turn; the target is still on the ground.
+  expect(r.cam.distance).toBeCloseTo(along, 9);
+  expect([r.cam.yaw, r.cam.pitch, r.cam.target[2]]).toEqual([0.4, 0.7, 0]);
+  // The target went towards the point by the share of the distance.
+  const k = r.cam.distance / 20;
+  expect(r.cam.target[0]).toBeCloseTo(point[0] + (1 - point[0]) * k, 9);
+  expect(r.cam.target[1]).toBeCloseTo(point[1] + (-2 - point[1]) * k, 9);
+  // Negative: with the flag off the target stays, and the point leaves its pixel.
+  [1, -2, 0].forEach((v, axis) => expect(plain.cam.target[axis]).toBeCloseTo(v, 9));
+  const drifted = towards(plain.cam, point);
+  expect(Math.hypot(drifted[0] - before[0], drifted[1] - before[1], drifted[2] - before[2])).toBeGreaterThan(0.05);
+});
+
+test('zoomToPointer: a pointer that moved mid-glide holds the new point; on the sky the zoom is along the view line', async () => {
+  const start = { yaw: 0, pitch: 0.9, distance: 30, target: [0, 0, 0] };
+  const r = await rig(start, { flags: { zoomToPointer: true }, ground: [4, 4] });
+  r.wheel(-200);
+  r.frame();
+  r.frame();
+  r.pointer.ground = [-5, 2];
+  const before = towards(r.cam, [-5, 2]);
+  r.wheel(-200);
+  r.settle();
+  const after = towards(r.cam, [-5, 2]);
+  for (const axis of [0, 1, 2]) expect(after[axis]).toBeCloseTo(before[axis], 9);
+  // Negative: no ground under the pointer (sky): the target does not move.
+  const sky = await rig(start, { flags: { zoomToPointer: true }, ground: null });
+  sky.wheel(-200);
+  sky.settle();
+  [0, 0, 0].forEach((v, axis) => expect(sky.cam.target[axis]).toBeCloseTo(v, 9));
+  expect(sky.cam.distance).toBeLessThan(30);
+});
+
+test('zoomToPointer: the eye stays over the height floor, and a view line off the ground does not anchor', async () => {
+  const r = await rig({ yaw: 0, pitch: 0.8, distance: 20, target: [0, 0, 0] }, { flags: { zoomToPointer: true }, ground: [3, 1] });
+  for (let i = 0; i < 40; i++) r.wheel(-1000);
+  r.settle();
+  expect(eyeOf(r.cam)[2]).toBeGreaterThanOrEqual(0.3 - 1e-9);
+  // Looking up: the view line never meets the ground, so nothing is held.
+  const up = await rig({ yaw: 0, pitch: -0.2, distance: 20, target: [0, 0, 8] }, { flags: { zoomToPointer: true }, ground: [3, 1] });
+  up.wheel(-100);
+  up.settle();
+  expect(up.cam.target).toEqual([0, 0, 8]);
 });
 
 test('negative: stop ends a glide where it is; no later frame moves the camera', async () => {

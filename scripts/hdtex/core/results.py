@@ -6,18 +6,20 @@ from typing import NamedTuple
 
 from . import limits, variants
 from .interfaces import Texture
-from .store import GameStore
+from .store import GameStore, StoreError
 
 ACCEPTED = "accepted"  # key of an entry: why its problems do not refuse a bake
 EDIT = "edit"  # key of an entry a transfer made: its input, its changed planes, their hash
-# Key of an entry a model made: whether its edges were made to match across the border. An entry
-# written before the key was kept had them matched: every upscale did then.
+# Key of an entry: whether its edges were made to match across the border (store FORMAT 3).
 TILES = "tiles"
 
 
 def made_tiling(entry: dict) -> bool:
-    """Whether the variants of this entry had their edges matched across the border."""
-    return bool(entry.get(TILES, True))
+    """Whether the variants of this entry had their edges matched across the border. An entry without the key is
+    refused: the store's entries of format 3 have it (storemigrate.py wrote it into the older ones)."""
+    if not isinstance(entry.get(TILES), bool):
+        raise StoreError(f"the entry of {entry.get('origin')!r} {entry.get('recipe')!r} has no {TILES!r}")
+    return entry[TILES]
 
 
 def edges_off(entry: dict, tiles: bool) -> bool:

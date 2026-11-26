@@ -43,6 +43,29 @@ test('the default clicks: select, add with Shift, the menu on the right button; 
   expect(got).toEqual(['select', 'select', 'addSelect', 'menu', 'menu', null]);
 });
 
+test('the double press: the second press the browser counts, on the binding of open; left when nothing is stored', async () => {
+  const { opens, parseInput, resolveInput } = await input();
+  const second = (button, mods = [], detail = 2) => ({ ...mouse(button, mods), detail });
+  const map = resolveInput(null);
+  expect(map.mouse.open).toEqual({ button: 'left', mods: [] });
+  // As the browser's dblclick: left, with any modifiers held.
+  expect([opens(map, second(LEFT)), opens(map, second(LEFT, ['ctrl']))]).toEqual([true, true]);
+  // Negative: a first press, a third press, another button.
+  expect([opens(map, second(LEFT, [], 1)), opens(map, second(LEFT, [], 3)), opens(map, second(MIDDLE)), opens(map, second(RIGHT))]).toEqual([false, false, false, false]);
+  const rebound = resolveInput(parseInput({ mouse: { open: { button: 'middle', mods: ['shift'] } } }));
+  expect(opens(rebound, second(MIDDLE, ['shift']))).toBe(true);
+  // Negative: the left button no longer opens, nor the middle one without Shift.
+  expect([opens(rebound, second(LEFT)), opens(rebound, second(MIDDLE))]).toEqual([false, false]);
+});
+
+test('the wheel flags are off when nothing is stored, and a stored one is read', async () => {
+  const { parseInput, resolveInput } = await input();
+  const { rates } = resolveInput(null);
+  expect([rates.invertZoom, rates.zoomToPointer]).toEqual([false, false]);
+  const stored = resolveInput(parseInput({ rates: { zoomToPointer: true } })).rates;
+  expect([stored.invertZoom, stored.zoomToPointer]).toEqual([false, true]);
+});
+
 test('a stored binding acts, and the default it replaced no longer does', async () => {
   const { pressAction, parseInput, resolveInput } = await input();
   const map = resolveInput(parseInput({ mouse: { pan: { button: 'left', mods: ['shift'] } } }));
@@ -79,6 +102,8 @@ test('a stored map with a fault is refused, naming it', async () => {
     [{ rates: { orbit: 1 } }, /orbit is not a number from/],
     [{ rates: { precise: 'shift' } }, /precision modifier/],
     [{ rates: { invertPan: 1 } }, /not true or false/],
+    [{ rates: { invertZoom: 'yes' } }, /invertZoom is not true or false/],
+    [{ rates: { zoomToPointer: 1 } }, /zoomToPointer is not true or false/],
     [{ extra: 1 }, /unknown key "extra"/],
   ];
   const got = faults.map(([value]) => {
