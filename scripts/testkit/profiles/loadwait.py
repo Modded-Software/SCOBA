@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import workpaths
+from mapgen import loading_screen
 from project_root import project_root
 
 from ..map_builder import TestMapSpec
@@ -29,6 +30,48 @@ ENTER_S = 30.0    # the bank must show this soon after the first key
 KEY = "space"
 
 
+# A label of the loading layout with a style that does not exist. The game
+# names it in its Text log only if it read the layout MapInfo names (R-LOAD-8).
+MARKER_STYLE = "ScobaLoadWaitNoSuchStyle"
+MARKER = (
+    f'        <Frame type="Label" name="ScobaLoadWaitMarker">\n'
+    f'            <Style val="{MARKER_STYLE}"/>\n'
+    f'        </Frame>\n'
+    f'    </Frame>\n</Desc>'
+)
+COLUMNS = ("UI/ScobaLoading/Controls", "UI/ScobaLoading/Hero")
+
+
+def patch(map_dir: Path) -> None:
+    """The marker into the profile map's copy of the loading layout.
+
+    Probe, 2026-11-27: the column strings into DocumentHeader for every
+    locale, from enUS, so a label finds its key there or in GameStrings.
+    """
+    layout = map_dir / "Base.SC2Data" / "UI" / "Layout" / "Custom" / "ScobaLoading.SC2Layout"
+    text = layout.read_text(encoding="utf-8")
+    end = "    </Frame>\n</Desc>"
+    if not text.rstrip().endswith(end):
+        raise SystemExit(f"loadwait: {layout} does not end with its root frame")
+    layout.write_text(text.rstrip()[: -len(end)] + MARKER + "\n", encoding="utf-8")
+    enus = loading_screen.read_strings(map_dir, "enUS")
+    header = map_dir / "DocumentHeader"
+    prefix, entries = loading_screen.read_document_header(header.read_bytes())
+    entries = [e for e in entries if e.key not in COLUMNS]
+    entries += [loading_screen.HeaderEntry(key, locale, enus[key]) for locale in loading_screen.LOCALES for key in COLUMNS]
+    header.write_bytes(loading_screen.write_document_header(prefix, entries))
+
+
+def text_lines(since: float) -> list[str]:
+    """The lines of the game's Text logs written since then."""
+    logs = workpaths.path("SC2_DOCUMENTS") / "GameLogs"
+    lines = []
+    for path in sorted(logs.glob("*Text.txt")):
+        if path.stat().st_mtime >= since:
+            lines += [f"{path.name}: {line}" for line in path.read_text(errors="replace").splitlines() if line.strip()]
+    return lines
+
+
 def map_spec() -> TestMapSpec:
     return TestMapSpec(
         profile="loadwait",
@@ -39,6 +82,7 @@ def map_spec() -> TestMapSpec:
         galaxy_includes=("scripts/test/loadwait/loadwait",),
         init_calls=("gt_LoadWaitTest_Init();",),
         options={"wait_for_key": True},
+        patch=patch,
     )
 
 
@@ -84,6 +128,16 @@ def check(ctx, data: dict, checks) -> None:
     checks.between("lw_host", "", "afterKeyS", 0.0, ENTER_S)
     # The game clock had only just started when the bank was written.
     checks.between("lw_game", "", "timeMs", 500, 5000)
+    # R-LOAD-8: the game read the layout MapInfo names. Raw lines first.
+    lines = text_lines(ctx.run_dir.stat().st_mtime)
+    for line in lines:
+        print(f"lw_text raw {line}")
+    marked = [line for line in lines if MARKER_STYLE in line]
+    ours = [line for line in lines if "ScobaLoading" in line and MARKER_STYLE not in line]
+    data["lw_layout"] = {"textLines": len(lines), "markerLines": len(marked), "otherLayoutLines": len(ours)}
+    checks.gt("lw_layout", "", "markerLines", 0)
+    # Negative: the layout has no other error.
+    checks.eq("lw_layout", "", "otherLayoutLines", 0)
 
 
 def run_spec(launch_timeout_s: float, case_timeout_s: float, run_root: Path) -> TestRunSpec:

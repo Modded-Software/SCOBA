@@ -460,24 +460,5 @@ void gt_AnimProbeLower_Init () {
     TriggerAddEventTimePeriodic(gt_AnimProbeLower, c_PROBE_LOWER_INTERVAL, c_timeGame);
 }
 
-bool gt_AnimProbeToggle_Func (bool testConds, bool runActions) {
-    if (!runActions) {
-        return true;
-    }
-    // Input hold of this player (systems/input_hold).
-    if (gf_InputHeld(1)) {
-        return true;
-    }
-    if (gv_bPROBE) {
-        gf_ProbeDisable(1);
-    }
-    else {
-        gf_ProbeEnable(1);
-    }
-    return true;
-}
-
-void gt_AnimProbeToggle_Init () {
-    gt_AnimProbeToggle = TriggerCreate("gt_AnimProbeToggle_Func");
-    TriggerAddEventKeyPressed(gt_AnimProbeToggle, 1, c_keyF9, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
-}
+// No key (operator 2026-11-27: F9 is cinematic mode, systems/cinematic).
+// Tests call gf_ProbeEnable and gf_ProbeDisable.

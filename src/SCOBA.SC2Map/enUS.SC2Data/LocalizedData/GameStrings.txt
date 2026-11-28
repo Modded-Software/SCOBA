@@ -168,5 +168,7 @@ Param/Value/FC048C54=Cloak Ability
 Param/Value/FC6AEECD=Irradiate Ability
 Param/Value/FD0D998F= 
 Sound/Name/DaySound=DaySound
+UI/ScobaLoading/Controls=<s val="LoadingCampaignSubtitle">CONTROLS</s><n/>Move with W, A, S, D. Hold Shift to walk.<n/>Space drops you in at the start. After that, it jumps.<n/>Hold Z to zoom. The mouse wheel moves the camera in and out.<n/>Ctrl+E opens order mode. Ctrl+C gets you out.<n/><n/><s val="LoadingCampaignSubtitle">POINT & CLICK</s><n/>Left-click an enemy to target it. Right-click to attack.<n/>Drag with any mouse button to turn the camera.<n/>Ctrl+C calls off the attack.<n/><n/><s val="LoadingCampaignSubtitle">ACTIONS</s><n/>Hold the right mouse button to aim. Left-click to fire.<n/>Middle-click shows or hides the cursor.
+UI/ScobaLoading/Hero=<s val="LoadingCampaignSubtitle">HERO</s><n/>You get 3 stat points every level.<n/>You get a new ability at levels 3, 6, 9, 12 and 15.<n/>At level 20, pick one ultimate from a skill tree with 3 points in it.
 Variant001/ModeDesc=Get ready to rumbleee!
 Variant001/ModeName=Top v Bottom MOBA

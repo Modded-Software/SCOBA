@@ -247,7 +247,9 @@ def expand_mapinfo(src: Path, dst: Path) -> None:
     # The built map waits for a key on its loading screen (REQ-LOADING-SCREEN
     # R-LOAD-5, operator 2026-11-26; the build cleared the flag before). The
     # check value is redone with the flag.
-    write(dst, loading_screen.set_wait_for_key(bytes(data), True))
+    data = loading_screen.set_wait_for_key(bytes(data), True)
+    # The text in two columns: the custom loading layout (R-LOAD-8).
+    write(dst, loading_screen.set_layout(data, loading_screen.LAYOUT))
 
 
 def expand_document_header(map_dir: Path) -> None:

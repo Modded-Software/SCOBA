@@ -1,0 +1,85 @@
+// Single shot scenarios of the combat profile (R-PNC-21). Included before
+// combat.galaxy, which calls them.
+
+void gf_DbgSingleShots (string lp_section, fixed lp_dx) {
+    fixed lv_at;
+    int lv_shots;
+
+    gf_DbgSpawnOne(lp_section, lp_dx, 500.0);
+    gf_DbgSnap(lp_section, "t0000");
+    lv_at = TimerGetElapsed(gv_sCOBA_Clock);
+    lv_shots = gv_aimShotEffectEvents;
+    gf_PncAttack(1, gv_dbgEnemy);
+    // The clocks in the loop that saw the shot (0.15 s Tosh period).
+    gf_DbgClockRead(lp_section, "tclock", lv_shots);
+    Wait(MaxF(0.0, 0.1 - (TimerGetElapsed(gv_sCOBA_Clock) - lv_at)), c_timeGame);
+    gf_DbgSnap(lp_section, "t0100");
+    Wait(MaxF(0.0, 0.5 - (TimerGetElapsed(gv_sCOBA_Clock) - lv_at)), c_timeGame);
+    gf_DbgSnap(lp_section, "t0500");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lp_section, "t1500");
+    Wait(2.5, c_timeGame);
+    gf_DbgSnap(lp_section, "t4000");
+    gf_PncAttack(1, gv_dbgEnemy);
+    Wait(2.0, c_timeGame);
+    gf_PncAttack(1, gv_dbgEnemy);
+    Wait(2.0, c_timeGame);
+    gf_DbgSnap(lp_section, "t8000");
+}
+
+// R-PNC-21 at a short Tosh period (0.15 s; the defect showed at 0.1 s):
+// c_DBG_BURST_COMMANDS single commands,
+// 0.625 s apart. Each must give exactly one shot; none comes in the 2 s after
+// the last. Raw per command, one mark per game loop for c_DBG_BURST_LOOPS
+// loops: shots so far, `o` with an attack order, `e` with SCOBAAttackEnd on
+// the hero, then the weapon cooldown in ms.
+const int c_DBG_BURST_COMMANDS = 48;
+const int c_DBG_BURST_LOOPS = 8;
+
+void gf_DbgSingleBurst (string lp_section, fixed lp_dx) {
+    unit lv_hero = gv_tPSUNIT[1];
+    int lv_c;
+    int lv_i;
+    int lv_before;
+    int lv_n;
+    int lv_doubles;
+    int lv_none;
+    string lv_row;
+    string lv_counts = "";
+
+    gf_DbgSpawnOne(lp_section, lp_dx, 1000.0);
+    gf_DbgSnap(lp_section, "t0000");
+    for (lv_c = 0; lv_c < c_DBG_BURST_COMMANDS; lv_c += 1) {
+        lv_before = gv_aimShotEffectEvents;
+        lv_row = "";
+        gf_PncAttack(1, gv_dbgEnemy);
+        for (lv_i = 0; lv_i < c_DBG_BURST_LOOPS; lv_i += 1) {
+            Wait(0.0625, c_timeGame);
+            lv_row = lv_row + IntToString(gv_aimShotEffectEvents - lv_before);
+            if (UnitOrderHasAbil(lv_hero, "attack")) {
+                lv_row = lv_row + "o";
+            }
+            if (UnitBehaviorCount(lv_hero, c_SCOBA_ATTACK_END_BEHAVIOR) > 0) {
+                lv_row = lv_row + "e";
+            }
+            lv_row = lv_row + ":" + IntToString(FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0)) + " ";
+        }
+        Wait(0.125, c_timeGame);
+        lv_n = gv_aimShotEffectEvents - lv_before;
+        if (lv_n > 1) {
+            lv_doubles += 1;
+        }
+        if (lv_n < 1) {
+            lv_none += 1;
+        }
+        lv_counts = lv_counts + IntToString(lv_n);
+        BankValueSetFromString(gv_dbgBank, lp_section, "c" + IntToString(100 + lv_c), lv_row);
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_section, "commands", c_DBG_BURST_COMMANDS);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "doubles", lv_doubles);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "none", lv_none);
+    BankValueSetFromString(gv_dbgBank, lp_section, "perCommand", lv_counts);
+    gf_DbgSnap(lp_section, "tend");
+    Wait(2.0, c_timeGame);
+    gf_DbgSnap(lp_section, "tlate");
+}

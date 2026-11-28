@@ -153,13 +153,21 @@ void gf_BaseAiCreateLane (int lp_lane) {
     gf_BaseAiStart(lv_owner);
 }
 
-void gf_BaseAiInit () {
+// The lanes of lp_mode get a base and the AI; the others get none
+// (R-BASE-37). Their waves and heroes do not depend on it.
+void gf_BaseAiInitMode (int lp_mode) {
     int lv_lane;
 
+    for (lv_lane = 1; lv_lane <= c_BASE_AI_LANES; lv_lane += 1) {
+        if (gf_BaseAiLaneHasBase(lv_lane, lp_mode)) {
+            gf_BaseAiCreateLane(lv_lane);
+        }
+    }
+}
+
+void gf_BaseAiInit () {
     if (!c_BASE_AI_ENABLED) {
         return;
     }
-    for (lv_lane = 1; lv_lane <= c_BASE_AI_LANES; lv_lane += 1) {
-        gf_BaseAiCreateLane(lv_lane);
-    }
+    gf_BaseAiInitMode(c_BASE_AI_MODE);
 }

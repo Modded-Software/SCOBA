@@ -6,6 +6,7 @@ The groups and their checks:
   flight  baseai_flight.py  the Alt+4 regular unit
   hall    baseai_hall.py    the measured Command Center footprint
   gas     baseai_gas.py     6x6 geysers (R-BASE-35), the map's gas orders (R-BASE-36)
+  mode    baseai_mode.py    the lane mode (R-BASE-37): middle only or 3v3
 Switches: baseai_env.py. Data patches: baseai_patch.py, baseai_scan.py.
 """
 
@@ -32,6 +33,7 @@ from .baseai_flight import check_flight_group
 from .baseai_gas import check_gas
 from .baseai_hall import check_hall
 from .baseai_macro import check_macro
+from .baseai_mode import check_mode
 from .baseai_probe import check_probe
 from .registry import PROFILE_BANKS, profile_output
 
@@ -40,7 +42,7 @@ GALAXY = ROOT / "scripts" / "testkit" / "galaxy"
 # Include order: a module calls only what comes before it (or what it declares).
 HARNESS = ("baseai", "baseai_live", "baseai_macro", "baseai_land", "baseai_feel", "baseai_flight", "baseai_hall",
            "baseai_gas", "baseai_gas_build", "baseai_gas_probe", "baseai_gas_help", "baseai_gas_map",
-           "baseai_gas_main")
+           "baseai_gas_main", "baseai_mode")
 
 CHECKS = {
     "probe": check_probe,
@@ -48,6 +50,7 @@ CHECKS = {
     "flight": check_flight_group,
     "hall": check_hall,
     "gas": check_gas,
+    "mode": check_mode,
 }
 
 

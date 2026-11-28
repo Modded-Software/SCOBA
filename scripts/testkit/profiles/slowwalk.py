@@ -115,10 +115,10 @@ def _facing_kept(checks, section: str) -> None:
 
 def _rate(checks, section: str) -> None:
     """R-SLOW-15: the slow clip rate = c_ANIM_SLOW_RATE x engine travel /
-    stride (operator 2026-11-21: 1.33). Raw: the speed property and the scale."""
+    stride (operator 2026-11-27: 1.66, was 1.33). Raw: the speed property and the scale."""
     speed, scale = checks.value(section, "slow", "Speed1000"), checks.value(section, "slow", "WalkScale1000")
     stride = slow_const("c_ANIM_SLOW_STRIDE")
-    rate = slow_const("c_ANIM_SLOW_RATE")  # operator 2026-11-21: 33 % faster
+    rate = slow_const("c_ANIM_SLOW_RATE")  # operator 2026-11-27: 1.66
     print(f"{section} rate raw: travel1000={speed} scale1000={scale} prop1000={checks.value(section, 'slow', 'UnitSpeed1000')} stride={stride} rate={rate}")
     want = None if speed is None else rate * speed / stride
     ok = None not in (want, scale) and want > 0 and abs(scale - want) <= RATE_TOLERANCE * want

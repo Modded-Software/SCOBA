@@ -1,11 +1,14 @@
 """baseai profile: the A/B data patches of the probe map, chosen by the environment
-(baseai_env.py): the stock 2x2 Supply Depot, and the gas radius scan (baseai_scan.py)."""
+(baseai_env.py): the base AI lane mode, the stock 2x2 Supply Depot, and the gas radius
+scan (baseai_scan.py)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from .baseai_env import depot_mode
+from mapgen.base_mode import patch_mode
+
+from .baseai_env import base_mode, depot_mode
 from .baseai_scan import gas_scan, patch_scan
 
 DEPOT_MAP = ('<CUnit id="SupplyDepot">\n        <Footprint value="Footprint4x4DepotContour"/>\n'
@@ -30,11 +33,14 @@ def patch_depot(map_dir: Path) -> None:
 
 def wanted() -> bool:
     """A data patch is asked for by the environment."""
-    return depot_mode() == "stock" or gas_scan() is not None
+    return depot_mode() == "stock" or gas_scan() is not None or base_mode() is not None
 
 
 def patch_ab(map_dir: Path) -> None:
     """The A/B data probes asked for by the environment."""
+    mode = base_mode()
+    if mode is not None:
+        patch_mode(map_dir, mode)
     if depot_mode() == "stock":
         patch_depot(map_dir)
     scan = gas_scan()

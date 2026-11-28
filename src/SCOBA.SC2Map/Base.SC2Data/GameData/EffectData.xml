@@ -44,10 +44,10 @@
         <ImpactUnit Value="Caster"/>
         <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="1"/>
     </CEffectModifyUnit>
-    <!-- TESTING (operator 2026-11-16): Tosh 0.25 s; his shots used SCOBAAttackCooldown10. -->
+    <!-- Tosh 0.15 s (operator 2026-11-27; was 0.1, before that 0.25); his shots used SCOBAAttackCooldown10. -->
     <CEffectModifyUnit id="SCOBAAttackCooldown01">
         <ImpactUnit Value="Caster"/>
-        <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="0.25"/>
+        <Cost Abil="SCOBAAutoAttackStatus,Execute" CooldownOperation="Set" CooldownTimeUse="0.15"/>
     </CEffectModifyUnit>
     <!-- Tosh shot damage 8-12 (operator 2026-11-16): Amount plus 0..Random. -->
     <CEffectDamage id="ToshU">

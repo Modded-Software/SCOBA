@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Cinematic letterbox (REQ-CINEMATIC R-CINE-5, R-CINE-10): two black
+     bars, 60 high (16:10 to 16:9), above the game UI. Script hooks them up
+     by name, shows them, and sends the events "In" and "Out": each bar
+     slides 60 from off screen in, or back out, in 0.4 s. No mouse. -->
+<Desc>
+    <Constant name="ScobaCineBarH" val="60"/>
+    <Constant name="ScobaCineBarHNegative" val="-60"/>
+
+    <Frame type="Frame" name="GameUI" file="GameUI">
+        <Frame type="Image" name="ScobaCineTop">
+            <Anchor side="Top" relative="$parent" pos="Min" offset="0"/>
+            <Anchor side="Left" relative="$parent" pos="Min" offset="0"/>
+            <Anchor side="Right" relative="$parent" pos="Max" offset="0"/>
+            <Height val="#ScobaCineBarH"/>
+            <TextureType val="None"/>
+            <Color val="0,0,0"/>
+            <AcceptsMouse val="false"/>
+            <Visible val="false"/>
+            <Animation name="In">
+                <Event event="In" action="Reset,Play"/>
+                <Controller type="Anchor" side="Top" relative="True" end="Pause">
+                    <Key type="Curve" time="0.0" value="#ScobaCineBarHNegative" out="Auto"/>
+                    <Key type="Curve" time="0.4" value="0" in="Auto"/>
+                </Controller>
+            </Animation>
+            <Animation name="Out">
+                <Event event="Out" action="Reset,Play"/>
+                <Controller type="Anchor" side="Top" relative="True" end="Pause">
+                    <Key type="Curve" time="0.0" value="0" out="Auto"/>
+                    <Key type="Curve" time="0.4" value="#ScobaCineBarHNegative" in="Auto"/>
+                </Controller>
+            </Animation>
+        </Frame>
+
+        <Frame type="Image" name="ScobaCineBottom">
+            <Anchor side="Bottom" relative="$parent" pos="Max" offset="0"/>
+            <Anchor side="Left" relative="$parent" pos="Min" offset="0"/>
+            <Anchor side="Right" relative="$parent" pos="Max" offset="0"/>
+            <Height val="#ScobaCineBarH"/>
+            <TextureType val="None"/>
+            <Color val="0,0,0"/>
+            <AcceptsMouse val="false"/>
+            <Visible val="false"/>
+            <Animation name="In">
+                <Event event="In" action="Reset,Play"/>
+                <Controller type="Anchor" side="Bottom" relative="True" end="Pause">
+                    <Key type="Curve" time="0.0" value="#ScobaCineBarH" out="Auto"/>
+                    <Key type="Curve" time="0.4" value="0" in="Auto"/>
+                </Controller>
+            </Animation>
+            <Animation name="Out">
+                <Event event="Out" action="Reset,Play"/>
+                <Controller type="Anchor" side="Bottom" relative="True" end="Pause">
+                    <Key type="Curve" time="0.0" value="0" out="Auto"/>
+                    <Key type="Curve" time="0.4" value="#ScobaCineBarH" in="Auto"/>
+                </Controller>
+            </Animation>
+        </Frame>
+    </Frame>
+</Desc>

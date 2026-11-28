@@ -2,4 +2,5 @@
 <Desc>
     <Include path="UI/Layout/Custom/ScobaMinimap.SC2Layout"/>
     <Include path="UI/Layout/Custom/ScobaTps.SC2Layout"/>
+    <Include path="UI/Layout/Custom/ScobaCine.SC2Layout"/>
 </Desc>

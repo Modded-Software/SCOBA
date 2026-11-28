@@ -30,6 +30,7 @@ void gf_BaMacro ();                 // scripts/testkit/galaxy/baseai/baseai_macr
 void gf_BaFlightGroup ();           // scripts/testkit/galaxy/baseai/baseai_flight.galaxy
 void gf_BhHall ();                  // scripts/testkit/galaxy/baseai/baseai_hall.galaxy
 void gf_BgGas ();                   // scripts/testkit/galaxy/baseai/baseai_gas_main.galaxy
+void gf_BmModeGroup ();             // scripts/testkit/galaxy/baseai/baseai_mode.galaxy
 
 int gf_Ba100 (fixed lp_v) {
     return FixedToInt(lp_v * 100.0);
@@ -469,6 +470,11 @@ bool gt_BaseAiTest_Func (bool testConds, bool runActions) {
         TimerPause(gv_sPAWNTIMER, true);
         gf_BaNoAir();
         gf_BgGas();
+    }
+    else if (gf_DbgGroup("mode")) {
+        // The map-init lanes of the mode, waves on; no air creeps.
+        gf_BaNoAir();
+        gf_BmModeGroup();
     }
     BankValueSetFromInt(gv_dbgBank, "ba_end", "RealClicks", gv_dbgRealClicks);
     BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);

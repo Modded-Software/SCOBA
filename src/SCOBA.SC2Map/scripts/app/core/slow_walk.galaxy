@@ -15,9 +15,10 @@ const int c_SLOW_WALK_LEVELS = 16;
 // calibration (WalkAnimMoveSpeed 3) times the planted-foot speed of
 // `Walk Slow Leg` over `Walk Leg`. The build measures it (walkanim.slow).
 const fixed c_ANIM_SLOW_STRIDE = 1.61;
-// Operator 2026-11-21: the slow walk clips 33 % faster (was 25 %) than the measured
-// stride gives, to match the movement speed on screen.
-const fixed c_ANIM_SLOW_RATE = 1.33;
+// The slow walk clips play this much faster than the measured stride
+// gives. Operator 2026-11-27: 25 % faster again, 1.33 x 1.25 (movement
+// speed unchanged). Was 1.33 (2026-11-21), 1.25, 1.0.
+const fixed c_ANIM_SLOW_RATE = 1.66;
 // Walk phase minus slow walk phase at the same foot pose. The build
 // measures it; both clips lead with the left foot at half cycle.
 const fixed c_ANIM_SLOW_GAIT_OFFSET = 0.0;

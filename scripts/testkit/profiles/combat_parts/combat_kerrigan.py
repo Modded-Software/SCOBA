@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from heroanim.rig import HEROES
 
-from .bank_checks import _report
+from ..bank_checks import _report
 
 PSI = "QueenOfBladesPsiBlast"
 TALONS_AUTO = "RazorTalonsAuto"

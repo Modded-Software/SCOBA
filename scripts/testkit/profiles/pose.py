@@ -100,25 +100,34 @@ def check_combat_pose(checks) -> None:
     check_attack_rate(checks)
 
 
-def _period_factor(period_ms) -> float | None:
-    """The weapon-period speed factor, as gf_AnimAttackSpeed computes it."""
-    if not period_ms:
+def _period_factor(period_4096) -> float | None:
+    """The weapon-period speed factor, as gf_AnimAttackSpeed computes it.
+
+    The period comes in Galaxy fixed point units (1/4096): 0.15 s is 614,
+    which a read in ms would round to 149 or 150."""
+    if not period_4096:
         return None
-    return max(0.25, 1000.0 / period_ms)
+    return max(0.25, 4096.0 / period_4096)
+
+
+def _near(got, want) -> bool:
+    """The factor is fixed point too (run combat/20261127-111020: 19980
+    for 20000 at 0.1 s). 2 thousandths, or 0.3 % of larger factors."""
+    return want is not None and got is not None and abs(got - want) <= max(2, 0.003 * want)
 
 
 def check_attack_rate(checks) -> None:
     """Tosh plays the attack clip at 2x the weapon-period rate (operator 2026-11-17)."""
     s = "attack_rate"
-    factor = _period_factor(checks.value(s, "", "toshPeriod1000"))
+    factor = _period_factor(checks.value(s, "", "toshPeriod4096"))
     want = None if factor is None else int(factor * 2.0 * 1000)
     got = checks.value(s, "", "toshSpeed1000")
-    ok = want is not None and got is not None and abs(got - want) <= 2
+    ok = _near(got, want)
     _report(checks, f"{s} Tosh factor is 2x the weapon factor", ok, f"got={got} want={want}")
     checks.true(s, "", "shotSeen")
     # Engine path: the factor the FSM stored on the real shot.
     stored = checks.value(s, "", "storedSpeed1000")
-    ok = want is not None and stored is not None and abs(stored - want) <= 2
+    ok = _near(stored, want)
     _report(
         checks,
         f"{s} shot stored the 2x factor",
@@ -130,7 +139,7 @@ def check_attack_rate(checks) -> None:
     if factor is not None:
         checks.lt(s, "", "holdMs", int(500.0 / factor))
     # Negative: Kerrigan keeps the weapon-period factor alone.
-    k_factor = _period_factor(checks.value(s, "", "kerriganPeriod1000"))
+    k_factor = _period_factor(checks.value(s, "", "kerriganPeriod4096"))
     k_want = None if k_factor is None else int(k_factor * 1000)
     k_got = checks.value(s, "", "kerriganSpeed1000")
     ok = k_want is not None and k_got is not None and abs(k_got - k_want) <= 2

@@ -3,10 +3,12 @@
 
 // In-game DOF (REQ-CAMERA-DOF). Max strength = the intro DOF
 // (c_INTRO_DOF_*): near 1..6, far 4..18, at the focus (the camera arm).
-// Near: k = (d - 1) / (40 - 1), falloffs = max x k (R-DOF-1).
+// Near: k = floor + (1 - floor) (d - 1) / (40 - 1), falloffs = max x k
+// (R-DOF-1): slight near DOF even at arm 1.
 // Aim: near at k = 1 at any arm, no far (R-DOF-2, R-DOF-4).
 // Far: kf = (d - 3) / (40 - 3), falloffs = max / kf; kf <= 0: none (R-DOF-3).
-// k = 0 and kf <= 0, no aim: DOF off (R-DOF-5).
+// Not aiming: k and kf times c_CAM_DOF_STRENGTH, capped (R-DOF-6).
+// k = 0 and kf <= 0, no aim: DOF off (R-DOF-5; only at strength 0).
 void gf_CameraDofApply (int lp_player) {
     fixed lv_d;
     fixed lv_k;
@@ -19,7 +21,10 @@ void gf_CameraDofApply (int lp_player) {
     lv_d = CameraGetDistance(lp_player);
     lv_aim = gv_aIMACTIVE[lp_player];
     lv_k = MaxF(MinF((lv_d - c_CAM_DOF_NEAR_MIN_ARM) / (c_CAM_DOF_MAX_ARM - c_CAM_DOF_NEAR_MIN_ARM), 1.0), 0.0);
+    lv_k = c_CAM_DOF_NEAR_FLOOR + (1.0 - c_CAM_DOF_NEAR_FLOOR) * lv_k;
     lv_kf = MaxF(MinF((lv_d - c_CAM_DOF_FAR_MIN_ARM) / (c_CAM_DOF_MAX_ARM - c_CAM_DOF_FAR_MIN_ARM), 1.0), 0.0);
+    lv_k = MaxF(MinF(lv_k * c_CAM_DOF_STRENGTH, c_CAM_DOF_K_MAX), 0.0);
+    lv_kf = MaxF(MinF(lv_kf * c_CAM_DOF_STRENGTH, c_CAM_DOF_K_MAX), 0.0);
     if (lv_aim) {
         lv_k = 1.0;
         lv_kf = 0.0;

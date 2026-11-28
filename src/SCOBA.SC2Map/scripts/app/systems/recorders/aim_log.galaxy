@@ -1,0 +1,201 @@
+// Module: systems/recorders/aim_log
+// Crosshair range recorder (operator 2026-11-27: "all launches of the map
+// record"). The TPS crosshair sometimes goes gray on a close enemy in range.
+// This module runs in every launch of the shipped map, for player 1, and
+// writes bank SCOBAAIMLOG, section `aimlog`, one key per entry:
+// - `mark`: key M. The range state now, then `before`: the state of the
+//   last c_AIMLOG_RING polls (3 s).
+// - `gray`: the shown reticle turned gray (enemy out of range), at most
+//   once per c_AIMLOG_GRAY_GAP.
+// - `press`: a left mouse press in TPS.
+// It changes no game state. The bank is cleared at map start.
+
+const int c_AIMLOG_PLAYER = 1;
+const int c_AIMLOG_MARK_KEY = c_keyM;
+const int c_AIMLOG_MAX = 3000;
+const int c_AIMLOG_RING = 30;
+const fixed c_AIMLOG_POLL = 0.1;
+const fixed c_AIMLOG_GRAY_GAP = 1.0;
+// Units this close to the hero are listed with their ray hit.
+const fixed c_AIMLOG_NEAR = 16.0;
+const string c_AIMLOG_BANK = "SCOBAAIMLOG";
+const string c_AIMLOG_SECTION = "aimlog";
+
+bank gv_aimLogBank;
+int gv_aimLogSeq;
+int gv_aimLogMarks;
+int gv_aimLogKind = -1;
+fixed gv_aimLogGrayAt = -100.0;
+string[c_AIMLOG_RING] gv_aimLogRing;
+int gv_aimLogRingAt;
+trigger gt_AimLogPoll;
+trigger gt_AimLogMark;
+trigger gt_AimLogPress;
+
+string gf_AimLogFlag (bool lp_value) {
+    if (lp_value) {
+        return "1";
+    }
+    return "0";
+}
+
+string gf_AimLogUnit (unit lp_unit) {
+    point lv_pos;
+
+    if (!UnitIsValid(lp_unit)) {
+        return "none";
+    }
+    lv_pos = UnitGetPosition(lp_unit);
+    return UnitGetType(lp_unit) + "#" + IntToString(UnitGetTag(lp_unit)) + "[o" + IntToString(UnitGetOwner(lp_unit)) + ",pos=" + FixedToString(PointGetX(lv_pos), 2) + ";" + FixedToString(PointGetY(lv_pos), 2) + "]";
+}
+
+// What the reticle shows, what it computes now, the range check and every
+// input of it, the ray, and each unit near the hero with the distance the
+// ray enters its volume (-1: miss, -2: no volume).
+string gf_AimLogState () {
+    int lv_p = c_AIMLOG_PLAYER;
+    unit lv_hero = gv_tPSUNIT[lv_p];
+    unit lv_pick;
+    unitgroup lv_near;
+    unit lv_u;
+    point lv_at;
+    int lv_i;
+    int lv_n;
+    int lv_type;
+    string lv_text;
+
+    lv_pick = gf_AimUnitAtCrosshair(lv_p, false);
+    lv_at = UnitGetPosition(lv_hero);
+    lv_text = "ms=" + IntToString(FixedToInt(GameGetMissionTime() * 1000.0));
+    lv_text = lv_text + " tps=" + gf_AimLogFlag(gf_TpsActive(lv_p));
+    lv_text = lv_text + " aim=" + gf_AimLogFlag(gv_aIMACTIVE[lv_p]);
+    lv_text = lv_text + " free=" + gf_AimLogFlag(gv_mOUSEMIDDLE[lv_p]);
+    lv_text = lv_text + " held=" + gf_AimLogFlag(gf_InputHeld(lv_p));
+    lv_text = lv_text + " shownKind=" + IntToString(gv_reticleKind[lv_p]);
+    lv_text = lv_text + " kindNow=" + IntToString(gf_ReticleKind(lv_p));
+    lv_text = lv_text + " pick=" + gf_AimLogUnit(lv_pick);
+    if (UnitIsValid(lv_pick)) {
+        lv_text = lv_text + " inRange=" + gf_AimLogFlag(gf_AimTargetInRange(lv_p, lv_pick));
+        lv_text = lv_text + " invuln=" + gf_AimLogFlag(UnitTestState(lv_pick, c_unitStateInvulnerable));
+        lv_text = lv_text + " pickRadius=" + CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lv_pick), "Radius", lv_p);
+        lv_text = lv_text + " pickDist=" + FixedToString(DistanceBetweenPoints(lv_at, UnitGetPosition(lv_pick)), 3);
+    }
+    lv_text = lv_text + " target=" + gf_AimLogUnit(gv_unitTarget[lv_p]);
+    lv_text = lv_text + " hero=" + gf_AimLogUnit(lv_hero);
+    lv_text = lv_text + " wIdx=" + IntToString(gf_AimWeaponIndex(lv_p));
+    lv_text = lv_text + " weapons=";
+    for (lv_i = 1; lv_i <= UnitWeaponCount(lv_hero); lv_i += 1) {
+        lv_text = lv_text + UnitWeaponGet(lv_hero, lv_i) + ":" + gf_AimLogFlag(UnitWeaponIsEnabled(lv_hero, lv_i)) + ":" + FixedToString(UnitWeaponRange(lv_hero, lv_i), 2) + ",";
+    }
+    lv_text = lv_text + " attackEnd=" + IntToString(UnitBehaviorCount(lv_hero, c_SCOBA_ATTACK_END_BEHAVIOR));
+    lv_text = lv_text + " single=" + IntToString(UnitBehaviorCount(lv_hero, c_SCOBA_SINGLE_BEHAVIOR));
+    lv_text = lv_text + " directControl=" + IntToString(UnitBehaviorCount(lv_hero, "UnitDirectControl"));
+    lv_text = lv_text + " heroZ=" + FixedToString(gf_UnitWorldZ(lv_hero), 3);
+    lv_text = lv_text + " camHeight=" + FixedToString(gv_cameraHeightApplied[lv_p], 3);
+    lv_text = lv_text + " camYaw=" + FixedToString(CameraGetYaw(lv_p), 1);
+    lv_text = lv_text + " camPitch=" + FixedToString(CameraGetPitch(lv_p), 1);
+    lv_text = lv_text + " ray=" + FixedToString(gv_aimPickOx, 2) + ";" + FixedToString(gv_aimPickOy, 2) + ";" + FixedToString(gv_aimPickOz, 2);
+    lv_text = lv_text + " dir=" + FixedToString(gv_aimPickDx, 3) + ";" + FixedToString(gv_aimPickDy, 3) + ";" + FixedToString(gv_aimPickDz, 3);
+    lv_near = UnitGroup(null, c_playerAny, RegionCircle(lv_at, c_AIMLOG_NEAR), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    lv_n = UnitGroupCount(lv_near, c_unitCountAll);
+    lv_text = lv_text + " near=";
+    for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
+        lv_u = UnitGroupUnit(lv_near, lv_i);
+        if (lv_u == lv_hero) {
+            continue;
+        }
+        lv_type = gf_HvTypeIndex(UnitGetType(lv_u));
+        lv_text = lv_text + UnitGetType(lv_u) + "#" + IntToString(UnitGetTag(lv_u)) + "(o" + IntToString(UnitGetOwner(lv_u));
+        lv_text = lv_text + ",d" + FixedToString(DistanceBetweenPoints(lv_at, UnitGetPosition(lv_u)), 2);
+        lv_text = lv_text + ",z" + FixedToString(gf_UnitWorldZ(lv_u), 2);
+        lv_text = lv_text + ",f" + FixedToString(UnitGetFacing(lv_u), 0);
+        lv_text = lv_text + ",valid" + gf_AimLogFlag(gf_UnitTargetValid(lv_p, lv_u, false));
+        lv_text = lv_text + ",alive" + gf_AimLogFlag(UnitIsAlive(lv_u));
+        if (lv_type < 0) {
+            lv_text = lv_text + ",t-2";
+        }
+        else {
+            lv_text = lv_text + ",t" + FixedToString(gf_HvRayUnit(lv_u, lv_type, gv_aimPickOx, gv_aimPickOy, gv_aimPickOz, gv_aimPickDx, gv_aimPickDy, gv_aimPickDz), 2);
+        }
+        lv_text = lv_text + ") ";
+    }
+    return lv_text;
+}
+
+void gf_AimLogWrite (string lp_kind, string lp_text) {
+    if (gv_aimLogSeq >= c_AIMLOG_MAX) {
+        return;
+    }
+    gv_aimLogSeq += 1;
+    BankValueSetFromString(gv_aimLogBank, c_AIMLOG_SECTION, "e" + IntToString(100000 + gv_aimLogSeq), lp_kind + " " + lp_text);
+}
+
+bool gf_AimLogActive () {
+    return UnitIsValid(gv_tPSUNIT[c_AIMLOG_PLAYER]) && gf_TpsActive(c_AIMLOG_PLAYER);
+}
+
+bool gt_AimLogPoll_Func (bool testConds, bool runActions) {
+    string lv_state;
+    int lv_kind;
+
+    if (!runActions || !gf_AimLogActive()) {
+        return true;
+    }
+    lv_state = gf_AimLogState();
+    gv_aimLogRing[gv_aimLogRingAt] = lv_state;
+    gv_aimLogRingAt = (gv_aimLogRingAt + 1) % c_AIMLOG_RING;
+    lv_kind = gv_reticleKind[c_AIMLOG_PLAYER];
+    if (lv_kind != gv_aimLogKind) {
+        gv_aimLogKind = lv_kind;
+        if (lv_kind == c_RETICLE_ENEMY_FAR && (GameGetMissionTime() - gv_aimLogGrayAt) >= c_AIMLOG_GRAY_GAP) {
+            gv_aimLogGrayAt = GameGetMissionTime();
+            gf_AimLogWrite("gray", lv_state);
+            BankSave(gv_aimLogBank);
+        }
+    }
+    return true;
+}
+
+bool gt_AimLogMark_Func (bool testConds, bool runActions) {
+    int lv_i;
+    int lv_at;
+    string lv_n;
+
+    if (!runActions || !UnitIsValid(gv_tPSUNIT[c_AIMLOG_PLAYER])) {
+        return true;
+    }
+    gv_aimLogMarks += 1;
+    lv_n = "n=" + IntToString(gv_aimLogMarks) + " ";
+    gf_AimLogWrite("mark", lv_n + gf_AimLogState());
+    for (lv_i = 0; lv_i < c_AIMLOG_RING; lv_i += 1) {
+        lv_at = (gv_aimLogRingAt + lv_i) % c_AIMLOG_RING;
+        if (gv_aimLogRing[lv_at] != "") {
+            gf_AimLogWrite("before", lv_n + gv_aimLogRing[lv_at]);
+        }
+    }
+    BankSave(gv_aimLogBank);
+    UIDisplayMessage(PlayerGroupSingle(c_AIMLOG_PLAYER), c_messageAreaSubtitle, StringToText("Aim log: mark " + IntToString(gv_aimLogMarks) + " saved."));
+    return true;
+}
+
+bool gt_AimLogPress_Func (bool testConds, bool runActions) {
+    if (!runActions || !gf_AimLogActive()) {
+        return true;
+    }
+    gf_AimLogWrite("press", gf_AimLogState());
+    BankSave(gv_aimLogBank);
+    return true;
+}
+
+void gt_AimLog_Init () {
+    gv_aimLogBank = BankLoad(c_AIMLOG_BANK, c_AIMLOG_PLAYER);
+    BankSectionRemove(gv_aimLogBank, c_AIMLOG_SECTION);
+    BankValueSetFromString(gv_aimLogBank, "meta", "build", c_SCOBA_BUILD_STAMP);
+    BankSave(gv_aimLogBank);
+    gt_AimLogPoll = TriggerCreate("gt_AimLogPoll_Func");
+    TriggerAddEventTimePeriodic(gt_AimLogPoll, c_AIMLOG_POLL, c_timeGame);
+    gt_AimLogMark = TriggerCreate("gt_AimLogMark_Func");
+    TriggerAddEventKeyPressed(gt_AimLogMark, c_AIMLOG_PLAYER, c_AIMLOG_MARK_KEY, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_AimLogPress = TriggerCreate("gt_AimLogPress_Func");
+    TriggerAddEventMouseClicked(gt_AimLogPress, c_AIMLOG_PLAYER, c_mouseButtonLeft, true);
+}

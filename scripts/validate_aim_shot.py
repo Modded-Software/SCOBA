@@ -46,9 +46,10 @@ KERRIGAN_REMOVED_ABILITY = "PoisonNova"
 AIR_EFFECT = "SCOBAToshAirU"
 AIR_SHOT = "SCOBAToshAirShot"
 AIR_ACTOR = "SCOBAToshAirAttack"
-# Tosh's button clock and its period. TESTING (operator 2026-11-16): 0.1 s;
-# the release value is ("SCOBAAttackCooldown10", "1").
-TOSH_CLOCK = ("SCOBAAttackCooldown01", "0.25")
+# Tosh's button clock and its period: 0.15 s (operator 2026-11-27: 0.1 was
+# too fast; 0.25 from 2026-11-16). The release value is
+# ("SCOBAAttackCooldown10", "1").
+TOSH_CLOCK = ("SCOBAAttackCooldown01", "0.15")
 
 # The aim shot runs the hero weapon's effect (R-TPS-1, R-TPS-3). The aim-shot
 # abilities, their effects, and their actors are gone and must stay gone.
@@ -147,6 +148,12 @@ def check_kerrigan_talons(map_dir: Path) -> None:
     cost = None if weapon is None else weapon.find("Cost/Cooldown")
     if period is None or period.get("value") != "1" or cost is None or cost.get("TimeUse") != "1":
         fail("RazorTalons must have Period 1 and cooldown TimeUse 1")
+    # Tosh: period and cost equal the button clock (TOSH_CLOCK).
+    tosh = ET.parse(map_dir / GAMEDATA / "WeaponData.xml").getroot().find("CWeaponLegacy[@id='Tosh']")
+    period = None if tosh is None else tosh.find("Period")
+    cost = None if tosh is None else tosh.find("Cost/Cooldown")
+    if period is None or period.get("value") != TOSH_CLOCK[1] or cost is None or cost.get("TimeUse") != TOSH_CLOCK[1]:
+        fail(f"Tosh must have Period {TOSH_CLOCK[1]} and cooldown TimeUse {TOSH_CLOCK[1]}")
 
 
 def check_kerrigan_psi_blast(gamedata: Path) -> None:

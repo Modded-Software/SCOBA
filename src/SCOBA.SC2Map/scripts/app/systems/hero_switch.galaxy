@@ -103,6 +103,8 @@ void gf_HeroBindPlayer (int lp_player, unit lp_hero) {
     UnitSetState(lp_hero, c_unitStateStatusBar, false);
     UnitXPGainEnable(lp_hero, null, true);
     gf_ControlApply(lp_player);
+    // gf_PncEnsure applies the held WASD keys to the new unit
+    // (gf_ControlModeApply: gf_MoveKeysChanged).
     gf_PncEnsure(lp_player);
     gf_HeroApplyCamera(lp_player, lp_hero);
     UnitClearSelection(lp_player);

@@ -206,6 +206,51 @@ class WaitForKeyTest(unittest.TestCase):
             self.assertEqual(path.read_bytes(), ls.set_wait_for_key(self.data, False))
 
 
+class LayoutTest(unittest.TestCase):
+    """R-LOAD-8: MapInfo names the two-column loading layout."""
+
+    def setUp(self) -> None:
+        self.data = (SRC / "MapInfo").read_bytes()
+
+    def test_source_names_none(self) -> None:
+        self.assertEqual(ls.layout(self.data), "")
+
+    def test_set_inserts_only_the_path(self) -> None:
+        at = ls.header(self.data)
+        out = ls.set_layout(self.data, ls.LAYOUT)
+        self.assertEqual(ls.layout(out), ls.LAYOUT)
+        self.assertEqual(out[: at.layout_off], self.data[: at.layout_off])
+        self.assertEqual(out[at.layout_off + len(ls.LAYOUT) :], self.data[at.layout_off :])
+        # The check value does not cover the path: it stays valid.
+        self.assertEqual(struct.unpack_from("<Q", out, ls.HASH_OFF)[0], ls.map_hash(out))
+        self.assertEqual(ls.wait_for_key(out), ls.wait_for_key(self.data))
+
+    def test_round_trip(self) -> None:
+        out = ls.set_layout(self.data, ls.LAYOUT)
+        self.assertEqual(ls.set_layout(out, ls.LAYOUT), out)
+        self.assertEqual(ls.set_layout(out, ""), self.data)
+
+    def test_build_and_test_maps_name_it(self) -> None:
+        from expand_map import expand_mapinfo
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "MapInfo"
+            expand_mapinfo(SRC / "MapInfo", out)
+            self.assertEqual(ls.layout(out.read_bytes()), ls.LAYOUT)
+            self.assertTrue(ls.wait_for_key(out.read_bytes()))
+            # A test map keeps it: only the wait is cleared.
+            patch_mapinfo(out)
+            self.assertEqual(ls.layout(out.read_bytes()), ls.LAYOUT)
+            self.assertFalse(ls.wait_for_key(out.read_bytes()))
+
+    def test_the_layout_file_is_there_and_not_in_desc_index(self) -> None:
+        layout = SRC / "Base.SC2Data" / ls.LAYOUT
+        self.assertTrue(layout.is_file(), layout)
+        index = (SRC / "Base.SC2Data" / "UI" / "Layout" / "DescIndex.SC2Layout").read_text(encoding="utf-8")
+        # Negative: in DescIndex, the game would read it with no help of MapInfo.
+        self.assertNotIn("ScobaLoading", index)
+
+
 class DocumentHeaderTest(unittest.TestCase):
     """The game shows the text the DocumentHeader holds, not GameStrings.txt alone."""
 

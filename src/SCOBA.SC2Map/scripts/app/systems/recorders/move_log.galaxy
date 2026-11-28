@@ -1,0 +1,432 @@
+// Module: systems/recorders/move_log
+// Stuck recorder (operator 2026-11-27: a direction key is held and the hero
+// stands; a camera turn or another key does not free it). Cause not found
+// (SPEC-POINT-AND-CLICK 5.8b). This module runs in every launch of the
+// shipped map, for player 1, and writes bank SCOBAMOVELOG, section
+// `movelog`, one key per entry:
+// - `stuck`: a WASD key is down for c_MOVELOG_LOOPS game loops and the hero's
+//   path in them is under c_MOVELOG_STILL. Once per case. Then `before`:
+//   the short state of the last c_MOVELOG_STUCK_ROWS loops, and `edges`:
+//   the input edges kept by systems/recorders/move_log_keys.
+// - `free`: the hero travels again with the key still down.
+// - `released`: every key went up while it stood.
+// - `keys`: the script key state differs from the key events.
+// - `mark`: key M. The state now, then `before` (the last c_MOVELOG_RING
+//   loops) and `edges`. The game cannot tell a key that is held and gave
+//   no key event: only a mark records that case.
+// It changes no game state. The bank is cleared at map start.
+
+const int c_MOVELOG_PLAYER = 1;
+const int c_MOVELOG_MARK_KEY = c_keyM;
+const int c_MOVELOG_MAX = 6000;      // a mark writes up to 181 entries
+const int c_MOVELOG_RING = 160;      // 10 s of game loops
+const int c_MOVELOG_STUCK_ROWS = 32; // 2 s: the rows of a stuck entry
+const int c_MOVELOG_LOOPS = 8;       // 0.5 s: the stuck window
+const int c_MOVELOG_KEY_LOOPS = 2;   // loops of differing key state
+const fixed c_MOVELOG_POLL = 0.0625;
+const fixed c_MOVELOG_STILL = 0.15;  // travel in the window; a walk: about 1.5
+const fixed c_MOVELOG_NEAR = 2.5;
+const string c_MOVELOG_BANK = "SCOBAMOVELOG";
+const string c_MOVELOG_SECTION = "movelog";
+
+bank gv_moveLogBank;
+int gv_moveLogSeq;
+int gv_moveLogMarks;
+int gv_moveLogStucks;
+int gv_moveLogFrees;
+int gv_moveLogKeyOffs;
+int gv_moveLogRaw;            // keys down by the key events: W 1, S 2, A 4, D 8
+int gv_moveLogDownLoops;
+int gv_moveLogOffLoops;
+bool gv_moveLogStuck;
+bool gv_moveLogKeyOff;
+string gv_moveLogLast = "";   // the last stuck entry
+string gv_moveLogLastMark = "";
+fixed gv_moveLogTravelNow = -1.0;  // travel of the window at the last poll
+string[c_MOVELOG_RING] gv_moveLogRing;
+int gv_moveLogRingAt;
+int gv_moveLogRingN;
+fixed[c_MOVELOG_LOOPS] gv_moveLogStep;  // travel of each loop of the window
+int gv_moveLogStepAt;
+int gv_moveLogStepN;
+point gv_moveLogLastPos;
+bool gv_moveLogHasPos;
+trigger gt_MoveLogPoll;
+trigger gt_MoveLogMark;
+trigger gt_MoveLogKeyDown;
+trigger gt_MoveLogKeyUp;
+
+string gf_MoveLogFlag (bool lp_value) {
+    if (lp_value) {
+        return "1";
+    }
+    return "0";
+}
+
+int gf_MoveLogBits (bool lp_w, bool lp_s, bool lp_a, bool lp_d) {
+    int lv_bits = 0;
+
+    if (lp_w) {
+        lv_bits += 1;
+    }
+    if (lp_s) {
+        lv_bits += 2;
+    }
+    if (lp_a) {
+        lv_bits += 4;
+    }
+    if (lp_d) {
+        lv_bits += 8;
+    }
+    return lv_bits;
+}
+
+int gf_MoveLogScriptKeys (int lp_p) {
+    return gf_MoveLogBits(gv_kEYFORWARD[lp_p], gv_kEYBACKWARD[lp_p], gv_kEYLEFT[lp_p], gv_kEYRIGHT[lp_p]);
+}
+
+// A key event of the recorder. lp_key: c_MOVE_KEY_*.
+void gf_MoveLogKey (int lp_key, bool lp_down) {
+    int lv_bit = 1 << lp_key;
+
+    gf_MoveLogKeyEdge(lp_key, lp_down);
+    if (lp_down) {
+        gv_moveLogRaw = gv_moveLogRaw | lv_bit;
+    }
+    else if ((gv_moveLogRaw & lv_bit) != 0) {
+        gv_moveLogRaw = gv_moveLogRaw - lv_bit;
+    }
+}
+
+int gf_MoveLogKeyIndex (int lp_key) {
+    if (lp_key == gv_mOVEFORWARD) {
+        return c_MOVE_KEY_FWD;
+    }
+    if (lp_key == gv_mOVEBACKWARD) {
+        return c_MOVE_KEY_BACK;
+    }
+    if (lp_key == gv_mOVELEFT) {
+        return c_MOVE_KEY_LEFT;
+    }
+    return c_MOVE_KEY_RIGHT;
+}
+
+string gf_MoveLogOrder (unit lp_hero, int lp_index) {
+    order lv_order = UnitOrder(lp_hero, lp_index);
+    string lv_text;
+
+    if (lv_order == null) {
+        return "none";
+    }
+    lv_text = AbilityCommandGetAbility(OrderGetAbilityCommand(lv_order));
+    if (OrderGetTargetType(lv_order) == c_orderTargetPoint) {
+        lv_text = lv_text + "@point,d" + FixedToString(DistanceBetweenPoints(UnitGetPosition(lp_hero), OrderGetTargetPoint(lv_order)), 2);
+    }
+    else if (OrderGetTargetType(lv_order) == c_orderTargetUnit) {
+        lv_text = lv_text + "@unit," + UnitGetType(OrderGetTargetUnit(lv_order));
+    }
+    return lv_text;
+}
+
+// The short state: one per game loop in the ring.
+string gf_MoveLogBrief (fixed lp_travel) {
+    int lv_p = c_MOVELOG_PLAYER;
+    unit lv_hero = gv_tPSUNIT[lv_p];
+    point lv_at = UnitGetPosition(lv_hero);
+    string lv_text;
+
+    lv_text = "ms=" + IntToString(FixedToInt(GameGetMissionTime() * 1000.0));
+    lv_text = lv_text + " pos=" + FixedToString(PointGetX(lv_at), 2) + ";" + FixedToString(PointGetY(lv_at), 2);
+    lv_text = lv_text + " travel=" + FixedToString(lp_travel, 2);
+    lv_text = lv_text + " raw=" + IntToString(gv_moveLogRaw);
+    lv_text = lv_text + " keys=" + IntToString(gf_MoveLogScriptKeys(lv_p));
+    lv_text = lv_text + " flags=" + IntToString(gf_MoveLogBits(gv_fORWARD[lv_p], gv_bACKWARD[lv_p], gv_lEFT[lv_p], gv_rIGHT[lv_p]));
+    lv_text = lv_text + " held=" + gf_MoveLogFlag(gf_InputHeld(lv_p));
+    lv_text = lv_text + " strafe=" + gf_MoveLogFlag(gv_holdStrafe[lv_p]);
+    lv_text = lv_text + " aim=" + gf_MoveLogFlag(gv_aIMACTIVE[lv_p]);
+    lv_text = lv_text + " root=" + IntToString(UnitBehaviorCount(lv_hero, "SCOBAStandRoot"));
+    lv_text = lv_text + " ticks=" + IntToString(gv_moveTicks);
+    lv_text = lv_text + " steps=" + IntToString(gv_moveSteps[lv_p]);
+    lv_text = lv_text + " orders=" + IntToString(UnitOrderCount(lv_hero));
+    lv_text = lv_text + " order0=" + gf_MoveLogOrder(lv_hero, 0);
+    return lv_text;
+}
+
+// Pathing on the key heading: the hero's own cell, then each distance with
+// "passable" and the reach test of the strafe step.
+string gf_MoveLogPath (int lp_p, unit lp_hero) {
+    point lv_at = UnitGetPosition(lp_hero);
+    fixed lv_heading = gf_AnimInputHeading(lp_p);
+    point lv_next;
+    fixed lv_dist = 0.5;
+    string lv_text;
+    int lv_i;
+
+    lv_text = "here:" + gf_MoveLogFlag(PointPathingPassable(lv_at)) + ",cliff" + FixedToString(PointPathingCliffLevel(lv_at), 1) + ",heading" + FixedToString(lv_heading, 0);
+    for (lv_i = 0; lv_i < 3; lv_i += 1) {
+        lv_next = PointWithOffsetPolar(lv_at, lv_dist, lv_heading);
+        lv_text = lv_text + ",d" + FixedToString(lv_dist, 1) + ":" + gf_MoveLogFlag(PointPathingPassable(lv_next)) + gf_MoveLogFlag(gf_AimMoveReachable(lp_p, lp_hero, lv_next, lv_dist));
+        if (lv_i == 0) {
+            lv_dist = 2.0;
+        }
+        else {
+            lv_dist = 6.0;
+        }
+    }
+    return lv_text;
+}
+
+// Every input of the movement step and what holds the unit.
+string gf_MoveLogState (fixed lp_travel) {
+    int lv_p = c_MOVELOG_PLAYER;
+    unit lv_hero = gv_tPSUNIT[lv_p];
+    point lv_at = UnitGetPosition(lv_hero);
+    unitgroup lv_near;
+    unit lv_u;
+    string lv_name;
+    string lv_text;
+    int lv_i;
+    int lv_n;
+
+    lv_text = gf_MoveLogBrief(lp_travel);
+    lv_text = lv_text + " hero=" + UnitGetType(lv_hero);
+    lv_text = lv_text + " alive=" + gf_MoveLogFlag(UnitIsAlive(lv_hero));
+    lv_text = lv_text + " facing=" + FixedToString(UnitGetFacing(lv_hero), 0);
+    lv_text = lv_text + " camYaw=" + FixedToString(CameraGetYaw(lv_p), 0);
+    lv_text = lv_text + " speed=" + FixedToString(UnitGetPropertyFixed(lv_hero, c_unitPropMovementSpeed, c_unitPropCurrent), 2);
+    lv_text = lv_text + " mouseFwd=" + gf_MoveLogFlag(gv_mOUSEFORWARD[lv_p]);
+    lv_text = lv_text + " scene=" + IntToString(gv_sceneOwners[lv_p]);
+    lv_text = lv_text + " tps=" + gf_MoveLogFlag(gf_TpsActive(lv_p));
+    lv_text = lv_text + " orderMode=" + gf_MoveLogFlag(gv_sCOBAOrderMode[lv_p]);
+    lv_text = lv_text + " free=" + gf_MoveLogFlag(gv_mOUSEMIDDLE[lv_p]);
+    lv_text = lv_text + " mright=" + gf_MoveLogFlag(gv_mOUSERIGHT[lv_p]);
+    lv_text = lv_text + " rorbit=" + gf_MoveLogFlag(gv_rIGHTORBIT[lv_p]);
+    lv_text = lv_text + " lorbit=" + gf_MoveLogFlag(gv_lEFTORBIT[lv_p]);
+    lv_text = lv_text + " rotUnit=" + gf_MoveLogFlag(gv_rOTATEUNIT[lv_p]);
+    lv_text = lv_text + " rotCam=" + gf_MoveLogFlag(gv_rOTATECAMERA[lv_p]);
+    lv_text = lv_text + " stand=" + IntToString(UnitBehaviorCount(lv_hero, c_SCOBA_STAND_BEHAVIOR));
+    lv_text = lv_text + " moveSup=" + gf_MoveLogFlag(UnitTestState(lv_hero, c_unitStateMoveSuppressed));
+    lv_text = lv_text + " turnSup=" + gf_MoveLogFlag(UnitTestState(lv_hero, c_unitStateTurnSuppressed));
+    lv_text = lv_text + " stun=" + gf_MoveLogFlag(UnitTestState(lv_hero, c_unitStateStunned));
+    lv_text = lv_text + " hidden=" + gf_MoveLogFlag(UnitTestState(lv_hero, c_unitStateHidden));
+    lv_text = lv_text + " jump=" + IntToString(gv_jumpPhase[lv_p]);
+    lv_text = lv_text + " hasTarget=" + gf_MoveLogFlag(gv_animHasMoveTarget[lv_p]);
+    if (gv_animHasMoveTarget[lv_p]) {
+        lv_text = lv_text + " targetDist=" + FixedToString(DistanceBetweenPoints(lv_at, gv_animMoveTarget[lv_p]), 2);
+        lv_text = lv_text + " targetHeading=" + FixedToString(gv_animMoveHeading[lv_p], 0);
+    }
+    lv_text = lv_text + " order1=" + gf_MoveLogOrder(lv_hero, 1);
+    lv_text = lv_text + " order2=" + gf_MoveLogOrder(lv_hero, 2);
+    lv_text = lv_text + " path=" + gf_MoveLogPath(lv_p, lv_hero);
+    lv_text = lv_text + " behaviors=";
+    lv_n = UnitBehaviorCountAll(lv_hero);
+    for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
+        lv_name = UnitBehaviorGet(lv_hero, lv_i);
+        if (lv_name != "") {
+            lv_text = lv_text + lv_name + "*" + IntToString(UnitBehaviorCount(lv_hero, lv_name)) + ",";
+        }
+    }
+    lv_near = UnitGroup(null, c_playerAny, RegionCircle(lv_at, c_MOVELOG_NEAR), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0);
+    lv_n = UnitGroupCount(lv_near, c_unitCountAll);
+    lv_text = lv_text + " near=";
+    for (lv_i = 1; lv_i <= lv_n; lv_i += 1) {
+        lv_u = UnitGroupUnit(lv_near, lv_i);
+        if (lv_u == lv_hero) {
+            continue;
+        }
+        lv_text = lv_text + UnitGetType(lv_u) + "(o" + IntToString(UnitGetOwner(lv_u)) + ",d" + FixedToString(DistanceBetweenPoints(lv_at, UnitGetPosition(lv_u)), 2) + ") ";
+    }
+    return lv_text;
+}
+
+void gf_MoveLogWrite (string lp_kind, string lp_text) {
+    if (gv_moveLogSeq >= c_MOVELOG_MAX) {
+        return;
+    }
+    gv_moveLogSeq += 1;
+    BankValueSetFromString(gv_moveLogBank, c_MOVELOG_SECTION, "e" + IntToString(100000 + gv_moveLogSeq), lp_kind + " " + lp_text);
+}
+
+// The last lp_rows loops of the ring, oldest first, as `before` entries.
+void gf_MoveLogWriteRing (string lp_n, int lp_rows) {
+    int lv_rows = lp_rows;
+    int lv_i;
+    int lv_at;
+
+    if (lv_rows > gv_moveLogRingN) {
+        lv_rows = gv_moveLogRingN;
+    }
+    for (lv_i = 0; lv_i < lv_rows; lv_i += 1) {
+        lv_at = (gv_moveLogRingAt + c_MOVELOG_RING - lv_rows + lv_i) % c_MOVELOG_RING;
+        gf_MoveLogWrite("before", lp_n + gv_moveLogRing[lv_at]);
+    }
+}
+
+// The kept input edges, oldest first, as `edges` entries.
+void gf_MoveLogWriteEdges (string lp_n) {
+    int lv_first;
+    int lv_i = 0;
+
+    // A key that is down now and gave no other edge since: write its down.
+    gf_MoveLogEdgeFlush();
+    lv_first = gf_MoveLogEdgeFirst();
+    while (lv_first < gv_moveLogEdgeSeq) {
+        gf_MoveLogWrite("edges", lp_n + "i=" + IntToString(lv_i) + " " + gf_MoveLogEdgesText(lv_first, c_MOVELOG_EDGE_ROW));
+        lv_first += c_MOVELOG_EDGE_ROW;
+        lv_i += 1;
+    }
+}
+
+// Travel over the stuck window: the length of the path, the sum of the
+// steps of its loops. A turn-around walks out and back: end to end it is
+// no travel (run combat/20261127-162040). -1 until the window is full.
+fixed gf_MoveLogTravel (point lp_now) {
+    fixed lv_travel = 0.0;
+    int lv_i;
+
+    if (!gv_moveLogHasPos) {
+        gv_moveLogHasPos = true;
+        gv_moveLogLastPos = lp_now;
+        return -1.0;
+    }
+    gv_moveLogStep[gv_moveLogStepAt] = DistanceBetweenPoints(lp_now, gv_moveLogLastPos);
+    gv_moveLogLastPos = lp_now;
+    gv_moveLogStepAt = (gv_moveLogStepAt + 1) % c_MOVELOG_LOOPS;
+    if (gv_moveLogStepN < c_MOVELOG_LOOPS) {
+        gv_moveLogStepN += 1;
+    }
+    if (gv_moveLogStepN < c_MOVELOG_LOOPS) {
+        return -1.0;
+    }
+    for (lv_i = 0; lv_i < c_MOVELOG_LOOPS; lv_i += 1) {
+        lv_travel += gv_moveLogStep[lv_i];
+    }
+    return lv_travel;
+}
+
+void gf_MoveLogStuckStep (bool lp_down, fixed lp_travel) {
+    string lv_n;
+
+    if (!gv_moveLogStuck) {
+        if (gv_moveLogDownLoops < c_MOVELOG_LOOPS || lp_travel < 0.0 || lp_travel >= c_MOVELOG_STILL) {
+            return;
+        }
+        gv_moveLogStuck = true;
+        gv_moveLogStucks += 1;
+        lv_n = "n=" + IntToString(gv_moveLogStucks) + " ";
+        gv_moveLogLast = gf_MoveLogState(lp_travel);
+        gf_MoveLogWrite("stuck", lv_n + gv_moveLogLast);
+        gf_MoveLogWriteRing(lv_n, c_MOVELOG_STUCK_ROWS);
+        gf_MoveLogWriteEdges(lv_n);
+        BankSave(gv_moveLogBank);
+        return;
+    }
+    lv_n = "n=" + IntToString(gv_moveLogStucks) + " ";
+    if (!lp_down) {
+        gv_moveLogStuck = false;
+        gf_MoveLogWrite("released", lv_n + gf_MoveLogState(lp_travel));
+        BankSave(gv_moveLogBank);
+    }
+    else if (lp_travel >= c_MOVELOG_STILL) {
+        gv_moveLogStuck = false;
+        gv_moveLogFrees += 1;
+        gf_MoveLogWrite("free", lv_n + gf_MoveLogState(lp_travel));
+        BankSave(gv_moveLogBank);
+    }
+}
+
+void gf_MoveLogKeysStep (fixed lp_travel) {
+    if (gv_moveLogRaw == gf_MoveLogScriptKeys(c_MOVELOG_PLAYER)) {
+        gv_moveLogOffLoops = 0;
+        gv_moveLogKeyOff = false;
+        return;
+    }
+    gv_moveLogOffLoops += 1;
+    if (gv_moveLogOffLoops < c_MOVELOG_KEY_LOOPS || gv_moveLogKeyOff) {
+        return;
+    }
+    gv_moveLogKeyOff = true;
+    gv_moveLogKeyOffs += 1;
+    gf_MoveLogWrite("keys", "n=" + IntToString(gv_moveLogKeyOffs) + " " + gf_MoveLogState(lp_travel));
+    BankSave(gv_moveLogBank);
+}
+
+bool gt_MoveLogPoll_Func (bool testConds, bool runActions) {
+    int lv_p = c_MOVELOG_PLAYER;
+    fixed lv_travel;
+    bool lv_down;
+
+    if (!runActions || !UnitIsValid(gv_tPSUNIT[lv_p])) {
+        return true;
+    }
+    lv_travel = gf_MoveLogTravel(UnitGetPosition(gv_tPSUNIT[lv_p]));
+    gv_moveLogTravelNow = lv_travel;
+    lv_down = gv_moveLogRaw != 0 || gf_MoveKeyDown(lv_p);
+    if (lv_down) {
+        gv_moveLogDownLoops += 1;
+    }
+    else {
+        gv_moveLogDownLoops = 0;
+    }
+    gf_MoveLogStuckStep(lv_down, lv_travel);
+    gf_MoveLogKeysStep(lv_travel);
+    gv_moveLogRing[gv_moveLogRingAt] = gf_MoveLogBrief(lv_travel);
+    gv_moveLogRingAt = (gv_moveLogRingAt + 1) % c_MOVELOG_RING;
+    if (gv_moveLogRingN < c_MOVELOG_RING) {
+        gv_moveLogRingN += 1;
+    }
+    return true;
+}
+
+bool gt_MoveLogMark_Func (bool testConds, bool runActions) {
+    string lv_n;
+
+    if (!runActions || !UnitIsValid(gv_tPSUNIT[c_MOVELOG_PLAYER])) {
+        return true;
+    }
+    gv_moveLogMarks += 1;
+    lv_n = "n=" + IntToString(gv_moveLogMarks) + " ";
+    gv_moveLogLastMark = gf_MoveLogState(gv_moveLogTravelNow);
+    gf_MoveLogWrite("mark", lv_n + gv_moveLogLastMark);
+    gf_MoveLogWriteRing(lv_n, c_MOVELOG_RING);
+    gf_MoveLogWriteEdges(lv_n);
+    BankSave(gv_moveLogBank);
+    return true;
+}
+
+bool gt_MoveLogKeyDown_Func (bool testConds, bool runActions) {
+    if (runActions) {
+        gf_MoveLogKey(gf_MoveLogKeyIndex(EventKeyPressed()), true);
+    }
+    return true;
+}
+
+bool gt_MoveLogKeyUp_Func (bool testConds, bool runActions) {
+    if (runActions) {
+        gf_MoveLogKey(gf_MoveLogKeyIndex(EventKeyPressed()), false);
+    }
+    return true;
+}
+
+void gf_MoveLogKeyEvents (trigger lp_t, bool lp_down) {
+    TriggerAddEventKeyPressed(lp_t, c_MOVELOG_PLAYER, gv_mOVEFORWARD, lp_down, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    TriggerAddEventKeyPressed(lp_t, c_MOVELOG_PLAYER, gv_mOVEBACKWARD, lp_down, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    TriggerAddEventKeyPressed(lp_t, c_MOVELOG_PLAYER, gv_mOVELEFT, lp_down, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    TriggerAddEventKeyPressed(lp_t, c_MOVELOG_PLAYER, gv_mOVERIGHT, lp_down, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+
+void gt_MoveLog_Init () {
+    gv_moveLogBank = BankLoad(c_MOVELOG_BANK, c_MOVELOG_PLAYER);
+    BankSectionRemove(gv_moveLogBank, c_MOVELOG_SECTION);
+    BankValueSetFromString(gv_moveLogBank, "meta", "build", c_SCOBA_BUILD_STAMP);
+    BankSave(gv_moveLogBank);
+    gt_MoveLogPoll = TriggerCreate("gt_MoveLogPoll_Func");
+    TriggerAddEventTimePeriodic(gt_MoveLogPoll, c_MOVELOG_POLL, c_timeGame);
+    gt_MoveLogMark = TriggerCreate("gt_MoveLogMark_Func");
+    TriggerAddEventKeyPressed(gt_MoveLogMark, c_MOVELOG_PLAYER, c_MOVELOG_MARK_KEY, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_MoveLogKeyDown = TriggerCreate("gt_MoveLogKeyDown_Func");
+    gf_MoveLogKeyEvents(gt_MoveLogKeyDown, true);
+    gt_MoveLogKeyUp = TriggerCreate("gt_MoveLogKeyUp_Func");
+    gf_MoveLogKeyEvents(gt_MoveLogKeyUp, false);
+    gf_MoveLogKeysInit(c_MOVELOG_PLAYER);
+}

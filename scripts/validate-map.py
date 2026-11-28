@@ -25,6 +25,7 @@ from hitvolumes.validate_intro import animation_actor_problems, intro_problems
 from hitvolumes.validate_pod_actor import check_pod_actor
 from input_gate_check import gated as check_input_gate
 from jumpanim.validate import check_jump
+from mapgen.base_mode import check_script as check_base_mode
 from mapgen.footprints.build import check_scaled_footprints
 from mapgen.loading_screen import check as check_loading_screen
 from mapgen.melee_map import check as check_melee_map
@@ -490,7 +491,7 @@ def main() -> int:
         fail(problem)
     for problem in check_resources(map_dir):
         fail(problem)
-    for problem in check_roster_script(galaxy_text(map_dir)):
+    for problem in [*check_roster_script(galaxy_text(map_dir)), *check_base_mode(galaxy_text(map_dir))]:
         fail(problem)
     for problem in [*check_input_gate(galaxy_text(map_dir)), *check_drop_path(map_dir), *check_loading_screen(map_dir)]:
         fail(problem)

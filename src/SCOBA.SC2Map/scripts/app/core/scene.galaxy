@@ -12,7 +12,7 @@ const fixed c_SCENE_LETTERBOX_OUT = 0.5;
 
 // Map dialogs hidden in the scene, and the triggers gated by its hold.
 const int c_SCENE_DIALOGS = 15;
-const int c_SCENE_TRIGGERS = 44;
+const int c_SCENE_TRIGGERS = 43;
 
 // The Dflt camera DOF values, set when the scene ends.
 const fixed c_SCENE_DFLT_FOCUS = 8.0;
@@ -25,3 +25,28 @@ int[16] gv_sceneOwners;
 int[16] gv_sceneEnters;            // scenes started (first owner), for tests
 bool[16][c_SCENE_DIALOGS] gv_sceneDialogKept;
 int[16] gv_sceneDialogReshown;     // dialogs the game showed in the scene, hidden again
+
+// Cinematic mode (REQ-CINEMATIC, operator 2026-11-27): F9 hides all UI,
+// input stays free. Shift+F9 toggles a 16:9 letterbox, only while it is on.
+// The bars are sized for a 16:10 screen (operator): the UI is 1200 high
+// and 1920 wide there, 16:9 of that width is 1080 high, so 60 per bar.
+const int c_CINE_KEY = c_keyF9;
+// The bars are layout frames (ScobaCine.SC2Layout). Their "In" and "Out"
+// animations slide them in 0.4 s; the bar is hidden when "Out" is done.
+const int c_CINE_BAR_H = 60;       // = #ScobaCineBarH in the layout
+const int c_CINE_BARS = 2;         // top, bottom
+const fixed c_CINE_SLIDE = 0.4;    // = the layout's last key time
+// The slide runs in UI time; the hide waits in game time ("Faster" runs
+// game time 1.4 times quicker), so it waits 0.4 * 1.4 plus a margin.
+const fixed c_CINE_HIDE_AFTER = 0.7;
+bool[16] gv_cineOn;
+bool[16] gv_cineBox;
+int[c_CINE_BARS] gv_cineBarCtl;
+fixed[16] gv_cineHideAt;           // game time to hide the bars; -1 none
+int[16] gv_cineSlideIns;           // "In" events sent, for tests
+int[16] gv_cineSlideOuts;          // "Out" events sent, for tests
+int[16] gv_cineToggles;            // F9 presses that switched it, for tests
+int[16] gv_cineBoxToggles;         // Shift+F9 presses that switched the box
+int[16] gv_cineBoxRefused;         // Shift+F9 presses refused (mode off)
+trigger gt_CineKey;
+trigger gt_CineBoxKey;

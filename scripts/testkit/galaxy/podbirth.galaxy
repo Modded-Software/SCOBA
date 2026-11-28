@@ -209,6 +209,7 @@ void gf_PbDof () {
     gf_AimEnd(1);
     gf_PbDofAt(lv_s, "after10", 10.0);
     gf_PbDofAt(lv_s, "min2", 2.0);
+    gf_PbDofAt(lv_s, "min1", 1.0);
     gv_cameraCollisionOff[1] = false;
     BankSave(gv_dbgBank);
 }

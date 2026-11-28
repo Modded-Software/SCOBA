@@ -5,7 +5,7 @@
 trigger gt_SlowWalkTest;
 trigger gt_SwForward;
 
-const int c_SW_FREE = 0;    // PNC, no hold, W loop (gf_ForwardBegin)
+const int c_SW_FREE = 0;    // PNC, no hold, W key (gf_MoveKeySet)
 const int c_SW_PNC = 1;     // PNC move order to a point
 const int c_SW_STRAFE = 2;  // PNC right hold, A
 const int c_SW_BACK = 3;    // PNC right hold, S
@@ -16,8 +16,7 @@ const fixed c_SW_RAMP_STEP = 0.25;  // ramp sample spacing (R-SLOW-21)
 const int c_SW_RAMP_SAMPLES = 4;    // 1.0 s: the whole ramp
 
 bool gt_SwForward_Func (bool testConds, bool runActions) {
-    gf_ForwardBegin(1);
-    return true;
+    return gf_MoveKeySet(1, c_MOVE_KEY_FWD, true);
 }
 
 // lp_mode: Point & Click without a hold runs with Chase on (not stand):
@@ -47,7 +46,6 @@ void gf_SwStart (int lp_mode) {
     unit lv_hero = gv_tPSUNIT[1];
 
     if (lp_mode == c_SW_FREE) {
-        gv_kEYFORWARD[1] = true;
         TriggerExecute(gt_SwForward, false, false);
     }
     else if (lp_mode == c_SW_PNC) {
@@ -71,7 +69,7 @@ void gf_SwStart (int lp_mode) {
 }
 
 void gf_SwStop () {
-    gv_kEYFORWARD[1] = false;
+    gf_MoveKeySet(1, c_MOVE_KEY_FWD, false);
     gv_fORWARD[1] = false;
     gv_bACKWARD[1] = false;
     gv_lEFT[1] = false;

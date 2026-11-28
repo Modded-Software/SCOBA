@@ -1,6 +1,7 @@
 """baseai profile: the group and the environment switches of a run.
 
-SC2_TEST_GROUP picks the group. SC2_BA_DEPOT and SC2_BA_GAS_* pick A/B data probes and gas probe
+SC2_TEST_GROUP picks the group. SC2_BA_MODE picks the base AI lane mode.
+SC2_BA_DEPOT and SC2_BA_GAS_* pick A/B data probes and gas probe
 modes (SPEC-BASE-AI 8); each switch is checked here, so a typo stops the run before the build.
 SC2_BA_GAS_SCAN is parsed in baseai_scan.py."""
 
@@ -8,9 +9,11 @@ from __future__ import annotations
 
 import os
 
+from mapgen.base_mode import MODES
+
 from .baseai_scan import SCAN_ENV
 
-GROUPS = ("probe", "macro", "flight", "hall", "gas")
+GROUPS = ("probe", "macro", "flight", "hall", "gas", "mode")
 # "all" runs these; macro (about 5 min, waves on) and gas (about 4 min) run by name only.
 ALL_GROUPS = ("probe", "hall")
 
@@ -28,6 +31,15 @@ def depot_mode() -> str:
     mode = os.environ.get("SC2_BA_DEPOT", "map")
     if mode not in ("map", "stock"):
         raise SystemExit(f"SC2_BA_DEPOT must be map or stock, got {mode}")
+    return mode
+
+
+def base_mode() -> str | None:
+    """SC2_BA_MODE=middle|3v3: the base AI lane mode of the test map
+    (R-BASE-37). Unset: the map's own mode, not patched."""
+    mode = os.environ.get("SC2_BA_MODE")
+    if mode is not None and mode not in MODES:
+        raise SystemExit(f"SC2_BA_MODE must be one of {', '.join(MODES)}, got {mode}")
     return mode
 
 

@@ -15,31 +15,7 @@ void gf_DbgWalk (int lp_steps, fixed lp_angle) {
     gf_CombatSyncRoot(1);
 }
 
-void gf_DbgSingleShots (string lp_section, fixed lp_dx) {
-    fixed lv_at;
-    int lv_shots;
-
-    gf_DbgSpawnOne(lp_section, lp_dx, 500.0);
-    gf_DbgSnap(lp_section, "t0000");
-    lv_at = TimerGetElapsed(gv_sCOBA_Clock);
-    lv_shots = gv_aimShotEffectEvents;
-    gf_PncAttack(1, gv_dbgEnemy);
-    // The clocks one loop after the shot (0.25 s Tosh period).
-    gf_DbgClockRead(lp_section, "tclock", lv_shots);
-    Wait(MaxF(0.0, 0.1 - (TimerGetElapsed(gv_sCOBA_Clock) - lv_at)), c_timeGame);
-    gf_DbgSnap(lp_section, "t0100");
-    Wait(MaxF(0.0, 0.5 - (TimerGetElapsed(gv_sCOBA_Clock) - lv_at)), c_timeGame);
-    gf_DbgSnap(lp_section, "t0500");
-    Wait(1.0, c_timeGame);
-    gf_DbgSnap(lp_section, "t1500");
-    Wait(2.5, c_timeGame);
-    gf_DbgSnap(lp_section, "t4000");
-    gf_PncAttack(1, gv_dbgEnemy);
-    Wait(2.0, c_timeGame);
-    gf_PncAttack(1, gv_dbgEnemy);
-    Wait(2.0, c_timeGame);
-    gf_DbgSnap(lp_section, "t8000");
-}
+// gf_DbgSingleShots and gf_DbgSingleBurst: combat_single.galaxy (included first).
 
 void gf_DbgAutoRun (string lp_section, fixed lp_dx, fixed lp_wait) {
     gf_DbgSpawnOne(lp_section, lp_dx, 500.0);
@@ -70,7 +46,8 @@ void gf_DbgAttackRate () {
 
     gf_DbgReset(lv_s, false, true);
     BankValueSetFromInt(gv_dbgBank, lv_s, "toshSpeed1000", FixedToInt(gf_AnimAttackSpeed(1, "Tosh") * 1000.0));
-    BankValueSetFromInt(gv_dbgBank, lv_s, "toshPeriod1000", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, "Tosh", "Period", 1)) * 1000.0));
+    // The period in fixed point units: ms would round 0.15 s (614 / 4096).
+    BankValueSetFromInt(gv_dbgBank, lv_s, "toshPeriod4096", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, "Tosh", "Period", 1)) * 4096.0));
     gf_DbgSpawnOne(lv_s, 3.0, 500.0);
     lv_shots = gv_aimShotEffectEvents;
     gf_PncAttack(1, gv_dbgEnemy);
@@ -85,7 +62,7 @@ void gf_DbgAttackRate () {
     gf_DbgReset(lv_s, false, true);
     gf_DbgUseKerrigan();
     BankValueSetFromInt(gv_dbgBank, lv_s, "kerriganSpeed1000", FixedToInt(gf_AnimAttackSpeed(1, "QueenOfBladesPsiBlast") * 1000.0));
-    BankValueSetFromInt(gv_dbgBank, lv_s, "kerriganPeriod1000", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, "QueenOfBladesPsiBlast", "Period", 1)) * 1000.0));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "kerriganPeriod4096", FixedToInt(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, "QueenOfBladesPsiBlast", "Period", 1)) * 4096.0));
     BankSave(gv_dbgBank);
 }
 
@@ -189,15 +166,14 @@ void gf_DbgHoldMove (string lp_section, bool lp_back, bool lp_left) {
     gf_DbgSnap(lp_section, "tend");
 }
 
-// Runs the real W key loop beside the test thread.
+// W down through the key entry, in its own thread as a key event.
 trigger gt_DbgForward;
 bool gt_DbgForward_Func (bool testConds, bool runActions) {
-    gf_ForwardBegin(1);
-    return true;
+    return gf_MoveKeySet(1, c_MOVE_KEY_FWD, true);
 }
 
 // A hold walking while the camera turns 90 degrees in small steps. Forward
-// uses the W loop, else A strafes. Records the straight distance, the worst
+// uses the W key, else A strafes. Records the straight distance, the worst
 // facing lag and the smallest position step.
 void gf_DbgHoldTurn (string lp_section, bool lp_right, bool lp_forward) {
     int lv_i;
@@ -246,7 +222,7 @@ void gf_DbgHoldTurn (string lp_section, bool lp_right, bool lp_forward) {
     BankValueSetFromInt(gv_dbgBank, lp_section, "YawTurned", FixedToInt(AbsF(gf_AnimYawDelta(lv_start, CameraGetYaw(1)))));
     gf_DbgSnap(lp_section, "tturn");
     gv_lEFT[1] = false;
-    gv_fORWARD[1] = false;
+    gf_MoveKeySet(1, c_MOVE_KEY_FWD, false);
     Wait(0.1, c_timeGame);
     gf_AimMoveStop(1);
     gf_CombatSyncRoot(1);
@@ -311,6 +287,10 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
         gf_DbgSnap("single_out_move", "t5000");
         Wait(2.5, c_timeGame);
         gf_DbgSnap("single_out_move", "tend");
+
+        // Single: 48 commands in a row, one shot each (R-PNC-21).
+        gf_DbgReset("single_burst", false, true);
+        gf_DbgSingleBurst("single_burst", 3.0);
     }
     if (gf_DbgGroup("auto")) {
         // Auto: a commanded attack repeats.
@@ -410,6 +390,16 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
         gf_DbgWalk(32, 270.0);
         gf_DbgSnap("move_fire_single", "tend");
     }
+    if (gf_DbgGroup("keys")) {
+        // Real keys and mouse from the host first (combat_keys_real.galaxy,
+        // combat_keys_race.galaxy), then the WASD keys through the key
+        // entry (combat_keys.galaxy).
+        gf_DbgKeysRealGroup();
+        gf_DbgKeysRaceGroup();
+        gf_DbgKeysGroup();
+        // The stuck recorder of the map (combat_keys_stuck.galaxy).
+        gf_DbgKeysStuckGroup();
+    }
     if (gf_DbgGroup("hold")) {
         // Right hold: facing locked to the camera yaw. S backpedals.
         gf_DbgHoldMove("hold_right_back", true, false);
@@ -439,7 +429,7 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
         gf_DbgSnap("weapon_button", "t0000");
         lv_shots = gv_aimShotEffectEvents;
         UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingUnit(AbilityCommand("SCOBAAutoAttackStatus", 0), gv_dbgEnemy), c_orderQueueReplace);
-        // The clocks one loop after the shot (0.25 s Tosh period).
+        // The clocks in the loop that saw the shot (0.15 s Tosh period).
         gf_DbgClockRead("weapon_button", "tclock", lv_shots);
         Wait(0.25, c_timeGame);
         gf_DbgSnap("weapon_button", "t0500");
@@ -507,6 +497,8 @@ bool gt_DbgTest_Func (bool testConds, bool runActions) {
 void gt_DbgTest_Init () {
     gt_DbgForward = TriggerCreate("gt_DbgForward_Func");
     gt_DbgTest = TriggerCreate("gt_DbgTest_Func");
+    gf_DbgKeysInit();
+    gf_DbgKeysRealInit();
     gf_DbgKerriganInit();
     TriggerAddEventMapInit(gt_DbgTest);
 }

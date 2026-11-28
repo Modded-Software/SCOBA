@@ -22,12 +22,12 @@ from . import check as check_mod
 ROOT = project_root()
 GALAXY = ROOT / "scripts" / "testkit" / "galaxy"
 
-GROUPS = ("hover", "recenter", "click", "warp", "hit", "rotate", "recentre", "scale", "ray", "look", "point", "inrange", "picklog", "attach")
+GROUPS = ("hover", "recenter", "click", "warp", "hit", "rotate", "recentre", "scale", "ray", "look", "point", "inrange", "roach", "picklog", "attach")
 # Galaxy sources in include order. shotprobe holds the group "all" probes;
 # pncprobe holds the trigger and the group dispatch, so it comes last.
 GALAXY_FILES = (
     "common", "hoverprobe", "recenterprobe", "clickprobe", "hitprobe", "rotateprobe", "recentreprobe",
-    "scaleprobe", "rayprobe", "lookprobe", "pointprobe", "inrangeprobe", "picklog", "attachprobe", "shotprobe", "pncprobe",
+    "scaleprobe", "rayprobe", "lookprobe", "pointprobe", "inrangeprobe", "roachprobe", "picklog", "attachprobe", "shotprobe", "pncprobe",
 )
 
 

@@ -1,0 +1,86 @@
+// Stuck recorder scenario of the keys group (SPEC-POINT-AND-CLICK 5.8b,
+// systems/recorders/move_log of the map). Included after combat_keys.galaxy and
+// before combat.galaxy, which calls gf_DbgKeysStuckGroup.
+
+// A key as a key event gives it: to the recorder and to the script.
+void gf_DbgStuckKey (int lp_key, bool lp_down) {
+    gf_MoveLogKey(lp_key, lp_down);
+    gf_DbgKey(lp_key, lp_down);
+}
+
+// The recorder's counters and the script's step counters at a tag.
+void gf_DbgStuckCounts (string lp_s, string lp_tag) {
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Stucks", gv_moveLogStucks);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Frees", gv_moveLogFrees);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "KeyOffs", gv_moveLogKeyOffs);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Seq", gv_moveLogSeq);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Ticks", gv_moveTicks);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "Steps", gv_moveSteps[1]);
+    // The edge log: the four-key triggers, the any-key trigger, the buttons.
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "KeyEdges", gv_moveLogKeyEdges);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "AnyEdges", gv_moveLogAnyEdges);
+    BankValueSetFromInt(gv_dbgBank, lp_s, lp_tag + "BtnEdges", gv_moveLogBtnEdges);
+}
+
+void gf_DbgKeyStuck () {
+    string lv_s = "key_stuck";
+    unit lv_hero;
+
+    gf_DbgKeysReset(lv_s, true);
+    lv_hero = gv_tPSUNIT[1];
+    // Negative: a stand with no key. Negative: W on free ground.
+    gf_DbgStuckCounts(lv_s, "a");
+    Wait(1.0, c_timeGame);
+    gf_DbgStuckCounts(lv_s, "b");
+    gf_DbgSnap(lv_s, "f0");
+    gf_DbgStuckKey(c_MOVE_KEY_FWD, true);
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap(lv_s, "f1");
+    gf_DbgStuckCounts(lv_s, "c");
+    // W stays down and the hero is stunned: it stands. One entry.
+    UnitSetState(lv_hero, c_unitStateStunned, true);
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap(lv_s, "s1");
+    gf_DbgStuckCounts(lv_s, "d");
+    BankValueSetFromString(gv_dbgBank, lv_s, "stuckText", gv_moveLogLast);
+    // Once per case: no second entry while it still stands.
+    Wait(1.0, c_timeGame);
+    gf_DbgStuckCounts(lv_s, "e");
+    // The stun ends with W still down: it walks, one `free` entry.
+    UnitSetState(lv_hero, c_unitStateStunned, false);
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap(lv_s, "s2");
+    gf_DbgStuckCounts(lv_s, "f");
+    gf_DbgStuckKey(c_MOVE_KEY_FWD, false);
+    gf_DbgKeysUp(lv_s, "t");
+
+    // Negative: a turn-around is not a stand. W, then also S, then S up.
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgStuckCounts(lv_s, "i");
+    gf_DbgStuckKey(c_MOVE_KEY_FWD, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgStuckKey(c_MOVE_KEY_BACK, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgStuckKey(c_MOVE_KEY_BACK, false);
+    Wait(1.0, c_timeGame);
+    gf_DbgStuckCounts(lv_s, "j");
+    gf_DbgStuckKey(c_MOVE_KEY_FWD, false);
+    gf_DbgKeysUp(lv_s, "v");
+
+    // A key through the script entry alone, no key event: one `keys` entry.
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgStuckCounts(lv_s, "g");
+    gf_DbgKey(c_MOVE_KEY_LEFT, true);
+    Wait(0.5, c_timeGame);
+    gf_DbgStuckCounts(lv_s, "h");
+    gf_DbgKeysUp(lv_s, "k");
+    BankSave(gv_dbgBank);
+}
+
+void gf_DbgKeysStuckGroup () {
+    point lv_anchor = gv_dbgAnchor;
+
+    gv_dbgAnchor = gf_DbgKeySpot();
+    gf_DbgKeyStuck();
+    gv_dbgAnchor = lv_anchor;
+}

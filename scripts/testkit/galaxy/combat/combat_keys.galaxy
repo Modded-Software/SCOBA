@@ -1,0 +1,419 @@
+// WASD key scenarios of the combat profile (R-PNC-57 to 59,
+// SPEC-POINT-AND-CLICK 5.8a). Included before combat.galaxy, which calls
+// gf_DbgKeysGroup. Every key goes through gf_MoveKeySet, the entry of the
+// key triggers. Each call runs in its own thread, as a key event does.
+const int c_DBG_KEY_SCENE = 64;  // the harness's own scene owner bit
+int[16] gv_dbgKeyQ;
+bool[16] gv_dbgKeyQDown;
+bool[4] gv_dbgKeyIsDown;
+int gv_dbgKeySent;
+int gv_dbgKeyRun;
+unitgroup gv_dbgKeyProps;
+trigger gt_DbgKey;
+
+bool gt_DbgKey_Func (bool testConds, bool runActions) {
+    int lv_i = gv_dbgKeyRun % 16;
+
+    gv_dbgKeyRun += 1;
+    return gf_MoveKeySet(1, gv_dbgKeyQ[lv_i], gv_dbgKeyQDown[lv_i]);
+}
+
+void gf_DbgKeysInit () {
+    gv_dbgKeyProps = UnitGroupEmpty();
+    gt_DbgKey = TriggerCreate("gt_DbgKey_Func");
+}
+
+void gf_DbgKey (int lp_key, bool lp_down) {
+    gv_dbgKeyQ[gv_dbgKeySent % 16] = lp_key;
+    gv_dbgKeyQDown[gv_dbgKeySent % 16] = lp_down;
+    gv_dbgKeyIsDown[lp_key] = lp_down;
+    gv_dbgKeySent += 1;
+    TriggerExecute(gt_DbgKey, false, false);
+}
+
+// Releases every key the harness holds down.
+void gf_DbgKeysRelease () {
+    int lv_k;
+
+    for (lv_k = 0; lv_k < 4; lv_k += 1) {
+        if (gv_dbgKeyIsDown[lv_k]) {
+            gf_DbgKey(lv_k, false);
+        }
+    }
+}
+
+void gf_DbgKeyPropsRemove () {
+    UnitGroupLoopBegin(gv_dbgKeyProps);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        UnitRemove(UnitGroupLoopCurrent());
+    }
+    UnitGroupLoopEnd();
+    UnitGroupClear(gv_dbgKeyProps);
+}
+
+// Keys up, scene and order mode off, props gone, then the common reset.
+void gf_DbgKeysReset (string lp_section, bool lp_stand) {
+    gf_DbgKeysRelease();
+    gf_SceneLeave(1, c_DBG_KEY_SCENE);
+    if (gv_sCOBAOrderMode[1]) {
+        gf_OrderExit(1);
+    }
+    gf_DbgKeyPropsRemove();
+    Wait(0.2, c_timeGame);
+    gf_DbgReset(lp_section, false, lp_stand);
+}
+
+// Keys up, then lp_tag + "stop" 0.4 s after the release and lp_tag + "end"
+// 0.6 s later: no travel between the two. Raw: key calls sent and run.
+void gf_DbgKeysUp (string lp_section, string lp_tag) {
+    gf_DbgKeysRelease();
+    Wait(0.4, c_timeGame);
+    gf_DbgSnap(lp_section, lp_tag + "stop");
+    Wait(0.6, c_timeGame);
+    gf_DbgSnap(lp_section, lp_tag + "end");
+    BankValueSetFromInt(gv_dbgBank, lp_section, "keysSent", gv_dbgKeySent);
+    BankValueSetFromInt(gv_dbgBank, lp_section, "keysRun", gv_dbgKeyRun);
+    BankSave(gv_dbgBank);
+}
+
+// Distance x10 from the hero's first order target to lp_point; -1 with no
+// point order.
+int gf_DbgKeyOrderOff (point lp_point) {
+    order lv_o = UnitOrder(gv_tPSUNIT[1], 0);
+
+    if (lv_o == null || OrderGetTargetType(lv_o) != c_orderTargetPoint) {
+        return -1;
+    }
+    return FixedToInt(DistanceBetweenPoints(OrderGetTargetPoint(lv_o), lp_point) * 10.0);
+}
+
+// Raw: the far points of the strafe step along the camera yaw, from the
+// farthest to the nearest, y = reachable (gf_AimMoveStep samples the same).
+string gf_DbgKeyReach () {
+    unit lv_hero = gv_tPSUNIT[1];
+    fixed lv_dist = gf_MoveTargetDist(lv_hero);
+    fixed lv_step = gf_MoveRetargetDist(lv_hero);
+    string lv_row = "";
+
+    while (lv_dist >= (lv_step * 3.0)) {
+        if (gf_AimMoveReachable(1, lv_hero, PointWithOffsetPolar(UnitGetPosition(lv_hero), lv_dist, CameraGetYaw(1)), lv_dist)) {
+            lv_row = lv_row + "y";
+        }
+        else {
+            lv_row = lv_row + "n";
+        }
+        lv_dist = lv_dist - lv_step;
+    }
+    return lv_row;
+}
+
+// The group needs free ground: straight ahead of the profile anchor the
+// ground is blocked (combat/20261127-140800: W walked 0.4 and stood).
+const int c_DBG_KEY_REACH = 18;  // 0.5 steps: 9.0 free each way
+string gv_dbgKeyOpenRow;
+
+bool gf_DbgKeyFree (point lp_p, fixed lp_level) {
+    return PointPathingPassable(lp_p) && PointPathingCliffLevel(lp_p) == lp_level;
+}
+
+// Free ground around lp_c: on 8 directions from the camera yaw, the number
+// of 0.5 steps, up to c_DBG_KEY_REACH, that stay passable and on one cliff
+// level, on the ray and 0.5 to each side. Returns the least of the eight;
+// gv_dbgKeyOpenRow holds all eight.
+int gf_DbgKeyOpen (point lp_c) {
+    fixed lv_level = PointPathingCliffLevel(lp_c);
+    fixed lv_a;
+    point lv_p;
+    int lv_d;
+    int lv_k;
+    int lv_n;
+    int lv_min = c_DBG_KEY_REACH;
+
+    gv_dbgKeyOpenRow = "";
+    if (!PointPathingPassable(lp_c)) {
+        return 0;
+    }
+    for (lv_d = 0; lv_d < 8; lv_d += 1) {
+        lv_a = CameraGetYaw(1) + 45.0 * IntToFixed(lv_d);
+        lv_n = 0;
+        for (lv_k = 1; lv_k <= c_DBG_KEY_REACH; lv_k += 1) {
+            lv_p = PointWithOffsetPolar(lp_c, 0.5 * IntToFixed(lv_k), lv_a);
+            if (!gf_DbgKeyFree(lv_p, lv_level) || !gf_DbgKeyFree(PointWithOffsetPolar(lv_p, 0.5, lv_a + 90.0), lv_level) || !gf_DbgKeyFree(PointWithOffsetPolar(lv_p, 0.5, lv_a - 90.0), lv_level)) {
+                break;
+            }
+            lv_n = lv_k;
+        }
+        gv_dbgKeyOpenRow = gv_dbgKeyOpenRow + IntToString(lv_n) + " ";
+        if (lv_n < lv_min) {
+            lv_min = lv_n;
+        }
+    }
+    return lv_min;
+}
+
+// Raw: the types of up to 12 units within 4 of lp_p, the hero left out.
+string gf_DbgKeyUnitsAt (point lp_p) {
+    unitgroup lv_g = UnitGroup(null, c_playerAny, RegionCircle(lp_p, 4.0), UnitFilter(0, 0, (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32)) | (1 << (c_targetFilterHidden - 32))), 12);
+    string lv_row = "";
+
+    UnitGroupLoopBegin(lv_g);
+    for ( ; !UnitGroupLoopDone() ; UnitGroupLoopStep() ) {
+        if (UnitGroupLoopCurrent() != gv_tPSUNIT[1]) {
+            lv_row = lv_row + UnitGetType(UnitGroupLoopCurrent()) + " ";
+        }
+    }
+    UnitGroupLoopEnd();
+    return lv_row;
+}
+
+// The first spot with free ground all around: the anchor, then eight
+// directions on rings 6 apart. Raw in section key_spot: the free steps at
+// the anchor and at the spot, and the units ahead of the anchor.
+point gf_DbgKeySpot () {
+    string lv_s = "key_spot";
+    int lv_ring;
+    int lv_dir;
+    point lv_c;
+
+    BankValueSetFromInt(gv_dbgBank, lv_s, "anchorOpen", gf_DbgKeyOpen(gv_dbgAnchor));
+    BankValueSetFromString(gv_dbgBank, lv_s, "anchorRow", gv_dbgKeyOpenRow);
+    BankValueSetFromString(gv_dbgBank, lv_s, "anchorAhead", gf_DbgKeyUnitsAt(PointWithOffsetPolar(gv_dbgAnchor, 3.0, CameraGetYaw(1))));
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "found", false);
+    for (lv_ring = 0; lv_ring <= 5; lv_ring += 1) {
+        for (lv_dir = 0; lv_dir < 8; lv_dir += 1) {
+            lv_c = PointWithOffsetPolar(gv_dbgAnchor, 6.0 * IntToFixed(lv_ring), CameraGetYaw(1) + 45.0 * IntToFixed(lv_dir));
+            if (gf_DbgKeyOpen(lv_c) >= c_DBG_KEY_REACH) {
+                BankValueSetFromFlag(gv_dbgBank, lv_s, "found", true);
+                BankValueSetFromInt(gv_dbgBank, lv_s, "ring", lv_ring);
+                BankValueSetFromInt(gv_dbgBank, lv_s, "dir", lv_dir);
+                BankValueSetFromString(gv_dbgBank, lv_s, "row", gv_dbgKeyOpenRow);
+                BankSave(gv_dbgBank);
+                return lv_c;
+            }
+            if (lv_ring == 0) {
+                break;
+            }
+        }
+        Wait(0.0625, c_timeGame);
+    }
+    BankSave(gv_dbgBank);
+    return gv_dbgAnchor;
+}
+
+// An own Marine beside the hero, as the unit of order mode.
+void gf_DbgKeyOrderMode (string lp_section, string lp_key) {
+    unitgroup lv_g = UnitCreate(1, "Marine", c_unitCreateIgnorePlacement, 1, PointWithOffsetPolar(gv_dbgAnchor, 3.0, CameraGetYaw(1) + 90.0), 270.0);
+
+    UnitGroupAddUnitGroup(gv_dbgKeyProps, lv_g);
+    gf_UnitTargetSet(1, UnitGroupUnit(lv_g, 1));
+    gf_OrderEnter(1);
+    BankValueSetFromFlag(gv_dbgBank, lp_section, lp_key, gv_sCOBAOrderMode[1]);
+}
+
+// W down walks; only the release ends it (R-PNC-57).
+void gf_DbgKeyHold () {
+    string lv_s = "key_hold";
+
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgSnap(lv_s, "t0000");
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "tmove");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "tmore");
+    gf_DbgKeysUp(lv_s, "t");
+}
+
+// Chase stand: W up and W down in one game loop (R-PNC-58).
+void gf_DbgKeyRetap () {
+    string lv_s = "key_retap";
+
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(0.5, c_timeGame);
+    gf_DbgSnap(lv_s, "t0000");
+    gf_DbgKey(c_MOVE_KEY_FWD, false);
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "tmove");
+    gf_DbgKeysUp(lv_s, "t");
+}
+
+// Two opposite keys: the one pressed last wins; its release gives the
+// movement back to the key still down (R-PNC-59). lp_a first, then lp_b.
+void gf_DbgKeyPair (string lp_section, int lp_a, int lp_b) {
+    gf_DbgKeysReset(lp_section, true);
+    gf_DbgSnap(lp_section, "t0000");
+    gf_DbgKey(lp_a, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lp_section, "ta");
+    gf_DbgKey(lp_b, true);
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap(lp_section, "tb");
+    gf_DbgKey(lp_b, false);
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap(lp_section, "ta2");
+    gf_DbgKeysUp(lp_section, "t");
+}
+
+// A key down replaces a move order and is not blocked by order mode
+// (R-PNC-58).
+void gf_DbgKeyOrder () {
+    string lv_s = "key_order";
+    point lv_click;
+
+    // Chase move: a click move away from the camera view, then W.
+    gf_DbgKeysReset(lv_s, false);
+    lv_click = PointWithOffsetPolar(gv_dbgAnchor, 6.0, CameraGetYaw(1) + 180.0);
+    gf_DbgSnap(lv_s, "c0");
+    gf_RightClickExecute(1, lv_click, null);
+    gf_DbgSnap(lv_s, "c1");
+    BankValueSetFromInt(gv_dbgBank, lv_s, "clickBefore10", gf_DbgKeyOrderOff(lv_click));
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(0.0625, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "clickAfter10", gf_DbgKeyOrderOff(lv_click));
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap(lv_s, "c2");
+    gf_DbgKeysUp(lv_s, "c");
+
+    // W pressed in order mode.
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgKeyOrderMode(lv_s, "m0OrderMode");
+    gf_DbgSnap(lv_s, "m0");
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "m1");
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "m1OrderMode", gv_sCOBAOrderMode[1]);
+    gf_DbgKeysUp(lv_s, "m");
+
+    // W held into order mode.
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(0.5, c_timeGame);
+    gf_DbgKeyOrderMode(lv_s, "h0OrderMode");
+    gf_DbgSnap(lv_s, "h0");
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "h1");
+    gf_DbgKeysUp(lv_s, "h");
+    gf_OrderExit(1);
+}
+
+// Input hold (scene): keys are kept, the hero does not move (R-INTRO-9,
+// R-PNC-58).
+void gf_DbgKeyScene () {
+    string lv_s = "key_scene";
+
+    // W pressed in the hold and kept down.
+    gf_DbgKeysReset(lv_s, true);
+    gf_SceneEnter(1, c_DBG_KEY_SCENE);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "held", gf_InputHeld(1));
+    gf_DbgSnap(lv_s, "t0000");
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "thold");
+    gf_SceneLeave(1, c_DBG_KEY_SCENE);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "heldAfter", gf_InputHeld(1));
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "tfree");
+    gf_DbgKeysUp(lv_s, "t");
+
+    // A down before the hold, released in it. W tapped in it.
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgSnap(lv_s, "r0");
+    gf_DbgKey(c_MOVE_KEY_LEFT, true);
+    Wait(0.75, c_timeGame);
+    gf_DbgSnap(lv_s, "r1");
+    gf_SceneEnter(1, c_DBG_KEY_SCENE);
+    Wait(0.3, c_timeGame);
+    gf_DbgSnap(lv_s, "r2");
+    Wait(0.7, c_timeGame);
+    gf_DbgSnap(lv_s, "r3");
+    gf_DbgKey(c_MOVE_KEY_LEFT, false);
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    gf_DbgKey(c_MOVE_KEY_FWD, false);
+    Wait(0.2, c_timeGame);
+    gf_SceneLeave(1, c_DBG_KEY_SCENE);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "r4");
+    gf_DbgKeysUp(lv_s, "r");
+}
+
+// Right hold, W: the strafe step walks in the open and up to a block
+// (R-PNC-57). The block: own Bunkers in a row along the camera yaw, from
+// 5.5 to 30.5 ahead, 2.5 apart, so every far point of the step lies in one.
+void gf_DbgKeyStrafe () {
+    string lv_s = "key_strafe";
+    fixed lv_yaw;
+    int lv_i;
+
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgHold(true, false);
+    Wait(0.3, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lv_s, "reachOpen", gf_DbgKeyReach());
+    gf_DbgSnap(lv_s, "o0");
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "o1");
+    gf_DbgKeysUp(lv_s, "o");
+    gf_DbgHold(false, false);
+
+    gf_DbgKeysReset(lv_s, true);
+    lv_yaw = CameraGetYaw(1);
+    for (lv_i = 0; lv_i <= 10; lv_i += 1) {
+        UnitGroupAddUnitGroup(gv_dbgKeyProps, UnitCreate(1, "Bunker", c_unitCreateIgnorePlacement, 1, PointWithOffsetPolar(gv_dbgAnchor, 5.5 + 2.5 * IntToFixed(lv_i), lv_yaw), 270.0));
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "wallCount", UnitGroupCount(gv_dbgKeyProps, c_unitCountAlive));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "wallOff10", FixedToInt(DistanceBetweenPoints(UnitGetPosition(UnitGroupUnit(gv_dbgKeyProps, 1)), PointWithOffsetPolar(gv_dbgAnchor, 5.5, lv_yaw)) * 10.0));
+    gf_DbgHold(true, false);
+    Wait(0.3, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lv_s, "reachWall", gf_DbgKeyReach());
+    gf_DbgSnap(lv_s, "w0");
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(1.5, c_timeGame);
+    gf_DbgSnap(lv_s, "w1");
+    gf_DbgKeysUp(lv_s, "w");
+    gf_DbgHold(false, false);
+    gf_DbgKeyPropsRemove();
+}
+
+// TPS, the mode after every touchdown: W and A walk (R-PNC-57, R-PNC-71).
+// TPS goes on and off through its toggle order, as the HUD button does.
+// Raw: the forward flag and the input hold while W is down.
+void gf_DbgKeyTps () {
+    string lv_s = "key_tps";
+
+    gf_DbgKeysReset(lv_s, true);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "tpsOn", gf_TpsActive(1));
+    gf_DbgSnap(lv_s, "p0");
+    gf_DbgKey(c_MOVE_KEY_FWD, true);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "p1Forward", gv_fORWARD[1]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "p1InputHeld", gf_InputHeld(1));
+    gf_DbgSnap(lv_s, "p1");
+    gf_DbgKeysUp(lv_s, "p");
+    gf_DbgSnap(lv_s, "q0");
+    gf_DbgKey(c_MOVE_KEY_LEFT, true);
+    Wait(1.0, c_timeGame);
+    gf_DbgSnap(lv_s, "q1");
+    gf_DbgKeysUp(lv_s, "q");
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "tpsAfter", gf_TpsActive(1));
+}
+
+void gf_DbgKeysGroup () {
+    point lv_anchor = gv_dbgAnchor;
+
+    gv_dbgAnchor = gf_DbgKeySpot();
+    gf_DbgKeyTps();
+    gf_DbgKeyHold();
+    gf_DbgKeyRetap();
+    gf_DbgKeyPair("key_ws", c_MOVE_KEY_FWD, c_MOVE_KEY_BACK);
+    gf_DbgKeyPair("key_ad", c_MOVE_KEY_LEFT, c_MOVE_KEY_RIGHT);
+    gf_DbgKeyOrder();
+    gf_DbgKeyScene();
+    gf_DbgKeyStrafe();
+    gv_dbgAnchor = lv_anchor;
+}

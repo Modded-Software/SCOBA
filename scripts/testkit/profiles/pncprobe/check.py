@@ -9,6 +9,7 @@ from .attach import print_attach
 from .click import CLICK_PROBE_PRESSES, print_click, print_hit, print_warp
 from .hover import print_hover, print_recenter, print_recentre, print_rotate, print_scale
 from .ray import check_point, print_ray
+from .roach import print_roach
 from .shots import print_shots
 
 # A group report: prints the raw lines, may add verdicts to checks.
@@ -68,6 +69,7 @@ GROUP_REPORTS: dict[str, Report] = {
     "look": _report(print_ray),
     "point": _point,
     "inrange": _inrange,
+    "roach": print_roach,
     "attach": _report(print_attach),
 }
 

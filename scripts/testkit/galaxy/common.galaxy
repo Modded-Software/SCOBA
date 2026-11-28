@@ -135,6 +135,9 @@ void gf_DbgReset (string lp_section, bool lp_auto, bool lp_stand) {
     gf_StrafeHoldSet(1, false);
     gv_rOTATECAMERA[1] = false;
     gv_kEYFORWARD[1] = false;
+    gv_kEYBACKWARD[1] = false;
+    gv_kEYLEFT[1] = false;
+    gv_kEYRIGHT[1] = false;
     gv_mOUSERIGHTCANCEL[1] = false;
     gv_mOUSELEFTCANCEL[1] = false;
     gv_unitHighlight[1] = null;
@@ -254,12 +257,14 @@ void gf_DbgSnap (string lp_section, string lp_tag) {
     BankSave(gv_dbgBank);
 }
 
-// Shot clocks inside one weapon period. Tosh fires every 0.25 s (operator
-// 2026-11-16): a read 0.25 s or later after the shot finds the clocks over.
-// Waits up to 2 s for the next hero shot effect, then reads the hero
-// cooldown, the button clock, the command state and the weapon cooldown
-// time in the next game loop. lp_shots: gv_aimShotEffectEvents before the
-// command, so a shot that already came counts. Returns whether it came.
+// Shot clocks inside one weapon period. Tosh fires every 0.15 s (operator
+// 2026-11-27; was 0.1, 0.25): a read 0.15 s or later after the shot finds
+// the clocks over. Waits up to 2 s for the next hero shot effect, then reads
+// the hero cooldown, the button clock, the command state and the weapon
+// cooldown time in the loop that saw it: 0 to 62.5 ms after the shot. The
+// old extra loop read up to 125 ms after it. lp_shots:
+// gv_aimShotEffectEvents before the command, so a shot that already came
+// counts. Returns whether it came.
 bool gf_DbgClockRead (string lp_section, string lp_tag, int lp_shots) {
     unit lv_hero;
     int lv_i;
@@ -274,7 +279,6 @@ bool gf_DbgClockRead (string lp_section, string lp_tag, int lp_shots) {
     }
     lv_seen = gv_aimShotEffectEvents > lp_shots;
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "ShotSeen", lv_seen);
-    Wait(0.0625, c_timeGame);
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EarlyCdMs", FixedToInt(UnitGetCooldown(lv_hero, c_SCOBA_ATTACK_COOLDOWN) * 1000.0));
     BankValueSetFromInt(gv_dbgBank, lp_section, lp_tag + "EarlyBtnMs", FixedToInt(UnitAbilityGetCooldown(lv_hero, "SCOBAAutoAttackStatus", c_DBG_BUTTON_COOLDOWN) * 1000.0));
     BankValueSetFromFlag(gv_dbgBank, lp_section, lp_tag + "EarlyCmdCd", UnitCheckAbilCmdState(lv_hero, AbilityCommand("SCOBAAutoAttackStatus", 0), c_cmdStateCooldown));
@@ -282,11 +286,11 @@ bool gf_DbgClockRead (string lp_section, string lp_tag, int lp_shots) {
     return lv_seen;
 }
 
-// Waits up to 2 s for the next hero shot, reads the clocks one loop after
-// it (gf_DbgClockRead), then snapshots 0.25 s after the shot.
+// Waits up to 2 s for the next hero shot, reads the clocks in the loop that
+// saw it (gf_DbgClockRead), then snapshots 0.25 s after the shot.
 void gf_DbgSnapAfterShot (string lp_section, string lp_tag) {
     gf_DbgClockRead(lp_section, lp_tag, gv_aimShotEffectEvents);
-    Wait(0.1875, c_timeGame);
+    Wait(0.25, c_timeGame);
     gf_DbgSnap(lp_section, lp_tag);
 }
 

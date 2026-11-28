@@ -269,7 +269,8 @@ bool gt_AimCursorTick_Func (bool testConds, bool runActions) {
         }
         gf_ReticleHookup();
         lv_group = PlayerGroupSingle(lv_player);
-        lv_visible = gf_TpsActive(lv_player) && !gv_mOUSEMIDDLE[lv_player];
+        // Cinematic mode hides it (REQ-CINEMATIC; core/scene).
+        lv_visible = gf_TpsActive(lv_player) && !gv_mOUSEMIDDLE[lv_player] && !gv_cineOn[lv_player];
         if (lv_visible != gv_reticleShown[lv_player]) {
             gv_reticleShown[lv_player] = lv_visible;
             DialogControlSetVisible(gv_reticleImage, lv_group, lv_visible);

@@ -161,6 +161,10 @@ host-test: ## Run the named host test modules, no map rebuild (ARGS="testkit.tes
 	test -n "$(ARGS)" || { echo "ERROR: name the test modules: make host-test ARGS=<module>" >&2; exit 1; }
 	$(PATHS) $(PYMOD) unittest -v $(ARGS)
 
+.PHONY: key-log
+key-log: ## Host key log for play: game keys, mouse buttons and focus while the game window has the focus (ARGS="--minutes 120"; Ctrl+C stops)
+	$(PATHS) $(PYMOD) testkit.host_keys $(ARGS)
+
 # The measuring tools read the built map: run make map-build first. ARGS
 # passes options on, such as ARGS="--map <folder>" or ARGS=--print.
 measure-hit-volumes: ## Measure hit volumes, then write their galaxy and camera heights (ARGS for hitvolumes.measure)
@@ -183,6 +187,11 @@ classic-skins: ## Rewrite the classic skin data from the game storage (ARGS=--li
 .PHONY: texture-store-migrate
 texture-store-migrate: ## Bring the texture store from layout 2 to 3: each entry names its edge rule (ARGS=--dry-run)
 	$(PATHS) $(PYMOD) hdtex.core.storemigrate $(ARGS)
+
+.PHONY: game-res
+game-res: ## Search or extract the game's own files (ARGS="list LoadingScreen --ext SC2Layout" or "extract <pattern>")
+	test -n "$(ARGS)" || { echo "ERROR: name the command: make game-res ARGS=\"list <pattern>\"" >&2; exit 1; }
+	$(PATHS) cd "$(REPO_ROOT)" && uv --project "$(REPO_ROOT)" run python "$(REPO_ROOT)/scripts/sc2res.py" $(ARGS)
 
 .PHONY: hd-textures
 hd-textures: ## Run one command of the texture pipeline (ARGS="status --game sc2 --dataset scoba --layer src/SCOBA.SC2Map")

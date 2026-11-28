@@ -163,6 +163,8 @@ void gf_ControlModeApply (int lp_player) {
     gv_rIGHTORBIT[lp_player] = false;
     gv_mOUSEMIDDLE[lp_player] = false;
     gv_tpsMiddleDown[lp_player] = false;
+    // A mode switch ends the two-button walk; the WASD keys stay (R-PNC-72).
+    gv_mOUSEFORWARD[lp_player] = false;
     gf_ControlForceSend(lp_player);
     gf_TpsStatusHover(lp_player, null);
     gf_AnimReset(lp_player);
@@ -172,6 +174,7 @@ void gf_ControlModeApply (int lp_player) {
     else {
         gf_PncRestore(lp_player);
     }
+    gf_MoveKeysChanged(lp_player);
     gf_HudModeIconUpdate(lp_player);
 }
 

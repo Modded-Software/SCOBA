@@ -42,10 +42,17 @@
     <CWeaponLegacy id="Tosh">
         <Range value="12"/>
         <Effect value="SCOBAToshShot"/>
-        <!-- TESTING (operator 2026-11-16): 0.1 s cooldown; was 1. -->
-        <Period value="0.25"/>
+        <!-- Operator 2026-11-27: 0.15 s cooldown (0.1 was too fast); was
+             0.25 (2026-11-16), before that 1. -->
+        <Period value="0.15"/>
+        <!-- No random delay. The stock -0.063 to +0.125 s is made for the
+             stock 1 s period; at 0.1 s the weapon was ready again within one
+             game loop and Attack single fired twice (R-PNC-21,
+             SPEC-POINT-AND-CLICK 5.5). -->
+        <RandomDelayMin value="0"/>
+        <RandomDelayMax value="0"/>
         <Cost>
-            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="0.25"/>
+            <Cooldown Link="SCOBA/Attack" Location="Unit" TimeUse="0.15"/>
         </Cost>
     </CWeaponLegacy>
     <!-- Attack auto: fires outside attack orders, while moving, at any facing. -->

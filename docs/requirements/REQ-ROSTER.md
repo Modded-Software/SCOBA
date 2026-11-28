@@ -55,6 +55,7 @@ Out of scope:
 | R-ROSTER-7 | The death, drop, return and intro logic MUST NOT read the camera. (TPS movement reads it by design, O-ROSTER-3.) |
 | R-ROSTER-8 | When a player leaves, their pending drop, held input and intro MUST end. |
 | R-ROSTER-9 | A unit's side (Terran or Zerg) MUST come from the roster table, not from the owner's race. An empty seat has no race (`PlayerRace` is "", roster run 2026-11-18), yet its waves MUST go on to the enemy spawn at the X like a played seat's (operator 2026-11-19: "the ally lanes are retreating and clustering with the army of the macro AI"). |
+| R-ROSTER-10 | The roster MUST name the middle lanes: lane 1 (Terran) and lane 4 (Zerg), the lanes that meet at the center X (REQ-INTRO). The base AI lane mode reads them (REQ-BASE-AI R-BASE-37). |
 
 ## 4. Acceptance
 

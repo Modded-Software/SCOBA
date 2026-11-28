@@ -104,7 +104,7 @@ wins over the file.
 
 All steps are in `scripts/setup/deps.sh` and can run again safely.
 
-- **stormex** is built from source: [Talv/stormex](https://github.com/Talv/stormex)
+- **stormex** is built from source: Talv/stormex (`github.com/Talv/stormex`)
   at `v2.2.0` (commit `1e93179`). Upstream ships only a Windows binary and has
   had no commit since 2019. Its tag pins a CascLib commit (`b2bd4c8`) that no
   public repository has, so the gitlinks are not used. Each dependency is the
@@ -112,9 +112,9 @@ All steps are in `scripts/setup/deps.sh` and can run again safely.
 
   | Dependency | Tag | Commit |
   | --- | --- | --- |
-  | [CascLib](https://github.com/ladislav-zezula/CascLib) | `3.0` | `4971d36` |
-  | [cxxopts](https://github.com/jarro2783/cxxopts) | `v3.3.1` | `44380e5` |
-  | [plog](https://github.com/SergiusTheBest/plog) | `1.1.11` | `e5c033e` |
+  | CascLib (`github.com/ladislav-zezula/CascLib`) | `3.0` | `4971d36` |
+  | cxxopts (`github.com/jarro2783/cxxopts`) | `v3.3.1` | `44380e5` |
+  | plog (`github.com/SergiusTheBest/plog`) | `1.1.11` | `e5c033e` |
 
   `scripts/setup/patches/stormex/` makes the 2019 source build against them.
   The source goes to `SC2_BUILD/deps/stormex`. The build uses the system compiler
@@ -124,11 +124,11 @@ All steps are in `scripts/setup/deps.sh` and can run again safely.
   pins. Needs `cmake`, a system C++ compiler, and the FUSE 2 headers (Ubuntu:
   `libfuse-dev`).
 - **upscale-on-arc** is
-  [Modded-Software/upscale-on-arc](https://github.com/Modded-Software/upscale-on-arc).
+  Modded-Software/upscale-on-arc (`github.com/Modded-Software/upscale-on-arc`).
   A checkout must contain commit `b35fa07`.
 - **Model viewer**: `make viewer-install` runs `npm install` (into
   `WEBVIEWER_WORK`), installs the Playwright browser, clones the pinned
-  [mdx-m3-viewer](https://github.com/flowtsohg/mdx-m3-viewer) into
+  mdx-m3-viewer (`github.com/flowtsohg/mdx-m3-viewer`) into
   `webviewer/ref/` (a real folder in the repo) with `webviewer/patches/`
   applied, and builds the renderer.
 - Not installed by any step: StarCraft II, GE-Proton, lsfg-vk. See

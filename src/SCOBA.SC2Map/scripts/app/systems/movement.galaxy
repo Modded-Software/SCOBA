@@ -63,109 +63,155 @@ void gt_DisableClickMove_Init () {
     TriggerAddEventUnitOrder(gt_DisableClickMove, null, AbilityCommand("move", 0));
 }
 
-// One W loop and one S loop per player (operator 2026-11-25: on the flying
-// Viking W/S sometimes stopped). W and S held together cancel; each loop
-// ends while the other key is held. The release of one key restarts the
-// loop of the other key if it is still held. Before, nothing restarted it:
-// hold W, tap S, and the hero stood still with W held. The guard also stops
-// a key repeat from starting a second loop.
-bool[16] gv_moveLoopFwd;     // a W loop runs
-bool[16] gv_moveLoopBack;    // an S loop runs
+// WASD (R-PNC-57 to 59, SPEC-POINT-AND-CLICK 5.8a). The key triggers store
+// the key state. gf_MoveKeysApply derives the direction flags from it. One
+// tick (gt_AimMoveTick, systems/strafe) steps the hero each game loop while
+// a direction is held. No thread per key: a key event cannot be lost in a
+// loop guard, and only a release ends the movement.
+const int c_MOVE_KEY_FWD = 0;
+const int c_MOVE_KEY_BACK = 1;
+const int c_MOVE_KEY_LEFT = 2;
+const int c_MOVE_KEY_RIGHT = 3;
 
-void gf_ForwardBegin (int lp_player) {
-    fixed lv_angle;
+bool[8] gv_moveHeroFrame;  // the free walk runs in the hero-facing frame
 
-    if (gv_sCOBAOrderMode[lp_player] == true) {
-        return;
+bool gf_MoveKeyGet (int lp_player, int lp_key) {
+    if (lp_key == c_MOVE_KEY_FWD) {
+        return gv_kEYFORWARD[lp_player];
     }
-    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
-        return;
+    if (lp_key == c_MOVE_KEY_BACK) {
+        return gv_kEYBACKWARD[lp_player];
     }
-    gv_fORWARD[lp_player] = true;
-    if (gv_moveLoopFwd[lp_player] || gv_bACKWARD[lp_player]) {
-        return;
+    if (lp_key == c_MOVE_KEY_LEFT) {
+        return gv_kEYLEFT[lp_player];
     }
-    gv_moveLoopFwd[lp_player] = true;
-    gf_CombatSetRoot(lp_player, false);
-    while ((gv_fORWARD[lp_player] == true) && (gv_bACKWARD[lp_player] == false)) {
-        if (((gv_rOTATEUNIT[lp_player] == true) || (gv_rOTATECAMERA[lp_player] == false))) {
-            lv_angle = CameraGetYaw(lp_player);
-        }
-        else {
-            lv_angle = UnitGetFacing(gv_tPSUNIT[lp_player]);
-        }
-        if ((gv_lEFT[lp_player] == true)) {
-            lv_angle = (lv_angle + 45.0);
-        }
-
-        if ((gv_rIGHT[lp_player] == true)) {
-            lv_angle = (lv_angle - 45.0);
-        }
-
-        if (gf_StrafeMoveActive(lp_player)) {
-            gf_StrafeLoopStep(lp_player);
-        }
-        else {
-            gf_CombatMoveStep(lp_player, lv_angle);
-            gf_UnitTurn(gv_tPSUNIT[lp_player], lv_angle, c_ANIM_MOVE_TURN_DURATION);
-            Wait(0.01, c_timeGame);
-        }
-    }
-    gv_moveLoopFwd[lp_player] = false;
+    return gv_kEYRIGHT[lp_player];
 }
 
-// S held: walk away from the camera yaw (or the facing at the loop start).
-void gf_BackwardBegin (int lp_player) {
-    fixed lv_angle;
-
-    if (gv_sCOBAOrderMode[lp_player] == true) {
-        return;
-    }
-    if (!UnitIsValid(gv_tPSUNIT[lp_player])) {
-        return;
-    }
-    gv_bACKWARD[lp_player] = true;
-    if (gv_moveLoopBack[lp_player] || gv_fORWARD[lp_player]) {
-        return;
-    }
-    gv_moveLoopBack[lp_player] = true;
-    gv_mOVEMENTDIRECTION[lp_player] = UnitGetFacing(gv_tPSUNIT[lp_player]);
-    gf_CombatSetRoot(lp_player, false);
-    while ((gv_bACKWARD[lp_player] == true) && (gv_fORWARD[lp_player] == false)) {
-        if (((gv_rOTATEUNIT[lp_player] == true) || (gv_rOTATECAMERA[lp_player] == false))) {
-            lv_angle = (CameraGetYaw(lp_player) + 180.0);
-        }
-        else {
-            lv_angle = (gv_mOVEMENTDIRECTION[lp_player] + 180.0);
-        }
-        if ((gv_lEFT[lp_player] == true)) {
-            lv_angle = (lv_angle - 45.0);
-        }
-
-        if ((gv_rIGHT[lp_player] == true)) {
-            lv_angle = (lv_angle + 45.0);
-        }
-
-        if (gf_StrafeMoveActive(lp_player)) {
-            gf_StrafeLoopStep(lp_player);
-        }
-        else {
-            gf_CombatMoveStep(lp_player, lv_angle);
-            gf_UnitTurn(gv_tPSUNIT[lp_player], lv_angle, c_ANIM_MOVE_TURN_DURATION);
-            Wait(0.01, c_timeGame);
-        }
-    }
-    gv_moveLoopBack[lp_player] = false;
+// A key or the two-button walk is down. A direction flag set alone moves
+// nothing in the free walk (SPEC-JUMP F8).
+bool gf_MoveKeyDown (int lp_player) {
+    return gv_kEYFORWARD[lp_player] || gv_kEYBACKWARD[lp_player] || gv_kEYLEFT[lp_player] || gv_kEYRIGHT[lp_player] || gv_mOUSEFORWARD[lp_player];
 }
 
+// The direction flags from the key state and the two-button walk. W against
+// S and A against D: the one pressed last (R-PNC-59). An input hold gives no
+// direction. Regular units: no A/D (operator 2026-11-18: the keys clash
+// with the ability-panel hotkeys).
+void gf_MoveKeysApply (int lp_player) {
+    bool lv_w = gv_kEYFORWARD[lp_player] || gv_mOUSEFORWARD[lp_player];
+    bool lv_s = gv_kEYBACKWARD[lp_player];
+    bool lv_a = gv_kEYLEFT[lp_player];
+    bool lv_d = gv_kEYRIGHT[lp_player];
+
+    if (gf_ControlRegular(lp_player)) {
+        lv_a = false;
+        lv_d = false;
+    }
+    if (lv_w && lv_s) {
+        lv_w = !gv_keyBackLast[lp_player];
+        lv_s = gv_keyBackLast[lp_player];
+    }
+    if (lv_a && lv_d) {
+        lv_a = !gv_keyRightLast[lp_player];
+        lv_d = gv_keyRightLast[lp_player];
+    }
+    if (gf_InputHeld(lp_player)) {
+        lv_w = false;
+        lv_s = false;
+        lv_a = false;
+        lv_d = false;
+    }
+    gv_fORWARD[lp_player] = lv_w;
+    gv_bACKWARD[lp_player] = lv_s;
+    gv_lEFT[lp_player] = lv_a;
+    gv_rIGHT[lp_player] = lv_d;
+}
+
+// Free walk heading. The frame is the camera yaw. During a left orbit alone
+// it is the hero facing at the start of the walk (SPEC-POINT-AND-CLICK 5.8).
+fixed gf_MoveHeading (int lp_player) {
+    fixed lv_yaw = CameraGetYaw(lp_player);
+    fixed lv_base = lv_yaw;
+
+    if (gv_rOTATECAMERA[lp_player] && !gv_rOTATEUNIT[lp_player]) {
+        if (!gv_moveHeroFrame[lp_player]) {
+            gv_moveHeroFrame[lp_player] = true;
+            gv_mOVEMENTDIRECTION[lp_player] = UnitGetFacing(gv_tPSUNIT[lp_player]);
+        }
+        lv_base = gv_mOVEMENTDIRECTION[lp_player];
+    }
+    else {
+        gv_moveHeroFrame[lp_player] = false;
+    }
+    return lv_base + (gf_AnimInputHeading(lp_player) - lv_yaw);
+}
+
+// One free walk step: the stand root off, a short move order, the turn to
+// the travel direction.
+void gf_MoveStep (int lp_player) {
+    unit lv_hero = gv_tPSUNIT[lp_player];
+    fixed lv_angle;
+
+    if (!UnitIsValid(lv_hero)) {
+        return;
+    }
+    lv_angle = gf_MoveHeading(lp_player);
+    gf_CombatSetRoot(lp_player, false);
+    gf_CombatMoveStep(lp_player, lv_angle);
+    gf_UnitTurn(lv_hero, lv_angle, c_ANIM_MOVE_TURN_DURATION);
+}
+
+// One movement step of a player: the strafe step in strafe movement, else
+// the free walk step. Each game loop (gt_AimMoveTick) and at once on a key
+// change.
+void gf_MoveTick (int lp_player) {
+    if (gf_InputHeld(lp_player) || !gf_MovementKeyHeld(lp_player)) {
+        return;
+    }
+    if (gf_StrafeMoveActive(lp_player)) {
+        gv_moveSteps[lp_player] += 1;
+        gf_AimMoveStep(lp_player, gf_AnimInputHeading(lp_player));
+        return;
+    }
+    if (gf_MoveKeyDown(lp_player)) {
+        gv_moveSteps[lp_player] += 1;
+        gf_MoveStep(lp_player);
+    }
+}
+
+// After a change of the key state, the two-button walk, the input hold or
+// the bound unit. A direction held: one step at once with a new strafe
+// target; it replaces any move order of the hero (R-PNC-58). The last
+// direction gone: the stop and the stand root.
+void gf_MoveKeysChanged (int lp_player) {
+    bool lv_was;
+
+    if (!gf_IsHeroPlayer(lp_player)) {
+        return;
+    }
+    lv_was = gf_MovementKeyHeld(lp_player);
+    gf_MoveKeysApply(lp_player);
+    if (gf_MovementKeyHeld(lp_player)) {
+        gv_animHasMoveTarget[lp_player] = false;
+        gf_MoveTick(lp_player);
+        return;
+    }
+    gv_moveHeroFrame[lp_player] = false;
+    if (lv_was) {
+        gf_AimMoveStop(lp_player);
+        gf_CombatSyncRoot(lp_player);
+    }
+}
+
+// Left and right mouse buttons together walk forward (R-PNC-56).
 void gf_MouseForwardStart (int lp_player) {
     if (gv_sCOBAOrderMode[lp_player] == true) {
         return;
     }
     gv_mOUSEFORWARD[lp_player] = true;
-    if (!gv_fORWARD[lp_player]) {
-        gf_ForwardBegin(lp_player);
-    }
+    gv_keyBackLast[lp_player] = false;
+    gf_MoveKeysChanged(lp_player);
 }
 
 void gf_MouseForwardStop (int lp_player) {
@@ -173,42 +219,54 @@ void gf_MouseForwardStop (int lp_player) {
         return;
     }
     gv_mOUSEFORWARD[lp_player] = false;
-    if (!gv_kEYFORWARD[lp_player]) {
-        gv_fORWARD[lp_player] = false;
+    gf_MoveKeysChanged(lp_player);
+}
+
+// The one entry of the eight key triggers and of the test harness. Every
+// down and every up is stored: order mode, a missing hero and the input
+// hold do not drop a key (R-PNC-58). A down of a key that is down is a key
+// repeat and changes nothing.
+bool gf_MoveKeySet (int lp_player, int lp_key, bool lp_down) {
+    if (!gf_IsHeroPlayer(lp_player) || gf_MoveKeyGet(lp_player, lp_key) == lp_down) {
+        return true;
     }
-    if (!gf_MovementKeyHeld(lp_player)) {
-        gf_AimMoveStop(lp_player);
-        gf_CombatSyncRoot(lp_player);
+    if (lp_key == c_MOVE_KEY_FWD) {
+        gv_kEYFORWARD[lp_player] = lp_down;
+        if (lp_down) {
+            gv_keyBackLast[lp_player] = false;
+        }
     }
-    // S still held: it walks again.
-    if (!gv_fORWARD[lp_player] && gv_bACKWARD[lp_player]) {
-        gf_BackwardBegin(lp_player);
+    else if (lp_key == c_MOVE_KEY_BACK) {
+        gv_kEYBACKWARD[lp_player] = lp_down;
+        gv_keyBackLast[lp_player] = lp_down;
+        if (!lp_down) {
+            UnitBehaviorRemove(gv_tPSUNIT[lp_player], "VileAcidSlowEffectsLevel2", 1);
+        }
     }
+    else if (lp_key == c_MOVE_KEY_LEFT) {
+        gv_kEYLEFT[lp_player] = lp_down;
+        if (lp_down) {
+            gv_keyRightLast[lp_player] = false;
+        }
+    }
+    else {
+        gv_kEYRIGHT[lp_player] = lp_down;
+        gv_keyRightLast[lp_player] = lp_down;
+    }
+    // Input hold of this player (systems/input_hold): the key is stored and
+    // the hero does not move. gf_SceneLeave applies the stored keys.
+    if (gf_InputHeld(lp_player)) {
+        return true;
+    }
+    gf_MoveKeysChanged(lp_player);
+    return true;
 }
 
 bool gt_ForwardStart_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
     if (!runActions) {
         return true;
     }
-    // Input hold of this player (systems/input_hold).
-    if (gf_InputHeld(EventPlayer())) {
-        return true;
-    }
-
-    if (gv_sCOBAOrderMode[lv_localPlayer] == true) {
-        return true;
-    }
-
-    gv_kEYFORWARD[lv_localPlayer] = true;
-    gf_ForwardBegin(lv_localPlayer);  // the loop guard drops a key repeat
-    return true;
+    return gf_MoveKeySet(EventPlayer(), c_MOVE_KEY_FWD, true);
 }
 
 void gt_ForwardStart_Init () {
@@ -217,35 +275,10 @@ void gt_ForwardStart_Init () {
 }
 
 bool gt_ForwardEnd_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
     if (!runActions) {
         return true;
     }
-    // The key is up, input hold or not: a release dropped during a hold
-    // left W "held" and the next press did nothing.
-    gv_kEYFORWARD[lv_localPlayer] = false;
-    if (!gv_mOUSEFORWARD[lv_localPlayer]) {
-        gv_fORWARD[lv_localPlayer] = false;
-    }
-    // Input hold of this player (systems/input_hold).
-    if (gf_InputHeld(EventPlayer())) {
-        return true;
-    }
-    if (!gf_MovementKeyHeld(lv_localPlayer)) {
-        gf_AimMoveStop(lv_localPlayer);
-        gf_CombatSyncRoot(lv_localPlayer);
-    }
-    // S still held: it walks again.
-    if (!gv_fORWARD[lv_localPlayer] && gv_bACKWARD[lv_localPlayer]) {
-        gf_BackwardBegin(lv_localPlayer);
-    }
-    return true;
+    return gf_MoveKeySet(EventPlayer(), c_MOVE_KEY_FWD, false);
 }
 
 void gt_ForwardEnd_Init () {
@@ -254,23 +287,10 @@ void gt_ForwardEnd_Init () {
 }
 
 bool gt_BackwardStart_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
     if (!runActions) {
         return true;
     }
-    // Input hold of this player (systems/input_hold).
-    if (gf_InputHeld(EventPlayer())) {
-        return true;
-    }
-
-    gf_BackwardBegin(lv_localPlayer);  // the loop guard drops a key repeat
-    return true;
+    return gf_MoveKeySet(EventPlayer(), c_MOVE_KEY_BACK, true);
 }
 
 void gt_BackwardStart_Init () {
@@ -279,32 +299,10 @@ void gt_BackwardStart_Init () {
 }
 
 bool gt_BackwardEnd_Func (bool testConds, bool runActions) {
-    // Variable Declarations
-    int lv_localPlayer;
-
-    // Variable Initialization
-    lv_localPlayer = EventPlayer();
-
-    // Actions
     if (!runActions) {
         return true;
     }
-    // The key is up, input hold or not (as W).
-    gv_bACKWARD[lv_localPlayer] = false;
-    // Input hold of this player (systems/input_hold).
-    if (gf_InputHeld(EventPlayer())) {
-        return true;
-    }
-    UnitBehaviorRemove(gv_tPSUNIT[lv_localPlayer], "VileAcidSlowEffectsLevel2", 1);
-    if (!gf_MovementKeyHeld(lv_localPlayer)) {
-        gf_AimMoveStop(lv_localPlayer);
-        gf_CombatSyncRoot(lv_localPlayer);
-    }
-    // W (key or mouse) still held: it walks again.
-    if (gv_fORWARD[lv_localPlayer]) {
-        gf_ForwardBegin(lv_localPlayer);
-    }
-    return true;
+    return gf_MoveKeySet(EventPlayer(), c_MOVE_KEY_BACK, false);
 }
 
 void gt_BackwardEnd_Init () {
@@ -312,83 +310,11 @@ void gt_BackwardEnd_Init () {
     TriggerAddEventKeyPressed(gt_BackwardEnd, c_playerAny, gv_mOVEBACKWARD, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
 }
 
-bool gf_SideHeld (int lp_player, bool lp_left) {
-    if (lp_left) {
-        return gv_lEFT[lp_player];
-    }
-    return gv_rIGHT[lp_player];
-}
-
-void gf_SideSet (int lp_player, bool lp_left, bool lp_on) {
-    if (lp_left) {
-        gv_lEFT[lp_player] = lp_on;
-    }
-    else {
-        gv_rIGHT[lp_player] = lp_on;
-    }
-}
-
-// A (lp_left) / D held. Left is +90 from the yaw, right -90; W / S bend it
-// 45 toward forward / back. Regular units: no A/D (operator 2026-11-18:
-// the keys clash with the ability-panel hotkeys).
-void gf_SideBegin (int lp_player, bool lp_left) {
-    fixed lv_side = 90.0;
-    fixed lv_angle;
-
-    if (gv_sCOBAOrderMode[lp_player] == true || gf_ControlRegular(lp_player)) {
-        return;
-    }
-    if (!lp_left) {
-        lv_side = -90.0;
-    }
-
-    gf_SideSet(lp_player, lp_left, true);
-    gf_CombatSetRoot(lp_player, false);
-    while (gf_SideHeld(lp_player, lp_left) && !gf_ControlRegular(lp_player)) {
-        if (((gv_rOTATEUNIT[lp_player] == true) || (gv_rOTATECAMERA[lp_player] == false))) {
-            lv_angle = (CameraGetYaw(lp_player) + lv_side);
-        }
-        else {
-            lv_angle = (UnitGetFacing(gv_tPSUNIT[lp_player]) + lv_side);
-        }
-        if ((gv_fORWARD[lp_player] == true)) {
-            lv_angle = (lv_angle - lv_side / 2.0);
-        }
-
-        if ((gv_bACKWARD[lp_player] == true)) {
-            lv_angle = (lv_angle + lv_side / 2.0);
-        }
-
-        if (gf_StrafeMoveActive(lp_player)) {
-            gf_StrafeLoopStep(lp_player);
-        }
-        else {
-            gf_CombatMoveStep(lp_player, lv_angle);
-            gf_UnitTurn(gv_tPSUNIT[lp_player], lv_angle, c_ANIM_MOVE_TURN_DURATION);
-            Wait(0.01, c_timeGame);
-        }
-    }
-}
-
-// A / D released. Only a press that set the flag stops movement, so the
-// key on a regular unit does not stop its order.
-void gf_SideEnd (int lp_player, bool lp_left) {
-    if (!gf_SideHeld(lp_player, lp_left)) {
-        return;
-    }
-    gf_SideSet(lp_player, lp_left, false);
-    if (!gf_MovementKeyHeld(lp_player)) {
-        gf_AimMoveStop(lp_player);
-        gf_CombatSyncRoot(lp_player);
-    }
-}
-
 bool gt_LeftStart_Func (bool testConds, bool runActions) {
-    // Input hold of this player (systems/input_hold).
-    if (runActions && !gf_InputHeld(EventPlayer())) {
-        gf_SideBegin(EventPlayer(), true);
+    if (!runActions) {
+        return true;
     }
-    return true;
+    return gf_MoveKeySet(EventPlayer(), c_MOVE_KEY_LEFT, true);
 }
 
 void gt_LeftStart_Init () {
@@ -397,11 +323,10 @@ void gt_LeftStart_Init () {
 }
 
 bool gt_LeftEnd_Func (bool testConds, bool runActions) {
-    // Input hold of this player (systems/input_hold).
-    if (runActions && !gf_InputHeld(EventPlayer())) {
-        gf_SideEnd(EventPlayer(), true);
+    if (!runActions) {
+        return true;
     }
-    return true;
+    return gf_MoveKeySet(EventPlayer(), c_MOVE_KEY_LEFT, false);
 }
 
 void gt_LeftEnd_Init () {
@@ -410,11 +335,10 @@ void gt_LeftEnd_Init () {
 }
 
 bool gt_RightStart_Func (bool testConds, bool runActions) {
-    // Input hold of this player (systems/input_hold).
-    if (runActions && !gf_InputHeld(EventPlayer())) {
-        gf_SideBegin(EventPlayer(), false);
+    if (!runActions) {
+        return true;
     }
-    return true;
+    return gf_MoveKeySet(EventPlayer(), c_MOVE_KEY_RIGHT, true);
 }
 
 void gt_RightStart_Init () {
@@ -423,11 +347,10 @@ void gt_RightStart_Init () {
 }
 
 bool gt_RightEnd_Func (bool testConds, bool runActions) {
-    // Input hold of this player (systems/input_hold).
-    if (runActions && !gf_InputHeld(EventPlayer())) {
-        gf_SideEnd(EventPlayer(), false);
+    if (!runActions) {
+        return true;
     }
-    return true;
+    return gf_MoveKeySet(EventPlayer(), c_MOVE_KEY_RIGHT, false);
 }
 
 void gt_RightEnd_Init () {

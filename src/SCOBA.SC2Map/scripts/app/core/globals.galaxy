@@ -50,7 +50,18 @@ bool[8] gv_rIGHTORBIT;
 bool[8] gv_holdStrafe;
 bool[8] gv_mOUSEMIDDLE;
 bool[8] gv_mOUSEFORWARD;
+// WASD key state (systems/movement, gf_MoveKeySet). The direction flags
+// gv_fORWARD, gv_bACKWARD, gv_lEFT, gv_rIGHT are derived from it.
 bool[8] gv_kEYFORWARD;
+bool[8] gv_kEYBACKWARD;
+bool[8] gv_kEYLEFT;
+bool[8] gv_kEYRIGHT;
+bool[8] gv_keyBackLast;   // S went down after W or the two-button walk
+bool[8] gv_keyRightLast;  // D went down after A
+// Counters for the stuck recorder (systems/recorders/move_log): runs of the
+// movement tick, and the steps it issued for each player.
+int gv_moveTicks;
+int[8] gv_moveSteps;
 bool[8] gv_mOUSERIGHTCANCEL;
 bool[8] gv_mOUSELEFTCANCEL;
 bool[8] gv_aIMACTIVE;
@@ -331,7 +342,6 @@ trigger gt_HeroSwitchScv;
 trigger gt_HeroSwitchViking;
 trigger gt_AnimProbe;
 trigger gt_AnimProbeLower;
-trigger gt_AnimProbeToggle;
 trigger gt_Target;
 trigger gt_ClearTarget;
 trigger gt_ZerusSpawn;

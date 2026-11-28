@@ -1,0 +1,183 @@
+// Module: systems/recorders/move_log_keys
+// Input edge log of the stuck recorder (SPEC-POINT-AND-CLICK 5.8b; operator
+// 2026-11-27: D was held, the game had no key down, and the recorder could
+// not show when the key was lost). Every edge the game gives the script,
+// with game time, as "<ms><d|u><name>":
+// - W S A D: the recorder's triggers on the four keys
+//   (systems/recorders/move_log);
+// - k<code>: one trigger on any key, the four keys too: a second witness;
+// - B<n>: a mouse button; 1 left, 2 middle, 3 right.
+// A tap, a down and an up of one key with no edge between, is the entry
+// "<ms>rk<code>*<n>from<ms of the first down>"; taps of that key in a row
+// add to its n. Run combat/20261127-165541: the game got a NumLock tap
+// (k81) with every key event, 16 to 30 a second with a key held.
+// The last c_MOVELOG_EDGES entries are kept. systems/recorders/move_log
+// writes them with a `mark` and a `stuck`. It changes no game state.
+
+const int c_MOVELOG_EDGES = 480;
+const int c_MOVELOG_EDGE_ROW = 24;   // entries in one bank entry
+
+string[c_MOVELOG_EDGES] gv_moveLogEdge;
+int gv_moveLogEdgeSeq;     // entries since map start
+int gv_moveLogKeyEdges;    // edges by the triggers on the four keys
+int gv_moveLogAnyEdges;    // edges by the any-key trigger
+int gv_moveLogBtnEdges;    // mouse button edges
+int gv_moveLogPendKey = -1;   // an any-key down that waits for its up
+int gv_moveLogPendMs;
+int gv_moveLogRunKey = -1;    // the key of the taps entry
+int gv_moveLogRunSeq;         // gv_moveLogEdgeSeq right after that entry
+int gv_moveLogRunCount;
+int gv_moveLogRunFirst;       // ms of its first down
+trigger gt_MoveLogAnyDown;
+trigger gt_MoveLogAnyUp;
+trigger gt_MoveLogBtnDown;
+trigger gt_MoveLogBtnUp;
+
+int gf_MoveLogMs () {
+    return FixedToInt(GameGetMissionTime() * 1000.0);
+}
+
+void gf_MoveLogEdgePut (string lp_text) {
+    gv_moveLogEdge[gv_moveLogEdgeSeq % c_MOVELOG_EDGES] = lp_text;
+    gv_moveLogEdgeSeq += 1;
+}
+
+// Writes the any-key down that waits for its up: it is no tap.
+void gf_MoveLogEdgeFlush () {
+    if (gv_moveLogPendKey < 0) {
+        return;
+    }
+    gf_MoveLogEdgePut(IntToString(gv_moveLogPendMs) + "dk" + IntToString(gv_moveLogPendKey));
+    gv_moveLogPendKey = -1;
+}
+
+// Ends the taps entry: the next tap starts a new one.
+void gf_MoveLogEdgeBreak () {
+    gf_MoveLogEdgeFlush();
+    gv_moveLogRunKey = -1;
+}
+
+void gf_MoveLogEdge (bool lp_down, string lp_name) {
+    string lv_edge = "u";
+
+    gf_MoveLogEdgeFlush();
+    if (lp_down) {
+        lv_edge = "d";
+    }
+    gf_MoveLogEdgePut(IntToString(gf_MoveLogMs()) + lv_edge + lp_name);
+}
+
+void gf_MoveLogAnyDown (int lp_key) {
+    gf_MoveLogEdgeFlush();
+    gv_moveLogPendKey = lp_key;
+    gv_moveLogPendMs = gf_MoveLogMs();
+}
+
+void gf_MoveLogAnyUp (int lp_key) {
+    if (gv_moveLogPendKey != lp_key) {
+        gf_MoveLogEdge(false, "k" + IntToString(lp_key));
+        return;
+    }
+    // A tap. The newest entry is the taps of this key: it takes this one.
+    gv_moveLogPendKey = -1;
+    if (gv_moveLogRunKey == lp_key && gv_moveLogRunSeq == gv_moveLogEdgeSeq) {
+        gv_moveLogRunCount += 1;
+        gv_moveLogEdgeSeq -= 1;
+    }
+    else {
+        gv_moveLogRunKey = lp_key;
+        gv_moveLogRunCount = 1;
+        gv_moveLogRunFirst = gv_moveLogPendMs;
+    }
+    gf_MoveLogEdgePut(IntToString(gf_MoveLogMs()) + "rk" + IntToString(lp_key) + "*" + IntToString(gv_moveLogRunCount) + "from" + IntToString(gv_moveLogRunFirst));
+    gv_moveLogRunSeq = gv_moveLogEdgeSeq;
+}
+
+// An edge of the triggers on the four keys. lp_key: c_MOVE_KEY_*.
+void gf_MoveLogKeyEdge (int lp_key, bool lp_down) {
+    string lv_name = "D";
+
+    if (lp_key == c_MOVE_KEY_FWD) {
+        lv_name = "W";
+    }
+    else if (lp_key == c_MOVE_KEY_BACK) {
+        lv_name = "S";
+    }
+    else if (lp_key == c_MOVE_KEY_LEFT) {
+        lv_name = "A";
+    }
+    gv_moveLogKeyEdges += 1;
+    gf_MoveLogEdge(lp_down, lv_name);
+}
+
+// The oldest entry still kept, counted from map start.
+int gf_MoveLogEdgeFirst () {
+    if (gv_moveLogEdgeSeq > c_MOVELOG_EDGES) {
+        return gv_moveLogEdgeSeq - c_MOVELOG_EDGES;
+    }
+    return 0;
+}
+
+// Up to lp_count edges from edge lp_first (counted from map start), oldest
+// first. An edge that is no longer kept is left out.
+string gf_MoveLogEdgesText (int lp_first, int lp_count) {
+    string lv_text = "";
+    int lv_i = lp_first;
+    int lv_end = lp_first + lp_count;
+
+    if (lv_i < gf_MoveLogEdgeFirst()) {
+        lv_i = gf_MoveLogEdgeFirst();
+    }
+    if (lv_end > gv_moveLogEdgeSeq) {
+        lv_end = gv_moveLogEdgeSeq;
+    }
+    while (lv_i < lv_end) {
+        lv_text = lv_text + gv_moveLogEdge[lv_i % c_MOVELOG_EDGES] + " ";
+        lv_i += 1;
+    }
+    return lv_text;
+}
+
+bool gt_MoveLogAnyDown_Func (bool testConds, bool runActions) {
+    if (runActions) {
+        gv_moveLogAnyEdges += 1;
+        gf_MoveLogAnyDown(EventKeyPressed());
+    }
+    return true;
+}
+
+bool gt_MoveLogAnyUp_Func (bool testConds, bool runActions) {
+    if (runActions) {
+        gv_moveLogAnyEdges += 1;
+        gf_MoveLogAnyUp(EventKeyPressed());
+    }
+    return true;
+}
+
+bool gt_MoveLogBtnDown_Func (bool testConds, bool runActions) {
+    if (runActions) {
+        gv_moveLogBtnEdges += 1;
+        gf_MoveLogEdge(true, "B" + IntToString(EventMouseClickedButton()));
+    }
+    return true;
+}
+
+bool gt_MoveLogBtnUp_Func (bool testConds, bool runActions) {
+    if (runActions) {
+        gv_moveLogBtnEdges += 1;
+        gf_MoveLogEdge(false, "B" + IntToString(EventMouseClickedButton()));
+    }
+    return true;
+}
+
+// c_keyNone is any key, c_mouseButtonNone any button.
+void gf_MoveLogKeysInit (int lp_player) {
+    gt_MoveLogAnyDown = TriggerCreate("gt_MoveLogAnyDown_Func");
+    TriggerAddEventKeyPressed(gt_MoveLogAnyDown, lp_player, c_keyNone, true, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_MoveLogAnyUp = TriggerCreate("gt_MoveLogAnyUp_Func");
+    TriggerAddEventKeyPressed(gt_MoveLogAnyUp, lp_player, c_keyNone, false, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    gt_MoveLogBtnDown = TriggerCreate("gt_MoveLogBtnDown_Func");
+    TriggerAddEventMouseClicked(gt_MoveLogBtnDown, lp_player, c_mouseButtonNone, true);
+    gt_MoveLogBtnUp = TriggerCreate("gt_MoveLogBtnUp_Func");
+    TriggerAddEventMouseClicked(gt_MoveLogBtnUp, lp_player, c_mouseButtonNone, false);
+}

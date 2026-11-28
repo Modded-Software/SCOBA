@@ -7,29 +7,36 @@ from __future__ import annotations
 
 import math
 import os
+import sys
 from pathlib import Path
 
 import workpaths
 from project_root import project_root
 
+from .. import host_keys
+from ..bank import find_latest_bank, read_bank
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
 from .bank_checks import _delta, _no_damage, _report, _shots, _still
 from .camheight import check_camclamp, check_camheight
-from .combat_kerrigan import (
+from .combat_parts.combat_kerrigan import (
     check_breath,
     check_psi_probe,
     check_psi_watch,
     check_talons,
     check_weapons,
 )
+from .combat_parts.combat_keys import check_keys, press_real_key
+from .combat_parts.combat_keys_log import check_host_log
+from .combat_parts.combat_keys_race import check_race_host, play_race, sent_presses
+from .combat_parts.combat_keys_real import play_combo, sent_buttons
 from .pose import check_combat_pose
 from .registry import PROFILE_BANKS, profile_output
 from .tps_shot import shot_clocks
 
 ROOT = project_root()
 
-GROUPS = ("idle", "single", "auto", "cancel", "wasd", "hold", "button", "switch", "pose", "kerrigan", "psiprobe", "talons", "psiwatch", "camheight", "camclamp")
+GROUPS = ("idle", "single", "auto", "cancel", "wasd", "keys", "hold", "button", "switch", "pose", "kerrigan", "psiprobe", "talons", "psiwatch", "camheight", "camclamp")
 
 
 def selected_group() -> str:
@@ -48,24 +55,72 @@ def map_spec() -> TestMapSpec:
         bank_names=PROFILE_BANKS["combat"],
         galaxy_files=(
             ROOT / "scripts" / "testkit" / "galaxy" / "common.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "combat_cam.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat" / "combat_cam.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "kerrigan" / "combat_kerrigan.galaxy",
             ROOT / "scripts" / "testkit" / "galaxy" / "kerrigan" / "combat_talons.galaxy",
-            ROOT / "scripts" / "testkit" / "galaxy" / "combat.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat" / "combat_single.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat" / "combat_keys.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat" / "combat_keys_real.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat" / "combat_keys_race.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat" / "combat_keys_stuck.galaxy",
+            ROOT / "scripts" / "testkit" / "galaxy" / "combat" / "combat.galaxy",
         ),
         galaxy_includes=(
             "scripts/test/combat/common",
             "scripts/test/combat/combat_cam",
             "scripts/test/combat/combat_kerrigan",
             "scripts/test/combat/combat_talons",
+            "scripts/test/combat/combat_single",
+            "scripts/test/combat/combat_keys",
+            "scripts/test/combat/combat_keys_real",
+            "scripts/test/combat/combat_keys_race",
+            "scripts/test/combat/combat_keys_stuck",
             "scripts/test/combat/combat",
         ),
         init_calls=(f'gv_dbgGroup = "{selected_group()}";', "gt_DbgTest_Init();"),
     )
 
 
+def _read_test_bank() -> dict | None:
+    """The test bank of this run. The runner deleted every older one."""
+    path = find_latest_bank(workpaths.path("SC2_DOCUMENTS"), PROFILE_BANKS["combat"][0], 0.0)
+    if path is None:
+        return None
+    try:
+        return read_bank(path)
+    except RuntimeError as exc:
+        # The game was writing the file. The caller reads again.
+        print(f"warning: bank read failed, retrying: {exc}", file=sys.stderr)
+        return None
+
+
+def _logged(ctx, name: str, play, driver) -> list[str]:
+    """A host sequence with the host key log (5.8b) beside it: what the X
+    server held. Returns the lines of the log."""
+    log = host_keys.Recording(ctx.run_dir / name)
+    log.start()
+    try:
+        play(_read_test_bank, driver)
+    finally:
+        lines = log.stop()
+    return lines
+
+
 def on_ready(ctx, data: dict) -> None:
-    return
+    # Group keys: the harness waits for a real W key (key_real), then for
+    # the real keys and mouse of key_combo, then for those of key_race.
+    if data.get("key_real", {}).get("waiting") != 1:
+        return
+    press_real_key(data)
+    from .. import input_driver
+
+    ctx.errors.extend(check_host_log(_logged(ctx, "host_keys.log", play_combo, input_driver)))
+    ctx.errors.extend(check_race_host(_logged(ctx, "host_keys_race.log", play_race, input_driver)))
+
+
+def expected_clicks(group: str) -> int:
+    """Mouse clicks a run must count: the ones the host sends, none else."""
+    return sent_buttons() + sum(sent_presses().values()) if group in ("all", "keys") else 0
 
 
 def _buttons_match(checks, data: dict) -> None:
@@ -92,7 +147,7 @@ def _buttons_match(checks, data: dict) -> None:
 def _button_after_shot(checks, section: str) -> None:
     """R-PNC-46: a shot the engine started on its own sets the button cooldown."""
     checks.true(section, "tshot", "ShotSeen")
-    # Read one loop after the shot: the 0.25 s Tosh clock is over by tshot.
+    # Read in the loop that saw the shot: the 0.15 s Tosh clock is over by tshot.
     checks.gt(section, "tshot", "EarlyBtnMs", 0)
 
 
@@ -114,8 +169,10 @@ def _single_shots(checks, section: str, damage: bool = True) -> None:
         ok = one is not None and three is not None and one < 0 and abs(three - 3 * one) <= 4
         _report(checks, f"{section} damage per shot", ok, f"one={one} three={three}")
     shot_clocks(checks, section, again=False, tag="tclock", bounded=section not in KERRIGAN_SINGLE)
-    checks.eq(section, "t4000", "ButtonCdMs", 0)
-    checks.eq(section, "t4000", "CooldownMs", 0)
+    # Over: an expired clock keeps its last step below 0 (at the 0.1 s
+    # period: -25, combat/20261127-105141), never a running value.
+    checks.between(section, "t4000", "ButtonCdMs", -62, 0)
+    checks.between(section, "t4000", "CooldownMs", -62, 0)
     _still(checks, section, "t0000", "t8000")
 
 
@@ -126,8 +183,9 @@ def check(ctx, data: dict, checks) -> None:
 
     checks.eq("meta", "", "done", 1)
 
-    # Real mouse input makes the run invalid.
-    checks.eq("done", "tend", "RealClicks", 0)
+    # Real mouse input makes the run invalid. Group keys sends its own
+    # clicks (key_combo): the count is theirs and no more.
+    checks.eq("done", "tend", "RealClicks", expected_clicks(selected_group()))
 
     # R-PNC-47: defaults. R-PNC-48: the buttons show them.
     checks.false("startup", "t0000", "Auto")
@@ -183,6 +241,25 @@ def _check_single(checks) -> None:
     _shots(checks, "single_out_move", "t0000", "t5000", 1)
     _shots(checks, "single_out_move", "t5000", "tend", 0)
     checks.false("single_out_move", "tend", "AttackOrder")
+
+    _single_burst(checks, "single_burst")
+
+
+def _single_burst(checks, section: str) -> None:
+    """R-PNC-21: every one of the commands in a row gives exactly one shot."""
+    commands = checks.value(section, "", "commands") or 0
+    print(f"{section} raw shots per command: {checks.value(section, '', 'perCommand')}")
+    for index in range(commands):
+        print(f"{section} raw c{100 + index}: {checks.value(section, '', f'c{100 + index}')}")
+    checks.eq(section, "", "commands", 48)
+    checks.eq(section, "", "doubles", 0)
+    checks.eq(section, "", "none", 0)
+    _shots(checks, section, "t0000", "tend", commands)
+    # Negative: no shot without a command, and no order left.
+    _shots(checks, section, "tend", "tlate", 0)
+    checks.false(section, "tend", "AttackOrder")
+    checks.false(section, "tlate", "AttackOrder")
+    _still(checks, section, "t0000", "tlate")
 
 
 def _check_auto(checks) -> None:
@@ -357,8 +434,9 @@ def _check_button(checks) -> None:
     _shots(checks, "weapon_button", "t0000", "tend", 1)
     checks.damage("weapon_button", "t0000", "tend")
     shot_clocks(checks, "weapon_button", again=False, tag="tclock")
-    checks.eq("weapon_button", "tend", "ButtonCdMs", 0)
-    checks.eq("weapon_button", "tend", "CooldownMs", 0)
+    # Over: below 0 by less than one loop (combat/20261127-105419: -25, -50).
+    checks.between("weapon_button", "tend", "ButtonCdMs", -62, 0)
+    checks.between("weapon_button", "tend", "CooldownMs", -62, 0)
     checks.false("weapon_button", "tend", "AttackOrder")
 
 
@@ -395,6 +473,7 @@ GROUP_CHECKS = {
     "auto": _check_auto,
     "cancel": _check_cancel,
     "wasd": _check_wasd,
+    "keys": check_keys,
     "hold": _check_hold,
     "button": _check_button,
     "switch": _check_switch,

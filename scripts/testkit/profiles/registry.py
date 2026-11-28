@@ -36,6 +36,7 @@ PROFILE_MAPS = {
         "waterfeat": "SCOBA256_waterfeat.SC2Map",
         "hdbake": "SCOBA256_hdbake.SC2Map",
         "loadwait": "SCOBA256_loadwait.SC2Map",
+        "cinematic": "SCOBA256_cinematic.SC2Map",
 }
 
 
@@ -77,6 +78,7 @@ PROFILE_BANKS = {
     "waterfeat": ("SCOBAWATERFEAT",),
     "hdbake": ("SCOBAHDBAKE",),
     "loadwait": ("SCOBALOADWAIT",),
+    "cinematic": ("SCOBACINETEST",),
 }
 
 
@@ -168,4 +170,7 @@ def profile_module(name):
     if name == "loadwait":
         from . import loadwait
         return loadwait
+    if name == "cinematic":
+        from . import cinematic
+        return cinematic
     raise SystemExit(f"unknown test profile: {name}")

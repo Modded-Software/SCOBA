@@ -126,6 +126,10 @@ const int c_FLOATER_SIZE_BASE = 32;
 const int c_FLOATER_SIZE_MAX = 72;
 // Each world floater starts at a random x and y offset inside this distance.
 const fixed c_FLOATER_JITTER = 0.5;
+// Rise speed, game units per second, over the 1.6 s life: 1.68 high.
+// Operator 2026-11-27: 1.05 (1.40 was too fast and too far); 0.70 before
+// that day, before that 0.35.
+const fixed c_FLOATER_RISE_SPEED = 1.05;
 const fixed c_FLOATER_DAMAGE_FULL = 1000.0;
 const fixed c_SCOBA_ZOOM_BLEND = 0.18;
 const fixed c_SCOBA_COLLISION_CLAMP_BLEND = 0.06;
@@ -150,6 +154,13 @@ const fixed c_CAM_DOF_FAR_MIN_ARM = 3.0;    // far DOF 0 below this (R-DOF-3)
 const fixed c_CAM_DOF_MAX_ARM = 40.0;       // max zoom: full strength
 const fixed c_CAM_DOF_FAR_NONE = 100000.0;  // far falloff past any far clip: no far blur
 const fixed c_CAM_DOF_BLEND = 0.2;          // value blend (s)
+// Regular camera (not aim) strength multiplier on near and far k
+// (R-DOF-6, operator 2026-11-27). 1 = the tuned look; raise for more blur.
+const fixed c_CAM_DOF_STRENGTH = 1.0;
+// Slight near DOF at the lowest zoom (arm 1): near k there (R-DOF-1).
+const fixed c_CAM_DOF_NEAR_FLOOR = 0.15;
+// k cap: above 1.44 the near fade end passes its start (NEAR_START_FRAC).
+const fixed c_CAM_DOF_K_MAX = 1.4;
 const fixed c_CAM_DOF_NEAR_START_FRAC = 0.08; // near blur starts 0.08 x arm before the focus (wider sharp band)
 const fixed c_CAM_DOF_NEAR_REACH = 0.3625;  // full near blur at (1 - 0.6375 k) x arm: max -15% (operator 2026-11-17)
 const fixed c_CAM_DOF_FAR_MAX_START = 2.5;  // far blur at max arm: starts 2.5 past the focus (wider sharp band)

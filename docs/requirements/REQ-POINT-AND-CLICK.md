@@ -113,6 +113,9 @@ Implementation lives in
 | R-PNC-54 | The hero MUST attack while WASD moves it. The engine weapon MUST do this. Script MUST NOT. |
 | R-PNC-55 | With no mouse button held, W and S MUST follow the camera view and the hero MUST face its travel direction. |
 | R-PNC-56 | Left and right mouse buttons held together MUST walk the hero forward. |
+| R-PNC-57 | Operator 2026-11-27. While a WASD key is down the hero MUST keep moving in its direction. Only the release of the key MUST end that movement. PNC and TPS (R-PNC-71). |
+| R-PNC-58 | Operator 2026-11-27. No WASD key down MUST be skipped. A key down MUST override or cancel any move order at the moment of the key down. |
+| R-PNC-59 | Operator 2026-11-27. W and S down together: the key pressed last MUST win. Its release MUST give the movement back to the key still down. |
 
 ### 3.7 Mouse holds
 
@@ -189,3 +192,7 @@ after each shot of a sequence.
 | AC-PNC-33 | Switch hero with Attack `auto` and Chase `move`: both buttons still read `Attack: Auto` and `Chase: Move`, and the new hero behaves that way. |
 | AC-PNC-34 | Tosh, Attack `single`, three right clicks on an in-range enemy one second apart: the upper body stays in the shooting pose from the first shot until 2 s after the last. It does not drop to idle between the shots. |
 | AC-PNC-35 | Tosh in the shooting pose, click the ground: the pose ends at once. |
+| AC-PNC-36 | Chase `stand`, hold W, release it and press it again at once: the hero walks on. |
+| AC-PNC-37 | Hold W, then also S: the hero walks back. Release S: it walks forward again. Release W: it stops. |
+| AC-PNC-38 | Press W during a scene (intro, hero drop) and keep it down: the hero stands in the scene and walks when the scene ends, with no new key press. |
+| AC-PNC-39 | The hero walks to a right-clicked point; press W: it walks forward at once. In order mode, press W: the hero walks. |

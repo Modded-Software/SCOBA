@@ -1,0 +1,111 @@
+// Cinematic mode (REQ-CINEMATIC). Calls gf_CineKeyPress as the F9 and
+// Shift+F9 triggers do. One section per step: the UI state the engine
+// reports for player 1.
+
+trigger gt_CineTest;
+
+void gf_CineSnap (string lp_tag) {
+    int lv_p = 1;
+
+    BankValueSetFromFlag(gv_dbgBank, "cine", lp_tag + "On", gv_cineOn[lv_p]);
+    BankValueSetFromFlag(gv_dbgBank, "cine", lp_tag + "Box", gv_cineBox[lv_p]);
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "Bars", gf_CineBarsVisible(lv_p));
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "Dialogs", gf_SceneDialogsVisible(lv_p));
+    BankValueSetFromFlag(gv_dbgBank, "cine", lp_tag + "Minimap", UIFrameVisible(lv_p, c_syncFrameTypeMinimapPanel));
+    BankValueSetFromFlag(gv_dbgBank, "cine", lp_tag + "TextTags", UIFrameVisible(lv_p, c_syncFrameTypeTextTag));
+    BankValueSetFromFlag(gv_dbgBank, "cine", lp_tag + "Reticle", gv_reticleShown[lv_p]);
+    BankValueSetFromFlag(gv_dbgBank, "cine", lp_tag + "TpsTexts", gv_uiFloaterPanel != c_invalidDialogControlId && DialogControlIsVisible(gv_uiFloaterPanel, lv_p));
+    BankValueSetFromFlag(gv_dbgBank, "cine", lp_tag + "InputHeld", gf_InputHeld(lv_p));
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "Toggles", gv_cineToggles[lv_p]);
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "BoxToggles", gv_cineBoxToggles[lv_p]);
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "BoxRefused", gv_cineBoxRefused[lv_p]);
+    BankValueSetFromFlag(gv_dbgBank, "cine", lp_tag + "Leaving", gf_CineBarsLeaving(lv_p));
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "SlideIns", gv_cineSlideIns[lv_p]);
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "SlideOuts", gv_cineSlideOuts[lv_p]);
+    if (gv_cineBarCtl[0] != c_invalidDialogControlId) {
+        BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "BarH", DialogControlGetHeight(gv_cineBarCtl[0], lv_p));
+        BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "BarH2", DialogControlGetHeight(gv_cineBarCtl[1], lv_p));
+    }
+    BankSave(gv_dbgBank);
+}
+
+// Hero position x 100, for the input check.
+void gf_CineSnapPos (string lp_tag) {
+    point lv_at = UnitGetPosition(gv_tPSUNIT[1]);
+
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "X100", FixedToInt(PointGetX(lv_at) * 100.0));
+    BankValueSetFromInt(gv_dbgBank, "cine", lp_tag + "Y100", FixedToInt(PointGetY(lv_at) * 100.0));
+}
+
+bool gt_CineTest_Func (bool testConds, bool runActions) {
+    if (!runActions) {
+        return true;
+    }
+    Wait(3.0, c_timeGame);
+    gv_dbgBank = BankLoad("SCOBACINETEST", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 0);
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    gv_dbgAnchor = UnitGetPosition(gv_tPSUNIT[1]);
+    BankSave(gv_dbgBank);
+    gf_DbgReset("cine", false, true);
+    gf_CineSet(1, false);
+    // TPS on: the crosshair is shown before the mode.
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    gf_CineSnap("base");
+
+    // Negative: Shift+F9 with the mode off does nothing.
+    gf_CineKeyPress(1, true);
+    Wait(0.2, c_timeGame);
+    gf_CineSnap("boxOff");
+
+    // F9: on. Wait past one crosshair tick and one scene tick.
+    gf_CineKeyPress(1, false);
+    Wait(0.5, c_timeGame);
+    gf_CineSnap("on");
+
+    // Input stays free: a move order walks the hero.
+    gf_CineSnapPos("moveA");
+    UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffset(gv_dbgAnchor, 3.0, 0.0)), c_orderQueueReplace);
+    Wait(1.5, c_timeGame);
+    gf_CineSnapPos("moveB");
+
+    // Shift+F9: bars slide in. Again: they slide out and stay shown until
+    // the slide is done, then hide. Again: in.
+    gf_CineKeyPress(1, true);
+    Wait(0.2, c_timeGame);
+    gf_CineSnap("box1");
+    gf_CineKeyPress(1, true);
+    Wait(0.2, c_timeGame);
+    gf_CineSnap("box2");
+    Wait(1.0, c_timeGame);
+    gf_CineSnap("box2done");
+    gf_CineKeyPress(1, true);
+    Wait(0.2, c_timeGame);
+    gf_CineSnap("box3");
+
+    // Negative: in again during a slide out. The late hide must not fire.
+    gf_CineKeyPress(1, true);
+    Wait(0.1, c_timeGame);
+    gf_CineKeyPress(1, true);
+    Wait(1.0, c_timeGame);
+    gf_CineSnap("box5");
+
+    // F9: off. Bars slide out with it, the UI comes back.
+    gf_CineKeyPress(1, false);
+    Wait(0.2, c_timeGame);
+    gf_CineSnap("off");
+    Wait(1.0, c_timeGame);
+    gf_CineSnap("offDone");
+
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    Wait(0.3, c_timeGame);
+    BankValueSetFromInt(gv_dbgBank, "meta", "done", 1);
+    BankSave(gv_dbgBank);
+    return true;
+}
+
+void gt_CineTest_Init () {
+    gt_CineTest = TriggerCreate("gt_CineTest_Func");
+    TriggerAddEventMapInit(gt_CineTest);
+}

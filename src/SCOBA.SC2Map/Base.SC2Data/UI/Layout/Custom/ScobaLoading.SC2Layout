@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Loading screen text in two columns (REQ-LOADING-SCREEN). MapInfo names
+     this file as the custom loading layout; DescIndex does not include it.
+     Left: the controls. Right: the hero. Stock styles only: the map's own
+     styles may not be loaded yet while the map loads. -->
+<Desc>
+    <Frame type="Frame" name="ScobaLoadingScreen">
+        <Anchor relative="$parent"/>
+
+        <Frame type="Label" name="ScobaLoadingControls">
+            <Anchor side="Top" relative="$parent" pos="Min" offset="140"/>
+            <Anchor side="Bottom" relative="$parent" pos="Max" offset="-140"/>
+            <Anchor side="Left" relative="$parent" pos="0.08" offset="0"/>
+            <Anchor side="Right" relative="$parent" pos="0.48" offset="0"/>
+            <Style val="LoadingCampaignText"/>
+            <Text val="@UI/ScobaLoading/Controls"/>
+        </Frame>
+
+        <Frame type="Label" name="ScobaLoadingHero">
+            <Anchor side="Top" relative="$parent" pos="Min" offset="140"/>
+            <Anchor side="Bottom" relative="$parent" pos="Max" offset="-140"/>
+            <Anchor side="Left" relative="$parent" pos="0.56" offset="0"/>
+            <Anchor side="Right" relative="$parent" pos="0.92" offset="0"/>
+            <Style val="LoadingCampaignText"/>
+            <Text val="@UI/ScobaLoading/Hero"/>
+        </Frame>
+    </Frame>
+</Desc>

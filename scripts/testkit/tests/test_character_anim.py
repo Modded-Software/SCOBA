@@ -205,8 +205,8 @@ class SlowWalkTest(unittest.TestCase):
         self.assertIn("lv_upper = gf_SlowWalkUpperState(lp_player, lv_lower);", fsm)
 
     def test_slow_rate_factor(self) -> None:
-        # Operator 2026-11-21: slow walk clips 33 % faster than the stride gives (was 25 %).
-        self.assertEqual(slowwalk.slow_const("c_ANIM_SLOW_RATE"), 1.33)
+        # Operator 2026-11-27: 25 % faster than 1.33 (2026-11-21), movement unchanged.
+        self.assertEqual(slowwalk.slow_const("c_ANIM_SLOW_RATE"), 1.66)
         bracket = app_text("systems", "animation_bracket.galaxy")
         self.assertIn("return c_ANIM_SLOW_RATE * UnitGetPropertyFixed(lp_hero, c_unitPropMovementSpeed, c_unitPropCurrent) / c_ANIM_SLOW_STRIDE;", bracket)
 

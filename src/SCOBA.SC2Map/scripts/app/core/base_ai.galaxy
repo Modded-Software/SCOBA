@@ -7,6 +7,13 @@
 // Off in every test profile but baseai (scripts/testkit/map_builder.py).
 const bool c_BASE_AI_ENABLED = true;
 
+// Which lanes get a town hall and the AI at map init (R-BASE-37):
+// middle: the middle lanes only (core/roster gf_RosterIsMiddle);
+// 3v3: all six lanes.
+const int c_BASE_AI_MODE_MIDDLE = 0;
+const int c_BASE_AI_MODE_3V3 = 1;
+const int c_BASE_AI_MODE = c_BASE_AI_MODE_MIDDLE;
+
 const int c_BASE_AI_LANES = 6;
 const int c_BASE_AI_WORKERS = 12;
 const int c_BASE_AI_MINERALS = 50;
@@ -35,6 +42,17 @@ unit[c_BASE_AI_PLAYERS] gv_baseAiHall;
 // Lane -> computer base owner (core/roster).
 int gf_BaseAiLaneOwner (int lp_lane) {
     return gf_RosterOwner(lp_lane);
+}
+
+// A lane gets a base and the AI in lp_mode (R-BASE-37).
+bool gf_BaseAiLaneHasBase (int lp_lane, int lp_mode) {
+    if (lp_lane < 1 || lp_lane > c_BASE_AI_LANES) {
+        return false;
+    }
+    if (lp_mode == c_BASE_AI_MODE_3V3) {
+        return true;
+    }
+    return gf_RosterIsMiddle(lp_lane);
 }
 
 bool gf_HireIsHired (unit lp_unit) {

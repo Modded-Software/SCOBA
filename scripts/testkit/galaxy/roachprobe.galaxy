@@ -1,0 +1,219 @@
+// Close Roach probe (operator 2026-11-27): a nearby Roach is sometimes
+// out of range in TPS and in aim. gf_AimTargetInRange takes the centre
+// distance minus the target Radius (Roach 1.5) and needs it >= the weapon
+// MinimumRange. Suspect: a hero within 1.5 of the centre gives a negative
+// edge distance, so the check fails. Tosh and Kerrigan, Roach at
+// 0.5 to 6 and at 16 (negative), then a walk into the Roach. Raw values
+// beside every verdict: where the engine put the units, and what fired.
+
+const int c_ROACH_PROBE_CASES = 8;
+const int c_ROACH_PROBE_HEROES = 2;
+
+fixed gf_RoachProbeDist (int lp_k) {
+    if (lp_k == 0) { return 0.5; }
+    if (lp_k == 1) { return 1.0; }
+    if (lp_k == 2) { return 1.4; }
+    if (lp_k == 3) { return 1.6; }
+    if (lp_k == 4) { return 2.0; }
+    if (lp_k == 5) { return 3.0; }
+    if (lp_k == 6) { return 6.0; }
+    // Negative: past both weapon ranges (Tosh 14, Psi Blast 12), edge
+    // 14.5. At 30 something on the map hit the Roach for about 25 life/s
+    // (run pncprobe/20261127-085438); 16 is on the quiet test lane.
+    return 16.0;
+}
+
+// One row: centre distance, Radius, edge distance, weapon range and
+// minimum, the script check, the native check, the pick, aim state.
+void gf_RoachProbeRow (string lp_s, string lp_tag, unit lp_roach) {
+    unit lv_hero = gv_tPSUNIT[1];
+    int lv_w = gf_AimWeaponIndex(1);
+    fixed lv_dist = DistanceBetweenPoints(UnitGetPosition(lv_hero), UnitGetPosition(lp_roach));
+    fixed lv_rad = StringToFixed(CatalogFieldValueGet(c_gameCatalogUnit, UnitGetType(lp_roach), "Radius", 1));
+    string lv_row;
+
+    lv_row = "script " + IntToString(BoolToInt(gf_AimTargetInRange(1, lp_roach)));
+    lv_row = lv_row + " native " + IntToString(BoolToInt(UnitInRangeAndAbleToAttackTarget(lv_hero, lp_roach)));
+    lv_row = lv_row + " pick " + IntToString(BoolToInt(gf_AimUnitAtCrosshair(1, false) == lp_roach));
+    lv_row = lv_row + " reticle " + IntToString(gf_ReticleKind(1));
+    lv_row = lv_row + " dist " + FixedToString(lv_dist, 3);
+    lv_row = lv_row + " radius " + FixedToString(lv_rad, 3);
+    lv_row = lv_row + " propRadius " + FixedToString(UnitGetPropertyFixed(lp_roach, c_unitPropRadius, c_unitPropCurrent), 3);
+    lv_row = lv_row + " heroRadius " + FixedToString(UnitGetPropertyFixed(lv_hero, c_unitPropRadius, c_unitPropCurrent), 3);
+    lv_row = lv_row + " edge " + FixedToString(lv_dist - lv_rad, 3);
+    lv_row = lv_row + " wIdx " + IntToString(lv_w);
+    if (lv_w > 0) {
+        lv_row = lv_row + " weapon " + UnitWeaponGet(lv_hero, lv_w);
+        lv_row = lv_row + " wRange " + FixedToString(UnitWeaponRange(lv_hero, lv_w), 3);
+        lv_row = lv_row + " wMin " + FixedToString(StringToFixed(CatalogFieldValueGet(c_gameCatalogWeapon, UnitWeaponGet(lv_hero, lv_w), "MinimumRange", 1)), 3);
+    }
+    lv_row = lv_row + " life " + FixedToString(UnitGetPropertyFixed(lp_roach, c_unitPropLife, c_unitPropCurrent), 2);
+    lv_row = lv_row + " aim " + IntToString(BoolToInt(gv_aIMACTIVE[1]));
+    lv_row = lv_row + " tps " + IntToString(BoolToInt(gf_TpsActive(1)));
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag, lv_row);
+}
+
+// Fresh case: no aim, no Roach, no order, hero at the anchor facing east.
+void gf_RoachProbeClear (unit lp_roach) {
+    gf_AimEnd(1);
+    gf_TpsShotClear(1);
+    if (UnitIsValid(lp_roach)) {
+        UnitRemove(lp_roach);
+    }
+    gf_DbgClearEnemies();
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    UnitSetPosition(gv_tPSUNIT[1], gv_dbgAnchor, false);
+    UnitSetFacing(gv_tPSUNIT[1], 0.0, 0.0);
+    Wait(1.2, c_timeGame);
+}
+
+unit gf_RoachProbeSpawn (fixed lp_dx) {
+    unit lv_unit;
+
+    libNtve_gf_CreateUnitsAtPoint2(1, "Roach", c_unitCreateIgnorePlacement, 4, PointWithOffset(gv_dbgAnchor, lp_dx, 0.0));
+    lv_unit = UnitLastCreated();
+    UnitSetState(lv_unit, c_unitStateStunned, true);
+    UnitSetPropertyFixed(lv_unit, c_unitPropLifeMax, 5000.0);
+    UnitSetPropertyFixed(lv_unit, c_unitPropLife, 5000.0);
+    // The hero back at the anchor: the spawn may push it.
+    UnitSetPosition(gv_tPSUNIT[1], gv_dbgAnchor, false);
+    gv_dbgEnemy = lv_unit;
+    return lv_unit;
+}
+
+// One aim shot through gf_AimShotPress; the life it took and the shot kind.
+void gf_RoachProbeShot (string lp_s, string lp_tag, unit lp_roach) {
+    fixed lv_life = UnitGetPropertyFixed(lp_roach, c_unitPropLife, c_unitPropCurrent);
+    int lv_kind;
+    bool lv_proxy;
+
+    gf_AimShotPress(1);
+    lv_kind = gv_tpsShotKind[1];
+    lv_proxy = gv_tpsShotTarget[1] == gv_tpsProxy[1] && UnitIsValid(gv_tpsProxy[1]);
+    Wait(1.0, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lp_s, lp_tag + "shot", "kind " + IntToString(lv_kind) + " proxy " + IntToString(BoolToInt(lv_proxy)) + " damage " + FixedToString(lv_life - UnitGetPropertyFixed(lp_roach, c_unitPropLife, c_unitPropCurrent), 2));
+}
+
+void gf_RoachProbeHero (string lp_s, int lp_h) {
+    unit lv_roach;
+    int lv_k;
+    string lv_tag;
+    fixed lv_min;
+    fixed lv_d;
+    int lv_i;
+
+    if (lp_h == 1) {
+        gf_HeroSwitchTo(gv_heroKerrigan);
+        Wait(0.5, c_timeGame);
+    }
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lp_s, "h" + IntToString(lp_h) + "type", UnitGetType(gv_tPSUNIT[1]));
+    for (lv_k = 0; lv_k < c_ROACH_PROBE_CASES; lv_k += 1) {
+        lv_tag = "h" + IntToString(lp_h) + "d" + IntToString(lv_k);
+        gf_RoachProbeClear(null);
+        lv_roach = gf_RoachProbeSpawn(gf_RoachProbeDist(lv_k));
+        Wait(0.3, c_timeGame);
+        gf_ProbeInRangeLook(lv_roach);
+        gf_RoachProbeRow(lp_s, lv_tag + "tps", lv_roach);
+        gf_AimBegin(1);
+        Wait(0.5, c_timeGame);
+        gf_ProbeInRangeLook(lv_roach);
+        gf_RoachProbeRow(lp_s, lv_tag + "aim", lv_roach);
+        gf_RoachProbeShot(lp_s, lv_tag, lv_roach);
+        BankSave(gv_dbgBank);
+        gf_RoachProbeClear(lv_roach);
+    }
+    // Walk: the hero walks into the Roach centre for 2 s. The closest
+    // centre distance the engine allows, and the check there.
+    lv_tag = "h" + IntToString(lp_h) + "walk";
+    lv_roach = gf_RoachProbeSpawn(4.0);
+    Wait(0.3, c_timeGame);
+    lv_min = 100.0;
+    for (lv_i = 0; lv_i < 20; lv_i += 1) {
+        UnitIssueOrder(gv_tPSUNIT[1], OrderTargetingPoint(AbilityCommand("move", 0), UnitGetPosition(lv_roach)), c_orderQueueReplace);
+        Wait(0.1, c_timeGame);
+        lv_d = DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), UnitGetPosition(lv_roach));
+        lv_min = MinF(lv_min, lv_d);
+    }
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+    Wait(0.3, c_timeGame);
+    BankValueSetFromString(gv_dbgBank, lp_s, lv_tag + "min", FixedToString(lv_min, 3));
+    gf_ProbeInRangeLook(lv_roach);
+    gf_RoachProbeRow(lp_s, lv_tag + "tps", lv_roach);
+    gf_AimBegin(1);
+    Wait(0.5, c_timeGame);
+    gf_ProbeInRangeLook(lv_roach);
+    gf_RoachProbeRow(lp_s, lv_tag + "aim", lv_roach);
+    gf_RoachProbeShot(lp_s, lv_tag, lv_roach);
+    BankSave(gv_dbgBank);
+    gf_RoachProbeClear(lv_roach);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+}
+
+// The aim log case (SCOBAAIMLOG marks 2 to 5, operator 2026-11-27): a
+// ZergDropPod 50 to 58 from Tosh won the pick over a Spine Crawler at 3.4
+// that the ray hit at 1.82. Its volume is the model bounds, a box 88 wide
+// (hit_volumes_18), so the ray starts inside it at t 0. The pod is
+// invulnerable: gray crosshair. Here a pod 30 behind the hero and a Roach 3
+// ahead: the pick must be the Roach. Raw: the pod's ray entry.
+void gf_RoachProbePod (string lp_s) {
+    unit lv_pod;
+    unit lv_roach;
+    int lv_type;
+    fixed lv_t = -1.0;
+
+    gf_RoachProbeClear(null);
+    libNtve_gf_CreateUnitsAtPoint2(1, "ZergDropPod", c_unitCreateIgnorePlacement, 4, PointWithOffset(gv_dbgAnchor, -30.0, 0.0));
+    lv_pod = UnitLastCreated();
+    lv_roach = gf_RoachProbeSpawn(3.0);
+    Wait(0.3, c_timeGame);
+    gf_ProbeInRangeLook(lv_roach);
+    lv_type = gf_HvTypeIndex("ZergDropPod");
+    gf_AimPickRay(1);
+    // No volume (HV_UNPICKABLE): type -1, t stays -1.
+    if (lv_type >= 0) {
+        lv_t = gf_HvRayUnit(lv_pod, lv_type, gv_aimPickOx, gv_aimPickOy, gv_aimPickOz, gv_aimPickDx, gv_aimPickDy, gv_aimPickDz);
+    }
+    BankValueSetFromString(gv_dbgBank, lp_s, "podRaw", "valid " + IntToString(BoolToInt(UnitIsValid(lv_pod))) + " invuln " + IntToString(BoolToInt(UnitTestState(lv_pod, c_unitStateInvulnerable))) + " dist " + FixedToString(DistanceBetweenPoints(UnitGetPosition(gv_tPSUNIT[1]), UnitGetPosition(lv_pod)), 2) + " type " + IntToString(lv_type) + " t " + FixedToString(lv_t, 2) + " pickPod " + IntToString(BoolToInt(gf_AimUnitAtCrosshair(1, false) == lv_pod)));
+    gf_RoachProbeRow(lp_s, "podtps", lv_roach);
+    gf_AimBegin(1);
+    Wait(0.5, c_timeGame);
+    gf_ProbeInRangeLook(lv_roach);
+    gf_RoachProbeRow(lp_s, "podaim", lv_roach);
+    gf_RoachProbeShot(lp_s, "pod", lv_roach);
+    BankSave(gv_dbgBank);
+    if (UnitIsValid(lv_pod)) {
+        UnitRemove(lv_pod);
+    }
+    gf_RoachProbeClear(lv_roach);
+}
+
+void gf_ProbeRoach (string lp_s) {
+    int lv_h;
+
+    for (lv_h = 0; lv_h < c_ROACH_PROBE_HEROES; lv_h += 1) {
+        // Chase move: the walk case must be able to walk.
+        gf_DbgReset(lp_s, false, false);
+        // The start Medic follows Tosh and stands in the TPS ray (run
+        // pncprobe/20261127-084939: reticle friendly). Park it off the lane.
+        if (UnitIsValid(gv_sCOBAMedic[1])) {
+            UnitIssueOrder(gv_sCOBAMedic[1], Order(AbilityCommand("stop", 0)), c_orderQueueReplace);
+            UnitSetState(gv_sCOBAMedic[1], c_unitStateStunned, true);
+            UnitSetPosition(gv_sCOBAMedic[1], Point(20.0, 20.0), false);
+        }
+        gf_RoachProbeHero(lp_s, lv_h);
+    }
+    // Tosh, TPS on, for the pod case.
+    gf_DbgReset(lp_s, false, false);
+    if (UnitIsValid(gv_sCOBAMedic[1])) {
+        UnitSetPosition(gv_sCOBAMedic[1], Point(20.0, 20.0), false);
+    }
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    gf_RoachProbePod(lp_s);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankSave(gv_dbgBank);
+}

@@ -1,0 +1,94 @@
+// Group mode (R-BASE-37, SPEC-BASE-AI 4.8): the base AI lane mode.
+// Unit: gf_BaseAiLaneHasBase for lanes 0 to 7 in both modes.
+// Integration: the real map-init path gf_BaseAiInitMode(c_BASE_AI_MODE)
+// (the test map has c_BASE_AI_ENABLED false, so map init made nothing);
+// then per lane owner and seat, engine counts at t1 and t120. Waves run;
+// air creeps are off, so a seat's units are its waves.
+
+const int c_BM_LANES = 6;
+const int c_BM_PEAK_LOOKS = 60;     // x 2 game s
+
+int gf_BmCount (string lp_type, int lp_player) {
+    return UnitGroupCount(UnitGroup(lp_type, lp_player, RegionEntireMap(), UnitFilter(0, 0, 0, (1 << (c_targetFilterDead - 32))), 0), c_unitCountAlive);
+}
+
+int gf_BmHalls (int lp_player) {
+    return gf_BmCount("CommandCenter", lp_player) + gf_BmCount("OrbitalCommand", lp_player)
+        + gf_BmCount("PlanetaryFortress", lp_player) + gf_BmCount("CommandCenterFlying", lp_player)
+        + gf_BmCount("Hatchery", lp_player) + gf_BmCount("Lair", lp_player) + gf_BmCount("Hive", lp_player);
+}
+
+int gf_BmWorkers (int lp_player) {
+    return gf_BmCount("SCV", lp_player) + gf_BmCount("Drone", lp_player);
+}
+
+// Alive non-structure units of a player.
+int gf_BmMobile (int lp_player) {
+    return UnitGroupCount(UnitGroup(null, lp_player, RegionEntireMap(), UnitFilter(0, 0, (1 << c_targetFilterStructure) | (1 << c_targetFilterMissile), (1 << (c_targetFilterDead - 32))), 0), c_unitCountAlive);
+}
+
+void gf_BmUnit (string lp_s) {
+    int lv_lane;
+
+    BankValueSetFromInt(gv_dbgBank, lp_s, "mode", c_BASE_AI_MODE);
+    for (lv_lane = 0; lv_lane <= c_BM_LANES + 1; lv_lane += 1) {
+        BankValueSetFromFlag(gv_dbgBank, lp_s, "middle" + IntToString(lv_lane), gf_BaseAiLaneHasBase(lv_lane, c_BASE_AI_MODE_MIDDLE));
+        BankValueSetFromFlag(gv_dbgBank, lp_s, "3v3" + IntToString(lv_lane), gf_BaseAiLaneHasBase(lv_lane, c_BASE_AI_MODE_3V3));
+    }
+}
+
+void gf_BmSnap (string lp_s, string lp_tag) {
+    int lv_lane;
+    int lv_p;
+    int lv_seat;
+
+    for (lv_lane = 1; lv_lane <= c_BM_LANES; lv_lane += 1) {
+        lv_p = gf_BaseAiLaneOwner(lv_lane);
+        lv_seat = gf_RosterSeat(lv_lane);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "Started"), gv_baseAiStarted[lv_p]);
+        BankValueSetFromFlag(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "HallSet"), UnitIsValid(gv_baseAiHall[lv_p]));
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "Halls"), gf_BmHalls(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "Workers"), gf_BmWorkers(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "Mobile"), gf_BmMobile(lv_p));
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "MinCollected"), PlayerGetPropertyInt(lv_p, c_playerPropMineralsCollected));
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "GasBuilds"), gv_baseGasBuilds[lv_p]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_p, lp_tag + "GasGathers"), gv_baseGasGathers[lv_p]);
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(lv_seat, lp_tag + "SeatMobile"), gf_BmMobile(lv_seat));
+    }
+    BankSave(gv_dbgBank);
+}
+
+// Peak of each seat's units, one look every 2 game s for 120 game s from
+// t1 (three periods of the 40 s spawn timer): a wave may land late or die
+// before the end snap.
+void gf_BmSeatPeak (string lp_s) {
+    int[7] lv_peak;                 // lanes 1 to c_BM_LANES
+    int lv_lane;
+    int lv_n;
+    int lv_i;
+
+    for (lv_i = 0; lv_i < c_BM_PEAK_LOOKS; lv_i += 1) {
+        Wait(2.0, c_timeGame);
+        for (lv_lane = 1; lv_lane <= c_BM_LANES; lv_lane += 1) {
+            lv_n = gf_BmMobile(gf_RosterSeat(lv_lane));
+            if (lv_n > lv_peak[lv_lane]) {
+                lv_peak[lv_lane] = lv_n;
+            }
+        }
+    }
+    for (lv_lane = 1; lv_lane <= c_BM_LANES; lv_lane += 1) {
+        BankValueSetFromInt(gv_dbgBank, lp_s, gf_BaKey(gf_RosterSeat(lv_lane), "SeatPeak"), lv_peak[lv_lane]);
+    }
+}
+
+void gf_BmModeGroup () {
+    string lv_s = "ba_mode";
+
+    gf_BmUnit(lv_s);
+    gf_BmSnap(lv_s, "t0");
+    gf_BaseAiInitMode(c_BASE_AI_MODE);
+    Wait(1.0, c_timeGame);
+    gf_BmSnap(lv_s, "t1");
+    gf_BmSeatPeak(lv_s);
+    gf_BmSnap(lv_s, "t120");
+}

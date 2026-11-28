@@ -18,12 +18,16 @@ from project_root import project_root
 
 from ..map_builder import TestMapSpec
 from ..runner import TestRunSpec
-from .herodrop_parts.herodrop_zoom import ARM_MAX_MS, ZOOM_LENGTH
+from .herodrop_parts.herodrop_zoom import ARM_MAX_MS, ZOOM_LENGTH, _galaxy_const
 from .herodrop_parts.herodrop_zoom import CAM_DISTANCE as CAM_ARM
 from .registry import PROFILE_BANKS, profile_output
 
 ROOT = project_root()
 LOOP_MS = 62
+_CONST = "scripts/app/core/constants.galaxy"
+DOF_STRENGTH = _galaxy_const(_CONST, "c_CAM_DOF_STRENGTH")
+DOF_NEAR_FLOOR = _galaxy_const(_CONST, "c_CAM_DOF_NEAR_FLOOR")
+DOF_K_MAX = _galaxy_const(_CONST, "c_CAM_DOF_K_MAX")
 BIRTH_MS = pod_birth.LENGTH_MS
 LEN_TOL_MS = 50  # the map's c_DROP_CLIP_LEN_TOL
 # Clip time against script time: one loop of read order either way.
@@ -254,19 +258,23 @@ def check_dof(checks) -> None:
     itself has no engine getter: operator check."""
     s = "pb_dof"
     rows = {}
-    for tag in ("d10", "d40", "aim10", "after10", "min2"):
+    for tag in ("d10", "d40", "aim10", "after10", "min2", "min1"):
         raw = str(checks.value(s, "", tag) or "0,0,0")
         print(f"{s} raw {tag} dist100,near100,far100 = {raw}")
         d, n, f = (int(v) / 100.0 for v in raw.split(","))
         rows[tag] = (d, n, f)
-    def near(d): return max(min((d - 1) / 39, 1), 0)
-    def far(d): return max(min((d - 3) / 37, 1), 0)
-    for tag in ("d10", "d40", "after10", "min2"):
+    def cap(k): return max(min(k * DOF_STRENGTH, DOF_K_MAX), 0)
+    def near(d): return cap(DOF_NEAR_FLOOR + (1 - DOF_NEAR_FLOOR) * max(min((d - 1) / 39, 1), 0))
+    def far(d): return cap(max(min((d - 3) / 37, 1), 0))
+    for tag in ("d10", "d40", "after10", "min2", "min1"):
         d, n, f = rows[tag]
         _report(checks, f"{s} {tag}: near/far follow the arm", abs(n - near(d)) < 0.02 and abs(f - far(d)) < 0.02, f"d={d} near={n} far={f}")
     _report(checks, f"{s} R-DOF-1/3 max arm: full near and far", rows["d40"][1] >= 0.99 and rows["d40"][2] >= 0.99, str(rows["d40"]))
     _report(checks, f"{s} R-DOF-3 negative: no far below arm 3", rows["min2"][2] == 0.0, str(rows["min2"]))
     _report(checks, f"{s} R-DOF-2/4 aim: full near, no far", rows["aim10"][1] >= 0.99 and rows["aim10"][2] == 0.0, str(rows["aim10"]))
+    # R-DOF-1: slight near DOF at the lowest zoom; no far there (negative).
+    d1, n1, f1 = rows["min1"]
+    _report(checks, f"{s} R-DOF-1 zoom 1: slight near, no far", d1 <= 1.05 and 0.05 <= n1 <= 0.5 and f1 == 0.0, str(rows["min1"]))
 
 
 def map_spec() -> TestMapSpec:

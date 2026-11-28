@@ -14,8 +14,15 @@ trigger gt_BfForward;
 trigger gt_BfMouse;
 
 bool gt_BfForward_Func (bool testConds, bool runActions) {
-    gf_ForwardBegin(1);
-    return true;
+    return gf_MoveKeySet(1, c_MOVE_KEY_FWD, true);
+}
+
+// The A or D key of the key entry.
+int gf_BfSideKeyId (bool lp_left) {
+    if (lp_left) {
+        return c_MOVE_KEY_LEFT;
+    }
+    return c_MOVE_KEY_RIGHT;
 }
 
 bool gt_BfMouse_Func (bool testConds, bool runActions) {
@@ -186,13 +193,10 @@ void gf_BfSpeed (string lp_s) {
     gv_bfStart = RegionGetCenter(RegionPlayableMap());
     gf_BfHome();
     BankValueSetFromInt(gv_dbgBank, lp_s, "camYaw", FixedToInt(CameraGetYaw(1)));
-    // W held: the key flags as the key triggers set them, own thread.
-    gv_kEYFORWARD[1] = true;
-    gv_fORWARD[1] = true;
+    // W held: through the key entry, own thread.
     TriggerExecute(gt_BfForward, false, false);
     BankValueSetFromInt(gv_dbgBank, lp_s, "speedW100", gf_BfSpan(lp_s, "W"));
-    gv_kEYFORWARD[1] = false;
-    gv_fORWARD[1] = false;
+    gf_MoveKeySet(1, c_MOVE_KEY_FWD, false);
     Wait(0.5, c_timeGame);
     gf_BfHome();
     // LMB+RMB held.
@@ -207,12 +211,9 @@ void gf_BfSpeed (string lp_s) {
     UnitIssueOrder(lv_w, Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
     Wait(0.5, c_timeGame);
     BankValueSetFromFlag(gv_dbgBank, lp_s, "freeTps", gf_TpsActive(1));
-    gv_kEYFORWARD[1] = true;
-    gv_fORWARD[1] = true;
     TriggerExecute(gt_BfForward, false, false);
     BankValueSetFromInt(gv_dbgBank, lp_s, "speedFree100", gf_BfSpan(lp_s, "F"));
-    gv_kEYFORWARD[1] = false;
-    gv_fORWARD[1] = false;
+    gf_MoveKeySet(1, c_MOVE_KEY_FWD, false);
     Wait(0.5, c_timeGame);
     gf_BfHome();
     // TPS on (command 0) on a regular unit: refused (operator 2026-11-18).
@@ -240,8 +241,6 @@ void gf_BfRightHold (string lp_s) {
     gv_mOUSERIGHT[1] = true;
     gv_rIGHTORBIT[1] = true;
     gf_ControlApply(1);
-    gv_kEYFORWARD[1] = true;
-    gv_fORWARD[1] = true;
     TriggerExecute(gt_BfForward, false, false);
     lv_t = "";
     for (lv_i = 1; lv_i <= 6; lv_i += 1) {
@@ -262,8 +261,7 @@ void gf_BfRightHold (string lp_s) {
     BankValueSetFromFlag(gv_dbgBank, lp_s, "rhRotateCamera", gv_rOTATECAMERA[1]);
     BankValueSetFromInt(gv_dbgBank, lp_s, "rhNoTurn", UnitBehaviorCount(lv_w, c_SCOBA_NO_TURN_BEHAVIOR));
     BankValueSetFromFlag(gv_dbgBank, lp_s, "rhTps", gf_TpsActive(1));
-    gv_kEYFORWARD[1] = false;
-    gv_fORWARD[1] = false;
+    gf_MoveKeySet(1, c_MOVE_KEY_FWD, false);
     gv_mOUSERIGHT[1] = false;
     gv_rIGHTORBIT[1] = false;
     gf_ControlApply(1);
@@ -336,39 +334,39 @@ void gf_BfChase (string lp_s) {
 }
 
 // Regular unit: A / D do nothing (operator 2026-11-18). The real key path
-// (gf_SideBegin / gf_SideEnd). Idle: no flag, no move, no turn. Moving: the
+// (gf_MoveKeySet). Idle: no flag, no move, no turn. Moving: the
 // release must not stop the move order.
 void gf_BfSideKey (string lp_s, string lp_k, bool lp_left) {
     unit lv_w = gv_heroViking;
+    int lv_key = gf_BfSideKeyId(lp_left);
     point lv_a;
     fixed lv_f;
 
     gf_BfHome();
     lv_a = UnitGetPosition(lv_w);
     lv_f = UnitGetFacing(lv_w);
-    gf_SideBegin(1, lp_left);
+    gf_MoveKeySet(1, lv_key, true);
     Wait(1.0, c_timeGame);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "Flag", gv_lEFT[1] || gv_rIGHT[1]);
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Moved100", FixedToInt(DistanceBetweenPoints(lv_a, UnitGetPosition(lv_w)) * 100.0));
     BankValueSetFromInt(gv_dbgBank, lp_s, lp_k + "Turn", FixedToInt(AbsF(ModF(UnitGetFacing(lv_w) - lv_f + 540.0, 360.0) - 180.0)));
-    gf_SideEnd(1, lp_left);
+    gf_MoveKeySet(1, lv_key, false);
     UnitIssueOrder(lv_w, OrderTargetingPoint(AbilityCommand("move", 0), PointWithOffsetPolar(lv_a, 30.0, lv_f)), c_orderQueueReplace);
     Wait(0.5, c_timeGame);
-    gf_SideBegin(1, lp_left);
+    gf_MoveKeySet(1, lv_key, true);
     Wait(0.25, c_timeGame);
-    gf_SideEnd(1, lp_left);
+    gf_MoveKeySet(1, lv_key, false);
     Wait(0.25, c_timeGame);
     BankValueSetFromFlag(gv_dbgBank, lp_s, lp_k + "MoveKept", UnitOrderHasAbil(lv_w, "move"));
     gf_BfHome();
 }
 
-// Positive control: a hero (Tosh) still moves on A (gf_SideBegin runs its
-// loop in its own thread). Raw: camera yaw, travel angle, distance.
+// Positive control: a hero (Tosh) still moves on A (the key entry, in its
+// own thread as a key event). Raw: camera yaw, travel angle, distance.
 trigger gt_BfSide;
 
 bool gt_BfSide_Func (bool testConds, bool runActions) {
-    gf_SideBegin(1, true);
-    return true;
+    return gf_MoveKeySet(1, c_MOVE_KEY_LEFT, true);
 }
 
 void gf_BfHeroSide (string lp_s) {
@@ -383,7 +381,7 @@ void gf_BfHeroSide (string lp_s) {
     TriggerExecute(gt_BfSide, false, false);
     Wait(1.0, c_timeGame);
     BankValueSetFromFlag(gv_dbgBank, lp_s, "heroSideFlag", gv_lEFT[1]);
-    gf_SideEnd(1, true);
+    gf_MoveKeySet(1, c_MOVE_KEY_LEFT, false);
     BankValueSetFromInt(gv_dbgBank, lp_s, "heroSideDist100", FixedToInt(DistanceBetweenPoints(lv_a, UnitGetPosition(lv_t)) * 100.0));
     BankValueSetFromInt(gv_dbgBank, lp_s, "heroSideTravel", FixedToInt(AngleBetweenPoints(lv_a, UnitGetPosition(lv_t))));
     Wait(0.5, c_timeGame);

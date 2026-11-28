@@ -96,6 +96,7 @@ Implementation lives in
 | R-BASE-17 | A lane player MUST still be able to order its AI units. An order to an AI unit MUST be accepted and the unit MUST act on it. |
 | R-BASE-18 | The AI MUST NOT change what a person controls: the hero, the control mode, the camera, the selection, the toggles. |
 | R-BASE-19 | The corner players MUST NOT get an AI from this feature. |
+| R-BASE-37 | One map flag MUST choose which lanes get a base and the AI at map init (operator 2026-11-27). `middle` (the default): only the two middle lanes, lane 1 (Terran) and lane 4 (Zerg), which meet at the center X. `3v3`: all six lanes. In `middle` the other four lane players MUST get no town hall, no workers, no AI and no gas order. Their waves, heroes and resource sites MUST stay as in `3v3`. R-BASE-9, 10, 11, 13 and 36 apply to the lanes the flag gives a base. |
 
 ### 3.4 Script units
 
@@ -148,6 +149,7 @@ Operator checks. A test cannot judge them.
 | AC-BASE-5 | The hero plays as before in both control modes while the AI runs for player 1. |
 | AC-BASE-6 | The frame rate holds with six AIs running. |
 | AC-BASE-7 | A hero rush is still held by the early waves. |
+| AC-BASE-8 | In the shipped map (mode `middle`) only the center lanes show a base that grows. |
 
 ## 5. Open points
 

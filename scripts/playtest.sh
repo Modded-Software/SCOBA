@@ -49,7 +49,7 @@ actions:
   launch-built           no build: launch the map as it was last built
   launch-check           rebuild, launch, and check runtime logs
   combat [group]         rebuild, build combat test map, run one scenario group
-                         (idle, single, auto, cancel, wasd, hold, button, switch,
+                         (idle, single, auto, cancel, wasd, keys, hold, button, switch,
                          pose, kerrigan, camheight) or the full suite when no group is given
   tps [group]            rebuild, build tps test map, run one scenario group
                          (move, cursor, aim, head, target, pick, shot, hold, pose) or the full suite when no group is given
@@ -119,6 +119,11 @@ profile_timeout() {
         combat|tps)
             if [ "${SC2_TEST_GROUP:-all}" = all ]; then
                 printf '%s\n' "${SC2_CASE_TIMEOUT:-420}"
+            elif [ "$1" = combat ] && [ "${SC2_TEST_GROUP:-all}" = keys ]; then
+                # Real keys and mouse from the host, about 100 s of them
+                # (key_combo, key_race). Run 20261127-170350 took 194 s
+                # in all without key_race.
+                printf '%s\n' "${SC2_CASE_TIMEOUT:-300}"
             else
                 printf '%s\n' "${SC2_CASE_TIMEOUT:-90}"
             fi
@@ -156,7 +161,7 @@ fresh_build() {
 build_profile() {
     local profile="$1"
     case "$profile" in
-        combat|tps|jump|slowwalk|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake|loadwait) ;;
+        combat|tps|jump|slowwalk|intro|aircreep|baseai|herodrop|podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake|loadwait|cinematic) ;;
         *) fail "unknown profile: $profile" ;;
     esac
     log "building profile map: $profile"
@@ -212,7 +217,7 @@ case "$ACTION" in
         export SC2_TEST_GROUP="${1:-all}"
         run_profile "$ACTION"
         ;;
-    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake|loadwait)
+    podbirth|aimdof|skyduel|ui|aim|motion|controls|pitch|aimfreeze|rungun|pncprobe|treepath|fprot|flora|crushtest|waterprobe|roster|ground|waterfeat|hdbake|loadwait|cinematic)
         run_profile "$ACTION"
         ;;
     picklog)

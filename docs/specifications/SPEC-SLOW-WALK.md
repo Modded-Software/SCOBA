@@ -25,7 +25,7 @@ test backs it; `[operator]` = only a person can judge it.
 | R-SLOW-12 | [build] | `make_slow_groups` raises, `check_slow` fails on a length other than `Walk Slow` |
 | R-SLOW-13 | [tested] [build] | `slowFullState` 6 or 7 while moving; host `test_lower_states` |
 | R-SLOW-14 | [tested] | `slowClip` = `Attack,Walk,Slow,Forward` (`slow_pnc`, `slow_aim`; `slow_free` passes the clip, not the travel), `...,Left` (`slow_strafe`), `...,Back` (`slow_back`); negative: `no slow clip without Shift` (`refClip`) |
-| R-SLOW-15 | [build] [operator] | Changed 2026-11-21 (`c_ANIM_SLOW_RATE` 1.33, was 1.25; host `test_slow_rate_factor`), not run in game since; the runs below passed at factor 1. `slow clip rate matches the ground`: `slowWalkScale1000` = `c_ANIM_SLOW_RATE` x travel / `c_ANIM_SLOW_STRIDE` within 10 %; `check_slow`: `c_ANIM_SLOW_STRIDE` within 2 % of the baked stride; feet: AC-SLOW-1 |
+| R-SLOW-15 | [build] [operator] | Changed 2026-11-27 (`c_ANIM_SLOW_RATE` 1.66, was 1.33 from 2026-11-21, before that 1.25; host `test_slow_rate_factor`). `slow clip rate matches the ground`: `slowWalkScale1000` = `c_ANIM_SLOW_RATE` x travel / `c_ANIM_SLOW_STRIDE` within 10 %; `check_slow`: `c_ANIM_SLOW_STRIDE` within 2 % of the baked stride; feet: AC-SLOW-1 |
 | R-SLOW-16 | [tested] [operator] | `normal legs within 0.25 s` (`out1FullState` not 6 or 7; was `releaseFullState`, renamed 2026-11-21); pop: AC-SLOW-3 |
 | R-SLOW-17 | [tested] | `slow_aim`: `slowUpperState` aim mid |
 | R-SLOW-19 | [build] [operator] | Not run in game. Build: `check_slow` (both arm clips exist, `Walk Slow` length, upper bones only, priority 10, script clip names); host `test_arm_states_and_clips`. Planned in game: `slow_pnc`, `slow_strafe` (`slow_free` too, F11) `slowUpper` 10, clip `Walk,Slow,Arm`; `slow_back` 11, `Walk,Slow,Arm,Back`; negatives `ref`, `after`, `slow_aim`, `slow_kerrigan`: no arm state. Arms in step with the legs: AC-SLOW-7 |
@@ -87,8 +87,8 @@ test backs it; `[operator]` = only a person can judge it.
 
 - `gf_AnimConfigAimSlow`: `Attack,Walk,Slow,<dir>` per direction, for both
   slow states, Tosh only.
-- `gf_AnimWalkScale` for the slow states: `c_ANIM_SLOW_RATE` (1.33, was 1.25;
-  operator 2026-11-21) x speed property (with the buff, F7) /
+- `gf_AnimWalkScale` for the slow states: `c_ANIM_SLOW_RATE` (1.66, operator
+  2026-11-27; was 1.33, 1.25) x speed property (with the buff, F7) /
   `c_ANIM_SLOW_STRIDE` (1.61 game units/s at rate 1). The arms play at the
   same rate (`gv_slowGaitScale`).
 - `gf_SlowWalkGaitMark`: the slow clip phase, reset when a slow clip

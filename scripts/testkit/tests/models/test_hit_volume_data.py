@@ -11,7 +11,7 @@ from pathlib import Path
 from hdtex.sc2.packaged import HD_MODEL_DIR, name_files
 from hitvolumes import fresh, galaxy, measure
 from hitvolumes.resolve import STACK, Catalog, GameData
-from hitvolumes.units import concrete
+from hitvolumes.units import concrete, unit_types
 
 ROOT = Path(__file__).resolve().parents[4]
 TOSH = ROOT / "src" / "SCOBA.SC2Map" / "Assets" / "Units" / "Terran" / "Tosh" / "ToshSCOBA.m3"
@@ -279,6 +279,22 @@ class CommittedDataTests(unittest.TestCase):
         # Negative: a morph state carries a reason, not a guessed volume.
         self.assertEqual(units["BanelingBurrowed"]["source"], "none")
         self.assertIn("morph state", units["BanelingBurrowed"]["reason"])
+
+    def test_no_map_type_has_a_bloated_bounds_volume(self) -> None:
+        # A bounds-only box this wide is the animation path: ZergDropPod
+        # (reach 71) took the pick from a Roach 3 away (operator 2026-11-27).
+        units = galaxy.load_json()["units"]
+        names = unit_types(galaxy.ROOT / "src" / "SCOBA.SC2Map", galaxy.HARNESS)
+        bloated = sorted(
+            n for n in names
+            if n not in galaxy.HV_UNPICKABLE
+            and units.get(n, {}).get("source") == "bounds"
+            and units[n]["reach"] > galaxy.HV_BOUNDS_REACH_MAX
+        )
+        self.assertEqual(bloated, [])
+        # Negative: the limit still lets a real body through (Overmind 14).
+        self.assertLessEqual(units["Overmind"]["reach"], galaxy.HV_BOUNDS_REACH_MAX)
+        self.assertEqual(units["Overmind"]["source"], "bounds")
 
     def test_every_record_has_an_input_key(self) -> None:
         missing = [n for n, rec in galaxy.load_json()["units"].items() if "inputs" not in rec]

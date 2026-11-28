@@ -112,38 +112,32 @@ void gf_AimMoveStep (int lp_player, fixed lp_angle) {
             gv_animMoveHeading[lp_player] = lp_angle;
             gv_animHasMoveTarget[lp_player] = true;
         }
+        else {
+            // No far point is reachable: the short step of the free walk.
+            // The hero walks up to the obstacle (R-PNC-57). No target is
+            // kept, so the next pass looks for a far point again.
+            gf_CombatMoveStep(lp_player, lp_angle);
+            gv_animHasMoveTarget[lp_player] = false;
+        }
     }
 }
 
-// One WASD loop pass during strafe movement. A right hold steps here, in the
-// thread and at the rate a middle hold steps.
-void gf_StrafeLoopStep (int lp_player) {
-    if (gv_holdStrafe[lp_player]) {
-        gf_AimMoveStep(lp_player, gf_AnimInputHeading(lp_player));
-        Wait(0.01, c_timeGame);
-        return;
-    }
-    Wait(c_ANIM_MOVE_TICK, c_timeGame);
-}
-
+// The one movement tick: every hero, each game loop (gf_MoveTick,
+// systems/movement). Strafe movement and the free walk step here, in one
+// thread and at one rate (R-PNC-68).
 bool gt_AimMoveTick_Func (bool testConds, bool runActions) {
     int lv_player;
 
     if (!runActions) {
         return true;
     }
+    gv_moveTicks += 1;
     for (lv_player = c_SCOBA_HERO_FIRST; lv_player <= c_SCOBA_HERO_LAST; lv_player += 1) {
         // Input hold of this player (systems/input_hold).
         if (gf_InputHeld(lv_player)) {
             continue;
         }
-        if (!gf_StrafeMoveActive(lv_player)) {
-            continue;
-        }
-        if (!gf_MovementKeyHeld(lv_player)) {
-            continue;
-        }
-        gf_AimMoveStep(lv_player, gf_AnimInputHeading(lv_player));
+        gf_MoveTick(lv_player);
     }
     return true;
 }

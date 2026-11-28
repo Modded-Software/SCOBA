@@ -50,6 +50,7 @@ can judge it.
 | R-BASE-36 | [tested] (`gas` `20261122-122231`, `-125459`, `-130824`); awaits operator approval | `gas` group, AI lanes 11 to 14: a finished gas building on both placed geysers, 3 crew workers on each, gas taken from each geyser, `GasCollected` > 0 at 180 game s and higher at 240. Negative: no map gas order before the AI starts; none for the owners 9 and 10, whose AI is not started; no worker left script controlled without gas work. Hand-back case: a killed gas building frees its slot and its crew, and the map orders a new build |
 | R-BASE-33 | [built] | `macro`: supply used + supply lost grows within every 2 minutes (`baseai_live.galaxy` death counter); an attacker lost units |
 | R-BASE-34 | [built] | `macro`: attackers ≥ 4 by t480, an owner attacks twice (state 3 left and entered again); `at least 3 owners expanded by t480` |
+| R-BASE-37 | [tested] (`mode` middle `20261127-002028`, 3v3 `20261127-001611`) | `mode` group in both modes (4.10); validator `base_mode.check_script`; host `test_base_mode.py` |
 | R-BASE-30 | [tested] (`hall` `20261119-203139`, `-172941`, `-135358`; earlier script legs: `20261119-115642`, `-121141`, `macro` `-120004`) | `hall` group: the engine pathing grid (36x36 sub-cells of 0.5) of the starting CC covers the measured feet outline; built, created and landed CCs equal them; open while flying and after death; an SCV mines. `macro`: every Terran CC covers the measured cells at t1; the Orbital Command links `FootprintSCOBAHall1x1` |
 
 ## 2. Facts
@@ -483,6 +484,25 @@ else is ordered.
 - **Not tested:** a real person's order (no real input in a run); the
   gas orders in a full game with waves on (`macro`).
 
+### 4.10 Lane mode (R-BASE-37)
+
+- `core/base_ai.galaxy`: `c_BASE_AI_MODE_MIDDLE` 0, `c_BASE_AI_MODE_3V3` 1,
+  `c_BASE_AI_MODE` (shipped: `c_BASE_AI_MODE_MIDDLE`). Change the line and
+  rebuild to play 3v3.
+- `core/roster.galaxy` `gf_RosterIsMiddle`: lanes 1 and 4 (R-ROSTER-10).
+- `gf_BaseAiLaneHasBase(lane, mode)`: 3v3 every lane 1 to 6; middle the
+  middle lanes; false outside 1 to 6.
+- `gf_BaseAiInit` calls `gf_BaseAiInitMode(c_BASE_AI_MODE)`, which runs
+  `gf_BaseAiCreateLane` for the lanes of the mode only. A lane without a
+  base has no started AI, so `base_gas` gives it no order (R-BASE-36).
+  Waves, heroes, start locations, sites and the supply rule do not depend
+  on the mode. The two placed Supply Depots of a Terran owner stay.
+- Validator: exactly one `c_BASE_AI_MODE` line naming a known mode
+  (`scripts/mapgen/base_mode.py`).
+- Tests: `SC2_BA_MODE=middle|3v3` patches the line in the `baseai` test
+  map. The `gas`, `macro` and `hall` groups call `gf_BaseAiCreateLane`
+  per lane and do not read the mode.
+
 ## 5. Files
 
 | File | Role |
@@ -493,7 +513,7 @@ else is ordered.
 | `scripts/mapgen/melee_map.py` | Start locations (Objects, MapInfo records), depot owners, `check` for the validator (4.7a) |
 | `scripts/testkit/profiles/baseai_melee.py`, `scripts/testkit/tests/test_melee_map.py` | `macro` melee checks (A11 to A13); host tests R-BASE-24, 27 to 29 |
 | `scripts/flora/scene.py`, `scripts/flora/build.py` | Site keep-outs |
-| `scripts/validate-map.py` | `check_base_sites`, `c_BASE_AI_ENABLED` |
+| `scripts/validate-map.py` | `check_base_sites`, `c_BASE_AI_ENABLED`, `c_BASE_AI_MODE` (`base_mode.check_script`) |
 | `src/SCOBA.SC2Map/scripts/app/data/base_sites.galaxy` | Site table (empty in `src/`) |
 | `src/SCOBA.SC2Map/scripts/app/core/base_ai.galaxy` | Constants, state |
 | `src/SCOBA.SC2Map/scripts/app/systems/base/base_ai.galaxy` | Exclusion, bases, AI start |
@@ -502,7 +522,8 @@ else is ordered.
 | `src/SCOBA.SC2Map/scripts/app/main.galaxy`, `header.galaxy`, `app/init.galaxy` | Includes, declarations, init order |
 | `spawns.galaxy`, `air_creep.galaxy`, `hero_switch.galaxy`, `hero_drop.galaxy`, `medic.galaxy`, `companion.galaxy`, `aim.galaxy`, `intro.galaxy` | Exclusion calls |
 | `scripts/testkit/galaxy/baseai/baseai.galaxy`, `baseai_macro.galaxy`, `baseai_flight.galaxy`, `scripts/testkit/profiles/baseai.py` (wiring), `baseai_probe.py`, `baseai_macro.py`, `baseai_flight.py`, `baseai_viking.py`, `baseai_common.py` | In-game tests |
-| `scripts/testkit/profiles/baseai_env.py`, `baseai_patch.py`, `baseai_scan.py` | Run switches; A/B data patches of the probe map (depot, gas scan) |
+| `scripts/testkit/profiles/baseai_env.py`, `baseai_patch.py`, `baseai_scan.py` | Run switches; A/B data patches of the probe map (lane mode, depot, gas scan) |
+| `scripts/mapgen/base_mode.py`, `scripts/testkit/galaxy/baseai/baseai_mode.galaxy`, `scripts/testkit/profiles/baseai_mode.py`, `scripts/testkit/tests/test_base_mode.py` | Lane mode (4.10): validator check, test patch, `mode` group, host tests |
 | `scripts/testkit/profiles/registry.py`, `scripts/testkit/map_builder.py`, `scripts/playtest.sh` | Profile, switch, entry point |
 | `scripts/testkit/tests/test_base_sites.py`, `test_base_ai.py` | Host tests |
 | `README.md` | Feature and command list |
@@ -520,6 +541,7 @@ is one bank section. Windows are in game time.
 | `macro` | All six lane owners, waves on, 8 game minutes, the operator in the Alt+4 Wraith. Per owner: minerals collected; workers, supply made, makers, fighters at t480; supply used plus supply lost (R-BASE-33: a harness death counter adds `c_unitPropSuppliesUsed` of every dying owner unit) grows within every 2 minutes; an owner whose fighters fell makes new fighters within 2 minutes (`FightersMade` counter). Terran halls: a CC links the measured footprint (R-FP-10) and its engine grid blocks every measured cell; an Orbital Command links `FootprintSCOBAHall1x1`; `PlacementFootprint` `FootprintSCOBAHall1x1`. Wraith flight as in `flight`. | Not supply-capped for 2 minutes. Hall: a Barracks refused at the four leg centres (±6, ±6); origin open; none of 4 directions blocked at 1.0 (R-BASE-30). Raw: the grid. |
 | `hall` | The first Terran lane owner, no waves, a script-controlled hall at a clear point A and a landing point B at least 20 away (19x19 pathable each). The engine pathing grid (36x36 sub-cells of 0.5) at A and B against the feet outline the build generates. Before: both open, a Barracks fits at each leg centre. Built by an SCV: grid A equals the cells, legs refuse a Barracks, origin open. Killed under construction: open. Created: equals; one SCV mines from a field 11 south in 25 s. Lift-off (4 s): both open. Land at B (polled up to 60 game s, then 2 s): B equals, A open. Killed: open. Last: lanes 1-3 started by the game path (`gf_BaseAiCreateLane`); each starting CC covers every cell and stands within half a cell per axis of its start point (the cell-centre snap). | Nothing blocked while flying, at the old point, or after death. Origin and 1.0 open on the ground. |
 | `gas` | Runs by name only (about 5 min). Lanes 1 and 4 (owners 9, 10): no AI; a script worker builds on a placed geyser; geyser, building under construction and finished building block the 6x6 (R-BASE-35). AI lanes (owners 11 to 14), 240 game s: a finished gas building on both placed geysers, 3 crew workers each, all counted as AI units, gas taken from each geyser, `GasCollected` > 0 at t180 and higher at t240 (R-BASE-36). Last, one case per owner: owner 11's gas building on its first geyser is killed (slot free after two looks, crew not script controlled and gathering again, a new build within 30 game s); a crew member of owner 12 gets a move order (it leaves the crew, is not script controlled, still an AI unit, the crew is full again, the AI gives it a gather or build order within 30 game s); owner 13's gas building is set to 0 gas (slot free, crew handed back, still free 20 game s later, no builder sent to its geyser). Raw: `CrewScript` (the engine's script-control mark). Probe modes by environment (`SC2_BA_GAS_SCAN`, `HELP`, `RING`, `TOWN`, `EXTRA`) turn the map's gas orders off. | Bare ground takes no gas building. No map gas order at t1. No map gas order for owners 9 and 10. No worker script controlled without gas work (`Stuck` 0), at the end and after the kill. |
+| `mode` | R-BASE-37 (4.10), about 2.5 min. Run once per mode: `SC2_BA_MODE=middle` and `SC2_BA_MODE=3v3`. Unit: `gf_BaseAiLaneHasBase` for lanes 0 to 7 in both modes (middle: lanes 1, 4; 3v3: 1 to 6). Integration: the map-init path `gf_BaseAiInitMode(c_BASE_AI_MODE)`, waves on, no air creeps. Per owner with a base: AI started, one hall and 12 workers at t1, a hall and minerals collected at t120. Every seat has wave units: the peak of 2 s looks over 120 game s is above 0 (lane 6 lands after t60). The bank's `mode` equals the asked mode. | Per owner without a base, at t1 and t120: no AI, no hall, no worker, no new unit, no gas order, nothing mined. Nothing for any owner at t0, before the init. |
 | `flight` | Alt+4 Viking (regular unit, PNC), no lanes, no waves. W held and LMB+RMB held: ground speed within 10 % of the unit's speed property, which equals its data speed. Space 1 s climbs 4, Ctrl 1 s descends 4 (within 1), camera = base + flight. Land and lift by the hero morph pair: landed type `SCOBAVikingHeroAssault` on the ground; lifted type `SCOBAVikingHero` at speed 12. Raw: the height methods of F17, each form's ability list. | Speed not Tosh's. Height holds after each release. No jump on the flyer. No TPS, no Stand. No stock morph in either hero form; lift is not a stock `VikingFighter`. A / D: no flag, no move, no turn; the release keeps a move order. Control: Tosh on A moves along camera yaw + 90 (within 20). |
 | `macro` raw (A11 to A13) | Per owner at t0 and every minute: `StartLoc100`, `GroundStartLocs`, `TotalStartLocs`, `NumEnemies`, `NumTeams`, `EnemyBuildings`, `OpeningType`, `AttackState`, wave sizes (main, attack), `NearbyOpen`, town state per slot. Asserts: start location equals the hall point; ground start locs > 0; enemies > 0; at least 3 owners hold a hall at a site by t480; at least 4 owners in attack state by t480 and one owner enters it twice (R-BASE-34). | No `AIExpand` call by script (counter stays 0). |
 | `expand` | For one Terran and one Zerg lane player: a town hall inside an expansion site radius within the time limit. The time is recorded. | No town hall of a lane player outside every site radius. |
@@ -670,3 +692,8 @@ AC-BASE-1 to AC-BASE-7 of the requirements. Also:
 | `baseai/20261122-123555` (`probe`) | failures 2: `t60Out`, `t120Out` `Moved100` 379, want < 50. The excluded Marine has no order and no wave. Raw: owner 11 had two Barracks at t60 and a Barracks order at 212.5,156.5; the Marine stood at 211.0,155.4. Likely pushed by the placement; not measured (the nearest-structure read-out was added after this run). |
 | `baseai/20261122-124813` (`probe`, nearest-structure read-out) | failures 1: `p11t180 Army` 2, want > 2. Raw: a second Command Center by t120. Same as `20261118-204818`. Marine moved 0, no structure within 8. |
 | `baseai/20261122-124022` (`hall`) | failures 12: `Refused` 3 of 4 on six hall states, `landed` not found. The same 12 as `20261120-113630`, before the gas orders existed. Open, not part of the gas work. |
+| `baseai/20261127-000851` (`mode`, middle, t60 window) | failures 1: `p6 t60SeatMobile` 0. Run `20261127-001236` (`mode`, 3v3) failed the same check, so it is not the mode: the lane 6 wave lands after t60. The window is now a 2 s peak over 120 game s. |
+| `baseai/20261127-001611` (`mode`, 3v3) | failures 0. All six owners: AI started, 1 hall, 12 workers at t1; seat peaks 8 to 21 (seat 6: 15 at t120). |
+| `baseai/20261127-002028` (`mode`, middle) | failures 0, 117 PASS, `RealClicks` 0, no ScriptError, stamp `741b28c8b830-7c0354de693b2cde`. Owners 9, 10: AI started, 1 hall, 12 workers, 1134 and 882 minerals collected by t120. Owners 11 to 14 at t1 and t120: no AI, no hall, no worker, no new unit, no gas order, 0 minerals. Every seat's waves seen (peaks 15 to 21). |
+| `baseai/20261127-002456` (all) | failures 114, all `hall` with no value: the dispatch of `20261122-123025`. `probe` passes. |
+| `baseai/20261127-003025` (`hall`) | failures 13: `Refused` 3 of 4 on seven hall states, `landed` not found (6 checks). The open failures of `20261122-124022`; the `hall` group does not read the lane mode. |

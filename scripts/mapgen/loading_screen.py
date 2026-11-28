@@ -40,6 +40,8 @@ SAME_TEXT = {"enGB": "enUS"}
 NAME = "SCOBA: StarCraft Online Battle Arena"
 AUTHOR = "SCOBA"
 TIP = "LoadingScreen/Tip"
+# The custom loading layout MapInfo names (R-LOAD-8), as a DescIndex path.
+LAYOUT = "UI/Layout/Custom/ScobaLoading.SC2Layout"
 FIELDS = ("DocInfo/Name", "DocInfo/Author", "DocInfo/DescShort", "DocInfo/DescLong", TIP)
 # Words of the texts before 2026-11-26 (R-LOAD-3).
 STALE = (
@@ -107,6 +109,8 @@ class Header(NamedTuple):
     desc_len: int
     bounds_off: int
     flags_off: int
+    # The C string of the custom loading layout (version 35 on).
+    layout_off: int
 
 
 def _skip_cstr(data: bytes, pos: int) -> int:
@@ -154,13 +158,15 @@ def header(data: bytes) -> Header:
         pos = _skip_sized(data, pos)
     if version >= 20:
         pos += 24
-    if version >= 35:
-        pos = _skip_sized(data, _skip_cstr(data, pos))
+    if version < 35:
+        raise SystemExit(f"loading_screen: MapInfo version {version} has no custom loading layout")
+    layout_off = pos
+    pos = _skip_sized(data, _skip_cstr(data, pos))
     if version >= 39:
         pos = _skip_sized(data, pos)
     if pos + 4 > len(data):
         raise SystemExit("loading_screen: MapInfo ends before its flags")
-    return Header(version, desc_len, bounds_off, pos)
+    return Header(version, desc_len, bounds_off, pos, layout_off)
 
 
 def map_hash(data: bytes) -> int:
@@ -171,6 +177,22 @@ def map_hash(data: bytes) -> int:
     flags = struct.unpack_from("<I", data, at.flags_off)[0]
     dx, dy = right - left, top - bottom
     return at.desc_len + 7 * height + 2 * (dx * dx + dy * dy) + 3 * width - bin(flags).count("1") - 17
+
+
+def layout(data: bytes) -> str:
+    """The custom loading layout MapInfo names; empty: none."""
+    at = header(data).layout_off
+    return data[at : data.index(0, at)].decode("utf-8")
+
+
+def set_layout(data: bytes, path: str) -> bytes:
+    """The same MapInfo naming another custom loading layout.
+
+    The check value does not cover the path, so it stays.
+    """
+    at = header(data).layout_off
+    end = data.index(0, at)
+    return data[:at] + path.encode("utf-8") + data[end:]
 
 
 def wait_for_key(data: bytes) -> bool:

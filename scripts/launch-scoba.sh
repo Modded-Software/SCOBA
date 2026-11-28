@@ -111,6 +111,8 @@ export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT"
 export STEAM_COMPAT_DATA_PATH="$BNET_PREFIX"
 export WINE_SIMULATE_WRITECOPY=1
 export PROTON_USE_NTSYNC=1
+# The game takes keys straight from X, not through the session's input method (operator 2026-11-27).
+export XMODIFIERS=@im=none
 export SC2_WINDOW_WIDTH="${SC2_WINDOW_WIDTH:-1920}"
 export SC2_WINDOW_HEIGHT="${SC2_WINDOW_HEIGHT:-1080}"
 

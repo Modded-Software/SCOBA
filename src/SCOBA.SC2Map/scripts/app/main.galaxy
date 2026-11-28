@@ -85,6 +85,9 @@ include "scripts/app/systems/visual_tuning"
 include "scripts/app/systems/xp"
 include "scripts/app/systems/hire"
 include "scripts/app/systems/wallet"
+include "scripts/app/systems/recorders/aim_log"
+include "scripts/app/systems/recorders/move_log_keys"
+include "scripts/app/systems/recorders/move_log"
 include "scripts/app/ui/abilities_dialog"
 include "scripts/app/ui/abilities_dialog_update"
 include "scripts/app/ui/ability_talent_trees"
@@ -172,7 +175,6 @@ void main () {
     gt_AnimPitchTick_Init();
     gt_AnimProbe_Init();
     gt_AnimProbeLower_Init();
-    gt_AnimProbeToggle_Init();
     gt_Target_Init();
     gt_ZerusSpawn_Init();
     gt_TerranSpawn_Init();
@@ -206,6 +208,8 @@ void main () {
     gt_StompLand_Init();
     gt_HudMapClick_Init();
     gt_Scene_Init();
+    gt_AimLog_Init();
+    gt_MoveLog_Init();
     // Last: it turns off triggers created above (SPEC-INTRO 3.8).
     gt_Intro_Init();
 }

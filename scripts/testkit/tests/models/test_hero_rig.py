@@ -13,7 +13,7 @@ from heroanim import breath
 from heroanim.rig import FRAME_MS, HEROES
 from heroanim.validate import MELEE_CONFIG, check_breath_script
 from testkit.checks import Checks
-from testkit.profiles import combat_kerrigan
+from testkit.profiles.combat_parts import combat_kerrigan
 from validate_aim_shot import check_aim_shot_data
 from walkanim.strafe import subtree
 

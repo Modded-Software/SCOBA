@@ -1,0 +1,293 @@
+// Real input scenarios of the keys group (R-PNC-57 to 59,
+// SPEC-POINT-AND-CLICK 5.8a). The host sends real keys, mouse motion and
+// mouse buttons to the game window
+// (profiles/combat_parts/combat_keys_real.py). Included
+// after combat_keys.galaxy and before combat.galaxy, which calls
+// gf_DbgKeysRealGroup. The recorder keeps what the game saw: its own
+// triggers on the four key events, apart from the triggers of the map.
+const fixed c_DBG_KEY_REAL_WAIT = 20.0;  // game seconds to wait for a key edge
+const int c_DBG_TRACE_ROWS = 30;         // rows in one bank key
+const int c_DBG_TRACE_MAX = 960;         // 60 game seconds
+const int c_DBG_TRACE_IDLE = 64;         // loops with no key down: the end
+const int c_DBG_RAW_LOG_MAX = 3000;      // characters of the edge log
+
+// Key index: 0 W, 1 S, 2 A, 3 D. Bit of a key: 1 << index.
+int gv_dbgRaw;              // the keys the key events left down
+int[4] gv_dbgRawDowns;
+int[4] gv_dbgRawUps;
+int gv_dbgRawRepeats;       // a down of a key that is down
+int gv_dbgRawLoose;         // an up of a key that is not down
+string gv_dbgRawLog = "";   // "<game ms><d|u><index> " for each edge
+trigger gt_DbgRawDown;
+trigger gt_DbgRawUp;
+
+int gf_DbgRawIndex (int lp_key) {
+    if (lp_key == gv_mOVEFORWARD) {
+        return 0;
+    }
+    if (lp_key == gv_mOVEBACKWARD) {
+        return 1;
+    }
+    if (lp_key == gv_mOVELEFT) {
+        return 2;
+    }
+    return 3;
+}
+
+void gf_DbgRawNote (string lp_edge, int lp_i) {
+    if (StringLength(gv_dbgRawLog) < c_DBG_RAW_LOG_MAX) {
+        gv_dbgRawLog = gv_dbgRawLog + IntToString(FixedToInt(TimerGetElapsed(gv_sCOBA_Clock) * 1000.0)) + lp_edge + IntToString(lp_i) + " ";
+    }
+}
+
+bool gt_DbgRawDown_Func (bool testConds, bool runActions) {
+    int lv_i = gf_DbgRawIndex(EventKeyPressed());
+    int lv_bit = 1 << lv_i;
+
+    if (EventPlayer() != 1) {
+        return true;
+    }
+    if ((gv_dbgRaw & lv_bit) != 0) {
+        gv_dbgRawRepeats += 1;
+        return true;
+    }
+    gv_dbgRaw = gv_dbgRaw | lv_bit;
+    gv_dbgRawDowns[lv_i] += 1;
+    gf_DbgRawNote("d", lv_i);
+    return true;
+}
+
+bool gt_DbgRawUp_Func (bool testConds, bool runActions) {
+    int lv_i = gf_DbgRawIndex(EventKeyPressed());
+    int lv_bit = 1 << lv_i;
+
+    if (EventPlayer() != 1) {
+        return true;
+    }
+    gv_dbgRawUps[lv_i] += 1;
+    gf_DbgRawNote("u", lv_i);
+    if ((gv_dbgRaw & lv_bit) == 0) {
+        gv_dbgRawLoose += 1;
+        return true;
+    }
+    gv_dbgRaw = gv_dbgRaw - lv_bit;
+    return true;
+}
+
+void gf_DbgRawKeyEvents (trigger lp_t, bool lp_down) {
+    TriggerAddEventKeyPressed(lp_t, c_playerAny, gv_mOVEFORWARD, lp_down, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    TriggerAddEventKeyPressed(lp_t, c_playerAny, gv_mOVEBACKWARD, lp_down, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    TriggerAddEventKeyPressed(lp_t, c_playerAny, gv_mOVELEFT, lp_down, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+    TriggerAddEventKeyPressed(lp_t, c_playerAny, gv_mOVERIGHT, lp_down, c_keyModifierStateIgnore, c_keyModifierStateIgnore, c_keyModifierStateIgnore);
+}
+
+// Mouse button downs the game saw, by button: 0 left, 1 middle, 2 right.
+int[3] gv_dbgRawBtn;
+trigger gt_DbgRawLeft;
+trigger gt_DbgRawMiddle;
+trigger gt_DbgRawRight;
+
+bool gt_DbgRawLeft_Func (bool testConds, bool runActions) {
+    gv_dbgRawBtn[0] += 1;
+    return true;
+}
+
+bool gt_DbgRawMiddle_Func (bool testConds, bool runActions) {
+    gv_dbgRawBtn[1] += 1;
+    return true;
+}
+
+bool gt_DbgRawRight_Func (bool testConds, bool runActions) {
+    gv_dbgRawBtn[2] += 1;
+    return true;
+}
+
+void gf_DbgKeysRealInit () {
+    gt_DbgRawDown = TriggerCreate("gt_DbgRawDown_Func");
+    gf_DbgRawKeyEvents(gt_DbgRawDown, true);
+    gt_DbgRawUp = TriggerCreate("gt_DbgRawUp_Func");
+    gf_DbgRawKeyEvents(gt_DbgRawUp, false);
+    gt_DbgRawLeft = TriggerCreate("gt_DbgRawLeft_Func");
+    TriggerAddEventMouseClicked(gt_DbgRawLeft, c_playerAny, c_mouseButtonLeft, true);
+    gt_DbgRawMiddle = TriggerCreate("gt_DbgRawMiddle_Func");
+    TriggerAddEventMouseClicked(gt_DbgRawMiddle, c_playerAny, c_mouseButtonMiddle, true);
+    gt_DbgRawRight = TriggerCreate("gt_DbgRawRight_Func");
+    TriggerAddEventMouseClicked(gt_DbgRawRight, c_playerAny, c_mouseButtonRight, true);
+}
+
+void gf_DbgRawReset () {
+    int lv_i;
+
+    gv_dbgRawBtn[0] = 0;
+    gv_dbgRawBtn[1] = 0;
+    gv_dbgRawBtn[2] = 0;
+    gv_dbgRaw = 0;
+    gv_dbgRawRepeats = 0;
+    gv_dbgRawLoose = 0;
+    gv_dbgRawLog = "";
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        gv_dbgRawDowns[lv_i] = 0;
+        gv_dbgRawUps[lv_i] = 0;
+    }
+}
+
+// The script key state and the direction flags, in the bits of gv_dbgRaw.
+int gf_DbgKeyBits (bool lp_w, bool lp_s, bool lp_a, bool lp_d) {
+    int lv_bits = 0;
+
+    if (lp_w) {
+        lv_bits += 1;
+    }
+    if (lp_s) {
+        lv_bits += 2;
+    }
+    if (lp_a) {
+        lv_bits += 4;
+    }
+    if (lp_d) {
+        lv_bits += 8;
+    }
+    return lv_bits;
+}
+
+// A real W key: the key event, the key trigger and the key entry. The host
+// presses when it reads "waiting" and holds the key for some seconds.
+bool gf_DbgKeyRealEdge (bool lp_down) {
+    fixed lv_end = TimerGetElapsed(gv_sCOBA_Clock) + c_DBG_KEY_REAL_WAIT;
+
+    while (gv_kEYFORWARD[1] != lp_down && TimerGetElapsed(gv_sCOBA_Clock) < lv_end) {
+        Wait(0.0625, c_timeGame);
+    }
+    return gv_kEYFORWARD[1] == lp_down;
+}
+
+void gf_DbgKeyReal () {
+    string lv_s = "key_real";
+
+    gf_DbgKeysReset(lv_s, true);
+    gf_DbgSnap(lv_s, "k0");
+    BankValueSetFromInt(gv_dbgBank, lv_s, "waiting", 1);
+    BankValueSetFromInt(gv_dbgBank, "meta", "ready", 1);
+    BankSave(gv_dbgBank);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "downSeen", gf_DbgKeyRealEdge(true));
+    Wait(1.0, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "k1Forward", gv_fORWARD[1]);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "k1InputHeld", gf_InputHeld(1));
+    gf_DbgSnap(lv_s, "k1");
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "upSeen", gf_DbgKeyRealEdge(false));
+    Wait(0.4, c_timeGame);
+    gf_DbgSnap(lv_s, "kstop");
+    Wait(0.6, c_timeGame);
+    gf_DbgSnap(lv_s, "kend");
+    BankValueSetFromInt(gv_dbgBank, lv_s, "waiting", 0);
+    BankSave(gv_dbgBank);
+}
+
+// One row each game loop, until no key was down for c_DBG_TRACE_IDLE loops:
+// "<keys by the events> <script key state> <direction flags> <aim>
+// <move order> <x * 100> <y * 100> <camera yaw>;". Rows go to the bank keys
+// trace0, trace1, ..., c_DBG_TRACE_ROWS in each.
+void gf_DbgKeyTrace (string lp_s) {
+    unit lv_hero = gv_tPSUNIT[1];
+    string lv_rows = "";
+    point lv_p;
+    int lv_n = 0;
+    int lv_idle = 0;
+    int lv_chunk = 0;
+
+    while (lv_n < c_DBG_TRACE_MAX && lv_idle < c_DBG_TRACE_IDLE) {
+        Wait(0.0625, c_timeGame);
+        lv_p = UnitGetPosition(lv_hero);
+        lv_rows = lv_rows + IntToString(gv_dbgRaw) + " " + IntToString(gf_DbgKeyBits(gv_kEYFORWARD[1], gv_kEYBACKWARD[1], gv_kEYLEFT[1], gv_kEYRIGHT[1])) + " " + IntToString(gf_DbgKeyBits(gv_fORWARD[1], gv_bACKWARD[1], gv_lEFT[1], gv_rIGHT[1])) + " " + IntToString(BoolToInt(gv_aIMACTIVE[1])) + " " + IntToString(BoolToInt(UnitOrderHasAbil(lv_hero, "move"))) + " " + IntToString(FixedToInt(PointGetX(lv_p) * 100.0)) + " " + IntToString(FixedToInt(PointGetY(lv_p) * 100.0)) + " " + IntToString(FixedToInt(CameraGetYaw(1))) + ";";
+        lv_n += 1;
+        if (gv_dbgRaw == 0) {
+            lv_idle += 1;
+        }
+        else {
+            lv_idle = 0;
+        }
+        if (lv_n % c_DBG_TRACE_ROWS == 0) {
+            BankValueSetFromString(gv_dbgBank, lp_s, "trace" + IntToString(lv_chunk), lv_rows);
+            lv_rows = "";
+            lv_chunk += 1;
+        }
+    }
+    if (lv_rows != "") {
+        BankValueSetFromString(gv_dbgBank, lp_s, "trace" + IntToString(lv_chunk), lv_rows);
+        lv_chunk += 1;
+    }
+    BankValueSetFromInt(gv_dbgBank, lp_s, "rows", lv_n);
+    BankValueSetFromInt(gv_dbgBank, lp_s, "chunks", lv_chunk);
+}
+
+// TPS, the mode after every touchdown. The host holds real keys in pairs,
+// turns the camera, starts and ends an aim and clicks, all with two keys
+// down (operator 2026-11-27: A and W held, the hero walked straight).
+void gf_DbgKeyCombo () {
+    string lv_s = "key_combo";
+    fixed lv_end;
+    int lv_i;
+    int lv_edge0;
+
+    gf_DbgKeysReset(lv_s, true);
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 0)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "tpsOn", gf_TpsActive(1));
+    gf_DbgRawReset();
+    BankValueSetFromInt(gv_dbgBank, lv_s, "clicks0", gv_dbgRealClicks);
+    // The stuck recorder of the map (5.8b) hears the same real keys.
+    BankValueSetFromInt(gv_dbgBank, lv_s, "stucks0", gv_moveLogStucks);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "keyOffs0", gv_moveLogKeyOffs);
+    // Its edge log and its mark key: the host presses M with S and D down.
+    BankValueSetFromInt(gv_dbgBank, lv_s, "marks0", gv_moveLogMarks);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "seq0", gv_moveLogSeq);
+    gf_MoveLogEdgeBreak();
+    lv_edge0 = gv_moveLogEdgeSeq;
+    gf_DbgSnap(lv_s, "c0");
+    BankSave(gv_dbgBank);
+    // The host starts its sequence some seconds after the key of key_real.
+    lv_end = TimerGetElapsed(gv_sCOBA_Clock) + c_DBG_KEY_REAL_WAIT;
+    while (gv_dbgRaw == 0 && TimerGetElapsed(gv_sCOBA_Clock) < lv_end) {
+        Wait(0.0625, c_timeGame);
+    }
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "started", gv_dbgRaw != 0);
+    gf_DbgKeyTrace(lv_s);
+    for (lv_i = 0; lv_i < 4; lv_i += 1) {
+        BankValueSetFromInt(gv_dbgBank, lv_s, "downs" + IntToString(lv_i), gv_dbgRawDowns[lv_i]);
+        BankValueSetFromInt(gv_dbgBank, lv_s, "ups" + IntToString(lv_i), gv_dbgRawUps[lv_i]);
+    }
+    BankValueSetFromInt(gv_dbgBank, lv_s, "repeats", gv_dbgRawRepeats);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "looseUps", gv_dbgRawLoose);
+    BankValueSetFromString(gv_dbgBank, lv_s, "edgeLog", gv_dbgRawLog);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "rawEnd", gv_dbgRaw);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "scriptEnd", gf_DbgKeyBits(gv_kEYFORWARD[1], gv_kEYBACKWARD[1], gv_kEYLEFT[1], gv_kEYRIGHT[1]));
+    BankValueSetFromInt(gv_dbgBank, lv_s, "clicks1", gv_dbgRealClicks);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "btnLeft", gv_dbgRawBtn[0]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "btnMiddle", gv_dbgRawBtn[1]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "btnRight", gv_dbgRawBtn[2]);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "stucks1", gv_moveLogStucks);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "keyOffs1", gv_moveLogKeyOffs);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "marks1", gv_moveLogMarks);
+    BankValueSetFromInt(gv_dbgBank, lv_s, "seq1", gv_moveLogSeq);
+    gf_MoveLogEdgeBreak();
+    BankValueSetFromInt(gv_dbgBank, lv_s, "moveEdgeEntries", gv_moveLogEdgeSeq - lv_edge0);
+    BankValueSetFromString(gv_dbgBank, lv_s, "moveEdges", gf_MoveLogEdgesText(lv_edge0, c_MOVELOG_EDGES));
+    BankValueSetFromString(gv_dbgBank, lv_s, "markText", gv_moveLogLastMark);
+    gf_DbgSnap(lv_s, "cend");
+    if (gv_aIMACTIVE[1]) {
+        gf_AimEnd(1);
+    }
+    UnitIssueOrder(gv_tPSUNIT[1], Order(AbilityCommand("SCOBATPSToggle", 1)), c_orderQueueReplace);
+    Wait(0.5, c_timeGame);
+    BankValueSetFromFlag(gv_dbgBank, lv_s, "tpsAfter", gf_TpsActive(1));
+    BankSave(gv_dbgBank);
+}
+
+void gf_DbgKeysRealGroup () {
+    point lv_anchor = gv_dbgAnchor;
+
+    gv_dbgAnchor = gf_DbgKeySpot();
+    gf_DbgKeyReal();
+    gf_DbgKeyCombo();
+    gv_dbgAnchor = lv_anchor;
+}

@@ -31,6 +31,12 @@ int gf_RosterSeat (int lp_lane) {
     return lp_lane;
 }
 
+// The middle lanes (R-ROSTER-10): lane 1 (Terran) and lane 4 (Zerg) meet
+// at the center X (REQ-INTRO).
+bool gf_RosterIsMiddle (int lp_lane) {
+    return lp_lane == 1 || lp_lane == 4;
+}
+
 bool gf_RosterTerran (int lp_lane) {
     return lp_lane >= 1 && lp_lane <= 3;
 }

@@ -478,7 +478,9 @@ not repeated here.
   left or right and up to `c_UI_FLOATER_JITTER_Y` (30) higher, then rises
   `c_UI_FLOATER_RISE` (240 px) over its life.
   World floaters: `gf_FloaterCreate` moves the start point up to
-  `c_FLOATER_JITTER` (0.5) in x and y, then rises at 0.70 per second.
+  `c_FLOATER_JITTER` (0.5) in x and y, then rises at `c_FLOATER_RISE_SPEED` (1.05 per second, operator
+  2026-11-27; was 1.40 earlier that day, before that 0.70) for its 1.6 s
+  life: 1.68 high.
   [built]. That a positive label offset
   from the bottom anchor is upward is not measured.
 - Assumption for O-TPS-3: the damage floater stays at the enemy.
@@ -523,6 +525,17 @@ not repeated here.
 - TerranDropPod is not pickable either (`HV_UNPICKABLE`): the escort pods
   fall through the lanes, and the m3 box is the whole fall path (reach
   147), not the pod. Before every stock type was measured it had no volume.
+- ZergDropPod, ZergDropPodLarge and SCOBAHeroPod are not pickable either
+  (`HV_UNPICKABLE`), for the same reason: m3 bounds boxes of reach 71, 47
+  and 106. The lane and scenery pods are ZergDropPod
+  (`libVCMI_gf_CreateDropPod`). The crosshair started inside a pod box 50
+  to 58 away, picked the invulnerable pod, and turned gray over a Spine
+  Crawler 3.4 away (SCOBAAIMLOG marks 2 to 5, operator 2026-11-27).
+  pncprobe `roach` case `pod` reproduced it (5 failures) and passes after
+  the fix (pncprobe 20261127-102041). Guard:
+  `test_no_map_type_has_a_bloated_bounds_volume` fails on any type the map
+  names with a bounds-only volume of reach above `HV_BOUNDS_REACH_MAX` (20)
+  that is not in `HV_UNPICKABLE`. Overmind (reach 14) stays pickable.
 - Data: `scripts/hitvolumes/measure.py` writes `scripts/data/hit_volumes.json`
   and `hitvolumes.galaxy` writes `scripts/app/data/hit_volumes_*.galaxy`.
   Measuring is a separate step: it reads the game install, the build does
@@ -549,7 +562,7 @@ not repeated here.
   parallel batches of 100, shapes 6 in a process pool). Serial (`--jobs 1`):
   111 s, same JSON. Before: 96 types, 24 s.
 - Near types: scanned in a circle of range + `c_HV_NEAR_REACH`. Far types
-  (reach above 20, 281 now): `gv_hvFarUnits`, one group kept by events
+  (reach above 20, 277 now): `gv_hvFarUnits`, one group kept by events
   (`gf_HvFarInit`: the units at start, then every unit that enters the map).
   It replaces one whole-map `UnitGroup` per far type on each pick. A unit
   that morphs into a far type is not added (not tested).
@@ -560,6 +573,28 @@ not repeated here.
   size limit (not confirmed).
 - A type without a volume is not pickable and is recorded once
   (`gv_hvMissing`).
+
+### 5.8a Crosshair range recorder (`systems/recorders/aim_log.galaxy`)
+
+- Operator 2026-11-27: the crosshair sometimes turns gray on a close enemy
+  in range ("like the hit volume disappears"), in TPS and in aim. Cause not
+  found. Every launch of the shipped map records (operator).
+- Player 1 only. Bank `SCOBAAIMLOG`, section `aimlog`, cleared at map start;
+  `meta/build` holds the build stamp. At most 3000 entries.
+- Entries: `mark` (key M: state now, then `before`, the last 30 polls of
+  0.1 s), `gray` (shown reticle turned gray, at most once per second),
+  `press` (left mouse press in TPS).
+- State: shown and recomputed reticle kind, pick, range check and its
+  inputs (weapons, enabled flags, ranges, `SCOBAAttackEnd`,
+  `SCOBAAttackSingle`, `UnitDirectControl`), UI target, ray origin and
+  direction, camera height, and each unit within 16 of the hero with the
+  ray entry distance into its volume (`-1` miss, `-2` no volume).
+- It changes no game state. Remove it when the cause is fixed.
+- Roach probe: `pncprobe` group `roach` (`roachprobe.galaxy`,
+  `profiles/pncprobe/roach.py`), Tosh and Kerrigan, Roach at 0.5 to 6 and
+  16 (negative), TPS and aim, one aim shot each. Case `pod`: a ZergDropPod
+  30 behind Tosh, a Roach 3 ahead; the pod must not be picked, the Roach
+  must be picked and hit.
 
 ### 5.9 Shooting pose, Attack auto, not aiming (R-TPS-17)
 
@@ -852,6 +887,40 @@ Shot clocks on the 0.25 s Tosh period:
 
 Only the harness files of `combat` and `pncprobe` changed after
 `tps/20261114-234256`.
+
+Close Roach out of range (operator 2026-11-27, section 5.8a):
+
+- `pncprobe/20261127-085438`: group `roach`, 2 failures, both the negative
+  case at 30 (the Roach lost about 25 life/s to something on the map). Every
+  in-range case: check 1, pick 1, the aim shot dealt damage. The engine kept
+  Tosh 1.813 and Kerrigan 2.188 from the Roach centre: the edge distance
+  never went negative. Not reproduced.
+- `pncprobe/20261127-092004`: group `roach`, negative case at 16, 0 failures.
+  Not reproduced.
+- Cause found in the operator's SCOBAAIMLOG marks: the pick was a
+  ZergDropPod 50 to 58 away (bloated bounds volume, section 5.8).
+- Group `roach` with case `pod`, before the fix (log `roach-pod-1.log`):
+  5 failures, pod picked at t 0, reticle 3, shot kind 2.
+- `pncprobe/20261127-102041`: group `roach` after the fix, 0 failures.
+- `tps/20261127-102526`: group `pick`, 0 failures.
+- `pncprobe/20261127-102904`: group `all`, 0 failures.
+
+Tosh cooldown 0.15 s (operator 2026-11-27: 0.1 was too fast; before that
+0.25): `Tosh` Period and cooldown TimeUse, `SCOBAAttackCooldown01`.
+`validate_aim_shot` checks all three against `TOSH_CLOCK`. 0.15 s is 2.4
+game loops. Galaxy fixed point holds it as 614 / 4096, so a read in ms gives
+149 or 150. The clock checks allow one loop below 0. No run at 0.15 s yet.
+
+Runs at 0.1 s (an expired clock read -25 or -50; the weapon clock could be
+over in the loop that saw the shot effect):
+
+- `combat/20261127-111646` `button`, `combat/20261127-111901` `pose`: 0 failures.
+- `combat/20261127-105141` `single`: 4 shots for 3 commands (one command
+  fired twice). `combat/20261127-111410`: 3 shots; damage check failed
+  (one -7, three -28; damage is 8 to 12 random).
+- `tps/20261127-112145` `shot`: 5 failures. `tps_shot_friendly` 7 shots
+  for 6, `tps_shot_ground` 4 for 3: an extra shot. `AgainCdMs` 0, -25, -13:
+  the second click came after the 0.1 s clock ended. Open.
 
 ## Camera depth of field (REQ-CAMERA-DOF)
 
